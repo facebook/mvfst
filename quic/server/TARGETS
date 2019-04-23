@@ -1,0 +1,43 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "server",
+    srcs = [
+        "QuicServer.cpp",
+        "QuicServerPacketRouter.cpp",
+        "QuicServerTransport.cpp",
+        "QuicServerWorker.cpp",
+    ],
+    headers = [
+        "QuicReusePortUDPSocketFactory.h",
+        "QuicServer.h",
+        "QuicServerPacketRouter.h",
+        "QuicServerTransport.h",
+        "QuicServerTransportFactory.h",
+        "QuicServerWorker.h",
+        "QuicSharedUDPSocketFactory.h",
+        "QuicUDPSocketFactory.h",
+    ],
+    deps = [
+        "//fizz/server:fizz_server_context",
+        "//folly:thread_local",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_udp_socket",
+        "//folly/io/async:event_base_manager",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/system:thread_id",
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/codec:header_codec",
+        "//quic/codec:types",
+        "//quic/common:timers",
+        "//quic/congestion_control:congestion_controller_factory",
+        "//quic/server/handshake:app_token",
+        "//quic/server/handshake:default_app_token_validator",
+        "//quic/server/handshake:server_extension",
+        "//quic/server/state:server",
+        "//quic/state:stats_callback",
+    ],
+)

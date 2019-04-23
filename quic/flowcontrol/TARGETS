@@ -1,0 +1,18 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "flow_control",
+    srcs = [
+        "QuicFlowController.cpp",
+    ],
+    headers = ["QuicFlowController.h"],
+    deps = [
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/codec:types",
+        "//quic/logging:logging",
+        "//quic/state:state_machine",
+    ],
+)

@@ -1,0 +1,675 @@
+/*
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+// Copyright 2004-present Facebook.  All rights reserved.
+
+#include <quic/codec/Decode.h>
+#include <folly/Random.h>
+#include <folly/container/Array.h>
+#include <folly/io/IOBuf.h>
+#include <folly/portability/GTest.h>
+#include <quic/codec/QuicReadCodec.h>
+#include <quic/codec/Types.h>
+#include <quic/common/test/TestUtils.h>
+
+using namespace quic;
+using namespace testing;
+
+namespace quic {
+namespace test {
+
+using UnderlyingFrameType = std::underlying_type<FrameType>::type;
+
+class DecodeTest : public Test {};
+
+ShortHeader makeHeader() {
+  PacketNum packetNum = 100;
+  return ShortHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), packetNum);
+}
+
+// NormalizedAckBlocks are in order needed.
+struct NormalizedAckBlock {
+  QuicInteger gap; // Gap to previous AckBlock
+  QuicInteger blockLen;
+
+  NormalizedAckBlock(QuicInteger gapIn, QuicInteger blockLenIn)
+      : gap(gapIn), blockLen(blockLenIn) {}
+};
+
+template <class LargestAckedType = uint64_t>
+std::unique_ptr<folly::IOBuf> createAckFrame(
+    folly::Optional<QuicInteger> largestAcked,
+    folly::Optional<QuicInteger> ackDelay = folly::none,
+    folly::Optional<QuicInteger> numAdditionalBlocks = folly::none,
+    folly::Optional<QuicInteger> firstAckBlockLength = folly::none,
+    std::vector<NormalizedAckBlock> ackBlocks = {},
+    bool useRealValuesForLargestAcked = false,
+    bool useRealValuesForAckDelay = false) {
+  folly::IOBufQueue ackFrame;
+  folly::io::QueueAppender wcursor(&ackFrame, 10);
+  if (largestAcked) {
+    if (useRealValuesForLargestAcked) {
+      wcursor.writeBE<LargestAckedType>(largestAcked->getValue());
+    } else {
+      largestAcked->encode(wcursor);
+    }
+  }
+  if (ackDelay) {
+    if (useRealValuesForAckDelay) {
+      wcursor.writeBE(ackDelay->getValue());
+    } else {
+      ackDelay->encode(wcursor);
+    }
+  }
+  if (numAdditionalBlocks) {
+    numAdditionalBlocks->encode(wcursor);
+  }
+  if (firstAckBlockLength) {
+    firstAckBlockLength->encode(wcursor);
+  }
+  for (size_t i = 0; i < ackBlocks.size(); ++i) {
+    ackBlocks[i].gap.encode(wcursor);
+    ackBlocks[i].blockLen.encode(wcursor);
+  }
+  return ackFrame.move();
+}
+
+template <class StreamIdType = StreamId>
+std::unique_ptr<folly::IOBuf> createStreamFrame(
+    folly::Optional<QuicInteger> streamId,
+    folly::Optional<QuicInteger> offset = folly::none,
+    folly::Optional<QuicInteger> dataLength = folly::none,
+    Buf data = nullptr,
+    bool useRealValuesForStreamId = false) {
+  folly::IOBufQueue streamFrame;
+  folly::io::QueueAppender wcursor(&streamFrame, 10);
+  if (streamId) {
+    if (useRealValuesForStreamId) {
+      wcursor.writeBE<StreamIdType>(streamId->getValue());
+    } else {
+      streamId->encode(wcursor);
+    }
+  }
+  if (offset) {
+    offset->encode(wcursor);
+  }
+  if (dataLength) {
+    dataLength->encode(wcursor);
+  }
+  if (data) {
+    wcursor.insert(std::move(data));
+  }
+  return streamFrame.move();
+}
+
+std::unique_ptr<folly::IOBuf> createCryptoFrame(
+    folly::Optional<QuicInteger> offset = folly::none,
+    folly::Optional<QuicInteger> dataLength = folly::none,
+    Buf data = nullptr) {
+  folly::IOBufQueue cryptoFrame;
+  folly::io::QueueAppender wcursor(&cryptoFrame, 10);
+  if (offset) {
+    offset->encode(wcursor);
+  }
+  if (dataLength) {
+    dataLength->encode(wcursor);
+  }
+  if (data) {
+    wcursor.insert(std::move(data));
+  }
+  return cryptoFrame.move();
+}
+
+TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
+  ConnectionId srcCid = getTestConnectionId(0),
+               destCid = getTestConnectionId(1);
+  std::vector<QuicVersion> versions{{static_cast<QuicVersion>(1234),
+                                     static_cast<QuicVersion>(4321),
+                                     static_cast<QuicVersion>(2341),
+                                     static_cast<QuicVersion>(3412),
+                                     static_cast<QuicVersion>(4123)}};
+  auto packet =
+      VersionNegotiationPacketBuilder(srcCid, destCid, versions).buildPacket();
+  auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(std::move(packet.second));
+  auto quicPacket = boost::get<QuicPacket>(
+      codec->parsePacket(packetQueue, ackStates));
+  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
+  EXPECT_EQ(versionPacket.destinationConnectionId, destCid);
+  EXPECT_EQ(versionPacket.sourceConnectionId, srcCid);
+  EXPECT_EQ(versionPacket.versions.size(), versions.size());
+  EXPECT_EQ(versionPacket.versions, versions);
+}
+
+TEST_F(DecodeTest, DifferentCIDLength) {
+  ConnectionId sourceConnectionId = getTestConnectionId();
+  ConnectionId destinationConnectionId({1, 2, 3, 4, 5, 6});
+  std::vector<QuicVersion> versions{{static_cast<QuicVersion>(1234),
+                                     static_cast<QuicVersion>(4321),
+                                     static_cast<QuicVersion>(2341),
+                                     static_cast<QuicVersion>(3412),
+                                     static_cast<QuicVersion>(4123)}};
+  auto packet = VersionNegotiationPacketBuilder(
+                    sourceConnectionId, destinationConnectionId, versions)
+                    .buildPacket();
+  auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(std::move(packet.second));
+  auto quicPacket = boost::get<QuicPacket>(
+      codec->parsePacket(packetQueue, ackStates));
+  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
+  EXPECT_EQ(versionPacket.sourceConnectionId, sourceConnectionId);
+  EXPECT_EQ(versionPacket.destinationConnectionId, destinationConnectionId);
+  EXPECT_EQ(versionPacket.versions.size(), versions.size());
+  EXPECT_EQ(versionPacket.versions, versions);
+}
+
+TEST_F(DecodeTest, VersionNegotiationPacketBadPacketTest) {
+  ConnectionId connId = getTestConnectionId();
+  QuicVersionType version = static_cast<QuicVersionType>(QuicVersion::MVFST);
+
+  auto buf = folly::IOBuf::create(10);
+  folly::io::Appender appender(buf.get(), 10);
+  appender.writeBE<uint8_t>(kHeaderFormMask);
+  appender.push(connId.data(), connId.size());
+  appender.writeBE<QuicVersionType>(
+      static_cast<QuicVersionType>(QuicVersion::VERSION_NEGOTIATION));
+  appender.push((uint8_t*)&version, sizeof(QuicVersion) - 1);
+
+  auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(std::move(buf));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_THROW(boost::get<QuicPacket>(packet), boost::bad_get);
+
+  buf = folly::IOBuf::create(0);
+  packetQueue = bufToQueue(std::move(buf));
+  packet = codec->parsePacket(packetQueue, ackStates);
+  // Packet with empty versions
+  EXPECT_THROW(boost::get<QuicPacket>(packet), boost::bad_get);
+}
+
+TEST_F(DecodeTest, ValidAckFrame) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(1);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+  auto ackFrame = decodeAckFrame(
+      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+  EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
+  EXPECT_EQ(ackFrame.largestAcked, 1000);
+  // Since 100 is the encoded value, we use the decoded value.
+  EXPECT_EQ(ackFrame.ackDelay.count(), 100 << kDefaultAckDelayExponent);
+}
+
+TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
+  // An integer larger than the representable range of quic integer.
+  QuicInteger largestAcked(std::numeric_limits<uint64_t>::max());
+  QuicInteger ackDelay(10);
+  QuicInteger numAdditionalBlocks(0);
+  QuicInteger firstAckBlockLength(10);
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      {},
+      true);
+  folly::io::Cursor cursor(result.get());
+  auto ackFrame = decodeAckFrame(
+      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+  // it will interpret this as a 8 byte range with the max value.
+  EXPECT_EQ(ackFrame.largestAcked, 4611686018427387903);
+}
+
+TEST_F(DecodeTest, AckFrameLargestAckInvalid) {
+  // An integer larger than the representable range of quic integer.
+  QuicInteger largestAcked(std::numeric_limits<uint64_t>::max());
+  QuicInteger ackDelay(10);
+  QuicInteger numAdditionalBlocks(0);
+  QuicInteger firstAckBlockLength(10);
+  auto result = createAckFrame<uint8_t>(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      {},
+      true);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameDelayEncodingInvalid) {
+  QuicInteger largestAcked(1000);
+  // Maximal representable value by quic integer.
+  QuicInteger ackDelay(4611686018427387903);
+  QuicInteger numAdditionalBlocks(0);
+  QuicInteger firstAckBlockLength(10);
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      {},
+      false,
+      true);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameDelayExceedsRange) {
+  QuicInteger largestAcked(1000);
+  // Maximal representable value by quic integer.
+  QuicInteger ackDelay(4611686018427387903);
+  QuicInteger numAdditionalBlocks(0);
+  QuicInteger firstAckBlockLength(10);
+  auto result = createAckFrame(
+      largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameAdditionalBlocksUnderflow) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(2);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(2);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+  decodeAckFrame(
+      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+}
+
+TEST_F(DecodeTest, AckFrameMissingFields) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(2);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+
+  auto header = makeHeader();
+  auto result1 = createAckFrame(
+      largestAcked,
+      folly::none,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor1(result1.get());
+
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor1, header, CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+
+  auto result2 = createAckFrame(
+      largestAcked, ackDelay, folly::none, firstAckBlockLength, ackBlocks);
+  folly::io::Cursor cursor2(result2.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor2, header, CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+
+  auto result3 = createAckFrame(
+      largestAcked, ackDelay, folly::none, firstAckBlockLength, ackBlocks);
+  folly::io::Cursor cursor3(result3.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor3, header, CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+
+  auto result4 = createAckFrame(
+      largestAcked, ackDelay, numAdditionalBlocks, folly::none, ackBlocks);
+  folly::io::Cursor cursor4(result4.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor4, header, CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+
+  auto result5 = createAckFrame(
+      largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength, {});
+  folly::io::Cursor cursor5(result5.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor5, header, CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameFirstBlockLengthInvalid) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(0);
+  QuicInteger firstAckBlockLength(2000);
+
+  auto result = createAckFrame(
+      largestAcked, ackDelay, numAdditionalBlocks, firstAckBlockLength);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameBlockLengthInvalid) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(2);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(1000));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameBlockGapInvalid) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(2);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(1000), QuicInteger(0));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+  EXPECT_THROW(
+      decodeAckFrame(
+          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+      QuicTransportException);
+}
+
+TEST_F(DecodeTest, AckFrameBlockLengthZero) {
+  QuicInteger largestAcked(1000);
+  QuicInteger ackDelay(100);
+  QuicInteger numAdditionalBlocks(3);
+  QuicInteger firstAckBlockLength(10);
+
+  std::vector<NormalizedAckBlock> ackBlocks;
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
+  ackBlocks.emplace_back(QuicInteger(10), QuicInteger(0));
+  ackBlocks.emplace_back(QuicInteger(0), QuicInteger(10));
+
+  auto result = createAckFrame(
+      largestAcked,
+      ackDelay,
+      numAdditionalBlocks,
+      firstAckBlockLength,
+      ackBlocks);
+  folly::io::Cursor cursor(result.get());
+
+  auto readAckFrame = decodeAckFrame(
+      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+  EXPECT_EQ(readAckFrame.ackBlocks[0].endPacket, 1000);
+  EXPECT_EQ(readAckFrame.ackBlocks[0].startPacket, 990);
+  EXPECT_EQ(readAckFrame.ackBlocks[1].endPacket, 978);
+  EXPECT_EQ(readAckFrame.ackBlocks[1].startPacket, 968);
+  EXPECT_EQ(readAckFrame.ackBlocks[2].endPacket, 956);
+  EXPECT_EQ(readAckFrame.ackBlocks[2].startPacket, 956);
+  EXPECT_EQ(readAckFrame.ackBlocks[3].endPacket, 954);
+  EXPECT_EQ(readAckFrame.ackBlocks[3].startPacket, 944);
+}
+
+TEST_F(DecodeTest, StreamDecodeSuccess) {
+  QuicInteger streamId(10);
+  QuicInteger offset(10);
+  QuicInteger length(1);
+  auto streamType =
+      StreamTypeField::Builder().setFin().setOffset().setLength().build();
+  auto streamFrame = createStreamFrame(
+      streamId, offset, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(streamFrame.get());
+  auto decodedFrame = decodeStreamFrame(cursor, streamType);
+  EXPECT_EQ(decodedFrame.offset, 10);
+  EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
+  EXPECT_EQ(decodedFrame.streamId, 10);
+  EXPECT_TRUE(decodedFrame.fin);
+}
+
+TEST_F(DecodeTest, StreamLengthStreamIdInvalid) {
+  QuicInteger streamId(std::numeric_limits<uint64_t>::max());
+  auto streamType =
+      StreamTypeField::Builder().setFin().setOffset().setLength().build();
+  auto streamFrame = createStreamFrame<uint8_t>(
+      streamId, folly::none, folly::none, nullptr, true);
+  folly::io::Cursor cursor(streamFrame.get());
+  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+}
+
+TEST_F(DecodeTest, StreamOffsetNotPresent) {
+  QuicInteger streamId(10);
+  QuicInteger length(1);
+  auto streamType =
+      StreamTypeField::Builder().setFin().setOffset().setLength().build();
+  auto streamFrame = createStreamFrame(
+      streamId, folly::none, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(streamFrame.get());
+  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+}
+
+TEST_F(DecodeTest, StreamIncorrectDataLength) {
+  QuicInteger streamId(10);
+  QuicInteger offset(10);
+  QuicInteger length(10);
+  auto streamType =
+      StreamTypeField::Builder().setFin().setOffset().setLength().build();
+  auto streamFrame = createStreamFrame(
+      streamId, offset, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(streamFrame.get());
+  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+}
+
+TEST_F(DecodeTest, CryptoDecodeSuccess) {
+  QuicInteger offset(10);
+  QuicInteger length(1);
+  auto cryptoFrame =
+      createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(cryptoFrame.get());
+  auto decodedFrame = decodeCryptoFrame(cursor);
+  EXPECT_EQ(decodedFrame.offset, 10);
+  EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
+}
+
+TEST_F(DecodeTest, CryptoOffsetNotPresent) {
+  QuicInteger length(1);
+  auto cryptoFrame =
+      createCryptoFrame(folly::none, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(cryptoFrame.get());
+  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+}
+
+TEST_F(DecodeTest, CryptoLengthNotPresent) {
+  QuicInteger offset(0);
+  auto cryptoFrame = createCryptoFrame(offset, folly::none, nullptr);
+  folly::io::Cursor cursor(cryptoFrame.get());
+  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+}
+
+TEST_F(DecodeTest, CryptoIncorrectDataLength) {
+  QuicInteger offset(10);
+  QuicInteger length(10);
+  auto cryptoFrame =
+      createCryptoFrame(offset, length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(cryptoFrame.get());
+  EXPECT_THROW(decodeCryptoFrame(cursor), QuicTransportException);
+}
+
+TEST_F(DecodeTest, PaddingFrameTest) {
+  auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
+  buf->append(1);
+
+  folly::io::RWPrivateCursor wcursor(buf.get());
+  folly::io::Cursor cursor(buf.get());
+  decodePaddingFrame(cursor);
+}
+
+std::unique_ptr<folly::IOBuf> createNewTokenFrame(
+    folly::Optional<QuicInteger> tokenLength = folly::none,
+    Buf token = nullptr) {
+  folly::IOBufQueue newTokenFrame;
+  folly::io::QueueAppender wcursor(&newTokenFrame, 10);
+  if (tokenLength) {
+    tokenLength->encode(wcursor);
+  }
+  if (token) {
+    wcursor.insert(std::move(token));
+  }
+  return newTokenFrame.move();
+}
+
+TEST_F(DecodeTest, NewTokenDecodeSuccess) {
+  QuicInteger length(1);
+  auto newTokenFrame =
+      createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(newTokenFrame.get());
+  auto decodedFrame = decodeNewTokenFrame(cursor);
+  EXPECT_EQ(decodedFrame.token->computeChainDataLength(), 1);
+}
+
+TEST_F(DecodeTest, NewTokenLengthNotPresent) {
+  auto newTokenFrame =
+      createNewTokenFrame(folly::none, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(newTokenFrame.get());
+  EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
+}
+
+TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
+  QuicInteger length(10);
+  auto newTokenFrame =
+      createNewTokenFrame(length, folly::IOBuf::copyBuffer("a"));
+  folly::io::Cursor cursor(newTokenFrame.get());
+  EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
+}
+
+std::unique_ptr<folly::IOBuf> createMinOrExpiredStreamDataFrame(
+    QuicInteger streamId,
+    folly::Optional<QuicInteger> maximumData = folly::none,
+    folly::Optional<QuicInteger> minimumStreamOffset = folly::none) {
+  folly::IOBufQueue bufQueue;
+  folly::io::QueueAppender wcursor(&bufQueue, 10);
+
+  streamId.encode(wcursor);
+
+  if (maximumData) {
+    maximumData->encode(wcursor);
+  }
+
+  if (minimumStreamOffset) {
+    minimumStreamOffset->encode(wcursor);
+  }
+  return bufQueue.move();
+}
+
+TEST_F(DecodeTest, DecodeMinStreamDataFrame) {
+  QuicInteger streamId(10);
+  QuicInteger maximumData(1000);
+  QuicInteger minimumStreamOffset(100);
+  auto noOffset = createMinOrExpiredStreamDataFrame(streamId, maximumData);
+  folly::io::Cursor cursor0(noOffset.get());
+  EXPECT_THROW(decodeMinStreamDataFrame(cursor0), QuicTransportException);
+
+  auto minStreamDataFrame = createMinOrExpiredStreamDataFrame(
+      streamId, maximumData, minimumStreamOffset);
+  folly::io::Cursor cursor(minStreamDataFrame.get());
+  auto result = decodeMinStreamDataFrame(cursor);
+  EXPECT_EQ(result.streamId, 10);
+  EXPECT_EQ(result.maximumData, 1000);
+  EXPECT_EQ(result.minimumStreamOffset, 100);
+}
+
+TEST_F(DecodeTest, DecodeExpiredStreamDataFrame) {
+  QuicInteger streamId(10);
+  QuicInteger offset(100);
+  auto noOffset = createMinOrExpiredStreamDataFrame(streamId);
+  folly::io::Cursor cursor0(noOffset.get());
+  EXPECT_THROW(decodeExpiredStreamDataFrame(cursor0), QuicTransportException);
+
+  auto expiredStreamDataFrame =
+      createMinOrExpiredStreamDataFrame(streamId, folly::none, offset);
+  folly::io::Cursor cursor(expiredStreamDataFrame.get());
+  auto result = decodeExpiredStreamDataFrame(cursor);
+  EXPECT_EQ(result.streamId, 10);
+  EXPECT_EQ(result.minimumStreamOffset, 100);
+}
+
+} // namespace test
+} // namespace quic

@@ -1,0 +1,149 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "types",
+    srcs = [
+        "DefaultConnectionIdAlgo.cpp",
+        "PacketNumber.cpp",
+        "QuicConnectionId.cpp",
+        "QuicInteger.cpp",
+        "Types.cpp",
+    ],
+    headers = [
+        "ConnectionIdAlgo.h",
+        "DefaultConnectionIdAlgo.h",
+        "PacketNumber.h",
+        "QuicConnectionId.h",
+        "QuicInteger.h",
+        "Types.h",
+    ],
+    deps = [
+        "//folly:conv",
+        "//folly:optional",
+        "//folly:overload",
+        "//folly:random",
+        "//folly:string",
+        "//folly/container:array",
+        "//folly/hash:hash",
+        "//folly/io:iobuf",
+        "//folly/lang:bits",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/common:interval_set",
+    ],
+    external_deps = [
+        "boost",
+        "glog",
+    ],
+)
+
+cpp_library(
+    name = "packet_number_cipher",
+    srcs = [
+        "PacketNumberCipher.cpp",
+    ],
+    deps = [
+        ":decode",
+        ":types",
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//folly/ssl:openssl_ptr_types",
+    ],
+)
+
+cpp_library(
+    name = "decode",
+    srcs = [
+        "Decode.cpp",
+    ],
+    headers = [
+        "Decode.h",
+    ],
+    compiler_flags = [
+        "-fstrict-aliasing",
+    ],
+    deps = [
+        ":types",
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//quic:exception",
+    ],
+)
+
+cpp_library(
+    name = "pktbuilder",
+    srcs = [
+        "QuicPacketBuilder.cpp",
+    ],
+    headers = [
+        "QuicPacketBuilder.h",
+    ],
+    compiler_flags = [
+        "-fstrict-aliasing",
+    ],
+    deps = [
+        ":types",
+        "//folly:random",
+        "//quic/handshake:handshake",
+    ],
+)
+
+cpp_library(
+    name = "pktrebuilder",
+    srcs = [
+        "QuicPacketRebuilder.cpp",
+    ],
+    headers = [
+        "QuicPacketRebuilder.h",
+    ],
+    deps = [
+        ":codec",
+        ":pktbuilder",
+        "//quic/flowcontrol:flow_control",
+        "//quic/state:simple_frame_functions",
+        "//quic/state:state_machine",
+        "//quic/state:stream_functions",
+    ],
+)
+
+cpp_library(
+    name = "header_codec",
+    srcs = [
+        "QuicHeaderCodec.cpp",
+    ],
+    headers = [
+        "QuicHeaderCodec.h",
+    ],
+    deps = [
+        ":decode",
+        ":types",
+        "//folly:optional",
+        "//quic:exception",
+    ],
+)
+
+cpp_library(
+    name = "codec",
+    srcs = [
+        "QuicReadCodec.cpp",
+        "QuicWriteCodec.cpp",
+    ],
+    headers = [
+        "QuicReadCodec.h",
+        "QuicWriteCodec.h",
+    ],
+    deps = [
+        ":decode",
+        ":pktbuilder",
+        ":types",
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/common:interval_set",
+        "//quic/handshake:handshake",
+        "//quic/state:ack_states",
+    ],
+)

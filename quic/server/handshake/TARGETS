@@ -1,0 +1,101 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "server_handshake",
+    srcs = [
+        "ServerHandshake.cpp",
+    ],
+    headers = [
+        "ServerHandshake.h",
+    ],
+    deps = [
+        ":app_token",
+        ":server_extension",
+        "//fizz/protocol:default_certificate_verifier",
+        "//fizz/protocol:protocol",
+        "//fizz/server:fizz_server",
+        "//fizz/server:fizz_server_context",
+        "//fizz/server:protocol",
+        "//folly/io:iobuf",
+        "//folly/io/async:delayed_destruction",
+        "//quic:constants",
+        "//quic:exception",
+        "//quic/handshake:handshake",
+        "//quic/state:state_machine",
+        "//quic/state:stream_functions",
+    ],
+)
+
+cpp_library(
+    name = "server_extension",
+    headers = [
+        "ServerTransportParametersExtension.h",
+    ],
+    deps = [
+        "//fizz/server:server_extensions",
+        "//quic/handshake:transport_parameters",
+    ],
+)
+
+cpp_library(
+    name = "app_token",
+    srcs = [
+        "AppToken.cpp",
+    ],
+    headers = [
+        "AppToken.h",
+    ],
+    deps = [
+        "//fizz/record:record",
+        "//fizz/server:protocol",
+        "//folly:network_address",
+        "//folly:optional",
+        "//folly/io:iobuf",
+        "//quic:constants",
+        "//quic/handshake:transport_parameters",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+cpp_library(
+    name = "default_app_token_validator",
+    srcs = [
+        "DefaultAppTokenValidator.cpp",
+    ],
+    headers = [
+        "DefaultAppTokenValidator.h",
+    ],
+    deps = [
+        "//fizz/server:protocol",
+        "//fizz/server:resumption_state",
+        "//folly:network_address",
+        "//folly:optional",
+        "//quic:constants",
+        "//quic/api:transport",
+        "//quic/handshake:transport_parameters",
+        "//quic/server/state:server",
+    ],
+    external_deps = [
+        "glog",
+    ],
+)
+
+cpp_library(
+    name = "stateless_reset_generator",
+    srcs = [
+        "StatelessResetGenerator.cpp",
+    ],
+    headers = [
+        "StatelessResetGenerator.h",
+    ],
+    deps = [
+        "//fizz/crypto:hkdf",
+        "//fizz/crypto:hmac_sha256",
+        "//folly:range",
+        "//quic/codec:types",
+    ],
+)

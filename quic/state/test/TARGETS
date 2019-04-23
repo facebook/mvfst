@@ -1,0 +1,104 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//quic:constants",
+    ],
+)
+
+cpp_unittest(
+    name = "StateMachineTest",
+    srcs = [
+        "StateDataTest.cpp",
+        "StateMachineTest.cpp",
+    ],
+    deps = [
+        "//quic/common/test:test_utils",
+        "//quic/state:state_machine",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStreamFunctionsTest",
+    srcs = [
+        "QuicStreamFunctionsTest.cpp",
+    ],
+    deps = [
+        "//quic/client/state:client",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "AckHandlersTest",
+    srcs = [
+        "AckHandlersTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state:ack_handler",
+        "//quic/state:state_machine",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "QuicStateFunctionsTest",
+    srcs = [
+        "QuicStateFunctionsTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state:state_functions",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "QuicPacingFunctionsTest",
+    srcs = [
+        "QuicPacingFunctionsTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/state:pacing_functions",
+    ],
+)
+
+cpp_unittest(
+    name = "QPRFunctionsTest",
+    srcs = [
+        "QPRFunctionsTest.cpp",
+    ],
+    deps = [
+        "//quic/server/state:server",
+        "//quic/state:qpr_functions",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)

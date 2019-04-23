@@ -1,0 +1,31 @@
+fb_xplat_cxx_library(
+    name = "quic",
+    srcs = glob([
+        "api/*.cpp",
+        "client/*.cpp",
+        "codec/*.cpp",
+        "common/*.cpp",
+        "congestion_control/*.cpp",
+        "flowcontrol/*.cpp",
+        "happyeyeballs/*.cpp",
+        "logging/*.cpp",
+        "loss/*.cpp",
+        "state/*.cpp",
+    ]),
+    header_namespace = "",
+    exported_headers = subdir_glob(
+        [
+            ("", "api/QuicSocket.h"),
+            ("", "client/QuicClientTransport.h"),
+            ("", "client/handshake/QuicPskCache.h"),
+        ],
+        prefix = "quic",
+    ),
+    apple_sdks = (IOS, MACOSX, APPLETVOS),
+    visibility = ["PUBLIC"],
+    deps = [
+        "fbsource//xplat/folly:extended",
+        "fbsource//xplat/folly:molly",
+        "fbsource//xplat/third-party/boost:boost",
+    ],
+)

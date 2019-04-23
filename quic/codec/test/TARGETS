@@ -1,0 +1,177 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+cpp_library(
+    name = "mocks",
+    headers = [
+        "Mocks.h",
+    ],
+    deps = [
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/codec:pktbuilder",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicHeaderCodec",
+    srcs = [
+        "QuicHeaderCodecTest.cpp",
+    ],
+    deps = [
+        "//folly:optional",
+        "//folly:overload",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:header_codec",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicReadCodecTests",
+    srcs = [
+        "QuicReadCodecTest.cpp",
+    ],
+    deps = [
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:codec",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicWriteCodecTests",
+    srcs = [
+        "QuicWriteCodecTest.cpp",
+    ],
+    compiler_flags = [
+        "-ftemplate-backtrace-limit=0",
+    ],
+    deps = [
+        ":mocks",
+        "//folly:random",
+        "//folly/io:iobuf",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:codec",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "TypesTests",
+    srcs = [
+        "TypesTest.cpp",
+    ],
+    deps = [
+        "//folly:overload",
+        "//folly:string",
+        "//folly/container:array",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "PacketNumberTest",
+    srcs = [
+        "PacketNumberTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/codec:types",
+    ],
+)
+
+cpp_unittest(
+    name = "PacketNumberCipherTest",
+    srcs = [
+        "PacketNumberCipherTest.cpp",
+    ],
+    deps = [
+        "//folly:string",
+        "//folly/portability:gtest",
+        "//quic/codec:packet_number_cipher",
+    ],
+)
+
+cpp_unittest(
+    name = "DecodeTests",
+    srcs = [
+        "DecodeTest.cpp",
+    ],
+    deps = [
+        "//folly:random",
+        "//folly/container:array",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic/codec:codec",
+        "//quic/codec:decode",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicConnectionIdTest",
+    srcs = [
+        "QuicConnectionIdTest.cpp",
+    ],
+    deps = [
+        "//folly/portability:gtest",
+        "//quic/codec:types",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicPacketBuilderTest",
+    srcs = [
+        "QuicPacketBuilderTest.cpp",
+        "QuicPacketRebuilderTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//quic/codec:codec",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:pktrebuilder",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+        "//quic/handshake:handshake",
+        "//quic/server/state:server",
+        "//quic/state:state_functions",
+        "//quic/state:state_machine",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicIntegerTest",
+    srcs = [
+        "QuicIntegerTest.cpp",
+    ],
+    deps = [
+        "//folly:expected",
+        "//folly:optional",
+        "//folly:string",
+        "//folly/io:iobuf",
+        "//folly/portability:gtest",
+        "//quic:exception",
+        "//quic/codec:types",
+    ],
+)

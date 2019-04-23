@@ -1,0 +1,33 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+cpp_unittest(
+    name = "StreamStateMachineTest",
+    srcs = [
+        "StreamStateMachineTest.cpp",
+    ],
+    deps = [
+        "//folly:overload",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "StreamStateFunctionsTest",
+    srcs = [
+        "StreamStateFunctionsTest.cpp",
+    ],
+    deps = [
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/stream:stream",
+    ],
+)

@@ -1,0 +1,173 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "transport_settings",
+    headers = [
+        "TransportSettings.h",
+    ],
+    deps = [
+        "//quic:constants",
+    ],
+)
+
+cpp_library(
+    name = "ack_states",
+    headers = [
+        "AckStates.h",
+    ],
+    deps = [
+        "//quic/codec:types",
+        "//quic/common:interval_set",
+    ],
+)
+
+cpp_library(
+    name = "state_machine",
+    srcs = [
+        "QuicStreamManager.cpp",
+        "QuicStreamUtilities.cpp",
+        "StateData.cpp",
+    ],
+    headers = [
+        "QuicStreamManager.h",
+        "QuicStreamUtilities.h",
+        "StateData.h",
+        "StateMachine.h",
+        "StreamData.h",
+    ],
+    deps = [
+        ":stats_callback",
+        ":transport_settings",
+        "//folly:optional",
+        "//folly:overload",
+        "//folly/io:iobuf",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_socket",
+        "//quic:constants",
+        "//quic/codec:codec",
+        "//quic/codec:types",
+        "//quic/handshake:handshake",
+        "//quic/state:ack_states",
+    ],
+    external_deps = [
+        "boost",
+    ],
+)
+
+cpp_library(
+    name = "ack_handler",
+    srcs = [
+        "AckHandlers.cpp",
+    ],
+    headers = [
+        "AckHandlers.h",
+    ],
+    deps = [
+        ":state_functions",
+        ":state_machine",
+        "//folly:overload",
+        "//quic:constants",
+        "//quic/codec:types",
+        "//quic/logging:logging",
+        "//quic/loss:loss",
+    ],
+)
+
+cpp_library(
+    name = "stream_functions",
+    srcs = [
+        "QuicStreamFunctions.cpp",
+    ],
+    headers = [
+        "QuicStreamFunctions.h",
+    ],
+    deps = [
+        ":state_machine",
+        "//folly/io:iobuf",
+        "//quic:exception",
+        "//quic/flowcontrol:flow_control",
+        "//quic/logging:logging",
+    ],
+)
+
+cpp_library(
+    name = "state_functions",
+    srcs = [
+        "QuicStateFunctions.cpp",
+    ],
+    headers = [
+        "QuicStateFunctions.h",
+    ],
+    deps = [
+        ":state_machine",
+        "//folly:overload",
+        "//quic/codec:pktbuilder",
+        "//quic/codec:types",
+        "//quic/common:time_util",
+        "//quic/logging:logging",
+        "//quic/state/stream:stream",
+    ],
+)
+
+cpp_library(
+    name = "stats_callback",
+    headers = [
+        "QuicTransportStatsCallback.h",
+    ],
+    deps = [
+        "//folly:optional",
+        "//folly/functional:invoke",
+        "//folly/io/async:async_base",
+    ],
+)
+
+cpp_library(
+    name = "pacing_functions",
+    srcs = [
+        "QuicPacingFunctions.cpp",
+    ],
+    headers = [
+        "QuicPacingFunctions.h",
+    ],
+    deps = [
+        ":state_machine",
+    ],
+)
+
+cpp_library(
+    name = "simple_frame_functions",
+    srcs = [
+        "SimpleFrameFunctions.cpp",
+    ],
+    headers = [
+        "SimpleFrameFunctions.h",
+    ],
+    deps = [
+        ":qpr_functions",
+        ":state_functions",
+        ":state_machine",
+        ":stream_functions",
+        "//quic/codec:types",
+    ],
+    external_deps = [
+        "boost",
+    ],
+)
+
+cpp_library(
+    name = "qpr_functions",
+    srcs = [
+        "QPRFunctions.cpp",
+    ],
+    headers = [
+        "QPRFunctions.h",
+    ],
+    deps = [
+        ":state_machine",
+        ":stream_functions",
+        "//quic/codec:types",
+        "//quic/flowcontrol:flow_control",
+    ],
+)

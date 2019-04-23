@@ -1,0 +1,22 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "happyeyeballs",
+    srcs = [
+        "QuicHappyEyeballsFunctions.cpp",
+    ],
+    headers = [
+        "QuicHappyEyeballsFunctions.h",
+    ],
+    deps = [
+        "//folly:network_address",
+        "//folly/io/async:async_base",
+        "//folly/io/async:async_udp_socket",
+        "//folly/net:net_ops",
+        "//folly/portability:sockets",
+        "//quic/logging:logging",
+        "//quic/state:state_machine",
+    ],
+)

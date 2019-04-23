@@ -1,0 +1,3 @@
+---
+Checks:          'boost-*,bugprone-*,clang-analyzer-*,modernize-*,performance-*'
+...

@@ -1,0 +1,90 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+cpp_unittest(
+    name = "ServerHandshakeTest",
+    srcs = [
+        "ServerHandshakeTest.cpp",
+    ],
+    deps = [
+        "//fizz/client/test:mocks",
+        "//fizz/crypto/test:TestUtil",
+        "//fizz/protocol/test:mocks",
+        "//fizz/server/test:mocks",
+        "//folly/io/async:scoped_event_base_thread",
+        "//folly/io/async:ssl_context",
+        "//folly/io/async/test:mocks",
+        "//folly/ssl:init",
+        "//quic/client/handshake:client_extension",
+        "//quic/common/test:test_utils",
+        "//quic/handshake:handshake",
+        "//quic/server/handshake:app_token",
+        "//quic/server/handshake:server_handshake",
+        "//quic/state:state_machine",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "ServerTransportParametersTest",
+    srcs = [
+        "ServerTransportParametersTest.cpp",
+    ],
+    deps = [
+        "//fizz/protocol/test:test_messages",
+        "//quic:constants",
+        "//quic/common/test:test_utils",
+        "//quic/server/handshake:server_extension",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "AppTokenTest",
+    srcs = [
+        "AppTokenTest.cpp",
+    ],
+    deps = [
+        "//fizz/server:resumption_state",
+        "//folly:optional",
+        "//quic:constants",
+        "//quic/server/handshake:app_token",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "DefaultAppTokenValidatorTest",
+    srcs = [
+        "DefaultAppTokenValidatorTest.cpp",
+    ],
+    deps = [
+        "//fizz/server:resumption_state",
+        "//folly:optional",
+        "//quic:constants",
+        "//quic/api/test:mocks",
+        "//quic/server/handshake:default_app_token_validator",
+        "//quic/server/state:server",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "StatelessResetGeneratorTest",
+    srcs = [
+        "StatelessResetGeneratorTest.cpp",
+    ],
+    deps = [
+        "//folly:network_address",
+        "//folly:random",
+        "//folly/portability:gtest",
+        "//quic/server/handshake:stateless_reset_generator",
+    ],
+)

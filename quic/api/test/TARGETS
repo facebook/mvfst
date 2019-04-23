@@ -1,0 +1,118 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+load("@fbcode_macros//build_defs:cpp_unittest.bzl", "cpp_unittest")
+
+cpp_library(
+    name = "mocks",
+    headers = [
+        "MockQuicSocket.h",
+        "MockQuicStats.h",
+        "Mocks.h",
+    ],
+    deps = [
+        "//folly/io/async:async_base",
+        "//folly/portability:gmock",
+        "//quic:exception",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common:timers",
+        "//quic/server:server",
+        "//quic/state:state_machine",
+        "//quic/state:stats_callback",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportTest",
+    srcs = [
+        "QuicTransportTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//fizz/crypto/aead/test:mocks",
+        "//folly:random",
+        "//folly/io:iobuf",
+        "//folly/io/async/test:mocks",
+        "//quic/api:transport",
+        "//quic/common:timers",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/test:mocks",
+    ],
+    external_deps = [
+        ("googletest", None, "gmock"),
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportBaseTest",
+    srcs = [
+        "QuicTransportBaseTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/io/async/test:mocks",
+        "//folly/portability:gmock",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/codec:types",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state:stream_functions",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicTransportFunctionsTest",
+    srcs = [
+        "QuicTransportFunctionsTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/io/async/test:mocks",
+        "//quic/api:transport",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+        "//quic/state/test:mocks",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicPacketSchedulerTest",
+    srcs = [
+        "QuicPacketSchedulerTest.cpp",
+    ],
+    deps = [
+        ":mocks",
+        "//folly/portability:gtest",
+        "//quic/api:transport",
+        "//quic/client/state:client",
+        "//quic/codec:pktbuilder",
+        "//quic/common/test:test_utils",
+        "//quic/server/state:server",
+    ],
+)
+
+cpp_unittest(
+    name = "IoBufQuicBatchTest",
+    srcs = [
+        "IoBufQuicBatchTest.cpp",
+    ],
+    deps = [
+        "//quic/api:transport",
+        "//quic/state:state_machine",
+    ],
+)
+
+cpp_unittest(
+    name = "QuicBatchWriterTest",
+    srcs = [
+        "QuicBatchWriterTest.cpp",
+    ],
+    deps = [
+        "//quic/api:transport",
+    ],
+)

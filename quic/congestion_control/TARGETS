@@ -1,0 +1,84 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:cpp_library.bzl", "cpp_library")
+
+cpp_library(
+    name = "congestion_control_functions",
+    srcs = [
+        "CongestionControlFunctions.cpp",
+    ],
+    headers = [
+        "CongestionControlFunctions.h",
+    ],
+    deps = [
+        "//quic:constants",
+        "//quic/common:time_util",
+        "//quic/state:state_machine",
+    ],
+)
+
+cpp_library(
+    name = "congestion_controller_factory",
+    srcs = [
+        "CongestionControllerFactory.cpp",
+    ],
+    headers = [
+        "CongestionControllerFactory.h",
+    ],
+    deps = [
+        ":copa",
+        ":cubic",
+        ":newreno",
+        "//quic:constants",
+    ],
+)
+
+cpp_library(
+    name = "cubic",
+    srcs = [
+        "QuicCubic.cpp",
+    ],
+    headers = [
+        "QuicCubic.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//quic:exception",
+        "//quic/logging:logging",
+        "//quic/state:state_functions",
+        "//quic/state:state_machine",
+    ],
+)
+
+cpp_library(
+    name = "newreno",
+    srcs = [
+        "NewReno.cpp",
+    ],
+    headers = [
+        "NewReno.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//quic:exception",
+        "//quic/state:state_machine",
+    ],
+)
+
+cpp_library(
+    name = "copa",
+    srcs = [
+        "Copa.cpp",
+    ],
+    headers = [
+        "Copa.h",
+    ],
+    deps = [
+        ":congestion_control_functions",
+        "//folly:optional",
+        "//quic:exception",
+        "//quic/common:time_util",
+        "//quic/congestion_control/third_party:chromium_windowed_filter",
+        "//quic/state:state_machine",
+    ],
+)
