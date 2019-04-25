@@ -28,7 +28,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     sock = socket;
   }
 
-  void onNewStream(quic::StreamId id) noexcept override {
+  void onNewBidirectionalStream(quic::StreamId id) noexcept override {
     LOG(INFO) << "Got bidirectional stream id=" << id;
     sock->setReadCallback(id, this);
   }

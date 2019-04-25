@@ -54,7 +54,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
                << ", error=" << toString(error);
   }
 
-  void onNewStream(quic::StreamId id) noexcept override {
+  void onNewBidirectionalStream(quic::StreamId id) noexcept override {
     LOG(INFO) << "EchoClient: new bidirectional stream=" << id;
     quicClient_->setReadCallback(id, this);
   }

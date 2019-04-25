@@ -53,7 +53,8 @@ void QuicServer::setListenerSocketFactory(
 void QuicServer::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
   CHECK(!initialized_)
-      << " Congestion Control Factorty must be set before the server is initialized.";
+      << " Congestion Control Factorty must be set before the server is "
+      << "initialized.";
   CHECK(ccFactory);
   ccFactory_ = std::move(ccFactory);
 }

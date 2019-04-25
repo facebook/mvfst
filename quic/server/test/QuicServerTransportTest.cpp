@@ -1414,7 +1414,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingBeforeStream) {
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
-  EXPECT_CALL(connCallback, onNewStream(streamId));
+  EXPECT_CALL(connCallback, onNewBidirectionalStream(streamId));
   EXPECT_CALL(
       connCallback, onStopSending(streamId, ApplicationErrorCode::STOPPING));
   deliverData(packetToBuf(packet));

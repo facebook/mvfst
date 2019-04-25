@@ -307,7 +307,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   writableStreams_.erase(streamId);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
-  flowControlUpdated_.erase(streamId);
+  windowUpdates_.erase(streamId);
   auto itr = std::find(lossStreams_.begin(), lossStreams_.end(), streamId);
   if (itr != lossStreams_.end()) {
     lossStreams_.erase(itr);

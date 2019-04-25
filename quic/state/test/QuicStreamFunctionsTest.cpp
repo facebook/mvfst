@@ -1506,6 +1506,31 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingReadDataCallsUpdateRL) {
   EXPECT_EQ(1, stream->holbCount);
 }
 
+TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto streamId = stream->id;
+  conn.streamManager->readableStreams().emplace(streamId);
+  conn.streamManager->peekableStreams().emplace(streamId);
+  conn.streamManager->addWritable(streamId);
+  conn.streamManager->queueBlocked(streamId, 0);
+  conn.streamManager->addDeliverable(streamId);
+  conn.streamManager->addLoss(streamId);
+  conn.streamManager->queueWindowUpdate(streamId);
+  conn.streamManager->addStopSending(
+      streamId, ApplicationErrorCode::HTTP_NO_ERROR);
+  stream->state = StreamStates::Closed{};
+  conn.streamManager->removeClosedStream(streamId);
+  EXPECT_FALSE(conn.streamManager->streamExists(streamId));
+  EXPECT_TRUE(conn.streamManager->readableStreams().empty());
+  EXPECT_TRUE(conn.streamManager->peekableStreams().empty());
+  EXPECT_FALSE(conn.streamManager->writableContains(streamId));
+  EXPECT_FALSE(conn.streamManager->hasBlocked());
+  EXPECT_FALSE(conn.streamManager->deliverableContains(streamId));
+  EXPECT_FALSE(conn.streamManager->hasLoss());
+  EXPECT_FALSE(conn.streamManager->pendingWindowUpdate(streamId));
+  EXPECT_TRUE(conn.streamManager->stopSendingStreams().empty());
+}
+
 TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
   StreamId clientStream = 0x10;
   std::deque<StreamId> newStreams = {0x0, 0x4, 0x8, 0xc, 0x10};

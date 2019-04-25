@@ -1247,7 +1247,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   for (const auto& stream : conn_->streamManager->newPeerStreams()) {
     CHECK_NOTNULL(connCallback_);
     if (isBidirectionalStream(stream)) {
-      connCallback_->onNewStream(stream);
+      connCallback_->onNewBidirectionalStream(stream);
     } else {
       connCallback_->onNewUnidirectionalStream(stream);
     }

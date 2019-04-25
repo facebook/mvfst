@@ -690,7 +690,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
 
   for (StreamId start = 0x00; start <= clientOutOfOrderStream;
        start += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewStream(start))
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
         .WillOnce(Invoke(
             [&](StreamId id) { transport->setReadCallback(id, &streamRead); }));
   }
@@ -770,15 +770,15 @@ TEST_F(QuicTransportImplTest, ReadCallbackDeleteTransport) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, OnNewStreamCallback) {
+TEST_F(QuicTransportImplTest, onNewBidirectionalStreamCallback) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   StreamId stream2 = 0x00;
-  EXPECT_CALL(connCallback, onNewStream(stream2));
+  EXPECT_CALL(connCallback, onNewBidirectionalStream(stream2));
   transport->addDataToStream(stream2, StreamBuffer(readData->clone(), 0, true));
 
   StreamId stream3 = 0x04;
-  EXPECT_CALL(connCallback, onNewStream(stream3));
+  EXPECT_CALL(connCallback, onNewBidirectionalStream(stream3));
   transport->addDataToStream(stream3, StreamBuffer(readData->clone(), 0, true));
 
   StreamId uniStream3 = 0xa;
@@ -793,13 +793,13 @@ TEST_F(QuicTransportImplTest, OnNewStreamCallback) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, OnNewStreamStreamOutOfOrder) {
+TEST_F(QuicTransportImplTest, onNewBidirectionalStreamStreamOutOfOrder) {
   InSequence dummy;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   StreamId biStream1 = 28;
   StreamId uniStream1 = 30;
   for (StreamId id = 0x00; id <= biStream1; id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewStream(id));
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
   }
   for (StreamId id = 0x02; id <= uniStream1; id += kStreamIncrement) {
     EXPECT_CALL(connCallback, onNewUnidirectionalStream(id));
@@ -813,7 +813,7 @@ TEST_F(QuicTransportImplTest, OnNewStreamStreamOutOfOrder) {
   StreamId uniStream2 = 38;
   for (StreamId id = biStream1 + kStreamIncrement; id <= biStream2;
        id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewStream(id));
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
   }
   for (StreamId id = uniStream1 + kStreamIncrement; id <= uniStream2;
        id += kStreamIncrement) {
@@ -826,14 +826,14 @@ TEST_F(QuicTransportImplTest, OnNewStreamStreamOutOfOrder) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, OnNewStreamSetReadCallback) {
+TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
   InSequence dummy;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   transport->addCryptoData(StreamBuffer(readData->clone(), 0, true));
 
   MockReadCallback stream2Read;
   StreamId stream2 = 0x00;
-  EXPECT_CALL(connCallback, onNewStream(stream2))
+  EXPECT_CALL(connCallback, onNewBidirectionalStream(stream2))
       .WillOnce(Invoke(
           [&](StreamId id) { transport->setReadCallback(id, &stream2Read); }));
   transport->addDataToStream(stream2, StreamBuffer(readData->clone(), 0, true));
@@ -842,7 +842,7 @@ TEST_F(QuicTransportImplTest, OnNewStreamSetReadCallback) {
   MockReadCallback streamRead;
   for (StreamId start = stream2 + kStreamIncrement; start <= stream3;
        start += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewStream(start))
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
         .WillOnce(Invoke(
             [&](StreamId id) { transport->setReadCallback(id, &streamRead); }));
   }

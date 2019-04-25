@@ -362,9 +362,9 @@ void QuicServerWorker::dispatchPacketData(
         trans->setRoutingCallback(this);
         trans->setSupportedVersions(supportedVersions_);
         trans->setOriginalPeerAddress(client);
+        trans->setCongestionControllerFactory(ccFactory_);
         trans->setTransportSettings(transportSettings_);
         trans->setConnectionIdAlgo(connIdAlgo_.get());
-        trans->setCongestionControllerFactory(ccFactory_);
         // parameters to create server chosen connection id
         ServerConnectionIdParams serverConnIdParams(
             hostId_, static_cast<uint8_t>(processId_), workerId_);

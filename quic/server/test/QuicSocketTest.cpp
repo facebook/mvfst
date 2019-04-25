@@ -29,7 +29,7 @@ class QuicSocketTest : public Test {
 
   void openStream(StreamId) {
     EXPECT_CALL(*socket_, setReadCallback(3, &handler_));
-    socket_->cb_->onNewStream(3);
+    socket_->cb_->onNewBidirectionalStream(3);
   }
 
  protected:

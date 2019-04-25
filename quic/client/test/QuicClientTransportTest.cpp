@@ -1287,7 +1287,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
     }
 
     GMOCK_METHOD1_(, noexcept, , onFlowControlUpdate, void(StreamId));
-    GMOCK_METHOD1_(, noexcept, , onNewStream, void(StreamId));
+    GMOCK_METHOD1_(, noexcept, , onNewBidirectionalStream, void(StreamId));
     GMOCK_METHOD1_(, noexcept, , onNewUnidirectionalStream, void(StreamId));
     GMOCK_METHOD2_(
         ,

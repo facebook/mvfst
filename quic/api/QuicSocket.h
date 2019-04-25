@@ -44,7 +44,7 @@ class QuicSocket {
      * Invoked when the peer creates a new bidirectional stream.  The most
      * common flow would be to set the ReadCallback from here
      */
-    virtual void onNewStream(StreamId id) noexcept = 0;
+    virtual void onNewBidirectionalStream(StreamId id) noexcept = 0;
 
     /**
      * Invoked when the peer creates a new unidirectional stream.  The most
@@ -445,7 +445,7 @@ class QuicSocket {
   /**
    * Usage:
    * class Application {
-   *   void onNewStream(StreamId id) {
+   *   void onNewBidirectionalStream(StreamId id) {
    *     socket_->setPeekCallback(id, this);
    *   }
    *
@@ -844,7 +844,7 @@ class QuicSocket {
    * A control stream outlives all the other streams in a connection, therefore,
    * if the transport knows about it, can enable some optimizations.
    * Applications should declare all their control streams after either calling
-   * createStream() or receiving onNewStream()
+   * createStream() or receiving onNewBidirectionalStream()
    */
   virtual folly::Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
 };
