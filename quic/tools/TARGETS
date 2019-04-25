@@ -1,0 +1,33 @@
+# @autodeps
+
+load("@fbcode_macros//build_defs:python_binary.bzl", "python_binary")
+load("@fbcode_macros//build_defs:python_library.bzl", "python_library")
+
+python_library(
+    name = "base",
+    srcs = [
+        "base.py",
+    ],
+    base_module = "mvfst",
+    external_deps = [
+        ("bcc-cpp", None, "bcc"),
+        ("bcc-py", None),
+    ],
+)
+
+python_binary(
+    name = "print",
+    srcs = [
+        "print.py",
+    ],
+    base_module = "mvfst",
+    main_module = "mvfst.print",
+    strip_libpar = False,
+    deps = [
+        ":base",
+    ],
+    external_deps = [
+        ("bcc-cpp", None, "bcc"),
+        ("bcc-py", None),
+    ],
+)
