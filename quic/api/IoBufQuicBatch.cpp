@@ -15,10 +15,12 @@ IOBufQuicBatch::IOBufQuicBatch(
     std::unique_ptr<BatchWriter>&& batchWriter,
     folly::AsyncUDPSocket& sock,
     folly::SocketAddress& peerAddress,
+    QuicConnectionStateBase& conn,
     QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState)
     : batchWriter_(std::move(batchWriter)),
       sock_(sock),
       peerAddress_(peerAddress),
+      conn_(conn),
       happyEyeballsState_(happyEyeballsState) {}
 
 bool IOBufQuicBatch::write(
@@ -62,9 +64,19 @@ bool IOBufQuicBatch::isNetworkUnreachable(int err) {
 }
 
 bool IOBufQuicBatch::isRetriableError(int err) {
-  return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS ||
-      err == EMSGSIZE ||
-      (continueOnNetworkUnreachable_ && isNetworkUnreachable(err));
+  if (err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS ||
+      err == EMSGSIZE) {
+    return true;
+  }
+  auto now = Clock::now();
+  if (continueOnNetworkUnreachable_ && isNetworkUnreachable(err)) {
+    if (!conn_.continueOnNetworkUnreachableDeadline) {
+      conn_.continueOnNetworkUnreachableDeadline =
+          now + conn_.transportSettings.continueOnNetworkUnreachableDuration;
+    }
+    return now <= *conn_.continueOnNetworkUnreachableDeadline;
+  }
+  return false;
 }
 
 bool IOBufQuicBatch::flushInternal() {
@@ -122,6 +134,9 @@ bool IOBufQuicBatch::flushInternal() {
     // TODO: Remove once we use write event from libevent.
     return false; // done
   }
+
+  // Reset the deadline after successful write
+  conn_.continueOnNetworkUnreachableDeadline = folly::none;
 
   return true; // success, not done yet
 }

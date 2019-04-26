@@ -1343,10 +1343,55 @@ TEST_F(QuicClientTransportTest, NetworkUnreachableIsNotFatalIfContinue) {
   EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
   setupCryptoLayer();
   EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
+  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
   client->start(&clientConnCallback);
-  loopForWrites();
+  EXPECT_TRUE(client->getConn().continueOnNetworkUnreachableDeadline);
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_TRUE(client->idleTimeout().isScheduled());
+}
+
+TEST_F(
+    QuicClientTransportTest,
+    NetworkUnreachableIsFatalIfContinueAfterDeadline) {
+  TransportSettings settings;
+  settings.continueOnNetworkUnreachable = true;
+  client->setTransportSettings(settings);
+  client->addNewPeerAddress(serverAddr);
+  setupCryptoLayer();
+  EXPECT_CALL(*sock, write(_, _))
+      .WillRepeatedly(SetErrnoAndReturn(ENETUNREACH, -1));
+  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
+  client->start(&clientConnCallback);
+  ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
+  ASSERT_TRUE(client->idleTimeout().isScheduled());
+  usleep(std::chrono::duration_cast<std::chrono::microseconds>(
+             settings.continueOnNetworkUnreachableDuration)
+             .count());
+  EXPECT_CALL(clientConnCallback, onConnectionError(_));
+  loopForWrites();
+}
+
+TEST_F(
+    QuicClientTransportTest,
+    NetworkUnreachableDeadlineIsResetAfterSuccessfulWrite) {
+  TransportSettings settings;
+  settings.continueOnNetworkUnreachable = true;
+  client->setTransportSettings(settings);
+  client->addNewPeerAddress(serverAddr);
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  setupCryptoLayer();
+  EXPECT_CALL(*sock, write(_, _))
+      .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1))
+      .WillOnce(Return(1));
+  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
+  client->start(&clientConnCallback);
+  EXPECT_TRUE(client->getConn().continueOnNetworkUnreachableDeadline);
+  ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
+  ASSERT_TRUE(client->idleTimeout().isScheduled());
+
+  client->lossTimeout().cancelTimeout();
+  client->lossTimeout().timeoutExpired();
+  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
 }
 
 TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV4Address) {

@@ -462,6 +462,9 @@ struct QuicConnectionStateBase {
   // Error sent on the connection by the peer.
   folly::Optional<std::pair<QuicErrorCode, std::string>> peerConnectionError;
 
+  // Before deadline, transport may treat ENETUNREACH as non-fatal error
+  folly::Optional<TimePoint> continueOnNetworkUnreachableDeadline;
+
   // Supported versions in order of preference. Only meaningful to clients.
   // TODO: move to client only conn state.
   std::vector<QuicVersion> supportedVersions;

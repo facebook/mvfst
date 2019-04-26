@@ -18,6 +18,7 @@ class IOBufQuicBatch {
       std::unique_ptr<BatchWriter>&& batchWriter,
       folly::AsyncUDPSocket& sock,
       folly::SocketAddress& peerAddress,
+      QuicConnectionStateBase& conn,
       QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState);
 
   ~IOBufQuicBatch() = default;
@@ -49,6 +50,7 @@ class IOBufQuicBatch {
   std::unique_ptr<BatchWriter> batchWriter_;
   folly::AsyncUDPSocket& sock_;
   folly::SocketAddress& peerAddress_;
+  QuicConnectionStateBase& conn_;
   QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState_;
   uint64_t pktSent_{0};
   bool continueOnNetworkUnreachable_{false};

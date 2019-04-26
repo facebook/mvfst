@@ -855,6 +855,7 @@ uint64_t writeConnectionDataToSocket(
       std::move(batchWriter),
       sock,
       connection.peerAddress,
+      connection,
       connection.happyEyeballsState);
   ioBufBatch.setContinueOnNetworkUnreachable(
       connection.transportSettings.continueOnNetworkUnreachable);

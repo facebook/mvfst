@@ -8,6 +8,7 @@
 
 #include <quic/api/IoBufQuicBatch.h>
 #include <gtest/gtest.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/state/StateData.h>
 
 constexpr const auto kNumLoops = 64;
@@ -52,10 +53,11 @@ void RunTest(int numBatch) {
 
   auto batchWriter = std::make_unique<TestPacketBatchWriter>(numBatch);
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
+  QuicClientConnectionState conn;
   QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
 
   IOBufQuicBatch ioBufBatch(
-      std::move(batchWriter), sock, peerAddress, happyEyeballsState);
+      std::move(batchWriter), sock, peerAddress, conn, happyEyeballsState);
 
   std::string strTest("Test");
 

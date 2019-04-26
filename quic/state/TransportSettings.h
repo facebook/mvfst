@@ -74,10 +74,18 @@ struct TransportSettings {
   // maximum number of packets we can batch
   // does not apply to BATCHING_MODE_NONE
   uint32_t batchingNum{kDefaultQuicBatchingNum};
-  // Sets network down to be a non fatal error. In some environments, ENETDOWN
-  // and ENETUNREACH could just be because the routing table is being setup.
-  // This option makes those non fatal connection errors.
+  // Sets network unreachable to be a non fatal error. In some environments,
+  // EHOSTUNREACH or ENETUNREACH could just be because the routing table is
+  // being setup. This option makes those non fatal connection errors.
   bool continueOnNetworkUnreachable{false};
+  // Amount of time for which the transport treats ENETUNREACH/EHOSTUNREACH as
+  // non-fatal error since the first error is seen. If transport still sees the
+  // error after this amount of time, it'll throw and report the error. This is
+  // to minimize the negative impact on user experience for real no network
+  // case, so that errors are only delayed to be reported for 200ms, which
+  // should be invisible to end users.
+  // Choosing 150ms because loss timer fires at the 100ms for the first time.
+  std::chrono::milliseconds continueOnNetworkUnreachableDuration{150};
   // Initial congestion window in MSS
   uint64_t initCwndInMss{kInitCwndInMss};
   // Minimum congestion window in MSS
