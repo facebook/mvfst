@@ -962,7 +962,7 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   auto regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
   conn.outstandingPackets.emplace_back(OutstandingPacket(
       std::move(regularPacket),
-      Clock::now(),
+      Clock::now() - std::chrono::milliseconds(200),
       111,
       false /* handshake */,
       true /* pureAck */,
@@ -970,16 +970,16 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   conn.outstandingPureAckPacketsCount++;
   ASSERT_FALSE(conn.outstandingPackets.empty());
   ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 0;
+  ackFrame.largestAcked = packetNum;
   ackFrame.ackDelay = std::chrono::microseconds(100);
-  ackFrame.ackBlocks.emplace_back(0, 0);
+  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   processAckFrame(
       conn,
       PacketNumberSpace::AppData,
       ackFrame,
       [&](const auto&, const auto&, const auto&) {},
       [&](auto&, auto&, bool, auto) {},
-      Clock::now());
+      Clock::now() - std::chrono::milliseconds(150));
   EXPECT_EQ(std::chrono::microseconds::max(), conn.lossState.mrtt);
   EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.srtt);
   EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.lrtt);
@@ -990,16 +990,16 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
   conn.outstandingPackets.emplace_back(OutstandingPacket(
       std::move(regularPacket),
-      Clock::now(),
+      Clock::now() - std::chrono::milliseconds(100),
       111,
       false /* handshake */,
       false /* pureAck */,
       111));
   ASSERT_FALSE(conn.outstandingPackets.empty());
-  ackFrame.largestAcked = 1;
+  ackFrame.largestAcked = packetNum;
   ackFrame.ackDelay = std::chrono::microseconds(100);
   ackFrame.ackBlocks.clear();
-  ackFrame.ackBlocks.emplace_back(1, 1);
+  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   processAckFrame(
       conn,
       PacketNumberSpace::AppData,
