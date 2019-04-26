@@ -215,8 +215,8 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::RST_STREAM);
   }
-  auto errorCode = static_cast<ApplicationErrorCode>(
-      cursor.readBE<std::underlying_type<ApplicationErrorCode>::type>());
+  auto errorCode =
+      static_cast<ApplicationErrorCode>(cursor.readBE<ApplicationErrorCode>());
   auto offset = decodeQuicInteger(cursor);
   if (UNLIKELY(!offset)) {
     throw QuicTransportException(
@@ -242,8 +242,8 @@ StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::STOP_SENDING);
   }
-  auto errorCode = static_cast<ApplicationErrorCode>(
-      cursor.readBE<std::underlying_type<ApplicationErrorCode>::type>());
+  auto errorCode =
+      static_cast<ApplicationErrorCode>(cursor.readBE<ApplicationErrorCode>());
   return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
 }
 
@@ -558,8 +558,7 @@ ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor) {
 }
 
 ApplicationCloseFrame decodeApplicationCloseFrame(folly::io::Cursor& cursor) {
-  auto detailedCode =
-      cursor.readBE<std::underlying_type<ApplicationErrorCode>::type>();
+  auto detailedCode = cursor.readBE<ApplicationErrorCode>();
   auto errorCode = static_cast<ApplicationErrorCode>(detailedCode);
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (UNLIKELY(

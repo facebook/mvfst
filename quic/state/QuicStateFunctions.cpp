@@ -16,16 +16,11 @@ namespace quic {
 void updateRtt(
     QuicConnectionStateBase& conn,
     std::chrono::microseconds rttSample,
-    std::chrono::microseconds ackDelay,
-    bool pureAck) {
+    std::chrono::microseconds ackDelay) {
   conn.lossState.mrtt = timeMin(conn.lossState.mrtt, rttSample);
-  // This interesting condition is from the specs.
+  conn.lossState.maxAckDelay = timeMax(conn.lossState.maxAckDelay, ackDelay);
   if (rttSample > conn.lossState.mrtt + ackDelay) {
     rttSample -= ackDelay;
-    if (!pureAck) {
-      conn.lossState.maxAckDelay =
-          timeMax(conn.lossState.maxAckDelay, ackDelay);
-    }
   }
   conn.lossState.lrtt = rttSample;
   if (conn.lossState.srtt == std::chrono::microseconds::zero()) {
@@ -251,5 +246,4 @@ bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept {
       conn.ackStates.handshakeAckState.largestReceivedPacketNum ||
       conn.ackStates.appDataAckState.largestReceivedPacketNum;
 }
-
 } // namespace quic

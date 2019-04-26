@@ -151,6 +151,10 @@ class TestQuicTransport
         false);
   }
 
+  std::chrono::milliseconds getLossTimeoutRemainingTime() const {
+    return lossTimeout_.getTimeRemaining();
+  }
+
   void onReadData(const folly::SocketAddress&, NetworkData&& data) {
     if (!data.data) {
       return;
@@ -977,6 +981,15 @@ TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
+  auto tickInterval = evb->timer().getTickInterval();
+  transport->scheduleLossTimeout(tickInterval - std::chrono::milliseconds(1));
+  EXPECT_NEAR(
+      tickInterval.count(),
+      transport->getLossTimeoutRemainingTime().count(),
+      2);
+}
+
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
   auto stream1 = transport->createBidirectionalStream().value();
 
@@ -1131,9 +1144,12 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
   transport->notifyPendingWriteOnConnection(&wcb);
   if (GetParam()) {
     EXPECT_CALL(
-        wcb, onConnectionWriteError(IsError(ApplicationErrorCode::STOPPING)));
+        wcb,
+        onConnectionWriteError(
+            IsAppError(GenericApplicationErrorCode::UNKNOWN)));
     transport->close(std::make_pair(
-        QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("Bye")));
+        QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+        std::string("Bye")));
   } else {
     transport->close(folly::none);
   }
@@ -1157,9 +1173,11 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
   if (GetParam()) {
     EXPECT_CALL(
         wcb,
-        onStreamWriteError(stream, IsError(ApplicationErrorCode::STOPPING)));
+        onStreamWriteError(
+            stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
     transport->close(std::make_pair(
-        QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("Bye")));
+        QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+        std::string("Bye")));
   } else {
     transport->close(folly::none);
   }
@@ -1199,8 +1217,9 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
-  EXPECT_TRUE(transport->resetStream(stream, ApplicationErrorCode::STOPPING)
-                  .hasError());
+  EXPECT_TRUE(
+      transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
 
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
@@ -1250,8 +1269,9 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
-  EXPECT_TRUE(transport->resetStream(stream, ApplicationErrorCode::STOPPING)
-                  .hasError());
+  EXPECT_TRUE(
+      transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
 }
 
 TEST_F(QuicTransportImplTest, TestImmediateClose) {
@@ -1261,10 +1281,14 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   MockReadCallback rcb;
   MockDeliveryCallback deliveryCb;
   EXPECT_CALL(
-      wcb, onStreamWriteError(stream, IsError(ApplicationErrorCode::STOPPING)));
+      wcb,
+      onStreamWriteError(
+          stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(
-      wcbConn, onConnectionWriteError(IsError(ApplicationErrorCode::STOPPING)));
-  EXPECT_CALL(rcb, readError(stream, IsError(ApplicationErrorCode::STOPPING)));
+      wcbConn,
+      onConnectionWriteError(IsAppError(GenericApplicationErrorCode::UNKNOWN)));
+  EXPECT_CALL(
+      rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(deliveryCb, onCanceled(stream, _));
 
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
@@ -1277,7 +1301,8 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   transport->writeChain(
       stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
   transport->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("Error")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("Error")));
 
   ASSERT_TRUE(transport->transportClosed);
   EXPECT_FALSE(transport->createBidirectionalStream());
@@ -1287,8 +1312,9 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
-  EXPECT_TRUE(transport->resetStream(stream, ApplicationErrorCode::STOPPING)
-                  .hasError());
+  EXPECT_TRUE(
+      transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
 
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
@@ -1452,7 +1478,7 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidReadFuncs) {
       transport->resumeRead(stream).thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(
-      transport->stopSending(stream, ApplicationErrorCode::STOPPING)
+      transport->stopSending(stream, GenericApplicationErrorCode::UNKNOWN)
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
 }
@@ -1481,7 +1507,7 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(
-      transport->resetStream(stream, ApplicationErrorCode::STOPPING)
+      transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
 }

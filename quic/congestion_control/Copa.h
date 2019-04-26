@@ -31,7 +31,6 @@ class Copa : public CongestionController {
   explicit Copa(QuicConnectionStateBase& conn);
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacket& packet) override;
-  void onRTOVerified() override;
   void onPacketAckOrLoss(folly::Optional<AckEvent>, folly::Optional<LossEvent>)
       override;
 

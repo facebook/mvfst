@@ -131,9 +131,20 @@ struct CongestionController {
     uint64_t lostBytes;
     uint32_t lostPackets;
     const TimePoint lossTime;
+    // The packet sent time of the lost packet with largest packet sent time in
+    // this LossEvent
+    folly::Optional<TimePoint> largestLostSentTime;
+    // The packet sent time of the lost packet with smallest packet sent time in
+    // the LossEvent
+    folly::Optional<TimePoint> smallestLostSentTime;
+    // Whether this LossEvent also indicates persistent congestion
+    bool persistentCongestion;
 
     explicit LossEvent(TimePoint time = Clock::now())
-        : lostBytes(0), lostPackets(0), lossTime(time) {}
+        : lostBytes(0),
+          lostPackets(0),
+          lossTime(time),
+          persistentCongestion(false) {}
 
     void addLostPacket(const OutstandingPacket& packet) {
       if (UNLIKELY(
@@ -150,6 +161,10 @@ struct CongestionController {
           std::max(packetNum, largestLostPacketNum.value_or(packetNum));
       lostBytes += packet.encodedSize;
       lostPackets++;
+      largestLostSentTime =
+          std::max(packet.time, largestLostSentTime.value_or(packet.time));
+      smallestLostSentTime =
+          std::min(packet.time, smallestLostSentTime.value_or(packet.time));
     }
   };
 
@@ -185,7 +200,6 @@ struct CongestionController {
   virtual void onPacketAckOrLoss(
       folly::Optional<AckEvent>,
       folly::Optional<LossEvent>) = 0;
-  virtual void onRTOVerified() = 0;
 
   /**
    * Return the number of bytes that the congestion controller
@@ -273,13 +287,7 @@ using Resets = std::unordered_map<StreamId, RstStreamFrame>;
 using FrameList = std::vector<QuicSimpleFrame>;
 
 struct LossState {
-  enum LossMode {
-    ReorderingThreshold,
-    TimeLossDetection,
-  };
   enum class AlarmMethod { EarlyRetransmitOrReordering, Handshake, RTO };
-  // Current loss mode we are running on
-  LossMode lossMode{LossState::ReorderingThreshold};
   // Smooth rtt
   std::chrono::microseconds srtt{std::chrono::microseconds::zero()};
   // Latest rtt
@@ -293,16 +301,12 @@ struct LossState {
   uint16_t handshakeAlarmCount{0};
   // The time when last handshake packet was sent
   TimePoint lastHandshakePacketSentTime;
-  // Latest packet number sent before latest RTO
-  folly::Optional<PacketNum> largestSentBeforeRto;
   // Latest packet number sent
   // TODO: 0 is a legit PacketNum now, we need to make this optional:
   // TODO: this also needs to be 3 numbers now...
   PacketNum largestSent{0};
   // Reordering threshold used
   uint32_t reorderingThreshold{kReorderingThreshold};
-  // Time reordering fraction used
-  double timeReorderingFraction{kTimeReorderingFraction};
   // Timer for time reordering detection or early retransmit alarm.
   folly::Optional<TimePoint> lossTime;
   // Current method by which the loss detection alarm is set.
@@ -341,6 +345,8 @@ struct LossState {
   folly::Optional<TimePoint> lastAckedPacketSentTime;
   // The latest time a packet is acked
   folly::Optional<TimePoint> lastAckedTime;
+  // The time when last retranmittable packet is sent
+  TimePoint lastRetransmittablePacketSentTime;
 };
 
 class Logger;

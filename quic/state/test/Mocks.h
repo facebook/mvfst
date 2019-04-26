@@ -22,7 +22,6 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD2(
       onPacketAckOrLoss,
       void(folly::Optional<AckEvent>, folly::Optional<LossEvent>));
-  MOCK_METHOD0(onRTOVerified, void());
   MOCK_CONST_METHOD0(getWritableBytes, uint64_t());
   MOCK_CONST_METHOD0(getCongestionWindow, uint64_t());
   MOCK_METHOD0(onSpuriousLoss, void());

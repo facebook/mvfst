@@ -22,7 +22,6 @@ class NewReno : public CongestionController {
   void onPacketSent(const OutstandingPacket& packet) override;
   void onPacketAckOrLoss(folly::Optional<AckEvent>, folly::Optional<LossEvent>)
       override;
-  void onRTOVerified() override;
 
   uint64_t getWritableBytes() const noexcept override;
   uint64_t getCongestionWindow() const noexcept override;

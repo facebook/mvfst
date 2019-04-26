@@ -1082,14 +1082,15 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
   std::string reasonPhrase;
   reasonPhrase.resize(kMaxReasonPhraseLength + 10);
   ApplicationCloseFrame applicationCloseFrame(
-      ApplicationErrorCode::STOPPING, reasonPhrase);
+      GenericApplicationErrorCode::UNKNOWN, reasonPhrase);
   writeFrame(applicationCloseFrame, pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   auto resultAppCloseFrame =
       boost::get<ApplicationCloseFrame>(regularPacket.frames[0]);
-  EXPECT_EQ(ApplicationErrorCode::STOPPING, resultAppCloseFrame.errorCode);
+  EXPECT_EQ(
+      GenericApplicationErrorCode::UNKNOWN, resultAppCloseFrame.errorCode);
   EXPECT_EQ(resultAppCloseFrame.reasonPhrase, reasonPhrase);
 
   auto wireBuf = std::move(builtOut.second);
@@ -1192,7 +1193,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   StreamId id = 0xBAAD;
-  ApplicationErrorCode errorCode = ApplicationErrorCode::STOPPING;
+  ApplicationErrorCode errorCode = GenericApplicationErrorCode::UNKNOWN;
   uint64_t offset = 0xF00D;
   RstStreamFrame rstStreamFrame(id, errorCode, offset);
   auto rstStreamBytesWritten = writeFrame(rstStreamFrame, pktBuilder);
@@ -1221,7 +1222,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForRst) {
   pktBuilder.remaining_ = 1;
   setupCommonExpects(pktBuilder);
   StreamId id = 0xBAAD;
-  ApplicationErrorCode errorCode = ApplicationErrorCode::STOPPING;
+  ApplicationErrorCode errorCode = GenericApplicationErrorCode::UNKNOWN;
   uint64_t offset = 0xF00D;
   RstStreamFrame rstStreamFrame(id, errorCode, offset);
   EXPECT_EQ(0, writeFrame(rstStreamFrame, pktBuilder));
@@ -1314,7 +1315,7 @@ TEST_F(QuicWriteCodecTest, WriteStopSending) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   StreamId streamId = 10;
-  auto errorCode = ApplicationErrorCode::STOPPING;
+  auto errorCode = GenericApplicationErrorCode::UNKNOWN;
 
   StopSendingFrame stopSending(streamId, errorCode);
   auto bytesWritten = writeSimpleFrame(stopSending, pktBuilder);

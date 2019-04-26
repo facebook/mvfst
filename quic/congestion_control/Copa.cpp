@@ -256,14 +256,13 @@ void Copa::onPacketLoss(const LossEvent& loss) {
            << " inflight=" << bytesInFlight_ << " " << conn_;
   DCHECK(loss.largestLostPacketNum.hasValue());
   subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
-}
-
-void Copa::onRTOVerified() {
-  // TODO See if we should go to slowStart here
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
-  cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
+  if (loss.persistentCongestion) {
+    // TODO See if we should go to slowStart here
+    VLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
+             << conn_;
+    cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
+  }
 }
 
 uint64_t Copa::getWritableBytes() const noexcept {

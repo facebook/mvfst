@@ -808,14 +808,16 @@ TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
   server->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("stopping")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("stopping")));
   EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
   server->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("stopping")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("stopping")));
   EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
 }
@@ -854,7 +856,8 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
       acks,
       PacketNumberSpace::AppData)));
   server->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("stopping")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("stopping")));
 
   EXPECT_THROW(
       recvEncryptedStream(streamId, *IOBuf::copyBuffer("hello")),
@@ -876,7 +879,7 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
 
   // Deliver a reset to non existent stream to trigger a local conn error
   StreamId streamId = 0x01;
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   writeFrame(std::move(rstFrame), builder);
   auto packet = std::move(builder).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
@@ -892,7 +895,7 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
       server->getConn().udpSendPacketLen,
       std::move(header2),
       0 /* largestAcked */);
-  RstStreamFrame rstFrame2(streamId, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame2(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   writeFrame(std::move(rstFrame2), builder2);
   auto packet2 = std::move(builder2).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet2));
@@ -912,7 +915,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
 
   // Deliver a reset to non existent stream to trigger a local conn error
   StreamId streamId = 0x01;
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   writeFrame(std::move(rstFrame), builder);
   auto packet = std::move(builder).buildPacket();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
@@ -981,7 +984,8 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   auto packet = std::move(builder).buildPacket();
 
   server->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("hello")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("hello")));
   EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
@@ -1134,7 +1138,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {
       0 /* largestAcked */);
   ASSERT_TRUE(builder.canBuildPacket());
 
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   writeFrame(std::move(rstFrame), builder);
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
@@ -1155,7 +1159,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistServerStream) {
   ASSERT_TRUE(builder.canBuildPacket());
 
   StreamId streamId = 0x01;
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   writeFrame(std::move(rstFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
@@ -1193,7 +1197,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
 
   RstStreamFrame rstFrame(
       streamId,
-      ApplicationErrorCode::STOPPING,
+      GenericApplicationErrorCode::UNKNOWN,
       words.at(0).length() + words.at(1).length());
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(rstFrame), builder);
@@ -1214,7 +1218,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
     }
   }
   ASSERT_NE(rstStreamFrame, nullptr);
-  EXPECT_EQ(ApplicationErrorCode::STOPPING, rstStreamFrame->errorCode);
+  EXPECT_EQ(GenericApplicationErrorCode::NO_ERROR, rstStreamFrame->errorCode);
   EXPECT_EQ(streamId, rstStreamFrame->streamId);
   EXPECT_EQ(
       words.at(2).length() + words.at(3).length(), rstStreamFrame->offset);
@@ -1265,12 +1269,14 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
       std::move(header),
       0 /* largestAcked */);
 
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
-      connCallback, onStopSending(streamId, ApplicationErrorCode::STOPPING));
+      connCallback,
+      onStopSending(streamId, GenericApplicationErrorCode::UNKNOWN));
   deliverData(packetToBuf(packet));
 }
 
@@ -1305,11 +1311,12 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
       std::move(header),
       0 /* largestAcked */);
 
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
-  server->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_CALL(connCallback, onStopSending(_, _)).Times(0);
   deliverData(packetToBuf(packet));
 }
@@ -1382,7 +1389,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       std::move(header),
       0 /* largestAcked */);
 
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   StreamFrameMetaData streamMeta;
   streamMeta.hasMoreFrames = true;
@@ -1394,7 +1402,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
-      connCallback, onStopSending(streamId, ApplicationErrorCode::STOPPING));
+      connCallback,
+      onStopSending(streamId, GenericApplicationErrorCode::UNKNOWN));
   deliverData(packetToBuf(packet));
 }
 
@@ -1410,13 +1419,15 @@ TEST_F(QuicServerTransportTest, RecvStopSendingBeforeStream) {
       std::move(header),
       0 /* largestAcked */);
 
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onNewBidirectionalStream(streamId));
   EXPECT_CALL(
-      connCallback, onStopSending(streamId, ApplicationErrorCode::STOPPING));
+      connCallback,
+      onStopSending(streamId, GenericApplicationErrorCode::UNKNOWN));
   deliverData(packetToBuf(packet));
 }
 
@@ -1460,13 +1471,16 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
       std::move(header),
       0 /* largestAcked */);
 
-  StopSendingFrame stopSendingFrame1(streamId1, ApplicationErrorCode::STOPPING);
-  StopSendingFrame stopSendingFrame2(streamId2, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame1(
+      streamId1, GenericApplicationErrorCode::UNKNOWN);
+  StopSendingFrame stopSendingFrame2(
+      streamId2, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(std::move(stopSendingFrame1), builder);
   writeFrame(std::move(stopSendingFrame2), builder);
   auto packet = std::move(builder).buildPacket();
-  EXPECT_CALL(connCallback, onStopSending(_, ApplicationErrorCode::STOPPING))
+  EXPECT_CALL(
+      connCallback, onStopSending(_, GenericApplicationErrorCode::UNKNOWN))
       .WillOnce(Invoke([&](StreamId /*sid*/, ApplicationErrorCode /*e*/) {
         server->close(folly::none);
       }));
@@ -1485,7 +1499,8 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       server->getConn().ackStates.appDataAckState.largestAckedByPeer);
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(stopSendingFrame, builder);
   auto packet = std::move(builder).buildPacket();
@@ -1513,7 +1528,8 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
       server->getConn().udpSendPacketLen,
       std::move(header),
       server->getConn().ackStates.appDataAckState.largestAckedByPeer);
-  StopSendingFrame stopSendingFrame(streamId, ApplicationErrorCode::STOPPING);
+  StopSendingFrame stopSendingFrame(
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(stopSendingFrame, builder);
   auto packet = std::move(builder).buildPacket();
@@ -1538,7 +1554,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   server->getNonConstConn().outstandingPackets.clear();
   server->getNonConstConn().lossState.lossTime.clear();
 
-  server->stopSending(streamId, ApplicationErrorCode::STOPPING);
+  server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   // Find the outstanding StopSending.
   auto packetItr = std::find_if(
@@ -1589,7 +1605,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
 TEST_F(QuicServerTransportTest, TestAckStopSending) {
   auto streamId = server->createBidirectionalStream().value();
   server->getNonConstConn().streamManager->getStream(streamId);
-  server->stopSending(streamId, ApplicationErrorCode::STOPPING);
+  server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   auto match = [](OutstandingPacket& packet) {
     return std::find_if(
@@ -1651,7 +1667,7 @@ TEST_F(QuicServerTransportTest, TestAckRstStream) {
       server->getNonConstConn(),
       server->getSocket(),
       *stream,
-      ApplicationErrorCode::STOPPING);
+      GenericApplicationErrorCode::UNKNOWN);
 
   IntervalSet<PacketNum> acks = {{packetNum, packetNum}};
   auto packet1 = createAckPacket(
@@ -1704,12 +1720,13 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
       std::move(header),
       0 /* largestAcked */);
   std::string errMsg = "Stand clear of the closing doors, please";
-  ApplicationCloseFrame appClose(ApplicationErrorCode::STOPPING, errMsg);
+  ApplicationCloseFrame appClose(GenericApplicationErrorCode::UNKNOWN, errMsg);
   writeFrame(std::move(appClose), builder);
   auto packet = std::move(builder).buildPacket();
 
   EXPECT_CALL(
-      connCallback, onConnectionError(IsError(ApplicationErrorCode::STOPPING)));
+      connCallback,
+      onConnectionError(IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   // Now the transport should be closed
   EXPECT_EQ(
@@ -1717,7 +1734,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
       server->getConn().localConnectionError->first);
   EXPECT_EQ(
       server->getConn().peerConnectionError->first,
-      QuicErrorCode(ApplicationErrorCode::STOPPING));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN));
   auto closedMsg =
       folly::to<std::string>("Server closed by peer reason=", errMsg);
   EXPECT_EQ(server->getConn().peerConnectionError->second, closedMsg);
@@ -2926,7 +2943,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   recvClientFinished();
 
   server->close(std::make_pair(
-      QuicErrorCode(ApplicationErrorCode::STOPPING), std::string("hello")));
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      std::string("hello")));
   EXPECT_TRUE(server->isClosed());
   testLooper.loop();
 

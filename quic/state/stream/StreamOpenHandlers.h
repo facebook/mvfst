@@ -70,7 +70,7 @@ Handler<StreamStateMachine, StreamStates::Open, RstStreamFrame>::handle(
   if (isBidirectionalStream(stream.id)) {
     // TODO: remove.
     appendPendingStreamReset(
-        stream.conn, stream, ApplicationErrorCode::STOPPING);
+        stream.conn, stream, GenericApplicationErrorCode::NO_ERROR);
   } else {
     transit<StreamStates::Closed>(stream);
   }

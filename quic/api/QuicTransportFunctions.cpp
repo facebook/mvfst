@@ -357,6 +357,8 @@ void updateConnection(
   }
   if (pureAck) {
     ++conn.outstandingPureAckPacketsCount;
+  } else {
+    conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
   }
   if (pkt.associatedEvent) {
     CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);

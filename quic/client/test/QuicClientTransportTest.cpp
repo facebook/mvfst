@@ -2173,7 +2173,7 @@ TEST_P(
   EXPECT_CALL(readCb, readError(streamId, _));
   if (GetParam()) {
     client->close(std::make_pair(
-        QuicErrorCode(ApplicationErrorCode::STOPPING),
+        QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
         socketWrites, *makeHandshakeCodec()));
@@ -2322,7 +2322,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
   socketWrites.clear();
   if (GetParam()) {
     client->close(std::make_pair(
-        QuicErrorCode(ApplicationErrorCode::STOPPING),
+        QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
         socketWrites, *makeEncryptedCodec()));
@@ -2598,7 +2598,7 @@ TEST_F(
     QuicClientTransportAfterStartTest,
     ReceiveRstStreamNonExistentClientStream) {
   StreamId streamId = 0x04;
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::INTERNAL_ERROR, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -2617,7 +2617,7 @@ TEST_F(
   // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
   // even on a nonexist server stream:
   StreamId streamId = 0x01;
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::INTERNAL_ERROR, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -2638,7 +2638,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamNewStream) {
       client->createBidirectionalStream(false /* replaySafe */).value();
   client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
 
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::INTERNAL_ERROR, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -2688,7 +2688,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   EXPECT_CALL(readCb, readError(streamId, _));
 
   RstStreamFrame rstFrame(
-      streamId, ApplicationErrorCode::INTERNAL_ERROR, data->length());
+      streamId, GenericApplicationErrorCode::UNKNOWN, data->length());
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -3065,7 +3065,7 @@ TEST_F(
 
   // Test whether packets from the remote endpoint can be processed after a
   // version negotiation
-  RstStreamFrame rstFrame(streamId, ApplicationErrorCode::INTERNAL_ERROR, 0);
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -3249,7 +3249,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
   client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, 100));
   EXPECT_CALL(readCb, readError(streamId, _));
-  client->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -3314,7 +3314,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
       std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
   ASSERT_TRUE(it != pendingLossStreams.end());
 
-  client->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   it =
       std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
   ASSERT_TRUE(it == pendingLossStreams.end());
@@ -3330,7 +3330,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   loopForWrites();
   ASSERT_FALSE(client->getConn().outstandingPackets.empty());
 
-  client->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
@@ -3355,7 +3355,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, 100));
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
 
-  client->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   verifyShortPackets(sentPackets);
   const auto& readCbs = client->getReadCallbacks();
@@ -3436,8 +3436,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, _, _))
       .WillOnce(Invoke([&](auto, auto, auto) {
-        client->resetStream(streamId, ApplicationErrorCode::STOPPING);
-        client->resetStream(streamId2, ApplicationErrorCode::STOPPING);
+        client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+        client->resetStream(streamId2, GenericApplicationErrorCode::UNKNOWN);
       }));
   auto packet1 = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -3557,7 +3557,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
       std::move(header),
       0 /* largestAcked */);
   ApplicationCloseFrame appClose(
-      ApplicationErrorCode::STOPPING,
+      GenericApplicationErrorCode::UNKNOWN,
       "Stand clear of the closing doors, please");
   writeFrame(std::move(appClose), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
@@ -3566,7 +3566,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
 
   EXPECT_CALL(
       clientConnCallback,
-      onConnectionError(IsError(ApplicationErrorCode::STOPPING)));
+      onConnectionError(IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   deliverDataWithoutErrorCheck(packet->coalesce());
   // Now the transport should be closed
   EXPECT_EQ(

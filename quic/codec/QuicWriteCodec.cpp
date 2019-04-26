@@ -300,8 +300,7 @@ size_t writeSimpleFrame(
           builder.write(packetType);
           builder.write(streamId);
           builder.writeBE(
-              static_cast<std::underlying_type<ApplicationErrorCode>::type>(
-                  stopSendingFrame.errorCode));
+              static_cast<ApplicationErrorCode>(stopSendingFrame.errorCode));
           builder.appendFrame(std::move(stopSendingFrame));
           return stopSendingFrameSize;
         }
@@ -410,8 +409,7 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           builder.write(packetType);
           builder.write(streamId);
           builder.writeBE(
-              static_cast<std::underlying_type<ApplicationErrorCode>::type>(
-                  rstStreamFrame.errorCode));
+              static_cast<ApplicationErrorCode>(rstStreamFrame.errorCode));
           builder.write(offset);
           builder.appendFrame(std::move(rstStreamFrame));
           return rstStreamFrameSize;
@@ -570,9 +568,8 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
             applicationCloseFrame.reasonPhrase.size();
         if (packetSpaceCheck(spaceLeft, applicationCloseFrameSize)) {
           builder.write(packetType);
-          builder.writeBE(
-              static_cast<std::underlying_type<ApplicationErrorCode>::type>(
-                  applicationCloseFrame.errorCode));
+          builder.writeBE(static_cast<ApplicationErrorCode>(
+              applicationCloseFrame.errorCode));
           builder.write(reasonLength);
           builder.push(
               (const uint8_t*)applicationCloseFrame.reasonPhrase.data(),

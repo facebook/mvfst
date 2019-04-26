@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/Traits.h>
+#include <quic/QuicConstants.h>
 #include <chrono>
 #include <utility>
 

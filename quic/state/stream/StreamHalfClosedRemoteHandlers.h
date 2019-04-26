@@ -74,7 +74,8 @@ Handler<StreamStateMachine, StreamStates::HalfClosedRemote, RstStreamFrame>::
   transit<StreamStates::WaitingForRstAck>(stream);
   onResetQuicStream(stream, std::move(rst));
   // TODO: remove.
-  appendPendingStreamReset(stream.conn, stream, ApplicationErrorCode::STOPPING);
+  appendPendingStreamReset(
+      stream.conn, stream, GenericApplicationErrorCode::NO_ERROR);
 }
 
 inline void Handler<

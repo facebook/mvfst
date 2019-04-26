@@ -297,25 +297,5 @@ TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   EXPECT_EQ(initCwnd * 0.9, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
-
-TEST_F(CubicHystartTest, RTOVerifiedDuringHystart) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 100;
-  Cubic cubic(conn);
-
-  conn.lossState.largestSent = 0;
-  auto packet = makeTestingWritePacket(0, 700, 700);
-  cubic.onPacketSent(packet);
-  cubic.onRTOVerified();
-
-  EXPECT_EQ(0, cubic.getWritableBytes());
-
-  CongestionController::LossEvent loss;
-  loss.addLostPacket(packet);
-  cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-
-  // Cwnd can't go less than mincwnd.
-  EXPECT_EQ(200, cubic.getWritableBytes());
-}
 } // namespace test
 } // namespace quic

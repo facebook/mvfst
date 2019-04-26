@@ -33,8 +33,7 @@ void updateAckSendStateOnSentPacketWithAcks(
 void updateRtt(
     QuicConnectionStateBase& conn,
     std::chrono::microseconds rttSample,
-    std::chrono::microseconds ackDelay,
-    bool pureAck);
+    std::chrono::microseconds ackDelay);
 
 template <typename Event>
 void invokeStreamStateMachine(

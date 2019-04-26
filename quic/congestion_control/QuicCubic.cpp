@@ -52,7 +52,14 @@ uint64_t Cubic::getCongestionWindow() const noexcept {
   return cwndBytes_;
 }
 
-void Cubic::onRTOVerified() {
+/**
+ * TODO: onPersistentCongestion entirely depends on how long a loss period is,
+ * not how much a sender sends during that period. If the connection is app
+ * limited and loss happens after that, it looks like a long loss period but it
+ * may not really be a persistent congestion. However, to keep this code simple,
+ * we decide to just ignore app limited state right now.
+ */
+void Cubic::onPersistentCongestion() {
   auto minCwnd = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   ssthresh_ = std::max(cwndBytes_ / 2, minCwnd);
   cwndBytes_ = minCwnd;
@@ -68,7 +75,7 @@ void Cubic::onRTOVerified() {
   state_ = CubicStates::Hystart;
 
   QUIC_TRACE(
-      cubic_rto,
+      cubic_persistent_congestion,
       conn_,
       cubicStateToString(state_).data(),
       cwndBytes_,
@@ -123,6 +130,10 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
   } else {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_loss");
   }
+
+  if (loss.persistentCongestion) {
+    onPersistentCongestion();
+  }
 }
 
 void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
@@ -176,10 +187,11 @@ void Cubic::setAppLimited(bool limited, TimePoint eventTime) noexcept {
                 steadyState_.lastReductionTime->time_since_epoch())
                 .count()
           : -1);
-  if (!quiescenceStart_.hasValue() && limited) {
+  bool currentAppLimited = isAppLimited();
+  if (!currentAppLimited && limited) {
     quiescenceStart_ = eventTime;
   }
-  if (!limited && quiescenceStart_ && *quiescenceStart_ <= eventTime &&
+  if (!limited && currentAppLimited && *quiescenceStart_ <= eventTime &&
       steadyState_.lastReductionTime) {
     *steadyState_.lastReductionTime +=
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -642,7 +654,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
  * Theoretically, both paper and Linux/Chromium should result to the same cwnd.
  */
 void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
-  if (quiescenceStart_.hasValue()) {
+  if (isAppLimited()) {
     QUIC_TRACE(fst_trace, conn_, "ack_in_quiescence");
     return;
   }

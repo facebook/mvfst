@@ -144,7 +144,7 @@ class QuicStreamAsyncTransport : public folly::AsyncTransportWrapper,
     if (writeBuf_.empty()) {
       shutdownWrite();
     } else {
-      sock_->resetStream(id_, quic::ApplicationErrorCode::STOPPING);
+      sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
       VLOG(4) << "Reset stream from shutdownWriteNow";
     }
   }

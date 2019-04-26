@@ -42,13 +42,6 @@ TEST_F(CubicStateTest, HystartAck) {
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
 
-TEST_F(CubicStateTest, HystartRTOVerified) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(conn);
-  cubic.onRTOVerified();
-  EXPECT_EQ(CubicStates::Hystart, cubic.state());
-}
-
 TEST_F(CubicStateTest, HystartPace) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.transportSettings.pacingEnabled = true;
@@ -104,14 +97,6 @@ TEST_F(CubicStateTest, FastRecoveryLoss) {
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
 
-TEST_F(CubicStateTest, FastRecoveryRTOVerified) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  TestingCubic cubic(conn);
-  cubic.setStateForTest(CubicStates::FastRecovery);
-  cubic.onRTOVerified();
-  EXPECT_EQ(CubicStates::Hystart, cubic.state());
-}
-
 TEST_F(CubicStateTest, RecoveryNoPace) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.transportSettings.pacingEnabled = true;
@@ -143,14 +128,6 @@ TEST_F(CubicStateTest, SteadyLoss) {
   lossEvent.addLostPacket(packet);
   cubic.onPacketAckOrLoss(folly::none, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
-}
-
-TEST_F(CubicStateTest, SteadyRTOVerified) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  TestingCubic cubic(conn);
-  cubic.setStateForTest(CubicStates::Steady);
-  cubic.onRTOVerified();
-  EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
 
 TEST_F(CubicStateTest, SteadyCanPace) {

@@ -151,89 +151,12 @@ std::string toString(TransportErrorCode code) {
   return "Unknown error";
 }
 
-std::string toString(ApplicationErrorCode code) {
-  switch (code) {
-    case ApplicationErrorCode::STOPPING:
-      return "Stopping";
-    case ApplicationErrorCode::HTTP_NO_ERROR:
-      return "HTTP: No error";
-    case ApplicationErrorCode::HTTP_PUSH_REFUSED:
-      return "HTTP: Client refused pushed content";
-    case ApplicationErrorCode::HTTP_INTERNAL_ERROR:
-      return "HTTP: Internal error";
-    case ApplicationErrorCode::HTTP_PUSH_ALREADY_IN_CACHE:
-      return "HTTP: Pushed content already cached";
-    case ApplicationErrorCode::HTTP_REQUEST_CANCELLED:
-      return "HTTP: Data no longer needed";
-    case ApplicationErrorCode::HTTP_INCOMPLETE_REQUEST:
-      return "HTTP: Stream terminated early";
-    case ApplicationErrorCode::HTTP_CONNECT_ERROR:
-      return "HTTP: Reset or error on CONNECT request";
-    case ApplicationErrorCode::HTTP_EXCESSIVE_LOAD:
-      return "HTTP: Peer generating excessive load";
-    case ApplicationErrorCode::HTTP_VERSION_FALLBACK:
-      return "HTTP: Retry over HTTP/1.1";
-    case ApplicationErrorCode::HTTP_WRONG_STREAM:
-      return "HTTP: A frame was sent on the wrong stream";
-    case ApplicationErrorCode::HTTP_PUSH_LIMIT_EXCEEDED:
-      return "HTTP: Maximum Push ID exceeded";
-    case ApplicationErrorCode::HTTP_DUPLICATE_PUSH:
-      return "HTTP: Push ID was fulfilled multiple times";
-    case ApplicationErrorCode::HTTP_UNKNOWN_STREAM_TYPE:
-      return "HTTP: Unknown unidirectional stream type";
-    case ApplicationErrorCode::HTTP_WRONG_STREAM_COUNT:
-      return "HTTP: Too many unidirectional streams";
-    case ApplicationErrorCode::HTTP_CLOSED_CRITICAL_STREAM:
-      return "HTTP: Critical stream was closed";
-    case ApplicationErrorCode::HTTP_WRONG_STREAM_DIRECTION:
-      return "HTTP: Unidirectional stream in wrong direction";
-    case ApplicationErrorCode::HTTP_EARLY_RESPONSE:
-      return "HTTP: Remainder of request not needed";
-    case ApplicationErrorCode::HTTP_MISSING_SETTINGS:
-      return "HTTP: No SETTINGS frame received";
-    case ApplicationErrorCode::HTTP_UNEXPECTED_FRAME:
-      return "HTTP: Unexpected frame from client";
-    case ApplicationErrorCode::HTTP_REQUEST_REJECTED:
-      return "HTTP: Server did not process request";
-    case ApplicationErrorCode::HTTP_QPACK_DECOMPRESSION_FAILED:
-      return "HTTP: QPACK decompression failed";
-    case ApplicationErrorCode::HTTP_QPACK_DECODER_STREAM_ERROR:
-      return "HTTP: Error on QPACK decoder stream";
-    case ApplicationErrorCode::HTTP_QPACK_ENCODER_STREAM_ERROR:
-      return "HTTP: Error on QPACK encoder stream";
-    case ApplicationErrorCode::HTTP_GENERAL_PROTOCOL_ERROR:
-      return "HTTP: General protocol error";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_DATA:
-      return "HTTP: Malformed DATA frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_HEADERS:
-      return "HTTP: Malformed HEADERS frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_PRIORITY:
-      return "HTTP: Malformed PRIORITY frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_CANCEL_PUSH:
-      return "HTTP: Malformed CANCEL_PUSH frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_SETTINGS:
-      return "HTTP: Malformed SETTINGS frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_PUSH_PROMISE:
-      return "HTTP: Malformed PUSH_PROMISE frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_GOAWAY:
-      return "HTTP: Malformed GOAWAY frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME_MAX_PUSH_ID:
-      return "HTTP: Malformed MAX_PUSH_ID frame";
-    case ApplicationErrorCode::HTTP_MALFORMED_FRAME:
-      return "HTTP: Malformed frame";
-    case ApplicationErrorCode::INTERNAL_ERROR:
-      return "Internal error";
-    case ApplicationErrorCode::GIVEUP_ZERO_RTT:
-      return "Give up Zero RTT";
-  }
-  LOG(WARNING) << "toString has unhandled ErrorCode";
-  return "Unknown error";
-}
-
 std::string toString(QuicErrorCode code) {
   return folly::variant_match(
       code,
-      [](ApplicationErrorCode errorCode) { return toString(errorCode); },
+      [](ApplicationErrorCode errorCode) {
+        return folly::to<std::string>(errorCode);
+      },
       [](LocalErrorCode errorCode) { return toString(errorCode); },
       [](TransportErrorCode errorCode) { return toString(errorCode); });
 }

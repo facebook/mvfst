@@ -172,6 +172,28 @@ MATCHER_P(IsError, error, "") {
   return matchError(arg, error);
 }
 
+inline bool matchAppError(
+    std::pair<QuicErrorCode, std::string> errorCode,
+    ApplicationErrorCode error) {
+  return folly::variant_match(
+      errorCode.first,
+      [&](ApplicationErrorCode err) { return err == error; },
+      [](auto) { return false; });
+}
+
+inline bool matchAppError(
+    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
+    ApplicationErrorCode error) {
+  return folly::variant_match(
+      errorCode.first,
+      [&](ApplicationErrorCode err) { return err == error; },
+      [](auto) { return false; });
+}
+
+MATCHER_P(IsAppError, error, "") {
+  return matchAppError(arg, error);
+}
+
 void updateAckState(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,

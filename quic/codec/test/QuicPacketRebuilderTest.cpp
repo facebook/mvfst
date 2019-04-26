@@ -178,7 +178,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
 
   // Then we reset the stream
   invokeStreamStateMachine(
-      conn, *stream, StreamEvents::SendReset(ApplicationErrorCode::STOPPING));
+      conn,
+      *stream,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, shortHeader, 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);

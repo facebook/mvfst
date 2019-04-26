@@ -64,6 +64,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = std::chrono::seconds(10);
 
   StreamId current = 10;
   auto sentTime = Clock::now();
@@ -136,6 +138,8 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = std::chrono::seconds(10);
 
   StreamId current = 10;
   for (PacketNum packetNum = 10; packetNum < 51; packetNum++) {
@@ -239,6 +243,8 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = std::chrono::seconds(10);
 
   StreamId current = 10;
   for (PacketNum packetNum = 10; packetNum < 20; packetNum++) {
@@ -413,139 +419,13 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   EXPECT_TRUE(conn.ackStates.appDataAckState.acks.empty());
 }
 
-TEST_P(AckHandlersTest, NotifyVerifiedRTO) {
-  QuicServerConnectionState conn;
-  auto mockController = std::make_unique<MockCongestionController>();
-  auto rawController = mockController.get();
-  conn.congestionController = std::move(mockController);
-
-  conn.lossState.largestSentBeforeRto = 8;
-  conn.lossState.rtoCount = 1;
-
-  PacketNum packetAfterRtoNum = 10;
-  auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(packetAfterRto), Clock::now(), 0, false, false, 0));
-
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 10;
-  ackFrame.ackBlocks.emplace_back(5, 7);
-  ackFrame.ackBlocks.emplace_back(9, 10);
-  EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().totalBytesSent);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().pureAck);
-      }));
-  EXPECT_CALL(*rawController, onRTOVerified()).Times(1);
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
-      Clock::now());
-  EXPECT_FALSE(conn.lossState.largestSentBeforeRto.hasValue());
-  // Nothing is outstanding any more
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-  EXPECT_EQ(0, conn.outstandingPureAckPacketsCount);
-  EXPECT_FALSE(conn.pendingEvents.setLossDetectionAlarm);
-}
-
-TEST_P(AckHandlersTest, RTOTrackerIsAcked) {
-  QuicServerConnectionState conn;
-  auto mockController = std::make_unique<MockCongestionController>();
-  auto rawController = mockController.get();
-  conn.congestionController = std::move(mockController);
-
-  conn.lossState.largestSentBeforeRto = 8;
-  conn.lossState.rtoCount = 1;
-
-  PacketNum rtoPacket = 8;
-  auto packetAfterRto = createNewPacket(rtoPacket, GetParam());
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(packetAfterRto), Clock::now(), 0, false, false, 0));
-
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 10;
-  ackFrame.ackBlocks.emplace_back(5, 10);
-  EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().totalBytesSent);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().pureAck);
-      }));
-  EXPECT_CALL(*rawController, onRTOVerified()).Times(0);
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
-      Clock::now());
-  EXPECT_FALSE(conn.lossState.largestSentBeforeRto.hasValue());
-  // Nothing is outstanding any more
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-  EXPECT_EQ(0, conn.outstandingPureAckPacketsCount);
-  EXPECT_FALSE(conn.pendingEvents.setLossDetectionAlarm);
-}
-
-TEST_P(AckHandlersTest, PacketBeforeRTOTrackerIsAcked) {
-  QuicServerConnectionState conn;
-  auto mockController = std::make_unique<MockCongestionController>();
-  auto rawController = mockController.get();
-  conn.congestionController = std::move(mockController);
-
-  conn.lossState.largestSentBeforeRto = 8;
-  conn.lossState.rtoCount = 1;
-
-  PacketNum packetBeforeRtoTracker = 7;
-  auto packetAfterRto = createNewPacket(packetBeforeRtoTracker, GetParam());
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(packetAfterRto), Clock::now(), 0, false, false, 0));
-
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 7;
-  ackFrame.ackBlocks.emplace_back(5, 7);
-  EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(0, ackEvent->ackedPackets.front().totalBytesSent);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().pureAck);
-      }));
-  EXPECT_CALL(*rawController, onRTOVerified()).Times(0);
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
-      Clock::now());
-  EXPECT_FALSE(conn.lossState.largestSentBeforeRto.hasValue());
-  // Nothing is outstanding any more
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-  EXPECT_EQ(0, conn.outstandingPureAckPacketsCount);
-  EXPECT_FALSE(conn.pendingEvents.setLossDetectionAlarm);
-}
-
 TEST_P(AckHandlersTest, NoNewAckedPacket) {
   QuicServerConnectionState conn;
   auto mockController = std::make_unique<MockCongestionController>();
   auto rawController = mockController.get();
   conn.congestionController = std::move(mockController);
 
-  conn.lossState.largestSentBeforeRto = 5;
   conn.lossState.rtoCount = 1;
-
   PacketNum packetAfterRtoNum = 10;
   auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
   conn.outstandingPackets.emplace_back(OutstandingPacket(
@@ -554,7 +434,6 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
   EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _)).Times(0);
-  EXPECT_CALL(*rawController, onRTOVerified()).Times(0);
   processAckFrame(
       conn,
       GetParam(),
@@ -562,7 +441,6 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       [](const auto&, const auto&, const auto&) {},
       [](auto&, auto&, bool, PacketNum) {},
       Clock::now());
-  EXPECT_TRUE(conn.lossState.largestSentBeforeRto.hasValue());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(conn.lossState.rtoCount, 1);
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckedByPeer, 0);
@@ -583,13 +461,14 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
       [](const auto&, const auto&, const auto&) {},
       [](auto&, auto&, bool, PacketNum) {},
       Clock::now());
-  EXPECT_FALSE(conn.lossState.largestSentBeforeRto.hasValue());
 }
 
 TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   QuicServerConnectionState conn;
   auto mockController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockController);
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = std::chrono::seconds(10);
 
   PacketNum packetNum1 = 9;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
@@ -614,7 +493,6 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       [](const auto&, const auto&, const auto&) {},
       [](auto&, auto&, bool, PacketNum) {},
       Clock::now());
-  EXPECT_FALSE(conn.lossState.largestSentBeforeRto.hasValue());
   EXPECT_EQ(1, conn.outstandingPackets.size());
 }
 
@@ -1075,6 +953,65 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   EXPECT_EQ(sentTime, *conn.lossState.lastAckedPacketSentTime);
   EXPECT_EQ(receiveTime, *conn.lossState.lastAckedTime);
   EXPECT_EQ(111 + 1357, conn.lossState.totalBytesAcked);
+}
+
+TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
+  QuicServerConnectionState conn;
+  conn.congestionController = nullptr;
+  PacketNum packetNum = 0;
+  auto regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
+  conn.outstandingPackets.emplace_back(OutstandingPacket(
+      std::move(regularPacket),
+      Clock::now(),
+      111,
+      false /* handshake */,
+      true /* pureAck */,
+      111));
+  conn.outstandingPureAckPacketsCount++;
+  ASSERT_FALSE(conn.outstandingPackets.empty());
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 0;
+  ackFrame.ackDelay = std::chrono::microseconds(100);
+  ackFrame.ackBlocks.emplace_back(0, 0);
+  processAckFrame(
+      conn,
+      PacketNumberSpace::AppData,
+      ackFrame,
+      [&](const auto&, const auto&, const auto&) {},
+      [&](auto&, auto&, bool, auto) {},
+      Clock::now());
+  EXPECT_EQ(std::chrono::microseconds::max(), conn.lossState.mrtt);
+  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.srtt);
+  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.lrtt);
+  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.rttvar);
+  EXPECT_TRUE(conn.outstandingPackets.empty());
+
+  packetNum++;
+  regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
+  conn.outstandingPackets.emplace_back(OutstandingPacket(
+      std::move(regularPacket),
+      Clock::now(),
+      111,
+      false /* handshake */,
+      false /* pureAck */,
+      111));
+  ASSERT_FALSE(conn.outstandingPackets.empty());
+  ackFrame.largestAcked = 1;
+  ackFrame.ackDelay = std::chrono::microseconds(100);
+  ackFrame.ackBlocks.clear();
+  ackFrame.ackBlocks.emplace_back(1, 1);
+  processAckFrame(
+      conn,
+      PacketNumberSpace::AppData,
+      ackFrame,
+      [&](const auto&, const auto&, const auto&) {},
+      [&](auto&, auto&, bool, auto) {},
+      Clock::now());
+  EXPECT_NE(std::chrono::microseconds::max(), conn.lossState.mrtt);
+  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.srtt);
+  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.lrtt);
+  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.rttvar);
+  EXPECT_TRUE(conn.outstandingPackets.empty());
 }
 
 INSTANTIATE_TEST_CASE_P(

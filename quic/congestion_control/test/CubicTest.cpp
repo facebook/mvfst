@@ -41,7 +41,7 @@ TEST_F(CubicTest, AckIncreaseWritable) {
   EXPECT_EQ(initCwnd, cubic.getWritableBytes());
 }
 
-TEST_F(CubicTest, RTOVerified) {
+TEST_F(CubicTest, PersistentCongestion) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), false);
   auto initCwnd = cubic.getWritableBytes();
@@ -50,11 +50,8 @@ TEST_F(CubicTest, RTOVerified) {
   cubic.onPacketSent(packet);
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet);
+  loss.persistentCongestion = true;
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
-
-  // rto verified:
-  cubic.onRTOVerified();
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
   // Cwnd should be dropped to minCwnd:
   EXPECT_EQ(
@@ -68,8 +65,9 @@ TEST_F(CubicTest, RTOVerified) {
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   // Verify both lastMaxCwndBytes and lastReductionTime are also reset in
-  // RTOVerified. When they are both verified, the first ACK will make both
-  // timeToOrigin and timeElapsed to be 0 in Ack handling in Steady handler:
+  // onPersistentCongestion. When they are both verified, the first ACK will
+  // make both timeToOrigin and timeElapsed to be 0 in Ack handling in Steady
+  // handler:
   auto currentCwnd = cubic.getWritableBytes(); // since nothing inflight
   auto packet3 = makeTestingWritePacket(2, 3000, initCwnd / 2 + 1000 + 3000);
   cubic.onPacketSent(packet3);
@@ -128,19 +126,6 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 
-TEST_F(CubicTest, PacketSizeChange) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1000;
-  Cubic cubic(conn);
-  EXPECT_EQ(
-      conn.transportSettings.initCwndInMss * 1000, cubic.getWritableBytes());
-
-  conn.udpSendPacketLen = 50000;
-  cubic.onRTOVerified();
-  EXPECT_EQ(
-      conn.transportSettings.minCwndInMss * 50000, cubic.getWritableBytes());
-}
-
 TEST_F(CubicTest, AppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1500;
@@ -169,6 +154,7 @@ TEST_F(CubicTest, AppLimited) {
   cwnd = cubic.getCongestionWindow();
 
   cubic.setAppLimited(true, reductionTime + std::chrono::milliseconds(1100));
+  EXPECT_TRUE(cubic.isAppLimited());
   auto packet2 = makeTestingWritePacket(2, 1000, 3000);
   cubic.onPacketSent(packet2);
   cubic.onPacketAckOrLoss(
@@ -178,6 +164,7 @@ TEST_F(CubicTest, AppLimited) {
 
   // 1 seconds of quiescence
   cubic.setAppLimited(false, reductionTime + std::chrono::milliseconds(2100));
+  EXPECT_FALSE(cubic.isAppLimited());
   auto packet3 = makeTestingWritePacket(3, 1000, 4000);
   cubic.onPacketSent(packet3);
   cubic.onPacketAckOrLoss(

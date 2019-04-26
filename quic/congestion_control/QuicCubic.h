@@ -31,14 +31,11 @@ enum class CubicStates : uint8_t {
  *  |      [Ack]                          [Ack]   |
  *  |        |                              |     |
  *  -->Hystart------------[Ack]---------->Cubic<--|
- *        |  ^                              |     ^
- *        |  |                              |     |
- *        |  |-------[RTOVerified]<---------|     |
- *        |           ^                     |     |
- *        |           |                     |     |
- *        |           |    ->[ACK/Loss]     |     |
- *        |           |    |     |          |     |
- *        |           |    |     |          |     |
+ *        |                                 |     |
+ *        |                                 |     |
+ *        |                ->[ACK/Loss]     |     |
+ *        |                |     |          |     |
+ *        |                |     |          |     |
  *        -[Loss]---->Fast Recovery<--[Loss]-     |
  *                             |                  |
  *                             |                  |
@@ -96,7 +93,6 @@ class Cubic : public CongestionController {
       override;
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacket& packet) override;
-  void onRTOVerified() override;
 
   uint64_t getWritableBytes() const noexcept override;
   uint64_t getCongestionWindow() const noexcept override;
@@ -128,6 +124,7 @@ class Cubic : public CongestionController {
 
   void onPacketLoss(const LossEvent& loss);
   void onPacketLossInRecovery(const LossEvent& loss);
+  void onPersistentCongestion();
 
   float pacingGain() const noexcept;
   void updatePacing() noexcept;

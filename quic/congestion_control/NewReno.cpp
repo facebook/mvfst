@@ -103,13 +103,12 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
              << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
              << " inflight=" << bytesInFlight_ << " " << conn_;
   }
-}
-
-void NewReno::onRTOVerified() {
-  VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
-  cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
+  if (loss.persistentCongestion) {
+    VLOG(10) << __func__ << " writable=" << getWritableBytes()
+             << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
+             << conn_;
+    cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
+  }
 }
 
 uint64_t NewReno::getWritableBytes() const noexcept {

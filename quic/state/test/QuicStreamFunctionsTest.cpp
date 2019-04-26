@@ -1517,7 +1517,7 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   conn.streamManager->addLoss(streamId);
   conn.streamManager->queueWindowUpdate(streamId);
   conn.streamManager->addStopSending(
-      streamId, ApplicationErrorCode::HTTP_NO_ERROR);
+      streamId, GenericApplicationErrorCode::UNKNOWN);
   stream->state = StreamStates::Closed{};
   conn.streamManager->removeClosedStream(streamId);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
@@ -1760,9 +1760,9 @@ TEST_F(QuicServerStreamFunctionsTest, TestAppendPendingStreamResetAllData) {
   stream.currentWriteOffset = len + 1;
   stream.retransmissionBuffer.clear();
 
-  appendPendingStreamReset(conn, stream, ApplicationErrorCode::STOPPING);
+  appendPendingStreamReset(conn, stream, GenericApplicationErrorCode::UNKNOWN);
   auto rst = conn.pendingEvents.resets.at(id);
-  EXPECT_EQ(rst.errorCode, ApplicationErrorCode::STOPPING);
+  EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_EQ(rst.offset, len);
 }
 
@@ -1779,9 +1779,9 @@ TEST_F(
   stream.currentWriteOffset = len;
   stream.retransmissionBuffer.clear();
 
-  appendPendingStreamReset(conn, stream, ApplicationErrorCode::STOPPING);
+  appendPendingStreamReset(conn, stream, GenericApplicationErrorCode::UNKNOWN);
   auto rst = conn.pendingEvents.resets.at(id);
-  EXPECT_EQ(rst.errorCode, ApplicationErrorCode::STOPPING);
+  EXPECT_EQ(rst.errorCode, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_EQ(rst.offset, len);
 }
 

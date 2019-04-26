@@ -28,6 +28,18 @@ bool hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 
 std::chrono::microseconds calculateRTO(const QuicConnectionStateBase& conn);
 
+/**
+ * Whether conn is having persistent congestion.
+ *
+ * TODO: This currently doesn't check if packets within this window from other
+ * pnSpace are lost too.
+ * Pending https://github.com/quicwg/base-drafts/issues/2649
+ */
+bool isPersistentCongestion(
+    const QuicConnectionStateBase& conn,
+    TimePoint lostPeriodStart,
+    TimePoint lostPeriodEnd) noexcept;
+
 inline std::ostream& operator<<(
     std::ostream& os,
     const LossState::AlarmMethod& alarmMethod) {
@@ -50,16 +62,15 @@ std::pair<std::chrono::milliseconds, LossState::AlarmMethod>
 calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   std::chrono::microseconds alarmDuration;
   folly::Optional<LossState::AlarmMethod> alarmMethod;
-  TimePoint lastSentPacketTime = conn.outstandingPackets.back().time;
+  TimePoint lastSentPacketTime =
+      conn.lossState.lastRetransmittablePacketSentTime;
   if (conn.outstandingHandshakePacketsCount > 0) {
     if (conn.lossState.srtt == std::chrono::microseconds(0)) {
       alarmDuration = kDefaultInitialRtt * 2;
     } else {
       alarmDuration = conn.lossState.srtt * 2;
     }
-    // TODO: kMinTLPTimeout will be gone in later diff
-    alarmDuration =
-        timeMax(conn.lossState.maxAckDelay + alarmDuration, kMinTLPTimeout);
+    alarmDuration += conn.lossState.maxAckDelay;
     alarmDuration *=
         1 << std::min(conn.lossState.handshakeAlarmCount, (uint16_t)15);
     alarmMethod = LossState::AlarmMethod::Handshake;
@@ -68,6 +79,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
     DCHECK_NE(lastSentPacketTime.time_since_epoch().count(), 0);
   } else if (conn.lossState.lossTime) {
     if (*conn.lossState.lossTime > lastSentPacketTime) {
+      // We do this so that lastSentPacketTime + alarmDuration = lossTime
       alarmDuration = std::chrono::duration_cast<std::chrono::microseconds>(
           *conn.lossState.lossTime - lastSentPacketTime);
     } else {
@@ -136,7 +148,6 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     timeout.cancelLossTimeout();
     return;
   }
-  // TODO: updating outstandingClonedPacketsCount will be in followup diffs.
   /*
    * We have this condition to disambiguate the case where we have.
    * (1) All outstanding packets that are clones that are processed and there
@@ -189,32 +200,24 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
  * This function should be invoked after some event that is possible to
  * trigger loss detection, for example: packets are acked
  */
-template <class LossVisitor, class ClockType = Clock>
+template <class LossVisitor>
 folly::Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
     PacketNum largestAcked,
     const LossVisitor& lossVisitor,
     TimePoint lossTime,
-    folly::Optional<PacketNum> rtoVerifiedPacket,
     PacketNumberSpace pnSpace) {
-  DCHECK(!rtoVerifiedPacket || *rtoVerifiedPacket <= largestAcked);
   conn.lossState.lossTime.clear();
-  folly::Optional<std::chrono::microseconds> delayUntilLost;
-  // TODO: maybe cache these values for efficiency
-  if (conn.lossState.lossMode == LossState::LossMode::TimeLossDetection) {
-    delayUntilLost = std::chrono::duration_cast<std::chrono::microseconds>(
-        std::max(conn.lossState.srtt, conn.lossState.lrtt) *
-        (1 + conn.lossState.timeReorderingFraction));
-  } else if (largestAcked == conn.lossState.largestSent) {
-    delayUntilLost = std::max(conn.lossState.srtt, conn.lossState.lrtt) * 9 / 8;
-  }
+  std::chrono::microseconds delayUntilLost =
+      std::max(conn.lossState.srtt, conn.lossState.lrtt) * 9 / 8;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandingPackets.size()
-           << " largestAcked=" << largestAcked << " delayUntilLost="
-           << delayUntilLost.value_or(std::chrono::microseconds::zero()).count()
-           << "us"
+           << " largestAcked=" << largestAcked
+           << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
+  // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
+  bool shouldSetTimer = false;
   while (iter != conn.outstandingPackets.end()) {
     auto& pkt = *iter;
     auto currentPacketNum = folly::variant_match(
@@ -230,21 +233,13 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       iter++;
       continue;
     }
-    bool lost = false;
-    if (delayUntilLost) {
-      lost = lost || ((ClockType::now() - pkt.time) > *delayUntilLost);
-    }
-    if (conn.lossState.lossMode == LossState::LossMode::ReorderingThreshold) {
-      lost = lost ||
-          (largestAcked - currentPacketNum) >
-              conn.lossState.reorderingThreshold;
-    }
-    if (rtoVerifiedPacket && currentPacketNum <= *rtoVerifiedPacket) {
-      lost = true;
-    }
+    bool lost = (lossTime - pkt.time) > delayUntilLost;
+    lost = lost ||
+        (largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
     if (!lost) {
       // We can exit early here because if packet N doesn't meet the
       // threshold, then packet N + 1 will not either.
+      shouldSetTimer = true;
       break;
     }
     if (!pkt.pureAck) {
@@ -276,19 +271,27 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     iter = conn.outstandingPackets.erase(iter);
   }
 
-  if (!conn.outstandingPackets.empty() && !conn.lossState.lossTime &&
-      delayUntilLost) {
+  // Because we handle handshake timer before lossTime, lossTime is used by
+  // AppData space only. So this is fine.
+  auto earliest = getFirstOutstandingPacket(conn, pnSpace);
+  for (; earliest != conn.outstandingPackets.end(); earliest++) {
+    if (!earliest->pureAck &&
+        (!earliest->associatedEvent ||
+         conn.outstandingPacketEvents.count(*earliest->associatedEvent))) {
+      break;
+    }
+  }
+  if (shouldSetTimer && earliest != conn.outstandingPackets.end()) {
     // We are eligible to set a loss timer and there are a few packets which
     // are unacked, so we can set the early retransmit timer for them.
     VLOG(10) << __func__ << " early retransmit timer outstanding="
              << conn.outstandingPackets.empty() << " delayUntilLost"
-             << delayUntilLost->count() << "us"
+             << delayUntilLost.count() << "us"
              << " " << conn;
-    conn.lossState.lossTime =
-        *delayUntilLost + conn.outstandingPackets.front().time;
+    conn.lossState.lossTime = delayUntilLost + earliest->time;
   }
-  // TODO(yangchi): pass the event time in to elimite the process delay
   if (lossEvent.largestLostPacketNum.hasValue()) {
+    DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
     QUIC_TRACE(
         packets_lost,
         conn,
@@ -370,19 +373,24 @@ void onLossDetectionAlarm(
     VLOG(10) << "Transmission alarm fired with no outstanding packets " << conn;
     return;
   }
+  // TODO: The specs prioritize EarlyRetransmitOrReordering over crypto timer.
   if (conn.lossState.currentAlarmMethod == LossState::AlarmMethod::Handshake) {
     onHandshakeAlarm<LossVisitor, ClockType>(conn, lossVisitor);
   } else if (
       conn.lossState.currentAlarmMethod ==
       LossState::AlarmMethod::EarlyRetransmitOrReordering) {
-    auto lossEvent = detectLossPackets<LossVisitor, ClockType>(
+    auto lossEvent = detectLossPackets<LossVisitor>(
         conn,
         getAckState(conn, PacketNumberSpace::AppData).largestAckedByPeer,
         lossVisitor,
         now,
-        folly::none,
         PacketNumberSpace::AppData);
     if (conn.congestionController && lossEvent) {
+      DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      lossEvent->persistentCongestion = isPersistentCongestion(
+          conn,
+          *lossEvent->smallestLostSentTime,
+          *lossEvent->largestLostSentTime);
       conn.congestionController->onPacketAckOrLoss(
           folly::none, std::move(lossEvent));
     }
@@ -416,28 +424,12 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     const LossVisitor& lossVisitor,
     CongestionController::AckEvent& ack,
     PacketNumberSpace pnSpace) {
-  folly::Optional<PacketNum> rtoVerifiedPacket;
   auto& largestAcked = getAckState(conn, pnSpace).largestAckedByPeer;
   if (ack.largestAckedPacket.hasValue()) {
-    // LargestAcked is larger than largest one in largestSentBeforeRto, notify
-    // onRTOVerified:
-    if (conn.lossState.rtoCount > 0 && conn.lossState.largestSentBeforeRto &&
-        *ack.largestAckedPacket > *conn.lossState.largestSentBeforeRto) {
-      QUIC_TRACE(
-          rto_verified,
-          conn,
-          *ack.largestAckedPacket,
-          *conn.lossState.largestSentBeforeRto,
-          (uint64_t)conn.outstandingPackets.size());
-      if (conn.congestionController) {
-        conn.congestionController->onRTOVerified();
-      }
-      rtoVerifiedPacket = *ack.largestAckedPacket;
-    }
-    // TODO: Should we NOT reset these counters if the received Ack
-    // frame doesn't ack anything that's in OP list?
+    // TODO: Should we NOT reset these counters if the received Ack frame
+    // doesn't ack anything that's in OP list?
     conn.lossState.rtoCount = 0;
-    conn.lossState.largestSentBeforeRto = folly::none;
+    conn.lossState.handshakeAlarmCount = 0;
     largestAcked = std::max(largestAcked, *ack.largestAckedPacket);
   }
   auto lossEvent = detectLossPackets(
@@ -445,7 +437,6 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       getAckState(conn, pnSpace).largestAckedByPeer,
       lossVisitor,
       ack.ackTime,
-      std::move(rtoVerifiedPacket),
       pnSpace);
   conn.pendingEvents.setLossDetectionAlarm =
       (conn.outstandingPackets.size() > conn.outstandingPureAckPacketsCount);

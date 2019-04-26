@@ -164,11 +164,22 @@ struct ReadCryptoFrame {
     }
   }
 
+  ReadCryptoFrame(ReadCryptoFrame&& other) noexcept {
+    offset = other.offset;
+    data = std::move(other.data);
+  }
+
   ReadCryptoFrame& operator=(const ReadCryptoFrame& other) {
     offset = other.offset;
     if (other.data) {
       data = other.data->clone();
     }
+    return *this;
+  }
+
+  ReadCryptoFrame& operator=(ReadCryptoFrame&& other) {
+    offset = other.offset;
+    data = std::move(other.data);
     return *this;
   }
 
@@ -287,12 +298,27 @@ struct ReadStreamFrame {
     fin = other.fin;
   }
 
+  ReadStreamFrame(ReadStreamFrame&& other) noexcept {
+    streamId = other.streamId;
+    offset = other.offset;
+    data = std::move(other.data);
+    fin = other.fin;
+  }
+
   ReadStreamFrame& operator=(const ReadStreamFrame& other) {
     streamId = other.streamId;
     offset = other.offset;
     if (other.data) {
       data = other.data->clone();
     }
+    fin = other.fin;
+    return *this;
+  }
+
+  ReadStreamFrame& operator=(ReadStreamFrame&& other) {
+    streamId = other.streamId;
+    offset = other.offset;
+    data = std::move(other.data);
     fin = other.fin;
     return *this;
   }

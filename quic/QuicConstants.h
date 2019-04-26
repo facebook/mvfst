@@ -108,46 +108,26 @@ enum class TransportErrorCode : uint16_t {
   TLS_FATAL_ALERT_RECEIVED = 0x203,
 };
 
-enum class ApplicationErrorCode : uint16_t {
-  STOPPING = 0x00,
-  // HTTP2/QUIC error codes
-  HTTP_NO_ERROR = 0x01,
-  HTTP_PUSH_REFUSED = 0x02,
-  HTTP_INTERNAL_ERROR = 0x03,
-  HTTP_PUSH_ALREADY_IN_CACHE = 0x04,
-  HTTP_REQUEST_CANCELLED = 0x05,
-  HTTP_INCOMPLETE_REQUEST = 0x06,
-  HTTP_CONNECT_ERROR = 0x07,
-  HTTP_EXCESSIVE_LOAD = 0x08,
-  HTTP_VERSION_FALLBACK = 0x09,
-  HTTP_WRONG_STREAM = 0x0A,
-  HTTP_PUSH_LIMIT_EXCEEDED = 0x0B,
-  HTTP_DUPLICATE_PUSH = 0x0C,
-  HTTP_UNKNOWN_STREAM_TYPE = 0x0D,
-  HTTP_WRONG_STREAM_COUNT = 0x0E,
-  HTTP_CLOSED_CRITICAL_STREAM = 0x0F,
-  HTTP_WRONG_STREAM_DIRECTION = 0x10,
-  HTTP_EARLY_RESPONSE = 0x11,
-  HTTP_MISSING_SETTINGS = 0x12,
-  HTTP_UNEXPECTED_FRAME = 0x13,
-  HTTP_REQUEST_REJECTED = 0x14,
-  HTTP_QPACK_DECOMPRESSION_FAILED = 0xE0,
-  HTTP_QPACK_DECODER_STREAM_ERROR = 0xE1,
-  HTTP_QPACK_ENCODER_STREAM_ERROR = 0xE2,
-  HTTP_GENERAL_PROTOCOL_ERROR = 0xFF,
-  HTTP_MALFORMED_FRAME_DATA = 0x0100,
-  HTTP_MALFORMED_FRAME_HEADERS = 0x0101,
-  HTTP_MALFORMED_FRAME_PRIORITY = 0x0102,
-  HTTP_MALFORMED_FRAME_CANCEL_PUSH = 0x0103,
-  HTTP_MALFORMED_FRAME_SETTINGS = 0x0104,
-  HTTP_MALFORMED_FRAME_PUSH_PROMISE = 0x0105,
-  HTTP_MALFORMED_FRAME_GOAWAY = 0x0107,
-  HTTP_MALFORMED_FRAME_MAX_PUSH_ID = 0x010D,
-  HTTP_MALFORMED_FRAME = 0x01FF,
-  // Internal use only
-  INTERNAL_ERROR = 0xF1,
-  GIVEUP_ZERO_RTT = 0xF2
+/**
+ * Application error codes are opaque to QUIC transport.  Each application
+ * protocol can define its own error codes.
+ */
+using ApplicationErrorCode = uint16_t;
+
+/**
+ * Example application error codes, or codes that can be used by very simple
+ * applications.  Note: by convention error code 0 means no error.
+ *
+ * It is convenient to use not strongly typed enums so they are implicitly
+ * castable to ints, but to get the scoping semantics we enclose it in a
+ * namespace of the same name.
+ */
+namespace GenericApplicationErrorCode {
+enum GenericApplicationErrorCode : uint16_t {
+  NO_ERROR = 0x0000,
+  UNKNOWN = 0xFFFF
 };
+}
 
 enum class LocalErrorCode : uint32_t {
   // Local errors
@@ -225,15 +205,12 @@ constexpr int kRttBeta = 4;
 // recommendation. This is not a bug.
 constexpr std::chrono::microseconds kDefaultInitialRtt =
     std::chrono::microseconds(50 * 1000);
-constexpr std::chrono::microseconds kMinTLPTimeout =
-    std::chrono::microseconds(10 * 1000);
 
 // HHWheelTimer tick interval
 constexpr std::chrono::microseconds kGranularity =
     std::chrono::microseconds(10 * 1000);
 
 constexpr uint32_t kReorderingThreshold = 3;
-constexpr double kTimeReorderingFraction = 0.125;
 
 constexpr auto kPacketToSendForRTO = 2;
 
@@ -248,6 +225,9 @@ constexpr uint64_t kDefaultMaxBurstPackets = 10;
 constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
 
 // Congestion control:
+constexpr std::chrono::microseconds::rep kPersistentCongestionThreshold = 3;
+constexpr std::chrono::microseconds::rep kPersistentCongestionPeriodFactor =
+    (((std::chrono::microseconds::rep)1 << kPersistentCongestionThreshold) - 1);
 enum class CongestionControlType : uint8_t { Cubic, NewReno, Copa, BBR, None };
 
 constexpr uint64_t kInitCwndInMss = 10;

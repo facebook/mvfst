@@ -590,7 +590,7 @@ QuicTransportBase::setReadCallbackInternal(
   } else {
     readCb = cb;
     if (readCb == nullptr) {
-      return stopSending(id, ApplicationErrorCode::HTTP_NO_ERROR);
+      return stopSending(id, GenericApplicationErrorCode::NO_ERROR);
     }
   }
   updateReadLooper();
@@ -1885,7 +1885,9 @@ void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
-  getEventBase()->timer().scheduleTimeout(&lossTimeout_, timeout);
+  auto& wheelTimer = getEventBase()->timer();
+  timeout = timeMax(timeout, wheelTimer.getTickInterval());
+  wheelTimer.scheduleTimeout(&lossTimeout_, timeout);
 }
 
 void QuicTransportBase::scheduleAckTimeout() {

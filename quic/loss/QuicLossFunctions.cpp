@@ -17,16 +17,24 @@ std::chrono::microseconds calculateRTO(const QuicConnectionStateBase& conn) {
       conn.lossState.maxAckDelay;
 }
 
+bool isPersistentCongestion(
+    const QuicConnectionStateBase& conn,
+    TimePoint lostPeriodStart,
+    TimePoint lostPeriodEnd) noexcept {
+  if (conn.lossState.srtt == std::chrono::microseconds::zero()) {
+    return false;
+  }
+  auto rto = calculateRTO(conn);
+  return (lostPeriodEnd - lostPeriodStart) >=
+      rto * kPersistentCongestionPeriodFactor;
+}
+
 void onRTOAlarm(QuicConnectionStateBase& conn) {
   VLOG(10) << __func__ << " " << conn;
-  if (conn.lossState.rtoCount == 0) {
-    conn.lossState.largestSentBeforeRto = conn.lossState.largestSent;
-  }
   QUIC_TRACE(
       rto_alarm,
       conn,
       conn.lossState.largestSent,
-      *conn.lossState.largestSentBeforeRto,
       conn.lossState.rtoCount,
       (uint64_t)conn.outstandingPackets.size());
   QUIC_STATS(conn.infoCallback, onRTO);

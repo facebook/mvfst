@@ -178,7 +178,7 @@ TEST_F(NewRenoTest, TestWritableBytes) {
   EXPECT_EQ(reno.getWritableBytes(), 0);
 }
 
-TEST_F(NewRenoTest, RTOVerified) {
+TEST_F(NewRenoTest, PersistentCongestion) {
   QuicServerConnectionState conn;
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
@@ -186,12 +186,15 @@ TEST_F(NewRenoTest, RTOVerified) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
-  reno.onPacketSent(createPacket(ackPacketNum, ackedSize));
-  reno.onRTOVerified();
-
+  auto pkt = createPacket(ackPacketNum, ackedSize);
+  reno.onPacketSent(pkt);
+  CongestionController::LossEvent loss;
+  loss.persistentCongestion = true;
+  loss.addLostPacket(pkt);
+  reno.onPacketAckOrLoss(folly::none, loss);
   EXPECT_EQ(
       reno.getWritableBytes(),
-      conn.transportSettings.minCwndInMss * conn.udpSendPacketLen - ackedSize);
+      conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);
   EXPECT_TRUE(reno.inSlowStart());
 }
 

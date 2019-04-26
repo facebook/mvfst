@@ -276,7 +276,7 @@ void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
 
 std::unique_ptr<fizz::test::MockAead> createNoOpAead() {
   // Fake that the handshake has already occured
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<NiceMock<fizz::test::MockAead>>();
   ON_CALL(*aead, _encrypt(_, _, _))
       .WillByDefault(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
@@ -299,7 +299,7 @@ std::unique_ptr<fizz::test::MockAead> createNoOpAead() {
 }
 
 std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher() {
-  auto headerCipher = std::make_unique<MockPacketNumberCipher>();
+  auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
   ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
   ON_CALL(*headerCipher, keyLength()).WillByDefault(Return(16));
   return headerCipher;

@@ -142,7 +142,7 @@ TEST_F(CopaTest, TestWritableBytes) {
   EXPECT_EQ(copa.getWritableBytes(), 0);
 }
 
-TEST_F(CopaTest, RTOVerified) {
+TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn;
   Copa copa(conn);
   EXPECT_TRUE(copa.inSlowStart());
@@ -150,12 +150,15 @@ TEST_F(CopaTest, RTOVerified) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
-  copa.onPacketSent(createPacket(ackPacketNum, ackedSize, ackedSize));
-  copa.onRTOVerified();
-
+  auto pkt = createPacket(ackPacketNum, ackedSize, ackedSize);
+  copa.onPacketSent(pkt);
+  CongestionController::LossEvent loss;
+  loss.persistentCongestion = true;
+  loss.addLostPacket(pkt);
+  copa.onPacketAckOrLoss(folly::none, loss);
   EXPECT_EQ(
       copa.getWritableBytes(),
-      conn.transportSettings.minCwndInMss * conn.udpSendPacketLen - ackedSize);
+      conn.transportSettings.minCwndInMss * conn.udpSendPacketLen);
   EXPECT_TRUE(copa.inSlowStart());
 }
 

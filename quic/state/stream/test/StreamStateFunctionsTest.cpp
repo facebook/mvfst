@@ -39,7 +39,7 @@ TEST_F(StreamStateFunctionsTests, SanityTest) {
   EXPECT_TRUE(stream.writable());
 
   invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(ApplicationErrorCode::STOPPING));
+      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
   // Something are cleared:
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_TRUE(stream.retransmissionBuffer.empty());
@@ -156,7 +156,7 @@ TEST_F(StreamStateFunctionsTests, SendReset) {
       stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0));
   EXPECT_FALSE(stream.writeBuffer.empty());
   EXPECT_FALSE(stream.readBuffer.empty());
-  resetQuicStream(stream, ApplicationErrorCode::STOPPING);
+  resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN);
 
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_TRUE(stream.readBuffer.empty());
@@ -169,7 +169,7 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
   QuicStreamState stream(id, conn);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
   EXPECT_GT(conn.flowControlState.sumCurStreamBufferLen, 0);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 90);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 90);
 
   stream.currentReadOffset = 80;
   stream.maxOffsetObserved = 90;
@@ -193,7 +193,7 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   QuicStreamState stream(id, conn);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
   EXPECT_GT(conn.flowControlState.sumCurStreamBufferLen, 0);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 100);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.currentReadOffset = 80;
   stream.maxOffsetObserved = 90;
   stream.flowControlState.advertisedMaxOffset = 100;
@@ -214,7 +214,7 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {
   QuicServerConnectionState conn;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 10);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 100;
   stream.finalReadOffset = 100;
@@ -227,7 +227,7 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
   QuicServerConnectionState conn;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 30);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 30);
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 100;
   stream.flowControlState.advertisedMaxOffset = 300;
@@ -239,7 +239,7 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanStreamFlowControl) {
   QuicServerConnectionState conn;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 200);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 200);
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 30;
   stream.flowControlState.advertisedMaxOffset = 100;
@@ -251,7 +251,7 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanConnFlowControl) {
   QuicServerConnectionState conn;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 200);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 200);
 
   stream.currentReadOffset = 20;
   stream.maxOffsetObserved = 30;
@@ -270,7 +270,7 @@ TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
   QuicServerConnectionState conn;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
-  RstStreamFrame rst(id, ApplicationErrorCode::STOPPING, 100);
+  RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.currentReadOffset = 101;
   stream.finalReadOffset = 100;
   stream.maxOffsetObserved = 100;

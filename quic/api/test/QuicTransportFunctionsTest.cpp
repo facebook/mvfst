@@ -438,9 +438,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   writeDataToQuicStream(*stream1, nullptr, true);
 
   conn->pendingEvents.resets.emplace(
-      1, RstStreamFrame(1, ApplicationErrorCode::STOPPING, 0));
+      1, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 0));
   auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  RstStreamFrame rstFrame(1, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(1, GenericApplicationErrorCode::UNKNOWN, 0);
   packet2.packet.frames.push_back(std::move(rstFrame));
 
   updateConnection(
@@ -1134,7 +1134,7 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotWriteOtherFrames) {
   auto socket = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
   auto rawSocket = socket.get();
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  RstStreamFrame rstFrame(stream1->id, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstFrame(stream1->id, GenericApplicationErrorCode::UNKNOWN, 0);
   conn->pendingEvents.resets.emplace(stream1->id, rstFrame);
   conn->pendingEvents.connWindowUpdate = true;
   conn->streamManager->queueWindowUpdate(stream1->id);
@@ -1504,7 +1504,8 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  RstStreamFrame rstStreamFrame(stream->id, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstStreamFrame(
+      stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.push_back(rstStreamFrame);
   conn->pendingEvents.resets.emplace(stream->id, rstStreamFrame);
   updateConnection(
@@ -1522,7 +1523,8 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   auto packetEvent = conn->ackStates.appDataAckState.nextPacketNum;
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  RstStreamFrame rstStreamFrame(stream->id, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstStreamFrame(
+      stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.push_back(rstStreamFrame);
   conn->outstandingPacketEvents.insert(packetEvent);
   // This shall not crash
@@ -1548,7 +1550,8 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   conn->lossState.timeoutBasedRetxCount = 246;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
-  RstStreamFrame rstStreamFrame(stream->id, ApplicationErrorCode::STOPPING, 0);
+  RstStreamFrame rstStreamFrame(
+      stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
   packet.packet.frames.push_back(rstStreamFrame);
   PacketEvent packetEvent = 100;
   conn->outstandingPacketEvents.insert(packetEvent);

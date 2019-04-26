@@ -758,7 +758,7 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
 TEST_F(QuicTransportTest, RstStream) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
-  transport_->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
   auto packet =
@@ -770,7 +770,7 @@ TEST_F(QuicTransportTest, RstStream) {
   for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
     EXPECT_EQ(streamId, frame.streamId);
     EXPECT_EQ(0, frame.offset);
-    EXPECT_EQ(ApplicationErrorCode::STOPPING, frame.errorCode);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
     rstFound = true;
   }
   EXPECT_TRUE(rstFound);
@@ -790,7 +790,7 @@ TEST_F(QuicTransportTest, RstStream) {
 TEST_F(QuicTransportTest, StopSending) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
-  transport_->stopSending(streamId, ApplicationErrorCode::STOPPING);
+  transport_->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
   auto packet =
@@ -804,7 +804,7 @@ TEST_F(QuicTransportTest, StopSending) {
         simpleFrame,
         [&](const StopSendingFrame& frame) {
           EXPECT_EQ(streamId, frame.streamId);
-          EXPECT_EQ(ApplicationErrorCode::STOPPING, frame.errorCode);
+          EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
           foundStopSending = true;
         },
         [&](auto&) {});
@@ -1229,7 +1229,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   auto currentWriteOffset = stream->currentWriteOffset;
 
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
-  transport_->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   // 2 packets are outstanding: one for Stream frame one for RstStream frame:
   EXPECT_EQ(2, transport_->getConnectionState().outstandingPackets.size());
@@ -1243,7 +1243,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
     EXPECT_EQ(streamId, frame.streamId);
     EXPECT_EQ(currentWriteOffset, frame.offset);
-    EXPECT_EQ(ApplicationErrorCode::STOPPING, frame.errorCode);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1259,7 +1259,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
 TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(SetErrnoAndReturn(EAGAIN, -1));
-  transport_->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
   EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
@@ -1272,7 +1272,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   bool foundReset = false;
   for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
     EXPECT_EQ(streamId, frame.streamId);
-    EXPECT_EQ(ApplicationErrorCode::STOPPING, frame.errorCode);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1293,7 +1293,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailFatal) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _))
       .WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
-  transport_->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   EXPECT_TRUE(transport_->getConnectionState().outstandingPackets.empty());
 
@@ -1311,7 +1311,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   ASSERT_TRUE(stream);
   auto currentWriteOffset = stream->currentWriteOffset;
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
-  transport_->resetStream(streamId, ApplicationErrorCode::STOPPING);
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
   EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(*stream));
@@ -1339,7 +1339,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
     EXPECT_EQ(streamId, frame.streamId);
     EXPECT_EQ(currentWriteOffset, frame.offset);
-    EXPECT_EQ(ApplicationErrorCode::STOPPING, frame.errorCode);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1351,13 +1351,15 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
 TEST_F(QuicTransportTest, DoubleReset) {
   auto streamId = transport_->createBidirectionalStream().value();
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
-  EXPECT_FALSE(transport_->resetStream(streamId, ApplicationErrorCode::STOPPING)
-                   .hasError());
+  EXPECT_FALSE(
+      transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
   loopForWrites();
 
   // Then reset again, which is a no-op:
-  EXPECT_FALSE(transport_->resetStream(streamId, ApplicationErrorCode::STOPPING)
-                   .hasError());
+  EXPECT_FALSE(
+      transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
 }
 
 TEST_F(QuicTransportTest, WriteStreamDataSetLossAlarm) {

@@ -83,7 +83,6 @@ class QuicApplicationException : public std::runtime_error {
  */
 std::string toString(TransportErrorCode code);
 std::string toString(LocalErrorCode code);
-std::string toString(ApplicationErrorCode code);
 std::string toString(QuicErrorCode code);
 std::string toString(
     const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>& error);

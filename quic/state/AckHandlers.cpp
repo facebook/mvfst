@@ -73,12 +73,6 @@ void processAckFrame(
       if (currentPacketNum > ackBlockIt->endPacket) {
         break;
       }
-      // If we are tracking RTO verification, and a packet sent before RTO is
-      // acked, then the RTO was spurious and we should stop tracking.
-      if (conn.lossState.largestSentBeforeRto &&
-          currentPacketNum <= *conn.lossState.largestSentBeforeRto) {
-        conn.lossState.largestSentBeforeRto = folly::none;
-      }
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
                << " handshake=" << (int)packetItEnd->isHandshake
@@ -99,8 +93,8 @@ void processAckFrame(
           ackReceiveTime > packetItEnd->time ? ackReceiveTime : Clock::now();
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
           ackReceiveTimeOrNow - packetItEnd->time);
-      if (currentPacketNum == frame.largestAcked) {
-        updateRtt(conn, rttSample, frame.ackDelay, packetItEnd->pureAck);
+      if (currentPacketNum == frame.largestAcked && !packetItEnd->pureAck) {
+        updateRtt(conn, rttSample, frame.ackDelay);
       }
       QUIC_TRACE(
           packet_acked,
@@ -149,6 +143,13 @@ void processAckFrame(
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
       (ack.largestAckedPacket.hasValue() || lossEvent)) {
+    if (lossEvent) {
+      DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      lossEvent->persistentCongestion = isPersistentCongestion(
+          conn,
+          *lossEvent->smallestLostSentTime,
+          *lossEvent->largestLostSentTime);
+    }
     conn.congestionController->onPacketAckOrLoss(
         std::move(ack), std::move(lossEvent));
   }
