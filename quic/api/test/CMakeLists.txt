@@ -101,6 +101,7 @@ quic_add_test(TARGET IoBufQuicBatchTest
   IoBufQuicBatchTest.cpp
   DEPENDS
   Folly::folly
+  mvfst_client
   mvfst_transport
   mvfst_state_machine
 )
