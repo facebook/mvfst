@@ -6,10 +6,11 @@
  *
  */
 
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include <fizz/crypto/Utils.h>
 #include <folly/init/Init.h>
+#include <folly/portability/GFlags.h>
 
 #include <quic/samples/echo/EchoClient.h>
 #include <quic/samples/echo/EchoServer.h>
@@ -22,9 +23,14 @@ DEFINE_bool(pr, false, "Enable partially realible mode");
 using namespace quic::samples;
 
 int main(int argc, char* argv[]) {
+#if FOLLY_HAVE_LIBGFLAGS
+  // Enable glog logging to stderr by default.
+  gflags::SetCommandLineOptionWithMode(
+      "logtostderr", "1", gflags::SET_FLAGS_DEFAULT);
+#endif
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-  google::InitGoogleLogging(argv[0]);
-  folly::ssl::init();
+  folly::Init init(&argc, &argv);
+  fizz::CryptoUtils::init();
 
   if (FLAGS_mode == "server") {
     EchoServer server(FLAGS_port, FLAGS_pr);
