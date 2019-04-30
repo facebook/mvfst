@@ -36,18 +36,23 @@ inline void Handler<
         return buffer.offset < offset;
       });
 
-  // Since the StreamFrames that are ACKed are computed from the outstanding
-  // packets, we always know that the retransmission buffer corresponds to
-  // 1 buffer in the retranmission buffer.
-  CHECK(ackedBuffer != stream.retransmissionBuffer.end());
-  CHECK_EQ(ackedBuffer->offset, ack.ackedFrame.offset);
-  CHECK_EQ(ackedBuffer->data.chainLength(), ack.ackedFrame.len);
+  if (ackedBuffer != stream.retransmissionBuffer.end()) {
+    // Since the StreamFrames that are ACKed are computed from the outstanding
+    // packets, we always know that the retransmission buffer corresponds to
+    // 1 buffer in the retranmission buffer.
+    CHECK_EQ(ackedBuffer->offset, ack.ackedFrame.offset);
+    CHECK_EQ(ackedBuffer->data.chainLength(), ack.ackedFrame.len);
 
-  VLOG(10) << "HalfClosedRemote: stream data acked stream=" << stream.id
-           << " offset=" << ackedBuffer->offset
-           << " len=" << ackedBuffer->data.chainLength()
-           << " eof=" << ackedBuffer->eof << " " << stream.conn;
-  stream.retransmissionBuffer.erase(ackedBuffer);
+    VLOG(10) << "HalfClosedRemote: stream data acked stream=" << stream.id
+             << " offset=" << ackedBuffer->offset
+             << " len=" << ackedBuffer->data.chainLength()
+             << " eof=" << ackedBuffer->eof << " " << stream.conn;
+    stream.retransmissionBuffer.erase(ackedBuffer);
+  } else {
+    VLOG(10) << __func__ << ": offset " << ack.ackedFrame.offset
+             << " no longer in retransmissionBuffer";
+  }
+
   // This stream may be able to invoke some deliveryCallbacks:
   stream.conn.streamManager->addDeliverable(stream.id);
 

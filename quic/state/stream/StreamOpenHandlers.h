@@ -108,20 +108,22 @@ Handler<StreamStateMachine, StreamStates::Open, StreamEvents::AckStreamFrame>::
         return buffer.offset < offset;
       });
 
-  // Since the StreamFrames that are ACKed are computed from the outstanding
-  // packets, we always know that the retransmission buffer corresponds to
-  // 1 buffer in the retranmission buffer.
-  CHECK(ackedBuffer != stream.retransmissionBuffer.end());
-  DCHECK_EQ(ackedBuffer->offset, ack.ackedFrame.offset);
+  if (ackedBuffer != stream.retransmissionBuffer.end()) {
+    // Since the StreamFrames that are ACKed are computed from the outstanding
+    // packets, we always know that the retransmission buffer corresponds to
+    // 1 buffer in the retranmission buffer.
+    DCHECK_EQ(ackedBuffer->offset, ack.ackedFrame.offset);
 
-  DCHECK_EQ(ackedBuffer->data.chainLength(), ack.ackedFrame.len);
-  DCHECK_EQ(ackedBuffer->eof, ack.ackedFrame.fin);
+    DCHECK_EQ(ackedBuffer->data.chainLength(), ack.ackedFrame.len);
+    DCHECK_EQ(ackedBuffer->eof, ack.ackedFrame.fin);
 
-  VLOG(10) << "Open: acked stream data stream=" << stream.id
-           << " offset=" << ackedBuffer->offset
-           << " len=" << ackedBuffer->data.chainLength()
-           << " eof=" << ackedBuffer->eof << " " << stream.conn;
-  stream.retransmissionBuffer.erase(ackedBuffer);
+    VLOG(10) << "Open: acked stream data stream=" << stream.id
+             << " offset=" << ackedBuffer->offset
+             << " len=" << ackedBuffer->data.chainLength()
+             << " eof=" << ackedBuffer->eof << " " << stream.conn;
+    stream.retransmissionBuffer.erase(ackedBuffer);
+  }
+
   // This stream may be able to invoke some deliveryCallbacks:
   stream.conn.streamManager->addDeliverable(stream.id);
 

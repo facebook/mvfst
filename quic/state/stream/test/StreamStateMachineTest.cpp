@@ -211,6 +211,47 @@ TEST_F(QuicOpenStateTest, AckStream) {
   ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
 }
 
+TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
+  auto conn = createConn();
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  serverChosenConnId.value().data()[0] ^= 0x01;
+  EventBase evb;
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+
+  auto buf = IOBuf::copyBuffer("hello");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      true);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+
+  auto& streamFrame = boost::get<WriteStreamFrame>(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->packet.frames.front());
+
+  PacketNum packetNum(1);
+  MinStreamDataFrame minDataFrame(stream->id, 1000, 100);
+  onRecvMinStreamDataFrame(stream, minDataFrame, packetNum);
+  EXPECT_EQ(stream->minimumRetransmittableOffset, buf->length());
+
+  EXPECT_TRUE(stream->retransmissionBuffer.empty());
+
+  StreamEvents::AckStreamFrame ack(streamFrame);
+  invokeHandler<StreamStateMachine>(*stream, ack);
+  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+
+  invokeHandler<StreamStateMachine>(*stream, ack);
+  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+}
+
 class QuicHalfClosedLocalStateTest : public Test {};
 
 TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithFIN) {
@@ -290,6 +331,52 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   auto& streamFrame = boost::get<WriteStreamFrame>(
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
           ->packet.frames.front());
+
+  StreamEvents::AckStreamFrame ack(streamFrame);
+  invokeHandler<StreamStateMachine>(*stream, ack);
+  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+
+  invokeHandler<StreamStateMachine>(*stream, ack);
+  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+}
+
+TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
+  auto conn = createConn();
+  // create server chosen connId with processId = 0 and workerId = 0
+  ServerConnectionIdParams params(0, 0, 0);
+  params.clientConnId = *conn->clientConnectionId;
+  auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
+  folly::Optional<ConnectionId> serverChosenConnId =
+      connIdAlgo->encodeConnectionId(params);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->state = StreamStates::HalfClosedRemote();
+
+  EventBase evb;
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+
+  auto buf = IOBuf::copyBuffer("hello");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      true);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+
+  auto& streamFrame = boost::get<WriteStreamFrame>(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->packet.frames.front());
+
+  PacketNum packetNum(1);
+  MinStreamDataFrame minDataFrame(stream->id, 1000, 100);
+  onRecvMinStreamDataFrame(stream, minDataFrame, packetNum);
+  EXPECT_EQ(stream->minimumRetransmittableOffset, buf->length());
+
+  EXPECT_TRUE(stream->retransmissionBuffer.empty());
 
   StreamEvents::AckStreamFrame ack(streamFrame);
   invokeHandler<StreamStateMachine>(*stream, ack);

@@ -202,17 +202,17 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
     const WriteStreamFrame& frame,
     const QuicStreamState* stream) {
   /**
-   * StreamBuffer is removed from retransmissionBuffer in 3 cases.
+   * StreamBuffer is removed from retransmissionBuffer in 4 cases.
    * 1: After send or receive RST.
    * 2: Packet containing the buffer gets acked.
    * 3: Packet containing the buffer is marked loss.
-   * Checking retransmittable() should cover first case. The latter two cases
-   * have to be covered by making sure we do not clone an already acked or lost
-   * packet.
+   * 4: Skip (MIN_DATA or EXPIRED_DATA) frame is received with offset larger
+   *    than what's in the retransmission buffer.
+   *
+   * Checking retransmittable() should cover first case. The latter three cases
+   * have to be covered by making sure we do not clone an already acked, lost or
+   * skipped packet.
    */
-  DCHECK(frame.len || frame.fin)
-      << "WriteStreamFrame cloning: frame is empty and doesn't have FIN set. "
-      << conn_;
   DCHECK(stream);
   DCHECK(retransmittable(*stream));
   auto iter = std::lower_bound(
@@ -222,19 +222,22 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
       [](const auto& buffer, const auto& targetOffset) {
         return buffer.offset < targetOffset;
       });
-  DCHECK(iter != stream->retransmissionBuffer.end())
-      << "WriteStreamFrame cloning: cannot find it in the retx buffer. "
-      << conn_;
-  DCHECK(iter->offset == frame.offset)
-      << "WriteStreamFrame cloning: offset mismatch. " << conn_;
-  DCHECK(iter->data.chainLength() == frame.len)
-      << "WriteStreamFrame cloning: Len mismatch. " << conn_;
-  DCHECK(iter->eof == frame.fin)
-      << "WriteStreamFrame cloning: fin mismatch. " << conn_;
-  DCHECK(!frame.len || !iter->data.empty())
-      << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has "
-      << "empty data. " << conn_;
-  return (frame.len ? iter->data.front()->clone() : nullptr);
+  if (iter != stream->retransmissionBuffer.end()) {
+    DCHECK(iter->offset == frame.offset)
+        << "WriteStreamFrame cloning: offset mismatch. " << conn_;
+    DCHECK(iter->data.chainLength() == frame.len)
+        << "WriteStreamFrame cloning: Len mismatch. " << conn_;
+    DCHECK(iter->eof == frame.fin)
+        << "WriteStreamFrame cloning: fin mismatch. " << conn_;
+    DCHECK(!frame.len || !iter->data.empty())
+        << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has "
+        << "empty data. " << conn_;
+    return (frame.len ? iter->data.front()->clone() : nullptr);
+  } else {
+    VLOG(10) << "WriteStreamFrame cloning: frame is not in retx buffer anymore "
+             << conn_;
+    return nullptr;
+  }
 }
 
 } // namespace quic

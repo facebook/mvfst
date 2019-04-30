@@ -50,6 +50,8 @@ void shrinkRetransmittableBuffers(
     maybeWriteBlockAfterSocketWrite(*stream);
     stream->conn.streamManager->updateWritableStreams(*stream);
   }
+  VLOG(10) << __func__ << ": shrinking retransmissionBuffer to "
+           << minimumRetransmittableOffset;
   shrinkBuffers(stream->retransmissionBuffer, minimumRetransmittableOffset);
   shrinkBuffers(stream->lossBuffer, minimumRetransmittableOffset);
 }
