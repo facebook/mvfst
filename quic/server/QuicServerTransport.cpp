@@ -99,7 +99,7 @@ void QuicServerTransport::onReadData(
   ServerEvents::ReadData readData;
   readData.peer = peer;
   readData.networkData = std::move(networkData);
-  invokeHandler<QuicServerStateMachine>(*serverConn_, std::move(readData));
+  onServerReadData(*serverConn_, readData);
   processPendingData(true);
 
   if (closeState_ == CloseState::CLOSED) {
@@ -250,7 +250,7 @@ void QuicServerTransport::closeTransport() {
   // Clear out pending data.
   serverConn_->pendingZeroRttData.reset();
   serverConn_->pendingOneRttData.reset();
-  invokeHandler<QuicServerStateMachine>(*serverConn_, ServerEvents::Close());
+  onServerClose(*serverConn_);
 }
 
 void QuicServerTransport::unbindConnection() {

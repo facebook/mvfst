@@ -8,24 +8,37 @@
 
 #pragma once
 
+#include <glog/logging.h>
+#include <memory>
+#include <vector>
+
+#include <quic/QuicException.h>
+#include <quic/codec/Types.h>
+#include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/logging/QuicLogger.h>
+#include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/handshake/ServerHandshake.h>
+#include <quic/state/AckHandlers.h>
+#include <quic/state/QPRFunctions.h>
+#include <quic/state/QuicStateFunctions.h>
+#include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
-#include <quic/state/StateMachine.h>
+#include <quic/state/stream/StreamStateMachine.h>
 
+#include <folly/ExceptionWrapper.h>
 #include <folly/IPAddress.h>
+#include <folly/Overload.h>
+#include <folly/Random.h>
 #include <folly/io/async/AsyncSocketException.h>
-
-#include <vector>
 
 namespace quic {
 
-struct ServerStates {
-  struct Handshaking {};
-  struct Established {};
-  struct Closed {};
-  struct Error {};
+enum ServerState {
+  Open,
+  Closed,
 };
 
 struct ServerEvents {
@@ -34,18 +47,8 @@ struct ServerEvents {
     NetworkData networkData;
   };
 
-  struct WriteData {
-    Buf buf;
-  };
-
   struct Close {};
 };
-
-using ServerState = boost::variant<
-    ServerStates::Handshaking,
-    ServerStates::Established,
-    ServerStates::Closed,
-    ServerStates::Error>;
 
 struct CongestionAndRttState {
   // The corresponding peer address
@@ -108,7 +111,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   folly::Optional<bool> sourceTokenMatching;
 
   QuicServerConnectionState() : QuicConnectionStateBase(QuicNodeType::Server) {
-    state = ServerStates::Handshaking();
+    state = ServerState::Open;
     // Create the crypto stream.
     cryptoState = std::make_unique<QuicCryptoState>();
     congestionController = std::make_unique<Cubic>(*this);
@@ -133,37 +136,21 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 // Transition to error state on invalid state transition.
 void ServerInvalidStateHandler(QuicServerConnectionState& state);
 
-struct QuicServerStateMachine {
-  using StateData = QuicServerConnectionState;
-  static constexpr auto InvalidEventHandler = &ServerInvalidStateHandler;
-};
+void onServerReadData(
+    QuicServerConnectionState& conn,
+    ServerEvents::ReadData& readData);
 
-/*
- * Handshaking -> Closed
- * TODO: full state machine.
- */
+void onServerReadDataFromOpen(
+    QuicServerConnectionState& conn,
+    ServerEvents::ReadData& readData);
 
-QUIC_DECLARE_STATE_HANDLER(
-    QuicServerStateMachine,
-    ServerStates::Handshaking,
-    ServerEvents::ReadData);
+void onServerReadDataFromClosed(
+    QuicServerConnectionState& conn,
+    ServerEvents::ReadData& readData);
 
-QUIC_DECLARE_STATE_HANDLER(
-    QuicServerStateMachine,
-    ServerStates::Handshaking,
-    ServerEvents::Close,
-    ServerStates::Closed);
+void onServerClose(QuicServerConnectionState& conn);
 
-QUIC_DECLARE_STATE_HANDLER(
-    QuicServerStateMachine,
-    ServerStates::Closed,
-    ServerEvents::ReadData,
-    ServerStates::Closed);
-
-QUIC_DECLARE_STATE_HANDLER(
-    QuicServerStateMachine,
-    ServerStates::Closed,
-    ServerEvents::Close);
+void onServerCloseOpenState(QuicServerConnectionState& conn);
 
 void processClientInitialParams(
     QuicServerConnectionState& conn,
@@ -191,4 +178,3 @@ void onConnectionMigration(
     const folly::SocketAddress& newPeerAddress);
 } // namespace quic
 
-#include <quic/server/state/ServerStateMachine-inl.h>

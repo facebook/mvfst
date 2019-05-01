@@ -27,6 +27,9 @@ using namespace folly::io;
 const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
 
 namespace quic {
+namespace {
+using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
+} // namespace
 namespace test {
 
 MATCHER_P(BufMatches, buf, "") {
