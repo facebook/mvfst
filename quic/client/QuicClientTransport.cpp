@@ -182,6 +182,57 @@ void QuicClientTransport::processPacketData(
     QUIC_TRACE(packet_drop, *conn_, "non_regular");
     return;
   }
+
+  bool longHeader = folly::variant_match(
+      regularOptional->header,
+      [](const LongHeader&) { return true; },
+      [](const ShortHeader&) { return false; });
+
+  if (longHeader &&
+      boost::get<LongHeader>(regularOptional->header).getHeaderType() ==
+          LongHeader::Types::Retry) {
+    if (clientConn_->retryToken_) {
+      VLOG(4) << "Server sent more than one retry packet";
+      return;
+    }
+
+    // TODO (amsharma): Check if we have already received an initial packet
+    // from the server. If so, discard it. Here are some ways in which I
+    // could do this:
+    // 1. Have a boolean flag initialPacketReceived_ that we set to true when
+    //   we get an initial packet from the server. This seems a bit messy.
+    // 2. Check for the presence of the oneRttWriteCipher and/or the
+    //   oneRttReadCipher in the handshake layer. I think this might be a
+    //   better approach, but I don't know if it is a good indicator that we've
+    //   received an initial packet from the server.
+
+    auto header = boost::get<LongHeader>(regularOptional->header);
+
+    auto dstConnId = conn_->serverConnectionId.value_or(
+        *clientConn_->initialDestinationConnectionId);
+    if (*header.getOriginalDstConnId() != dstConnId) {
+      VLOG(4) << "Original destination connection id field in the retry "
+              << "packet doesn't match the destination connection id from the "
+              << "client's initial packet";
+      return;
+    }
+
+    // Set the destination connection ID to be the value from the source
+    // connection id of the retry packet
+    clientConn_->initialDestinationConnectionId = header.getSourceConnId();
+
+    auto released = static_cast<QuicClientConnectionState*>(conn_.release());
+    std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
+    auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
+
+    clientConn_ = tempConn.get();
+    conn_ = std::move(tempConn);
+
+    clientConn_->retryToken_ = header.getToken()->clone();
+    startCryptoHandshake();
+    return;
+  }
+
   auto protectionLevel = folly::variant_match(
       regularOptional->header,
       [](auto& header) { return header.getProtectionType(); });
@@ -223,10 +274,7 @@ void QuicClientTransport::processPacketData(
   if (!conn_->version) {
     conn_->version = conn_->originalVersion;
   }
-  bool longHeader = folly::variant_match(
-      regularOptional->header,
-      [](const LongHeader&) { return true; },
-      [](const ShortHeader&) { return false; });
+
   if (!conn_->serverConnectionId && longHeader) {
     folly::Optional<ConnectionId> receivedSrcConnId(folly::variant_match(
         regularOptional->header,
@@ -713,7 +761,8 @@ void QuicClientTransport::writeData() {
         *conn_->initialWriteCipher,
         *conn_->initialHeaderCipher,
         version,
-        packetLimit);
+        packetLimit,
+        clientConn_->retryToken_ ? clientConn_->retryToken_->clone() : nullptr);
   }
   if (!packetLimit) {
     return;

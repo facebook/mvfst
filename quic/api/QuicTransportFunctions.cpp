@@ -417,8 +417,15 @@ HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
              const ConnectionId& srcConnId,
              const ConnectionId& dstConnId,
              PacketNum packetNum,
-             QuicVersion version) -> PacketHeader {
-    return LongHeader(packetType, srcConnId, dstConnId, packetNum, version);
+             QuicVersion version,
+             Buf token) {
+    return LongHeader(
+        packetType,
+        srcConnId,
+        dstConnId,
+        packetNum,
+        version,
+        token ? std::move(token) : nullptr);
   };
 }
 
@@ -426,7 +433,8 @@ HeaderBuilder ShortHeaderBuilder() {
   return [](const ConnectionId& /* srcConnId */,
             const ConnectionId& dstConnId,
             PacketNum packetNum,
-            QuicVersion) -> PacketHeader {
+            QuicVersion,
+            Buf) {
     return ShortHeader(ProtectionType::KeyPhaseZero, dstConnId, packetNum);
   };
 }
@@ -513,7 +521,8 @@ uint64_t writeCryptoAndAckDataToSocket(
     fizz::Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
-    uint64_t packetLimit) {
+    uint64_t packetLimit,
+    Buf token) {
   auto encryptionLevel = protectionTypeToEncryptionLevel(
       longHeaderTypeToProtectionType(packetType));
   FrameScheduler scheduler =
@@ -539,7 +548,8 @@ uint64_t writeCryptoAndAckDataToSocket(
       packetLimit,
       cleartextCipher,
       headerCipher,
-      version);
+      version,
+      token ? std::move(token) : nullptr);
   VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
                            << " written crypto and acks data type="
                            << packetType << " packets=" << written << " "
@@ -841,7 +851,8 @@ uint64_t writeConnectionDataToSocket(
     uint64_t packetLimit,
     const fizz::Aead& aead,
     const PacketNumberCipher& headerCipher,
-    QuicVersion version) {
+    QuicVersion version,
+    Buf token) {
   VLOG(10) << nodeToString(connection.nodeType)
            << " writing data using scheduler=" << scheduler.name() << " "
            << connection;
@@ -862,7 +873,12 @@ uint64_t writeConnectionDataToSocket(
 
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
-    auto header = builder(srcConnId, dstConnId, packetNum, version);
+    auto header = builder(
+        srcConnId,
+        dstConnId,
+        packetNum,
+        version,
+        token ? token->clone() : nullptr);
     uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
         connection.udpSendPacketLen, writableBytesFunc(connection)));
     uint64_t cipherOverhead = aead.getCipherOverhead();

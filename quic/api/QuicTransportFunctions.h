@@ -24,7 +24,8 @@ using HeaderBuilder = std::function<PacketHeader(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     PacketNum packetNum,
-    QuicVersion version)>;
+    QuicVersion version,
+    Buf token)>;
 
 using WritableBytesFunc =
     std::function<uint64_t(const QuicConnectionStateBase& conn)>;
@@ -57,7 +58,8 @@ uint64_t writeCryptoAndAckDataToSocket(
     fizz::Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
-    uint64_t packetLimit);
+    uint64_t packetLimit,
+    Buf token = nullptr);
 
 /**
  * Writes out all the data streams without writing out crypto streams.
@@ -213,7 +215,8 @@ uint64_t writeConnectionDataToSocket(
     uint64_t packetLimit,
     const fizz::Aead& aead,
     const PacketNumberCipher& headerCipher,
-    QuicVersion version);
+    QuicVersion version,
+    Buf token = nullptr);
 
 uint64_t writeProbingDataToSocket(
     folly::AsyncUDPSocket& sock,

@@ -1878,10 +1878,10 @@ class QuicClientTransportAfterStartTest : public QuicClientTransportTest {
   std::string hostname_{"TestHost"};
 };
 
-class QuicClientTransportVersionTest
+class QuicClientTransportVersionAndRetryTest
     : public QuicClientTransportAfterStartTest {
  public:
-  ~QuicClientTransportVersionTest() override = default;
+  ~QuicClientTransportVersionAndRetryTest() override = default;
 
   void start() override {
     client->start(&clientConnCallback);
@@ -2997,7 +2997,7 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 }
 
 TEST_F(
-    QuicClientTransportVersionTest,
+    QuicClientTransportVersionAndRetryTest,
     VersionNegotiationPacketSupportedVersion) {
   StreamId streamId = client->createBidirectionalStream().value();
   StreamId streamIdNext = client->createBidirectionalStream().value();
@@ -3153,8 +3153,73 @@ TEST_F(
   client->close(folly::none);
 }
 
-TEST_F(QuicClientTransportVersionTest, VersionNegotiationPacketNotSupported) {
-  StreamId streamId = client->createBidirectionalStream().value();
+TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
+  // Create a stream and attempt to send some data to the server
+  StreamId streamId = *client->createBidirectionalStream();
+  auto write = IOBuf::copyBuffer("ice cream");
+  client->writeChain(streamId, write->clone(), true, false, nullptr);
+  loopForWrites();
+
+  std::unique_ptr<IOBuf> bytesWrittenToNetwork = nullptr;
+
+  EXPECT_CALL(*sock, write(_, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            bytesWrittenToNetwork = buf->clone();
+            return buf->computeChainDataLength();
+          }));
+
+  // Make the server send a retry packet to the client. The server chooses a
+  // connection id that the client must use in all future initial packets.
+  auto serverChosenConnId = getTestConnectionId();
+
+  LongHeader headerIn(
+      LongHeader::Types::Retry,
+      serverChosenConnId,
+      *originalConnId,
+      321,
+      QuicVersion::MVFST,
+      IOBuf::copyBuffer("this is a retry token :)"),
+      *client->getConn().initialDestinationConnectionId);
+
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+
+  deliverData(packet->coalesce());
+
+  ASSERT_TRUE(bytesWrittenToNetwork);
+
+  // Check to see that the server receives an initial packet with the following
+  // properties:
+  // 1. The token in the initial packet matches the token sent in the retry
+  // packet
+  // 2. The destination connection id matches the connection id that the server
+  // chose when it sent the retry packet
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(bytesWrittenToNetwork->clone());
+  auto codecResult =
+      makeEncryptedCodec(true)->parsePacket(packetQueue, ackStates);
+
+  auto quicPacket = boost::get<QuicPacket>(&codecResult);
+  auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
+  auto header = boost::get<LongHeader>(regularQuicPacket->header);
+  EXPECT_EQ(header.getHeaderType(), LongHeader::Types::Initial);
+  EXPECT_TRUE(header.hasToken());
+  folly::IOBufEqualTo eq;
+  EXPECT_TRUE(
+      eq(header.getToken()->clone(),
+         IOBuf::copyBuffer("this is a retry token :)")));
+  EXPECT_EQ(header.getDestinationConnId(), serverChosenConnId);
+
+  eventbase_->loopOnce();
+  client->close(folly::none);
+}
+
+TEST_F(
+    QuicClientTransportVersionAndRetryTest,
+    VersionNegotiationPacketNotSupported) {
+  StreamId streamId = *client->createBidirectionalStream();
 
   client->setReadCallback(streamId, &readCb);
 
@@ -3179,8 +3244,10 @@ TEST_F(QuicClientTransportVersionTest, VersionNegotiationPacketNotSupported) {
   client->close(folly::none);
 }
 
-TEST_F(QuicClientTransportVersionTest, VersionNegotiationPacketCurrentVersion) {
-  StreamId streamId = client->createBidirectionalStream().value();
+TEST_F(
+    QuicClientTransportVersionAndRetryTest,
+    VersionNegotiationPacketCurrentVersion) {
+  StreamId streamId = *client->createBidirectionalStream();
 
   client->setReadCallback(streamId, &readCb);
 
@@ -3197,8 +3264,8 @@ TEST_F(QuicClientTransportVersionTest, VersionNegotiationPacketCurrentVersion) {
   client->close(folly::none);
 }
 
-TEST_F(QuicClientTransportVersionTest, UnencryptedStreamData) {
-  StreamId streamId = client->createBidirectionalStream().value();
+TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedStreamData) {
+  StreamId streamId = *client->createBidirectionalStream();
   auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = appDataPacketNum++;
   auto packet = packetToBufCleartext(
@@ -3217,7 +3284,7 @@ TEST_F(QuicClientTransportVersionTest, UnencryptedStreamData) {
   EXPECT_THROW(deliverData(packet->coalesce()), std::runtime_error);
 }
 
-TEST_F(QuicClientTransportVersionTest, UnencryptedAckData) {
+TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
   IntervalSet<PacketNum> acks = {{1, 2}};
   auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = initialPacketNum++;
@@ -3266,8 +3333,8 @@ Buf getHandshakePacketWithFrame(
       packetNum);
 }
 
-TEST_F(QuicClientTransportVersionTest, FrameNotAllowed) {
-  StreamId streamId = client->createBidirectionalStream().value();
+TEST_F(QuicClientTransportVersionAndRetryTest, FrameNotAllowed) {
+  StreamId streamId = *client->createBidirectionalStream();
   auto data = IOBuf::copyBuffer("data");
 
   auto clientConnectionId = *client->getConn().clientConnectionId;

@@ -47,6 +47,9 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // The stateless reset token sent by the server.
   folly::Optional<StatelessResetToken> statelessResetToken;
 
+  // The retry token sent by the server.
+  Buf retryToken_{nullptr};
+
   // Initial destination connection id.
   folly::Optional<ConnectionId> initialDestinationConnectionId;
 
@@ -84,11 +87,18 @@ struct QuicClientStateMachine {
 
 /**
  * Undos the clients state to be the original state of the client. This is
- * intended to be used in the case version negotiation is performed.
+ * intended to be used in the case version negotiation or stateless retry is
+ * performed.
  */
+std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
+    std::unique_ptr<QuicClientConnectionState> conn);
+
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateForVersionMismatch(
     std::unique_ptr<QuicClientConnectionState> conn,
     QuicVersion /* negotiatedVersion */);
+
+std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
+    std::unique_ptr<QuicClientConnectionState> conn);
 
 void processServerInitialParams(
     QuicClientConnectionState& conn,
