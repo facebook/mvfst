@@ -116,6 +116,11 @@ read our guide to [guide to contributing](CONTRIBUTING.md)
 ## License
 `mvfst` is MIT licensed, as found in the LICENSE file.
 
+## API
+The API should be considered in alpha. We can't predict all the use cases that
+people will have, so we're waiting some time before declaring a more stable API.
+We are open to have several different APIs for different constraints.
+
 ## Reporting and Fixing Security Issues
 
 Please do not open GitHub issues or pull requests - this makes the problem
