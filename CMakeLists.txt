@@ -17,7 +17,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Dependencies
-find_package(Boost 1.58
+find_package(Boost 1.62
   REQUIRED COMPONENTS
   iostreams
   system
