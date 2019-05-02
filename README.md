@@ -27,7 +27,7 @@
 - `quic/congestion_control`: Implementation of different congestion control algorithms such  as Cubic and Copa
 - `quic/flowcontrol`: Implementations of flowcontrol functions
 - `quic/handshake`:   Implementations cryptographic handshake layer
-- `quic/loss`:        Implementations of different loss recovery algotithms
+- `quic/loss`:        Implementations of different loss recovery algorithms
 - `quic/logging`:     Implementation of logging framework
 - `quic/happyeyeballs`: Implementation of mechanism to race IPV4 and IPV6 connection and pick a winner
 - `quic/state`:       Defines and implements both connection and stream level state artifacts and state machines
