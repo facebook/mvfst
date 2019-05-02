@@ -10,13 +10,6 @@
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 
-namespace {
-
-// This is an approximation of a small enough number
-// for cwnd to be blocked.
-constexpr size_t kBlockedSizeBytes = 20;
-}
-
 namespace quic {
 
 Cubic::Cubic(
@@ -89,17 +82,6 @@ void Cubic::onPacketSent(const OutstandingPacket& packet) {
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
   inflightBytes_ += packet.encodedSize;
-  // An approximation of the app being blocked. The app
-  // technically might not have bytes to write.
-  bool cwndBlocked = getWritableBytes() < kBlockedSizeBytes;
-  if (cwndBlocked) {
-    QUIC_TRACE(
-        cubic_may_block,
-        conn_,
-        cubicStateToString(state_).data(),
-        cwndBytes_,
-        inflightBytes_);
-  }
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {

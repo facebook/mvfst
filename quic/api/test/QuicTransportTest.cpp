@@ -358,11 +358,8 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
   loopForWrites();
   // Pending numProbePackets is cleared:
   EXPECT_EQ(0, conn.pendingEvents.numProbePackets);
-  // getWritableBytes should be called with the same times as write
-  // getWritableBytes should happen exact one less time than socket write and
-  // onPacketSent on write path and one more time in the updateWriteLooper.
-  EXPECT_EQ(socketWriteCounter, getWritableBytesCounter);
-  EXPECT_EQ(onPacketSentCounter, getWritableBytesCounter);
+  // both write and onPacketSent will inquire getWritableBytes
+  EXPECT_EQ(onPacketSentCounter + socketWriteCounter, getWritableBytesCounter);
   transport_->close(folly::none);
 }
 

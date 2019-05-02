@@ -348,6 +348,14 @@ void updateConnection(
   conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
   if (conn.congestionController && !pureAck) {
     conn.congestionController->onPacketSent(pkt);
+    // An approximation of the app being blocked. The app
+    // technically might not have bytes to write.
+    auto writableBytes = conn.congestionController->getWritableBytes();
+    bool cwndBlocked = writableBytes < kBlockedSizeBytes;
+    if (cwndBlocked) {
+      auto cwndBytes = conn.congestionController->getCongestionWindow();
+      QUIC_TRACE(cwnd_may_block, conn, writableBytes, cwndBytes);
+    }
   }
   if (pkt.isHandshake) {
     ++conn.outstandingHandshakePacketsCount;
