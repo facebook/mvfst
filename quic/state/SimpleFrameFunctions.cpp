@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook. All Rights Reserved.
-
 #include "SimpleFrameFunctions.h"
 
 #include <boost/variant/get.hpp>

@@ -6,7 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
 #include <quic/codec/QuicReadCodec.h>
 #include <folly/io/Cursor.h>
 #include <folly/portability/GTest.h>

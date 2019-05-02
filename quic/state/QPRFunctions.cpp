@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook. All Rights Reserved.
-
 #include <quic/state/QPRFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStreamFunctions.h>

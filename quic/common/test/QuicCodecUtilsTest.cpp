@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/common/test/QuicCodecUtils.h>
 
 #include <folly/portability/GTest.h>

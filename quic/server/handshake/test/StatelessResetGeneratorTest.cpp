@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <folly/Random.h>
 #include <folly/SocketAddress.h>

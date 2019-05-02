@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/codec/Decode.h>
 #include <folly/String.h>
 #include <quic/QuicException.h>

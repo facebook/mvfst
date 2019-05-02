@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/QuicException.h>
 
 #include <folly/Overload.h>

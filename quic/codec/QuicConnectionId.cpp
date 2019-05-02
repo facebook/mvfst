@@ -6,7 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
 #include <quic/codec/QuicConnectionId.h>
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>

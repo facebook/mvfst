@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <folly/Expected.h>
 #include <folly/Optional.h>
 #include <folly/String.h>

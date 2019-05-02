@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <folly/portability/GTest.h>
 #include <quic/logging/QuicLogger.h>
 

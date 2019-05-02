@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>

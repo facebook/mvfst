@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook. All Rights Reserved.
-
 #include <quic/api/QuicTransportFunctions.h>
 
 #include <folly/Overload.h>

@@ -6,7 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
 // override-include-guard
 #include <quic/codec/QuicReadCodec.h>
 #include <folly/io/Cursor.h>

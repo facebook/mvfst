@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <folly/Optional.h>
 #include <folly/Overload.h>
 #include <folly/portability/GTest.h>

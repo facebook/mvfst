@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook. All Rights Reserved.
-
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <gtest/gtest.h>
 #include <quic/server/state/ServerStateMachine.h>

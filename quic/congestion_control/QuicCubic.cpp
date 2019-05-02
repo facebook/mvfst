@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/state/QuicStateFunctions.h>

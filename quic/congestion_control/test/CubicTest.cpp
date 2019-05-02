@@ -6,8 +6,6 @@
  *
  */
 
-// Copyright 2004-present Facebook.  All rights reserved.
-
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/test/TestingCubic.h>
