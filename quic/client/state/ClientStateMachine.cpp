@@ -125,7 +125,7 @@ void processServerInitialParams(
       maxStreamsBidi.value_or(0));
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       maxStreamsUni.value_or(0));
-  conn.peerIdleTimeout = std::chrono::seconds(idleTimeout.value_or(0));
+  conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
     throw QuicTransportException(
         "ack_delay_exponent too large",
@@ -171,7 +171,7 @@ void updateTransportParamsFromCachedEarlyParams(
       transportParams.initialMaxStreamDataUni;
   conn.flowControlState.peerAdvertisedMaxOffset =
       transportParams.initialMaxData;
-  conn.peerIdleTimeout = std::chrono::seconds(transportParams.idleTimeout);
+  conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
   if (conn.transportSettings.canIgnorePathMTU) {
     conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
   }

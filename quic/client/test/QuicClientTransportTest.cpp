@@ -225,11 +225,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
   }
 
   void verifyTransportParameters() {
-    EXPECT_EQ(
-        std::chrono::duration_cast<std::chrono::seconds>(
-            client->getConn().peerIdleTimeout)
-            .count(),
-        kDefaultIdleTimeout.count());
+    EXPECT_EQ(client->getConn().peerIdleTimeout, kDefaultIdleTimeout);
   }
 
   void expectTransportCallbacks() {
@@ -1024,7 +1020,7 @@ class QuicClientTransportTest : public Test {
   void verifyTransportParameters(
       uint64_t connFlowControl,
       uint64_t initialStreamFlowControl,
-      std::chrono::seconds idleTimeout,
+      std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxPacketSize) {
     EXPECT_EQ(

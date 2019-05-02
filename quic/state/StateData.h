@@ -549,8 +549,8 @@ struct QuicConnectionStateBase {
   uint64_t peerAckDelayExponent{kDefaultAckDelayExponent};
 
   // Idle timeout advertised by the peer. Initially sets it to the maximum value
-  // until the handshake negotiates the timeout.
-  std::chrono::seconds peerIdleTimeout{kMaxIdleTimeout};
+  // until the handshake sets the timeout.
+  std::chrono::milliseconds peerIdleTimeout{kMaxIdleTimeout};
 
   // The max UDP packet size we will be sending, limited by both the received
   // max_packet_size in Transport Parameters and PMTU

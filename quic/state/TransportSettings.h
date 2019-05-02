@@ -24,7 +24,7 @@ struct TransportSettings {
   // Maximum number of packets to buffer while cipher is unavailable.
   uint32_t maxPacketsToBuffer{kDefaultMaxBufferedPackets};
   // Idle timeout to advertise to the peer.
-  std::chrono::seconds idleTimeout{kDefaultIdleTimeout};
+  std::chrono::milliseconds idleTimeout{kDefaultIdleTimeout};
   // Ack delay exponent to use.
   uint64_t ackDelayExponent{kDefaultAckDelayExponent};
   // Default congestion controller type.

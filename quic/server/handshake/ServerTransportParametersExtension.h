@@ -22,7 +22,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
       uint64_t initialMaxStreamDataUni,
-      std::chrono::seconds idleTimeout,
+      std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
       TransportPartialReliabilitySetting partialReliability)
@@ -108,7 +108,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;
   uint64_t initialMaxStreamDataUni_;
-  std::chrono::seconds idleTimeout_;
+  std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
   TransportPartialReliabilitySetting partialReliability_;

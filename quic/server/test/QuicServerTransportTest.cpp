@@ -503,7 +503,7 @@ class QuicServerTransportTest : public Test {
     EXPECT_EQ(cryptoState->initialStream.retransmissionBuffer.size(), 0);
   }
 
-  void verifyTransportParameters(std::chrono::seconds idleTimeout) {
+  void verifyTransportParameters(std::chrono::milliseconds idleTimeout) {
     EXPECT_EQ(server->getConn().peerIdleTimeout, idleTimeout);
     EXPECT_EQ(
         server->getConn().udpSendPacketLen, fakeHandshake->maxRecvPacketSize);

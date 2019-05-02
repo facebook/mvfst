@@ -1445,7 +1445,8 @@ void QuicTransportBase::setIdleTimer() {
   if (idleTimeout_.isScheduled()) {
     idleTimeout_.cancelTimeout();
   }
-  if (conn_->transportSettings.idleTimeout > std::chrono::seconds::zero()) {
+  if (conn_->transportSettings.idleTimeout >
+      std::chrono::milliseconds::zero()) {
     getEventBase()->timer().scheduleTimeout(
         &idleTimeout_, conn_->transportSettings.idleTimeout);
   }

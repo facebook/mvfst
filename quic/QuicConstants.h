@@ -276,8 +276,8 @@ constexpr uint64_t kMaxMaxStreams = 1ull << 60;
 
 /* Idle timeout parameters */
 // Default idle timeout to advertise.
-constexpr std::chrono::seconds kDefaultIdleTimeout = std::chrono::seconds(60);
-constexpr std::chrono::seconds kMaxIdleTimeout = std::chrono::seconds(600);
+constexpr auto kDefaultIdleTimeout = std::chrono::milliseconds(60'000);
+constexpr auto kMaxIdleTimeout = std::chrono::milliseconds(600'000);
 
 // Time format related:
 constexpr uint8_t kQuicTimeExpoBits = 5;
