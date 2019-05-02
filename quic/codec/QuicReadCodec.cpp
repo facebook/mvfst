@@ -36,7 +36,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
     queue.clear();
-    return folly::none;
+    return CodecResult(folly::none);
   }
   if (longHeaderInvariant->invariant.version ==
       QuicVersion::VERSION_NEGOTIATION) {
@@ -116,7 +116,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
           VLOG(4) << nodeToString(nodeType_)
                   << " dropping initial packet for exceeding key timeout"
                   << connIdToHex();
-          return folly::none;
+          return CodecResult(folly::none);
         }
       }
       headerCipher = initialHeaderCipher_.get();
@@ -133,7 +133,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
           VLOG(4) << nodeToString(nodeType_)
                   << " dropping zero rtt packet for exceeding key timeout"
                   << connIdToHex();
-          return folly::none;
+          return CodecResult(folly::none);
         }
       }
       headerCipher = zeroRttHeaderCipher_.get();
