@@ -24,10 +24,13 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
 EOF
 }
 
-while getopts ":hp:" arg; do
+while getopts ":hp:i:" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
+      ;;
+    i)
+      INSTALL_PREFIX="${OPTARG}"
       ;;
     h | *) # Display help.
       usage
