@@ -129,13 +129,10 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
  public:
   ~MockDeliveryCallback() override = default;
-  GMOCK_METHOD3_(
-      ,
-      ,
-      ,
+  MOCK_METHOD3(
       onDeliveryAck,
       void(StreamId, uint64_t, std::chrono::microseconds));
-  GMOCK_METHOD2_(, , , onCanceled, void(StreamId, size_t));
+  MOCK_METHOD2(onCanceled, void(StreamId, uint64_t));
 };
 
 class MockDataExpiredCallback : public QuicSocket::DataExpiredCallback {

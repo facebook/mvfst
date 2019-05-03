@@ -81,7 +81,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
 
   void onStreamWriteReady(
       quic::StreamId id,
-      size_t maxToSend) noexcept override {
+      uint64_t maxToSend) noexcept override {
     LOG(INFO) << "EchoClient socket is write ready with maxToSend="
               << maxToSend;
     sendMessage(id, pendingOutput_[id]);

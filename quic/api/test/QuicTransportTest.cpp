@@ -161,7 +161,7 @@ class TransportClosingDeliveryCallback : public QuicSocket::DeliveryCallback {
     }
   }
 
-  void onCanceled(StreamId, size_t) override {
+  void onCanceled(StreamId, uint64_t) override {
     transport_->close(folly::none);
   }
 
@@ -280,7 +280,7 @@ void verifyCorrectness(
     const folly::IOBuf& expected,
     bool finExpected = false,
     bool writeAll = true) {
-  size_t endOffset = 0;
+  uint64_t endOffset = 0;
   size_t totalLen = 0;
   bool finSet = false;
   std::vector<uint64_t> offsets;

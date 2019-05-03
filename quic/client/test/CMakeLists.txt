@@ -15,7 +15,6 @@ quic_add_test(TARGET QuicClientTransportTest
   ${LIBGMOCK_LIBRARIES}
   mvfst_client
   mvfst_codec_types
-  mvfst_echohandler
   mvfst_handshake
   mvfst_server
   mvfst_test_utils

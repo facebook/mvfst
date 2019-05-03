@@ -7,28 +7,6 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-add_library(mvfst_mock_codec STATIC
-  Mocks.h
-)
-
-target_include_directories(
-  mvfst_mock_codec PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-)
-
-add_dependencies(
-  mvfst_mock_codec
-  mvfst_codec_pktbuilder
-  mvfst_test_utils
-)
-
-target_link_libraries(
-  mvfst_mock_codec PUBLIC
-  Folly::folly
-  mvfst_codec_pktbuilder
-  mvfst_test_utils
-)
-
 quic_add_test(TARGET QuicHeaderCodecTest
   SOURCES
   QuicHeaderCodecTest.cpp
@@ -60,7 +38,6 @@ quic_add_test(TARGET QuicWriteCodecTest
   mvfst_codec_decode
   mvfst_codec_types
   mvfst_exception
-  mvfst_mock_codec
   mvfst_test_utils
   ${LIBGTEST_LIBRARY}
 )
@@ -128,7 +105,6 @@ quic_add_test(TARGET QuicPacketBuilderTest
   mvfst_codec_pktrebuilder
   mvfst_codec_types
   mvfst_handshake
-  mvfst_mock_codec
   mvfst_server
   mvfst_state_functions
   mvfst_state_machine
