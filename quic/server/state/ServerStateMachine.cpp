@@ -301,7 +301,7 @@ void updateTransportParamsFromTicket(
   conn.transportSettings.advertisedInitialUniStreamWindowSize =
       initialMaxUniStreamData;
   conn.transportSettings.advertisedInitialConnectionWindowSize = initialMaxData;
-  conn.transportSettings.idleTimeout = std::chrono::seconds(idleTimeout);
+  conn.transportSettings.idleTimeout = std::chrono::milliseconds(idleTimeout);
   conn.transportSettings.maxRecvPacketSize = maxRecvPacketSize;
   updateFlowControlStateWithSettings(
       conn.flowControlState, conn.transportSettings);

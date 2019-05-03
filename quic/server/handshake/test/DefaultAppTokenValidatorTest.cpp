@@ -221,6 +221,30 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   EXPECT_FALSE(validator.validate(resState));
 }
 
+TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
+  QuicServerConnectionState conn;
+  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.version = QuicVersion::MVFST;
+
+  MockConnectionCallback connCallback;
+
+  AppToken appToken;
+  appToken.transportParams = createTicketTransportParameters(
+      *conn.version,
+      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
+      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
+      conn.transportSettings.idleTimeout.count() + 100,
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.ackDelayExponent);
+  ResumptionState resState;
+  resState.appToken = encodeAppToken(appToken);
+
+  DefaultAppTokenValidator validator(&conn, &connCallback);
+  EXPECT_FALSE(validator.validate(resState));
+}
+
 TEST(DefaultAppTokenValidatorTest, TestInvalidUnequalAckDelayExponent) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);

@@ -98,8 +98,10 @@ bool DefaultAppTokenValidator::validate(
 
   auto ticketIdleTimeout =
       getIntegerParameter(TransportParameterId::idle_timeout, params);
-  if (!ticketIdleTimeout) {
-    VLOG(10) << "Idle timeout empty";
+  if (!ticketIdleTimeout ||
+      conn_->transportSettings.idleTimeout !=
+          std::chrono::milliseconds(*ticketIdleTimeout)) {
+    VLOG(10) << "Changed idle timeout";
     return false;
   }
 
