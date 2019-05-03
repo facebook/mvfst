@@ -64,6 +64,18 @@ else
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
 fi
 
+# Default to parallel build width of 4.
+# If we have "nproc", use that to get a better value.
+# If not, then intentionally go a bit conservative and
+# just use the default of 4 (e.g., some desktop/laptop OSs
+# have a tendency to freeze if we actually use all cores).
+set +x
+nproc=4
+if [ -z "$(hash nproc 2>&1)" ]; then
+    nproc=$(nproc)
+fi
+set -x
+
 function install_dependencies_linux() {
   sudo apt-get install        \
     g++                       \
@@ -137,7 +149,7 @@ function setup_folly() {
     -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
     -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
     ..
-  make -j "$(nproc)"
+  make -j "$nproc"
   make install
   cd "$BWD" || exit
 }
@@ -162,6 +174,6 @@ cmake -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
  -DCMAKE_BUILD_TYPE=RelWithDebInfo                \
  -DBUILD_TESTS=On                                 \
   ../..
-make -j "$(nproc)"
+make -j "$nproc"
 echo -e "${COLOR_GREEN}MVFST build is complete. To run unit test: \
   cd _build/build && make test ${COLOR_OFF}"
