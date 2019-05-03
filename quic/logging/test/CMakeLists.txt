@@ -12,6 +12,6 @@ quic_add_test(TARGET MacroTest
   QuicLoggingMacroTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_logging
   ${LIBGTEST_LIBRARY}
+  mvfst_state_functions
 )

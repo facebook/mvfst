@@ -25,7 +25,6 @@ add_dependencies(
   mvfst_constants
   mvfst_exception
   mvfst_codec_types
-  mvfst_logging
   mvfst_state_machine
 )
 
@@ -35,7 +34,6 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_constants
   mvfst_exception
-  mvfst_logging
   mvfst_state_machine
 )
 

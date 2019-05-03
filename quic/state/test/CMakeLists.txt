@@ -7,25 +7,6 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-add_library(mvfst_mock_state STATIC
-  Mocks.h
-)
-
-target_include_directories(
-  mvfst_mock_state PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-)
-
-add_dependencies(
-  mvfst_mock_state
-  mvfst_constants
-)
-
-target_link_libraries(
-  mvfst_mock_state PUBLIC
-  mvfst_constants
-)
-
 quic_add_test(TARGET StateMachineTest
   SOURCES
   StateMachineTest.cpp
@@ -52,7 +33,6 @@ quic_add_test(TARGET AckHandlersTest
   SOURCES
   AckHandlersTest.cpp
   DEPENDS
-  mvfst_mock_socket
   mvfst_server
   mvfst_state_machine
   mvfst_state_ack_handler
@@ -64,7 +44,6 @@ quic_add_test(TARGET QuicStateFunctionsTest
   SOURCES
   QuicStateFunctionsTest.cpp
   DEPENDS
-  mvfst_mock_state
   mvfst_server
   mvfst_test_utils
   mvfst_state_functions

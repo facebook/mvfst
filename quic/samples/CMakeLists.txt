@@ -31,7 +31,6 @@ target_link_libraries(
   mvfst_echohandler PUBLIC
   Folly::folly
   fizz::fizz
-  mvfst_logging
   mvfst_transport
   mvfst_client
   mvfst_test_utils

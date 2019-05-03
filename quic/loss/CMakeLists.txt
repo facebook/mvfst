@@ -26,7 +26,6 @@ add_dependencies(
   mvfst_constants
   mvfst_exception
   mvfst_flowcontrol
-  mvfst_logging
   mvfst_state_functions
   mvfst_state_machine
   mvfst_state_simple_frame_functions
@@ -39,7 +38,6 @@ target_link_libraries(
   mvfst_constants
   mvfst_exception
   mvfst_flowcontrol
-  mvfst_logging
   mvfst_state_functions
   mvfst_state_machine
   mvfst_state_simple_frame_functions

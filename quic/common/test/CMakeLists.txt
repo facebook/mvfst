@@ -32,7 +32,6 @@ add_dependencies(
   mvfst_codec_types
   mvfst_handshake
   mvfst_server
-  mvfst_state_ack_states
   mvfst_state_machine
   mvfst_transport
 )
@@ -46,7 +45,6 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_handshake
   mvfst_server
-  mvfst_state_ack_states
   mvfst_state_machine
   mvfst_transport
   PRIVATE
@@ -68,7 +66,6 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   mvfst_looper
   mvfst_transport
   mvfst_server
-  mvfst_state_ack_states
   mvfst_state_machine
   mvfst_test_utils
   ${BOOST_LIBRARIES}

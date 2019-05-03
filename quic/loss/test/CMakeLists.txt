@@ -15,8 +15,6 @@ quic_add_test(TARGET QuicLossFunctionsTest
   mvfst_codec_types
   mvfst_client
   mvfst_loss
-  mvfst_mock_socket
-  mvfst_mock_state
   mvfst_server
   mvfst_test_utils
   mvfst_transport

@@ -28,7 +28,6 @@ add_dependencies(
   mvfst_cc_algo
   mvfst_constants
   mvfst_exception
-  mvfst_logging
   mvfst_state_machine
   mvfst_state_functions
 )
@@ -39,7 +38,6 @@ target_link_libraries(
   fizz::fizz
   mvfst_constants
   mvfst_exception
-  mvfst_logging
   mvfst_state_machine
   mvfst_state_functions
 )

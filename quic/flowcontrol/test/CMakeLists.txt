@@ -14,7 +14,6 @@ quic_add_test(TARGET QuicFlowControlTest
   Folly::folly
   mvfst_client
   mvfst_flowcontrol
-  mvfst_mock_socket
   mvfst_test_utils
   ${LIBGTEST_LIBRARY}
 )

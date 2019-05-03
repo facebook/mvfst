@@ -17,8 +17,6 @@ quic_add_test(TARGET QuicClientTransportTest
   mvfst_codec_types
   mvfst_echohandler
   mvfst_handshake
-  mvfst_mock_socket
-  mvfst_mock_state
   mvfst_server
   mvfst_test_utils
   mvfst_transport

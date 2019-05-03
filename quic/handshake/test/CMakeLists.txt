@@ -19,7 +19,6 @@ target_include_directories(
 target_link_libraries(
   quic_mock_handshake PUBLIC
   Folly::folly
-  mvfst_state_stats_callback
   ${LIBGMOCK_LIBRARIES}
   ${LIBGTEST_LIBRARY}
 )

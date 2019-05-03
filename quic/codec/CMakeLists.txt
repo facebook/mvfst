@@ -194,7 +194,6 @@ add_dependencies(
   mvfst_codec_pktbuilder
   mvfst_exception
   mvfst_handshake
-  mvfst_state_ack_states
 )
 
 target_link_libraries(
@@ -205,7 +204,6 @@ target_link_libraries(
   mvfst_codec_types
   mvfst_exception
   mvfst_handshake
-  mvfst_state_ack_states
 )
 
 file(

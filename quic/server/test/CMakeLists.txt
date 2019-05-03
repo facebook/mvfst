@@ -16,7 +16,6 @@ quic_add_test(TARGET QuicServerTest
   mvfst_codec
   mvfst_codec_types
   mvfst_echohandler
-  mvfst_mock_socket
   mvfst_server
   mvfst_test_utils
   mvfst_transport
@@ -31,7 +30,6 @@ quic_add_test(TARGET QuicServerTransportTest
   mvfst_codec_pktbuilder
   mvfst_codec_types
   mvfst_handshake
-  mvfst_mock_socket
   mvfst_server
   mvfst_state_stream_functions
   mvfst_test_utils

@@ -4,62 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_state_transport_settings
-  TransportSettings.h
-)
-
-target_include_directories(
-  mvfst_state_transport_settings PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_state_transport_settings
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-add_dependencies(
-  mvfst_state_transport_settings
-  mvfst_constants
-)
-
-target_link_libraries(
-  mvfst_state_transport_settings PUBLIC
-  Folly::folly
-  mvfst_constants
-)
-
-add_library(
-  mvfst_state_ack_states
-  AckStates.h
-)
-
-target_include_directories(
-  mvfst_state_ack_states PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_state_ack_states
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-add_dependencies(
-  mvfst_state_ack_states
-  mvfst_codec_types
-)
-
-target_link_libraries(
-  mvfst_state_ack_states PUBLIC
-  Folly::folly
-  mvfst_codec_types
-)
-
-add_library(
   mvfst_state_machine
   QuicStreamManager.cpp
   QuicStreamUtilities.cpp
@@ -84,9 +28,6 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
-  mvfst_state_ack_states
-  mvfst_state_stats_callback
-  mvfst_state_transport_settings
 )
 
 target_link_libraries(
@@ -97,9 +38,6 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
-  mvfst_state_ack_states
-  mvfst_state_stats_callback
-  mvfst_state_transport_settings
 )
 
 add_library(
@@ -123,7 +61,6 @@ add_dependencies(
   mvfst_state_ack_handler
   mvfst_constants
   mvfst_codec_types
-  mvfst_logging
   mvfst_loss
   mvfst_state_functions
   mvfst_state_machine
@@ -134,7 +71,6 @@ target_link_libraries(
   Folly::folly
   mvfst_constants
   mvfst_codec_types
-  mvfst_logging
   mvfst_loss
   mvfst_state_functions
   mvfst_state_machine
@@ -162,7 +98,6 @@ add_dependencies(
   mvfst_state_stream_functions
   mvfst_codec
   mvfst_codec_types
-  mvfst_logging
   mvfst_state_machine
 )
 
@@ -171,7 +106,6 @@ target_link_libraries(
   Folly::folly
   mvfst_codec
   mvfst_codec_types
-  mvfst_logging
   mvfst_state_machine
 )
 
@@ -198,7 +132,6 @@ add_dependencies(
   mvfst_state_functions
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_logging
   mvfst_state_machine
   mvfst_state_stream
 )
@@ -208,7 +141,6 @@ target_link_libraries(
   Folly::folly
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_logging
   mvfst_state_machine
   mvfst_state_stream
 )
@@ -242,29 +174,6 @@ target_link_libraries(
   mvfst_state_machine
 )
 
-
-# stats callback
-add_library(
-  mvfst_state_stats_callback
-  QuicTransportStatsCallback.h
-)
-
-target_include_directories(
-  mvfst_state_stats_callback PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_state_stats_callback
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-target_link_libraries(
-  mvfst_state_stats_callback PUBLIC
-  Folly::folly
-)
 
 # simple frame function
 add_library(
@@ -386,18 +295,6 @@ foreach(header ${QUIC_API_HEADERS_TOINSTALL})
 endforeach()
 
 install(
-  TARGETS mvfst_state_transport_settings
-  EXPORT mvfst-exports
-  DESTINATION lib
-)
-
-install(
-  TARGETS mvfst_state_ack_states
-  EXPORT mvfst-exports
-  DESTINATION lib
-)
-
-install(
   TARGETS mvfst_state_machine
   EXPORT mvfst-exports
   DESTINATION lib
@@ -423,12 +320,6 @@ install(
 
 install(
   TARGETS mvfst_state_functions
-  EXPORT mvfst-exports
-  DESTINATION lib
-)
-
-install(
-  TARGETS mvfst_state_stats_callback
   EXPORT mvfst-exports
   DESTINATION lib
 )

@@ -35,7 +35,6 @@ add_dependencies(
   mvfst_exception
   mvfst_flowcontrol
   mvfst_happyeyeballs
-  mvfst_logging
   mvfst_looper
   mvfst_loss
   mvfst_state_functions
@@ -59,7 +58,6 @@ target_link_libraries(
   mvfst_exception
   mvfst_flowcontrol
   mvfst_happyeyeballs
-  mvfst_logging
   mvfst_looper
   mvfst_loss
   mvfst_state_functions
