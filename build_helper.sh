@@ -151,6 +151,7 @@ function setup_folly() {
     ..
   make -j "$nproc"
   make install
+  echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
   cd "$BWD" || exit
 }
 
