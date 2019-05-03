@@ -142,6 +142,18 @@ function setup_folly() {
       exit 1
     fi
   fi
+
+  if [ "$Platform" = "Mac" ]; then
+    # Homebrew installs OpenSSL in a non-default location on MacOS >= Mojave
+    # 10.14 because MacOS has its own SSL implementation.  If we find the
+    # typical Homebrew OpenSSL dir, load OPENSSL_ROOT_DIR so that cmake
+    # will find the Homebrew version.
+    dir=/usr/local/opt/openssl
+    if [ -d $dir ]; then
+        export OPENSSL_ROOT_DIR=$dir
+    fi
+  fi
+
   echo -e "${COLOR_GREEN}Building Folly ${COLOR_OFF}"
   mkdir -p "$FOLLY_BUILD_DIR"
   cd "$FOLLY_BUILD_DIR" || exit
