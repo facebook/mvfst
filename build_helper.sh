@@ -173,9 +173,16 @@ function setup_googletest() {
     TMP_DIR=$(mktemp -d)
     pushd .
     cd "$TMP_DIR"
-    wget https://github.com/google/googletest/archive/release-1.8.0.zip -O "googletest.zip"
-    unzip "googletest.zip" -d "$DEPS_DIR"
-    popd
+    if wget https://github.com/google/googletest/archive/release-1.8.0.zip -O "googletest.zip"; then
+      unzip "googletest.zip" -d "$DEPS_DIR"
+      popd
+    else
+      echo -e "${COLOR_RED}[ INFO ] Googletest is a reqiured dependency${COLOR_OFF}"
+      echo -e "${COLOR_RED}[ INFO ] Cloning googletest from Github has failed.${COLOR_OFF}"
+      echo -e "${COLOR_RED}[ INFO ] Try downloading from Github and manually" \
+              "installing ${GTEST_DIR} and running again.${COLOR_OFF}"
+      exit
+    fi
   fi
   echo -e "${COLOR_GREEN}Building Googletest ${COLOR_OFF}"
   mkdir -p "$GTEST_BUILD_DIR"
