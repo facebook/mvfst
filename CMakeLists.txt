@@ -16,6 +16,13 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # $QUIC_FBCODE_ROOT/quic/path/to/file on disk
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
+# If ccache is available, then use it.
+find_program(CCACHE ccache)
+if(CCACHE)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE})
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ${CCACHE})
+endif(CCACHE)
+
 # Dependencies
 find_package(Boost 1.62
   REQUIRED COMPONENTS
