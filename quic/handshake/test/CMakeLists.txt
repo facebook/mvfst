@@ -14,7 +14,6 @@ quic_add_test(TARGET TransportParametersTest
   Folly::folly
   mvfst_handshake
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET HandshakeLayerTest
@@ -25,5 +24,4 @@ quic_add_test(TARGET HandshakeLayerTest
   mvfst_codec_types
   mvfst_handshake
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )

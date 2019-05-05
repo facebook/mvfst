@@ -18,7 +18,6 @@ quic_add_test(TARGET QuicServerTest
   mvfst_server
   mvfst_test_utils
   mvfst_transport
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicServerTransportTest
@@ -33,5 +32,4 @@ quic_add_test(TARGET QuicServerTransportTest
   mvfst_state_stream_functions
   mvfst_test_utils
   mvfst_transport
-  ${LIBGTEST_LIBRARY}
 )

@@ -17,6 +17,8 @@ target_include_directories(
   mvfst_test_utils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<BUILD_INTERFACE:${FIZZ_PROJECT}>
+  ${LIBGMOCK_INCLUDE_DIR}
+  ${LIBGTEST_INCLUDE_DIR}
 )
 
 target_compile_options(
@@ -40,6 +42,8 @@ target_link_libraries(
   mvfst_test_utils PUBLIC
   Folly::folly
   fizz::fizz
+  ${LIBGMOCK_LIBRARIES}
+  ${LIBGTEST_LIBRARIES}
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types

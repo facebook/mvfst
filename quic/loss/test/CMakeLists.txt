@@ -18,5 +18,4 @@ quic_add_test(TARGET QuicLossFunctionsTest
   mvfst_server
   mvfst_test_utils
   mvfst_transport
-  ${LIBGTEST_LIBRARY}
 )

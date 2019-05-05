@@ -15,7 +15,6 @@ quic_add_test(TARGET StateMachineTest
   Folly::folly
   mvfst_state_machine
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicStreamFunctionsTest
@@ -26,7 +25,6 @@ quic_add_test(TARGET QuicStreamFunctionsTest
   mvfst_server
   mvfst_state_stream_functions
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET AckHandlersTest
@@ -37,7 +35,6 @@ quic_add_test(TARGET AckHandlersTest
   mvfst_state_machine
   mvfst_state_ack_handler
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicStateFunctionsTest
@@ -47,7 +44,6 @@ quic_add_test(TARGET QuicStateFunctionsTest
   mvfst_server
   mvfst_test_utils
   mvfst_state_functions
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicPacingFunctionsTest
@@ -55,7 +51,6 @@ quic_add_test(TARGET QuicPacingFunctionsTest
   QuicPacingFunctionsTest.cpp
   DEPENDS
   mvfst_state_pacing_functions
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QPRFunctionsTest
@@ -64,5 +59,4 @@ quic_add_test(TARGET QPRFunctionsTest
   DEPENDS
   mvfst_server
   mvfst_state_qpr_functions
-  ${LIBGTEST_LIBRARY}
 )

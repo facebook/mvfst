@@ -58,10 +58,15 @@ else()
 endif()
 
 list(APPEND
-  _QUIC_COMMON_COMPILE_OPTIONS
+  _QUIC_BASE_COMPILE_OPTIONS
   -std=c++14
   -Wall
   -Wextra
+)
+
+list(APPEND
+  _QUIC_COMMON_COMPILE_OPTIONS
+  ${_QUIC_BASE_COMPILE_OPTIONS}
   # more strict options
   -Werror=sign-compare
   -Werror=bool-compare
@@ -70,15 +75,12 @@ list(APPEND
   -Wnon-virtual-dtor
 )
 
-include(QuicTest)
-
-add_subdirectory(quic)
-
 if(BUILD_TESTS)
   enable_testing()
-  find_package(GTest REQUIRED)
-  find_package(GMock REQUIRED)
+  include(QuicTest)
 endif()
+
+add_subdirectory(quic)
 
 install(
   EXPORT mvfst-exports

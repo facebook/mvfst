@@ -21,5 +21,4 @@ quic_add_test(TARGET CongestionControllerTests
   Folly::folly
   mvfst_cc_algo
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )

@@ -164,32 +164,6 @@ function setup_fizz() {
   cd "$BWD" || exit
 }
 
-function setup_googletest() {
-  GTEST_DIR=$DEPS_DIR/googletest-release-1.8.0
-  GTEST_BUILD_DIR=$GTEST_DIR/build
-  # requires googletest-1.8
-  if [ ! -d "$GTEST_DIR" ] ; then
-    echo -e "${COLOR_GREEN}[ INFO ] Downloading gtest-1.8 ${COLOR_OFF}"
-    TMP_DIR=$(mktemp -d)
-    pushd .
-    cd "$TMP_DIR"
-    wget https://github.com/google/googletest/archive/release-1.8.0.zip -O "googletest.zip"
-    unzip "googletest.zip" -d "$DEPS_DIR"
-    popd
-  fi
-  echo -e "${COLOR_GREEN}Building Googletest ${COLOR_OFF}"
-  mkdir -p "$GTEST_BUILD_DIR"
-  cd "$GTEST_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-    -DCMAKE_PREFIX_PATH="$GTEST_INSTALL_DIR"      \
-    -DCMAKE_INSTALL_PREFIX="$GTEST_INSTALL_DIR"   \
-    ..
-  make -j "$(nproc)"
-  make install
-  echo -e "${COLOR_GREEN}Googletest is installed ${COLOR_OFF}"
-  cd "$BWD" || exit
-}
-
 function detect_platform() {
   unameOut="$(uname -s)"
   case "${unameOut}" in
@@ -201,7 +175,6 @@ function detect_platform() {
 }
 
 detect_platform
-setup_googletest
 setup_folly
 setup_fizz
 

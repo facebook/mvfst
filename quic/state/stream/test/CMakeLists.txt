@@ -19,6 +19,4 @@ quic_add_test(TARGET StreamStateMachineTest
   mvfst_state_stream_functions
   mvfst_test_utils
   mvfst_transport
-  ${LIBGTEST_LIBRARIES}
-  ${LIBGTEST_LIBRARY}
 )

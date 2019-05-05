@@ -15,5 +15,4 @@ quic_add_test(TARGET QuicFlowControlTest
   mvfst_client
   mvfst_flowcontrol
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )

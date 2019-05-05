@@ -16,7 +16,6 @@ quic_add_test(TARGET QuicTransportTest
   mvfst_server
   mvfst_state_stream_functions
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicTransportBaseTest
@@ -29,7 +28,6 @@ quic_add_test(TARGET QuicTransportBaseTest
   mvfst_test_utils
   mvfst_state_stream_functions
   mvfst_server
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicTransportFunctionsTest
@@ -40,7 +38,6 @@ quic_add_test(TARGET QuicTransportFunctionsTest
   mvfst_transport
   mvfst_test_utils
   mvfst_server
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET QuicPacketSchedulerTest
@@ -53,7 +50,6 @@ quic_add_test(TARGET QuicPacketSchedulerTest
   mvfst_transport
   mvfst_test_utils
   mvfst_server
-  ${LIBGTEST_LIBRARY}
 )
 
 quic_add_test(TARGET IoBufQuicBatchTest

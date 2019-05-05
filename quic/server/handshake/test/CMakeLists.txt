@@ -24,6 +24,4 @@ quic_add_test(TARGET ServerHandshakeTest
   mvfst_server
   mvfst_state_machine
   mvfst_test_utils
-  ${LIBGTEST_LIBRARY}
-  ${LIBGTEST_LIBRARY}
 )

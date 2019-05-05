@@ -31,5 +31,5 @@ target_link_libraries(
   mvfst_test_utils
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
-  ${LIBGTEST_LIBRARY}
+  ${LIBGTEST_LIBRARIES}
 )
