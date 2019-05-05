@@ -138,7 +138,7 @@ class TestQuicTransport
     drainTimeoutExpired();
   }
 
-  std::unique_ptr<fizz::Aead> aead;
+  std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};
 };

@@ -112,7 +112,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   }
 
   EventBase evb;
-  std::unique_ptr<fizz::Aead> aead;
+  std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   MockLossTimeout timeout;
   std::unique_ptr<MockQuicStats> transportInfoCb_;

@@ -244,11 +244,11 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   folly::IOBufQueue serverReadBuf{folly::IOBufQueue::cacheChainLength()};
   std::unique_ptr<DelayedHolder, folly::DelayedDestruction::Destructor> dg;
 
-  std::unique_ptr<fizz::Aead> handshakeWriteCipher;
-  std::unique_ptr<fizz::Aead> handshakeReadCipher;
-  std::unique_ptr<fizz::Aead> oneRttWriteCipher;
-  std::unique_ptr<fizz::Aead> oneRttReadCipher;
-  std::unique_ptr<fizz::Aead> zeroRttWriteCipher;
+  std::unique_ptr<Aead> handshakeWriteCipher;
+  std::unique_ptr<Aead> handshakeReadCipher;
+  std::unique_ptr<Aead> oneRttWriteCipher;
+  std::unique_ptr<Aead> oneRttReadCipher;
+  std::unique_ptr<Aead> zeroRttWriteCipher;
 
   folly::Optional<bool> zeroRttRejected;
 

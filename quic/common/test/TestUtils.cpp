@@ -106,7 +106,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
     PacketNum pn,
     IntervalSet<PacketNum>& acks,
     PacketNumberSpace pnSpace,
-    const fizz::Aead* aead) {
+    const Aead* aead) {
   // This function sends ACK to dstConn
   auto srcConnId =
       (dstConn.nodeType == QuicNodeType::Client ? *dstConn.serverConnectionId
@@ -360,7 +360,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     PacketNum packetNum,
     QuicVersion version,
     folly::IOBuf& data,
-    const fizz::Aead& aead,
+    const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset) {
   LongHeader header(
@@ -379,7 +379,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
     QuicVersion version,
     ProtectionType protectionType,
     folly::IOBuf& data,
-    const fizz::Aead& aead,
+    const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset,
     uint64_t packetSizeLimit) {
@@ -431,7 +431,7 @@ Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet) {
 
 Buf packetToBufCleartext(
     const RegularQuicPacketBuilder::Packet& packet,
-    const fizz::Aead& cleartextCipher,
+    const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum) {
   VLOG(10) << __func__ << " packet header: "

@@ -324,11 +324,11 @@ class ServerHandshakeTest : public Test {
   std::vector<fizz::WriteToSocket> clientWrites;
   MockServerHandshakeCallback serverCallback;
 
-  std::unique_ptr<fizz::Aead> oneRttWriteCipher;
-  std::unique_ptr<fizz::Aead> oneRttReadCipher;
-  std::unique_ptr<fizz::Aead> zeroRttReadCipher;
-  std::unique_ptr<fizz::Aead> handshakeWriteCipher;
-  std::unique_ptr<fizz::Aead> handshakeReadCipher;
+  std::unique_ptr<Aead> oneRttWriteCipher;
+  std::unique_ptr<Aead> oneRttReadCipher;
+  std::unique_ptr<Aead> zeroRttReadCipher;
+  std::unique_ptr<Aead> handshakeWriteCipher;
+  std::unique_ptr<Aead> handshakeReadCipher;
 
   std::exception_ptr ex;
   std::string hostname;

@@ -88,35 +88,35 @@ void ServerHandshake::writeNewSessionTicket(const AppToken& appToken) {
   }
 }
 
-std::unique_ptr<fizz::Aead> ServerHandshake::getHandshakeWriteCipher() {
+std::unique_ptr<Aead> ServerHandshake::getHandshakeWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(handshakeWriteCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ServerHandshake::getHandshakeReadCipher() {
+std::unique_ptr<Aead> ServerHandshake::getHandshakeReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(handshakeReadCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ServerHandshake::getOneRttWriteCipher() {
+std::unique_ptr<Aead> ServerHandshake::getOneRttWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(oneRttWriteCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ServerHandshake::getOneRttReadCipher() {
+std::unique_ptr<Aead> ServerHandshake::getOneRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(oneRttReadCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ServerHandshake::getZeroRttReadCipher() {
+std::unique_ptr<Aead> ServerHandshake::getZeroRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }

@@ -40,8 +40,8 @@ std::unique_ptr<QuicReadCodec> makeUnencryptedCodec() {
 
 std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
     ConnectionId clientConnId,
-    std::unique_ptr<fizz::Aead> oneRttAead,
-    std::unique_ptr<fizz::Aead> zeroRttAead = nullptr,
+    std::unique_ptr<Aead> oneRttAead,
+    std::unique_ptr<Aead> zeroRttAead = nullptr,
     std::unique_ptr<StatelessResetToken> sourceToken = nullptr) {
   QuicFizzFactory fizzFactory;
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);

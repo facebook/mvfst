@@ -104,7 +104,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   }
   cursor.pull(sample.data(), sample.size());
   const PacketNumberCipher* headerCipher{nullptr};
-  const fizz::Aead* cipher{nullptr};
+  const Aead* cipher{nullptr};
   auto protectionType = longHeader.getProtectionType();
   switch (protectionType) {
     case ProtectionType::Initial:
@@ -334,15 +334,15 @@ CodecResult QuicReadCodec::parsePacket(
   return decodeRegularPacket(std::move(*shortHeader), params_, packetCursor);
 }
 
-const fizz::Aead* QuicReadCodec::getOneRttReadCipher() const {
+const Aead* QuicReadCodec::getOneRttReadCipher() const {
   return oneRttReadCipher_.get();
 }
 
-const fizz::Aead* QuicReadCodec::getZeroRttReadCipher() const {
+const Aead* QuicReadCodec::getZeroRttReadCipher() const {
   return zeroRttReadCipher_.get();
 }
 
-const fizz::Aead* QuicReadCodec::getHandshakeReadCipher() const {
+const Aead* QuicReadCodec::getHandshakeReadCipher() const {
   return handshakeReadCipher_.get();
 }
 
@@ -352,17 +352,17 @@ QuicReadCodec::getStatelessResetToken() const {
 }
 
 void QuicReadCodec::setInitialReadCipher(
-    std::unique_ptr<fizz::Aead> initialReadCipher) {
+    std::unique_ptr<Aead> initialReadCipher) {
   initialReadCipher_ = std::move(initialReadCipher);
 }
 
 void QuicReadCodec::setOneRttReadCipher(
-    std::unique_ptr<fizz::Aead> oneRttReadCipher) {
+    std::unique_ptr<Aead> oneRttReadCipher) {
   oneRttReadCipher_ = std::move(oneRttReadCipher);
 }
 
 void QuicReadCodec::setZeroRttReadCipher(
-    std::unique_ptr<fizz::Aead> zeroRttReadCipher) {
+    std::unique_ptr<Aead> zeroRttReadCipher) {
   if (nodeType_ == QuicNodeType::Client) {
     throw QuicTransportException(
         "Invalid cipher", TransportErrorCode::INTERNAL_ERROR);
@@ -371,7 +371,7 @@ void QuicReadCodec::setZeroRttReadCipher(
 }
 
 void QuicReadCodec::setHandshakeReadCipher(
-    std::unique_ptr<fizz::Aead> handshakeReadCipher) {
+    std::unique_ptr<Aead> handshakeReadCipher) {
   handshakeReadCipher_ = std::move(handshakeReadCipher);
 }
 
@@ -412,7 +412,7 @@ void QuicReadCodec::setStatelessResetToken(
   statelessResetToken_ = std::move(statelessResetToken);
 }
 
-const fizz::Aead* QuicReadCodec::getInitialCipher() const {
+const Aead* QuicReadCodec::getInitialCipher() const {
   return initialReadCipher_.get();
 }
 

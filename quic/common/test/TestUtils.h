@@ -58,7 +58,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
     PacketNum pn,
     IntervalSet<PacketNum>& acks,
     PacketNumberSpace pnSpace,
-    const fizz::Aead* aead = nullptr);
+    const Aead* aead = nullptr);
 
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
@@ -90,7 +90,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     PacketNum packetNum,
     QuicVersion version,
     folly::IOBuf& data,
-    const fizz::Aead& aead,
+    const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset = 0);
 
@@ -101,7 +101,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
     QuicVersion version,
     ProtectionType protectionType,
     folly::IOBuf& data,
-    const fizz::Aead& aead,
+    const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset = 0,
     uint64_t packetSizeLimit = kDefaultUDPSendPacketLen);
@@ -110,7 +110,7 @@ Buf packetToBuf(const RegularQuicPacketBuilder::Packet& packet);
 
 Buf packetToBufCleartext(
     const RegularQuicPacketBuilder::Packet& packet,
-    const fizz::Aead& cleartextCipher,
+    const Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     PacketNum packetNum);
 

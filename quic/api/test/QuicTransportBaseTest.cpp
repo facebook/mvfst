@@ -332,7 +332,7 @@ class TestQuicTransport
   }
 
   QuicServerConnectionState* transportConn;
-  std::unique_ptr<fizz::Aead> aead;
+  std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   bool transportClosed{false};

@@ -31,7 +31,7 @@ std::vector<QuicVersion> versionList(
 
 Buf packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
-    fizz::Aead* aead = nullptr) {
+    Aead* aead = nullptr) {
   auto buf = folly::IOBuf::create(0);
   // This doesnt matter.
   PacketNum num = 10;
@@ -62,8 +62,8 @@ constexpr size_t kVersionNegotiationHeaderSize =
 std::unique_ptr<QuicReadCodec> makeCodec(
     ConnectionId clientConnId,
     QuicNodeType nodeType,
-    std::unique_ptr<fizz::Aead> zeroRttCipher = nullptr,
-    std::unique_ptr<fizz::Aead> oneRttCipher = nullptr) {
+    std::unique_ptr<Aead> zeroRttCipher = nullptr,
+    std::unique_ptr<Aead> oneRttCipher = nullptr) {
   QuicFizzFactory fizzFactory;
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
   if (nodeType != QuicNodeType::Client) {

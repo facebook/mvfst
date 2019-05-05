@@ -415,17 +415,17 @@ struct QuicConnectionStateBase {
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher;
 
   // Write cipher for 1-RTT data
-  std::unique_ptr<fizz::Aead> oneRttWriteCipher;
+  std::unique_ptr<Aead> oneRttWriteCipher;
 
   // Write cipher for packets with initial keys.
-  std::unique_ptr<fizz::Aead> initialWriteCipher;
+  std::unique_ptr<Aead> initialWriteCipher;
 
   // Write cipher for packets with handshake keys.
-  std::unique_ptr<fizz::Aead> handshakeWriteCipher;
+  std::unique_ptr<Aead> handshakeWriteCipher;
 
   // Write cipher for 0-RTT data
   // TODO: move this back into the client state
-  std::unique_ptr<fizz::Aead> zeroRttWriteCipher;
+  std::unique_ptr<Aead> zeroRttWriteCipher;
 
   // Time at which the connection started.
   TimePoint connectionTime;
