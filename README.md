@@ -113,6 +113,9 @@ For more options, see
 We'd love to have your help in making `mvfst` better. If you're interested, please
 read our guide to [guide to contributing](CONTRIBUTING.md)
 
+Please also join our
+[slack](https://join.slack.com/t/mvfst/shared_invite/enQtNjE0ODIwNDU3MDU4LWFkOTc0ZTQ4NzczZmE2MjRlMjQxNWQxNDAyYzAzMDQ5MTQ0ZGI0YTJhZWM0MThhM2FiYzc0Zjg3MTYyNDg2MWI) to ask questions or start discussions.
+
 ## License
 `mvfst` is MIT licensed, as found in the LICENSE file.
 
