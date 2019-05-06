@@ -119,13 +119,13 @@ class QuicStreamAsyncTransport : public folly::AsyncTransportWrapper,
     if (writeBuf_.empty()) {
       close();
     } else {
-      sock_->resetStream(id_, quic::ApplicationErrorCode::STOPPING);
+      sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
       VLOG(4) << "Reset stream from closeNow";
     }
   }
 
   void closeWithReset() override {
-    sock_->resetStream(id_, quic::ApplicationErrorCode::STOPPING);
+    sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
     VLOG(4) << "Reset stream from closeWithReset";
   }
 
