@@ -267,6 +267,7 @@ class QuicStreamAsyncTransport : public folly::AsyncTransportWrapper,
         folly::AsyncSocketException::UNKNOWN,
         folly::to<std::string>("Quic read error: ", toString(error)));
     sock_->getEventBase()->runInLoop(this, true);
+    // RST here?
   }
 
   void runLoopCallback() noexcept override {

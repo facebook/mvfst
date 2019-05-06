@@ -192,6 +192,10 @@ class QuicTransportBase : public QuicSocket {
       StreamId id,
       ApplicationErrorCode errorCode) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> maybeResetStreamFromReadError(
+      StreamId id,
+      QuicErrorCode error) override;
+
   void sendPing(PingCallback* callback, std::chrono::milliseconds pingTimeout)
       override;
 

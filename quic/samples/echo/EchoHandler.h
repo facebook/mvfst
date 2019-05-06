@@ -90,6 +90,9 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
           error) noexcept override {
     LOG(ERROR) << "Got read error on stream=" << id
                << " error=" << toString(error);
+    // A read error only terminates the ingress portion of the stream state.
+    // Your application should probably terminate the egress portion via
+    // resetStream
   }
 
   void echo(quic::StreamId id, StreamData& data) {

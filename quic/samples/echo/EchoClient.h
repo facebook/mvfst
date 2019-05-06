@@ -52,6 +52,9 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
           error) noexcept override {
     LOG(ERROR) << "EchoClient failed read from stream=" << streamId
                << ", error=" << toString(error);
+    // A read error only terminates the ingress portion of the stream state.
+    // Your application should probably terminate the egress portion via
+    // resetStream
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {

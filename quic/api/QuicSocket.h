@@ -791,6 +791,16 @@ class QuicSocket {
       ApplicationErrorCode error) = 0;
 
   /**
+   * Helper method to check a generic error for an Application error, and reset
+   * the stream with the reciprocal error.
+   *
+   * Returns true if the error was an ApplicationErrorCode, and the stream was
+   * reset.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  maybeResetStreamFromReadError(StreamId id, QuicErrorCode error) = 0;
+
+  /**
    * Callback class for pings
    */
   class PingCallback {

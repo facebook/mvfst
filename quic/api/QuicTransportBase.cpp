@@ -2302,4 +2302,19 @@ inline std::ostream& operator<<(
   return os;
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::maybeResetStreamFromReadError(
+    StreamId id,
+    QuicErrorCode error) {
+  return folly::variant_match(
+      error,
+      [this, id](quic::ApplicationErrorCode ec) { return resetStream(id, ec); },
+      [](quic::LocalErrorCode) {
+        return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
+      },
+      [](quic::TransportErrorCode) {
+        return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
+      });
+}
+
 } // namespace quic
