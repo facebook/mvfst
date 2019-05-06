@@ -1221,11 +1221,6 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
       }
     }
   }
-  ASSERT_NE(rstStreamFrame, nullptr);
-  EXPECT_EQ(GenericApplicationErrorCode::NO_ERROR, rstStreamFrame->errorCode);
-  EXPECT_EQ(streamId, rstStreamFrame->streamId);
-  EXPECT_EQ(
-      words.at(2).length() + words.at(3).length(), rstStreamFrame->offset);
 
   // Verify stream state is cleaned up:
   auto updatedStream =
@@ -1240,7 +1235,8 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   EXPECT_EQ(
       words.at(2).length() + words.at(3).length(),
       updatedStream->currentWriteOffset);
-  EXPECT_FALSE(updatedStream->writable());
+  // updatedStream still writable since receiving rst has no impact on egress
+  EXPECT_TRUE(updatedStream->writable());
 }
 
 TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
@@ -1665,7 +1661,7 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
 }
 
 TEST_F(QuicServerTransportTest, TestAckRstStream) {
-  auto streamId = server->createBidirectionalStream().value();
+  auto streamId = server->createUnidirectionalStream().value();
   auto stream = server->getNonConstConn().streamManager->getStream(streamId);
   auto packetNum = rstStreamAndSendPacket(
       server->getNonConstConn(),

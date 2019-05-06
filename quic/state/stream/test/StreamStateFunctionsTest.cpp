@@ -159,8 +159,6 @@ TEST_F(StreamStateFunctionsTests, SendReset) {
   resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN);
 
   EXPECT_TRUE(stream.writeBuffer.empty());
-  EXPECT_TRUE(stream.readBuffer.empty());
-  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 0);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
@@ -184,7 +182,6 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
   EXPECT_EQ(stream.currentReadOffset, 90);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 90);
   EXPECT_FALSE(conn.pendingEvents.connWindowUpdate);
-  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 0);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
@@ -207,7 +204,6 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   EXPECT_EQ(stream.currentReadOffset, 100);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 100);
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
-  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 0);
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {

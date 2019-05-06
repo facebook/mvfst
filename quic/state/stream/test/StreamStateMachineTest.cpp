@@ -27,14 +27,8 @@ void verifyStreamReset(
     const QuicStreamState& stream,
     uint64_t readOffsetExpected) {
   EXPECT_TRUE(stream.readBuffer.empty());
-  // AHF
-  EXPECT_TRUE(stream.retransmissionBuffer.empty());
-  EXPECT_TRUE(stream.writeBuffer.empty());
-
   EXPECT_TRUE(stream.finalReadOffset.hasValue());
   EXPECT_EQ(readOffsetExpected, stream.finalReadOffset.value());
-  // AHF
-  EXPECT_FALSE(stream.writable());
 }
 
 std::unique_ptr<QuicServerConnectionState> createConn() {
@@ -172,10 +166,8 @@ TEST_F(QuicResetSentStateTest, RstAck) {
       stream.send, StreamEvents::RstAck(frame), stream);
 
   EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
-  // AHF
-  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
-  // EXPECT_FALSE(stream.finalReadOffset);
-  // EXPECT_FALSE(stream.readBuffer.empty());
+  EXPECT_FALSE(stream.finalReadOffset);
+  EXPECT_FALSE(stream.readBuffer.empty());
 }
 
 class QuicClosedStateTest : public Test {};
@@ -487,7 +479,7 @@ TEST_F(QuicRecvResetTest, FromOpen) {
   QuicStreamState stream(id, *conn);
   RstStreamFrame rst(rstStream, GenericApplicationErrorCode::UNKNOWN, 100);
   invokeHandler<StreamReceiveStateMachine>(stream.recv, std::move(rst), stream);
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamSendStates::Open>(stream.send));
   EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 100);
 }
@@ -515,7 +507,7 @@ TEST_F(QuicRecvResetTest, FromHalfClosedRemoteNoReadOffsetYet) {
       stream.recv,
       RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 100),
       stream);
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamSendStates::Open>(stream.send));
   EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 100);
 }
@@ -531,7 +523,7 @@ TEST_F(QuicRecvResetTest, FromHalfClosedRemoteReadOffsetMatch) {
       stream.recv,
       RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1024),
       stream);
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamSendStates::Open>(stream.send));
   EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 1024);
 }

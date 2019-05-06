@@ -11,11 +11,6 @@
 #include <quic/state/QuicStreamUtilities.h>
 
 namespace quic {
-template <typename Event>
-void invokeStreamSendStateMachine(
-    QuicConnectionStateBase&,
-    QuicStreamState& stream,
-    Event event);
 inline void
 Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, ReadStreamFrame>::
     handle(
@@ -55,14 +50,6 @@ Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, RstStreamFrame>::
         QuicStreamState::Recv& state,
         RstStreamFrame rst,
         QuicStreamState& stream) {
-  if (matchesStates<StreamSendStateData, StreamSendStates::Open>(
-          stream.send.state)) {
-    // TODO: remove.
-    invokeStreamSendStateMachine(
-        stream.conn,
-        stream,
-        StreamEvents::SendReset(GenericApplicationErrorCode::NO_ERROR));
-  }
   // We transit the receive state machine to Closed before invoking
   // onResetQuicStream because it will check the state of the stream for flow
   // control.

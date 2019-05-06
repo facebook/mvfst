@@ -11,13 +11,6 @@
 #include <quic/state/stream/StreamStateFunctions.h>
 
 namespace quic {
-
-template <typename Event>
-void invokeStreamReceiveStateMachine(
-    QuicConnectionStateBase&,
-    QuicStreamState& stream,
-    Event event);
-
 inline void Handler<
     StreamSendStateMachine,
     StreamSendStates::ResetSent,
@@ -52,14 +45,6 @@ inline void Handler<
   VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
            << stream.conn;
   transit<StreamSendStates::Closed>(state);
-  if (matchesStates<StreamReceiveStateData, StreamReceiveStates::Open>(
-          stream.recv.state)) {
-    // Terminate the ingress state machine until we remove rst on rst
-    invokeStreamReceiveStateMachine(
-        stream.conn,
-        stream,
-        RstStreamFrame(stream.id, GenericApplicationErrorCode::NO_ERROR, 0));
-  }
   if (stream.inTerminalStates()) {
     stream.conn.streamManager->addClosed(stream.id);
   }

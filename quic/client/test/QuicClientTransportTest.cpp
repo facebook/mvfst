@@ -2652,57 +2652,6 @@ TEST_F(
   EXPECT_THROW(deliverData(packet->coalesce()), std::runtime_error);
 }
 
-TEST_F(
-    QuicClientTransportAfterStartTest,
-    ReceiveRstStreamNonExistentServerStream) {
-  // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
-  // even on a nonexist server stream:
-  StreamId streamId = 0x01;
-  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  ShortHeader header(
-      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
-  RegularQuicPacketBuilder builder(
-      client->getConn().udpSendPacketLen,
-      std::move(header),
-      0 /* largestAcked */);
-  ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(rstFrame, builder);
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  deliverData(packet->coalesce());
-  assertWritten(true, folly::none);
-  client->close(folly::none);
-}
-
-TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamNewStream) {
-  // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
-  auto streamId =
-      client->createBidirectionalStream(false /* replaySafe */).value();
-  client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
-
-  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  ShortHeader header(
-      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
-  RegularQuicPacketBuilder builder(
-      client->getConn().udpSendPacketLen,
-      std::move(header),
-      0 /* largestAcked */);
-  ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(rstFrame, builder);
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  EXPECT_CALL(deliveryCallback, onCanceled(_, _)).Times(1);
-  deliverData(packet->coalesce());
-  assertWritten(true, folly::none);
-
-  // And error if you try to write it:
-  EXPECT_EQ(
-      LocalErrorCode::STREAM_CLOSED,
-      client
-          ->writeChain(
-              streamId, IOBuf::copyBuffer("hello"), false, false, nullptr)
-          .error());
-  client->close(folly::none);
-}
-
 TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   // A RstStreamFrame will be written to sock when we receive a RstStreamFrame
   auto streamId =
@@ -3372,8 +3321,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
       sentPackets,
       PacketNumberSpace::AppData));
   deliverData(packet->coalesce());
-  // Stream should be closed after it received the ack for rst
-  EXPECT_FALSE(conn.streamManager->streamExists(streamId));
+  // Stream is not yet closed because ingress state machine is open
+  EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   client->close(folly::none);
   EXPECT_TRUE(client->isClosed());
 }
@@ -3478,8 +3427,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
       sentPackets,
       PacketNumberSpace::AppData));
   deliverData(packet->coalesce());
-  // Stream should be closed after it received the ack for rst
-  EXPECT_FALSE(conn.streamManager->streamExists(streamId));
+  // Stream still exists since ingress state machine is still open
+  EXPECT_TRUE(conn.streamManager->streamExists(streamId));
   client->close(folly::none);
   EXPECT_TRUE(client->isClosed());
 }

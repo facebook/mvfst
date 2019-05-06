@@ -347,9 +347,9 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
   EXPECT_THROW(
       invokeStreamReceiveStateMachine(conn, stream, std::move(rst)),
       QuicTransportException);
-  bool matches =
-      matchesStates<StreamSendStateData, StreamSendStates::ResetSent>(
-          stream.send.state);
+  // This doesn't change the send state machine implicitly anymore
+  bool matches = matchesStates<StreamSendStateData, StreamSendStates::Open>(
+      stream.send.state);
   EXPECT_TRUE(matches);
 }
 
@@ -364,8 +364,8 @@ TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   conn.flowControlState.windowSize = 100;
   invokeStreamReceiveStateMachine(conn, stream, std::move(rst));
   bool matches =
-      matchesStates<StreamSendStateData, StreamSendStates::ResetSent>(
-          stream.send.state);
+      matchesStates<StreamReceiveStateData, StreamReceiveStates::Closed>(
+          stream.recv.state);
   EXPECT_TRUE(matches);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);

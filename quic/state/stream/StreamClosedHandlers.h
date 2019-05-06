@@ -12,12 +12,6 @@
 #include <quic/state/stream/StreamStateFunctions.h>
 
 namespace quic {
-template <typename Event>
-void invokeStreamSendStateMachine(
-    QuicConnectionStateBase&,
-    QuicStreamState& stream,
-    Event event);
-
 inline void Handler<
     StreamReceiveStateMachine,
     StreamReceiveStates::Closed,
@@ -50,11 +44,6 @@ inline void Handler<
         QuicStreamState::Recv& state,
         RstStreamFrame rst,
         QuicStreamState& stream) {
-  // TODO: Remove
-  invokeStreamSendStateMachine(
-      stream.conn,
-      stream,
-      StreamEvents::SendReset(GenericApplicationErrorCode::NO_ERROR));
   // This will check whether the reset is still consistent with the stream.
   onResetQuicStream(stream, std::move(rst));
 }
