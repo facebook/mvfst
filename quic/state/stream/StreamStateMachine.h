@@ -205,6 +205,6 @@ QUIC_DECLARE_STATE_HANDLER(
     StreamEvents::SendReset);
 } // namespace quic
 
-#include <quic/state/stream/StreamClosedHandlers.h>
-#include <quic/state/stream/StreamOpenHandlers.h>
-#include <quic/state/stream/StreamWaitingForRstAckHandlers.h>
+#include <quic/state/stream/StreamClosedHandlers-inl.h>
+#include <quic/state/stream/StreamOpenHandlers-inl.h>
+#include <quic/state/stream/StreamWaitingForRstAckHandlers-inl.h>

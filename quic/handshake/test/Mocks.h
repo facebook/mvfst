@@ -7,6 +7,7 @@
  */
 
 #include <gmock/gmock.h>
+#include <quic/codec/PacketNumberCipher.h>
 
 namespace quic {
 namespace test {
@@ -19,4 +20,5 @@ class MockPacketNumberCipher : public PacketNumberCipher {
   MOCK_CONST_METHOD1(mask, HeaderProtectionMask(folly::ByteRange));
   MOCK_CONST_METHOD0(keyLength, size_t());
 };
-}}
+} // namespace test
+} // namespace quic
