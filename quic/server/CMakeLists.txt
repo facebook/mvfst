@@ -19,6 +19,7 @@ add_library(
 target_include_directories(
   mvfst_server PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include/>
 )
 
@@ -30,6 +31,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_server
+  ${FIZZ_TARGET}
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
@@ -40,7 +42,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_server PUBLIC
   Folly::folly
-  fizz::fizz
+  ${LIBFIZZ_LIBRARY}
   mvfst_constants
   mvfst_codec
   mvfst_codec_types

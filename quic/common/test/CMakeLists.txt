@@ -10,13 +10,14 @@ endif()
 add_library(
   mvfst_test_utils STATIC
   TestUtils.cpp
-  ${FIZZ_PROJECT}/fizz/crypto/aead/test/TestUtil.cpp
-  ${FIZZ_PROJECT}/fizz/crypto/test/TestUtil.cpp
+  AeadTestUtil.cpp
+  CryptoTestUtil.cpp
 )
+
 target_include_directories(
   mvfst_test_utils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  $<BUILD_INTERFACE:${FIZZ_PROJECT}>
+  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   ${LIBGMOCK_INCLUDE_DIR}
   ${LIBGTEST_INCLUDE_DIR}
 )
@@ -29,6 +30,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_test_utils
+  ${FIZZ_TARGET}
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
@@ -41,7 +43,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_test_utils PUBLIC
   Folly::folly
-  fizz::fizz
+  ${LIBFIZZ_LIBRARY}
   ${LIBGMOCK_LIBRARIES}
   ${LIBGTEST_LIBRARIES}
   mvfst_client
@@ -62,7 +64,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   IntervalSetTest.cpp
   DEPENDS
   Folly::folly
-  fizz::fizz
+  ${LIBFIZZ_LIBRARY}
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types

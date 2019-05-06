@@ -16,7 +16,7 @@ quic_add_test(TARGET ServerHandshakeTest
   StatelessResetGeneratorTest.cpp
   DEPENDS
   Folly::folly
-  fizz::fizz
+  ${LIBFIZZ_LIBRARY}
   mvfst_client
   mvfst_codec_types
   mvfst_constants

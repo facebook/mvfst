@@ -27,7 +27,6 @@ find_package(Boost 1.62
   context
 )
 find_package(folly REQUIRED)
-find_package(Fizz REQUIRED)
 find_package(Glog REQUIRED)
 find_package(Threads)
 
@@ -75,6 +74,7 @@ list(APPEND
   -Wnon-virtual-dtor
 )
 
+include(BuildFizz)
 if(BUILD_TESTS)
   enable_testing()
   include(QuicTest)

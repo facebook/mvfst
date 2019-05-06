@@ -70,7 +70,8 @@ function(quic_add_test)
     # implementation of 'main()' that calls folly::init
     "${QUIC_FBCODE_ROOT}/quic/common/test/TestMain.cpp"
   )
-  add_dependencies(${QUIC_TEST_TARGET} googletest) # make sure googletest is built first
+   # make sure googletest and fizz are built first
+  add_dependencies(${QUIC_TEST_TARGET} googletest ${FIZZ_TARGET})
   target_compile_options(
     ${QUIC_TEST_TARGET} PRIVATE
     ${_QUIC_BASE_COMPILE_OPTIONS}
