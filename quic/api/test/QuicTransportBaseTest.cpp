@@ -281,7 +281,8 @@ class TestQuicTransport
 
   void closeStream(StreamId id) {
     QuicStreamState* stream = conn_->streamManager->getStream(id);
-    stream->state = StreamStates::Closed{};
+    stream->send.state = StreamSendStates::Closed();
+    stream->recv.state = StreamReceiveStates::Closed();
     conn_->streamManager->addClosed(id);
 
     auto deliveryCb = deliveryCallbacks_.find(id);

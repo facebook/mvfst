@@ -32,6 +32,13 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
       : isLocalStream(connIn.nodeType, idIn)
           ? conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote
           : conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal;
+  if (isUnidirectionalStream(idIn)) {
+    if (isLocalStream(connIn.nodeType, idIn)) {
+      recv.state = StreamReceiveStates::Invalid();
+    } else {
+      send.state = StreamSendStates::Invalid();
+    }
+  }
 }
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st) {

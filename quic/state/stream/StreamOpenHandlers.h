@@ -9,95 +9,92 @@
 // override-include-guard
 
 #include <quic/state/QuicStreamUtilities.h>
-#include <quic/state/stream/StreamStateFunctions.h>
 
 namespace quic {
-
-inline void
-Handler<StreamStateMachine, StreamStates::Open, ReadStreamFrame>::handle(
+template <typename Event>
+void invokeStreamSendStateMachine(
+    QuicConnectionStateBase&,
     QuicStreamState& stream,
-    ReadStreamFrame frame) {
-  if (isSendingStream(stream.conn.nodeType, stream.id)) {
-    throw QuicTransportException(
-        "ReadStreamFrame on unidirectional sending stream",
-        TransportErrorCode::STREAM_STATE_ERROR);
-  }
+    Event event);
+inline void
+Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, ReadStreamFrame>::
+    handle(
+        QuicStreamState::Recv& state,
+        ReadStreamFrame frame,
+        QuicStreamState& stream) {
   VLOG_IF(10, frame.fin) << "Open: Received data with fin"
                          << " stream=" << stream.id << " " << stream.conn;
   appendDataToReadBuffer(
       stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
   if (isAllDataReceived(stream)) {
-    if (isUnidirectionalStream(stream.id)) {
-      VLOG(10) << "Open: Transition to Closed"
-               << " stream=" << stream.id << " " << stream.conn;
-      transit<StreamStates::Closed>(stream);
-    } else {
-      VLOG(10) << "Open: Transition to HalfClosedRemote"
-               << " stream=" << stream.id << " " << stream.conn;
-      transit<StreamStates::HalfClosedRemote>(stream);
+    VLOG(10) << "Open: Transition to Closed"
+             << " stream=" << stream.id << " " << stream.conn;
+    transit<StreamReceiveStates::Closed>(state);
+    if (stream.inTerminalStates()) {
+      stream.conn.streamManager->addClosed(stream.id);
     }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
 }
 
 inline void
-Handler<StreamStateMachine, StreamStates::Open, StopSendingFrame>::handle(
-    QuicStreamState& stream,
-    StopSendingFrame frame) {
-  if (isBidirectionalStream(stream.id) ||
-      isSendingStream(stream.conn.nodeType, stream.id)) {
-    stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
-  } else {
-    throw QuicTransportException(
-        "StopSendingFrame on unidirectional receiving stream",
-        TransportErrorCode::STREAM_STATE_ERROR);
-  }
+Handler<StreamSendStateMachine, StreamSendStates::Open, StopSendingFrame>::
+    handle(
+        QuicStreamState::Send& state,
+        StopSendingFrame frame,
+        QuicStreamState& stream) {
+  CHECK(
+      isBidirectionalStream(stream.id) ||
+      isSendingStream(stream.conn.nodeType, stream.id));
+  stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
 }
 
 inline void
-Handler<StreamStateMachine, StreamStates::Open, RstStreamFrame>::handle(
-    QuicStreamState& stream,
-    RstStreamFrame rst) {
-  if (isSendingStream(stream.conn.nodeType, stream.id)) {
-    throw QuicTransportException(
-        "RstStreamFrame on unidirectional sending stream",
-        TransportErrorCode::STREAM_STATE_ERROR);
-  }
-  // We transit before invoking onResetQuicStream because it will check the
-  // state of the stream for flow control.
-  transit<StreamStates::WaitingForRstAck>(stream);
-  onResetQuicStream(stream, std::move(rst));
-  if (isBidirectionalStream(stream.id)) {
+Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, RstStreamFrame>::
+    handle(
+        QuicStreamState::Recv& state,
+        RstStreamFrame rst,
+        QuicStreamState& stream) {
+  if (matchesStates<StreamSendStateData, StreamSendStates::Open>(
+          stream.send.state)) {
     // TODO: remove.
-    appendPendingStreamReset(
-        stream.conn, stream, GenericApplicationErrorCode::NO_ERROR);
-  } else {
-    transit<StreamStates::Closed>(stream);
+    invokeStreamSendStateMachine(
+        stream.conn,
+        stream,
+        StreamEvents::SendReset(GenericApplicationErrorCode::NO_ERROR));
   }
+  // We transit the receive state machine to Closed before invoking
+  // onResetQuicStream because it will check the state of the stream for flow
+  // control.
+  transit<StreamReceiveStates::Closed>(state);
+  if (stream.inTerminalStates()) {
+    stream.conn.streamManager->addClosed(stream.id);
+  }
+  onResetQuicStream(stream, std::move(rst));
 }
 
-inline void
-Handler<StreamStateMachine, StreamStates::Open, StreamEvents::SendReset>::
-    handle(QuicStreamState& stream, StreamEvents::SendReset rst) {
-  if (isReceivingStream(stream.conn.nodeType, stream.id)) {
-    throw QuicTransportException(
-        "SendReset on unidirectional receiving stream",
-        TransportErrorCode::STREAM_STATE_ERROR);
-  }
+inline void Handler<
+    StreamSendStateMachine,
+    StreamSendStates::Open,
+    StreamEvents::SendReset>::
+    handle(
+        QuicStreamState::Send& state,
+        StreamEvents::SendReset rst,
+        QuicStreamState& stream) {
   resetQuicStream(stream, rst.errorCode);
   appendPendingStreamReset(stream.conn, stream, rst.errorCode);
   // Move the state machine:
-  transit<StreamStates::WaitingForRstAck>(stream);
+  transit<StreamSendStates::ResetSent>(state);
 }
 
-inline void
-Handler<StreamStateMachine, StreamStates::Open, StreamEvents::AckStreamFrame>::
-    handle(QuicStreamState& stream, StreamEvents::AckStreamFrame ack) {
-  if (isReceivingStream(stream.conn.nodeType, stream.id)) {
-    throw QuicTransportException(
-        "AckStreamFrame on unidirectional receiving stream",
-        TransportErrorCode::STREAM_STATE_ERROR);
-  }
+inline void Handler<
+    StreamSendStateMachine,
+    StreamSendStates::Open,
+    StreamEvents::AckStreamFrame>::
+    handle(
+        QuicStreamState::Send& state,
+        StreamEvents::AckStreamFrame ack,
+        QuicStreamState& stream) {
   // Clean up the acked buffers from the retransmissionBuffer.
 
   auto ackedBuffer = std::lower_bound(
@@ -129,10 +126,9 @@ Handler<StreamStateMachine, StreamStates::Open, StreamEvents::AckStreamFrame>::
 
   // Check for whether or not we have ACKed all bytes until our FIN.
   if (allBytesTillFinAcked(stream)) {
-    if (isUnidirectionalStream(stream.id)) {
-      transit<StreamStates::Closed>(stream);
-    } else {
-      transit<StreamStates::HalfClosedLocal>(stream);
+    transit<StreamSendStates::Closed>(state);
+    if (stream.inTerminalStates()) {
+      stream.conn.streamManager->addClosed(stream.id);
     }
   }
 }

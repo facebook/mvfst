@@ -175,7 +175,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   ASSERT_EQ(1, packet1.packet.frames.size());
 
   // Then we reset the stream
-  invokeStreamStateMachine(
+  invokeStreamSendStateMachine(
       conn,
       *stream,
       StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));

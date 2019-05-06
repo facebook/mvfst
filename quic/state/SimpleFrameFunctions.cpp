@@ -129,7 +129,7 @@ bool updateSimpleFrameOnPacketReceived(
       [&](const StopSendingFrame& frame) {
         auto stream = conn.streamManager->getStream(frame.streamId);
         if (stream) {
-          invokeStreamStateMachine(conn, *stream, frame);
+          invokeStreamSendStateMachine(conn, *stream, frame);
         }
         return true;
       },

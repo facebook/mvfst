@@ -443,7 +443,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
       *stream1,
       *buf,
       true);
-  invokeStreamStateMachine(
+  invokeStreamSendStateMachine(
       *conn,
       *stream1,
       StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));

@@ -177,4 +177,3 @@ void onConnectionMigration(
     QuicServerConnectionState& conn,
     const folly::SocketAddress& newPeerAddress);
 } // namespace quic
-

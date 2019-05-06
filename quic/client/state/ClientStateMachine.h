@@ -82,6 +82,7 @@ void ClientInvalidStateHandler(QuicClientConnectionState& state);
 
 struct QuicClientStateMachine {
   using StateData = QuicClientConnectionState;
+  using UserData = QuicClientConnectionState;
   static constexpr auto InvalidEventHandler = &ClientInvalidStateHandler;
 };
 

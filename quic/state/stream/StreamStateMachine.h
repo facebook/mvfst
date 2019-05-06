@@ -40,219 +40,171 @@ struct StreamEvents {
 
 // Transition the stream to an error state if there is an invalid state
 // transition.
-inline void StreamStateMachineInvalidHandler(const QuicStreamState& state) {
+inline void StreamSendStateMachineInvalidHandler(const QuicStreamState& state) {
   throw QuicTransportException(
       folly::to<std::string>(
           "Invalid transition from state=",
           folly::variant_match(
-              state.state,
-              [](const StreamStates::Open&) { return "Open"; },
-              [](const StreamStates::HalfClosedLocal&) {
-                return "HalfClosedLocal";
-              },
-              [](const StreamStates::HalfClosedRemote&) {
-                return "HalfClosedRemote";
-              },
-              [](const StreamStates::WaitingForRstAck&) {
-                return "WaitingForRstAck";
-              },
-              [](const StreamStates::Closed&) { return "Closed"; })),
+              state.send.state,
+              [](const StreamSendStates::Open&) { return "Open"; },
+              [](const StreamSendStates::ResetSent&) { return "ResetSent"; },
+              [](const StreamSendStates::Closed&) { return "Closed"; },
+              [](const StreamSendStates::Invalid&) { return "Invalid"; })),
       TransportErrorCode::STREAM_STATE_ERROR);
 }
 
-struct StreamStateMachine {
-  using StateData = QuicStreamState;
-  static constexpr auto InvalidEventHandler = &StreamStateMachineInvalidHandler;
+struct StreamSendStateMachine {
+  using StateData = QuicStreamState::Send;
+  using UserData = QuicStreamState;
+  static constexpr auto InvalidEventHandler =
+      &StreamSendStateMachineInvalidHandler;
+};
+
+// Transition the stream to an error state if there is an invalid state
+// transition.
+inline void StreamReceiveStateMachineInvalidHandler(
+    const QuicStreamState& state) {
+  throw QuicTransportException(
+      folly::to<std::string>(
+          "Invalid transition from state=",
+          folly::variant_match(
+              state.recv.state,
+              [](const StreamReceiveStates::Open&) { return "Open"; },
+              [](const StreamReceiveStates::Closed&) { return "Closed"; },
+              [](const StreamReceiveStates::Invalid&) { return "Invalid"; })),
+      TransportErrorCode::STREAM_STATE_ERROR);
+}
+
+struct StreamReceiveStateMachine {
+  using StateData = QuicStreamState::Recv;
+  using UserData = QuicStreamState;
+  static constexpr auto InvalidEventHandler =
+      &StreamReceiveStateMachineInvalidHandler;
 };
 
 /**
  *  Welcome to the stream state machine, we got fun and games.
  *
- *  ACK = Ack of stream frame.
+ * This is a simplified version of the state machines defined in the transport
+ * specification.  The "Invalid" state is used for unidirectional streams that
+ * do not have that half (eg: an ingress uni stream is in send state Invalid)
+ *
+ * Send State Machine
+ * ==================
+ *
+ * [ Initial State ]
+ *      |
+ *      | Send Stream
+ *      |
+ *      v
+ * Send::Open ---------------+
+ *      |                    |
+ *      | Ack all bytes      | Send RST
+ *      | ti FIN             |
+ *      v                    v
+ * Send::Closed <------  ResetSent
+ *                RST
+ *                Acked
  *
  *
- *  Stream / ACK                 Stream/ ACK
- *    |--|                         |----|
- *    |  v  All bytes till FIN     |    v            All bytes till FIN
- *    Open ---------------------> HalfClosedRemote ------------------------|
- *     |  |        recv                    |                acked          |
- *     |  |                                |                               |
- *     |  |     SendReset / Reset          |                               |
- *     |  ----------------------------|    |                               |
- *     |                              |    |                               |
- *     |  All bytes till FIN acked    |    |                               |
- *     |                              |    |                               |
- *     |                              |    |                               |
- *     | Stream / ACK                 |    | SendReset /                   |
- *     |   |---|                      |    | Reset                         |
- *     v   |   v         SendReset    v    v                 RstAck        v
- *    HalfClosedLocal --------------> WaitingForRstAck---------------------|
- *     |                                  |   ^                            |
- *     |                                  |---|                            |
- *     | Reset /                         Stream / ACK / Reset / SendReset  |
- *     | All bytes till FIN recv                                           |
- *     |--------------------------------------------------------------> Closed
- *                                                                      |   ^
- *                                                                      |---|
- *                                                                     Stream /
- *                                                                     Reset /
- *                                                                     RstAck /
- *                                                                     Ack /
- *                                                                     SendReset
+ * Receive State Machine
+ * =====================
+ *
+ * [ Initial State ]
+ *      |
+ *      |  Stream
+ *      |
+ *      v
+ * Receive::Open  -----------+
+ *      |                    |
+ *      | Receive all        | Receive RST
+ *      | bytes til FIN      |
+ *      v                    |
+ * Receive::Closed <---------+
+ *
  */
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Open,
+    StreamReceiveStateMachine,
+    StreamReceiveStates::Open,
     ReadStreamFrame,
-    StreamStates::HalfClosedRemote,
-    StreamStates::Closed);
+    StreamReceiveStates::Closed);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Open,
+    StreamReceiveStateMachine,
+    StreamReceiveStates::Open,
     RstStreamFrame,
-    StreamStates::WaitingForRstAck,
-    StreamStates::Closed);
+    StreamReceiveStates::Closed);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Open,
+    StreamSendStateMachine,
+    StreamSendStates::Open,
     StreamEvents::SendReset,
-    StreamStates::WaitingForRstAck);
+    StreamSendStates::ResetSent);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Open,
+    StreamSendStateMachine,
+    StreamSendStates::Open,
     StreamEvents::AckStreamFrame,
-    StreamStates::HalfClosedLocal,
-    StreamStates::Closed);
+    StreamSendStates::Closed);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Open,
+    StreamSendStateMachine,
+    StreamSendStates::Open,
     StopSendingFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedLocal,
-    RstStreamFrame,
-    StreamStates::Closed);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedLocal,
-    ReadStreamFrame,
-    StreamStates::Closed);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedLocal,
+    StreamSendStateMachine,
+    StreamSendStates::ResetSent,
     StreamEvents::AckStreamFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedLocal,
+    StreamSendStateMachine,
+    StreamSendStates::ResetSent,
     StopSendingFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedLocal,
-    StreamEvents::SendReset,
-    StreamStates::WaitingForRstAck);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedRemote,
-    ReadStreamFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedRemote,
-    StreamEvents::AckStreamFrame,
-    StreamStates::Closed);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedRemote,
-    StopSendingFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedRemote,
-    StreamEvents::SendReset,
-    StreamStates::WaitingForRstAck);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::HalfClosedRemote,
-    RstStreamFrame,
-    StreamStates::WaitingForRstAck);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
-    ReadStreamFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
-    StreamEvents::AckStreamFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
-    StopSendingFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
-    RstStreamFrame);
-
-QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
+    StreamSendStateMachine,
+    StreamSendStates::ResetSent,
     StreamEvents::RstAck,
-    StreamStates::Closed);
+    StreamSendStates::Closed);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::WaitingForRstAck,
+    StreamSendStateMachine,
+    StreamSendStates::ResetSent,
     StreamEvents::SendReset);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamReceiveStateMachine,
+    StreamReceiveStates::Closed,
     ReadStreamFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamSendStateMachine,
+    StreamSendStates::Closed,
     StreamEvents::RstAck);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamSendStateMachine,
+    StreamSendStates::Closed,
     StreamEvents::AckStreamFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamSendStateMachine,
+    StreamSendStates::Closed,
     StopSendingFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamReceiveStateMachine,
+    StreamReceiveStates::Closed,
     RstStreamFrame);
 
 QUIC_DECLARE_STATE_HANDLER(
-    StreamStateMachine,
-    StreamStates::Closed,
+    StreamSendStateMachine,
+    StreamSendStates::Closed,
     StreamEvents::SendReset);
 } // namespace quic
 
 #include <quic/state/stream/StreamClosedHandlers.h>
-#include <quic/state/stream/StreamHalfClosedLocalHandlers.h>
-#include <quic/state/stream/StreamHalfClosedRemoteHandlers.h>
 #include <quic/state/stream/StreamOpenHandlers.h>
 #include <quic/state/stream/StreamWaitingForRstAckHandlers.h>

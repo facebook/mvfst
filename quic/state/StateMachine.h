@@ -28,6 +28,7 @@ namespace quic {
  * 2. Create a Machine type with an alias of StateData
  *    struct Machine {
  *       using StateData = StateDataType;
+ *       using UserData = UserDataType;
  *       constexpr auto InvalidEventHandler = &InvalidEventHandler;
  *    }
  * 3. Create types for each state
@@ -96,12 +97,15 @@ struct HandlerBase {
   }
 };
 
-#define QUIC_DECLARE_STATE_HANDLER(machine, state, event, ...)        \
-  template <>                                                         \
-  class Handler<machine, state, event>                                \
-      : public HandlerBase<machine, state, event, ##__VA_ARGS__> {    \
-   public:                                                            \
-    static void handle(typename machine::StateData& data, event evt); \
+#define QUIC_DECLARE_STATE_HANDLER(machine, state, event, ...)     \
+  template <>                                                      \
+  class Handler<machine, state, event>                             \
+      : public HandlerBase<machine, state, event, ##__VA_ARGS__> { \
+   public:                                                         \
+    static void handle(                                            \
+        typename machine::StateData& data,                         \
+        event evt,                                                 \
+        typename machine::UserData& userData);                     \
   };
 
 #define QUIC_DECLARE_STATE_HANDLER_T(state, event, ...)                    \
@@ -109,7 +113,10 @@ struct HandlerBase {
   class Handler<Machine, state, event>                                     \
       : public HandlerBase<Machine, state, event, ##__VA_ARGS__> {         \
    public:                                                                 \
-    static void handle(typename Machine::StateData& data, event evt);      \
+    static void handle(                                                    \
+        typename Machine::StateData& data,                                 \
+        event evt,                                                         \
+        typename Machine::UserData&);                                      \
     template <class NewState>                                              \
     static void transit(typename Machine::StateData& data) {               \
       HandlerBase<Machine, state, event, ##__VA_ARGS__>::template transit< \
@@ -123,28 +130,39 @@ struct HandlerBase {
  */
 template <class Machine, class State, class Event>
 struct Handler : public HandlerBase<Machine, State, Event> {
-  static void handle(typename Machine::StateData& data, Event /*event*/) {
-    Machine::InvalidEventHandler(data);
+  static void handle(
+      typename Machine::StateData& /*state*/,
+      Event /*event*/,
+      typename Machine::UserData& userData) {
+    Machine::InvalidEventHandler(userData);
   }
 };
 
 template <class Machine, class Event>
 struct state_visitor : public boost::static_visitor<> {
-  explicit state_visitor(Event event, typename Machine::StateData& data)
-      : event_(std::move(event)), data_(data) {}
+  explicit state_visitor(
+      Event event,
+      typename Machine::StateData& data,
+      typename Machine::UserData& userData)
+      : event_(std::move(event)), data_(data), userData_(userData) {}
 
   template <class State>
   void operator()(const State& /*state*/) {
-    Handler<Machine, State, Event>::handle(data_, std::move(event_));
+    Handler<Machine, State, Event>::handle(data_, std::move(event_), userData_);
   }
 
   Event event_;
   typename Machine::StateData& data_;
+  typename Machine::UserData& userData_;
 };
 
 template <class Machine, class Event>
-void invokeHandler(typename Machine::StateData& data, Event event) {
-  auto visitor = state_visitor<Machine, Event>(std::move(event), data);
+void invokeHandler(
+    typename Machine::StateData& data,
+    Event event,
+    typename Machine::UserData& userData) {
+  auto visitor =
+      state_visitor<Machine, Event>(std::move(event), data, userData);
   return boost::apply_visitor(visitor, data.state);
 }
 }

@@ -27,10 +27,13 @@ void verifyStreamReset(
     const QuicStreamState& stream,
     uint64_t readOffsetExpected) {
   EXPECT_TRUE(stream.readBuffer.empty());
+  // AHF
   EXPECT_TRUE(stream.retransmissionBuffer.empty());
   EXPECT_TRUE(stream.writeBuffer.empty());
+
   EXPECT_TRUE(stream.finalReadOffset.hasValue());
   EXPECT_EQ(readOffsetExpected, stream.finalReadOffset.value());
+  // AHF
   EXPECT_FALSE(stream.writable());
 }
 
@@ -65,10 +68,11 @@ TEST_F(QuicOpenStateTest, ReadStreamDataNotFin) {
   bool fin = false;
   ReadStreamFrame frame(id, offset, fin);
   frame.data = IOBuf::copyBuffer("hey");
-  invokeHandler<StreamStateMachine>(stream, std::move(frame));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv, std::move(frame), stream);
   EXPECT_TRUE(stream.hasReadableData());
   EXPECT_TRUE(stream.hasPeekableData());
-  EXPECT_TRUE(isState<StreamStates::Open>(stream));
+  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream.recv));
 }
 
 TEST_F(QuicOpenStateTest, ReadInvalidData) {
@@ -81,15 +85,17 @@ TEST_F(QuicOpenStateTest, ReadInvalidData) {
   // EOF in middle of stream
   ReadStreamFrame frame1(id, offset1, fin1);
   frame1.data = IOBuf::copyBuffer("hey");
-  invokeHandler<StreamStateMachine>(stream, std::move(frame1));
-  EXPECT_TRUE(isState<StreamStates::Open>(stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv, std::move(frame1), stream);
+  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream.recv));
 
   uint64_t offset2 = 1;
   bool fin2 = true;
   ReadStreamFrame frame2(id, offset2, fin2);
   frame2.data = IOBuf::copyBuffer("e");
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, std::move(frame2)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv, std::move(frame2), stream),
       QuicTransportException);
 }
 
@@ -99,7 +105,8 @@ TEST_F(QuicOpenStateTest, InvalidEvent) {
   QuicStreamState stream(id, *conn);
   RstStreamFrame frame(1, GenericApplicationErrorCode::UNKNOWN, 0);
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, StreamEvents::RstAck(frame)),
+      invokeHandler<StreamSendStateMachine>(
+          stream.send, StreamEvents::RstAck(frame), stream),
       QuicTransportException);
 }
 
@@ -113,8 +120,9 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithFIN) {
   ReadStreamFrame receivedStreamFrame(stream->id, 100, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::HalfClosedRemote>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamReceiveStates::Closed>(stream->recv));
 }
 
 TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithFINReadbuffHole) {
@@ -127,8 +135,9 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithFINReadbuffHole) {
   ReadStreamFrame receivedStreamFrame(stream->id, 200, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::Open>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
 TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithoutFIN) {
@@ -141,28 +150,32 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithoutFIN) {
   ReadStreamFrame receivedStreamFrame(stream->id, 100, false);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::Open>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
-class QuicWaitingForRstAckStateTest : public Test {};
+class QuicResetSentStateTest : public Test {};
 
-TEST_F(QuicWaitingForRstAckStateTest, RstAck) {
+TEST_F(QuicResetSentStateTest, RstAck) {
   auto conn = createConn();
   StreamId id = 5;
 
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
+  stream.send.state = StreamSendStates::ResetSent();
   stream.currentReadOffset = 0xABCD;
   stream.finalWriteOffset = 0xACDC;
   stream.readBuffer.emplace_back(
       folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  invokeHandler<StreamStateMachine>(stream, StreamEvents::RstAck(frame));
+  invokeHandler<StreamSendStateMachine>(
+      stream.send, StreamEvents::RstAck(frame), stream);
 
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
-  EXPECT_FALSE(stream.finalReadOffset);
-  EXPECT_FALSE(stream.readBuffer.empty());
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  // AHF
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
+  // EXPECT_FALSE(stream.finalReadOffset);
+  // EXPECT_FALSE(stream.readBuffer.empty());
 }
 
 class QuicClosedStateTest : public Test {};
@@ -171,10 +184,11 @@ TEST_F(QuicClosedStateTest, RstAck) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Closed();
   RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  invokeHandler<StreamStateMachine>(stream, StreamEvents::RstAck(frame));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  invokeHandler<StreamSendStateMachine>(
+      stream.send, StreamEvents::RstAck(frame), stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
 }
 
 TEST_F(QuicOpenStateTest, AckStream) {
@@ -204,11 +218,11 @@ TEST_F(QuicOpenStateTest, AckStream) {
           ->packet.frames.front());
 
   StreamEvents::AckStreamFrame ack(streamFrame);
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
 
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
 }
 
 TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
@@ -245,11 +259,13 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
 
   StreamEvents::AckStreamFrame ack(streamFrame);
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
 class QuicHalfClosedLocalStateTest : public Test {};
@@ -258,45 +274,54 @@ TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithFIN) {
   auto conn = createConn();
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->state = StreamStates::HalfClosedLocal();
+  stream->send.state = StreamSendStates::Closed();
+  stream->recv.state = StreamReceiveStates::Open();
   stream->currentReadOffset = 100;
 
   // We received FIN and everything:
   ReadStreamFrame receivedStreamFrame(stream->id, 100, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Closed>(stream->recv));
 }
 
 TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithFINReadbuffHole) {
   auto conn = createConn();
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->state = StreamStates::HalfClosedLocal();
+  stream->send.state = StreamSendStates::Closed();
+  stream->recv.state = StreamReceiveStates::Open();
   stream->currentReadOffset = 100;
 
   // We received FIN, but we havn't received anything between 100 and 200:
   ReadStreamFrame receivedStreamFrame(stream->id, 200, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
 TEST_F(QuicHalfClosedLocalStateTest, ReceiveStreamFrameWithoutFIN) {
   auto conn = createConn();
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->state = StreamStates::HalfClosedLocal();
+  stream->send.state = StreamSendStates::Closed();
+  stream->recv.state = StreamReceiveStates::Open();
   stream->currentReadOffset = 100;
 
   // We haven't received FIN:
   ReadStreamFrame receivedStreamFrame(stream->id, 100, false);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(*stream, std::move(receivedStreamFrame));
-  ASSERT_TRUE(isState<StreamStates::HalfClosedLocal>(*stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream->recv, std::move(receivedStreamFrame), *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
 class QuicHalfClosedRemoteStateTest : public Test {};
@@ -310,7 +335,8 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   folly::Optional<ConnectionId> serverChosenConnId =
       connIdAlgo->encodeConnectionId(params);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->state = StreamStates::HalfClosedRemote();
+  stream->send.state = StreamSendStates::Open();
+  stream->recv.state = StreamReceiveStates::Closed();
 
   EventBase evb;
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
@@ -333,11 +359,11 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
           ->packet.frames.front());
 
   StreamEvents::AckStreamFrame ack(streamFrame);
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
 
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
 }
 
 TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
@@ -349,7 +375,8 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
   folly::Optional<ConnectionId> serverChosenConnId =
       connIdAlgo->encodeConnectionId(params);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  stream->state = StreamStates::HalfClosedRemote();
+  stream->send.state = StreamSendStates::Open();
+  stream->recv.state = StreamReceiveStates::Closed();
 
   EventBase evb;
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
@@ -379,11 +406,13 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
 
   StreamEvents::AckStreamFrame ack(streamFrame);
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Closed>(stream->recv));
 
-  invokeHandler<StreamStateMachine>(*stream, ack);
-  ASSERT_TRUE(isState<StreamStates::Closed>(*stream));
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Closed>(stream->recv));
 }
 
 class QuicSendResetTest : public Test {};
@@ -392,47 +421,61 @@ TEST_F(QuicSendResetTest, FromOpen) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  invokeHandler<StreamSendStateMachine>(
+      stream.send,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
 }
 
 TEST_F(QuicSendResetTest, FromHalfCloseRemote) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedRemote();
-  invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Closed();
+  invokeHandler<StreamSendStateMachine>(
+      stream.send,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
 }
 
 TEST_F(QuicSendResetTest, FromHalfCloseLocal) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedLocal();
-  invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Open();
+  invokeHandler<StreamSendStateMachine>(
+      stream.send,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+      stream);
+
+  // You cannot send a reset after FIN has been acked
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
 }
 
 TEST_F(QuicSendResetTest, FromClosed) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
-  invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
+  stream.send.state = StreamSendStates::Closed();
+  invokeHandler<StreamSendStateMachine>(
+      stream.send,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+      stream);
 }
 
-TEST_F(QuicSendResetTest, FromWaitingForRstAck) {
+TEST_F(QuicSendResetTest, FromResetSent) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
-  invokeHandler<StreamStateMachine>(
-      stream, StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
+  stream.send.state = StreamSendStates::ResetSent();
+  invokeHandler<StreamSendStateMachine>(
+      stream.send,
+      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+      stream);
 }
 
 class QuicRecvResetTest : public Test {};
@@ -443,8 +486,9 @@ TEST_F(QuicRecvResetTest, FromOpen) {
   StreamId rstStream = 1;
   QuicStreamState stream(id, *conn);
   RstStreamFrame rst(rstStream, GenericApplicationErrorCode::UNKNOWN, 100);
-  invokeHandler<StreamStateMachine>(stream, std::move(rst));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  invokeHandler<StreamReceiveStateMachine>(stream.recv, std::move(rst), stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 100);
 }
 
@@ -456,7 +500,8 @@ TEST_F(QuicRecvResetTest, FromOpenReadEOFMismatch) {
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.finalReadOffset = 1024;
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, std::move(rst)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv, std::move(rst), stream),
       QuicTransportException);
 }
 
@@ -464,10 +509,14 @@ TEST_F(QuicRecvResetTest, FromHalfClosedRemoteNoReadOffsetYet) {
   StreamId id = 5;
   auto conn = createConn();
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedRemote();
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 100));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Closed();
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 100),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 100);
 }
 
@@ -475,11 +524,15 @@ TEST_F(QuicRecvResetTest, FromHalfClosedRemoteReadOffsetMatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedRemote();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Closed();
   stream.finalReadOffset = 1024;
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1024));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1024),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 1024);
 }
 
@@ -487,11 +540,14 @@ TEST_F(QuicRecvResetTest, FromHalfClosedRemoteReadOffsetMismatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedRemote();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Closed();
   stream.finalReadOffset = 1024;
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 100)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 100),
+          stream),
       QuicTransportException);
 }
 
@@ -499,10 +555,14 @@ TEST_F(QuicRecvResetTest, FromHalfClosedLocal) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedLocal();
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Open();
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 200);
 }
 
@@ -510,46 +570,60 @@ TEST_F(QuicRecvResetTest, FromHalfClosedLocalReadEOFMismatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::HalfClosedLocal();
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Open();
   stream.finalReadOffset = 2014;
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+          stream),
       QuicTransportException);
 }
 
-TEST_F(QuicRecvResetTest, FromWaitingForRstAckNoReadOffsetYet) {
+TEST_F(QuicRecvResetTest, FromResetSentNoReadOffsetYet) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.recv.state = StreamReceiveStates::Open();
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 200);
 }
 
-TEST_F(QuicRecvResetTest, FromWaitingForRstAckOffsetMatch) {
+TEST_F(QuicRecvResetTest, FromResetSentOffsetMatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.recv.state = StreamReceiveStates::Open();
   stream.finalReadOffset = 200;
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200));
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 200);
 }
 
-TEST_F(QuicRecvResetTest, FromWaitingForRstAckOffsetMismatch) {
+TEST_F(QuicRecvResetTest, FromResetSentOffsetMismatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.recv.state = StreamReceiveStates::Open();
   stream.finalReadOffset = 300;
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+          stream),
       QuicTransportException);
 }
 
@@ -557,10 +631,14 @@ TEST_F(QuicRecvResetTest, FromClosedNoReadOffsetYet) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Closed();
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 200),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 200);
 }
 
@@ -568,11 +646,15 @@ TEST_F(QuicRecvResetTest, FromClosedOffsetMatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Closed();
   stream.finalReadOffset = 1234;
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
   verifyStreamReset(stream, 1234);
 }
 
@@ -580,12 +662,14 @@ TEST_F(QuicRecvResetTest, FromClosedOffsetMismatch) {
   auto conn = createConn();
   StreamId id = 5;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Closed();
+  stream.recv.state = StreamReceiveStates::Closed();
   stream.finalReadOffset = 123;
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+          stream),
       QuicTransportException);
 }
 
@@ -595,9 +679,11 @@ TEST_F(QuicUnidirectionalStreamTest, OpenInvalidReadStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, ReadStreamFrame(id, 1, false)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv, ReadStreamFrame(id, 1, false), stream),
       QuicTransportException);
 }
 
@@ -605,11 +691,13 @@ TEST_F(QuicUnidirectionalStreamTest, OpenInvalidRstStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+          stream),
       QuicTransportException);
 }
 
@@ -617,11 +705,13 @@ TEST_F(QuicUnidirectionalStreamTest, OpenInvalidSendReset) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Open();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN)),
+      invokeHandler<StreamSendStateMachine>(
+          stream.send,
+          StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+          stream),
       QuicTransportException);
 }
 
@@ -629,20 +719,25 @@ TEST_F(QuicUnidirectionalStreamTest, OpenInvalidAckStreamFrame) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Open();
   StreamEvents::AckStreamFrame ack(WriteStreamFrame(id, 0, 0, false));
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, ack), QuicTransportException);
+      invokeHandler<StreamSendStateMachine>(stream.send, ack, stream),
+      QuicTransportException);
 }
 
 TEST_F(QuicUnidirectionalStreamTest, OpenInvalidStopSending) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Open();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, StopSendingFrame(id, GenericApplicationErrorCode::UNKNOWN)),
+      invokeHandler<StreamSendStateMachine>(
+          stream.send,
+          StopSendingFrame(id, GenericApplicationErrorCode::UNKNOWN),
+          stream),
       QuicTransportException);
 }
 
@@ -650,9 +745,11 @@ TEST_F(QuicUnidirectionalStreamTest, ClosedInvalidReadStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, ReadStreamFrame(id, 1, false)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv, ReadStreamFrame(id, 1, false), stream),
       QuicTransportException);
 }
 
@@ -660,11 +757,13 @@ TEST_F(QuicUnidirectionalStreamTest, ClosedInvalidRstStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+          stream),
       QuicTransportException);
 }
 
@@ -672,11 +771,13 @@ TEST_F(QuicUnidirectionalStreamTest, ClosedInvalidSendReset) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Closed();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN)),
+      invokeHandler<StreamSendStateMachine>(
+          stream.send,
+          StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
+          stream),
       QuicTransportException);
 }
 
@@ -684,20 +785,25 @@ TEST_F(QuicUnidirectionalStreamTest, ClosedInvalidAckStreamFrame) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Closed();
   StreamEvents::AckStreamFrame ack(WriteStreamFrame(id, 0, 0, false));
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, ack), QuicTransportException);
+      invokeHandler<StreamSendStateMachine>(stream.send, ack, stream),
+      QuicTransportException);
 }
 
 TEST_F(QuicUnidirectionalStreamTest, ClosedInvalidStopSending) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Closed();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Closed();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, StopSendingFrame(id, GenericApplicationErrorCode::UNKNOWN)),
+      invokeHandler<StreamSendStateMachine>(
+          stream.send,
+          StopSendingFrame(id, GenericApplicationErrorCode::UNKNOWN),
+          stream),
       QuicTransportException);
 }
 
@@ -705,23 +811,30 @@ TEST_F(QuicUnidirectionalStreamTest, OpenReadStreamFin) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Open();
   stream.currentReadOffset = 100;
   ReadStreamFrame receivedStreamFrame(stream.id, 100, true);
   receivedStreamFrame.data = folly::IOBuf::create(10);
   receivedStreamFrame.data->append(10);
-  invokeHandler<StreamStateMachine>(stream, std::move(receivedStreamFrame));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv, std::move(receivedStreamFrame), stream);
+  EXPECT_TRUE(isState<StreamSendStates::Invalid>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
 }
 
 TEST_F(QuicUnidirectionalStreamTest, OpenRstStream) {
   auto conn = createConn();
   StreamId id = 0b110;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::Open();
-  invokeHandler<StreamStateMachine>(
-      stream, RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234));
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  stream.send.state = StreamSendStates::Invalid();
+  stream.recv.state = StreamReceiveStates::Open();
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv,
+      RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+      stream);
+  EXPECT_TRUE(isState<StreamSendStates::Invalid>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Closed>(stream.recv));
 }
 
 TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
@@ -729,48 +842,44 @@ TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
   WriteStreamFrame streamFrame(id, 1, 1, false);
-  stream.state = StreamStates::Open();
+  stream.send.state = StreamSendStates::Open();
+  stream.recv.state = StreamReceiveStates::Invalid();
   stream.finalWriteOffset = 1;
   stream.currentWriteOffset = 2;
   auto buf = folly::IOBuf::create(1);
   buf->append(1);
   stream.retransmissionBuffer.emplace_back(std::move(buf), 1, false);
   StreamEvents::AckStreamFrame ack(streamFrame);
-  invokeHandler<StreamStateMachine>(stream, ack);
-  EXPECT_TRUE(isState<StreamStates::Closed>(stream));
+  invokeHandler<StreamSendStateMachine>(stream.send, ack, stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  EXPECT_TRUE(isState<StreamReceiveStates::Invalid>(stream.recv));
 }
 
-TEST_F(QuicUnidirectionalStreamTest, WaitingForRstAckInvalidReadStream) {
+TEST_F(QuicUnidirectionalStreamTest, ResetSentInvalidReadStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(stream, ReadStreamFrame(id, 1, false)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv, ReadStreamFrame(id, 1, false), stream),
       QuicTransportException);
 }
 
-TEST_F(QuicUnidirectionalStreamTest, WaitingForRstAckInvalidRstStream) {
+TEST_F(QuicUnidirectionalStreamTest, ResetSentInvalidRstStream) {
   auto conn = createConn();
   StreamId id = 0b111;
   QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.recv.state = StreamReceiveStates::Invalid();
   EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream,
-          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234)),
+      invokeHandler<StreamReceiveStateMachine>(
+          stream.recv,
+          RstStreamFrame(1, GenericApplicationErrorCode::UNKNOWN, 1234),
+          stream),
       QuicTransportException);
 }
 
-TEST_F(QuicUnidirectionalStreamTest, WaitingForRstAckInvalidStopSending) {
-  auto conn = createConn();
-  StreamId id = 0b110;
-  QuicStreamState stream(id, *conn);
-  stream.state = StreamStates::WaitingForRstAck();
-  EXPECT_THROW(
-      invokeHandler<StreamStateMachine>(
-          stream, StopSendingFrame(id, GenericApplicationErrorCode::UNKNOWN)),
-      QuicTransportException);
-}
 } // namespace test
 } // namespace quic

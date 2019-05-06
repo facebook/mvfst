@@ -36,11 +36,20 @@ void updateRtt(
     std::chrono::microseconds ackDelay);
 
 template <typename Event>
-void invokeStreamStateMachine(
+void invokeStreamSendStateMachine(
     QuicConnectionStateBase&,
     QuicStreamState& stream,
     Event event) {
-  invokeHandler<StreamStateMachine>(stream, std::move(event));
+  invokeHandler<StreamSendStateMachine>(stream.send, std::move(event), stream);
+}
+
+template <typename Event>
+void invokeStreamReceiveStateMachine(
+    QuicConnectionStateBase&,
+    QuicStreamState& stream,
+    Event event) {
+  invokeHandler<StreamReceiveStateMachine>(
+      stream.recv, std::move(event), stream);
 }
 
 bool isConnectionPaced(const QuicConnectionStateBase& conn) noexcept;

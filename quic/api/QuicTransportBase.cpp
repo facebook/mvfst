@@ -1801,7 +1801,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
     // Invoke state machine
-    invokeStreamStateMachine(
+    invokeStreamSendStateMachine(
         *conn_, *stream, StreamEvents::SendReset(errorCode));
     for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
          closeState_ == CloseState::OPEN &&

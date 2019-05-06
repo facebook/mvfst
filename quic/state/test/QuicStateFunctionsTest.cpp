@@ -345,10 +345,11 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.finalReadOffset = 1024;
   EXPECT_THROW(
-      invokeStreamStateMachine(conn, stream, std::move(rst)),
+      invokeStreamReceiveStateMachine(conn, stream, std::move(rst)),
       QuicTransportException);
-  bool matches = matchesStates<StreamStateData, StreamStates::WaitingForRstAck>(
-      stream.state);
+  bool matches =
+      matchesStates<StreamSendStateData, StreamSendStates::ResetSent>(
+          stream.send.state);
   EXPECT_TRUE(matches);
 }
 
@@ -361,9 +362,10 @@ TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   stream.flowControlState.windowSize = 100;
   conn.flowControlState.advertisedMaxOffset = 100;
   conn.flowControlState.windowSize = 100;
-  invokeStreamStateMachine(conn, stream, std::move(rst));
-  bool matches = matchesStates<StreamStateData, StreamStates::WaitingForRstAck>(
-      stream.state);
+  invokeStreamReceiveStateMachine(conn, stream, std::move(rst));
+  bool matches =
+      matchesStates<StreamSendStateData, StreamSendStates::ResetSent>(
+          stream.send.state);
   EXPECT_TRUE(matches);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
@@ -376,13 +378,13 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   try {
-    invokeStreamStateMachine(conn, stream, StreamEvents::RstAck(rst));
+    invokeStreamSendStateMachine(conn, stream, StreamEvents::RstAck(rst));
     ADD_FAILURE();
   } catch (QuicTransportException& ex) {
     EXPECT_EQ(ex.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
   }
-  bool matches =
-      matchesStates<StreamStateData, StreamStates::Open>(stream.state);
+  bool matches = matchesStates<StreamSendStateData, StreamSendStates::Open>(
+      stream.send.state);
   EXPECT_TRUE(matches);
 }
 

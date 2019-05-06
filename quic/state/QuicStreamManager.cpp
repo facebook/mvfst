@@ -305,9 +305,8 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     return;
   }
   VLOG(10) << "Removing closed stream=" << streamId;
-  bool matchClosedState =
-      matchesStates<StreamStateData, StreamStates::Closed>(it->second.state);
-  DCHECK(matchClosedState);
+  bool inTerminalStates = it->second.inTerminalStates();
+  DCHECK(inTerminalStates);
   readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
   writableStreams_.erase(streamId);

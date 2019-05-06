@@ -75,7 +75,8 @@ PacketNum rstStreamAndSendPacket(
   auto aead = createNoOpAead();
   auto headerCipher = createNoOpHeaderCipher();
   auto version = conn.version.value_or(*conn.originalVersion);
-  invokeStreamStateMachine(conn, stream, StreamEvents::SendReset(errorCode));
+  invokeStreamSendStateMachine(
+      conn, stream, StreamEvents::SendReset(errorCode));
   writeQuicDataToSocket(
       sock,
       conn,

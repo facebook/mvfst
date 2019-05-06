@@ -41,6 +41,7 @@ void ThrowExceptionHandler(const ConnectionState&) {
 
 struct TestMachine {
   using StateData = ConnectionState;
+  using UserData = ConnectionState;
   static auto constexpr InvalidEventHandler = &ThrowExceptionHandler;
 };
 
@@ -51,14 +52,16 @@ QUIC_DECLARE_STATE_HANDLER(TestMachine, State2, Event2, State1, State3);
 // The handlers
 void Handler<TestMachine, State1, Event1>::handle(
     ConnectionState& connState,
-    Event1 /*event*/) {
+    Event1 /*event*/,
+    TestMachine::UserData&) {
   connState.visitedState1Event1 = true;
   transit<State2>(connState);
 }
 
 void Handler<TestMachine, State1, Event2>::handle(
     ConnectionState& connState,
-    Event2 /*event*/) {
+    Event2 /*event*/,
+    TestMachine::UserData&) {
   connState.visitedState1Event2 = true;
   transit<State3>(connState);
   // transit<State1>(connState); This will fail to compile because it
@@ -67,7 +70,8 @@ void Handler<TestMachine, State1, Event2>::handle(
 
 void Handler<TestMachine, State2, Event2>::handle(
     ConnectionState& connState,
-    Event2 /*event*/) {
+    Event2 /*event*/,
+    TestMachine::UserData&) {
   connState.visitedState2Event2 = true;
   transit<State3>(connState);
 }
@@ -83,6 +87,7 @@ struct ConnectionStateT {
 template <typename T>
 struct TestMachineT {
   using StateData = ConnectionStateT<T>;
+  using UserData = ConnectionStateT<T>;
   static void InvalidEventHandler(ConnectionStateT<T>& /*s*/) {
     throw InvalidHandlerException("invalid state in template machine");
   }
@@ -95,7 +100,8 @@ QUIC_DECLARE_STATE_HANDLER_T(State2, Event2, State3);
 template <typename Machine>
 void Handler<Machine, State1, Event1>::handle(
     typename Machine::StateData& s,
-    Event1) {
+    Event1,
+    typename Machine::UserData&) {
   s.visitedState1Event1 = true;
   transit<State2>(s);
 }
@@ -103,7 +109,8 @@ void Handler<Machine, State1, Event1>::handle(
 template <typename Machine>
 void Handler<Machine, State1, Event2>::handle(
     typename Machine::StateData& s,
-    Event2) {
+    Event2,
+    typename Machine::UserData&) {
   s.visitedState1Event2 = true;
   transit<State3>(s);
 }
@@ -111,7 +118,8 @@ void Handler<Machine, State1, Event2>::handle(
 template <typename Machine>
 void Handler<Machine, State2, Event2>::handle(
     typename Machine::StateData& s,
-    Event2) {
+    Event2,
+    typename Machine::UserData&) {
   s.visitedState2Event2 = true;
   transit<State3>(s);
 }
@@ -126,7 +134,7 @@ class StateMachineTest : public Test {
 
 TEST_F(StateMachineTest, TestTransitions) {
   state.state = State1();
-  invokeHandler<TestMachine>(state, Event1());
+  invokeHandler<TestMachine>(state, Event1(), state);
   EXPECT_TRUE(state.visitedState1Event1);
   EXPECT_FALSE(state.visitedState1Event2);
   EXPECT_FALSE(state.visitedState2Event2);
@@ -134,7 +142,7 @@ TEST_F(StateMachineTest, TestTransitions) {
   // check that the state is correct.
   boost::get<State2>(state.state);
 
-  invokeHandler<TestMachine>(state, Event2());
+  invokeHandler<TestMachine>(state, Event2(), state);
 
   EXPECT_TRUE(state.visitedState1Event1);
   EXPECT_FALSE(state.visitedState1Event2);
@@ -146,19 +154,20 @@ TEST_F(StateMachineTest, TestTransitions) {
 TEST_F(StateMachineTest, TestInvalid) {
   state.state = State2();
   EXPECT_THROW(
-      invokeHandler<TestMachine>(state, Event1()), InvalidHandlerException);
+      invokeHandler<TestMachine>(state, Event1(), state),
+      InvalidHandlerException);
 }
 
 TEST_F(StateMachineTest, TestTemplateTransitions) {
   stateT.state = State1();
-  invokeHandler<TestMachineT<int>>(stateT, Event1());
+  invokeHandler<TestMachineT<int>>(stateT, Event1(), stateT);
   EXPECT_TRUE(stateT.visitedState1Event1);
   EXPECT_FALSE(stateT.visitedState1Event2);
   EXPECT_FALSE(stateT.visitedState2Event2);
 
   boost::get<State2>(stateT.state);
 
-  invokeHandler<TestMachineT<int>>(stateT, Event2());
+  invokeHandler<TestMachineT<int>>(stateT, Event2(), stateT);
 
   EXPECT_TRUE(stateT.visitedState1Event1);
   EXPECT_FALSE(stateT.visitedState1Event2);
@@ -170,7 +179,7 @@ TEST_F(StateMachineTest, TestTemplateTransitions) {
 TEST_F(StateMachineTest, TestTemplateInvalid) {
   stateT.state = State2();
   EXPECT_THROW(
-      invokeHandler<TestMachineT<int>>(stateT, Event1()),
+      invokeHandler<TestMachineT<int>>(stateT, Event1(), stateT),
       InvalidHandlerException);
 }
 }

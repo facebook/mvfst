@@ -1518,7 +1518,8 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   conn.streamManager->queueWindowUpdate(streamId);
   conn.streamManager->addStopSending(
       streamId, GenericApplicationErrorCode::UNKNOWN);
-  stream->state = StreamStates::Closed{};
+  stream->send.state = StreamSendStates::Closed{};
+  stream->recv.state = StreamReceiveStates::Closed{};
   conn.streamManager->removeClosedStream(streamId);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(conn.streamManager->readableStreams().empty());
@@ -1594,8 +1595,8 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetCloseBothDirections) {
   conn.streamManager->createStream(serverBiStream).value();
   EXPECT_EQ(conn.streamManager->getStream(serverBiStream)->id, serverBiStream);
   StreamId serverUniStream = 0x0B;
-  conn.streamManager->createStream(serverUniStream).value()->state =
-      StreamStates::Closed{};
+  auto stream = conn.streamManager->createStream(serverUniStream).value();
+  stream->send.state = StreamSendStates::Closed{};
 
   conn.streamManager->removeClosedStream(serverUniStream);
   EXPECT_TRUE(
@@ -1679,7 +1680,10 @@ TEST_F(QuicStreamFunctionsTest, StreamExists) {
   EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
   EXPECT_FALSE(conn.streamManager->streamExists(peerAutoOpened));
 
-  conn.streamManager->getStream(peerStream)->state = StreamStates::Closed{};
+  conn.streamManager->getStream(peerStream)->send.state =
+      StreamSendStates::Closed{};
+  conn.streamManager->getStream(peerStream)->recv.state =
+      StreamReceiveStates::Closed{};
   EXPECT_TRUE(conn.streamManager->streamExists(localStream));
   EXPECT_TRUE(conn.streamManager->streamExists(localAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedLocal));

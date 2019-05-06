@@ -775,7 +775,7 @@ TEST_F(QuicTransportTest, RstStream) {
   auto stream =
       transport_->getConnectionState().streamManager->findStream(streamId);
   ASSERT_TRUE(stream);
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(*stream));
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1245,7 +1245,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   }
   EXPECT_TRUE(foundReset);
 
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(*stream));
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1311,7 +1311,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
-  EXPECT_TRUE(isState<StreamStates::WaitingForRstAck>(*stream));
+  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());

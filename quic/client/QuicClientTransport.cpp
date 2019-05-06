@@ -355,7 +355,7 @@ void QuicClientTransport::processPacketData(
                       auto stream =
                           conn_->streamManager->getStream(frame.streamId);
                       if (stream) {
-                        invokeStreamStateMachine(
+                        invokeStreamSendStateMachine(
                             *conn_, *stream, StreamEvents::RstAck(frame));
                       }
                     },
@@ -368,7 +368,7 @@ void QuicClientTransport::processPacketData(
                               << " closed=" << (ackedStream == nullptr) << " "
                               << *this;
                       if (ackedStream) {
-                        invokeStreamStateMachine(
+                        invokeStreamSendStateMachine(
                             *conn_,
                             *ackedStream,
                             StreamEvents::AckStreamFrame(frame));
@@ -398,7 +398,7 @@ void QuicClientTransport::processPacketData(
           if (!stream) {
             return;
           }
-          invokeStreamStateMachine(*conn_, *stream, std::move(frame));
+          invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
         },
         [&](ReadCryptoFrame& cryptoFrame) {
           pktHasRetransmittableData = true;
@@ -425,7 +425,7 @@ void QuicClientTransport::processPacketData(
                      << *conn_;
             return;
           }
-          invokeStreamStateMachine(*conn_, *stream, std::move(frame));
+          invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
         },
         [&](MaxDataFrame& connWindowUpdate) {
           VLOG(10) << "Client received max data offset="

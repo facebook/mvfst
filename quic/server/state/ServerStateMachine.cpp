@@ -690,7 +690,7 @@ void onServerReadDataFromOpen(
                         auto ackedStream =
                             conn.streamManager->getStream(frame.streamId);
                         if (ackedStream) {
-                          invokeStreamStateMachine(
+                          invokeStreamSendStateMachine(
                               conn,
                               *ackedStream,
                               StreamEvents::AckStreamFrame(frame));
@@ -708,7 +708,7 @@ void onServerReadDataFromOpen(
                         auto stream =
                             conn.streamManager->getStream(frame.streamId);
                         if (stream) {
-                          invokeStreamStateMachine(
+                          invokeStreamSendStateMachine(
                               conn, *stream, StreamEvents::RstAck(frame));
                         }
                       },
@@ -734,7 +734,7 @@ void onServerReadDataFromOpen(
             if (!stream) {
               return;
             }
-            invokeStreamStateMachine(conn, *stream, frame);
+            invokeStreamReceiveStateMachine(conn, *stream, frame);
           },
           [&](ReadCryptoFrame& cryptoFrame) {
             pktHasRetransmittableData = true;
@@ -763,7 +763,7 @@ void onServerReadDataFromOpen(
             // Ignore data from closed streams that we don't have the
             // state for any more.
             if (stream) {
-              invokeStreamStateMachine(conn, *stream, frame);
+              invokeStreamReceiveStateMachine(conn, *stream, frame);
             }
           },
           [&](MaxDataFrame& connWindowUpdate) {

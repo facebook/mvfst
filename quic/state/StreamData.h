@@ -81,38 +81,57 @@ struct QuicStreamLike {
 
 struct QuicConnectionStateBase;
 
-struct StreamStates {
-  // The stream is open
+struct StreamSendStates {
+  // Ready, Send and FinSent are collapsed into Open
   struct Open {};
 
-  // The stream has closed its write
-  struct HalfClosedLocal {};
+  // RST has been sent
+  struct ResetSent {};
 
-  // The stream has closed read.
-  struct HalfClosedRemote {};
-
-  // The stream is waiting for the ack of the reset stream
-  struct WaitingForRstAck {};
-
-  // The stream is now closed.
+  // All data acked or RST acked.  Collapsed Data Received and Reset Received
   struct Closed {};
+
+  // Used for peer initiated unidirectional streams
+  struct Invalid {};
 };
 
-using StreamStateData = boost::variant<
-    StreamStates::Open,
-    StreamStates::HalfClosedLocal,
-    StreamStates::HalfClosedRemote,
-    StreamStates::WaitingForRstAck,
-    StreamStates::Closed>;
+struct StreamReceiveStates {
+  // Renamed Receive to Open
+  struct Open {};
 
-inline std::string streamStateToString(const StreamStateData& state) {
+  // All data or rst received
+  struct Closed {};
+
+  // Used for self-initiated unidirectional streams
+  struct Invalid {};
+};
+
+using StreamSendStateData = boost::variant<
+    StreamSendStates::Open,
+    StreamSendStates::ResetSent,
+    StreamSendStates::Closed,
+    StreamSendStates::Invalid>;
+
+using StreamReceiveStateData = boost::variant<
+    StreamReceiveStates::Open,
+    StreamReceiveStates::Closed,
+    StreamReceiveStates::Invalid>;
+
+inline std::string streamStateToString(const StreamSendStateData& state) {
   return folly::variant_match(
       state,
-      [](const StreamStates::Open&) { return "Open"; },
-      [](const StreamStates::HalfClosedLocal&) { return "HalfClosedLocal"; },
-      [](const StreamStates::HalfClosedRemote&) { return "HalfClosedRemote"; },
-      [](const StreamStates::WaitingForRstAck&) { return "WaitingForRstAck"; },
-      [](const StreamStates::Closed&) { return "Closed"; });
+      [](const StreamSendStates::Open&) { return "Open"; },
+      [](const StreamSendStates::ResetSent&) { return "ResetSent"; },
+      [](const StreamSendStates::Closed&) { return "Closed"; },
+      [](const StreamSendStates::Invalid&) { return "Invalid"; });
+}
+
+inline std::string streamStateToString(const StreamReceiveStateData& state) {
+  return folly::variant_match(
+      state,
+      [](const StreamReceiveStates::Open&) { return "Open"; },
+      [](const StreamReceiveStates::Closed&) { return "Closed"; },
+      [](const StreamReceiveStates::Invalid&) { return "Invalid"; });
 }
 
 struct QuicStreamState : public QuicStreamLike {
@@ -145,7 +164,12 @@ struct QuicStreamState : public QuicStreamLike {
   folly::Optional<QuicErrorCode> streamWriteError;
 
   // State machine data
-  StreamStateData state{StreamStates::Open()};
+  struct Send {
+    StreamSendStateData state{StreamSendStates::Open()};
+  } send;
+  struct Recv {
+    StreamReceiveStateData state{StreamReceiveStates::Open()};
+  } recv;
 
   // The packet number of the latest packet that contains a MaxStreamDataFrame
   // sent out by us.
@@ -167,20 +191,29 @@ struct QuicStreamState : public QuicStreamLike {
   // lastHolbTime indicates whether the stream is HOL blocked at the moment.
   uint32_t holbCount{0};
 
+  // Returns true if both send and receive state machines are in a terminal
+  // state
+  bool inTerminalStates() const {
+    return matchesStates<
+               StreamSendStateData,
+               StreamSendStates::Closed,
+               StreamSendStates::Invalid>(send.state) &&
+        matchesStates<
+               StreamReceiveStateData,
+               StreamReceiveStates::Closed,
+               StreamReceiveStates::Invalid>(recv.state);
+  }
+
   // If the stream is still writable.
   bool writable() const {
-    return matchesStates<
-               StreamStateData,
-               StreamStates::Open,
-               StreamStates::HalfClosedRemote>(state) &&
+    return matchesStates<StreamSendStateData, StreamSendStates::Open>(
+               send.state) &&
         !finalWriteOffset.hasValue();
   }
 
   bool shouldSendFlowControl() const {
-    return matchesStates<
-        StreamStateData,
-        StreamStates::Open,
-        StreamStates::HalfClosedLocal>(state);
+    return matchesStates<StreamReceiveStateData, StreamReceiveStates::Open>(
+        recv.state);
   }
 
   bool hasWritableData() const {
