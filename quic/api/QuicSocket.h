@@ -341,6 +341,8 @@ class QuicSocket {
    */
   virtual void setTransportSettings(TransportSettings transportSettings) = 0;
 
+  virtual const TransportSettings& getTransportSettings() const = 0;
+
   /**
    * Is partial reliability supported.
    */

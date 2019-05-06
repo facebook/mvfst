@@ -34,6 +34,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(
       getClientConnectionId,
       folly::Optional<quic::ConnectionId>());
+  MOCK_CONST_METHOD0(getTransportSettings, const TransportSettings&());
   MOCK_CONST_METHOD0(
       getServerConnectionId,
       folly::Optional<quic::ConnectionId>());

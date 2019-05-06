@@ -260,6 +260,11 @@ class QuicTransportBase : public QuicSocket {
   virtual void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
 
+  /**
+   * Retrieve the transport settings
+   */
+  const TransportSettings& getTransportSettings() const override;
+
   // Subclass API.
 
   /**

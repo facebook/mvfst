@@ -2132,6 +2132,10 @@ void QuicTransportBase::setTransportSettings(
   setCongestionControl(transportSettings.defaultCongestionController);
 }
 
+const TransportSettings& QuicTransportBase::getTransportSettings() const {
+  return conn_->transportSettings;
+}
+
 bool QuicTransportBase::isPartiallyReliableTransport() const {
   return conn_->partialReliabilityEnabled;
 }
