@@ -8,7 +8,6 @@
 
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
 
