@@ -405,6 +405,14 @@ class QuicSocket {
   virtual void cancelDeliveryCallbacksForStream(StreamId streamId) = 0;
 
   /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId for
+   * offsets lower than the offset provided.
+   */
+  virtual void cancelDeliveryCallbacksForStream(
+      StreamId streamId,
+      uint64_t offset) = 0;
+
+  /**
    * Pause/Resume read callback being triggered when data is available.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> pauseRead(

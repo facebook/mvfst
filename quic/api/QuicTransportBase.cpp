@@ -895,6 +895,12 @@ QuicTransportBase::sendDataExpired(StreamId id, uint64_t offset) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto newOffset = advanceMinimumRetransmittableOffset(stream, offset);
+
+  // Invoke any delivery callbacks that are set for any offset below newOffset.
+  if (newOffset) {
+    cancelDeliveryCallbacksForStream(id, *newOffset);
+  }
+
   updateWriteLooper(true);
   return folly::makeExpected<LocalErrorCode>(newOffset);
 }
@@ -954,6 +960,14 @@ void QuicTransportBase::invokeDataRejectedCallbacks() {
 
     auto dataRejectedCb = callbackData->second.dataRejectedCb;
     auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
+
+    // Invoke any delivery callbacks that are set for any offset below newly set
+    // minimumRetransmittableOffset.
+    if (!stream->streamReadError) {
+      cancelDeliveryCallbacksForStream(
+          streamId, stream->minimumRetransmittableOffset);
+    }
+
     if (dataRejectedCb && !stream->streamReadError) {
       VLOG(10) << "invoking data rejected callback on stream=" << streamId
                << " " << *this;
@@ -1048,6 +1062,46 @@ void QuicTransportBase::cancelDeliveryCallbacksForStream(StreamId streamId) {
     }
   }
   deliveryCallbacks_.erase(deliveryCallbackIter);
+}
+
+void QuicTransportBase::cancelDeliveryCallbacksForStream(
+    StreamId streamId,
+    uint64_t offset) {
+  if (isReceivingStream(conn_->nodeType, streamId)) {
+    return;
+  }
+
+  auto deliveryCallbackIter = deliveryCallbacks_.find(streamId);
+  if (deliveryCallbackIter == deliveryCallbacks_.end()) {
+    conn_->streamManager->removeDeliverable(streamId);
+    return;
+  }
+
+  // Callbacks are kept sorted by offset, so we can just walk the queue and
+  // invoke those with offset below provided offset.
+  while (!deliveryCallbackIter->second.empty()) {
+    auto deliveryCallback = deliveryCallbackIter->second.front();
+    auto& cbOffset = deliveryCallback.first;
+    if (cbOffset < offset) {
+      deliveryCallbackIter->second.pop_front();
+      deliveryCallback.second->onCanceled(streamId, cbOffset);
+      if (closeState_ != CloseState::OPEN) {
+        // socket got closed - we can't use deliveryCallbackIter anymore,
+        // closeImpl should take care of delivering callbacks that are left in
+        // deliveryCallbackIter->second
+        return;
+      }
+    } else {
+      // Only larger or equal offsets left, exit the loop.
+      break;
+    }
+  }
+
+  // Clean up state for this stream if no callbacks left to invoke.
+  if (deliveryCallbackIter->second.empty()) {
+    conn_->streamManager->removeDeliverable(streamId);
+    deliveryCallbacks_.erase(deliveryCallbackIter);
+  }
 }
 
 folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(

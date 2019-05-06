@@ -312,6 +312,13 @@ class QuicTransportBase : public QuicSocket {
    */
   void cancelDeliveryCallbacksForStream(StreamId streamId) override;
 
+  /**
+   * Invoke onCanceled on all the delivery callbacks registered for streamId for
+   * offsets lower than the offset provided.
+   */
+  void cancelDeliveryCallbacksForStream(StreamId streamId, uint64_t offset)
+      override;
+
   // Timeout functions
   class LossTimeout : public folly::HHWheelTimer::Callback {
    public:

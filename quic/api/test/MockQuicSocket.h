@@ -68,6 +68,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD0(unsetAllPeekCallbacks, void());
   MOCK_METHOD0(unsetAllDeliveryCallbacks, void());
   MOCK_METHOD1(cancelDeliveryCallbacksForStream, void(StreamId));
+  MOCK_METHOD2(
+      cancelDeliveryCallbacksForStream,
+      void(StreamId, uint64_t offset));
   MOCK_METHOD1(
       setConnectionFlowControlWindow,
       folly::Expected<folly::Unit, LocalErrorCode>(uint64_t));

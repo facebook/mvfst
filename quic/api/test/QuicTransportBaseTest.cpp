@@ -1097,6 +1097,62 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
   transport->close(folly::none);
 }
 
+TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpire) {
+  InSequence enforceOrder;
+
+  transport->transportConn->partialReliabilityEnabled = true;
+
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  MockDeliveryCallback dcb1;
+  MockDeliveryCallback dcb2;
+
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _));
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+
+  auto res = transport->sendDataExpired(stream1, 11);
+  EXPECT_EQ(res.hasError(), false);
+
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(_, _));
+
+  transport->close(folly::none);
+}
+
+TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpireCallbacksLeft) {
+  InSequence enforceOrder;
+
+  transport->transportConn->partialReliabilityEnabled = true;
+
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  MockDeliveryCallback dcb1;
+  MockDeliveryCallback dcb2;
+
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream1, 20, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _));
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+
+  auto res = transport->sendDataExpired(stream1, 11);
+  EXPECT_EQ(res.hasError(), false);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_CALL(dcb2, onCanceled(_, _));
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(1);
+
+  transport->close(folly::none);
+}
+
 TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpected) {
   auto stream = transport->createBidirectionalStream().value();
   MockDeliveryCallback dcb1;
@@ -2164,6 +2220,98 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackDataAvailable) {
   transport->addMinStreamDataFrameToStream(MinStreamDataFrame(stream3, 42, 39));
 
   transport.reset();
+}
+
+TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
+  InSequence enforceOrder;
+
+  transport->transportConn->partialReliabilityEnabled = true;
+
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+
+  MockDeliveryCallback dcb1;
+  MockDeliveryCallback dcb2;
+  MockDataRejectedCallback dataRejectedCb1;
+  MockDataRejectedCallback dataRejectedCb2;
+
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
+  transport->setDataRejectedCallback(stream2, &dataRejectedCb2);
+
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10)).Times(1);
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dataRejectedCb1, onDataRejected(stream1, 15));
+  transport->addMinStreamDataFrameToStream(
+      MinStreamDataFrame(stream1, kDefaultStreamWindowSize, 15));
+
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+  Mock::VerifyAndClearExpectations(&dataRejectedCb1);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(stream2, 20)).Times(1);
+  EXPECT_CALL(dataRejectedCb2, onDataRejected(stream2, 23));
+  transport->addMinStreamDataFrameToStream(
+      MinStreamDataFrame(stream2, kDefaultStreamWindowSize, 23));
+
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+  Mock::VerifyAndClearExpectations(&dataRejectedCb2);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+  transport->close(folly::none);
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    DataRejecteddCallbackWithDeliveryCallbacksSomeLeft) {
+  InSequence enforceOrder;
+
+  transport->transportConn->partialReliabilityEnabled = true;
+
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+
+  MockDeliveryCallback dcb1;
+  MockDeliveryCallback dcb2;
+  MockDataRejectedCallback dataRejectedCb1;
+  MockDataRejectedCallback dataRejectedCb2;
+
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream1, 25, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+  transport->registerDeliveryCallback(stream2, 29, &dcb2);
+
+  transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
+  transport->setDataRejectedCallback(stream2, &dataRejectedCb2);
+
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10)).Times(1);
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dataRejectedCb1, onDataRejected(stream1, 15));
+  transport->addMinStreamDataFrameToStream(
+      MinStreamDataFrame(stream1, kDefaultStreamWindowSize, 15));
+
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+  Mock::VerifyAndClearExpectations(&dataRejectedCb1);
+
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(stream2, 20)).Times(1);
+  EXPECT_CALL(dataRejectedCb2, onDataRejected(stream2, 23));
+  transport->addMinStreamDataFrameToStream(
+      MinStreamDataFrame(stream2, kDefaultStreamWindowSize, 23));
+
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+  Mock::VerifyAndClearExpectations(&dataRejectedCb2);
+
+  EXPECT_CALL(dcb2, onCanceled(stream2, 29)).Times(1);
+  EXPECT_CALL(dcb1, onCanceled(stream1, 25)).Times(1);
+  transport->close(folly::none);
 }
 
 TEST_F(QuicTransportImplTest, DataRejectedCallbackChangeCallback) {
