@@ -31,7 +31,6 @@
 - `quic/logging`:     Implementation of logging framework
 - `quic/happyeyeballs`: Implementation of mechanism to race IPV4 and IPV6 connection and pick a winner
 - `quic/state`:       Defines and implements both connection and stream level state artifacts and state machines
-- `quic/tools`:       Implementation of tools such as one to trace transport events within a connection
 - `quic/sample`:      Example client and server
 
 
