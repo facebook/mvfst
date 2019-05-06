@@ -152,7 +152,9 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
 
 QuicStreamState* QuicStreamManager::getStream(StreamId streamId) {
   if (isRemoteStream(nodeType_, streamId)) {
-    return getOrCreatePeerStream(streamId);
+    auto stream = getOrCreatePeerStream(streamId);
+    updateAppLimitedState();
+    return stream;
   }
   auto it = streams_.find(streamId);
   if (it != streams_.end()) {
@@ -167,6 +169,7 @@ QuicStreamState* QuicStreamManager::getStream(StreamId streamId) {
         "Trying to get unopened local stream",
         TransportErrorCode::STREAM_STATE_ERROR);
   }
+  updateAppLimitedState();
   return stream;
 }
 
@@ -295,6 +298,7 @@ QuicStreamManager::createStream(StreamId streamId) {
       std::forward_as_tuple(streamId),
       std::forward_as_tuple(streamId, conn_));
   QUIC_STATS(conn_.infoCallback, onNewQuicStream);
+  updateAppLimitedState();
   return &it.first->second;
 }
 
@@ -338,6 +342,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
       openLocalStreams_.erase(streamItr);
     }
   }
+  updateAppLimitedState();
 }
 
 void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
@@ -398,4 +403,30 @@ void QuicStreamManager::updatePeekableStreams(QuicStreamState& stream) {
   }
 }
 
+void QuicStreamManager::updateAppLimitedState() {
+  bool currentNonCtrlStreams = hasNonCtrlStreams();
+  if (isAppLimited_ && !currentNonCtrlStreams) {
+    // We were app limited, and we continue to be app limited.
+    return;
+  } else if (!isAppLimited_ && currentNonCtrlStreams) {
+    // We were not app limited, and we continue to be not app limited.
+    return;
+  }
+  isAppLimited_ = !currentNonCtrlStreams;
+  if (conn_.congestionController) {
+    conn_.congestionController->setAppLimited(isAppLimited_, Clock::now());
+  }
+}
+
+void QuicStreamManager::setStreamAsControl(QuicStreamState& stream) {
+  if (!stream.isControl) {
+    stream.isControl = true;
+    numControlStreams_++;
+  }
+  updateAppLimitedState();
+}
+
+bool QuicStreamManager::isAppLimited() const {
+  return isAppLimited_;
+}
 } // namespace quic

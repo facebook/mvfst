@@ -1519,7 +1519,6 @@ QuicTransportBase::createStreamInternal(bool bidirectional) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  bool hadNonCtrlStreams = conn_->streamManager->hasNonCtrlStreams();
   folly::Expected<QuicStreamState*, LocalErrorCode> streamResult;
   if (bidirectional) {
     streamResult = conn_->streamManager->createNextBidirectionalStream();
@@ -1527,7 +1526,6 @@ QuicTransportBase::createStreamInternal(bool bidirectional) {
     streamResult = conn_->streamManager->createNextUnidirectionalStream();
   }
   if (streamResult) {
-    updateAppLimitedState(hadNonCtrlStreams);
     return streamResult.value()->id;
   } else {
     return folly::makeUnexpected(streamResult.error());
@@ -1840,7 +1838,6 @@ void QuicTransportBase::checkForClosedStream() {
     return;
   }
   auto itr = conn_->streamManager->closedStreams().begin();
-  bool hadNonCtrlStreams = conn_->streamManager->hasNonCtrlStreams();
   while (itr != conn_->streamManager->closedStreams().end()) {
     auto callbackIt = readCallbacks_.find(*itr);
     // We might be in the process of delivering all the delivery callbacks for
@@ -1868,7 +1865,6 @@ void QuicTransportBase::checkForClosedStream() {
       conn_->streamManager->streamCount() == 0) {
     closeImpl(folly::none);
   }
-  updateAppLimitedState(hadNonCtrlStreams);
 }
 
 void QuicTransportBase::sendPing(
@@ -2195,26 +2191,13 @@ void QuicTransportBase::detachEventBase() {
   evb_ = nullptr;
 }
 
-void QuicTransportBase::updateAppLimitedState(bool hadNonCtrlStreams) {
-  bool hasNonCtrlStreams = conn_->streamManager->hasNonCtrlStreams();
-  if (hadNonCtrlStreams == hasNonCtrlStreams) {
-    return;
-  }
-  if (conn_->congestionController) {
-    conn_->congestionController->setAppLimited(
-        hadNonCtrlStreams && !hasNonCtrlStreams, Clock::now());
-  }
-}
-
 folly::Optional<LocalErrorCode> QuicTransportBase::setControlStream(
     StreamId id) {
   if (!conn_->streamManager->streamExists(id)) {
     return LocalErrorCode::STREAM_NOT_EXISTS;
   }
   auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-  bool hadNonCtrlStreams = conn_->streamManager->hasNonCtrlStreams();
   conn_->streamManager->setStreamAsControl(*stream);
-  updateAppLimitedState(hadNonCtrlStreams);
   return folly::none;
 }
 

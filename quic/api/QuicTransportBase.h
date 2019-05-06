@@ -223,14 +223,6 @@ class QuicTransportBase : public QuicSocket {
 
   folly::Optional<LocalErrorCode> setControlStream(StreamId id) override;
 
-  // Updates the congestion controller app limited state, after a change in the
-  // number of streams.
-  // App limited state is set to true if there was at least one non-control
-  // before the update and there are none after. It is set to false if instead
-  // there were no non-control streams before and there is at least one at the
-  // time of calling
-  void updateAppLimitedState(bool hadNonCtrlStreams);
-
   /**
    * Invoke onCanceled for all the delivery callbacks in the deliveryCallbacks
    * passed in. This is supposed to be a copy of the real deque of the delivery

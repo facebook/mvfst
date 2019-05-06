@@ -548,12 +548,7 @@ class QuicStreamManager {
   /*
    * Sets the given stream to be tracked as a control stream.
    */
-  void setStreamAsControl(QuicStreamState& stream) {
-    if (!stream.isControl) {
-      stream.isControl = true;
-      numControlStreams_++;
-    }
-  }
+  void setStreamAsControl(QuicStreamState& stream);
 
   /*
    * Clear the tracking of streams which can trigger API callbacks.
@@ -566,7 +561,17 @@ class QuicStreamManager {
     dataRejectedStreams_.clear();
   }
 
+  bool isAppLimited() const;
+
  private:
+  // Updates the congestion controller app limited state, after a change in the
+  // number of streams.
+  // App limited state is set to true if there was at least one non-control
+  // before the update and there are none after. It is set to false if instead
+  // there were no non-control streams before and there is at least one at the
+  // time of calling
+  void updateAppLimitedState();
+
   QuicStreamState* FOLLY_NULLABLE
   getOrCreateOpenedLocalStream(StreamId streamId);
 
@@ -658,6 +663,9 @@ class QuicStreamManager {
 
   // Data structure to keep track of stream that have detected lost data
   std::vector<StreamId> lossStreams_;
+
+  // Record whether or not we are app limited.
+  bool isAppLimited_{false};
 };
 
 } // namespace quic
