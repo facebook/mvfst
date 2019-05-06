@@ -15,7 +15,6 @@
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/StateData.h>
-#include <quic/state/StateMachine.h>
 
 namespace quic {
 
