@@ -19,19 +19,19 @@
 - QUIC trace APIs to retrieve deep transport level stats.
 
 ## Source Layout
-- `quic/api`:         Defines API that applications can use to interact with the QUIC transport  layer.
+- `quic/api`:         Defines API that applications can use to interact with the QUIC transport layer.
 - `quic/client`:      Client transport implementation
-- `quic/server`:      Server transport implementation
 - `quic/codec`:       Read and write codec implementation for the protocol
 - `quic/common`:      Implementation of common utility functions
-- `quic/congestion_control`: Implementation of different congestion control algorithms such  as Cubic and Copa
-- `quic/flowcontrol`: Implementations of flowcontrol functions
+- `quic/congestion_control`: Implementation of different congestion control algorithms such as Cubic and Copa
+- `quic/flowcontrol`: Implementations of flow control functions
 - `quic/handshake`:   Implementations cryptographic handshake layer
-- `quic/loss`:        Implementations of different loss recovery algorithms
-- `quic/logging`:     Implementation of logging framework
 - `quic/happyeyeballs`: Implementation of mechanism to race IPV4 and IPV6 connection and pick a winner
+- `quic/logging`:     Implementation of logging framework
+- `quic/loss`:        Implementations of different loss recovery algorithms
+- `quic/samples`:     Example client and server
+- `quic/server`:      Server transport implementation
 - `quic/state`:       Defines and implements both connection and stream level state artifacts and state machines
-- `quic/sample`:      Example client and server
 
 
 ## Dependencies
