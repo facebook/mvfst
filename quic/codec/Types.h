@@ -691,9 +691,8 @@ struct ShortHeaderInvariant {
 
 struct ShortHeader {
  public:
+  // There is also a spin bit which is 0x20 that we don't currently implement.
   static constexpr uint8_t kFixedBitMask = 0x40;
-  // There is also a spin bit which is 0x20, but as a decent implementation of
-  // course we don't implement that.
   static constexpr uint8_t kReservedBitsMask = 0x18;
   static constexpr uint8_t kKeyPhaseMask = 0x04;
   static constexpr uint8_t kPacketNumLenMask = 0x03;
