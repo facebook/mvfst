@@ -41,8 +41,8 @@ struct TransportSettings {
   // only be used in environments where you know your IP address does not
   // change. See AsyncUDPSocket::connect for the caveats.
   bool connectUDP{false};
-  // Maximum number of consecutive RTOs before the connection is torn down.
-  uint16_t maxNumRTOs{kDefaultMaxNumRTO};
+  // Maximum number of consecutive PTOs before the connection is torn down.
+  uint16_t maxNumPTOs{kDefaultMaxNumPTO};
   // Whether to turn off PMTUD on the socket
   bool turnoffPMTUD{false};
   // Whether to listen to socket error

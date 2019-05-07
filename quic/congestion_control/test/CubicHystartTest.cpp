@@ -19,9 +19,6 @@ namespace test {
 
 class CubicHystartTest : public Test {};
 
-// TODO: add test of currSampledRtt gets reset once the onRTOVerified is
-// implemented
-
 TEST_F(CubicHystartTest, SendAndAck) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 100;

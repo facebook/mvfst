@@ -100,7 +100,7 @@ class QuicTransportStatsCallback {
   virtual void onCwndBlocked() = 0;
 
   // retransmission timeout counter
-  virtual void onRTO() = 0;
+  virtual void onPTO() = 0;
 
   // metrics to track bytes read from / written to wire
   virtual void onRead(size_t bufSize) = 0;

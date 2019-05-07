@@ -944,7 +944,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
-  // On RTO, endpoint sends 2 probing packets, thus 1+2=3
+  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
   EXPECT_EQ(conn.outstandingPackets.size(), 3);
   numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),

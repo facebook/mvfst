@@ -212,7 +212,7 @@ constexpr std::chrono::microseconds kGranularity =
 
 constexpr uint32_t kReorderingThreshold = 3;
 
-constexpr auto kPacketToSendForRTO = 2;
+constexpr auto kPacketToSendForPTO = 2;
 
 // Maximum number of packets to write per writeConnectionDataToSocket call.
 constexpr uint64_t kDefaultWriteConnectionDataPacketLimit = 5;
@@ -327,8 +327,8 @@ constexpr size_t kMaxReasonPhraseLength = 1024;
 // Minimum size of an initial packet
 constexpr size_t kMinInitialPacketSize = 1200;
 
-// Default maximum RTOs that will happen before tearing down the connection
-constexpr uint16_t kDefaultMaxNumRTO = 7;
+// Default maximum PTOs that will happen before tearing down the connection
+constexpr uint16_t kDefaultMaxNumPTO = 7;
 
 // Maximum early data size that we need to negotiate in TLS
 constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;

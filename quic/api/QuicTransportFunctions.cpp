@@ -984,7 +984,7 @@ uint64_t writeProbingDataToSocket(
 
 bool shouldWriteData(const QuicConnectionStateBase& conn) {
   if (conn.pendingEvents.numProbePackets) {
-    VLOG(10) << nodeToString(conn.nodeType) << " needs write because of RTO"
+    VLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"
              << conn;
     return true;
   }

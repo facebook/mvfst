@@ -348,7 +348,7 @@ void QuicTransportBase::closeImpl(
     getEventBase()->timer().scheduleTimeout(
         &drainTimeout_,
         std::chrono::duration_cast<std::chrono::milliseconds>(
-            kDrainFactor * calculateRTO(*conn_)));
+            kDrainFactor * calculatePTO(*conn_)));
   } else {
     drainTimeoutExpired();
   }
@@ -445,11 +445,11 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRetxCount;
   transportInfo.totalBytesRetransmitted =
       conn_->lossState.totalBytesRetransmitted;
-  transportInfo.rto = calculateRTO(*conn_);
+  transportInfo.pto = calculatePTO(*conn_);
   transportInfo.bytesSent = conn_->lossState.totalBytesSent;
   transportInfo.bytesRecvd = conn_->lossState.totalBytesRecvd;
-  transportInfo.rtoCount = conn_->lossState.rtoCount;
-  transportInfo.totalRTOCount = conn_->lossState.totalRTOCount;
+  transportInfo.ptoCount = conn_->lossState.ptoCount;
+  transportInfo.totalPTOCount = conn_->lossState.totalPTOCount;
   transportInfo.largestPacketAckedByPeer =
       conn_->ackStates.appDataAckState.largestAckedByPeer;
   transportInfo.largestPacketSent = conn_->lossState.largestSent;

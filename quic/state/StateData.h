@@ -287,7 +287,7 @@ using Resets = std::unordered_map<StreamId, RstStreamFrame>;
 using FrameList = std::vector<QuicSimpleFrame>;
 
 struct LossState {
-  enum class AlarmMethod { EarlyRetransmitOrReordering, Handshake, RTO };
+  enum class AlarmMethod { EarlyRetransmitOrReordering, Handshake, PTO };
   // Smooth rtt
   std::chrono::microseconds srtt{std::chrono::microseconds::zero()};
   // Latest rtt
@@ -295,7 +295,7 @@ struct LossState {
   // Rtt var
   std::chrono::microseconds rttvar{std::chrono::microseconds::zero()};
   // Number of packet loss timer fired before receiving an ack
-  uint32_t rtoCount{0};
+  uint32_t ptoCount{0};
   // The number of times the handshake packets have been retransmitted without
   // receiving an ack.
   uint16_t handshakeAlarmCount{0};
@@ -314,10 +314,10 @@ struct LossState {
   // Total number of packet retransmitted on this connection, including packet
   // clones, retransmitted clones, handshake and rejected zero rtt packets.
   uint32_t rtxCount{0};
-  // Total number of retransmission due to RTO
+  // Total number of retransmission due to PTO
   uint32_t timeoutBasedRetxCount{0};
-  // Total number of RTO count
-  uint32_t totalRTOCount{0};
+  // Total number of PTO count
+  uint32_t totalPTOCount{0};
   // Total number of bytes sent on this connection. This is after encoding.
   uint64_t totalBytesSent{0};
   // Total number of bytes received on this connection. This is before decoding.
@@ -492,7 +492,7 @@ struct QuicConnectionStateBase {
     // If there is a pending loss detection alarm update
     bool setLossDetectionAlarm{false};
 
-    // Number of probing packets to send after RTO
+    // Number of probing packets to send after PTO
     uint8_t numProbePackets{0};
   };
 

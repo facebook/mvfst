@@ -10,7 +10,7 @@
 
 namespace quic {
 
-std::chrono::microseconds calculateRTO(const QuicConnectionStateBase& conn) {
+std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
   return conn.lossState.srtt + 4 * conn.lossState.rttvar +
       conn.lossState.maxAckDelay;
 }
@@ -22,26 +22,26 @@ bool isPersistentCongestion(
   if (conn.lossState.srtt == std::chrono::microseconds::zero()) {
     return false;
   }
-  auto rto = calculateRTO(conn);
+  auto pto = calculatePTO(conn);
   return (lostPeriodEnd - lostPeriodStart) >=
-      rto * kPersistentCongestionPeriodFactor;
+      pto * kPersistentCongestionPeriodFactor;
 }
 
-void onRTOAlarm(QuicConnectionStateBase& conn) {
+void onPTOAlarm(QuicConnectionStateBase& conn) {
   VLOG(10) << __func__ << " " << conn;
   QUIC_TRACE(
-      rto_alarm,
+      pto_alarm,
       conn,
       conn.lossState.largestSent,
-      conn.lossState.rtoCount,
+      conn.lossState.ptoCount,
       (uint64_t)conn.outstandingPackets.size());
-  QUIC_STATS(conn.infoCallback, onRTO);
-  conn.lossState.rtoCount++;
-  conn.lossState.totalRTOCount++;
-  if (conn.lossState.rtoCount == conn.transportSettings.maxNumRTOs) {
-    throw QuicInternalException("Exceeded max RTO", LocalErrorCode::NO_ERROR);
+  QUIC_STATS(conn.infoCallback, onPTO);
+  conn.lossState.ptoCount++;
+  conn.lossState.totalPTOCount++;
+  if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
+    throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
   }
-  conn.pendingEvents.numProbePackets = kPacketToSendForRTO;
+  conn.pendingEvents.numProbePackets = kPacketToSendForPTO;
 }
 
 void markPacketLoss(

@@ -425,7 +425,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   auto rawController = mockController.get();
   conn.congestionController = std::move(mockController);
 
-  conn.lossState.rtoCount = 1;
+  conn.lossState.ptoCount = 1;
   PacketNum packetAfterRtoNum = 10;
   auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
   conn.outstandingPackets.emplace_back(OutstandingPacket(
@@ -442,7 +442,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       [](auto&, auto&, bool, PacketNum) {},
       Clock::now());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
-  EXPECT_EQ(conn.lossState.rtoCount, 1);
+  EXPECT_EQ(conn.lossState.ptoCount, 1);
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckedByPeer, 0);
 }
 

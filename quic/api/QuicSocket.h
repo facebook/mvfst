@@ -130,12 +130,12 @@ class QuicSocket {
     uint64_t congestionWindow;
     uint32_t packetsRetransmitted;
     uint32_t timeoutBasedLoss;
-    std::chrono::microseconds rto;
+    std::chrono::microseconds pto;
     uint64_t bytesSent;
     uint64_t bytesRecvd;
     uint64_t totalBytesRetransmitted;
-    uint32_t rtoCount;
-    uint32_t totalRTOCount;
+    uint32_t ptoCount;
+    uint32_t totalPTOCount;
     PacketNum largestPacketAckedByPeer;
     PacketNum largestPacketSent;
   };

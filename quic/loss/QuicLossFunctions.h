@@ -26,7 +26,7 @@ namespace quic {
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 bool hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 
-std::chrono::microseconds calculateRTO(const QuicConnectionStateBase& conn);
+std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn);
 
 /**
  * Whether conn is having persistent congestion.
@@ -50,8 +50,8 @@ inline std::ostream& operator<<(
     case LossState::AlarmMethod::EarlyRetransmitOrReordering:
       os << "EarlyRetransmitOrReordering";
       break;
-    case LossState::AlarmMethod::RTO:
-      os << "RTO";
+    case LossState::AlarmMethod::PTO:
+      os << "PTO";
       break;
   }
   return os;
@@ -88,10 +88,10 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
     }
     alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
   } else {
-    auto rtoTimeout = calculateRTO(conn);
-    rtoTimeout *= 1 << std::min(conn.lossState.rtoCount, (uint32_t)31);
-    alarmDuration = rtoTimeout;
-    alarmMethod = LossState::AlarmMethod::RTO;
+    auto ptoTimeout = calculatePTO(conn);
+    ptoTimeout *= 1 << std::min(conn.lossState.ptoCount, (uint32_t)31);
+    alarmDuration = ptoTimeout;
+    alarmMethod = LossState::AlarmMethod::PTO;
   }
   TimePoint now = ClockType::now();
   std::chrono::milliseconds adjustedAlarmDuration{0};
@@ -130,11 +130,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
       conn.outstandingPackets.size(), conn.outstandingPureAckPacketsCount);
   /*
    * We might have new data or lost data to send even if we don't have any
-   * outstanding packets. When we get an RTO event, it is possible that only
+   * outstanding packets. When we get a PTO event, it is possible that only
    * cloned packets might be outstanding. Since cwnd might be set to min cwnd,
    * we might not be able to send data. However we might still have data sitting
    * in the buffers which is unsent or known to be lost. We should set a timer
-   * in this case to be able to send this data on the next RTO.
+   * in this case to be able to send this data on the next PTO.
    */
   bool hasDataToWrite = hasAckDataToWrite(conn) || hasNonAckDataToWrite(conn);
   auto totalPacketsOutstanding = conn.outstandingPackets.size();
@@ -155,7 +155,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * (2) All outstanding are clones that are processed and there is data to
    *  write.
    * If there are only clones with no data, then we don't need to set the timer.
-   * This will free up the evb. However after an RTO verified event, clones take
+   * This will free up the evb. However after a PTO verified event, clones take
    * up space in cwnd. If we have data left to write, we would not be able to
    * write them since we could be blocked by cwnd. So we must set the loss timer
    * so that we can write this data with the slack packet space for the clones.
@@ -307,7 +307,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   return folly::none;
 }
 
-void onRTOAlarm(QuicConnectionStateBase& conn);
+void onPTOAlarm(QuicConnectionStateBase& conn);
 
 template <class LossVisitor, class ClockType = Clock>
 void onHandshakeAlarm(
@@ -357,7 +357,7 @@ void onHandshakeAlarm(
   if (conn.nodeType == QuicNodeType::Client && conn.oneRttWriteCipher) {
     // When sending client finished, we should also send a 1-rtt probe packet to
     // elicit an ack.
-    conn.pendingEvents.numProbePackets = kPacketToSendForRTO;
+    conn.pendingEvents.numProbePackets = kPacketToSendForPTO;
   }
 }
 
@@ -395,7 +395,7 @@ void onLossDetectionAlarm(
           folly::none, std::move(lossEvent));
     }
   } else {
-    onRTOAlarm(conn);
+    onPTOAlarm(conn);
   }
   conn.pendingEvents.setLossDetectionAlarm =
       (conn.outstandingPackets.size() > conn.outstandingPureAckPacketsCount);
@@ -428,7 +428,7 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
   if (ack.largestAckedPacket.hasValue()) {
     // TODO: Should we NOT reset these counters if the received Ack frame
     // doesn't ack anything that's in OP list?
-    conn.lossState.rtoCount = 0;
+    conn.lossState.ptoCount = 0;
     conn.lossState.handshakeAlarmCount = 0;
     largestAcked = std::max(largestAcked, *ack.largestAckedPacket);
   }
