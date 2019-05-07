@@ -56,7 +56,8 @@ TEST_F(QuicStreamManagerTest, TestAppLimitedCreateBidiStream) {
 
   EXPECT_CALL(*mockController, setAppLimited(true, _));
   // Force transition to closed state
-  stream.value()->state = StreamStates::Closed();
+  stream.value()->send.state = StreamSendStates::Closed();
+  stream.value()->recv.state = StreamReceiveStates::Closed();
   manager.removeClosedStream(stream.value()->id);
   EXPECT_TRUE(manager.isAppLimited());
   EXPECT_EQ(manager.getStream(id), nullptr);
@@ -71,7 +72,8 @@ TEST_F(QuicStreamManagerTest, TestAppLimitedCreateUnidiStream) {
 
   // Force transition to closed state
   EXPECT_CALL(*mockController, setAppLimited(true, _));
-  stream.value()->state = StreamStates::Closed();
+  stream.value()->send.state = StreamSendStates::Closed();
+  stream.value()->recv.state = StreamReceiveStates::Closed();
   manager.removeClosedStream(stream.value()->id);
   EXPECT_TRUE(manager.isAppLimited());
 }
@@ -151,7 +153,8 @@ TEST_F(QuicStreamManagerTest, TestAppLimitedClosePeerStream) {
 
   EXPECT_CALL(*mockController, setAppLimited(true, _));
   // Force transition to closed state
-  stream->state = StreamStates::Closed();
+  stream->send.state = StreamSendStates::Closed();
+  stream->recv.state = StreamReceiveStates::Closed();
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppLimited());
   EXPECT_EQ(manager.getStream(id), nullptr);
@@ -171,7 +174,8 @@ TEST_F(QuicStreamManagerTest, TestAppLimitedCloseControlStream) {
   EXPECT_TRUE(manager.isAppLimited());
 
   // Force transition to closed state
-  stream->state = StreamStates::Closed();
+  stream->send.state = StreamSendStates::Closed();
+  stream->recv.state = StreamReceiveStates::Closed();
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppLimited());
 }
