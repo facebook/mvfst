@@ -15,7 +15,7 @@ inline void
 Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, ReadStreamFrame>::
     handle(
         QuicStreamState::Recv& state,
-        ReadStreamFrame frame,
+        ReadStreamFrame&& frame,
         QuicStreamState& stream) {
   VLOG_IF(10, frame.fin) << "Open: Received data with fin"
                          << " stream=" << stream.id << " " << stream.conn;
@@ -36,7 +36,7 @@ inline void
 Handler<StreamSendStateMachine, StreamSendStates::Open, StopSendingFrame>::
     handle(
         QuicStreamState::Send& state,
-        StopSendingFrame frame,
+        StopSendingFrame&& frame,
         QuicStreamState& stream) {
   CHECK(
       isBidirectionalStream(stream.id) ||
@@ -48,7 +48,7 @@ inline void
 Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, RstStreamFrame>::
     handle(
         QuicStreamState::Recv& state,
-        RstStreamFrame rst,
+        RstStreamFrame&& rst,
         QuicStreamState& stream) {
   // We transit the receive state machine to Closed before invoking
   // onResetQuicStream because it will check the state of the stream for flow
@@ -66,7 +66,7 @@ inline void Handler<
     StreamEvents::SendReset>::
     handle(
         QuicStreamState::Send& state,
-        StreamEvents::SendReset rst,
+        StreamEvents::SendReset&& rst,
         QuicStreamState& stream) {
   resetQuicStream(stream, rst.errorCode);
   appendPendingStreamReset(stream.conn, stream, rst.errorCode);
@@ -80,7 +80,7 @@ inline void Handler<
     StreamEvents::AckStreamFrame>::
     handle(
         QuicStreamState::Send& state,
-        StreamEvents::AckStreamFrame ack,
+        StreamEvents::AckStreamFrame&& ack,
         QuicStreamState& stream) {
   // Clean up the acked buffers from the retransmissionBuffer.
 

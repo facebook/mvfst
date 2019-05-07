@@ -104,7 +104,7 @@ struct HandlerBase {
    public:                                                         \
     static void handle(                                            \
         typename machine::StateData& data,                         \
-        event evt,                                                 \
+        event&& evt,                                               \
         typename machine::UserData& userData);                     \
   };
 
@@ -115,7 +115,7 @@ struct HandlerBase {
    public:                                                                 \
     static void handle(                                                    \
         typename Machine::StateData& data,                                 \
-        event evt,                                                         \
+        event&& evt,                                                       \
         typename Machine::UserData&);                                      \
     template <class NewState>                                              \
     static void transit(typename Machine::StateData& data) {               \
@@ -132,7 +132,7 @@ template <class Machine, class State, class Event>
 struct Handler : public HandlerBase<Machine, State, Event> {
   static void handle(
       typename Machine::StateData& /*state*/,
-      Event /*event*/,
+      Event&& /*event*/,
       typename Machine::UserData& userData) {
     Machine::InvalidEventHandler(userData);
   }

@@ -17,7 +17,7 @@ inline void Handler<
     StreamEvents::AckStreamFrame>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StreamEvents::AckStreamFrame /*ack*/,
+        StreamEvents::AckStreamFrame&& /*ack*/,
         QuicStreamState& stream) {
   // do nothing here. We should have already dumped the stream state before
   // we got here.
@@ -29,7 +29,7 @@ inline void
 Handler<StreamSendStateMachine, StreamSendStates::ResetSent, StopSendingFrame>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StopSendingFrame /*frame*/,
+        StopSendingFrame&& /*frame*/,
         QuicStreamState& /*stream*/) {
   // no-op, we already sent a reset
 }
@@ -40,7 +40,7 @@ inline void Handler<
     StreamEvents::RstAck>::
     handle(
         QuicStreamState::Send& state,
-        StreamEvents::RstAck /*ack*/,
+        StreamEvents::RstAck&& /*ack*/,
         QuicStreamState& stream) {
   VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
            << stream.conn;
@@ -56,7 +56,7 @@ inline void Handler<
     StreamEvents::SendReset>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StreamEvents::SendReset,
+        StreamEvents::SendReset&&,
         QuicStreamState& /*stream*/) {
   // do nothing.
 }

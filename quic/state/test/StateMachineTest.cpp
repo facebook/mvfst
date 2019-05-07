@@ -52,7 +52,7 @@ QUIC_DECLARE_STATE_HANDLER(TestMachine, State2, Event2, State1, State3);
 // The handlers
 void Handler<TestMachine, State1, Event1>::handle(
     ConnectionState& connState,
-    Event1 /*event*/,
+    Event1&& /*event*/,
     TestMachine::UserData&) {
   connState.visitedState1Event1 = true;
   transit<State2>(connState);
@@ -60,7 +60,7 @@ void Handler<TestMachine, State1, Event1>::handle(
 
 void Handler<TestMachine, State1, Event2>::handle(
     ConnectionState& connState,
-    Event2 /*event*/,
+    Event2&& /*event*/,
     TestMachine::UserData&) {
   connState.visitedState1Event2 = true;
   transit<State3>(connState);
@@ -70,7 +70,7 @@ void Handler<TestMachine, State1, Event2>::handle(
 
 void Handler<TestMachine, State2, Event2>::handle(
     ConnectionState& connState,
-    Event2 /*event*/,
+    Event2&& /*event*/,
     TestMachine::UserData&) {
   connState.visitedState2Event2 = true;
   transit<State3>(connState);
@@ -100,7 +100,7 @@ QUIC_DECLARE_STATE_HANDLER_T(State2, Event2, State3);
 template <typename Machine>
 void Handler<Machine, State1, Event1>::handle(
     typename Machine::StateData& s,
-    Event1,
+    Event1&&,
     typename Machine::UserData&) {
   s.visitedState1Event1 = true;
   transit<State2>(s);
@@ -109,7 +109,7 @@ void Handler<Machine, State1, Event1>::handle(
 template <typename Machine>
 void Handler<Machine, State1, Event2>::handle(
     typename Machine::StateData& s,
-    Event2,
+    Event2&&,
     typename Machine::UserData&) {
   s.visitedState1Event2 = true;
   transit<State3>(s);
@@ -118,7 +118,7 @@ void Handler<Machine, State1, Event2>::handle(
 template <typename Machine>
 void Handler<Machine, State2, Event2>::handle(
     typename Machine::StateData& s,
-    Event2,
+    Event2&&,
     typename Machine::UserData&) {
   s.visitedState2Event2 = true;
   transit<State3>(s);

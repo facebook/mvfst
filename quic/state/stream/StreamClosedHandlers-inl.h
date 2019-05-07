@@ -18,7 +18,7 @@ inline void Handler<
     ReadStreamFrame>::
     handle(
         QuicStreamState::Recv& state,
-        ReadStreamFrame frame,
+        ReadStreamFrame&& frame,
         QuicStreamState& stream) {
   CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
   VLOG_IF(10, frame.fin) << "Closed: Received data with fin"
@@ -31,7 +31,7 @@ inline void
 Handler<StreamSendStateMachine, StreamSendStates::Closed, StopSendingFrame>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StopSendingFrame /*frame*/,
+        StopSendingFrame&& /*frame*/,
         QuicStreamState& /*stream*/) {
   // no-op, we're already done sending
 }
@@ -42,7 +42,7 @@ inline void Handler<
     RstStreamFrame>::
     handle(
         QuicStreamState::Recv& state,
-        RstStreamFrame rst,
+        RstStreamFrame&& rst,
         QuicStreamState& stream) {
   // This will check whether the reset is still consistent with the stream.
   onResetQuicStream(stream, std::move(rst));
@@ -54,7 +54,7 @@ inline void Handler<
     StreamEvents::AckStreamFrame>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StreamEvents::AckStreamFrame /*ack*/,
+        StreamEvents::AckStreamFrame&& /*ack*/,
         QuicStreamState& stream) {
   DCHECK(stream.retransmissionBuffer.empty());
   DCHECK(stream.writeBuffer.empty());
@@ -66,7 +66,7 @@ inline void Handler<
     StreamEvents::RstAck>::
     handle(
         QuicStreamState::Send& /*state*/,
-        StreamEvents::RstAck /*ack*/,
+        StreamEvents::RstAck&& /*ack*/,
         QuicStreamState& /*stream*/) {
   // Just discard the ack if we are already in Closed state.
 }
@@ -77,7 +77,7 @@ inline void Handler<
     StreamEvents::SendReset>::
     handle(
         QuicStreamState::Send& state,
-        StreamEvents::SendReset,
+        StreamEvents::SendReset&&,
         QuicStreamState& stream) {
   // TODO: remove this as a valid state transition
   LOG(ERROR) << "Ignoring SendReset from closed state.  This may be a bug";
