@@ -70,7 +70,7 @@ struct TransportSettings {
   // flowControlWindowFrequency * window if the flow control changes.
   uint16_t flowControlWindowFrequency{2};
   // batching mode
-  QuicBatchingMode batchingMode{QuicBatchingMode::BATCHING_MODE_NONE};
+  QuicBatchingMode batchingMode{QuicBatchingMode::BATCHING_MODE_GSO};
   // maximum number of packets we can batch
   // does not apply to BATCHING_MODE_NONE
   uint32_t batchingNum{kDefaultQuicBatchingNum};
