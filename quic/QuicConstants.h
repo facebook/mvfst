@@ -24,7 +24,6 @@ constexpr uint64_t kDefaultV4UDPSendPacketLen = 1252;
 constexpr uint64_t kDefaultV6UDPSendPacketLen = 1232;
 // With Android NDK r15c for some apps we use gnu-libstdc++ instead of
 // llvm-libc++. And gnu-libstdc++ doesn't like to make std::min constexpr.
-// That's why we can't have nice things in the world.
 constexpr uint16_t kDefaultUDPSendPacketLen =
     (kDefaultV4UDPSendPacketLen < kDefaultV6UDPSendPacketLen
          ? kDefaultV4UDPSendPacketLen
