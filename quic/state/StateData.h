@@ -394,14 +394,12 @@ struct QuicConnectionStateBase {
   uint64_t outstandingPureAckPacketsCount{0};
 
   // Number of handshake packets outstanding.
-  // TODO: I think with oustandingPackets split into 3, we can get rid of this.
   uint64_t outstandingHandshakePacketsCount{0};
 
   // Number of packets are clones or cloned.
   uint64_t outstandingClonedPacketsCount{0};
 
-  // The read codec to use for the packet which will decrypt and decode the
-  // packet.
+  // The read codec to decrypt and decode packets.
   std::unique_ptr<QuicReadCodec> readCodec;
 
   // Initial header cipher.

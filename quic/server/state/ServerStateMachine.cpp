@@ -242,7 +242,7 @@ bool validateAndUpdateSourceToken(
   DCHECK(conn.peerAddress.isInitialized());
   bool foundMatch = false;
   for (int ii = sourceAddresses.size() - 1; ii >= 0; --ii) {
-    // TODO T33014230 subnect matching
+    // TODO T33014230 subnet matching
     if (conn.peerAddress.getIPAddress() == sourceAddresses[ii]) {
       foundMatch = true;
       // If peer address is found in the token, move the element to the end

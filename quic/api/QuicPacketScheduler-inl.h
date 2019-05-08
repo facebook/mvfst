@@ -49,7 +49,7 @@ folly::Optional<PacketNum> AckScheduler::writeAcksImpl(
   auto ackingTime = ClockType::now();
   DCHECK(ackState_.largestRecvdPacketTime.hasValue())
       << "Missing received time for the largest acked packet";
-  // assuming that we're going to ack the largest recived with hightest pri
+  // assuming that we're going to ack the largest received with hightest pri
   auto receivedTime = *ackState_.largestRecvdPacketTime;
   std::chrono::microseconds ackDelay =
       (ackingTime > receivedTime

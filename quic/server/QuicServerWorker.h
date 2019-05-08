@@ -77,7 +77,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   /**
    * Initialize and bind given listening socket to the given takeover address
    * so that this server can accept and process misrouted packets forwarded
-   *  by other server
+   * by other server
    */
   void allowBeingTakenOver(
       std::unique_ptr<folly::AsyncUDPSocket> socket,

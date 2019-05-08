@@ -32,7 +32,7 @@ class QuicPacketScheduler {
    * Schedules frames and writes them to the builder and returns
    * a pair of PacketEvent and the Packet that was built.
    *
-   * Returns a optional PacketEvent which indicates if the built out packet is
+   * Returns an optional PacketEvent which indicates if the built out packet is
    * a clone and the associated PacketEvent for both origin and clone.
    */
   virtual std::pair<

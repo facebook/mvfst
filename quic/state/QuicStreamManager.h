@@ -276,6 +276,7 @@ class QuicStreamManager {
   void setMaxLocalUnidirectionalStreams(
       uint64_t maxStreams,
       bool force = false);
+
   /*
    * Returns a const reference to the underlying stream window updates
    * container.
@@ -397,6 +398,7 @@ class QuicStreamManager {
   const auto& dataExpiredStreams() const {
     return dataExpiredStreams_;
   }
+
   /*
    * Clear the data rejected streams.
    */
