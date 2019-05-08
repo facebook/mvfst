@@ -6,7 +6,6 @@
  *
  */
 
-// override-include-guard
 #include <quic/codec/QuicReadCodec.h>
 #include <folly/io/Cursor.h>
 #include <quic/codec/Decode.h>
