@@ -31,9 +31,10 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn);
 /**
  * Whether conn is having persistent congestion.
  *
- * TODO: This currently doesn't check if packets within this window from other
- * pnSpace are lost too.
- * Pending https://github.com/quicwg/base-drafts/issues/2649
+ * Persistent congestion requires a time period much longer than crypto timer.
+ * This means no handshake packet should be in a persistent congestion range.
+ * Thus persistent congestion is per pnSpace, and it's AppData space only.
+ *
  */
 bool isPersistentCongestion(
     const QuicConnectionStateBase& conn,
