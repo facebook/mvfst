@@ -46,9 +46,9 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 constexpr uint16_t kDefaultUDPReadBufferSize = 4096;
 
 constexpr uint16_t kMaxNumCoalescedPackets = 5;
-// As per version 17 of the spec, transport parameters for private use must
-// have ids greater than 0x3fff.
-constexpr uint16_t kCustomTransportParameterThreshold = 0x3fff;
+// As per version 20 of the spec, transport parameters for private use must
+// have ids with first byte being 0xff.
+constexpr uint16_t kCustomTransportParameterThreshold = 0xff00;
 
 // If the amount of data in the buffer of a QuicSocket equals or exceeds this
 // threshold, then the callback registered through

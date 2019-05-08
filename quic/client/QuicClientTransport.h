@@ -119,8 +119,7 @@ class QuicClientTransport
   /**
    * Used to set private transport parameters that are not in the
    * TransportParameterId enum.
-   * As per section 22.2 of the IETF QUIC draft version 17, private transport
-   * parameters must have IDs greater than 0x3fff.
+   * See kCustomTransportParameterThreshold in QuicConstants.h
    */
   bool setCustomTransportParameter(
       std::unique_ptr<CustomTransportParameter> customParam);
