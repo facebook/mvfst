@@ -4,11 +4,12 @@
 # LICENSE file in the root directory of this source tree.
 
 include(ExternalProject)
+list(APPEND PREFIX_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_INSTALL_PREFIX})
 # Construct platform aware cmake args since on OSX
 # it requires path to the openssl libs
 list(APPEND CMAKE_ARGS
       -DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo
-      -DCMAKE_PREFIX_PATH:STRING=${CMAKE_PREFIX_PATH}
+      -DCMAKE_PREFIX_PATH:STRING=${PREFIX_PATH}
 )
 if(UNIX AND APPLE)
   list(APPEND CMAKE_ARGS
