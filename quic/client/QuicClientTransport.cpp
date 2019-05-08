@@ -103,8 +103,7 @@ void QuicClientTransport::processPacketData(
             QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
             toString(LocalErrorCode::CONNECTION_RESET));
         throw QuicInternalException("Peer reset", LocalErrorCode::NO_ERROR);
-        // Lame, we need to return a bool even though we will never return.
-        return false;
+        folly::assume_unreachable();
       },
       [&](auto&) { return false; });
   if (!parseSuccess) {

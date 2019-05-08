@@ -169,8 +169,7 @@ std::unique_ptr<BatchWriter> BatchWriterFactory::makeBatchWriter(
       // no default so we can catch missing case at compile time
   }
 
-  // should be unreachable
-  return std::make_unique<SinglePacketBatchWriter>();
+  folly::assume_unreachable();
 }
 
 } // namespace quic
