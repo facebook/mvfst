@@ -24,10 +24,13 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
 EOF
 }
 
-while getopts ":hp:" arg; do
+while getopts ":hp:i:" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
+      ;;
+    i)
+      INSTALL_PREFIX="${OPTARG}"
       ;;
     h | *) # Display help.
       usage
@@ -60,6 +63,18 @@ else
   FOLLY_INSTALL_DIR=$INSTALL_PREFIX
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
 fi
+
+# Default to parallel build width of 4.
+# If we have "nproc", use that to get a better value.
+# If not, then intentionally go a bit conservative and
+# just use the default of 4 (e.g., some desktop/laptop OSs
+# have a tendency to freeze if we actually use all cores).
+set +x
+nproc=4
+if [ -z "$(hash nproc 2>&1)" ]; then
+    nproc=$(nproc)
+fi
+set -x
 
 function install_dependencies_linux() {
   sudo apt-get install        \
@@ -127,6 +142,18 @@ function setup_folly() {
       exit 1
     fi
   fi
+
+  if [ "$Platform" = "Mac" ]; then
+    # Homebrew installs OpenSSL in a non-default location on MacOS >= Mojave
+    # 10.14 because MacOS has its own SSL implementation.  If we find the
+    # typical Homebrew OpenSSL dir, load OPENSSL_ROOT_DIR so that cmake
+    # will find the Homebrew version.
+    dir=/usr/local/opt/openssl
+    if [ -d $dir ]; then
+        export OPENSSL_ROOT_DIR=$dir
+    fi
+  fi
+
   echo -e "${COLOR_GREEN}Building Folly ${COLOR_OFF}"
   mkdir -p "$FOLLY_BUILD_DIR"
   cd "$FOLLY_BUILD_DIR" || exit
@@ -134,8 +161,9 @@ function setup_folly() {
     -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
     -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
     ..
-  make -j "$(nproc)"
+  make -j "$nproc"
   make install
+  echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
   cd "$BWD" || exit
 }
 
@@ -159,6 +187,6 @@ cmake -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
  -DCMAKE_BUILD_TYPE=RelWithDebInfo                \
  -DBUILD_TESTS=On                                 \
   ../..
-make -j "$(nproc)"
+make -j "$nproc"
 echo -e "${COLOR_GREEN}MVFST build is complete. To run unit test: \
   cd _build/build && make test ${COLOR_OFF}"
