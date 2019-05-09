@@ -1163,7 +1163,7 @@ bool QuicClientTransport::setCustomTransportParameter(
     std::unique_ptr<CustomTransportParameter> customParam) {
   // check that the parameter id is in the "private parameter" range, as
   // described by the spec.
-  if (static_cast<uint16_t>(customParam->getParameterId()) <=
+  if (static_cast<uint16_t>(customParam->getParameterId()) <
       kCustomTransportParameterThreshold) {
     return false;
   }
