@@ -693,7 +693,7 @@ void QuicTransportBase::updateReadLooper() {
     readLooper_->stop();
     return;
   }
-  auto cnt = std::count_if(
+  auto iter = std::find_if(
       conn_->streamManager->readableStreams().begin(),
       conn_->streamManager->readableStreams().end(),
       [& readCallbacks = readCallbacks_](StreamId s) {
@@ -705,7 +705,7 @@ void QuicTransportBase::updateReadLooper() {
         // still return an error
         return readCb->second.readCb && readCb->second.resumed;
       });
-  if (cnt) {
+  if (iter != conn_->streamManager->readableStreams().end()) {
     VLOG(10) << "Scheduling read looper " << *this;
     readLooper_->run();
   } else {
@@ -1001,7 +1001,7 @@ void QuicTransportBase::updatePeekLooper() {
     peekLooper_->stop();
     return;
   }
-  auto cnt = std::count_if(
+  auto iter = std::find_if(
       conn_->streamManager->peekableStreams().begin(),
       conn_->streamManager->peekableStreams().end(),
       [& peekCallbacks = peekCallbacks_](StreamId s) {
@@ -1011,7 +1011,7 @@ void QuicTransportBase::updatePeekLooper() {
         }
         return peekCb->second.peekCb && peekCb->second.resumed;
       });
-  if (cnt) {
+  if (iter != conn_->streamManager->peekableStreams().end()) {
     VLOG(10) << "Scheduling peek looper " << *this;
     peekLooper_->run();
   } else {
