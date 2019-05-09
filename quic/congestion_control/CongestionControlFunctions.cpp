@@ -45,12 +45,9 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
           conn.transportSettings.minCwndInMss,
           (uint64_t)std::ceil(
               (double)cwndInPackets * (double)minimalInterval.count() /
-              (double)std::chrono::duration_cast<std::chrono::microseconds>(rtt)
-                  .count())));
-  auto interval = std::max(
-      minimalInterval,
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          rtt * burstPerInterval / cwndInPackets));
+              (double)rtt.count())));
+  auto interval =
+      timeMax(minimalInterval, rtt * burstPerInterval / cwndInPackets);
   return std::make_pair(interval, burstPerInterval);
 }
 } // namespace quic
