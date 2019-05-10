@@ -1852,7 +1852,7 @@ void QuicTransportBase::checkForClosedStream() {
         (callbackIt == readCallbacks_.end() ||
          callbackIt->second.readCb == nullptr ||
          callbackIt->second.deliveredEOM)) {
-      auto stream = conn_->streamManager->findStream(*itr);
+      FOLLY_MAYBE_UNUSED auto stream = conn_->streamManager->findStream(*itr);
       QUIC_TRACE(
           holb_time,
           *conn_,

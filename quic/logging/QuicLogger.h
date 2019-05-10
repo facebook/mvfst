@@ -86,9 +86,15 @@ void quicTraceLogger(std::string name, const T& conn, Args&&... args) {
       TAKE_1)              \
   (__VA_ARGS__)
 
+#if FOLLY_MOBILE
+#define QUIC_LOGGER(name, conn, ...) (void)conn;
+#else
+#define QUIC_LOGGER(name, conn, ...) quicTraceLogger(#name, conn, __VA_ARGS__);
+#endif
+
 #define QUIC_TRACE(name, conn, ...)                                           \
   do {                                                                        \
-    quicTraceLogger(#name, conn, __VA_ARGS__);                                \
+    QUIC_LOGGER(name, conn, __VA_ARGS__)                                      \
     FOLLY_SDT(                                                                \
         quic,                                                                 \
         name,                                                                 \
