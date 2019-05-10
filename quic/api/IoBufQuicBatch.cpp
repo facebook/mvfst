@@ -93,7 +93,6 @@ bool IOBufQuicBatch::flushInternal() {
 
     if (!happyEyeballsState_.shouldWriteToFirstSocket) {
       sock_.pauseRead();
-      sock_.close();
     }
   }
 
@@ -118,7 +117,6 @@ bool IOBufQuicBatch::flushInternal() {
         (consumed >= 0 || isRetriableError(errno));
     if (!happyEyeballsState_.shouldWriteToSecondSocket) {
       happyEyeballsState_.secondSocket->pauseRead();
-      happyEyeballsState_.secondSocket->close();
     }
   }
 

@@ -1683,10 +1683,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     auto& conn = client->getConn();
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    // Socket is closed once during happy eyeballs
-    // Socket is closed for the second time when QuicClientTransport dies
+    // Socket is paused read once during happy eyeballs
+    // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
-    EXPECT_CALL(*sock, close()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(1);
     EXPECT_CALL(*secondSock, write(_, _));
     client->start(&clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
@@ -1761,10 +1761,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    // Socket is closed once during happy eyeballs
-    // Socket is closed for the second time when QuicClientTransport dies
+    // Socket is paused read once during happy eyeballs
+    // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
-    EXPECT_CALL(*sock, close()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(1);
     EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
@@ -1838,10 +1838,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    // Socket is closed once during happy eyeballs
-    // Socket is closed for the second time when QuicClientTransport dies
+    // Socket is paused read once during happy eyeballs
+    // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*secondSock, pauseRead()).Times(2);
-    EXPECT_CALL(*secondSock, close()).Times(2);
+    EXPECT_CALL(*secondSock, close()).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
 
