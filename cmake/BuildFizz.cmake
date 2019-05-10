@@ -26,12 +26,6 @@ ExternalProject_Add(
   SOURCE_SUBDIR fizz
   # Disable install step
   INSTALL_COMMAND ""
-  LOG_DOWNLOAD ON
-  LOG_UPDATE 1
-  LOG_CONFIGURE ON
-  LOG_BUILD ON
-  LOG_TEST 1
-  LOG_INSTALL 1
   CMAKE_CACHE_ARGS ${CMAKE_ARGS}
 )
 set(FIZZ_TARGET fizz_project)
