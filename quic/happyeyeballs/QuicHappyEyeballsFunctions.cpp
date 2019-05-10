@@ -184,6 +184,7 @@ void happyEyeballsOnDataReceived(
   QUIC_TRACE(happy_eyeballs, connection, "finish", peerAddress.getAddressStr());
   connAttemptDelayTimeout.cancelTimeout();
   connection.happyEyeballsState.finished = true;
+  connection.happyEyeballsState.shouldWriteToFirstSocket = true;
   connection.happyEyeballsState.shouldWriteToSecondSocket = false;
   // If second socket won, update main socket and peerAddress
   if (connection.peerAddress.getFamily() != peerAddress.getFamily()) {

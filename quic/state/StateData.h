@@ -587,7 +587,10 @@ struct QuicConnectionStateBase {
     // The UDP socket that will be used for the second connection attempt
     std::unique_ptr<folly::AsyncUDPSocket> secondSocket;
 
-    // Whether should write to UDP socket from the second connection
+    // Whether should write to the first UDP socket
+    bool shouldWriteToFirstSocket{true};
+
+    // Whether should write to the second UDP socket
     bool shouldWriteToSecondSocket{false};
 
     // Whether HappyEyeballs has finished

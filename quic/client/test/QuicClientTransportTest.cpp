@@ -1646,11 +1646,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.finished);
   }
 
-  void nonFatalWriteErrorOnFirstStartsSecondImmediately(
+  void nonFatalWriteErrorOnFirstBeforeSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
-
     TransportSettings settings;
     settings.continueOnNetworkUnreachable = true;
     client->setTransportSettings(settings);
@@ -1660,11 +1659,39 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     client->start(&clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    // Continue trying first socket
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
   }
 
-  void nonFatalWriteErrorOnFirstDoNotBlockSecond(
+  void fatalWriteErrorOnFirstBeforeSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+    EXPECT_CALL(*sock, write(firstAddress, _))
+        .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    EXPECT_CALL(*secondSock, write(_, _));
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    // Give up first socket
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  void nonFatalWriteErrorOnFirstAfterSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
@@ -1690,20 +1717,17 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
   }
 
-  void fatalWriteErrorBeforeSecondStart(
-      const SocketAddress& firstAddress,
-      const SocketAddress& /* unused */) {
-    EXPECT_CALL(*sock, write(firstAddress, _))
-        .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
-    EXPECT_CALL(clientConnCallback, onConnectionError(_));
-    eventbase_->loopOnce();
-  }
-
-  void fatalWriteErrorOnFirstAfterSecondStart(
+  void fatalWriteErrorOnFirstAfterSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
@@ -1726,13 +1750,56 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    EXPECT_CALL(clientConnCallback, onConnectionError(_));
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
 
-  void fatalWriteErrorOnSecondAfterSecondStart(
+  void nonFatalWriteErrorOnSecondAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire loss timeout to trigger write to both first and second
+    // socket
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _))
+        .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  void fatalWriteErrorOnSecondAfterSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
@@ -1756,9 +1823,86 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  void nonFatalWriteErrorOnBothAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire loss timeout to trigger write to both first and second
+    // socket
+    EXPECT_CALL(*sock, write(firstAddress, _))
+        .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
+    EXPECT_CALL(*secondSock, write(secondAddress, _))
+        .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  void fatalWriteErrorOnBothAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire loss timeout to trigger write to both first and second
+    // socket
+    EXPECT_CALL(*sock, write(firstAddress, _))
+        .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    EXPECT_CALL(*secondSock, write(secondAddress, _))
+        .WillOnce(SetErrnoAndReturn(EBADF, -1));
     EXPECT_CALL(clientConnCallback, onConnectionError(_));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   }
 
  protected:
@@ -1786,25 +1930,49 @@ TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV4BindFailure) {
 TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V6FirstAndV6NonFatalErrorBeforeV4Starts) {
-  nonFatalWriteErrorOnFirstStartsSecondImmediately(serverAddrV6, serverAddrV4);
+  nonFatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6FatalErrorBeforeV4Start) {
+  fatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV6, serverAddrV4);
 }
 
 TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V6FirstAndV6NonFatalErrorAfterV4Starts) {
-  nonFatalWriteErrorOnFirstDoNotBlockSecond(serverAddrV6, serverAddrV4);
+  nonFatalWriteErrorOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV6ErrorBeforeV4Start) {
-  fatalWriteErrorBeforeSecondStart(serverAddrV6, serverAddrV4);
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6FatalErrorAfterV4Start) {
+  fatalWriteErrorOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV6ErrorAfterV4Start) {
-  fatalWriteErrorOnFirstAfterSecondStart(serverAddrV6, serverAddrV4);
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV4NonFatalErrorAfterV4Start) {
+  nonFatalWriteErrorOnSecondAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV4ErrorAfterV4Start) {
-  fatalWriteErrorOnSecondAfterSecondStart(serverAddrV6, serverAddrV4);
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV4FatalErrorAfterV4Start) {
+  fatalWriteErrorOnSecondAfterSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndBothNonFatalErrorAfterV4Start) {
+  nonFatalWriteErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndBothFatalErrorAfterV4Start) {
+  fatalWriteErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
 TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinBeforeV6Start) {
@@ -1831,29 +1999,56 @@ TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4NonFatalErrorBeforeV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
-  nonFatalWriteErrorOnFirstStartsSecondImmediately(serverAddrV4, serverAddrV6);
+  nonFatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV4, serverAddrV6);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndV4FatalErrorBeforeV6Start) {
+  client->setHappyEyeballsCachedFamily(AF_INET);
+  fatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV4, serverAddrV6);
 }
 
 TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4NonFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
-  nonFatalWriteErrorOnFirstDoNotBlockSecond(serverAddrV4, serverAddrV6);
+  nonFatalWriteErrorOnFirstAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV4ErrorBeforeV6Start) {
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndV4FatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
-  fatalWriteErrorBeforeSecondStart(serverAddrV4, serverAddrV6);
+  fatalWriteErrorOnFirstAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV4ErrorAfterV6Start) {
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndV6NonFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
-  fatalWriteErrorOnFirstAfterSecondStart(serverAddrV4, serverAddrV6);
+  nonFatalWriteErrorOnSecondAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV6ErrorAfterV6Start) {
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndV6FatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
-  fatalWriteErrorOnSecondAfterSecondStart(serverAddrV4, serverAddrV6);
+  fatalWriteErrorOnSecondAfterSecondStarts(serverAddrV4, serverAddrV6);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndBothNonFatalErrorAfterV6Start) {
+  client->setHappyEyeballsCachedFamily(AF_INET);
+  nonFatalWriteErrorOnBothAfterSecondStarts(serverAddrV4, serverAddrV6);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V4FirstAndBothFatalErrorAfterV6Start) {
+  client->setHappyEyeballsCachedFamily(AF_INET);
+  fatalWriteErrorOnBothAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
 class QuicClientTransportAfterStartTest : public QuicClientTransportTest {

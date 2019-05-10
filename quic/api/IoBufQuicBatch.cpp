@@ -84,37 +84,39 @@ bool IOBufQuicBatch::flushInternal() {
     return true;
   }
 
-  auto consumed = batchWriter_->write(sock_, peerAddress_);
-  bool written = (consumed >= 0);
+  bool written = false;
+  if (happyEyeballsState_.shouldWriteToFirstSocket) {
+    auto consumed = batchWriter_->write(sock_, peerAddress_);
+    written = (consumed >= 0);
+    happyEyeballsState_.shouldWriteToFirstSocket =
+        (consumed >= 0 || isRetriableError(errno));
+  }
 
-  // If retriable error occured on first socket, kick off second socket
-  // immediately
-  // TODO I think any error on first socket should trigger this though.
-  if ((!written && isRetriableError(errno)) &&
-      happyEyeballsState_.connAttemptDelayTimeout &&
+  // If error occured on first socket, kick off second socket immediately
+  if (!written && happyEyeballsState_.connAttemptDelayTimeout &&
       happyEyeballsState_.connAttemptDelayTimeout->isScheduled()) {
     happyEyeballsState_.connAttemptDelayTimeout->cancelTimeout();
     happyEyeballsStartSecondSocket(happyEyeballsState_);
   }
 
-  // Write to second socket if there is no fatal error on first socket write
-  if ((written || isRetriableError(errno)) &&
-      happyEyeballsState_.shouldWriteToSecondSocket) {
+  if (happyEyeballsState_.shouldWriteToSecondSocket) {
     // TODO: if the errno is EMSGSIZE, and we move on with the second socket,
     // we actually miss the chance to fix our UDP packet size with the first
     // socket.
-    consumed = batchWriter_->write(
+    auto consumed = batchWriter_->write(
         *happyEyeballsState_.secondSocket,
         happyEyeballsState_.secondPeerAddress);
 
-    // written is marked false if either socket write fails
-    // This causes write loop to exit early.
-    // I am not sure if this is necessary but at least it should be OK
-    written &= (consumed >= 0);
+    // written is marked true if either socket write succeeds
+    written |= (consumed >= 0);
+    happyEyeballsState_.shouldWriteToSecondSocket =
+        (consumed >= 0 || isRetriableError(errno));
   }
 
   // TODO: handle ENOBUFS and backpressure the socket.
-  if (!written && !isRetriableError(errno)) {
+  if (!happyEyeballsState_.shouldWriteToFirstSocket &&
+      !happyEyeballsState_.shouldWriteToSecondSocket) {
+    // Both sockets becomes fatal, close connection
     int errnoCopy = errno;
     std::string errorMsg = folly::to<std::string>(
         folly::errnoStr(errnoCopy),
