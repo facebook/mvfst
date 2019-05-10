@@ -260,11 +260,13 @@ void QuicServerTransport::unbindConnection() {
     // TODO: we need a better way to solve the case that a QuicServerTransport
     // is created and added to the map, but conn.ClientConnectionId doesn't get
     // a legit value.
+    const ConnectionId* connId =
+        &(*serverConn_->serverConnIdParams->clientConnId);
+    if (conn_->clientConnectionId) {
+      connId = &(*conn_->clientConnectionId);
+    }
     routingCb->onConnectionUnbound(
-        std::make_pair(
-            getOriginalPeerAddress(),
-            conn_->clientConnectionId.value_or(
-                *serverConn_->serverConnIdParams->clientConnId)),
+        std::make_pair(getOriginalPeerAddress(), *connId),
         conn_->serverConnectionId);
   }
 }
