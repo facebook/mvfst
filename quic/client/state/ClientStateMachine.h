@@ -39,10 +39,6 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   ClientState state;
 
-  // Whether version negotiation was done. We might need to error out
-  // all the callbacks as a result.
-  bool versionNegotiationNeeded{false};
-
   // The stateless reset token sent by the server.
   folly::Optional<StatelessResetToken> statelessResetToken;
 
@@ -66,7 +62,6 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
-    supportedVersions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
     originalVersion = QuicVersion::MVFST;
     clientHandshakeLayer = new ClientHandshake(*cryptoState);
     handshakeLayer.reset(clientHandshakeLayer);
@@ -86,16 +81,10 @@ struct QuicClientStateMachine {
 };
 
 /**
- * Undos the clients state to be the original state of the client. This is
- * intended to be used in the case version negotiation or stateless retry is
- * performed.
+ * Undos the clients state to be the original state of the client.
  */
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
     std::unique_ptr<QuicClientConnectionState> conn);
-
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateForVersionMismatch(
-    std::unique_ptr<QuicClientConnectionState> conn,
-    QuicVersion /* negotiatedVersion */);
 
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     std::unique_ptr<QuicClientConnectionState> conn);

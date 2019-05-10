@@ -91,18 +91,18 @@ class CustomIntegralTransportParameter : public CustomTransportParameter {
 };
 
 struct ClientTransportParameters {
-  QuicVersion initial_version;
+  folly::Optional<QuicVersion> initial_version;
   std::vector<TransportParameter> parameters;
 };
 
 struct ServerTransportParameters {
-  QuicVersion negotiated_version;
+  folly::Optional<QuicVersion> negotiated_version;
   std::vector<QuicVersion> supported_versions;
   std::vector<TransportParameter> parameters;
 };
 
 struct TicketTransportParameters {
-  QuicVersion negotiated_version;
+  folly::Optional<QuicVersion> negotiated_version;
   std::vector<TransportParameter> parameters;
 };
 
@@ -146,7 +146,9 @@ inline fizz::Extension encodeExtension(
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
   folly::io::Appender appender(ext.extension_data.get(), 40);
-  fizz::detail::write(params.initial_version, appender);
+  if (params.initial_version) {
+    fizz::detail::write(params.initial_version.value(), appender);
+  }
   fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   return ext;
 }
@@ -157,8 +159,10 @@ inline fizz::Extension encodeExtension(
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
   folly::io::Appender appender(ext.extension_data.get(), 40);
-  fizz::detail::write(params.negotiated_version, appender);
-  fizz::detail::writeVector<uint8_t>(params.supported_versions, appender);
+  if (params.negotiated_version) {
+    fizz::detail::write(params.negotiated_version.value(), appender);
+    fizz::detail::writeVector<uint8_t>(params.supported_versions, appender);
+  }
   fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   return ext;
 }
@@ -169,7 +173,9 @@ inline fizz::Extension encodeExtension(
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
   folly::io::Appender appender(ext.extension_data.get(), 40);
-  fizz::detail::write(params.negotiated_version, appender);
+  if (params.negotiated_version) {
+    fizz::detail::write(params.negotiated_version.value(), appender);
+  }
   fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   return ext;
 }
@@ -187,7 +193,15 @@ inline folly::Optional<quic::ClientTransportParameters> getExtension(
   }
   quic::ClientTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  detail::read(parameters.initial_version, cursor);
+  folly::io::Cursor versionCursor(it->extension_data.get());
+  quic::QuicVersion tryVersion{quic::QuicVersion::MVFST_INVALID};
+  if (cursor.canAdvance(sizeof(tryVersion))) {
+    detail::read(tryVersion, versionCursor);
+  }
+  if (tryVersion == quic::QuicVersion::MVFST) {
+    parameters.initial_version = tryVersion;
+    cursor.skip(sizeof(tryVersion));
+  }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
   return std::move(parameters);
 }
@@ -201,8 +215,16 @@ inline folly::Optional<quic::ServerTransportParameters> getExtension(
   }
   quic::ServerTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  detail::read(parameters.negotiated_version, cursor);
-  detail::readVector<uint8_t>(parameters.supported_versions, cursor);
+  folly::io::Cursor versionCursor(it->extension_data.get());
+  quic::QuicVersion tryVersion{quic::QuicVersion::MVFST_INVALID};
+  if (cursor.canAdvance(sizeof(tryVersion))) {
+    detail::read(tryVersion, versionCursor);
+  }
+  if (tryVersion == quic::QuicVersion::MVFST) {
+    parameters.negotiated_version = tryVersion;
+    cursor.skip(sizeof(tryVersion));
+    detail::readVector<uint8_t>(parameters.supported_versions, cursor);
+  }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
   return std::move(parameters);
 }
@@ -216,7 +238,15 @@ inline folly::Optional<quic::TicketTransportParameters> getExtension(
   }
   quic::TicketTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  detail::read(parameters.negotiated_version, cursor);
+  folly::io::Cursor versionCursor(it->extension_data.get());
+  quic::QuicVersion tryVersion{quic::QuicVersion::MVFST_INVALID};
+  if (versionCursor.canAdvance(sizeof(tryVersion))) {
+    detail::read(tryVersion, versionCursor);
+  }
+  if (tryVersion == quic::QuicVersion::MVFST) {
+    parameters.negotiated_version = tryVersion;
+    cursor.skip(sizeof(tryVersion));
+  }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
   return std::move(parameters);
 }

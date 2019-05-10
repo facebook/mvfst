@@ -89,7 +89,7 @@ class ServerHandshakeTest : public Test {
     uint64_t initialMaxStreamDataUni = kDefaultStreamWindowSize;
     auto clientExtensions =
         std::make_shared<ClientTransportParametersExtension>(
-            getVersion(),
+            folly::none,
             initialMaxData,
             initialMaxStreamDataBidiLocal,
             initialMaxStreamDataBidiRemote,
@@ -103,7 +103,7 @@ class ServerHandshakeTest : public Test {
                 clientState, clientReadBuffer, *this, dg.get()));
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto params = std::make_shared<ServerTransportParametersExtension>(
-        getVersion(),
+        folly::none,
         supportedVersions,
         initialMaxData,
         initialMaxStreamDataBidiLocal,

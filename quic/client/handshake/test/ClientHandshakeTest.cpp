@@ -49,7 +49,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   QuicVersion getVersion() {
-    return QuicVersion::QUIC_DRAFT;
+    return QuicVersion::MVFST;
   }
 
   virtual void connect() {
@@ -59,7 +59,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
-            getVersion(),
+            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -83,7 +83,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
-            getVersion(),
+            folly::none,
             supportedVersions,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),

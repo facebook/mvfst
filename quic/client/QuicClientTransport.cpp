@@ -128,54 +128,10 @@ void QuicClientTransport::processPacketData(
     VLOG(4) << "Got version negotiation packet from peer=" << peer
             << " versions=" << std::hex << versionNegotiation->versions << " "
             << *this;
-    // TODO: move this into the state machine. Should we enforce that we only
-    // get this after we send a packet?
-    if (conn_->version) {
-      // Invalid data, just ignore this since someone might be trying to mess
-      // with the connection or this could be multiple version negotiation
-      // packets sent by the server for 0-rtt data.
-      return;
-    }
 
-    // TODO: validate that the sequence number and the all the long header
-    // fields match the one we sent in client initial.
-
-    folly::Optional<QuicVersion> negotiatedVersion;
-    for (auto& ourVersion : conn_->supportedVersions) {
-      auto it = std::find(
-          versionNegotiation->versions.begin(),
-          versionNegotiation->versions.end(),
-          ourVersion);
-      if (it != versionNegotiation->versions.end()) {
-        negotiatedVersion = *it;
-        break;
-      }
-    }
-    if (!negotiatedVersion) {
-      VLOG(4) << "Could not negotiate version, peer supports versions="
-              << std::hex << versionNegotiation->versions << " " << *this;
-      throw QuicTransportException(
-          "Could not negotiate version",
-          TransportErrorCode::VERSION_NEGOTIATION_ERROR);
-
-    } else if (*negotiatedVersion == *conn_->originalVersion) {
-      VLOG(4) << "Dropping version negotiation that lists original version";
-      QUIC_TRACE(packet_drop, *conn_, "dup_version");
-      return;
-    } else {
-      // We should treat version negotiation like even the crypto never
-      // happened.
-      conn_->version = negotiatedVersion;
-      auto released = static_cast<QuicClientConnectionState*>(conn_.release());
-      std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
-      auto tempConn = undoAllClientStateForVersionMismatch(
-          std::move(uniqueClient), *negotiatedVersion);
-      // Do not attempt zero rtt after version negotiation
-      clientConn_ = tempConn.get();
-      conn_ = std::move(tempConn);
-      startCryptoHandshake();
-      return;
-    }
+    throw QuicInternalException(
+        "Received version negotiation packet",
+        LocalErrorCode::CONNECTION_ABANDONED);
   }
 
   // TODO: handle other packet types.
@@ -597,12 +553,6 @@ void QuicClientTransport::processPacketData(
             "No server transport params",
             TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
       }
-      if (serverParams->negotiated_version !=
-          conn_->version.value_or(*conn_->originalVersion)) {
-        throw QuicTransportException(
-            "Negotiated version mismatch with version",
-            TransportErrorCode::VERSION_NEGOTIATION_ERROR);
-      }
       processServerInitialParams(
           *clientConn_, std::move(*serverParams), packetNum);
 
@@ -673,21 +623,6 @@ void QuicClientTransport::onReadData(
     return;
   }
   processUDPData(peer, std::move(networkData));
-  auto& versionNegotiationNeeded = clientConn_->versionNegotiationNeeded;
-  if (versionNegotiationNeeded) {
-    // The connection needs to be undone, so tell the app that all it's hopes
-    // and dreams are crushed.
-    versionNegotiationNeeded = false;
-    cancelAllAppCallbacks(std::make_pair(
-        QuicErrorCode(LocalErrorCode::NEW_VERSION_NEGOTIATED),
-        toString(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-    // Callbacks could trigger new events on the delivery or reset list, so
-    // abort early here so that we don't have to deal with them, since we
-    // would have already dealt with it.
-    // TODO: if 0-rtt is allowed after version negotiation, we should trigger
-    // the WriteCallbacks which have scheduled notifyPendingWrite callbacks.
-    return;
-  }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
     CHECK_NOTNULL(connCallback_)->onTransportReady();
@@ -912,9 +847,6 @@ void QuicClientTransport::startCryptoHandshake() {
     DCHECK(quicCachedPsk);
 
     auto& transportParams = quicCachedPsk->transportParams;
-    // Version match is a prerequisite of zero rtt attempt
-    DCHECK_EQ(*conn_->originalVersion, transportParams.negotiatedVersion);
-
     cacheServerInitialParams(
         transportParams.initialMaxData,
         transportParams.initialMaxStreamDataBidiLocal,

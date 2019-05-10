@@ -16,7 +16,7 @@ namespace quic {
 class ServerTransportParametersExtension : public fizz::ServerExtensions {
  public:
   ServerTransportParametersExtension(
-      QuicVersion negotiatedVersion,
+      folly::Optional<QuicVersion> negotiatedVersion,
       const std::vector<QuicVersion>& supportedVersions,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
@@ -50,6 +50,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           fizz::AlertDescription::missing_extension);
     }
     clientTransportParameters_ = std::move(clientParams);
+    if (!clientTransportParameters_->initial_version.hasValue()) {
+      negotiatedVersion_ = folly::none;
+    }
 
     std::vector<fizz::Extension> exts;
 
@@ -102,7 +105,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   }
 
  private:
-  QuicVersion negotiatedVersion_;
+  folly::Optional<QuicVersion> negotiatedVersion_;
   std::vector<QuicVersion> supportedVersions_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;

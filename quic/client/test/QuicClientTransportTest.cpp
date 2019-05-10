@@ -358,11 +358,26 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
-    client->close(folly::none);
-    eventbase_.terminateLoopSoon();
-  }));
+  if (getVersion() == QuicVersion::MVFST) {
+    EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+      ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+      client->close(folly::none);
+      eventbase_.terminateLoopSoon();
+    }));
+  } else {
+    EXPECT_CALL(clientConnCallback, onConnectionError(_))
+        .WillOnce(Invoke([&](const auto& errorCode) {
+          LOG(ERROR) << "error: " << errorCode.second;
+          EXPECT_TRUE(folly::variant_match(
+              errorCode.first,
+              [](const TransportErrorCode& err) {
+                return err == TransportErrorCode::TLS_HANDSHAKE_FAILED;
+              },
+              [](const auto&) { return false; }));
+          client->close(folly::none);
+          eventbase_.terminateLoopSoon();
+        }));
+  }
   ASSERT_EQ(client->getAppProtocol(), folly::none);
   client->start(&clientConnCallback);
   eventbase_.loopForever();
@@ -430,7 +445,11 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   expected->prependChain(data->clone());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  CHECK(client->getConn().zeroRttWriteCipher);
+  if (getVersion() == QuicVersion::MVFST) {
+    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  } else {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
@@ -477,6 +496,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       kDefaultStreamWindowSize);
 }
 
+// TODO re enable after the client stops sending old transport param version
+#if 0
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   expectTransportCallbacks();
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
@@ -485,7 +506,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   server_->setFizzContext(serverCtx);
   // This needs to be a version that's not in getVersion() but in server's
   // supported version list.
-  client->getNonConstConn().originalVersion = MVFST1;
+  client->getNonConstConn().originalVersion = QuicVersion::MVFST;
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _)).Times(0);
   client->start(&clientConnCallback);
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
@@ -508,6 +529,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
 }
+#endif
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   expectTransportCallbacks();
@@ -628,7 +650,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
                     })
                 .ensure([&] { eventbase_.terminateLoopSoon(); });
   eventbase_.loopForever();
-  std::move(f2).get(std::chrono::seconds(1));
+  std::move(f2).get(std::chrono::seconds(5));
   EXPECT_TRUE(resetRecvd);
 }
 
@@ -715,7 +737,8 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
 INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,
-    ::testing::Values(QuicVersion::MVFST, QuicVersion::QUIC_DRAFT));
+    // TODO undo when we are sufficiently rolled out past draft 18.
+    ::testing::Values(QuicVersion::MVFST/*, QuicVersion::QUIC_DRAFT*/));
 
 // Simulates a simple 1rtt handshake without needing to get any handshake bytes
 // from the server.
@@ -3162,163 +3185,6 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
   EXPECT_FALSE(destructionCallback->isDestroyed());
 }
 
-TEST_F(
-    QuicClientTransportVersionAndRetryTest,
-    VersionNegotiationPacketSupportedVersion) {
-  StreamId streamId = client->createBidirectionalStream().value();
-  StreamId streamIdNext = client->createBidirectionalStream().value();
-
-  // Artificially limit flow control window on conn and stream.
-  auto connFlowControlWindow = client->getConnectionFlowControl();
-  while (connFlowControlWindow->sendWindowAvailable != 0) {
-    StreamId randStream = client->createBidirectionalStream().value();
-    auto streamFlowControlWindow = client->getStreamFlowControl(randStream);
-    auto windowData =
-        IOBuf::create(streamFlowControlWindow->sendWindowAvailable);
-    windowData->append(streamFlowControlWindow->sendWindowAvailable);
-    client->writeChain(randStream, std::move(windowData), false, false);
-    connFlowControlWindow = client->getConnectionFlowControl();
-  }
-  loopForWrites();
-  MockReadCallback readCbNext;
-  client->setReadCallback(streamId, &readCb);
-  client->setReadCallback(streamIdNext, &readCbNext);
-
-  MockWriteCallback connWriteCb;
-  client->notifyPendingWriteOnConnection(&connWriteCb);
-
-  MockWriteCallback streamWriteCb;
-  client->notifyPendingWriteOnStream(streamId, &streamWriteCb);
-  eventbase_->loopOnce();
-
-  MockWriteCallback streamWriteCbNext;
-  client->notifyPendingWriteOnStream(streamIdNext, &streamWriteCbNext);
-
-  auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
-  loopForWrites();
-
-  std::tuple<PacketNum, PacketNum, PacketNum> previousSequenceNums{
-      client->getConn().ackStates.initialAckState.nextPacketNum,
-      client->getConn().ackStates.handshakeAckState.nextPacketNum,
-      client->getConn().ackStates.appDataAckState.nextPacketNum};
-
-  auto previousHandshakeCipher = client->getConn().initialWriteCipher.get();
-  auto packet = VersionNegotiationPacketBuilder(
-                    *client->getConn().initialDestinationConnectionId,
-                    *originalConnId,
-                    {MVFST1})
-                    .buildPacket();
-
-  // Test whether the client now uses the new version to serialize packets.
-  // This should be the crypto data.
-  std::unique_ptr<IOBuf> bytesWrittenToNetwork;
-  EXPECT_CALL(*sock, write(_, _))
-      .WillRepeatedly(Invoke(
-          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            bytesWrittenToNetwork = buf->clone();
-            return buf->computeChainDataLength();
-          }));
-
-  EXPECT_CALL(
-      connWriteCb,
-      onConnectionWriteError(IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  EXPECT_CALL(
-      streamWriteCb,
-      onStreamWriteError(
-          streamId, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  EXPECT_CALL(
-      readCb,
-      readError(streamId, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  EXPECT_CALL(
-      readCbNext,
-      readError(streamIdNext, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  EXPECT_CALL(deliveryCallback, onCanceled(streamId, write->length()));
-  EXPECT_CALL(
-      streamWriteCbNext,
-      onStreamWriteError(
-          streamIdNext, IsError(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-  deliverData(packet.second->coalesce());
-  EXPECT_EQ(*client->getConn().version, MVFST1);
-
-  // Expect that the handshake layer was re-created.
-  EXPECT_NE(client->getConn().handshakeLayer.get(), mockClientHandshake);
-  EXPECT_EQ(client->getConn().streamManager->streamCount(), 0);
-  EXPECT_EQ(client->getConn().streamManager->openPeerStreams().size(), 0);
-  EXPECT_EQ(client->getConn().streamManager->openLocalStreams().size(), 0);
-  EXPECT_EQ(client->getConn().streamManager->openLocalStreams().size(), 0);
-  EXPECT_EQ(client->getConn().streamManager->newPeerStreams().size(), 0);
-  EXPECT_EQ(client->getConn().streamManager->readableStreams().size(), 0);
-  EXPECT_FALSE(client->getConn().streamManager->hasWindowUpdates());
-  EXPECT_FALSE(client->getConn().streamManager->hasDeliverable());
-  EXPECT_EQ(client->getConn().streamManager->flowControlUpdated().size(), 0);
-  EXPECT_EQ(client->getConn().streamManager->closedStreams().size(), 0);
-  EXPECT_FALSE(client->getConn().versionNegotiationNeeded);
-  EXPECT_EQ(*client->getConn().clientConnectionId, *originalConnId);
-  EXPECT_FALSE(client->getConn().serverConnectionId.hasValue());
-  EXPECT_NE(client->getConn().readCodec.get(), nullptr);
-  EXPECT_NE(
-      client->getConn().initialWriteCipher.get(), previousHandshakeCipher);
-  // Make sure that the version negotiation extends the next sequence number.
-  std::tuple<PacketNum, PacketNum, PacketNum> currentSequenceNums{
-      client->getConn().ackStates.initialAckState.nextPacketNum,
-      client->getConn().ackStates.handshakeAckState.nextPacketNum,
-      client->getConn().ackStates.appDataAckState.nextPacketNum};
-  EXPECT_GE(currentSequenceNums, previousSequenceNums);
-
-  EXPECT_TRUE(client->getReadCallbacks().empty());
-  EXPECT_TRUE(client->getDeliveryCallbacks().empty());
-  EXPECT_EQ(client->getConnPendingWriteCallback(), nullptr);
-  EXPECT_TRUE(client->getStreamPendingWriteCallbacks().empty());
-
-  // Make sure the pending write callbacks do not run.
-  eventbase_->loopOnce();
-
-  // Test whether packets from the remote endpoint can be processed after a
-  // version negotiation
-  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  ShortHeader header(
-      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
-  ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(rstFrame, builder);
-  auto rcvPacket = packetToBuf(std::move(builder).buildPacket());
-  deliverData(rcvPacket->coalesce());
-
-  // Test whether the stream can be created now after a version negotaition.
-  client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
-      std::numeric_limits<uint32_t>::max());
-  client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
-      std::numeric_limits<uint32_t>::max());
-  StreamId streamId2 = client->createBidirectionalStream().value();
-  ASSERT_EQ(streamId2, streamId);
-
-  MockReadCallback readCb2;
-  client->setReadCallback(streamId2, &readCb2);
-
-  MockDeliveryCallback deliveryCallback2;
-  client->writeChain(
-      streamId2, write->clone(), true, false, &deliveryCallback2);
-  loopForWrites();
-
-  // Decode the packet.
-  ASSERT_TRUE(bytesWrittenToNetwork);
-
-  AckStates ackStates;
-  auto packetQueue = bufToQueue(bytesWrittenToNetwork->clone());
-  auto codecResult =
-      makeEncryptedCodec(true)->parsePacket(packetQueue, ackStates);
-  auto parsed = parseRegularQuicPacket(codecResult);
-  EXPECT_NE(parsed, nullptr);
-  auto longHeader = boost::get<LongHeader>(parsed->header);
-  EXPECT_EQ(longHeader.getVersion(), MVFST1);
-
-  EXPECT_CALL(deliveryCallback2, onCanceled(streamId, write->length()));
-  EXPECT_CALL(readCb2, readError(streamId, IsError(LocalErrorCode::NO_ERROR)));
-  client->close(folly::none);
-}
-
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   // Create a stream and attempt to send some data to the server
   StreamId streamId = *client->createBidirectionalStream();
@@ -3399,8 +3265,7 @@ TEST_F(
                     .buildPacket();
   EXPECT_CALL(
       readCb,
-      readError(
-          streamId, IsError(TransportErrorCode::VERSION_NEGOTIATION_ERROR)));
+      readError(streamId, IsError(LocalErrorCode::CONNECTION_ABANDONED)));
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, write->length()));
   EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
 
@@ -3426,7 +3291,7 @@ TEST_F(
                     *originalConnId,
                     {QuicVersion::MVFST})
                     .buildPacket();
-  EXPECT_NO_THROW(deliverData(packet.second->coalesce()));
+  EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
   client->close(folly::none);
 }
 

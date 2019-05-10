@@ -254,13 +254,18 @@ void QuicTransportBase::closeImpl(
   } else if (errorCode) {
     cancelCode = *errorCode;
   }
-  bool isReset = folly::variant_match(
+  bool isReset = false;
+  bool isAbandon = false;
+  folly::variant_match(
       cancelCode.first,
-      [](const LocalErrorCode& err) {
-        return err == LocalErrorCode::CONNECTION_RESET;
+      [&](const LocalErrorCode& err) {
+        isReset = err == LocalErrorCode::CONNECTION_RESET;
+        isAbandon = err == LocalErrorCode::CONNECTION_ABANDONED;
       },
-      [](const auto&) { return false; });
+      [](const auto&) {});
   VLOG_IF(4, isReset) << "Closing transport due to stateless reset " << *this;
+  VLOG_IF(4, isAbandon) << "Closing transport due to abandoned connection "
+                        << *this;
   cancelLossTimeout();
   if (ackTimeout_.isScheduled()) {
     ackTimeout_.cancelTimeout();
@@ -330,7 +335,7 @@ void QuicTransportBase::closeImpl(
   // We don't need no congestion control.
   conn_->congestionController = nullptr;
 
-  sendCloseImmediately &= !isReset;
+  sendCloseImmediately = sendCloseImmediately && !isReset && !isAbandon;
   if (sendCloseImmediately) {
     // We might be invoked from the destructor, so just send the connection
     // close directly.
@@ -341,7 +346,7 @@ void QuicTransportBase::closeImpl(
       LOG(ERROR) << "close threw exception " << ex.what() << " " << *this;
     }
   }
-  drainConnection &= !isReset;
+  drainConnection = drainConnection && !isReset && !isAbandon;
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
     DCHECK(!drainTimeout_.isScheduled());

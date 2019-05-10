@@ -21,7 +21,7 @@ namespace quic {
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
     std::unique_ptr<QuicClientConnectionState> conn) {
   // Create a new connection state and copy over properties that don't change
-  // across version negotiation or stateless retry.
+  // across stateless retry.
   auto newConn = std::make_unique<QuicClientConnectionState>();
   newConn->clientConnectionId = conn->clientConnectionId;
   newConn->initialDestinationConnectionId =
@@ -46,14 +46,6 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
   newConn->readCodec->setCodecParameters(
       CodecParameters(conn->peerAckDelayExponent));
-  return newConn;
-}
-
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateForVersionMismatch(
-    std::unique_ptr<QuicClientConnectionState> conn,
-    QuicVersion /* negotiatedVersion */) {
-  auto newConn = undoAllClientStateCommon(std::move(conn));
-  newConn->versionNegotiationNeeded = true;
   return newConn;
 }
 

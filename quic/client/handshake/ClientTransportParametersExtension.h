@@ -16,7 +16,7 @@ namespace quic {
 class ClientTransportParametersExtension : public fizz::ClientExtensions {
  public:
   ClientTransportParametersExtension(
-      QuicVersion initialVersion,
+      folly::Optional<QuicVersion> initialVersion,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
@@ -91,7 +91,7 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
   }
 
  private:
-  QuicVersion initialVersion_;
+  folly::Optional<QuicVersion> initialVersion_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;
