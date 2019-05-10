@@ -114,8 +114,10 @@ void processServerInitialParams(
   // TODO Make idleTimeout disableable via transport parameter.
   conn.streamManager->setMaxLocalBidirectionalStreams(
       maxStreamsBidi.value_or(0));
+  conn.peerAdvertisedInitialMaxStreamsBidi = maxStreamsBidi.value_or(0);
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       maxStreamsUni.value_or(0));
+  conn.peerAdvertisedInitialMaxStreamsUni = maxStreamsUni.value_or(0);
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
     throw QuicTransportException(
@@ -154,19 +156,22 @@ void processServerInitialParams(
 void updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
     const CachedServerTransportParameters& transportParams) {
+  conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
+  if (conn.transportSettings.canIgnorePathMTU) {
+    conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
+  }
+  conn.flowControlState.peerAdvertisedMaxOffset =
+      transportParams.initialMaxData;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
       transportParams.initialMaxStreamDataBidiLocal;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
       transportParams.initialMaxStreamDataBidiRemote;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       transportParams.initialMaxStreamDataUni;
-  conn.flowControlState.peerAdvertisedMaxOffset =
-      transportParams.initialMaxData;
-  conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
-  if (conn.transportSettings.canIgnorePathMTU) {
-    conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
-  }
-  conn.peerAckDelayExponent = transportParams.ackDelayExponent;
+  conn.streamManager->setMaxLocalBidirectionalStreams(
+      transportParams.initialMaxStreamsBidi);
+  conn.streamManager->setMaxLocalUnidirectionalStreams(
+      transportParams.initialMaxStreamsUni);
 }
 
 void ClientInvalidStateHandler(QuicClientConnectionState& state) {

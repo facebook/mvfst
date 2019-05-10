@@ -50,6 +50,12 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 
   ClientHandshake* clientHandshakeLayer;
 
+  // Save the server transport params here so that client can access the value
+  // when it wants to write the values to psk cache
+  // TODO Save TicketTransportParams here instead of in QuicClientTransport
+  uint64_t peerAdvertisedInitialMaxStreamsBidi{0};
+  uint64_t peerAdvertisedInitialMaxStreamsUni{0};
+
   // Packet number in which client initial was sent. Receipt of data on the
   // crypto stream from the server can implicitly ack the client initial packet.
   // TODO: use this to get rid of the data in the crypto stream.

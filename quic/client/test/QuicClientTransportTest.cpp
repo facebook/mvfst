@@ -186,10 +186,6 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
     client->addNewPeerAddress(serverAddr);
     pskCache_ = std::make_shared<BasicQuicPskCache>();
     client->setPskCache(pskCache_);
-    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
-    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
   }
 
   QuicVersion getVersion() {
@@ -230,7 +226,6 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
   }
 
   void expectTransportCallbacks() {
-    EXPECT_CALL(clientConnCallback, onTransportReady());
     EXPECT_CALL(clientConnCallback, onReplaySafe());
   }
 
@@ -334,6 +329,13 @@ void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
 TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   expectTransportCallbacks();
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -344,9 +346,15 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
 TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   expectTransportCallbacks();
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   client->setStreamFlowControlWindow(streamId, 1024);
-
   // TODO: change this once we negotiate the flow control window.
   auto data = IOBuf::create(kDefaultStreamWindowSize * 4);
   data->append(kDefaultStreamWindowSize * 4);
@@ -406,6 +414,13 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   settings.connectUDP = true;
   client->setTransportSettings(settings);
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -414,9 +429,6 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
-    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
-  }));
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
   pskCache_->putPsk(hostname, cachedPsk);
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
@@ -439,6 +451,17 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    CHECK(client->getConn().zeroRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->good());
+  EXPECT_FALSE(client->replaySafe());
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -475,6 +498,18 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
   client->serverInitialParamsSet() = false;
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    CHECK(client->getConn().zeroRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->good());
+  EXPECT_FALSE(client->replaySafe());
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -511,6 +546,14 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   client->start(&clientConnCallback);
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
   EXPECT_FALSE(client->serverInitialParamsSet());
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -540,7 +583,14 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   client->getNonConstConn().transportSettings.attemptEarlyData = false;
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _)).Times(0);
   client->start(&clientConnCallback);
-  CHECK(!client->getConn().zeroRttWriteCipher);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -569,7 +619,14 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _))
       .WillOnce(Return(false));
   client->start(&clientConnCallback);
-  CHECK(!client->getConn().zeroRttWriteCipher);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -594,6 +651,13 @@ TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
   folly::ScopedEventBaseThread newEvb;
   expectTransportCallbacks();
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -627,6 +691,13 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
   };
 
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -666,6 +737,13 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest) {
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -686,6 +764,13 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest2) {
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -706,6 +791,13 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest3) {
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -726,6 +818,13 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
   auto streamId = client->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
@@ -3986,8 +4085,10 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
-        quicCachedPsk.transportParams.ackDelayExponent =
-            kDefaultAckDelayExponent;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
@@ -4032,8 +4133,10 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
-        quicCachedPsk.transportParams.ackDelayExponent =
-            kDefaultAckDelayExponent;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
@@ -4075,8 +4178,10 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
-        quicCachedPsk.transportParams.ackDelayExponent =
-            kDefaultAckDelayExponent;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
@@ -4111,8 +4216,10 @@ TEST_F(
         quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
         quicCachedPsk.transportParams.maxRecvPacketSize =
             kDefaultUDPReadBufferSize;
-        quicCachedPsk.transportParams.ackDelayExponent =
-            kDefaultAckDelayExponent;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));

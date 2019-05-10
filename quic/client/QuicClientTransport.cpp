@@ -906,16 +906,19 @@ void QuicClientTransport::onNewCachedPsk(
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
 
   quicCachedPsk.transportParams.negotiatedVersion = *conn_->version;
+  quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
+  quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
+  quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
       peerAdvertisedInitialMaxStreamDataBidiLocal_;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
       peerAdvertisedInitialMaxStreamDataBidiRemote_;
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
       peerAdvertisedInitialMaxStreamDataUni_;
-  quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;
-  quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
-  quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
-  quicCachedPsk.transportParams.ackDelayExponent = conn_->peerAckDelayExponent;
+  quicCachedPsk.transportParams.initialMaxStreamsBidi =
+      clientConn_->peerAdvertisedInitialMaxStreamsBidi;
+  quicCachedPsk.transportParams.initialMaxStreamsUni =
+      clientConn_->peerAdvertisedInitialMaxStreamsUni;
 
   auto appParams = CHECK_NOTNULL(connCallback_)->serializeEarlyDataAppParams();
   if (appParams) {
