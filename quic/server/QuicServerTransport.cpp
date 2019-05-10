@@ -123,7 +123,7 @@ void QuicServerTransport::accept() {
       evb_,
       ctx_,
       this,
-      std::make_unique<DefaultAppTokenValidator>(serverConn_, connCallback_));
+      std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
 void QuicServerTransport::writeData() {
@@ -363,13 +363,14 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
         *conn_->version,
+        conn_->transportSettings.idleTimeout.count(),
+        conn_->transportSettings.maxRecvPacketSize,
+        conn_->transportSettings.advertisedInitialConnectionWindowSize,
         conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
         conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
         conn_->transportSettings.advertisedInitialUniStreamWindowSize,
-        conn_->transportSettings.advertisedInitialConnectionWindowSize,
-        conn_->transportSettings.idleTimeout.count(),
-        conn_->transportSettings.maxRecvPacketSize,
-        conn_->transportSettings.ackDelayExponent);
+        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<uint32_t>::max());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     // If a client connects to server for the first time and doesn't attempt
     // early data, tokenSourceAddresses will not be set because

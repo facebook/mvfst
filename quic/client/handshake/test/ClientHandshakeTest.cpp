@@ -89,6 +89,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
+            std::numeric_limits<uint32_t>::max(),
+            std::numeric_limits<uint32_t>::max(),
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,

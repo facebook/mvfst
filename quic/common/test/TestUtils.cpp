@@ -196,13 +196,14 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
         cachedPsk_.transportParams.negotiatedVersion,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultConnectionWindowSize,
         kDefaultIdleTimeout.count(),
         kDefaultUDPReadBufferSize,
-        kDefaultAckDelayExponent);
+        kDefaultConnectionWindowSize,
+        kDefaultStreamWindowSize,
+        kDefaultStreamWindowSize,
+        kDefaultStreamWindowSize,
+        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<uint32_t>::max());
     resState.appToken = encodeAppToken(appToken);
     return resState;
   }

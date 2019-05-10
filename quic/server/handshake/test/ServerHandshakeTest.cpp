@@ -109,6 +109,8 @@ class ServerHandshakeTest : public Test {
         initialMaxStreamDataBidiLocal,
         initialMaxStreamDataBidiRemote,
         initialMaxStreamDataUni,
+        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<uint32_t>::max(),
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,

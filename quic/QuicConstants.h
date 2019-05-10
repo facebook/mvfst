@@ -363,7 +363,7 @@ constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState =
 
 constexpr uint32_t kMaxNumMigrationsAllowed = 6;
 
-constexpr auto kExpectedNumOfParamsInTheTicket = 7;
+constexpr auto kExpectedNumOfParamsInTheTicket = 8;
 
 // default capability of QUIC partial reliability
 constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;
