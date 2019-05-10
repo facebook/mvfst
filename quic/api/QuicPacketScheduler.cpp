@@ -33,14 +33,15 @@ quic::StreamFrameMetaData makeStreamFrameMetaDataFromStreamBuffer(
 namespace quic {
 
 bool hasAcksToSchedule(const AckState& ackState) {
-  if (ackState.acks.empty()) {
+  folly::Optional<PacketNum> largestAckSend = largestAckToSend(ackState);
+  if (!largestAckSend) {
     return false;
   }
   if (!ackState.largestAckScheduled) {
     // Never scheduled an ack, we need to send
     return true;
   }
-  return *largestAckToSend(ackState) > *(ackState.largestAckScheduled);
+  return *largestAckSend > *(ackState.largestAckScheduled);
 }
 
 bool neverWrittenAcksBefore(const QuicConnectionStateBase& conn) {
