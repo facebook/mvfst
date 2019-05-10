@@ -24,6 +24,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/handshake/TransportParameters.h>
+#include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 #include <quic/state/test/Mocks.h>
@@ -1491,6 +1492,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(clientConnCallback, onTransportReady());
     EXPECT_CALL(clientConnCallback, onReplaySafe());
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, pauseRead());
+    EXPECT_CALL(*secondSock, close());
     performFakeHandshake(firstAddress);
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
     EXPECT_TRUE(conn.happyEyeballsState.finished);
@@ -1556,6 +1559,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
           return buf->computeChainDataLength();
         }));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, pauseRead());
+    EXPECT_CALL(*secondSock, close());
     performFakeHandshake(firstAddress);
     EXPECT_TRUE(conn.happyEyeballsState.finished);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
@@ -1615,6 +1620,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(clientConnCallback, onTransportReady());
     EXPECT_CALL(clientConnCallback, onReplaySafe());
     EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*sock, pauseRead());
+    EXPECT_CALL(*sock, close());
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -1676,6 +1683,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     auto& conn = client->getConn();
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    // Socket is closed once during happy eyeballs
+    // Socket is closed for the second time when QuicClientTransport dies
+    EXPECT_CALL(*sock, pauseRead()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(2);
     EXPECT_CALL(*secondSock, write(_, _));
     client->start(&clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
@@ -1750,6 +1761,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     // socket
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    // Socket is closed once during happy eyeballs
+    // Socket is closed for the second time when QuicClientTransport dies
+    EXPECT_CALL(*sock, pauseRead()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(2);
     EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
@@ -1823,6 +1838,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
+    // Socket is closed once during happy eyeballs
+    // Socket is closed for the second time when QuicClientTransport dies
+    EXPECT_CALL(*secondSock, pauseRead()).Times(2);
+    EXPECT_CALL(*secondSock, close()).Times(2);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
 
@@ -4327,6 +4346,42 @@ TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
           .largestReceivedPacketNum,
       largestReceivedPacketNum);
+}
+
+TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
+  class EmptyReadCallback : public AsyncUDPSocket::ReadCallback {
+   public:
+    void getReadBuffer(void**, size_t*) noexcept override {}
+    void onDataAvailable(
+        const folly::SocketAddress&,
+        size_t,
+        bool) noexcept override {}
+    void onReadError(const AsyncSocketException&) noexcept override {}
+    void onReadClosed() noexcept override {}
+  };
+
+  class EmptyErrMessageCallback : public AsyncUDPSocket::ErrMessageCallback {
+   public:
+    void errMessage(const cmsghdr&) noexcept override {}
+    void errMessageError(const AsyncSocketException&) noexcept override {}
+  };
+
+  EventBase evb;
+  AsyncUDPSocket socket(&evb);
+  TransportSettings transportSettings;
+  EmptyErrMessageCallback errMessageCallback;
+  EmptyReadCallback readCallback;
+  happyEyeballsSetUpSocket(
+      socket,
+      folly::SocketAddress("127.0.0.1", 12345),
+      transportSettings,
+      &errMessageCallback,
+      &readCallback);
+
+  socket.pauseRead();
+  socket.close();
+  socket.pauseRead();
+  socket.close();
 }
 } // namespace test
 } // namespace quic

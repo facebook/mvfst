@@ -90,6 +90,11 @@ bool IOBufQuicBatch::flushInternal() {
     written = (consumed >= 0);
     happyEyeballsState_.shouldWriteToFirstSocket =
         (consumed >= 0 || isRetriableError(errno));
+
+    if (!happyEyeballsState_.shouldWriteToFirstSocket) {
+      sock_.pauseRead();
+      sock_.close();
+    }
   }
 
   // If error occured on first socket, kick off second socket immediately
@@ -111,6 +116,10 @@ bool IOBufQuicBatch::flushInternal() {
     written |= (consumed >= 0);
     happyEyeballsState_.shouldWriteToSecondSocket =
         (consumed >= 0 || isRetriableError(errno));
+    if (!happyEyeballsState_.shouldWriteToSecondSocket) {
+      happyEyeballsState_.secondSocket->pauseRead();
+      happyEyeballsState_.secondSocket->close();
+    }
   }
 
   // TODO: handle ENOBUFS and backpressure the socket.

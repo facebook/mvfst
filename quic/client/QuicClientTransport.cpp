@@ -61,6 +61,12 @@ QuicClientTransport::~QuicClientTransport() {
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from client destructor")),
       false);
+
+  if (conn_->happyEyeballsState.secondSocket) {
+    auto sock = std::move(conn_->happyEyeballsState.secondSocket);
+    sock->pauseRead();
+    sock->close();
+  }
 }
 
 void QuicClientTransport::processUDPData(
