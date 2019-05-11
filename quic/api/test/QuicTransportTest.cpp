@@ -1189,7 +1189,7 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   NewConnectionIdFrame newConnId(
       1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
-  conn.pendingEvents.frames.push_back(newConnId);
+  sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
 
@@ -1222,7 +1222,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
 
   NewConnectionIdFrame newConnId(
       1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
-  conn.pendingEvents.frames.push_back(newConnId);
+  sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
 
@@ -1272,6 +1272,30 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
                    }) != p.packet.frames.end();
       });
   EXPECT_EQ(numNewConnIdPackets, 3);
+}
+
+TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
+  auto& conn = transport_->getConnectionState();
+
+  NewConnectionIdFrame newConnId(
+      1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  sendSimpleFrame(conn, newConnId);
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  auto packet =
+      getLastOutstandingPacket(
+          transport_->getConnectionState(), PacketNumberSpace::AppData)
+          ->packet;
+
+  EXPECT_TRUE(conn.pendingEvents.frames.empty());
+  markPacketLoss(conn, packet, false, 2);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  EXPECT_TRUE(folly::variant_match(
+      conn.pendingEvents.frames.front(),
+      [&](NewConnectionIdFrame& f) { return f == newConnId; },
+      [&](auto&) { return false; }));
 }
 
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {

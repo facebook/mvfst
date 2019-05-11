@@ -121,8 +121,8 @@ void updateSimpleFrameOnPacketLoss(
       [&](const PathResponseFrame& frame) {
         conn.pendingEvents.frames.push_back(frame);
       },
-      [&](const NewConnectionIdFrame&) {
-        // TODO junqiw
+      [&](const NewConnectionIdFrame& frame) {
+        conn.pendingEvents.frames.push_back(frame);
       });
 }
 
