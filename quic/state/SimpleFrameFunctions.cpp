@@ -58,6 +58,10 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       },
       [&](const PathResponseFrame& frame) -> folly::Optional<QuicSimpleFrame> {
         return QuicSimpleFrame(frame);
+      },
+      [&](const NewConnectionIdFrame&) -> folly::Optional<QuicSimpleFrame> {
+        // TODO junqiw
+        return folly::none;
       });
 }
 
@@ -116,6 +120,9 @@ void updateSimpleFrameOnPacketLoss(
       },
       [&](const PathResponseFrame& frame) {
         conn.pendingEvents.frames.push_back(frame);
+      },
+      [&](const NewConnectionIdFrame&) {
+        // TODO junqiw
       });
 }
 
@@ -163,6 +170,10 @@ bool updateSimpleFrameOnPacketReceived(
         conn.outstandingPathValidation = folly::none;
         conn.pendingEvents.schedulePathValidationTimeout = false;
         conn.writableBytesLimit = folly::none;
+        return false;
+      },
+      [&](const NewConnectionIdFrame&) {
+        // TODO junqiw
         return false;
       });
 }
