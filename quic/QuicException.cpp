@@ -109,6 +109,8 @@ std::string toString(LocalErrorCode code) {
       return "Invalid operation";
     case LocalErrorCode::STREAM_LIMIT_EXCEEDED:
       return "Stream limit exceeded";
+    case LocalErrorCode::CONNECTION_ABANDONED:
+      return "Connection abandoned";
   }
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";

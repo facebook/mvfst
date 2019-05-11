@@ -123,7 +123,7 @@ void QuicServerTransport::accept() {
       evb_,
       ctx_,
       this,
-      std::make_unique<DefaultAppTokenValidator>(serverConn_, connCallback_));
+      std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
 void QuicServerTransport::writeData() {
@@ -260,11 +260,13 @@ void QuicServerTransport::unbindConnection() {
     // TODO: we need a better way to solve the case that a QuicServerTransport
     // is created and added to the map, but conn.ClientConnectionId doesn't get
     // a legit value.
+    const ConnectionId* connId =
+        &(*serverConn_->serverConnIdParams->clientConnId);
+    if (conn_->clientConnectionId) {
+      connId = &(*conn_->clientConnectionId);
+    }
     routingCb->onConnectionUnbound(
-        std::make_pair(
-            getOriginalPeerAddress(),
-            conn_->clientConnectionId.value_or(
-                *serverConn_->serverConnIdParams->clientConnId)),
+        std::make_pair(getOriginalPeerAddress(), *connId),
         conn_->serverConnectionId);
   }
 }
@@ -361,13 +363,14 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
         *conn_->version,
+        conn_->transportSettings.idleTimeout.count(),
+        conn_->transportSettings.maxRecvPacketSize,
+        conn_->transportSettings.advertisedInitialConnectionWindowSize,
         conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
         conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
         conn_->transportSettings.advertisedInitialUniStreamWindowSize,
-        conn_->transportSettings.advertisedInitialConnectionWindowSize,
-        conn_->transportSettings.idleTimeout.count(),
-        conn_->transportSettings.maxRecvPacketSize,
-        conn_->transportSettings.ackDelayExponent);
+        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<uint32_t>::max());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     // If a client connects to server for the first time and doesn't attempt
     // early data, tokenSourceAddresses will not be set because

@@ -21,6 +21,7 @@ import zipfile
 
 from .copytree import prefetch_dir_if_eden
 from .envfuncs import Env
+from .errors import TransientFailure
 from .platform import is_windows
 from .runcmd import run_cmd
 
@@ -387,17 +388,17 @@ class ShipitPathMap(object):
         # may legitimately need to keep some state in the source tree :-/
         installed_name = os.path.join(dest_root, ".shipit_shipped")
         if os.path.exists(installed_name):
-            with open(installed_name, "r") as f:
-                for name in f.readlines():
+            with open(installed_name, "rb") as f:
+                for name in f.read().decode("utf-8").splitlines():
                     name = name.strip()
                     if name not in full_file_list:
                         print("Remove %s" % name)
                         os.unlink(name)
                         change_status.record_change(name)
 
-        with open(installed_name, "w") as f:
+        with open(installed_name, "wb") as f:
             for name in sorted(list(full_file_list)):
-                f.write("%s\n" % name)
+                f.write(("%s\n" % name).encode("utf-8"))
 
         return change_status
 
@@ -548,7 +549,13 @@ def download_url_to_file_with_progress(url, file_name):
 
     progress = Progress()
     start = time.time()
-    (_filename, headers) = urlretrieve(url, file_name, reporthook=progress.progress)
+    try:
+        (_filename, headers) = urlretrieve(url, file_name, reporthook=progress.progress)
+    except OSError as exc:
+        raise TransientFailure(
+            "Failed to download %s to %s: %s" % (url, file_name, str(exc))
+        )
+
     end = time.time()
     sys.stdout.write(" [Complete in %f seconds]\n" % (end - start))
     sys.stdout.flush()

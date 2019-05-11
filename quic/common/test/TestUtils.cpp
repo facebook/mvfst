@@ -196,13 +196,14 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
         cachedPsk_.transportParams.negotiatedVersion,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultStreamWindowSize,
-        kDefaultConnectionWindowSize,
         kDefaultIdleTimeout.count(),
         kDefaultUDPReadBufferSize,
-        kDefaultAckDelayExponent);
+        kDefaultConnectionWindowSize,
+        kDefaultStreamWindowSize,
+        kDefaultStreamWindowSize,
+        kDefaultStreamWindowSize,
+        std::numeric_limits<uint32_t>::max(),
+        std::numeric_limits<uint32_t>::max());
     resState.appToken = encodeAppToken(appToken);
     return resState;
   }
@@ -255,16 +256,19 @@ QuicCachedPsk setupZeroRttOnClientCtx(
   psk.maxEarlyDataSize = 2;
 
   quicCachedPsk.transportParams.negotiatedVersion = version;
+  quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
+  quicCachedPsk.transportParams.maxRecvPacketSize = kDefaultUDPReadBufferSize;
+  quicCachedPsk.transportParams.initialMaxData = kDefaultConnectionWindowSize;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
       kDefaultStreamWindowSize;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
       kDefaultStreamWindowSize;
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
       kDefaultStreamWindowSize;
-  quicCachedPsk.transportParams.initialMaxData = kDefaultConnectionWindowSize;
-  quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
-  quicCachedPsk.transportParams.maxRecvPacketSize = kDefaultUDPReadBufferSize;
-  quicCachedPsk.transportParams.ackDelayExponent = kDefaultAckDelayExponent;
+  quicCachedPsk.transportParams.initialMaxStreamsBidi =
+      std::numeric_limits<uint32_t>::max();
+  quicCachedPsk.transportParams.initialMaxStreamsUni =
+      std::numeric_limits<uint32_t>::max();
   return quicCachedPsk;
 }
 

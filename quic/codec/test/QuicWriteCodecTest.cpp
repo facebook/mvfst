@@ -1294,16 +1294,16 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 27);
-  auto resultNewConnIdFrame =
-      boost::get<NewConnectionIdFrame>(regularPacket.frames[0]);
+  auto resultNewConnIdFrame = boost::get<NewConnectionIdFrame>(
+      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
   EXPECT_EQ(resultNewConnIdFrame.sequence, 1);
   EXPECT_EQ(resultNewConnIdFrame.connectionId, getTestConnectionId());
   EXPECT_EQ(resultNewConnIdFrame.token, token);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
-  auto wireNewConnIdFrame =
-      boost::get<NewConnectionIdFrame>(parseQuicFrame(cursor));
+  auto wireNewConnIdFrame = boost::get<NewConnectionIdFrame>(
+      boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
   EXPECT_EQ(1, wireNewConnIdFrame.sequence);
   EXPECT_EQ(getTestConnectionId(), wireNewConnIdFrame.connectionId);
   EXPECT_TRUE(cursor.isAtEnd());

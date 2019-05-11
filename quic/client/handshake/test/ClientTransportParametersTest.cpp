@@ -32,7 +32,7 @@ static EncryptedExtensions getEncryptedExtensions() {
 
 TEST(ClientTransportParametersTest, TestGetChloExtensions) {
   ClientTransportParametersExtension ext(
-      MVFST1,
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -97,7 +97,7 @@ TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
   customTransportParameters.push_back(element3->encode());
 
   ClientTransportParametersExtension ext(
-      MVFST1,
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,

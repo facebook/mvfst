@@ -3180,11 +3180,18 @@ class QuicServerTransportHandshakeTest
               server->getConn()
                   .transportSettings.advertisedInitialUniStreamWindowSize);
 
-          auto ackDelayExponent = getIntegerParameter(
-              TransportParameterId::ack_delay_exponent, params);
+          auto initialMaxStreamsBidi = *getIntegerParameter(
+              TransportParameterId::initial_max_streams_bidi, params);
+          auto initialMaxStreamsUni = *getIntegerParameter(
+              TransportParameterId::initial_max_streams_uni, params);
           EXPECT_EQ(
-              ackDelayExponent,
-              server->getConn().transportSettings.ackDelayExponent);
+              initialMaxStreamsBidi,
+              server->getConn()
+                  .transportSettings.advertisedInitialMaxStreamsBidi);
+          EXPECT_EQ(
+              initialMaxStreamsUni,
+              server->getConn()
+                  .transportSettings.advertisedInitialMaxStreamsUni);
 
           auto maxRecvPacketSize = *getIntegerParameter(
               TransportParameterId::max_packet_size, params);

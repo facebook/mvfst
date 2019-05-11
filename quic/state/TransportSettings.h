@@ -21,6 +21,9 @@ struct TransportSettings {
   uint64_t advertisedInitialBidiRemoteStreamWindowSize{
       kDefaultStreamWindowSize};
   uint64_t advertisedInitialUniStreamWindowSize{kDefaultStreamWindowSize};
+  uint64_t advertisedInitialMaxStreamsBidi{
+      std::numeric_limits<uint32_t>::max()};
+  uint64_t advertisedInitialMaxStreamsUni{std::numeric_limits<uint32_t>::max()};
   // Maximum number of packets to buffer while cipher is unavailable.
   uint32_t maxPacketsToBuffer{kDefaultMaxBufferedPackets};
   // Idle timeout to advertise to the peer.

@@ -22,11 +22,13 @@ using namespace quic;
 namespace quic {
 namespace test {
 
-static ClientHello getClientHello() {
+static ClientHello getClientHello(folly::Optional<QuicVersion> initialVersion) {
   auto chlo = TestMessages::clientHello();
 
   ClientTransportParameters clientParams;
-  clientParams.initial_version = QuicVersion::MVFST;
+  clientParams.initial_version = initialVersion;
+  clientParams.parameters.emplace_back(
+      CustomIntegralTransportParameter(0xffff, 0xffff).encode());
 
   chlo.extensions.push_back(encodeExtension(std::move(clientParams)));
 
@@ -41,15 +43,40 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
+      std::numeric_limits<uint32_t>::max(),
+      std::numeric_limits<uint32_t>::max(),
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       kDefaultPartialReliability);
-  auto extensions = ext.getExtensions(getClientHello());
+  auto extensions = ext.getExtensions(getClientHello(folly::none));
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
   EXPECT_TRUE(serverParams.hasValue());
+  EXPECT_FALSE(serverParams->negotiated_version.hasValue());
+}
+
+TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
+  ServerTransportParametersExtension ext(
+      QuicVersion::MVFST,
+      {MVFST1, QuicVersion::MVFST},
+      kDefaultConnectionWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultStreamWindowSize,
+      std::numeric_limits<uint32_t>::max(),
+      std::numeric_limits<uint32_t>::max(),
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      kDefaultUDPSendPacketLen,
+      kDefaultPartialReliability);
+  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
+
+  EXPECT_EQ(extensions.size(), 1);
+  auto serverParams = getExtension<ServerTransportParameters>(extensions);
+  EXPECT_TRUE(serverParams.hasValue());
+  EXPECT_TRUE(serverParams->negotiated_version.hasValue());
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
@@ -60,6 +87,8 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
+      std::numeric_limits<uint32_t>::max(),
+      std::numeric_limits<uint32_t>::max(),
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,

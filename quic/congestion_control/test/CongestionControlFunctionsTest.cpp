@@ -24,13 +24,21 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   std::chrono::microseconds rtt(1000 * 100);
-  auto result =
-      calculatePacingRate(conn, 50, std::chrono::milliseconds(10), rtt);
+  auto result = calculatePacingRate(
+      conn,
+      50,
+      conn.transportSettings.minCwndInMss,
+      std::chrono::milliseconds(10),
+      rtt);
   EXPECT_EQ(std::chrono::milliseconds(10), result.first);
   EXPECT_EQ(5, result.second);
 
-  auto result2 =
-      calculatePacingRate(conn, 300, std::chrono::milliseconds(1), rtt);
+  auto result2 = calculatePacingRate(
+      conn,
+      300,
+      conn.transportSettings.minCwndInMss,
+      std::chrono::milliseconds(1),
+      rtt);
   EXPECT_EQ(std::chrono::milliseconds(1), result2.first);
   EXPECT_EQ(3, result2.second);
 }
@@ -41,6 +49,7 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   auto result = calculatePacingRate(
       conn,
       100,
+      conn.transportSettings.minCwndInMss,
       std::chrono::milliseconds(1),
       std::chrono::microseconds(1000 * 100));
   EXPECT_EQ(std::chrono::milliseconds(2), result.first);
@@ -53,6 +62,7 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   auto result = calculatePacingRate(
       conn,
       10,
+      conn.transportSettings.minCwndInMss,
       std::chrono::milliseconds(1),
       std::chrono::microseconds(1000 * 100));
   EXPECT_EQ(std::chrono::milliseconds(20), result.first);
@@ -63,7 +73,11 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
-      conn, 10, std::chrono::milliseconds(10), std::chrono::milliseconds(1));
+      conn,
+      10,
+      conn.transportSettings.minCwndInMss,
+      std::chrono::milliseconds(10),
+      std::chrono::milliseconds(1));
   EXPECT_EQ(std::chrono::milliseconds::zero(), result.first);
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit, result.second);

@@ -158,6 +158,7 @@ enum class LocalErrorCode : uint32_t {
   PACKET_NUMBER_ENCODING = 0x40000016,
   INVALID_OPERATION = 0x40000017,
   STREAM_LIMIT_EXCEEDED = 0x40000018,
+  CONNECTION_ABANDONED = 0x40000019,
 };
 
 using QuicErrorCode =
@@ -362,7 +363,7 @@ constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState =
 
 constexpr uint32_t kMaxNumMigrationsAllowed = 6;
 
-constexpr auto kExpectedNumOfParamsInTheTicket = 7;
+constexpr auto kExpectedNumOfParamsInTheTicket = 8;
 
 // default capability of QUIC partial reliability
 constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;

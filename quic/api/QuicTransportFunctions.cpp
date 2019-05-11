@@ -353,8 +353,11 @@ void updateConnection(
     auto writableBytes = conn.congestionController->getWritableBytes();
     bool cwndBlocked = writableBytes < kBlockedSizeBytes;
     if (cwndBlocked) {
-      auto cwndBytes = conn.congestionController->getCongestionWindow();
-      QUIC_TRACE(cwnd_may_block, conn, writableBytes, cwndBytes);
+      QUIC_TRACE(
+          cwnd_may_block,
+          conn,
+          writableBytes,
+          conn.congestionController->getCongestionWindow());
     }
   }
   if (pkt.isHandshake) {

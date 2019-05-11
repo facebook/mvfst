@@ -23,15 +23,12 @@ struct QuicServerConnectionState;
 
 class DefaultAppTokenValidator : public fizz::server::AppTokenValidator {
  public:
-  explicit DefaultAppTokenValidator(
-      QuicServerConnectionState* conn,
-      QuicSocket::ConnectionCallback* connCallback);
+  explicit DefaultAppTokenValidator(QuicServerConnectionState* conn);
 
   bool validate(const fizz::server::ResumptionState&) const override;
 
  private:
   QuicServerConnectionState* conn_;
-  QuicSocket::ConnectionCallback* connCallback_;
 };
 
 } // namespace quic

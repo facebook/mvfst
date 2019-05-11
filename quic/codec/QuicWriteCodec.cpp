@@ -367,6 +367,30 @@ size_t writeSimpleFrame(
         }
         // no space left in packet
         return size_t(0);
+      },
+      [&](NewConnectionIdFrame& newConnectionIdFrame) {
+        QuicInteger frameType(
+            static_cast<uint8_t>(FrameType::NEW_CONNECTION_ID));
+        QuicInteger sequence(newConnectionIdFrame.sequence);
+        // Include an 8-bit unsigned integer containing the length of the connId
+        auto newConnectionIdFrameSize = frameType.getSize() + sizeof(uint8_t) +
+            sequence.getSize() + newConnectionIdFrame.connectionId.size() +
+            newConnectionIdFrame.token.size();
+        if (packetSpaceCheck(spaceLeft, newConnectionIdFrameSize)) {
+          builder.write(frameType);
+          builder.write(sequence);
+          builder.writeBE(newConnectionIdFrame.connectionId.size());
+          builder.push(
+              newConnectionIdFrame.connectionId.data(),
+              newConnectionIdFrame.connectionId.size());
+          builder.push(
+              newConnectionIdFrame.token.data(),
+              newConnectionIdFrame.token.size());
+          builder.appendFrame(std::move(newConnectionIdFrame));
+          return newConnectionIdFrameSize;
+        }
+        // no space left in packet
+        return size_t(0);
       });
 }
 
@@ -503,30 +527,6 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           builder.write(streamId);
           builder.appendFrame(std::move(streamsBlockedFrame));
           return streamBlockedFrameSize;
-        }
-        // no space left in packet
-        return size_t(0);
-      },
-      [&](NewConnectionIdFrame& newConnectionIdFrame) {
-        QuicInteger packetType(
-            static_cast<uint8_t>(FrameType::NEW_CONNECTION_ID));
-        QuicInteger sequence(newConnectionIdFrame.sequence);
-        // Include an 8-bit unsigned integer containing the length of the connId
-        auto newConnectionIdFrameSize = packetType.getSize() + sizeof(uint8_t) +
-            sequence.getSize() + newConnectionIdFrame.connectionId.size() +
-            newConnectionIdFrame.token.size();
-        if (packetSpaceCheck(spaceLeft, newConnectionIdFrameSize)) {
-          builder.write(packetType);
-          builder.write(sequence);
-          builder.writeBE(newConnectionIdFrame.connectionId.size());
-          builder.push(
-              newConnectionIdFrame.connectionId.data(),
-              newConnectionIdFrame.connectionId.size());
-          builder.push(
-              newConnectionIdFrame.token.data(),
-              newConnectionIdFrame.token.size());
-          builder.appendFrame(std::move(newConnectionIdFrame));
-          return newConnectionIdFrameSize;
         }
         // no space left in packet
         return size_t(0);

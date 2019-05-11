@@ -27,9 +27,8 @@
 namespace quic {
 
 DefaultAppTokenValidator::DefaultAppTokenValidator(
-    QuicServerConnectionState* conn,
-    QuicSocket::ConnectionCallback* connCallback)
-    : conn_(conn), connCallback_(CHECK_NOTNULL(connCallback)) {}
+    QuicServerConnectionState* conn)
+    : conn_(conn) {}
 
 bool DefaultAppTokenValidator::validate(
     const fizz::server::ResumptionState& resumptionState) const {
@@ -66,6 +65,34 @@ bool DefaultAppTokenValidator::validate(
     return false;
   }
 
+  auto ticketIdleTimeout =
+      getIntegerParameter(TransportParameterId::idle_timeout, params);
+  if (!ticketIdleTimeout ||
+      conn_->transportSettings.idleTimeout !=
+          std::chrono::milliseconds(*ticketIdleTimeout)) {
+    VLOG(10) << "Changed idle timeout";
+    return false;
+  }
+
+  auto ticketPacketSize =
+      getIntegerParameter(TransportParameterId::max_packet_size, params);
+  if (!ticketPacketSize ||
+      conn_->transportSettings.maxRecvPacketSize < *ticketPacketSize) {
+    VLOG(10) << "Decreased max receive packet size";
+    return false;
+  }
+
+  // if the current max data is less than the one advertised previously we
+  // reject the early data
+  auto ticketMaxData =
+      getIntegerParameter(TransportParameterId::initial_max_data, params);
+  if (!ticketMaxData ||
+      conn_->transportSettings.advertisedInitialConnectionWindowSize <
+          *ticketMaxData) {
+    VLOG(10) << "Decreased max data";
+    return false;
+  }
+
   auto ticketMaxStreamDataBidiLocal = getIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local, params);
   auto ticketMaxStreamDataBidiRemote = getIntegerParameter(
@@ -85,41 +112,22 @@ bool DefaultAppTokenValidator::validate(
     return false;
   }
 
-  // if the current max data is less than the one advertised previously we
-  // reject the early data
-  auto ticketMaxData =
-      getIntegerParameter(TransportParameterId::initial_max_data, params);
-  if (!ticketMaxData ||
-      conn_->transportSettings.advertisedInitialConnectionWindowSize <
-          *ticketMaxData) {
-    VLOG(10) << "Decreased max data";
+  auto ticketMaxStreamsBidi = getIntegerParameter(
+      TransportParameterId::initial_max_streams_bidi, params);
+  auto ticketMaxStreamsUni = getIntegerParameter(
+      TransportParameterId::initial_max_streams_uni, params);
+  if (!ticketMaxStreamsBidi ||
+      conn_->transportSettings.advertisedInitialMaxStreamsBidi <
+          *ticketMaxStreamsBidi ||
+      !ticketMaxStreamsUni ||
+      conn_->transportSettings.advertisedInitialMaxStreamsUni <
+          *ticketMaxStreamsUni) {
+    VLOG(10) << "Decreased max stream data";
     return false;
   }
 
-  auto ticketIdleTimeout =
-      getIntegerParameter(TransportParameterId::idle_timeout, params);
-  if (!ticketIdleTimeout ||
-      conn_->transportSettings.idleTimeout !=
-          std::chrono::milliseconds(*ticketIdleTimeout)) {
-    VLOG(10) << "Changed idle timeout";
-    return false;
-  }
-
-  auto ticketPacketSize =
-      getIntegerParameter(TransportParameterId::max_packet_size, params);
-  if (!ticketPacketSize ||
-      conn_->transportSettings.maxRecvPacketSize < *ticketPacketSize) {
-    VLOG(10) << "Decreased max receive packet size";
-    return false;
-  }
-
-  auto ticketAckDelayExponent =
-      getIntegerParameter(TransportParameterId::ack_delay_exponent, params);
-  if (!ticketAckDelayExponent ||
-      conn_->transportSettings.ackDelayExponent != *ticketAckDelayExponent) {
-    VLOG(10) << "Ack delay exponent mismatch";
-    return false;
-  }
+  // TODO max ack delay, is this really necessary?
+  // spec says disable_migration should also be in the ticket. It shouldn't.
 
   conn_->transportParamsMatching = true;
 
@@ -131,12 +139,14 @@ bool DefaultAppTokenValidator::validate(
 
   updateTransportParamsFromTicket(
       *conn_,
+      *ticketIdleTimeout,
+      *ticketPacketSize,
+      *ticketMaxData,
       *ticketMaxStreamDataBidiLocal,
       *ticketMaxStreamDataBidiRemote,
       *ticketMaxStreamDataUni,
-      *ticketMaxData,
-      *ticketIdleTimeout,
-      *ticketPacketSize);
+      *ticketMaxStreamsBidi,
+      *ticketMaxStreamsUni);
 
   return true;
 }

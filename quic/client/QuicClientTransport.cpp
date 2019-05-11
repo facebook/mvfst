@@ -128,54 +128,10 @@ void QuicClientTransport::processPacketData(
     VLOG(4) << "Got version negotiation packet from peer=" << peer
             << " versions=" << std::hex << versionNegotiation->versions << " "
             << *this;
-    // TODO: move this into the state machine. Should we enforce that we only
-    // get this after we send a packet?
-    if (conn_->version) {
-      // Invalid data, just ignore this since someone might be trying to mess
-      // with the connection or this could be multiple version negotiation
-      // packets sent by the server for 0-rtt data.
-      return;
-    }
 
-    // TODO: validate that the sequence number and the all the long header
-    // fields match the one we sent in client initial.
-
-    folly::Optional<QuicVersion> negotiatedVersion;
-    for (auto& ourVersion : conn_->supportedVersions) {
-      auto it = std::find(
-          versionNegotiation->versions.begin(),
-          versionNegotiation->versions.end(),
-          ourVersion);
-      if (it != versionNegotiation->versions.end()) {
-        negotiatedVersion = *it;
-        break;
-      }
-    }
-    if (!negotiatedVersion) {
-      VLOG(4) << "Could not negotiate version, peer supports versions="
-              << std::hex << versionNegotiation->versions << " " << *this;
-      throw QuicTransportException(
-          "Could not negotiate version",
-          TransportErrorCode::VERSION_NEGOTIATION_ERROR);
-
-    } else if (*negotiatedVersion == *conn_->originalVersion) {
-      VLOG(4) << "Dropping version negotiation that lists original version";
-      QUIC_TRACE(packet_drop, *conn_, "dup_version");
-      return;
-    } else {
-      // We should treat version negotiation like even the crypto never
-      // happened.
-      conn_->version = negotiatedVersion;
-      auto released = static_cast<QuicClientConnectionState*>(conn_.release());
-      std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
-      auto tempConn = undoAllClientStateForVersionMismatch(
-          std::move(uniqueClient), *negotiatedVersion);
-      // Do not attempt zero rtt after version negotiation
-      clientConn_ = tempConn.get();
-      conn_ = std::move(tempConn);
-      startCryptoHandshake();
-      return;
-    }
+    throw QuicInternalException(
+        "Received version negotiation packet",
+        LocalErrorCode::CONNECTION_ABANDONED);
   }
 
   // TODO: handle other packet types.
@@ -213,9 +169,12 @@ void QuicClientTransport::processPacketData(
 
     auto header = boost::get<LongHeader>(regularOptional->header);
 
-    auto dstConnId = conn_->serverConnectionId.value_or(
-        *clientConn_->initialDestinationConnectionId);
-    if (*header.getOriginalDstConnId() != dstConnId) {
+    const ConnectionId* dstConnId =
+        &(*clientConn_->initialDestinationConnectionId);
+    if (conn_->serverConnectionId) {
+      dstConnId = &(*conn_->serverConnectionId);
+    }
+    if (*header.getOriginalDstConnId() != *dstConnId) {
       VLOG(4) << "Original destination connection id field in the retry "
               << "packet doesn't match the destination connection id from the "
               << "client's initial packet";
@@ -597,12 +556,6 @@ void QuicClientTransport::processPacketData(
             "No server transport params",
             TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
       }
-      if (serverParams->negotiated_version !=
-          conn_->version.value_or(*conn_->originalVersion)) {
-        throw QuicTransportException(
-            "Negotiated version mismatch with version",
-            TransportErrorCode::VERSION_NEGOTIATION_ERROR);
-      }
       processServerInitialParams(
           *clientConn_, std::move(*serverParams), packetNum);
 
@@ -673,21 +626,6 @@ void QuicClientTransport::onReadData(
     return;
   }
   processUDPData(peer, std::move(networkData));
-  auto& versionNegotiationNeeded = clientConn_->versionNegotiationNeeded;
-  if (versionNegotiationNeeded) {
-    // The connection needs to be undone, so tell the app that all it's hopes
-    // and dreams are crushed.
-    versionNegotiationNeeded = false;
-    cancelAllAppCallbacks(std::make_pair(
-        QuicErrorCode(LocalErrorCode::NEW_VERSION_NEGOTIATED),
-        toString(LocalErrorCode::NEW_VERSION_NEGOTIATED)));
-    // Callbacks could trigger new events on the delivery or reset list, so
-    // abort early here so that we don't have to deal with them, since we
-    // would have already dealt with it.
-    // TODO: if 0-rtt is allowed after version negotiation, we should trigger
-    // the WriteCallbacks which have scheduled notifyPendingWrite callbacks.
-    return;
-  }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
     CHECK_NOTNULL(connCallback_)->onTransportReady();
@@ -712,8 +650,11 @@ void QuicClientTransport::writeData() {
   auto phase = clientConn_->clientHandshakeLayer->getPhase();
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
-  const ConnectionId& destConnId = conn_->serverConnectionId.value_or(
-      *clientConn_->initialDestinationConnectionId);
+  const ConnectionId* destConnId =
+      &(*clientConn_->initialDestinationConnectionId);
+  if (conn_->serverConnectionId) {
+    destConnId = &(*conn_->serverConnectionId);
+  }
   if (closeState_ == CloseState::CLOSED) {
     // TODO: get rid of phase
     if (phase == ClientHandshake::Phase::Established &&
@@ -722,7 +663,7 @@ void QuicClientTransport::writeData() {
       writeShortClose(
           *socket_,
           *conn_,
-          destConnId /* dst */,
+          *destConnId /* dst */,
           conn_->localConnectionError,
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
@@ -732,7 +673,7 @@ void QuicClientTransport::writeData() {
           *socket_,
           *conn_,
           srcConnId /* src */,
-          destConnId /* dst */,
+          *destConnId /* dst */,
           LongHeader::Types::Initial,
           conn_->localConnectionError,
           *conn_->initialWriteCipher,
@@ -761,7 +702,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId /* src */,
-        destConnId /* dst */,
+        *destConnId /* dst */,
         LongHeader::Types::Initial,
         *conn_->initialWriteCipher,
         *conn_->initialHeaderCipher,
@@ -781,7 +722,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId /* src */,
-        destConnId /* dst */,
+        *destConnId /* dst */,
         LongHeader::Types::Handshake,
         *conn_->handshakeWriteCipher,
         *conn_->handshakeWriteHeaderCipher,
@@ -797,7 +738,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId /* src */,
-        destConnId /* dst */,
+        *destConnId /* dst */,
         *clientConn_->zeroRttWriteCipher,
         *clientConn_->zeroRttWriteHeaderCipher,
         version,
@@ -812,7 +753,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId,
-        destConnId,
+        *destConnId,
         *conn_->oneRttWriteCipher,
         *conn_->oneRttWriteHeaderCipher,
         version,
@@ -912,9 +853,6 @@ void QuicClientTransport::startCryptoHandshake() {
     DCHECK(quicCachedPsk);
 
     auto& transportParams = quicCachedPsk->transportParams;
-    // Version match is a prerequisite of zero rtt attempt
-    DCHECK_EQ(*conn_->originalVersion, transportParams.negotiatedVersion);
-
     cacheServerInitialParams(
         transportParams.initialMaxData,
         transportParams.initialMaxStreamDataBidiLocal,
@@ -968,16 +906,19 @@ void QuicClientTransport::onNewCachedPsk(
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
 
   quicCachedPsk.transportParams.negotiatedVersion = *conn_->version;
+  quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
+  quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
+  quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
       peerAdvertisedInitialMaxStreamDataBidiLocal_;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
       peerAdvertisedInitialMaxStreamDataBidiRemote_;
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
       peerAdvertisedInitialMaxStreamDataUni_;
-  quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;
-  quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
-  quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
-  quicCachedPsk.transportParams.ackDelayExponent = conn_->peerAckDelayExponent;
+  quicCachedPsk.transportParams.initialMaxStreamsBidi =
+      clientConn_->peerAdvertisedInitialMaxStreamsBidi;
+  quicCachedPsk.transportParams.initialMaxStreamsUni =
+      clientConn_->peerAdvertisedInitialMaxStreamsUni;
 
   auto appParams = CHECK_NOTNULL(connCallback_)->serializeEarlyDataAppParams();
   if (appParams) {

@@ -33,22 +33,21 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_TRUE(validator.validate(resState));
 }
 
@@ -59,24 +58,23 @@ TEST(
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   auto initialMaxData =
       conn.transportSettings.advertisedInitialConnectionWindowSize;
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      initialMaxData - 1,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      initialMaxData - 1,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_TRUE(validator.validate(resState));
 
   EXPECT_EQ(
@@ -91,10 +89,8 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   ResumptionState resState;
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -103,22 +99,21 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidVersionMismatch) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::QUIC_DRAFT;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       QuicVersion::MVFST,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -127,14 +122,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams.negotiated_version = *conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -142,8 +135,6 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
-
-  MockConnectionCallback connCallback;
 
   AppToken appToken;
   appToken.transportParams.negotiated_version = *conn.version;
@@ -167,7 +158,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -176,24 +167,23 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   appToken.transportParams.parameters.push_back(
       encodeIntegerParameter(TransportParameterId::idle_timeout, 100));
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -202,22 +192,21 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize + 1,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize + 1,
       conn.transportSettings.advertisedInitialUniStreamWindowSize + 1,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -226,46 +215,44 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count() + 100,
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count() + 100,
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
-TEST(DefaultAppTokenValidatorTest, TestInvalidUnequalAckDelayExponent) {
+TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
-  MockConnectionCallback connCallback;
-
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
       *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.ackDelayExponent - 1,
-      conn.transportSettings.maxRecvPacketSize);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi + 1,
+      conn.transportSettings.advertisedInitialMaxStreamsUni + 1);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  DefaultAppTokenValidator validator(&conn);
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -303,26 +290,26 @@ class SourceAddressTokenTest : public Test {
 
     appToken_.transportParams = createTicketTransportParameters(
         *conn_.version,
+        conn_.transportSettings.idleTimeout.count(),
+        conn_.transportSettings.maxRecvPacketSize,
+        conn_.transportSettings.advertisedInitialConnectionWindowSize,
         conn_.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
         conn_.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
         conn_.transportSettings.advertisedInitialUniStreamWindowSize,
-        conn_.transportSettings.advertisedInitialConnectionWindowSize,
-        conn_.transportSettings.idleTimeout.count(),
-        conn_.transportSettings.maxRecvPacketSize,
-        conn_.transportSettings.ackDelayExponent);
+        conn_.transportSettings.advertisedInitialMaxStreamsBidi,
+        conn_.transportSettings.advertisedInitialMaxStreamsUni);
   }
 
   void encodeAndValidate(bool acceptZeroRtt = true) {
     ResumptionState resState;
     resState.appToken = encodeAppToken(appToken_);
 
-    DefaultAppTokenValidator validator(&conn_, &connCallback_);
+    DefaultAppTokenValidator validator(&conn_);
     EXPECT_EQ(validator.validate(resState), acceptZeroRtt);
   }
 
  protected:
   QuicServerConnectionState conn_;
-  MockConnectionCallback connCallback_;
   AppToken appToken_;
 };
 

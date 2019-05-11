@@ -27,6 +27,7 @@ uint64_t boundedCwnd(
 std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
+    uint64_t minCwndInMss,
     std::chrono::microseconds minimalInterval,
     std::chrono::microseconds rtt) {
   if (minimalInterval > rtt) {
@@ -35,14 +36,13 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
         std::chrono::microseconds::zero(),
         conn.transportSettings.writeConnectionDataPacketsLimit);
   }
-  uint64_t cwndInPackets = std::max(
-      conn.transportSettings.minCwndInMss, cwnd / conn.udpSendPacketLen);
+  uint64_t cwndInPackets = std::max(minCwndInMss, cwnd / conn.udpSendPacketLen);
   // Each interval we want to send cwndInpackets / (rtt / minimalInverval)
   // number of packets.
   uint64_t burstPerInterval = std::min(
       conn.transportSettings.maxBurstPackets,
       std::max(
-          conn.transportSettings.minCwndInMss,
+          minCwndInMss,
           (uint64_t)std::ceil(
               (double)cwndInPackets * (double)minimalInterval.count() /
               (double)rtt.count())));

@@ -21,7 +21,7 @@ namespace quic {
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
     std::unique_ptr<QuicClientConnectionState> conn) {
   // Create a new connection state and copy over properties that don't change
-  // across version negotiation or stateless retry.
+  // across stateless retry.
   auto newConn = std::make_unique<QuicClientConnectionState>();
   newConn->clientConnectionId = conn->clientConnectionId;
   newConn->initialDestinationConnectionId =
@@ -46,14 +46,6 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
   newConn->readCodec->setCodecParameters(
       CodecParameters(conn->peerAckDelayExponent));
-  return newConn;
-}
-
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateForVersionMismatch(
-    std::unique_ptr<QuicClientConnectionState> conn,
-    QuicVersion /* negotiatedVersion */) {
-  auto newConn = undoAllClientStateCommon(std::move(conn));
-  newConn->versionNegotiationNeeded = true;
   return newConn;
 }
 
@@ -122,8 +114,10 @@ void processServerInitialParams(
   // TODO Make idleTimeout disableable via transport parameter.
   conn.streamManager->setMaxLocalBidirectionalStreams(
       maxStreamsBidi.value_or(0));
+  conn.peerAdvertisedInitialMaxStreamsBidi = maxStreamsBidi.value_or(0);
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       maxStreamsUni.value_or(0));
+  conn.peerAdvertisedInitialMaxStreamsUni = maxStreamsUni.value_or(0);
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
     throw QuicTransportException(
@@ -162,19 +156,22 @@ void processServerInitialParams(
 void updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
     const CachedServerTransportParameters& transportParams) {
+  conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
+  if (conn.transportSettings.canIgnorePathMTU) {
+    conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
+  }
+  conn.flowControlState.peerAdvertisedMaxOffset =
+      transportParams.initialMaxData;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
       transportParams.initialMaxStreamDataBidiLocal;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
       transportParams.initialMaxStreamDataBidiRemote;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       transportParams.initialMaxStreamDataUni;
-  conn.flowControlState.peerAdvertisedMaxOffset =
-      transportParams.initialMaxData;
-  conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
-  if (conn.transportSettings.canIgnorePathMTU) {
-    conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
-  }
-  conn.peerAckDelayExponent = transportParams.ackDelayExponent;
+  conn.streamManager->setMaxLocalBidirectionalStreams(
+      transportParams.initialMaxStreamsBidi);
+  conn.streamManager->setMaxLocalUnidirectionalStreams(
+      transportParams.initialMaxStreamsUni);
 }
 
 void ClientInvalidStateHandler(QuicClientConnectionState& state) {

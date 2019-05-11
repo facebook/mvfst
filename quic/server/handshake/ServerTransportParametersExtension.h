@@ -16,12 +16,14 @@ namespace quic {
 class ServerTransportParametersExtension : public fizz::ServerExtensions {
  public:
   ServerTransportParametersExtension(
-      QuicVersion negotiatedVersion,
+      folly::Optional<QuicVersion> negotiatedVersion,
       const std::vector<QuicVersion>& supportedVersions,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
       uint64_t initialMaxStreamDataUni,
+      uint64_t initialMaxStreamsBidi,
+      uint64_t initialMaxStreamsUni,
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
@@ -32,6 +34,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
         initialMaxStreamDataBidiRemote_(initialMaxStreamDataBidiRemote),
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
+        initialMaxStreamsBidi_(initialMaxStreamsBidi),
+        initialMaxStreamsUni_(initialMaxStreamsUni),
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
@@ -50,6 +54,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           fizz::AlertDescription::missing_extension);
     }
     clientTransportParameters_ = std::move(clientParams);
+    if (!clientTransportParameters_->initial_version.hasValue()) {
+      negotiatedVersion_ = folly::none;
+    }
 
     std::vector<fizz::Extension> exts;
 
@@ -69,10 +76,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         TransportParameterId::initial_max_data, initialMaxData_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_streams_bidi,
-        std::numeric_limits<uint32_t>::max()));
+        initialMaxStreamsBidi_));
     params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_uni,
-        std::numeric_limits<uint32_t>::max()));
+        TransportParameterId::initial_max_streams_uni, initialMaxStreamsUni_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::idle_timeout, idleTimeout_.count()));
     params.parameters.push_back(encodeIntegerParameter(
@@ -102,12 +108,14 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   }
 
  private:
-  QuicVersion negotiatedVersion_;
+  folly::Optional<QuicVersion> negotiatedVersion_;
   std::vector<QuicVersion> supportedVersions_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;
   uint64_t initialMaxStreamDataUni_;
+  uint64_t initialMaxStreamsBidi_;
+  uint64_t initialMaxStreamsUni_;
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
