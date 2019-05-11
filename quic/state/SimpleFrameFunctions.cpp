@@ -59,9 +59,9 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       [&](const PathResponseFrame& frame) -> folly::Optional<QuicSimpleFrame> {
         return QuicSimpleFrame(frame);
       },
-      [&](const NewConnectionIdFrame&) -> folly::Optional<QuicSimpleFrame> {
-        // TODO junqiw
-        return folly::none;
+      [&](const NewConnectionIdFrame& frame)
+          -> folly::Optional<QuicSimpleFrame> {
+        return QuicSimpleFrame(frame);
       });
 }
 

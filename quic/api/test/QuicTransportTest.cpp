@@ -1212,6 +1212,68 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
   EXPECT_TRUE(foundNewConnectionId);
 }
 
+TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
+  auto& conn = transport_->getConnectionState();
+  // knock every handshake outstanding packets out
+  conn.outstandingHandshakePacketsCount = 0;
+  conn.outstandingPureAckPacketsCount = 0;
+  conn.outstandingPackets.clear();
+  conn.lossState.lossTime.clear();
+
+  NewConnectionIdFrame newConnId(
+      1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  conn.pendingEvents.frames.push_back(newConnId);
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  auto numNewConnIdPackets = std::count_if(
+      conn.outstandingPackets.begin(),
+      conn.outstandingPackets.end(),
+      [&](auto& p) {
+        return std::find_if(
+                   p.packet.frames.begin(),
+                   p.packet.frames.end(),
+                   [&](auto& f) {
+                     return folly::variant_match(
+                         f,
+                         [&](QuicSimpleFrame& s) {
+                           return folly::variant_match(
+                               s,
+                               [&](NewConnectionIdFrame&) { return true; },
+                               [&](auto&) { return false; });
+                         },
+                         [&](auto&) { return false; });
+                   }) != p.packet.frames.end();
+      });
+  EXPECT_EQ(numNewConnIdPackets, 1);
+
+  // Force a timeout with no data so that it clones the packet
+  transport_->lossTimeout().timeoutExpired();
+  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
+  EXPECT_EQ(conn.outstandingPackets.size(), 3);
+  numNewConnIdPackets = std::count_if(
+      conn.outstandingPackets.begin(),
+      conn.outstandingPackets.end(),
+      [&](auto& p) {
+        return std::find_if(
+                   p.packet.frames.begin(),
+                   p.packet.frames.end(),
+                   [&](auto& f) {
+                     return folly::variant_match(
+                         f,
+                         [&](QuicSimpleFrame& s) {
+                           return folly::variant_match(
+                               s,
+                               [&](NewConnectionIdFrame&) { return true; },
+                               [&](auto&) { return false; });
+                         },
+                         [&](auto&) { return false; });
+                   }) != p.packet.frames.end();
+      });
+  EXPECT_EQ(numNewConnIdPackets, 3);
+}
+
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
