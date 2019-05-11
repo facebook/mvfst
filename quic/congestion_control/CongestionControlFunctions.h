@@ -24,6 +24,7 @@ uint64_t boundedCwnd(
 std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
+    uint64_t minCwndInMss,
     std::chrono::microseconds minimalInterval,
     std::chrono::microseconds rtt);
 
