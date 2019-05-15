@@ -20,17 +20,21 @@ cat 1>&2 <<EOF
 Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -p BUILD_DIR                           (optional): Path of the base dir for mvfst
   -i INSTALL_PREFIX                      (optional): install prefix path
+  -m                                     (optional): Build folly without jemalloc
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:" arg; do
+while getopts ":hp:i:m" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
       ;;
     i)
       INSTALL_PREFIX="${OPTARG}"
+      ;;
+    m)
+      MVFST_FOLLY_USE_JEMALLOC="n"
       ;;
     h | *) # Display help.
       usage
