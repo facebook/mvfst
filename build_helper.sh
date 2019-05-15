@@ -46,6 +46,12 @@ if [ -z "${BUILD_DIR-}" ] ; then
   mkdir -p $BUILD_DIR
 fi
 
+if [[ ! -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+    if [[ "$MVFST_FOLLY_USE_JEMALLOC" != "n" ]]; then
+        unset $MVFST_FOLLY_USE_JEMALLOC
+    fi
+fi
+
 ### configure necessary build and install directories
 
 cd $BUILD_DIR || exit
@@ -157,10 +163,20 @@ function setup_folly() {
   echo -e "${COLOR_GREEN}Building Folly ${COLOR_OFF}"
   mkdir -p "$FOLLY_BUILD_DIR"
   cd "$FOLLY_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-    -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
-    -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
-    ..
+
+  # check for environment variable. If 
+  if [[ -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
+      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
+      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
+      ..
+  else 
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
+      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
+      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
+      -DFOLLY_USE_JEMALLOC=0                        \
+      ..
+  fi
   make -j "$nproc"
   make install
   echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
