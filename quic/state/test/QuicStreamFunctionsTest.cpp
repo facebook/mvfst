@@ -1911,5 +1911,72 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
   processCryptoStreamAck(cryptoStream, 20, chlo->length());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
+
+TEST_F(QuicStreamFunctionsTest, AckFrameMatchesRetransmitBufferFullyReliable) {
+  conn.partialReliabilityEnabled = false;
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+
+  auto data = IOBuf::copyBuffer("Hello");
+  auto buf = StreamBuffer(data->clone(), 0, true);
+
+  WriteStreamFrame ackFrame(
+      id /* streamId */,
+      0 /* offset */,
+      data->length() /* length */,
+      true /* eof */);
+  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    AckFrameMatchesRetransmitBufferPartiallyReliableNoSkip) {
+  conn.partialReliabilityEnabled = true;
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+
+  auto data = IOBuf::copyBuffer("Hello");
+  auto buf = StreamBuffer(data->clone(), 0, true);
+
+  WriteStreamFrame ackFrame(
+      id /* streamId */,
+      0 /* offset */,
+      data->length() /* length */,
+      true /* eof */);
+  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    AckFrameMatchesRetransmitBufferPartiallyReliableFullBufSkipped) {
+  conn.partialReliabilityEnabled = true;
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+
+  auto data = IOBuf::copyBuffer("Hello");
+  auto buf = StreamBuffer(data->clone(), 42, true);
+
+  WriteStreamFrame ackFrame(
+      id /* streamId */,
+      0 /* offset */,
+      data->length() /* length */,
+      true /* eof */);
+  EXPECT_FALSE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    AckFrameMatchesRetransmitBufferPartiallyReliableHalfBufSkipped) {
+  conn.partialReliabilityEnabled = true;
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+
+  auto data = IOBuf::copyBuffer("llo");
+  auto buf = StreamBuffer(data->clone(), 2, true);
+
+  WriteStreamFrame ackFrame(
+      id /* streamId */, 0 /* offset */, 5 /* length */, true /* eof */);
+  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+}
 } // namespace test
 } // namespace quic

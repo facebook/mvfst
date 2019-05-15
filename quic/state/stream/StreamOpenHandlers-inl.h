@@ -8,6 +8,7 @@
 
 // override-include-guard
 
+#include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
 
 namespace quic {
@@ -93,19 +94,18 @@ inline void Handler<
       });
 
   if (ackedBuffer != stream.retransmissionBuffer.end()) {
-    // Since the StreamFrames that are ACKed are computed from the outstanding
-    // packets, we always know that the retransmission buffer corresponds to
-    // 1 buffer in the retranmission buffer.
-    DCHECK_EQ(ackedBuffer->offset, ack.ackedFrame.offset);
-
-    DCHECK_EQ(ackedBuffer->data.chainLength(), ack.ackedFrame.len);
-    DCHECK_EQ(ackedBuffer->eof, ack.ackedFrame.fin);
-
-    VLOG(10) << "Open: acked stream data stream=" << stream.id
-             << " offset=" << ackedBuffer->offset
-             << " len=" << ackedBuffer->data.chainLength()
-             << " eof=" << ackedBuffer->eof << " " << stream.conn;
-    stream.retransmissionBuffer.erase(ackedBuffer);
+    if (ackFrameMatchesRetransmitBuffer(stream, ack.ackedFrame, *ackedBuffer)) {
+      VLOG(10) << "Open: acked stream data stream=" << stream.id
+               << " offset=" << ackedBuffer->offset
+               << " len=" << ackedBuffer->data.chainLength()
+               << " eof=" << ackedBuffer->eof << " " << stream.conn;
+      stream.retransmissionBuffer.erase(ackedBuffer);
+    } else {
+      VLOG(10) << "Open: received an ack for already discarded buffer; stream="
+               << stream.id << " offset=" << ackedBuffer->offset
+               << " len=" << ackedBuffer->data.chainLength()
+               << " eof=" << ackedBuffer->eof << " " << stream.conn;
+    }
   }
 
   // This stream may be able to invoke some deliveryCallbacks:

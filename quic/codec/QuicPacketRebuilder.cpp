@@ -221,21 +221,14 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
         return buffer.offset < targetOffset;
       });
   if (iter != stream->retransmissionBuffer.end()) {
-    DCHECK(iter->offset == frame.offset)
-        << "WriteStreamFrame cloning: offset mismatch. " << conn_;
-    DCHECK(iter->data.chainLength() == frame.len)
-        << "WriteStreamFrame cloning: Len mismatch. " << conn_;
-    DCHECK(iter->eof == frame.fin)
-        << "WriteStreamFrame cloning: fin mismatch. " << conn_;
-    DCHECK(!frame.len || !iter->data.empty())
-        << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has "
-        << "empty data. " << conn_;
-    return (frame.len ? iter->data.front()->clone() : nullptr);
-  } else {
-    VLOG(10) << "WriteStreamFrame cloning: frame is not in retx buffer anymore "
-             << conn_;
-    return nullptr;
+    if (ackFrameMatchesRetransmitBuffer(*stream, frame, *iter)) {
+      DCHECK(!frame.len || !iter->data.empty())
+          << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
+          << " empty data. " << conn_;
+      return (frame.len ? iter->data.front()->clone() : nullptr);
+    }
   }
+  return nullptr;
 }
 
 } // namespace quic

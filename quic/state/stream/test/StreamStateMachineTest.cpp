@@ -219,6 +219,7 @@ TEST_F(QuicOpenStateTest, AckStream) {
 
 TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
   auto conn = createConn();
+  conn->partialReliabilityEnabled = true;
 
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
@@ -256,6 +257,113 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
   ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 
   invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+}
+
+TEST_F(QuicOpenStateTest, AckStreamAfterSkipHalfBuf) {
+  auto conn = createConn();
+  conn->partialReliabilityEnabled = true;
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  serverChosenConnId.value().data()[0] ^= 0x01;
+  EventBase evb;
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+
+  auto buf = IOBuf::copyBuffer("hello");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      true);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+
+  auto& streamFrame = boost::get<WriteStreamFrame>(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->packet.frames.front());
+
+  PacketNum packetNum(1);
+  // Skip ~0.5 buffers.
+  MinStreamDataFrame minDataFrame(stream->id, 1000, 3);
+  onRecvMinStreamDataFrame(stream, minDataFrame, packetNum);
+  EXPECT_EQ(stream->minimumRetransmittableOffset, 3);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+
+  StreamEvents::AckStreamFrame ack(streamFrame);
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+}
+
+TEST_F(QuicOpenStateTest, AckStreamAfterSkipOneAndAHalfBuf) {
+  auto conn = createConn();
+  conn->partialReliabilityEnabled = true;
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  serverChosenConnId.value().data()[0] ^= 0x01;
+  EventBase evb;
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+
+  // Write two buffers.
+  auto buf = IOBuf::copyBuffer("hello");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      false);
+  auto buf2 = IOBuf::copyBuffer("hello again");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      true);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 2);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+
+  auto streamFrameIt =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
+  auto& streamFrame1 =
+      boost::get<WriteStreamFrame>(streamFrameIt->packet.frames.front());
+  auto& streamFrame2 = boost::get<WriteStreamFrame>(
+      getNextOutstandingPacket(
+          *conn, PacketNumberSpace::AppData, ++streamFrameIt)
+          ->packet.frames.front());
+
+  PacketNum packetNum(1);
+  // Skip ~1.5 buffers.
+  MinStreamDataFrame minDataFrame(stream->id, 1000, 7);
+  onRecvMinStreamDataFrame(stream, minDataFrame, packetNum);
+  EXPECT_EQ(stream->minimumRetransmittableOffset, 7);
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+
+  // Send ack for the first buffer, should be ignored since that buffer was
+  // discarded after the skip.
+  StreamEvents::AckStreamFrame ack1(streamFrame1);
+  invokeHandler<StreamSendStateMachine>(stream->send, ack1, *stream);
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
+  ASSERT_TRUE(isState<StreamSendStates::Open>(stream->send));
+  ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+
+  // Send ack for the second buffer, should clear out the retransmit queue after
+  // correctly identifying adjusted offset.
+  StreamEvents::AckStreamFrame ack2(streamFrame2);
+  invokeHandler<StreamSendStateMachine>(stream->send, ack2, *stream);
+  EXPECT_TRUE(stream->retransmissionBuffer.empty());
   ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
   ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }

@@ -427,4 +427,53 @@ void processCryptoStreamAck(
   }
   cryptoStream.retransmissionBuffer.erase(ackedBuffer);
 }
+
+bool ackFrameMatchesRetransmitBuffer(
+    const QuicStreamState& stream,
+    const WriteStreamFrame& ackFrame,
+    const StreamBuffer& buf) {
+  // There are 3 possible situations.
+  // 1) Fully reliable mode: the buffer's and ack frame's offsets and lengths
+  //    must match.
+  // 2) Partially reliable mode: the retransmit queue buffer has been
+  //    fully removed by an egress skip before the ack frame arrived.
+  // 3) Partially reliable mode: the retransmit queue buffer was only
+  //    partially trimmed.
+  //    In this case, the retransmit buffer offset must be >= ack frame offset
+  //    and retransmit buffer length must be <= ack frame length. Also, the
+  //    retransmit buffer [offset + length] must match (ack) frame [offset +
+  //    length].
+
+  bool match = false;
+  if (stream.conn.partialReliabilityEnabled) {
+    auto frameRightOffset = ackFrame.offset + ackFrame.len;
+    if (frameRightOffset > buf.offset) {
+      // There is overlap, buffer fully or partially matches.
+      DCHECK(buf.offset >= ackFrame.offset);
+      DCHECK(buf.data.chainLength() <= ackFrame.len);
+
+      // The offsets and lengths in the ack frame and buffer may be different,
+      // but their sum should stay the same (e.g. offset grows, length shrinks
+      // but sum must be the same).
+      //
+      // Example: let's say we send data buf with offset=0 and len=11 and we
+      // save a copy in retransmission queue. Then we send egress skip to offset
+      // 6 and that trims that buf copy in retransmission queue to offset=6 and
+      // len=5. Then we get an ACK for the original buf we sent with old
+      // offset=0 and len=11 and comparing it to the already trimmed buf. The
+      // offsets and lengths are going to be different, but their sum will be
+      // the same.
+      DCHECK_EQ(
+          buf.offset + buf.data.chainLength(), ackFrame.offset + ackFrame.len);
+      DCHECK_EQ(buf.eof, ackFrame.fin);
+      match = true;
+    } // else frameRightOffset <= buf.offset { ignore }
+  } else {
+    DCHECK_EQ(buf.offset, ackFrame.offset);
+    DCHECK_EQ(buf.data.chainLength(), ackFrame.len);
+    DCHECK_EQ(buf.eof, ackFrame.fin);
+    match = true;
+  }
+  return match;
+}
 } // namespace quic

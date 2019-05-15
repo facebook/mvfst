@@ -93,11 +93,16 @@ void markPacketLoss(
                 return buffer.offset < offset;
               });
           if (bufferItr == stream->retransmissionBuffer.end()) {
-            // It's possible that the stream was reset while we discovered that
-            // it's packet was lost so we might not have the offset.
+            // It's possible that the stream was reset or data on the stream was
+            // skipped while we discovered that its packet was lost so we might
+            // not have the offset.
             return;
           }
-          DCHECK(bufferItr->offset == frame.offset);
+          // The original rxmt offset might have been bumped up after it was
+          // shrunk due to egress partially reliable skip.
+          if (!ackFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
+            return;
+          }
           stream->lossBuffer.insert(
               std::upper_bound(
                   stream->lossBuffer.begin(),

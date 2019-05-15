@@ -135,4 +135,16 @@ void processCryptoStreamAck(
     QuicCryptoStream& cryptoStream,
     uint64_t offset,
     uint64_t len);
+
+/**
+ * Checks if ack frame matches buffer from the retransmit queue.
+ *
+ * @param stream    The stream.
+ * @param ackFrame  Ack frame that allegedly acks the above buffer.
+ * @param buf       Buffer from the retransmit queue.
+ */
+bool ackFrameMatchesRetransmitBuffer(
+    const QuicStreamState& stream,
+    const WriteStreamFrame& ackFrame,
+    const StreamBuffer& buf);
 } // namespace quic
