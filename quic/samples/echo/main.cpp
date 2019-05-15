@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
   fizz::CryptoUtils::init();
 
   if (FLAGS_mode == "server") {
-    EchoServer server(FLAGS_port, FLAGS_pr);
+    EchoServer server(FLAGS_host, FLAGS_port, FLAGS_pr);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {

@@ -59,8 +59,11 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
 
 class EchoServer {
  public:
-  explicit EchoServer(uint16_t port, bool prEnabled = false)
-      : port_(port),
+  explicit EchoServer(const std::string& host = "::1", 
+                      uint16_t port = 6666, 
+                      bool prEnabled = false)
+      : host_(host),
+        port_(port),
         prEnabled_(prEnabled),
         server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
@@ -74,14 +77,16 @@ class EchoServer {
   }
 
   void start() {
-    folly::SocketAddress addr1;
-    addr1.setFromLocalPort(port_);
+    // Create a SocketAddress and the default or passed in host. 
+    folly::SocketAddress addr1(host_.c_str(), port_);
+    addr1.setFromHostPort(host_, port_);
     server_->start(addr1, 0);
     LOG(INFO) << "Echo server started at: " << addr1.describe();
     eventbase_.loopForever();
   }
 
  private:
+  std::string host_;
   uint16_t port_;
   bool prEnabled_;
   folly::EventBase eventbase_;
