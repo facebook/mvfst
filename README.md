@@ -95,13 +95,13 @@ You might need to run the script as root to install to certain directories.
 By default the build script `build_helper.sh` enables the building of test target (i.e. runs with `-DBUILD_TEST=ON` option). Since some of tests in `mvfst` require some test artifacts of Fizz, it is necessary to supply the path of the Fizz src directory (via option `DFIZZ_PROJECT`) to correctly build all test targets in `mvfst`.
 
 ## Run a sample client and server
-Building the test targets of `mvfst` (or via `build_helper.sh`) should automatically build the sample client and server binaries as well. You can then spin a simple echo server by running:
+Building the test targets of `mvfst` (or via `build_helper.sh`) should automatically build the sample client and server binaries as well. The server will automatically bind to `::1` by default, but you can then spin a simple echo server by running:
 ```
-./quic/samples/echo -mode=server -host=<ip> -port=<port>
+./quic/samples/echo -mode=server -port=<port>
 ```
 and to run a client:
 ```
-./quic/samples/echo -mode=client  -host=<ip> -port=<port>
+./quic/samples/echo -mode=client -host=::1 -port=<port>
 ```
 For more options, see
 ```
