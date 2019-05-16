@@ -358,6 +358,7 @@ void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
 
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   updateHolBlockedTime(stream);
+  updatePeekableStreams(stream);
   auto itr = readableStreams_.find(stream.id);
   if (!stream.hasReadableData() && !stream.streamReadError.hasValue()) {
     if (itr != readableStreams_.end()) {
