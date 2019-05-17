@@ -9,6 +9,7 @@
 #include <quic/server/handshake/ServerHandshake.h>
 
 #include <fizz/protocol/Protocol.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -92,35 +93,35 @@ std::unique_ptr<Aead> ServerHandshake::getHandshakeWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return std::move(handshakeWriteCipher_);
+  return FizzAead::wrap(std::move(handshakeWriteCipher_));
 }
 
 std::unique_ptr<Aead> ServerHandshake::getHandshakeReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return std::move(handshakeReadCipher_);
+  return FizzAead::wrap(std::move(handshakeReadCipher_));
 }
 
 std::unique_ptr<Aead> ServerHandshake::getOneRttWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return std::move(oneRttWriteCipher_);
+  return FizzAead::wrap(std::move(oneRttWriteCipher_));
 }
 
 std::unique_ptr<Aead> ServerHandshake::getOneRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return std::move(oneRttReadCipher_);
+  return FizzAead::wrap(std::move(oneRttReadCipher_));
 }
 
 std::unique_ptr<Aead> ServerHandshake::getZeroRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return std::move(zeroRttReadCipher_);
+  return FizzAead::wrap(std::move(zeroRttReadCipher_));
 }
 
 std::unique_ptr<PacketNumberCipher>
