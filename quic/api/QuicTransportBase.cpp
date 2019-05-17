@@ -1122,6 +1122,7 @@ folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
+    updatePeekLooper(); // read can affect "peek" API
     updateWriteLooper(true);
   };
   try {
@@ -1236,6 +1237,7 @@ folly::
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   SCOPE_EXIT {
     checkForClosedStream();
+    updatePeekLooper();
     updateReadLooper(); // consume may affect "read" API
     updateWriteLooper(true);
   };
@@ -1444,8 +1446,8 @@ void QuicTransportBase::onNetworkData(
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   SCOPE_EXIT {
     checkForClosedStream();
-    updatePeekLooper();
     updateReadLooper();
+    updatePeekLooper();
     updateWriteLooper(true);
   };
   try {
