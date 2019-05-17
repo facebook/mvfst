@@ -8,14 +8,14 @@
 
 #pragma once
 
-#include <fizz/protocol/Factory.h>
+#include <fizz/protocol/OpenSSLFactory.h>
 #include <quic/codec/PacketNumberCipher.h>
 
 namespace quic {
 
 constexpr folly::StringPiece kQuicHkdfLabelPrefix = "quic ";
 
-class QuicFizzFactory : public fizz::Factory {
+class QuicFizzFactory : public fizz::OpenSSLFactory {
  public:
   std::unique_ptr<fizz::PlaintextReadRecordLayer> makePlaintextReadRecordLayer()
       const override;
