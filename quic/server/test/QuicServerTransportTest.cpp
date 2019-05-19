@@ -133,9 +133,9 @@ class FakeServerHandshake : public ServerHandshake {
   }
 
   void setEarlyKeys() {
-    oneRttWriteCipher_ = createNoOpAead();
+    oneRttWriteCipher_ = createNoOpFizzAead();
     oneRttWriteHeaderCipher_ = createNoOpHeaderCipher();
-    zeroRttReadCipher_ = createNoOpAead();
+    zeroRttReadCipher_ = createNoOpFizzAead();
     zeroRttReadHeaderCipher_ = createNoOpHeaderCipher();
   }
 
@@ -143,17 +143,17 @@ class FakeServerHandshake : public ServerHandshake {
     // Mimic ServerHandshake behavior.
     // oneRttWriteCipher would already be set during ReportEarlyHandshakeSuccess
     if (!allowZeroRttKeys_) {
-      oneRttWriteCipher_ = createNoOpAead();
+      oneRttWriteCipher_ = createNoOpFizzAead();
       oneRttWriteHeaderCipher_ = createNoOpHeaderCipher();
     }
-    oneRttReadCipher_ = createNoOpAead();
+    oneRttReadCipher_ = createNoOpFizzAead();
     oneRttReadHeaderCipher_ = createNoOpHeaderCipher();
   }
 
   void setHandshakeKeys() {
-    handshakeWriteCipher_ = createNoOpAead();
+    handshakeWriteCipher_ = createNoOpFizzAead();
     handshakeWriteHeaderCipher_ = createNoOpHeaderCipher();
-    handshakeReadCipher_ = createNoOpAead();
+    handshakeReadCipher_ = createNoOpFizzAead();
     handshakeReadHeaderCipher_ = createNoOpHeaderCipher();
   }
 

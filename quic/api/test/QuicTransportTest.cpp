@@ -9,7 +9,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <fizz/crypto/aead/test/Mocks.h>
 #include <folly/Random.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/IOBufQueue.h>
@@ -19,6 +18,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/handshake/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/Mocks.h>
@@ -182,7 +182,7 @@ class QuicTransportTest : public Test {
         new TestQuicTransport(&evb_, std::move(sock), connCallback_));
     // Set the write handshake state to tell the client that the handshake has
     // a cipher.
-    auto aead = std::make_unique<fizz::test::MockAead>();
+    auto aead = std::make_unique<MockAead>();
     aead_ = aead.get();
     EXPECT_CALL(*aead_, _encrypt(_, _, _))
         .WillRepeatedly(
@@ -221,7 +221,7 @@ class QuicTransportTest : public Test {
   MockAsyncUDPSocket* socket_;
   MockConnectionCallback connCallback_;
   MockWriteCallback writeCallback_;
-  fizz::test::MockAead* aead_;
+  MockAead* aead_;
   std::unique_ptr<PacketNumberCipher> headerCipher_;
   std::shared_ptr<TestQuicTransport> transport_;
 };

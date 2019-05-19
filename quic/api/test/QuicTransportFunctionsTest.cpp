@@ -1010,7 +1010,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   auto socket = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
   auto rawSocket = socket.get();
   EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(100));
-  auto capturingAead = std::make_unique<fizz::test::MockAead>();
+  auto capturingAead = std::make_unique<MockAead>();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = folly::IOBuf::copyBuffer("Where you wanna go");
   writeDataToQuicStream(*stream, buf->clone(), true);
