@@ -556,6 +556,12 @@ void QuicClientTransport::processPacketData(
             "No server transport params",
             TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
       }
+      auto maxStreamsBidi = getIntegerParameter(
+          TransportParameterId::initial_max_streams_bidi,
+          serverParams->parameters);
+      auto maxStreamsUni = getIntegerParameter(
+          TransportParameterId::initial_max_streams_uni,
+          serverParams->parameters);
       processServerInitialParams(
           *clientConn_, std::move(*serverParams), packetNum);
 
@@ -564,7 +570,9 @@ void QuicClientTransport::processPacketData(
           conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal,
           conn_->flowControlState
               .peerAdvertisedInitialMaxStreamOffsetBidiRemote,
-          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni);
+          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
+          maxStreamsBidi.value_or(0),
+          maxStreamsUni.value_or(0));
 
       auto& statelessResetToken = clientConn_->statelessResetToken;
       if (statelessResetToken) {
@@ -857,7 +865,9 @@ void QuicClientTransport::startCryptoHandshake() {
         transportParams.initialMaxData,
         transportParams.initialMaxStreamDataBidiLocal,
         transportParams.initialMaxStreamDataBidiRemote,
-        transportParams.initialMaxStreamDataUni);
+        transportParams.initialMaxStreamDataUni,
+        transportParams.initialMaxStreamsBidi,
+        transportParams.initialMaxStreamsUni);
     updateTransportParamsFromCachedEarlyParams(*clientConn_, transportParams);
   }
   writeSocketData();
@@ -876,7 +886,9 @@ void QuicClientTransport::cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxData,
     uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal,
     uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
-    uint64_t peerAdvertisedInitialMaxStreamDataUni) {
+    uint64_t peerAdvertisedInitialMaxStreamDataUni,
+    uint64_t peerAdvertisedInitialMaxStreamsBidi,
+    uint64_t peerAdvertisedInitialMaxStreamUni) {
   serverInitialParamsSet_ = true;
   peerAdvertisedInitialMaxData_ = peerAdvertisedInitialMaxData;
   peerAdvertisedInitialMaxStreamDataBidiLocal_ =
@@ -885,6 +897,10 @@ void QuicClientTransport::cacheServerInitialParams(
       peerAdvertisedInitialMaxStreamDataBidiRemote;
   peerAdvertisedInitialMaxStreamDataUni_ =
       peerAdvertisedInitialMaxStreamDataUni;
+  clientConn_->peerAdvertisedInitialMaxStreamsBidi =
+      peerAdvertisedInitialMaxStreamsBidi;
+  clientConn_->peerAdvertisedInitialMaxStreamsUni =
+      peerAdvertisedInitialMaxStreamUni;
 }
 
 void QuicClientTransport::removePsk() {

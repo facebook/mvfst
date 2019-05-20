@@ -183,8 +183,9 @@ class QuicClientTransport
       uint64_t peerAdvertisedInitialMaxData,
       uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal,
       uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
-      uint64_t peerAdvertisedInitialMaxStreamDataUni);
-
+      uint64_t peerAdvertisedInitialMaxStreamDataUni,
+      uint64_t peerAdvertisedInitialMaxStreamsBidi,
+      uint64_t peerAdvertisedInitialMaxStreamUni);
   folly::Optional<QuicCachedPsk> getPsk();
   void removePsk();
   void setPartialReliabilityTransportParameter();
