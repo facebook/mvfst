@@ -327,12 +327,6 @@ void onConnectionMigration(
   }
   ++conn.migrationState.numMigrations;
 
-  // NAT rebinding, no path validation & keep congestion state unchanged
-  if (maybeNATRebinding(newPeerAddress, conn.peerAddress)) {
-    conn.peerAddress = newPeerAddress;
-    return;
-  }
-
   auto& previousPeerAddresses = conn.migrationState.previousPeerAddresses;
   auto it = std::find(
       previousPeerAddresses.begin(),
@@ -351,21 +345,31 @@ void onConnectionMigration(
     previousPeerAddresses.erase(it);
   }
 
+  // At this point, path validation scheduled, writable bytes limit set
+  // However if this is NAT rebinding, keep congestion state unchanged
+  bool isNATRebinding = maybeNATRebinding(newPeerAddress, conn.peerAddress);
+
   // Cancel current path validation if any
   if (conn.outstandingPathValidation) {
     conn.pendingEvents.schedulePathValidationTimeout = false;
     conn.outstandingPathValidation = folly::none;
 
-    recoverOrResetCongestionAndRttState(conn, newPeerAddress);
+    // Only change congestion & rtt state if not NAT rebinding
+    if (!isNATRebinding) {
+      recoverOrResetCongestionAndRttState(conn, newPeerAddress);
+    }
   } else {
     // Only add validated addresses to previousPeerAddresses
     conn.migrationState.previousPeerAddresses.push_back(conn.peerAddress);
 
-    // Current peer address is validated,
-    // remember its congestion state and rtt stats
-    CongestionAndRttState state = moveCurrentCongestionAndRttState(conn);
-    recoverOrResetCongestionAndRttState(conn, newPeerAddress);
-    conn.migrationState.lastCongestionAndRtt = std::move(state);
+    // Only change congestion & rtt state if not NAT rebinding
+    if (!isNATRebinding) {
+      // Current peer address is validated,
+      // remember its congestion state and rtt stats
+      CongestionAndRttState state = moveCurrentCongestionAndRttState(conn);
+      recoverOrResetCongestionAndRttState(conn, newPeerAddress);
+      conn.migrationState.lastCongestionAndRtt = std::move(state);
+    }
   }
 
   conn.peerAddress = newPeerAddress;
