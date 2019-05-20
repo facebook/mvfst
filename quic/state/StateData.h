@@ -315,7 +315,7 @@ struct LossState {
   // clones, retransmitted clones, handshake and rejected zero rtt packets.
   uint32_t rtxCount{0};
   // Total number of retransmission due to PTO
-  uint32_t timeoutBasedRetxCount{0};
+  uint32_t timeoutBasedRtxCount{0};
   // Total number of PTO count
   uint32_t totalPTOCount{0};
   // Total number of bytes sent on this connection. This is after encoding.

@@ -345,7 +345,7 @@ void onHandshakeAlarm(
       lossVisitor(conn, packet.packet, false, currentPacketNum);
       DCHECK(conn.outstandingHandshakePacketsCount);
       --conn.outstandingHandshakePacketsCount;
-      ++conn.lossState.timeoutBasedRetxCount;
+      ++conn.lossState.timeoutBasedRtxCount;
       ++conn.lossState.rtxCount;
       iter = conn.outstandingPackets.erase(iter);
     } else {

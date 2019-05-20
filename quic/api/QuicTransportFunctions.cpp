@@ -372,7 +372,7 @@ void updateConnection(
   if (pkt.associatedEvent) {
     CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);
     ++conn.outstandingClonedPacketsCount;
-    ++conn.lossState.timeoutBasedRetxCount;
+    ++conn.lossState.timeoutBasedRtxCount;
   }
 
   auto packetIt = std::lower_bound(

@@ -1548,7 +1548,7 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
 TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
-  conn->lossState.timeoutBasedRetxCount = 246;
+  conn->lossState.timeoutBasedRtxCount = 246;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   RstStreamFrame rstStreamFrame(
       stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
@@ -1556,7 +1556,7 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   PacketEvent packetEvent = 100;
   conn->outstandingPacketEvents.insert(packetEvent);
   updateConnection(*conn, packetEvent, packet.packet, TimePoint(), 500);
-  EXPECT_EQ(247, conn->lossState.timeoutBasedRetxCount);
+  EXPECT_EQ(247, conn->lossState.timeoutBasedRtxCount);
 }
 
 } // namespace test

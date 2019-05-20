@@ -832,7 +832,7 @@ TEST_F(
   // Half are lost
   EXPECT_EQ(5, lostPackets.size());
   EXPECT_EQ(1, conn->lossState.handshakeAlarmCount);
-  EXPECT_EQ(5, conn->lossState.timeoutBasedRetxCount);
+  EXPECT_EQ(5, conn->lossState.timeoutBasedRtxCount);
   EXPECT_EQ(conn->pendingEvents.numProbePackets, 0);
   EXPECT_EQ(5, conn->lossState.rtxCount);
 }

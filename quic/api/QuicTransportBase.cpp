@@ -447,7 +447,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.writableBytes = writableBytes;
   transportInfo.congestionWindow = congestionWindow;
   transportInfo.packetsRetransmitted = conn_->lossState.rtxCount;
-  transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRetxCount;
+  transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRtxCount;
   transportInfo.totalBytesRetransmitted =
       conn_->lossState.totalBytesRetransmitted;
   transportInfo.pto = calculatePTO(*conn_);
