@@ -36,7 +36,6 @@ class QuicTransportStatsCallback {
     ROUTING_ERROR_WRONG_HOST,
     SERVER_STATE_CLOSED,
     TRANSPORT_PARAMETER_ERROR,
-    VERSION_NEGOTIATION_ERROR,
     WORKER_NOT_INITIALIZED,
     SERVER_SHUTDOWN,
     INITIAL_CONNID_SMALL,
@@ -146,8 +145,6 @@ class QuicTransportStatsCallback {
         return "TRANSPORT_PARAMETER_ERROR";
       case PacketDropReason::WORKER_NOT_INITIALIZED:
         return "WORKER_NOT_INITIALIZED";
-      case PacketDropReason::VERSION_NEGOTIATION_ERROR:
-        return "VERSION_NEGOTIATION_ERROR";
       case PacketDropReason::SERVER_SHUTDOWN:
         return "SERVER_SHUTDOWN";
       case PacketDropReason::INITIAL_CONNID_SMALL:

@@ -415,18 +415,7 @@ void onServerReadDataFromOpen(
           conn.infoCallback, onPacketDropped, PacketDropReason::INVALID_PACKET);
       return;
     }
-    if (std::find(
-            conn.supportedVersions.begin(),
-            conn.supportedVersions.end(),
-            version) == conn.supportedVersions.end()) {
-      VLOG(4) << "No match for version " << std::hex
-              << static_cast<int>(version);
-      QUIC_STATS(
-          conn.infoCallback,
-          onPacketDropped,
-          PacketDropReason::VERSION_NEGOTIATION_ERROR);
-      return;
-    }
+
     const auto& clientConnectionId = parsedLongHeader->invariant.srcConnId;
     const auto& initialDestinationConnectionId =
         parsedLongHeader->invariant.dstConnId;
@@ -627,24 +616,6 @@ void onServerReadDataFromOpen(
     // is supported.
     if (!conn.version) {
       conn.version = boost::get<LongHeader>(regularPacket.header).getVersion();
-    } else if (conn.version) {
-      // TODO: move requirements for short and long header matching into the
-      // state machine.
-      bool versionMismatch = folly::variant_match(
-          regularPacket.header,
-          [&](const LongHeader& header) {
-            return *conn.version != header.getVersion();
-          },
-          [](const ShortHeader&) { return false; });
-      if (versionMismatch) {
-        QUIC_STATS(
-            conn.infoCallback,
-            onPacketDropped,
-            PacketDropReason::VERSION_NEGOTIATION_ERROR);
-        throw QuicTransportException(
-            "Version mismatch after negotiation",
-            TransportErrorCode::VERSION_NEGOTIATION_ERROR);
-      }
     }
 
     if (conn.peerAddress != readData.peer) {

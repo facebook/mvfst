@@ -32,12 +32,12 @@ void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame) {
         "Read offset mismatch, " +
             folly::to<std::string>(stream.finalReadOffset.value()) +
             " != " + folly::to<std::string>(frame.offset),
-        TransportErrorCode::FINAL_OFFSET_ERROR);
+        TransportErrorCode::FINAL_SIZE_ERROR);
   }
   // Mark eofoffset:
   if (stream.maxOffsetObserved > frame.offset) {
     throw QuicTransportException(
-        "Reset in middle of stream", TransportErrorCode::FINAL_OFFSET_ERROR);
+        "Reset in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
   }
   // Verify that the flow control is consistent.
   updateFlowControlOnStreamData(stream, stream.maxOffsetObserved, frame.offset);

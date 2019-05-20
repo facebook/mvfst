@@ -71,19 +71,19 @@ void appendDataToReadBufferCommon(
   if (stream.finalReadOffset && bufferEofOffset &&
       *stream.finalReadOffset != *bufferEofOffset) {
     throw QuicTransportException(
-        "Invalid EOF", TransportErrorCode::FINAL_OFFSET_ERROR);
+        "Invalid EOF", TransportErrorCode::FINAL_SIZE_ERROR);
   } else if (bufferEofOffset) {
     // Do some consistency checks on the stream.
     if (stream.maxOffsetObserved > *bufferEofOffset) {
       throw QuicTransportException(
-          "EOF in middle of stream", TransportErrorCode::FINAL_OFFSET_ERROR);
+          "EOF in middle of stream", TransportErrorCode::FINAL_SIZE_ERROR);
     }
     stream.finalReadOffset = bufferEofOffset;
   } else if (stream.finalReadOffset) {
     // We did not receive a segment with an EOF set.
     if (buffer.offset + buffer.data.chainLength() > *stream.finalReadOffset) {
       throw QuicTransportException(
-          "Invalid data after EOF", TransportErrorCode::FINAL_OFFSET_ERROR);
+          "Invalid data after EOF", TransportErrorCode::FINAL_SIZE_ERROR);
     }
   }
   // Update the flow control information before changing max offset observed on

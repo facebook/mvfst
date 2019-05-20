@@ -128,24 +128,20 @@ std::string toString(TransportErrorCode code) {
       return "Stream limit error";
     case TransportErrorCode::STREAM_STATE_ERROR:
       return "Stream State error";
-    case TransportErrorCode::FINAL_OFFSET_ERROR:
+    case TransportErrorCode::FINAL_SIZE_ERROR:
       return "Final offset error";
     case TransportErrorCode::FRAME_ENCODING_ERROR:
       return "Frame format error";
     case TransportErrorCode::TRANSPORT_PARAMETER_ERROR:
       return "Transport parameter error";
-    case TransportErrorCode::VERSION_NEGOTIATION_ERROR:
-      return "Version negotiation error";
     case TransportErrorCode::PROTOCOL_VIOLATION:
       return "Protocol violation";
     case TransportErrorCode::INVALID_MIGRATION:
       return "Invalid migration";
+    case TransportErrorCode::SERVER_BUSY:
+      return "Server busy";
     case TransportErrorCode::TLS_HANDSHAKE_FAILED:
       return "Handshake Failed";
-    case TransportErrorCode::TLS_FATAL_ALERT_GENERATED:
-      return "TLS Alert Sent";
-    case TransportErrorCode::TLS_FATAL_ALERT_RECEIVED:
-      return "TLS Alert Received";
   }
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";
