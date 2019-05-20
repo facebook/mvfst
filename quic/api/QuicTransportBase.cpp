@@ -1976,8 +1976,8 @@ void QuicTransportBase::schedulePathValidationTimeout() {
     return;
   }
   if (!conn_->pendingEvents.schedulePathValidationTimeout) {
-    VLOG(10) << __func__ << " cancel timeout " << *this;
     if (pathValidationTimeout_.isScheduled()) {
+      VLOG(10) << __func__ << " cancel timeout " << *this;
       // This means path validation succeeded, and we should have updated to
       // correct state
       pathValidationTimeout_.cancelTimeout();
