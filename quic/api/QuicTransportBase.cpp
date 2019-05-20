@@ -45,7 +45,7 @@ QuicTransportBase::QuicTransportBase(
       conn_->congestionController->markPacerTimeoutScheduled(Clock::now());
       return conn_->congestionController->getPacingInterval();
     }
-    return std::chrono::microseconds::zero();
+    return 0us;
   });
 }
 

@@ -984,7 +984,7 @@ TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
 
 TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
   auto tickInterval = evb->timer().getTickInterval();
-  transport->scheduleLossTimeout(tickInterval - std::chrono::milliseconds(1));
+  transport->scheduleLossTimeout(tickInterval - 1ms);
   EXPECT_NEAR(
       tickInterval.count(),
       transport->getLossTimeoutRemainingTime().count(),

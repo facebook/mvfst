@@ -16,6 +16,8 @@
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
+using namespace std::chrono_literals;
+
 namespace {
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 } // namespace
@@ -53,9 +55,9 @@ void resetCongestionAndRttState(QuicServerConnectionState& conn) {
   conn.congestionController =
       conn.congestionControllerFactory->makeCongestionController(
           conn, conn.transportSettings.defaultCongestionController);
-  conn.lossState.srtt = std::chrono::microseconds::zero();
-  conn.lossState.lrtt = std::chrono::microseconds::zero();
-  conn.lossState.rttvar = std::chrono::microseconds::zero();
+  conn.lossState.srtt = 0us;
+  conn.lossState.lrtt = 0us;
+  conn.lossState.rttvar = 0us;
 }
 
 void recoverOrResetCongestionAndRttState(

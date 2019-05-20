@@ -43,9 +43,9 @@ TEST_F(CubicStateTest, HystartAck) {
 TEST_F(CubicStateTest, HystartPace) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = std::chrono::microseconds(1000 * 200);
+  conn.lossState.srtt = 2000000us;
   TestingCubic cubic(conn);
-  cubic.setMinimalPacingInterval(std::chrono::milliseconds(10));
+  cubic.setMinimalPacingInterval(10ms);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
   EXPECT_TRUE(cubic.canBePaced());
 }
@@ -98,7 +98,7 @@ TEST_F(CubicStateTest, FastRecoveryLoss) {
 TEST_F(CubicStateTest, RecoveryNoPace) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = std::chrono::microseconds(1000 * 200);
+  conn.lossState.srtt = 2000000us;
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::FastRecovery);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
@@ -131,13 +131,13 @@ TEST_F(CubicStateTest, SteadyLoss) {
 TEST_F(CubicStateTest, SteadyCanPace) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = std::chrono::microseconds(1000 * 200);
+  conn.lossState.srtt = 2000000us;
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::Steady);
   EXPECT_FALSE(cubic.canBePaced());
-  cubic.setMinimalPacingInterval(std::chrono::milliseconds(10));
+  cubic.setMinimalPacingInterval(10ms);
   EXPECT_TRUE(cubic.canBePaced());
-  conn.lossState.srtt = std::chrono::milliseconds(1);
+  conn.lossState.srtt = 1ms;
   EXPECT_FALSE(cubic.canBePaced());
 }
 

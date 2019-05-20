@@ -146,8 +146,7 @@ class QuicSocket {
   struct StreamTransportInfo {
     // Total time the stream has spent in head-of-line blocked state,
     // in microseconds
-    std::chrono::microseconds totalHeadOfLineBlockedTime{
-        std::chrono::microseconds::zero()};
+    std::chrono::microseconds totalHeadOfLineBlockedTime{0us};
 
     // How many times the stream has entered the "head-of-line blocked" state
     uint32_t holbCount{0};

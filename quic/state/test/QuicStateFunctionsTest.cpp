@@ -313,30 +313,30 @@ class QuicStateFunctionsTest : public TestWithParam<PacketNumberSpace> {};
 
 TEST_F(QuicStateFunctionsTest, RttCalculationNoAckDelay) {
   QuicServerConnectionState conn;
-  auto rttSample = std::chrono::microseconds(1100);
-  updateRtt(conn, rttSample, std::chrono::microseconds::zero());
+  auto rttSample = 1100us;
+  updateRtt(conn, rttSample, 0us);
   EXPECT_EQ(1100, conn.lossState.srtt.count());
   EXPECT_EQ(1100 / 2, conn.lossState.rttvar.count());
-  EXPECT_EQ(std::chrono::microseconds(0), conn.lossState.maxAckDelay);
+  EXPECT_EQ(0us, conn.lossState.maxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelay) {
   QuicServerConnectionState conn;
-  auto rttSample = std::chrono::microseconds(1000);
-  updateRtt(conn, rttSample, std::chrono::microseconds(300));
+  auto rttSample = 1000us;
+  updateRtt(conn, rttSample, 300us);
   EXPECT_EQ(1000, conn.lossState.srtt.count());
   EXPECT_EQ(500, conn.lossState.rttvar.count());
-  EXPECT_EQ(std::chrono::microseconds(300), conn.lossState.maxAckDelay);
+  EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, RttCalculationWithMrttAckDelay) {
   QuicServerConnectionState conn;
-  conn.lossState.mrtt = std::chrono::microseconds(100);
-  auto rttSample = std::chrono::microseconds(1000);
-  updateRtt(conn, rttSample, std::chrono::microseconds(300));
+  conn.lossState.mrtt = 100us;
+  auto rttSample = 1000us;
+  updateRtt(conn, rttSample, 300us);
   EXPECT_EQ(700, conn.lossState.srtt.count());
   EXPECT_EQ(350, conn.lossState.rttvar.count());
-  EXPECT_EQ(std::chrono::microseconds(300), conn.lossState.maxAckDelay);
+  EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
@@ -391,36 +391,36 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
 TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   QuicServerConnectionState conn;
   // First rtt sample, will be assign to both srtt and mrtt
-  auto rttSample = std::chrono::microseconds(100);
-  updateRtt(conn, rttSample, std::chrono::microseconds::zero());
-  EXPECT_EQ(std::chrono::microseconds(100), conn.lossState.lrtt);
+  auto rttSample = 100us;
+  updateRtt(conn, rttSample, 0us);
+  EXPECT_EQ(100us, conn.lossState.lrtt);
   EXPECT_EQ(conn.lossState.lrtt, conn.lossState.mrtt);
   EXPECT_EQ(conn.lossState.lrtt, conn.lossState.srtt);
   auto oldMrtt = conn.lossState.mrtt;
 
   // Slower packet
-  rttSample = std::chrono::microseconds(550);
-  updateRtt(conn, rttSample, std::chrono::microseconds::zero());
+  rttSample = 550us;
+  updateRtt(conn, rttSample, 0us);
   EXPECT_EQ(oldMrtt, conn.lossState.mrtt);
 
   // Faster packet
-  rttSample = std::chrono::microseconds(20);
-  updateRtt(conn, rttSample, std::chrono::microseconds::zero());
-  EXPECT_EQ(std::chrono::microseconds(20), conn.lossState.mrtt);
+  rttSample = 20us;
+  updateRtt(conn, rttSample, 0us);
+  EXPECT_EQ(20us, conn.lossState.mrtt);
 }
 
 TEST_F(QuicStateFunctionsTest, UpdateMaxAckDelay) {
   QuicServerConnectionState conn;
-  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.maxAckDelay);
-  auto rttSample = std::chrono::microseconds(100);
+  EXPECT_EQ(0us, conn.lossState.maxAckDelay);
+  auto rttSample = 100us;
 
   // update maxAckDelay
-  updateRtt(conn, rttSample, std::chrono::microseconds(30));
-  EXPECT_EQ(std::chrono::microseconds(30), conn.lossState.maxAckDelay);
+  updateRtt(conn, rttSample, 30us);
+  EXPECT_EQ(30us, conn.lossState.maxAckDelay);
 
   // smaller ackDelay
-  updateRtt(conn, rttSample, std::chrono::microseconds(3));
-  EXPECT_EQ(std::chrono::microseconds(30), conn.lossState.maxAckDelay);
+  updateRtt(conn, rttSample, 3us);
+  EXPECT_EQ(30us, conn.lossState.maxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, IsConnectionPaced) {

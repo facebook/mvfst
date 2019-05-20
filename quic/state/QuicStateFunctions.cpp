@@ -23,7 +23,7 @@ void updateRtt(
     rttSample -= ackDelay;
   }
   conn.lossState.lrtt = rttSample;
-  if (conn.lossState.srtt == std::chrono::microseconds::zero()) {
+  if (conn.lossState.srtt == 0us) {
     conn.lossState.srtt = rttSample;
     conn.lossState.rttvar = rttSample / 2;
   } else {

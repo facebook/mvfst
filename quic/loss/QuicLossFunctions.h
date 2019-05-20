@@ -66,7 +66,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   TimePoint lastSentPacketTime =
       conn.lossState.lastRetransmittablePacketSentTime;
   if (conn.outstandingHandshakePacketsCount > 0) {
-    if (conn.lossState.srtt == std::chrono::microseconds(0)) {
+    if (conn.lossState.srtt == 0us) {
       alarmDuration = kDefaultInitialRtt * 2;
     } else {
       alarmDuration = conn.lossState.srtt * 2;
@@ -85,7 +85,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
           *conn.lossState.lossTime - lastSentPacketTime);
     } else {
       // This should trigger an immediate alarm.
-      alarmDuration = std::chrono::microseconds(0);
+      alarmDuration = 0us;
     }
     alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
   } else {

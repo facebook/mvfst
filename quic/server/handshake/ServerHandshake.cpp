@@ -12,7 +12,7 @@
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
-
+using namespace std::chrono_literals;
 ServerHandshake::ServerHandshake(QuicCryptoState& cryptoState)
     : cryptoState_(cryptoState), visitor_(*this) {}
 

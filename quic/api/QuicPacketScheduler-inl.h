@@ -55,7 +55,7 @@ folly::Optional<PacketNum> AckScheduler::writeAcksImpl(
       (ackingTime > receivedTime
            ? std::chrono::duration_cast<std::chrono::microseconds>(
                  ackingTime - receivedTime)
-           : std::chrono::microseconds::zero());
+           : 0us);
   AckFrameMetaData meta(ackState_.acks, ackDelay, ackDelayExponentToUse);
   auto ackWriteResult = writeAckFrame(meta, builder);
   if (!ackWriteResult) {

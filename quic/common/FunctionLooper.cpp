@@ -10,6 +10,7 @@
 #include <folly/ScopeGuard.h>
 
 namespace quic {
+using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
     folly::EventBase* evb,
@@ -45,7 +46,7 @@ void FunctionLooper::commonLoopBody(bool fromTimer) noexcept {
 bool FunctionLooper::schedulePacingTimeout(bool /* fromTimer */) noexcept {
   if (pacingFunc_ && pacingTimer_ && !isScheduled()) {
     auto nextPacingTime = (*pacingFunc_)();
-    if (nextPacingTime != std::chrono::microseconds::zero()) {
+    if (nextPacingTime != 0us) {
       pacingTimer_->scheduleTimeout(this, nextPacingTime);
       return true;
     }

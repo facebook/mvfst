@@ -1034,10 +1034,9 @@ class QuicServerTest : public Test {
       tries++;
       auto ret = client.write(serverAddr, data->clone());
       CHECK_EQ(ret, data->computeChainDataLength());
-      cv.wait_until(
-          lg, std::chrono::system_clock::now() + std::chrono::seconds(1), [&] {
-            return calledOnNetworkData;
-          });
+      cv.wait_until(lg, std::chrono::system_clock::now() + 1s, [&] {
+        return calledOnNetworkData;
+      });
     }
     CHECK(calledOnNetworkData);
     return transport;
@@ -1329,7 +1328,7 @@ class QuicServerTakeoverTest : public Test {
 
     // Disable packet forwarding on the new server and send packet
     // This packet should be dropped since it's not an initial packet
-    newServer_->stopPacketForwarding(std::chrono::milliseconds(0));
+    newServer_->stopPacketForwarding(0ms);
     std::atomic<bool> posted{false};
     EXPECT_CALL(*newTransInfoCb_, onPacketReceived())
         .WillRepeatedly(Invoke([&] {
@@ -1582,9 +1581,7 @@ TEST_F(QuicServerTest, NetworkTestHealthCheck) {
   EXPECT_EQ(serverData->moveToFbString().toStdString(), std::string("OK"));
 
   reader->getSocket().write(serverAddr, IOBuf::copyBuffer(notHealthCheckToken));
-  EXPECT_THROW(
-      reader->readOne().get(std::chrono::milliseconds(20)),
-      folly::FutureTimeout);
+  EXPECT_THROW(reader->readOne().get(20ms), folly::FutureTimeout);
 }
 
 void QuicServerTest::testReset(Buf packet) {
@@ -1608,7 +1605,7 @@ void QuicServerTest::testReset(Buf packet) {
 
   reader->getSocket().write(serverAddr, packet->clone());
 
-  auto serverData = reader->readOne().get(std::chrono::milliseconds(1000));
+  auto serverData = reader->readOne().get(1000ms);
   EXPECT_LE(serverData->computeChainDataLength(), kDefaultUDPSendPacketLen);
 
   QuicReadCodec codec(QuicNodeType::Client);

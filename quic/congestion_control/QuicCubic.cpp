@@ -454,7 +454,7 @@ std::chrono::microseconds Cubic::getPacingInterval() const noexcept {
 
 void Cubic::setMinimalPacingInterval(
     std::chrono::microseconds interval) noexcept {
-  if (interval != std::chrono::microseconds::zero()) {
+  if (interval != 0us) {
     minimalPacingInterval_ = interval;
     updatePacing();
   }

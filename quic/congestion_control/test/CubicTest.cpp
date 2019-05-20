@@ -145,29 +145,26 @@ TEST_F(CubicTest, AppLimited) {
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   cubic.onPacketSent(packet1);
   cubic.onPacketAckOrLoss(
-      makeAck(1, 1000, reductionTime + std::chrono::milliseconds(1000)),
-      folly::none);
+      makeAck(1, 1000, reductionTime + 1000ms), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
   EXPECT_GT(cubic.getCongestionWindow(), cwnd);
   cwnd = cubic.getCongestionWindow();
 
-  cubic.setAppLimited(true, reductionTime + std::chrono::milliseconds(1100));
+  cubic.setAppLimited(true, reductionTime + 1100ms);
   EXPECT_TRUE(cubic.isAppLimited());
   auto packet2 = makeTestingWritePacket(2, 1000, 3000);
   cubic.onPacketSent(packet2);
   cubic.onPacketAckOrLoss(
-      makeAck(2, 1000, reductionTime + std::chrono::milliseconds(2000)),
-      folly::none);
+      makeAck(2, 1000, reductionTime + 2000ms), folly::none);
   EXPECT_EQ(cubic.getCongestionWindow(), cwnd);
 
   // 1 seconds of quiescence
-  cubic.setAppLimited(false, reductionTime + std::chrono::milliseconds(2100));
+  cubic.setAppLimited(false, reductionTime + 2100ms);
   EXPECT_FALSE(cubic.isAppLimited());
   auto packet3 = makeTestingWritePacket(3, 1000, 4000);
   cubic.onPacketSent(packet3);
   cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, reductionTime + std::chrono::milliseconds(3000)),
-      folly::none);
+      makeAck(3, 1000, reductionTime + 3000ms), folly::none);
   EXPECT_GT(cubic.getCongestionWindow(), cwnd);
 
   auto expectedDelta = static_cast<int64_t>(std::floor(
@@ -180,13 +177,13 @@ TEST_F(CubicTest, PacingGain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1500;
   Cubic cubic(conn);
-  cubic.setMinimalPacingInterval(std::chrono::milliseconds(1));
-  conn.lossState.srtt = std::chrono::microseconds(3 * 1000);
+  cubic.setMinimalPacingInterval(1ms);
+  conn.lossState.srtt = 3000us;
   cubic.onPacketSent(makeTestingWritePacket(0, 1500, 1500));
   cubic.onPacketAckOrLoss(makeAck(0, 1500, Clock::now()), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
   // 11 * 2 / (3 / 1), then take ceil
-  EXPECT_EQ(std::chrono::milliseconds(1), cubic.getPacingInterval());
+  EXPECT_EQ(1ms, cubic.getPacingInterval());
   EXPECT_EQ(8, cubic.getPacingRate(Clock::now()));
 
   auto packet = makeTestingWritePacket(1, 1500, 3000);
@@ -197,7 +194,7 @@ TEST_F(CubicTest, PacingGain) {
   cubic.onPacketAckOrLoss(folly::none, loss);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   // 9 * 1.25 / (3 / 1) then take ceil
-  EXPECT_EQ(std::chrono::milliseconds(1), cubic.getPacingInterval());
+  EXPECT_EQ(1ms, cubic.getPacingInterval());
   EXPECT_EQ(4, cubic.getPacingRate(Clock::now()));
 
   cubic.onPacketSent(makeTestingWritePacket(2, 1500, 4500));
@@ -205,18 +202,18 @@ TEST_F(CubicTest, PacingGain) {
   EXPECT_EQ(CubicStates::Steady, cubic.state());
   // Cwnd should still be very close to 9 mss
   // 9 / (3 / 1)
-  EXPECT_EQ(std::chrono::milliseconds(1), cubic.getPacingInterval());
+  EXPECT_EQ(1ms, cubic.getPacingInterval());
   EXPECT_NEAR(3, cubic.getPacingRate(Clock::now()), 1);
 }
 
 TEST_F(CubicTest, PacingSpread) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.lossState.srtt = std::chrono::milliseconds(60);
+  conn.lossState.srtt = 60ms;
   conn.udpSendPacketLen = 1500;
   Cubic::CubicBuilder builder;
   builder.setPacingSpreadAcrossRtt(true);
   auto cubic = builder.build(conn);
-  cubic->setMinimalPacingInterval(std::chrono::milliseconds(1));
+  cubic->setMinimalPacingInterval(1ms);
 
   for (size_t i = 0; i < 5; i++) {
     cubic->onPacketSent(makeTestingWritePacket(i, 1500, 4500 + 1500 * (1 + i)));
@@ -224,14 +221,14 @@ TEST_F(CubicTest, PacingSpread) {
   }
   ASSERT_EQ(1500 * 15, cubic->getCongestionWindow());
   EXPECT_EQ(2, cubic->getPacingRate(Clock::now()));
-  EXPECT_EQ(std::chrono::milliseconds(4), cubic->getPacingInterval());
+  EXPECT_EQ(4ms, cubic->getPacingInterval());
 }
 
 TEST_F(CubicTest, LatePacingTimer) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.lossState.srtt = std::chrono::milliseconds(50);
+  conn.lossState.srtt = 50ms;
   Cubic cubic(conn);
-  cubic.setMinimalPacingInterval(std::chrono::milliseconds(1));
+  cubic.setMinimalPacingInterval(1ms);
   cubic.onPacketSent(
       makeTestingWritePacket(0, conn.udpSendPacketLen, conn.udpSendPacketLen));
   cubic.onPacketAckOrLoss(
@@ -240,25 +237,22 @@ TEST_F(CubicTest, LatePacingTimer) {
   auto currentTime = Clock::now();
   auto pacingRateWithoutCompensation = cubic.getPacingRate(currentTime);
   cubic.markPacerTimeoutScheduled(currentTime);
-  auto pacingRateWithCompensation =
-      cubic.getPacingRate(currentTime + std::chrono::milliseconds(50));
+  auto pacingRateWithCompensation = cubic.getPacingRate(currentTime + 50ms);
   EXPECT_GT(pacingRateWithCompensation, pacingRateWithoutCompensation);
 
   // No matter how late it comes, you cannot go beyond the max limit
-  auto veryLatePacingRate =
-      cubic.getPacingRate(currentTime + std::chrono::seconds(100));
+  auto veryLatePacingRate = cubic.getPacingRate(currentTime + 100s);
   EXPECT_GE(conn.transportSettings.maxBurstPackets, veryLatePacingRate);
 
   // But if you call getPacingRate again, it won't have compensation
-  auto pacingRateAgain =
-      cubic.getPacingRate(currentTime + std::chrono::milliseconds(50));
+  auto pacingRateAgain = cubic.getPacingRate(currentTime + 50ms);
   EXPECT_LT(pacingRateAgain, pacingRateWithCompensation);
 }
 
 TEST_F(CubicTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1500;
-  conn.lossState.srtt = std::chrono::microseconds(1);
+  conn.lossState.srtt = 1us;
   Cubic cubic(conn);
   cubic.onPacketSent(makeTestingWritePacket(0, 1500, 1500));
   cubic.onPacketAckOrLoss(makeAck(0, 1500, Clock::now()), folly::none);

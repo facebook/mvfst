@@ -1966,12 +1966,9 @@ TEST_F(QuicServerTransportTest, MigrateToUnvalidatedPeer) {
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2181,9 +2178,9 @@ TEST_F(QuicServerTransportTest, MigrateToValidatedPeer) {
   state.congestionController = ccFactory_->makeCongestionController(
       server->getNonConstConn(),
       server->getNonConstConn().transportSettings.defaultCongestionController);
-  state.srtt = std::chrono::microseconds(1000);
-  state.lrtt = std::chrono::microseconds(2000);
-  state.rttvar = std::chrono::microseconds(3000);
+  state.srtt = 1000us;
+  state.lrtt = 2000us;
+  state.rttvar = 3000us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2252,9 +2249,9 @@ TEST_F(
   state.congestionController = ccFactory_->makeCongestionController(
       server->getNonConstConn(),
       server->getNonConstConn().transportSettings.defaultCongestionController);
-  state.srtt = std::chrono::microseconds(1000);
-  state.lrtt = std::chrono::microseconds(2000);
-  state.rttvar = std::chrono::microseconds(3000);
+  state.srtt = 1000us;
+  state.lrtt = 2000us;
+  state.rttvar = 3000us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2288,12 +2285,9 @@ TEST_F(
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2320,9 +2314,9 @@ TEST_F(QuicServerTransportTest, MigrateToStaleValidatedPeer) {
   state.congestionController = ccFactory_->makeCongestionController(
       server->getNonConstConn(),
       server->getNonConstConn().transportSettings.defaultCongestionController);
-  state.srtt = std::chrono::microseconds(1000);
-  state.lrtt = std::chrono::microseconds(2000);
-  state.rttvar = std::chrono::microseconds(3000);
+  state.srtt = 1000us;
+  state.lrtt = 2000us;
+  state.rttvar = 3000us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2353,12 +2347,9 @@ TEST_F(QuicServerTransportTest, MigrateToStaleValidatedPeer) {
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2405,12 +2396,9 @@ TEST_F(
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2443,12 +2431,9 @@ TEST_F(
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2495,12 +2480,9 @@ TEST_F(
   EXPECT_EQ(
       server->getConn().migrationState.previousPeerAddresses.back(),
       peerAddress);
-  EXPECT_EQ(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_EQ(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.srtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
+  EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2590,12 +2572,9 @@ TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   EXPECT_TRUE(server->getConn().writableBytesLimit);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
-  EXPECT_NE(
-      server->getConn().lossState.srtt, std::chrono::microseconds::zero());
-  EXPECT_NE(
-      server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
-  EXPECT_NE(
-      server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_NE(server->getConn().lossState.srtt, 0us);
+  EXPECT_NE(server->getConn().lossState.lrtt, 0us);
+  EXPECT_NE(server->getConn().lossState.rttvar, 0us);
   EXPECT_EQ(server->getConn().congestionController.get(), congestionController);
   EXPECT_FALSE(server->getConn().migrationState.lastCongestionAndRtt);
 }
@@ -2704,7 +2683,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   DCHECK(builder.canBuildPacket());
-  AckFrameMetaData ackData(acks, std::chrono::microseconds::zero(), 0);
+  AckFrameMetaData ackData(acks, 0us, 0);
   writeAckFrame(ackData, builder);
   auto packet = packetToBufCleartext(
       std::move(builder).buildPacket(),

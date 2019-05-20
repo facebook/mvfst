@@ -54,24 +54,20 @@ TEST_F(QuicFlowControlTest, MaybeSendConnWindowUpdateTimeElapsed) {
   conn_.flowControlState.advertisedMaxOffset = 400;
   conn_.flowControlState.sumCurReadOffset = 100;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
   // Should not send window update
   EXPECT_CALL(*transportInfoCb_, onConnFlowControlUpdate()).Times(0);
   // less than 2rtt passes
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(100));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 100us);
   EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
 
   // Should send window update
   EXPECT_CALL(*transportInfoCb_, onConnFlowControlUpdate()).Times(1);
 
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
 }
 
@@ -80,20 +76,16 @@ TEST_F(QuicFlowControlTest, DontSendConnFlowControlTwice) {
   conn_.flowControlState.advertisedMaxOffset = 400;
   conn_.flowControlState.sumCurReadOffset = 100;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
 
   // Should send window update
   EXPECT_CALL(*transportInfoCb_, onConnFlowControlUpdate()).Times(1);
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_TRUE(conn_.pendingEvents.connWindowUpdate);
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 300us);
 }
 
 TEST_F(QuicFlowControlTest, NoStreamFlowControlUpdateOnTimeFlowUnchanged) {
@@ -101,14 +93,12 @@ TEST_F(QuicFlowControlTest, NoStreamFlowControlUpdateOnTimeFlowUnchanged) {
   conn_.flowControlState.advertisedMaxOffset = 600;
   conn_.flowControlState.sumCurReadOffset = 100;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
   EXPECT_CALL(*transportInfoCb_, onConnFlowControlUpdate()).Times(0);
 
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
 }
 
@@ -117,14 +107,12 @@ TEST_F(QuicFlowControlTest, NoConnFlowControlUpdateOnTimeExpiredIfNotChanged) {
   conn_.flowControlState.advertisedMaxOffset = 600;
   conn_.flowControlState.sumCurReadOffset = 100;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   conn_.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
   EXPECT_CALL(*transportInfoCb_, onConnFlowControlUpdate()).Times(0);
 
   maybeSendConnWindowUpdate(
-      conn_,
-      *conn_.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      conn_, *conn_.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
 }
 
@@ -218,22 +206,18 @@ TEST_F(QuicFlowControlTest, MaybeSendStreamWindowUpdateTimeElapsed) {
   stream.flowControlState.windowSize = 500;
   stream.flowControlState.advertisedMaxOffset = 400;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
 
   // Should not send window update
   EXPECT_CALL(*transportInfoCb_, onStreamFlowControlUpdate()).Times(0);
   maybeSendStreamWindowUpdate(
-      stream,
-      *stream.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(100));
+      stream, *stream.flowControlState.timeOfLastFlowControlUpdate + 100us);
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
 
   EXPECT_CALL(*transportInfoCb_, onStreamFlowControlUpdate()).Times(1);
   maybeSendStreamWindowUpdate(
-      stream,
-      *stream.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      stream, *stream.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
 }
 
@@ -244,19 +228,15 @@ TEST_F(QuicFlowControlTest, DontSendStreamWindowUpdateTwice) {
   stream.flowControlState.windowSize = 500;
   stream.flowControlState.advertisedMaxOffset = 400;
 
-  conn_.lossState.srtt = std::chrono::microseconds(100);
+  conn_.lossState.srtt = 100us;
   stream.flowControlState.timeOfLastFlowControlUpdate = Clock::now();
 
   EXPECT_CALL(*transportInfoCb_, onStreamFlowControlUpdate()).Times(1);
   maybeSendStreamWindowUpdate(
-      stream,
-      *stream.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      stream, *stream.flowControlState.timeOfLastFlowControlUpdate + 300us);
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   maybeSendStreamWindowUpdate(
-      stream,
-      *stream.flowControlState.timeOfLastFlowControlUpdate +
-          std::chrono::microseconds(300));
+      stream, *stream.flowControlState.timeOfLastFlowControlUpdate + 300us);
 }
 
 TEST_F(QuicFlowControlTest, DontSendStreamWindowUpdateOnRemoteHalfClosed) {

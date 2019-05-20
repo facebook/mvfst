@@ -25,21 +25,13 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   conn.udpSendPacketLen = 1;
   std::chrono::microseconds rtt(1000 * 100);
   auto result = calculatePacingRate(
-      conn,
-      50,
-      conn.transportSettings.minCwndInMss,
-      std::chrono::milliseconds(10),
-      rtt);
-  EXPECT_EQ(std::chrono::milliseconds(10), result.first);
+      conn, 50, conn.transportSettings.minCwndInMss, 10ms, rtt);
+  EXPECT_EQ(10ms, result.first);
   EXPECT_EQ(5, result.second);
 
   auto result2 = calculatePacingRate(
-      conn,
-      300,
-      conn.transportSettings.minCwndInMss,
-      std::chrono::milliseconds(1),
-      rtt);
-  EXPECT_EQ(std::chrono::milliseconds(1), result2.first);
+      conn, 300, conn.transportSettings.minCwndInMss, 1ms, rtt);
+  EXPECT_EQ(1ms, result2.first);
   EXPECT_EQ(3, result2.second);
 }
 
@@ -47,12 +39,8 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
-      conn,
-      100,
-      conn.transportSettings.minCwndInMss,
-      std::chrono::milliseconds(1),
-      std::chrono::microseconds(1000 * 100));
-  EXPECT_EQ(std::chrono::milliseconds(2), result.first);
+      conn, 100, conn.transportSettings.minCwndInMss, 1ms, 100000us);
+  EXPECT_EQ(2ms, result.first);
   EXPECT_EQ(conn.transportSettings.minCwndInMss, result.second);
 }
 
@@ -60,12 +48,8 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
-      conn,
-      10,
-      conn.transportSettings.minCwndInMss,
-      std::chrono::milliseconds(1),
-      std::chrono::microseconds(1000 * 100));
-  EXPECT_EQ(std::chrono::milliseconds(20), result.first);
+      conn, 10, conn.transportSettings.minCwndInMss, 1ms, 100000us);
+  EXPECT_EQ(20ms, result.first);
   EXPECT_EQ(conn.transportSettings.minCwndInMss, result.second);
 }
 
@@ -73,11 +57,7 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
-      conn,
-      10,
-      conn.transportSettings.minCwndInMss,
-      std::chrono::milliseconds(10),
-      std::chrono::milliseconds(1));
+      conn, 10, conn.transportSettings.minCwndInMss, 10ms, 1ms);
   EXPECT_EQ(std::chrono::milliseconds::zero(), result.first);
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit, result.second);

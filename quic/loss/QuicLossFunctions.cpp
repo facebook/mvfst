@@ -19,7 +19,7 @@ bool isPersistentCongestion(
     const QuicConnectionStateBase& conn,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd) noexcept {
-  if (conn.lossState.srtt == std::chrono::microseconds::zero()) {
+  if (conn.lossState.srtt == 0us) {
     return false;
   }
   auto pto = calculatePTO(conn);

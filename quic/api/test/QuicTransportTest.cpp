@@ -1627,12 +1627,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   streamState->retransmissionBuffer.clear();
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   NetworkData emptyData2;
-  EXPECT_CALL(
-      mockedDeliveryCallback,
-      onDeliveryAck(stream, 1, std::chrono::microseconds(100)))
-      .Times(1);
+  EXPECT_CALL(mockedDeliveryCallback, onDeliveryAck(stream, 1, 100us)).Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
 }
 
@@ -1648,16 +1645,13 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   auto& conn = transport_->getConnectionState();
   // Faking a delivery:
   conn.streamManager->addDeliverable(stream);
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
 
   folly::SocketAddress addr;
   NetworkData emptyData;
-  EXPECT_CALL(
-      mockedDeliveryCallback,
-      onDeliveryAck(stream, 1, std::chrono::microseconds(100)))
-      .Times(1);
+  EXPECT_CALL(mockedDeliveryCallback, onDeliveryAck(stream, 1, 100us)).Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
 }
 
@@ -1674,15 +1668,13 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   auto& conn = transport_->getConnectionState();
   // Faking a delivery:
   conn.streamManager->addDeliverable(stream);
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
 
   folly::SocketAddress addr;
   NetworkData emptyData;
-  EXPECT_CALL(
-      mockedDeliveryCallback1,
-      onDeliveryAck(stream, 50, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
 
@@ -1696,9 +1688,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
-  EXPECT_CALL(
-      mockedDeliveryCallback2,
-      onDeliveryAck(stream, 150, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
 }
@@ -1716,7 +1706,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   auto& conn = transport_->getConnectionState();
   // Faking a delivery and retx:
   conn.streamManager->addDeliverable(stream);
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
   streamState->retransmissionBuffer.emplace_back(
@@ -1724,9 +1714,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
 
   folly::SocketAddress addr;
   NetworkData emptyData;
-  EXPECT_CALL(
-      mockedDeliveryCallback1,
-      onDeliveryAck(stream, 50, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
 
@@ -1740,9 +1728,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
-  EXPECT_CALL(
-      mockedDeliveryCallback2,
-      onDeliveryAck(stream, 150, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
 }
@@ -1762,7 +1748,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   auto& conn = transport_->getConnectionState();
   // Faking a delivery, retx and loss:
   conn.streamManager->addDeliverable(stream);
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
   streamState->lossBuffer.clear();
@@ -1773,9 +1759,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
 
   folly::SocketAddress addr;
   NetworkData emptyData;
-  EXPECT_CALL(
-      mockedDeliveryCallback1,
-      onDeliveryAck(stream, 30, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 30, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
 
@@ -1789,13 +1773,9 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
-  EXPECT_CALL(
-      mockedDeliveryCallback2,
-      onDeliveryAck(stream, 50, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 50, 100us))
       .Times(1);
-  EXPECT_CALL(
-      mockedDeliveryCallback3,
-      onDeliveryAck(stream, 150, std::chrono::microseconds(100)))
+  EXPECT_CALL(mockedDeliveryCallback3, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
 }
@@ -2221,7 +2201,7 @@ TEST_F(QuicTransportTest, NoStream) {
 
 TEST_F(QuicTransportTest, CancelAckTimeout) {
   transport_->getTimer()->scheduleTimeout(
-      transport_->getAckTimeout(), std::chrono::milliseconds(1000 * 1000));
+      transport_->getAckTimeout(), 1000000ms);
   EXPECT_TRUE(transport_->getAckTimeout()->isScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = false;
   transport_->onNetworkData(
@@ -2232,8 +2212,7 @@ TEST_F(QuicTransportTest, CancelAckTimeout) {
 
 TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   // Make srtt large so we will use kMinAckTimeout
-  transport_->getConnectionState().lossState.srtt =
-      std::chrono::microseconds(25 * 1000 * 1000);
+  transport_->getConnectionState().lossState.srtt = 25000000us;
   EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
@@ -2245,8 +2224,7 @@ TEST_F(QuicTransportTest, ScheduleAckTimeout) {
 }
 
 TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
-  transport_->getConnectionState().lossState.srtt =
-      std::chrono::microseconds(25 * 1000 * 1000);
+  transport_->getConnectionState().lossState.srtt = 25000000us;
   EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());
   transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
   transport_->onNetworkData(
@@ -2261,7 +2239,7 @@ TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
   transport_->writeChain(stream, buf->clone(), false, false);
   loopForWrites();
-  transport_->scheduleLossTimeout(std::chrono::milliseconds(500));
+  transport_->scheduleLossTimeout(500ms);
   EXPECT_TRUE(transport_->isLossTimeoutScheduled());
 
   transport_->closeNow(folly::none);
@@ -2315,8 +2293,7 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
 }
 
 TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
-  transport_->setPacingTimer(
-      TimerHighRes::newTimer(&evb_, std::chrono::milliseconds(1)));
+  transport_->setPacingTimer(TimerHighRes::newTimer(&evb_, 1ms));
   auto& conn = transport_->getConnectionState();
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -2336,7 +2313,7 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
       .WillRepeatedly(Return(1));
   EXPECT_CALL(*rawCongestionController, markPacerTimeoutScheduled(_));
   EXPECT_CALL(*rawCongestionController, getPacingInterval())
-      .WillRepeatedly(Return(std::chrono::milliseconds(1000 * 60 * 60)));
+      .WillRepeatedly(Return(3600000ms));
   // This will write out 100 bytes, leave 100 bytes behind. FunctionLooper will
   // schedule a pacing timeout.
   loopForWrites();

@@ -53,7 +53,7 @@ TEST_F(QuicCodecUtilsTest, TestIterateStreamFrameInBetweenAcks) {
   ReadStreamFrame frame1(1, 0, true);
   ReadAckFrame ack;
   ack.largestAcked = 0;
-  ack.ackDelay = std::chrono::microseconds::zero();
+  ack.ackDelay = 0us;
 
   packet.frames.push_back(ack);
   packet.frames.push_back(frame1);

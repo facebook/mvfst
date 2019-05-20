@@ -554,10 +554,7 @@ TEST_F(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {
   IntervalSet<PacketNum> ackBlocks = {{max - 10, max - 10}, {1, 1}};
   EXPECT_THROW(
       writeAckFrame(
-          AckFrameMetaData(
-              ackBlocks,
-              std::chrono::microseconds::zero(),
-              kDefaultAckDelayExponent),
+          AckFrameMetaData(ackBlocks, 0us, kDefaultAckDelayExponent),
           pktBuilder),
       QuicTransportException);
 }
@@ -573,8 +570,7 @@ TEST_F(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
   // total 11 bytes
   PacketNum largest = (uint64_t)1 << 55;
   IntervalSet<PacketNum> ackBlocks = {{1, largest}};
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds::zero(), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 0us, kDefaultAckDelayExponent);
 
   auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
 
@@ -604,8 +600,7 @@ TEST_F(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
   // total 15 bytes
   IntervalSet<PacketNum> ackBlocks = {{1000, 1000}, {500, 700}, {100, 200}};
   // 4 btyes are just not enough for anything
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(555), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
 
   auto result = writeAckFrame(ackMetadata, pktBuilder);
   EXPECT_FALSE(result.hasValue());
@@ -615,7 +610,7 @@ TEST_F(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
 TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  auto ackDelay = std::chrono::microseconds(111);
+  auto ackDelay = 111us;
   IntervalSet<PacketNum> ackBlocks = {{501, 1000}, {101, 400}};
   AckFrameMetaData meta(ackBlocks, ackDelay, kDefaultAckDelayExponent);
 
@@ -659,7 +654,7 @@ TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
 TEST_F(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  auto ackDelay = std::chrono::microseconds(111);
+  auto ackDelay = 111us;
   IntervalSet<PacketNum> ackBlocks = {{501, 1000}, {101, 400}};
   AckFrameMetaData meta(ackBlocks, ackDelay, kDefaultAckDelayExponent);
 
@@ -696,8 +691,7 @@ TEST_F(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
     currentEnd -= blockLength + gap;
   }
   ackBlocks.insert({largest, largest});
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds::zero(), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 0us, kDefaultAckDelayExponent);
 
   auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
 
@@ -720,8 +714,7 @@ TEST_F(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
 
   IntervalSet<PacketNum> ackBlocks{{1000, 1000}};
   uint8_t ackDelayExponent = 6;
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(1240), ackDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 1240us, ackDelayExponent);
 
   writeAckFrame(ackMetadata, pktBuilder);
   auto builtOut = std::move(pktBuilder).buildPacket();
@@ -740,8 +733,7 @@ TEST_F(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
 
   IntervalSet<PacketNum> ackBlocks{{1000, 1000}};
   uint8_t ackDelayExponent = 6;
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(1240), ackDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 1240us, ackDelayExponent);
 
   writeAckFrame(ackMetadata, pktBuilder);
   auto builtOut = std::move(pktBuilder).buildLongHeaderPacket();
@@ -765,8 +757,7 @@ TEST_F(QuicWriteCodecTest, OnlyAckLargestPacket) {
   // 1 byte for first ack block length
   // total 7 bytes
   IntervalSet<PacketNum> ackBlocks{{1000, 1000}};
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(555), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
 
   // No AckBlock is added to the metadata. There will still be one block
   // generated as the first block to cover largestAcked => 2 bytes
@@ -818,8 +809,7 @@ TEST_F(QuicWriteCodecTest, WriteSomeAckBlocks) {
   }
   testAckBlocks.insert({1000, 1000});
 
-  AckFrameMetaData ackMetadata(
-      testAckBlocks, std::chrono::milliseconds(555), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(testAckBlocks, 555ms, kDefaultAckDelayExponent);
   auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
 
   EXPECT_EQ(ackFrameWriteResult.bytesWritten, 35);
@@ -853,8 +843,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   // 1 byte for num ack blocks
   // 1 byte for first ack block length
   IntervalSet<PacketNum> ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(555), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
   auto ackFrameWriteResult = writeAckFrame(ackMetadata, pktBuilder);
   EXPECT_FALSE(ackFrameWriteResult.hasValue());
 }
@@ -869,8 +858,7 @@ TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   // 1 byte for num ack blocks
   // 1 byte for first ack block length
   IntervalSet<PacketNum> ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
-  AckFrameMetaData ackMetadata(
-      ackBlocks, std::chrono::microseconds(555), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
   auto ackFrameWriteResult = *writeAckFrame(ackMetadata, pktBuilder);
 
   EXPECT_EQ(ackFrameWriteResult.bytesWritten, 7);

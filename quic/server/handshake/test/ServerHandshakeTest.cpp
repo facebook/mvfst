@@ -397,12 +397,12 @@ class AsyncRejectingTicketCipher : public fizz::server::TicketCipher {
       std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     if (!encryptAsync_) {
-      return std::make_pair(IOBuf::create(0), std::chrono::seconds(2));
+      return std::make_pair(IOBuf::create(0), 2s);
     } else {
       encryptAsync_ = false;
       return std::move(encryptFuture_).thenValue([](auto&&) {
         VLOG(1) << "got ticket async";
-        return std::make_pair(IOBuf::create(0), std::chrono::seconds(2));
+        return std::make_pair(IOBuf::create(0), 2s);
       });
     }
   }
@@ -482,8 +482,7 @@ TEST_F(ServerHandshakeWriteNSTTest, TestWriteNST) {
       .WillOnce(Invoke([&appToken](fizz::server::ResumptionState& resState) {
         EXPECT_TRUE(
             folly::IOBufEqualTo()(resState.appToken, encodeAppToken(appToken)));
-        return std::make_pair(
-            folly::IOBuf::copyBuffer("appToken"), std::chrono::seconds(100));
+        return std::make_pair(folly::IOBuf::copyBuffer("appToken"), 100s);
       }));
   handshake->writeNewSessionTicket(appToken);
   evb.loop();
@@ -506,8 +505,7 @@ class ServerHandshakePskTest : public ServerHandshakeTest {
     psk.alpn = std::string("h1q-fb");
     psk.ticketAgeAdd = 1;
     psk.ticketIssueTime = std::chrono::system_clock::now();
-    psk.ticketExpirationTime =
-        std::chrono::system_clock::now() + std::chrono::seconds(20);
+    psk.ticketExpirationTime = std::chrono::system_clock::now() + 20s;
     psk.maxEarlyDataSize = 2;
     ServerHandshakeTest::SetUp();
   }
@@ -725,7 +723,7 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
         std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
     encrypt(fizz::server::ResumptionState) const override {
       // Fake handshake, no need todo anything here.
-      return std::make_pair(IOBuf::create(0), std::chrono::seconds(2));
+      return std::make_pair(IOBuf::create(0), 2s);
     }
 
     void setPsk(fizz::client::CachedPsk psk) {
@@ -752,8 +750,7 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
     clientCtx->setSendEarlyData(true);
     serverCtx->setEarlyDataSettings(
         true,
-        fizz::server::ClockSkewTolerance{std::chrono::milliseconds(-1000),
-                                         std::chrono::milliseconds(1000)},
+        fizz::server::ClockSkewTolerance{-1000ms, 1000ms},
         std::make_shared<fizz::server::AllowAllReplayReplayCache>());
 
     clientCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});

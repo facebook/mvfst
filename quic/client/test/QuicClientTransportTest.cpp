@@ -309,7 +309,7 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
       .WillByDefault(Invoke([streamData](auto, auto err) mutable {
         streamData->setException(err);
       }));
-  return streamData->promise.getFuture().within(std::chrono::seconds(10));
+  return streamData->promise.getFuture().within(10s);
 }
 
 void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
@@ -323,7 +323,7 @@ void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
                })
                .ensure([&] { eventbase_.terminateLoopSoon(); });
   eventbase_.loopForever();
-  std::move(f).get(std::chrono::seconds(1));
+  std::move(f).get(1s);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
@@ -721,7 +721,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
                     })
                 .ensure([&] { eventbase_.terminateLoopSoon(); });
   eventbase_.loopForever();
-  std::move(f2).get(std::chrono::seconds(5));
+  std::move(f2).get(5s);
   EXPECT_TRUE(resetRecvd);
 }
 
@@ -3427,7 +3427,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   DCHECK(builder.canBuildPacket());
-  AckFrameMetaData ackData(acks, std::chrono::microseconds::zero(), 0);
+  AckFrameMetaData ackData(acks, 0us, 0);
   writeAckFrame(ackData, builder);
   auto packet = packetToBufCleartext(
       std::move(builder).buildPacket(),

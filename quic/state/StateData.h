@@ -289,11 +289,11 @@ using FrameList = std::vector<QuicSimpleFrame>;
 struct LossState {
   enum class AlarmMethod { EarlyRetransmitOrReordering, Handshake, PTO };
   // Smooth rtt
-  std::chrono::microseconds srtt{std::chrono::microseconds::zero()};
+  std::chrono::microseconds srtt{0us};
   // Latest rtt
-  std::chrono::microseconds lrtt{std::chrono::microseconds::zero()};
+  std::chrono::microseconds lrtt{0us};
   // Rtt var
-  std::chrono::microseconds rttvar{std::chrono::microseconds::zero()};
+  std::chrono::microseconds rttvar{0us};
   // Number of packet loss timer fired before receiving an ack
   uint32_t ptoCount{0};
   // The number of times the handshake packets have been retransmitted without
@@ -338,7 +338,7 @@ struct LossState {
   // packet is acked.
   uint64_t totalBytesAckedAtLastAck{0};
   // Max ack delay received from peer
-  std::chrono::microseconds maxAckDelay{std::chrono::microseconds::zero()};
+  std::chrono::microseconds maxAckDelay{0us};
   // minimum rtt. AckDelay isn't excluded from this.
   std::chrono::microseconds mrtt{std::chrono::microseconds::max()};
   // The sent time of the latest acked packet

@@ -68,8 +68,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(
-      ackBlocks, std::chrono::microseconds(0), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
   QuicServerConnectionState conn;
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -317,8 +316,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(
-      ackBlocks, std::chrono::microseconds(0), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
   QuicServerConnectionState conn;
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();

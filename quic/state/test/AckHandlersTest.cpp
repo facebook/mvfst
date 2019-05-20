@@ -65,7 +65,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   // Get the time based loss detection out of the way
-  conn.lossState.srtt = std::chrono::seconds(10);
+  conn.lossState.srtt = 10s;
 
   StreamId current = 10;
   auto sentTime = Clock::now();
@@ -139,7 +139,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   // Get the time based loss detection out of the way
-  conn.lossState.srtt = std::chrono::seconds(10);
+  conn.lossState.srtt = 10s;
 
   StreamId current = 10;
   for (PacketNum packetNum = 10; packetNum < 51; packetNum++) {
@@ -244,7 +244,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   // Get the time based loss detection out of the way
-  conn.lossState.srtt = std::chrono::seconds(10);
+  conn.lossState.srtt = 10s;
 
   StreamId current = 10;
   for (PacketNum packetNum = 10; packetNum < 20; packetNum++) {
@@ -468,7 +468,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   auto mockController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockController);
   // Get the time based loss detection out of the way
-  conn.lossState.srtt = std::chrono::seconds(10);
+  conn.lossState.srtt = 10s;
 
   PacketNum packetNum1 = 9;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
@@ -834,7 +834,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
 TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   QuicServerConnectionState conn;
   conn.congestionController = nullptr;
-  conn.lossState.mrtt = std::chrono::microseconds(200);
+  conn.lossState.mrtt = 200us;
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
   auto sentTime = Clock::now();
@@ -843,11 +843,11 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
 
   ReadAckFrame ackFrame;
   // ackDelay has no effect on mrtt
-  ackFrame.ackDelay = std::chrono::microseconds(50);
+  ackFrame.ackDelay = 50us;
   ackFrame.largestAcked = 0;
   ackFrame.ackBlocks.emplace_back(0, 0);
 
-  auto receiveTime = sentTime + std::chrono::microseconds(10);
+  auto receiveTime = sentTime + 10us;
   processAckFrame(
       conn,
       GetParam(),
@@ -855,7 +855,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
       [&](const auto&, const auto&, const auto&) { /* ackVisitor */ },
       [&](auto&, auto&, bool, PacketNum) { /* lossVisitor */ },
       receiveTime);
-  EXPECT_EQ(std::chrono::microseconds(10), conn.lossState.mrtt);
+  EXPECT_EQ(10us, conn.lossState.mrtt);
 }
 
 // Ack only acks packets aren't outstanding, but TimeReordering still finds loss
@@ -926,7 +926,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   conn.lossState.totalBytesAcked = 1357;
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
-  auto sentTime = Clock::now() - std::chrono::milliseconds(1500);
+  auto sentTime = Clock::now() - 1500ms;
   conn.outstandingPackets.emplace_back(OutstandingPacket(
       std::move(regularPacket),
       sentTime,
@@ -940,7 +940,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   ackFrame.largestAcked = 0;
   ackFrame.ackBlocks.emplace_back(0, 0);
 
-  auto receiveTime = Clock::now() - std::chrono::milliseconds(200);
+  auto receiveTime = Clock::now() - 200ms;
   processAckFrame(
       conn,
       GetParam(),
@@ -962,7 +962,7 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   auto regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
   conn.outstandingPackets.emplace_back(OutstandingPacket(
       std::move(regularPacket),
-      Clock::now() - std::chrono::milliseconds(200),
+      Clock::now() - 200ms,
       111,
       false /* handshake */,
       true /* pureAck */,
@@ -971,7 +971,7 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   ASSERT_FALSE(conn.outstandingPackets.empty());
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum;
-  ackFrame.ackDelay = std::chrono::microseconds(100);
+  ackFrame.ackDelay = 100us;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   processAckFrame(
       conn,
@@ -979,25 +979,25 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
       ackFrame,
       [&](const auto&, const auto&, const auto&) {},
       [&](auto&, auto&, bool, auto) {},
-      Clock::now() - std::chrono::milliseconds(150));
+      Clock::now() - 150ms);
   EXPECT_EQ(std::chrono::microseconds::max(), conn.lossState.mrtt);
-  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.srtt);
-  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.lrtt);
-  EXPECT_EQ(std::chrono::microseconds::zero(), conn.lossState.rttvar);
+  EXPECT_EQ(0us, conn.lossState.srtt);
+  EXPECT_EQ(0us, conn.lossState.lrtt);
+  EXPECT_EQ(0us, conn.lossState.rttvar);
   EXPECT_TRUE(conn.outstandingPackets.empty());
 
   packetNum++;
   regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
   conn.outstandingPackets.emplace_back(OutstandingPacket(
       std::move(regularPacket),
-      Clock::now() - std::chrono::milliseconds(100),
+      Clock::now() - 100ms,
       111,
       false /* handshake */,
       false /* pureAck */,
       111));
   ASSERT_FALSE(conn.outstandingPackets.empty());
   ackFrame.largestAcked = packetNum;
-  ackFrame.ackDelay = std::chrono::microseconds(100);
+  ackFrame.ackDelay = 100us;
   ackFrame.ackBlocks.clear();
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   processAckFrame(
@@ -1008,9 +1008,9 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
       [&](auto&, auto&, bool, auto) {},
       Clock::now());
   EXPECT_NE(std::chrono::microseconds::max(), conn.lossState.mrtt);
-  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.srtt);
-  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.lrtt);
-  EXPECT_NE(std::chrono::microseconds::zero(), conn.lossState.rttvar);
+  EXPECT_NE(0us, conn.lossState.srtt);
+  EXPECT_NE(0us, conn.lossState.lrtt);
+  EXPECT_NE(0us, conn.lossState.rttvar);
   EXPECT_TRUE(conn.outstandingPackets.empty());
 }
 

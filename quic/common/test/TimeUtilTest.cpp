@@ -17,30 +17,30 @@ using namespace quic;
 using namespace testing;
 
 TEST(TimeUtil, TestMinTwo) {
-  std::chrono::milliseconds ms1 = std::chrono::milliseconds(10);
-  std::chrono::milliseconds ms2 = std::chrono::milliseconds(20);
+  std::chrono::milliseconds ms1 = 10ms;
+  std::chrono::milliseconds ms2 = 20ms;
   EXPECT_EQ(timeMin(ms1, ms2).count(), 10);
 }
 
 TEST(TimeUtil, TestMinFive) {
-  std::chrono::milliseconds ms1 = std::chrono::milliseconds(20);
-  std::chrono::milliseconds ms2 = std::chrono::milliseconds(30);
-  std::chrono::milliseconds ms3 = std::chrono::milliseconds(40);
-  std::chrono::milliseconds ms4 = std::chrono::milliseconds(10);
+  std::chrono::milliseconds ms1 = 20ms;
+  std::chrono::milliseconds ms2 = 30ms;
+  std::chrono::milliseconds ms3 = 40ms;
+  std::chrono::milliseconds ms4 = 10ms;
   EXPECT_EQ(timeMin(ms1, ms2, ms3, ms4).count(), 10);
 }
 
 TEST(TimeUtil, TestMaxTwo) {
-  std::chrono::milliseconds ms1 = std::chrono::milliseconds(10);
-  std::chrono::milliseconds ms2 = std::chrono::milliseconds(20);
+  std::chrono::milliseconds ms1 = 10ms;
+  std::chrono::milliseconds ms2 = 20ms;
   EXPECT_EQ(timeMax(ms1, ms2).count(), 20);
 }
 
 TEST(TimeUtil, TestMaxFive) {
-  std::chrono::milliseconds ms1 = std::chrono::milliseconds(20);
-  std::chrono::milliseconds ms2 = std::chrono::milliseconds(30);
-  std::chrono::milliseconds ms3 = std::chrono::milliseconds(40);
-  std::chrono::milliseconds ms4 = std::chrono::milliseconds(10);
+  std::chrono::milliseconds ms1 = 20ms;
+  std::chrono::milliseconds ms2 = 30ms;
+  std::chrono::milliseconds ms3 = 40ms;
+  std::chrono::milliseconds ms4 = 10ms;
   EXPECT_EQ(timeMax(ms1, ms2, ms3, ms4).count(), 40);
 }
 } // namespace test

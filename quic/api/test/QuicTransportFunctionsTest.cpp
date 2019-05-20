@@ -563,9 +563,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalBytesSent = 13579;
   conn->lossState.totalBytesAcked = 8642;
   auto currentTime = Clock::now();
-  conn->lossState.lastAckedTime = currentTime - std::chrono::seconds(123);
-  conn->lossState.lastAckedPacketSentTime =
-      currentTime - std::chrono::seconds(234);
+  conn->lossState.lastAckedTime = currentTime - 123s;
+  conn->lossState.lastAckedPacketSentTime = currentTime - 234s;
   conn->lossState.totalBytesSentAtLastAck = 10000;
   conn->lossState.totalBytesAckedAtLastAck = 5000;
   updateConnection(*conn, folly::none, packet.packet, TimePoint(), 555);
@@ -576,11 +575,11 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
                   ->lastAckedPacketInfo.hasValue());
   EXPECT_EQ(
-      currentTime - std::chrono::seconds(123),
+      currentTime - 123s,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->lastAckedPacketInfo->ackTime);
   EXPECT_EQ(
-      currentTime -= std::chrono::seconds(234),
+      currentTime -= 234s,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->lastAckedPacketInfo->sentTime);
   EXPECT_EQ(
@@ -611,7 +610,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   writePacket.frames.push_back(std::move(maxDataFrame));
   PacketEvent event = 1;
   conn->outstandingPacketEvents.insert(event);
-  auto futureMoment = thisMoment + std::chrono::milliseconds(50);
+  auto futureMoment = thisMoment + 50ms;
   MockClock::mockNow = [=]() { return futureMoment; };
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   updateConnection(

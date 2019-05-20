@@ -149,15 +149,14 @@ TEST(FunctionLooperTest, DetachStopsLooper) {
 
 TEST(FunctionLooperTest, PacingOnce) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(1)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
   std::vector<bool> fromTimerVec;
   auto func = [&](bool fromTimer) { fromTimerVec.push_back(fromTimer); };
   bool firstTime = true;
   auto pacingFunc = [&]() -> auto {
     if (firstTime) {
       firstTime = false;
-      return std::chrono::milliseconds(60 * 60 * 1000);
+      return 3600000ms;
     }
     return std::chrono::milliseconds::zero();
   };
@@ -177,8 +176,7 @@ TEST(FunctionLooperTest, PacingOnce) {
 
 TEST(FunctionLooperTest, KeepPacing) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(1)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
   std::vector<bool> fromTimerVec;
   auto func = [&](bool fromTimer) { fromTimerVec.push_back(fromTimer); };
   bool stopPacing = false;
@@ -186,7 +184,7 @@ TEST(FunctionLooperTest, KeepPacing) {
     if (stopPacing) {
       return std::chrono::milliseconds::zero();
     }
-    return std::chrono::milliseconds(60 * 60 * 1000);
+    return 3600000ms;
   };
   FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
   looper->setPacingTimer(std::move(pacingTimer));
@@ -224,30 +222,27 @@ TEST(FunctionLooperTest, KeepPacing) {
 
 TEST(FunctionLooperTest, TimerTickSize) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(123)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
   FunctionLooper::Ptr looper(new FunctionLooper(&evb, [&](bool) {}));
   looper->setPacingTimer(std::move(pacingTimer));
-  EXPECT_EQ(std::chrono::milliseconds(123), looper->getTimerTickInterval());
+  EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
 
 TEST(FunctionLooperTest, TimerTickSizeAfterNewEvb) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(123)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
   FunctionLooper::Ptr looper(new FunctionLooper(&evb, [&](bool) {}));
   looper->setPacingTimer(std::move(pacingTimer));
-  EXPECT_EQ(std::chrono::milliseconds(123), looper->getTimerTickInterval());
+  EXPECT_EQ(123ms, looper->getTimerTickInterval());
   looper->detachEventBase();
   EventBase evb2;
   looper->attachEventBase(&evb2);
-  EXPECT_EQ(std::chrono::milliseconds(123), looper->getTimerTickInterval());
+  EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
 
 TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(1)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
   uint32_t loopCallbackRunCounter = 0, pacingRunCounter = 0;
   auto runFunc = [&](bool fromTimer) {
     if (!fromTimer) {
@@ -256,7 +251,7 @@ TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
       pacingRunCounter++;
     }
   };
-  auto pacingFunc = [&]() { return std::chrono::milliseconds(60 * 60 * 1000); };
+  auto pacingFunc = [&]() { return 3600000ms; };
   FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(runFunc)));
   looper->setPacingTimer(std::move(pacingTimer));
   looper->setPacingFunction(std::move(pacingFunc));
@@ -271,8 +266,7 @@ TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
 
 TEST(FunctionLooperTest, RunConditions) {
   EventBase evb;
-  TimerHighRes::SharedPtr pacingTimer(
-      TimerHighRes::newTimer(&evb, std::chrono::milliseconds(1)));
+  TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 1ms));
   uint32_t loopCallbackRunCounter = 0, pacingRunCounter = 0;
   FunctionLooper::Ptr* looperPtr = nullptr;
   auto runFunc = [&](bool fromTimer) {
@@ -283,7 +277,7 @@ TEST(FunctionLooperTest, RunConditions) {
     }
     (*looperPtr)->run();
   };
-  auto pacingFunc = [&]() { return std::chrono::milliseconds(60 * 60 * 1000); };
+  auto pacingFunc = [&]() { return 3600000ms; };
   FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(runFunc)));
   looperPtr = &looper;
   looper->setPacingTimer(std::move(pacingTimer));

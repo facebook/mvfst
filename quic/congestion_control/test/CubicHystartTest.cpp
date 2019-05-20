@@ -28,7 +28,7 @@ TEST_F(CubicHystartTest, SendAndAck) {
   conn.lossState.largestSent = 0;
 
   // Packet 0 is acked:
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(makeAck(0, 1000, Clock::now()), folly::none);
@@ -61,13 +61,12 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
   conn.lossState.largestSent = 0;
 
   // Packet 0 is acked:
-  conn.lossState.srtt = std::chrono::microseconds(2);
+  conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, realNow + std::chrono::microseconds(2)), folly::none);
+  cubic.onPacketAckOrLoss(makeAck(0, 1000, realNow + 2us), folly::none);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
@@ -81,7 +80,7 @@ TEST_F(CubicHystartTest, AckTrain) {
       true);
   auto initCwnd = cubic.getWritableBytes();
   // srtt will be assigned to delayMin:
-  conn.lossState.srtt = std::chrono::microseconds(2);
+  conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   conn.lossState.largestSent = 0;
   // Packet 0 is sent:
@@ -97,10 +96,7 @@ TEST_F(CubicHystartTest, AckTrain) {
       folly::none);
   // Packet 1 is acked:
   cubic.onPacketAckOrLoss(
-      makeAck(
-          1,
-          kLowSsthreshInMss * conn.udpSendPacketLen,
-          realNow + std::chrono::microseconds(2)),
+      makeAck(1, kLowSsthreshInMss * conn.udpSendPacketLen, realNow + 2us),
       folly::none);
   EXPECT_EQ(
       initCwnd + kLowSsthreshInMss * conn.udpSendPacketLen * 2,
@@ -117,15 +113,13 @@ TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
 
   // Packet 0 is acked:
   // make sure AckTrain won't find it
-  conn.lossState.srtt = std::chrono::microseconds(2);
+  conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
-      makeAck(
-          0, 1000, realNow + kAckCountingGap + std::chrono::microseconds(2)),
-      folly::none);
+      makeAck(0, 1000, realNow + kAckCountingGap + 2us), folly::none);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
@@ -160,13 +154,13 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   conn.lossState.largestSent = secondPacketNum;
   cubic.onPacketSent(packet1);
 
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto realNow = quic::Clock::now();
 
   // First onPacketAcked will set up lastSampledRtt = 200us for next round. It
   // will also set up rttRoundEndTarget = 1 since largestSent = 1.
   auto ackTime = realNow;
-  auto ackTimeIncrease = std::chrono::microseconds(2);
+  auto ackTimeIncrease = 2us;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(makeAck(firstPacketNum, 1000, ackTime), folly::none);
   ackTime += ackTimeIncrease;
@@ -183,7 +177,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   auto cwndEndRound = cubic.getWritableBytes();
 
   // New RTT round, give currSampledRtt a value larger than previous RTT:
-  conn.lossState.srtt = std::chrono::microseconds(200);
+  conn.lossState.srtt = 200us;
   // onPacketAcked kAckSampling - 1 times:
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {
@@ -227,12 +221,12 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   cubic.onPacketSent(packet1);
   totalSent += 1;
 
-  conn.lossState.srtt = std::chrono::microseconds(100);
+  conn.lossState.srtt = 100us;
   auto realNow = quic::Clock::now();
 
   // First onPacketAcked will set up lastSampledRtt = 200us for next round:
   auto ackTime = realNow;
-  auto ackTimeIncrease = std::chrono::microseconds(2);
+  auto ackTimeIncrease = 2us;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(makeAck(0, 1, ackTime), folly::none);
   ackTime += ackTimeIncrease;
@@ -247,7 +241,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   auto cwndEndRound = cubic.getWritableBytes();
 
   // New RTT round, give currSampledRtt a value larger than previous RTT:
-  conn.lossState.srtt = std::chrono::microseconds(200);
+  conn.lossState.srtt = 200us;
   // onPacketAcked kAckSampling - 1 times:
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {

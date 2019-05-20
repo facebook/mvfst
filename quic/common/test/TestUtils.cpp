@@ -141,9 +141,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
   }
   DCHECK(builder.canBuildPacket());
   AckFrameMetaData ackData(
-      acks,
-      std::chrono::microseconds::zero(),
-      dstConn.transportSettings.ackDelayExponent);
+      acks, 0us, dstConn.transportSettings.ackDelayExponent);
   writeAckFrame(ackData, builder);
   return std::move(builder).buildPacket();
 }
@@ -176,7 +174,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
       std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     // Fake handshake, no need todo anything here.
-    return std::make_pair(folly::IOBuf::create(0), std::chrono::seconds(2));
+    return std::make_pair(folly::IOBuf::create(0), 2s);
   }
 
   void setPsk(const QuicCachedPsk& cachedPsk) {
@@ -223,8 +221,7 @@ void setupZeroRttOnServerCtx(
     const QuicCachedPsk& cachedPsk) {
   serverCtx.setEarlyDataSettings(
       true,
-      fizz::server::ClockSkewTolerance{std::chrono::milliseconds(-100000),
-                                       std::chrono::milliseconds(100000)},
+      fizz::server::ClockSkewTolerance{-100000ms, 100000ms},
       std::make_shared<fizz::server::AllowAllReplayReplayCache>());
   auto ticketCipher = std::make_shared<AcceptingTicketCipher>();
   ticketCipher->setPsk(cachedPsk);

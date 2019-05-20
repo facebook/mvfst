@@ -185,7 +185,7 @@ struct QuicStreamState : public QuicStreamLike {
   folly::Optional<Clock::time_point> lastHolbTime;
 
   // The total amount of time we are head line blocked on the stream.
-  std::chrono::microseconds totalHolbTime{std::chrono::microseconds::zero()};
+  std::chrono::microseconds totalHolbTime{0us};
 
   // Number of times the stream has entered the HOLB state
   // lastHolbTime indicates whether the stream is HOL blocked at the moment.

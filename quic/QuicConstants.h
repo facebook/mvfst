@@ -18,6 +18,7 @@ namespace quic {
 
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
+using namespace std::chrono_literals;
 
 // Default QUIC packet size for both read and write.
 constexpr uint64_t kDefaultV4UDPSendPacketLen = 1252;
@@ -201,12 +202,10 @@ constexpr int kRttBeta = 4;
 
 // Draft-17 recommends 100ms as initial RTT. We delibrately ignore that
 // recommendation. This is not a bug.
-constexpr std::chrono::microseconds kDefaultInitialRtt =
-    std::chrono::microseconds(50 * 1000);
+constexpr std::chrono::microseconds kDefaultInitialRtt = 50000us;
 
 // HHWheelTimer tick interval
-constexpr std::chrono::microseconds kGranularity =
-    std::chrono::microseconds(10 * 1000);
+constexpr std::chrono::microseconds kGranularity = 10000us;
 
 constexpr uint32_t kReorderingThreshold = 3;
 
@@ -274,8 +273,8 @@ constexpr uint64_t kMaxMaxStreams = 1ull << 60;
 
 /* Idle timeout parameters */
 // Default idle timeout to advertise.
-constexpr auto kDefaultIdleTimeout = std::chrono::milliseconds(60'000);
-constexpr auto kMaxIdleTimeout = std::chrono::milliseconds(600'000);
+constexpr auto kDefaultIdleTimeout = 60000ms;
+constexpr auto kMaxIdleTimeout = 600000ms;
 
 // Time format related:
 constexpr uint8_t kQuicTimeExpoBits = 5;
@@ -297,11 +296,9 @@ constexpr uint8_t kRxPacketsPendingBeforeAckThresh = 10;
 // Ack timeout = SRTT * kAckTimerFactor
 constexpr double kAckTimerFactor = 0.25;
 // max ack timeout: 25ms
-constexpr std::chrono::microseconds kMaxAckTimeout =
-    std::chrono::microseconds(25 * 1000);
+constexpr std::chrono::microseconds kMaxAckTimeout = 25000us;
 // min ack timeout: 10ms
-constexpr std::chrono::microseconds kMinAckTimeout =
-    std::chrono::microseconds(10 * 1000);
+constexpr std::chrono::microseconds kMinAckTimeout = 10000us;
 
 constexpr uint64_t kAckPurgingThresh = 10;
 
@@ -338,26 +335,22 @@ constexpr uint16_t kMinStatelessPacketSize = 13 + 16 + 16;
 // TODO: remove this when we have a stateless reset generator.
 constexpr folly::StringPiece kTestStatelessResetToken = "aaaabbbbccccdddd";
 
-constexpr std::chrono::milliseconds kHappyEyeballsV4Delay =
-    std::chrono::milliseconds(150);
+constexpr std::chrono::milliseconds kHappyEyeballsV4Delay = 150ms;
 
 constexpr std::chrono::milliseconds kHappyEyeballsConnAttemptDelayWithCache =
-    std::chrono::seconds(15);
+    15s;
 
 constexpr size_t kMaxNumTokenSourceAddresses = 3;
 
 // Amount of time to retain initial keys until they are dropped after handshake
 // completion.
-constexpr std::chrono::seconds kTimeToRetainInitialKeys =
-    std::chrono::seconds(20);
+constexpr std::chrono::seconds kTimeToRetainInitialKeys = 20s;
 
 // Amount of time to retain zero rtt keys until they are dropped after handshake
 // completion.
-constexpr std::chrono::seconds kTimeToRetainZeroRttKeys =
-    std::chrono::seconds(20);
+constexpr std::chrono::seconds kTimeToRetainZeroRttKeys = 20s;
 
-constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState =
-    std::chrono::seconds(60);
+constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState = 60s;
 
 constexpr uint32_t kMaxNumMigrationsAllowed = 6;
 

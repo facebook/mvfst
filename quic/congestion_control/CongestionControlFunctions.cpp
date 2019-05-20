@@ -33,8 +33,7 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
   if (minimalInterval > rtt) {
     // We cannot really pace in this case.
     return std::make_pair(
-        std::chrono::microseconds::zero(),
-        conn.transportSettings.writeConnectionDataPacketsLimit);
+        0us, conn.transportSettings.writeConnectionDataPacketsLimit);
   }
   uint64_t cwndInPackets = std::max(minCwndInMss, cwnd / conn.udpSendPacketLen);
   // Each interval we want to send cwndInpackets / (rtt / minimalInverval)

@@ -1301,14 +1301,14 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingUpdateReadingListIdempotentWrtHolb) {
   auto lastHolbTimeMark = stream->lastHolbTime;
   EXPECT_TRUE(lastHolbTimeMark);
   // No total holb time should be recorded
-  EXPECT_EQ(std::chrono::microseconds::zero(), stream->totalHolbTime);
+  EXPECT_EQ(0us, stream->totalHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
   // uRL 0.1 - expected state transition: none
   conn.streamManager->updateReadableStreams(*stream);
 
   EXPECT_EQ(lastHolbTimeMark, stream->lastHolbTime);
-  EXPECT_EQ(std::chrono::microseconds::zero(), stream->totalHolbTime);
+  EXPECT_EQ(0us, stream->totalHolbTime);
   EXPECT_EQ(1, stream->holbCount);
 
   appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));
@@ -1395,7 +1395,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingFirstBufferHOLBlocked) {
   // HOLB state must be detected after the first readable list update
   EXPECT_TRUE(stream->lastHolbTime);
   EXPECT_EQ(1, stream->holbCount);
-  EXPECT_EQ(std::chrono::microseconds::zero(), stream->totalHolbTime);
+  EXPECT_EQ(0us, stream->totalHolbTime);
   auto lastHolbTimeMark = stream->lastHolbTime;
 
   readDataFromQuicStream(*stream);
@@ -1453,7 +1453,7 @@ TEST_F(QuicStreamFunctionsTest, HolbTimingLockstepScenario) {
 
   // At this point, the stream has not been unblocked even once,
   // hence the total holb time is expected to be zero
-  EXPECT_EQ(std::chrono::microseconds::zero(), stream->totalHolbTime);
+  EXPECT_EQ(0us, stream->totalHolbTime);
 
   // Data has arrived
   appendDataToReadBuffer(*stream, StreamBuffer(buf2->clone(), 0));

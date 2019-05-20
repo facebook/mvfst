@@ -367,8 +367,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(
-      ackBlocks, std::chrono::microseconds(0), kDefaultAckDelayExponent);
+  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
 
   // Write those framses with a regular builder
   writeFrame(connCloseFrame, regularBuilder);
