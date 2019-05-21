@@ -4115,6 +4115,22 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       initialUDPSendPacketLen);
+
+  EXPECT_CALL(*mockQuicPskCache_, putPsk(hostname_, _))
+      .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
+        auto& params = psk.transportParams;
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
+        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamsBidi, std::numeric_limits<uint32_t>::max());
+        EXPECT_EQ(
+            params.initialMaxStreamsUni, std::numeric_limits<uint32_t>::max());
+      }));
+  mockClientHandshake->triggerOnNewCachedPsk();
 }
 
 TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
