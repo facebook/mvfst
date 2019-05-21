@@ -366,26 +366,11 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
-  if (getVersion() == QuicVersion::MVFST) {
-    EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
-      ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
-      client->close(folly::none);
-      eventbase_.terminateLoopSoon();
-    }));
-  } else {
-    EXPECT_CALL(clientConnCallback, onConnectionError(_))
-        .WillOnce(Invoke([&](const auto& errorCode) {
-          LOG(ERROR) << "error: " << errorCode.second;
-          EXPECT_TRUE(folly::variant_match(
-              errorCode.first,
-              [](const TransportErrorCode& err) {
-                return err == TransportErrorCode::TLS_HANDSHAKE_FAILED;
-              },
-              [](const auto&) { return false; }));
-          client->close(folly::none);
-          eventbase_.terminateLoopSoon();
-        }));
-  }
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    client->close(folly::none);
+    eventbase_.terminateLoopSoon();
+  }));
   ASSERT_EQ(client->getAppProtocol(), folly::none);
   client->start(&clientConnCallback);
   eventbase_.loopForever();
@@ -531,8 +516,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       kDefaultStreamWindowSize);
 }
 
-// TODO re enable after the client stops sending old transport param version
-#if 0
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   expectTransportCallbacks();
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
@@ -541,7 +524,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   server_->setFizzContext(serverCtx);
   // This needs to be a version that's not in getVersion() but in server's
   // supported version list.
-  client->getNonConstConn().originalVersion = QuicVersion::MVFST;
+  client->getNonConstConn().originalVersion = MVFST1;
   EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _)).Times(0);
   client->start(&clientConnCallback);
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
@@ -572,7 +555,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
 }
-#endif
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   expectTransportCallbacks();
@@ -836,8 +818,7 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
 INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,
-    // TODO undo when we are sufficiently rolled out past draft 18.
-    ::testing::Values(QuicVersion::MVFST/*, QuicVersion::QUIC_DRAFT*/));
+    ::testing::Values(QuicVersion::MVFST, QuicVersion::QUIC_DRAFT));
 
 // Simulates a simple 1rtt handshake without needing to get any handshake bytes
 // from the server.
