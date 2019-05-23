@@ -122,7 +122,7 @@ void handleRetransmissionWritten(
       stream.lossBuffer.begin(),
       stream.lossBuffer.end(),
       [&](const auto& buffer) { return frameOffset == buffer.offset; });
-  DCHECK(lossBufferIter != stream.lossBuffer.end());
+  CHECK(lossBufferIter != stream.lossBuffer.end());
   VLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
            << " packetNum=" << packetNum << " " << conn;
   auto bufferLen = lossBufferIter->data.chainLength();
