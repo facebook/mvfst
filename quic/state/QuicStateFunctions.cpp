@@ -165,12 +165,6 @@ AckStateVersion currentAckStateVersion(
       conn.ackStates.appDataAckState.acks.insertVersion());
 }
 
-bool needsToSendAckImmediately(const QuicConnectionStateBase& conn) noexcept {
-  return conn.ackStates.initialAckState.needsToSendAckImmediately ||
-      conn.ackStates.handshakeAckState.needsToSendAckImmediately ||
-      conn.ackStates.appDataAckState.needsToSendAckImmediately;
-}
-
 PacketNum getNextPacketNum(
     const QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept {

@@ -44,33 +44,6 @@ bool hasAcksToSchedule(const AckState& ackState) {
   return *largestAckSend > *(ackState.largestAckScheduled);
 }
 
-bool neverWrittenAcksBefore(const QuicConnectionStateBase& conn) {
-  return (
-      !conn.ackStates.initialAckState.largestAckScheduled &&
-      !conn.ackStates.handshakeAckState.largestAckScheduled &&
-      !conn.ackStates.appDataAckState.largestAckScheduled);
-}
-
-bool hasAcksToSchedule(const QuicConnectionStateBase& conn) {
-  bool initialSpaceHasAcks = hasAcksToSchedule(conn.ackStates.initialAckState);
-  bool handshakeSpaceHasAcks =
-      hasAcksToSchedule(conn.ackStates.handshakeAckState);
-  bool appDataSpaceHasAcks = hasAcksToSchedule(conn.ackStates.appDataAckState);
-  bool cannotWriteInitialAcks =
-      !conn.initialWriteCipher || !initialSpaceHasAcks;
-  bool cannotWriteHandshakeAcks =
-      !conn.handshakeWriteCipher || !handshakeSpaceHasAcks;
-  bool cannotWriteAppDataAcks = !conn.oneRttWriteCipher || !appDataSpaceHasAcks;
-  if (cannotWriteInitialAcks && cannotWriteHandshakeAcks &&
-      cannotWriteAppDataAcks) {
-    return false;
-  }
-  if (neverWrittenAcksBefore(conn)) {
-    return true;
-  }
-  return initialSpaceHasAcks || handshakeSpaceHasAcks || appDataSpaceHasAcks;
-}
-
 folly::Optional<PacketNum> largestAckToSend(const AckState& ackState) {
   if (ackState.acks.empty()) {
     return folly::none;

@@ -666,19 +666,6 @@ TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
   EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
 }
 
-TEST_F(QuicPacketSchedulerTest, ConnHasAcksToSchedule) {
-  QuicClientConnectionState conn;
-  EXPECT_FALSE(hasAcksToSchedule(conn));
-  conn.ackStates.initialAckState.acks.insert(0, 100);
-  EXPECT_FALSE(hasAcksToSchedule(conn));
-  conn.initialWriteCipher = createNoOpAead();
-  EXPECT_TRUE(hasAcksToSchedule(conn));
-  conn.ackStates.initialAckState.acks.clear();
-  EXPECT_FALSE(hasAcksToSchedule(conn));
-  conn.oneRttWriteCipher = createNoOpAead();
-  EXPECT_FALSE(hasAcksToSchedule(conn));
-}
-
 TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
   QuicClientConnectionState conn;
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.initialAckState));

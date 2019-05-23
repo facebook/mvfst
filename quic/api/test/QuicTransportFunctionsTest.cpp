@@ -1382,6 +1382,19 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWrite) {
   EXPECT_TRUE(hasAckDataToWrite(*conn));
 }
 
+TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteMismatch) {
+  // When one ack space has needsToSendAckImmediately = true and another has
+  // hasAckToSchedule = true, but no ack space has both of them to true, we
+  // should not send.
+  auto conn = createConn();
+  EXPECT_FALSE(hasAckDataToWrite(*conn));
+  conn->ackStates.initialAckState.needsToSendAckImmediately = true;
+  EXPECT_FALSE(hasAckDataToWrite(*conn));
+  conn->ackStates.handshakeAckState.acks.insert(0, 10);
+  conn->handshakeWriteCipher = test::createNoOpAead();
+  EXPECT_FALSE(hasAckDataToWrite(*conn));
+}
+
 TEST_F(QuicTransportFunctionsTest, HasCryptoDataToWrite) {
   auto conn = createConn();
   conn->cryptoState->initialStream.lossBuffer.emplace_back(

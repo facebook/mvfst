@@ -56,6 +56,28 @@ std::string largestAckToSendToString(
       optionalToString(largestAckToSend(conn.ackStates.appDataAckState)),
       "]");
 }
+
+bool toWriteInitialAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.initialWriteCipher &&
+      hasAcksToSchedule(conn.ackStates.initialAckState) &&
+      conn.ackStates.initialAckState.needsToSendAckImmediately);
+}
+
+bool toWriteHandshakeAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.handshakeWriteCipher &&
+      hasAcksToSchedule(conn.ackStates.handshakeAckState) &&
+      conn.ackStates.handshakeAckState.needsToSendAckImmediately);
+}
+
+bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
+  return (
+      conn.oneRttWriteCipher &&
+      hasAcksToSchedule(conn.ackStates.appDataAckState) &&
+      conn.ackStates.appDataAckState.needsToSendAckImmediately);
+}
+
 } // namespace
 
 namespace quic {
@@ -1019,16 +1041,17 @@ bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
   // have an immediate need to schedule the acks then we need to wait till we
   // satisfy a condition where there is immediate need, so we shouldn't
   // consider the acks to be writable.
-  if (needsToSendAckImmediately(conn) && hasAcksToSchedule(conn)) {
-    VLOG(10) << nodeToString(conn.nodeType)
-             << " needs write because of acks largestAck="
-             << largestAckToSendToString(conn)
-             << " largestSentAck=" << largestAckScheduledToString(conn)
-             << " ackTimeoutSet=" << conn.pendingEvents.scheduleAckTimeout
-             << " " << conn;
-    return true;
-  }
-  return false;
+  bool writeAcks =
+      (toWriteInitialAcks(conn) || toWriteHandshakeAcks(conn) ||
+       toWriteAppDataAcks(conn));
+  VLOG_IF(10, writeAcks) << nodeToString(conn.nodeType)
+                         << " needs write because of acks largestAck="
+                         << largestAckToSendToString(conn) << " largestSentAck="
+                         << largestAckScheduledToString(conn)
+                         << " ackTimeoutSet="
+                         << conn.pendingEvents.scheduleAckTimeout << " "
+                         << conn;
+  return writeAcks;
 }
 
 bool hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {

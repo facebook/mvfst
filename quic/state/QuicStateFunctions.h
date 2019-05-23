@@ -65,8 +65,6 @@ const AckState& getAckState(
 AckStateVersion currentAckStateVersion(
     const QuicConnectionStateBase& conn) noexcept;
 
-bool needsToSendAckImmediately(const QuicConnectionStateBase& conn) noexcept;
-
 PacketNum getNextPacketNum(
     const QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept;

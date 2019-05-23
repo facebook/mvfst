@@ -215,9 +215,7 @@ class AckScheduler {
  * Returns whether or not the Ack scheduler has acks to schedule. This does not
  * tell you when the ACKs can be written.
  */
-bool hasAcksToSchedule(const QuicConnectionStateBase& conn);
 bool hasAcksToSchedule(const AckState& ackState);
-bool neverWrittenAcksBefore(const QuicConnectionStateBase& conn);
 
 /**
  * Returns the largest packet received which needs to be acked.
