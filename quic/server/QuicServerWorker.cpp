@@ -610,6 +610,12 @@ void QuicServerWorker::onConnectionIdBound(
     LOG(ERROR) << "Transport not match, client=" << *transport;
   } else {
     sourceAddressMap_.erase(source);
+    if (transport->shouldShedConnection()) {
+      VLOG_EVERY_N(1, 100) << "Shedding connection";
+      transport->closeNow(std::make_pair(
+          QuicErrorCode(TransportErrorCode::SERVER_BUSY),
+          std::string("shedding under load")));
+    }
   }
 }
 

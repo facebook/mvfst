@@ -411,6 +411,25 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
   eventbase_.loop();
 }
 
+TEST_F(QuicServerWorkerTest, QuicShedTest) {
+  auto connId = getTestConnectionId(hostId_);
+  createQuicConnection(kClientAddr, connId);
+
+  worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
+  EXPECT_CALL(*transport_, getClientConnectionId())
+      .WillRepeatedly(Return(getTestConnectionId(hostId_)));
+  transport_->setShedConnection();
+  EXPECT_CALL(
+      *transport_,
+      closeNow(Eq(std::make_pair(
+          QuicErrorCode(TransportErrorCode::SERVER_BUSY),
+          std::string("shedding under load")))));
+  worker_->onConnectionIdBound(transport_);
+  worker_->onConnectionUnbound(
+      std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
+      getTestConnectionId(hostId_));
+}
+
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   auto data = createData(kDefaultUDPSendPacketLen);
   auto connId = ConnectionId(std::vector<uint8_t>());
