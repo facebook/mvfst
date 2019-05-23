@@ -69,6 +69,7 @@ void shrinkReadBuffer(QuicStreamState* stream) {
   updateFlowControlOnRead(*stream, lastReadOffset, Clock::now());
   // may become readable after shrink
   stream->conn.streamManager->updateReadableStreams(*stream);
+  stream->conn.streamManager->updatePeekableStreams(*stream);
 }
 } // namespace
 

@@ -33,13 +33,16 @@ QuicTransportBase::QuicTransportBase(
       drainTimeout_(this),
       readLooper_(new FunctionLooper(
           evb,
-          [this](bool /* ignored */) { invokeReadDataAndCallbacks(); })),
+          [this](bool /* ignored */) { invokeReadDataAndCallbacks(); },
+          LooperType::ReadLooper)),
       peekLooper_(new FunctionLooper(
           evb,
-          [this](bool /* ignored */) { invokePeekDataAndCallbacks(); })),
-      writeLooper_(new FunctionLooper(evb, [this](bool fromTimer) {
-        pacedWriteDataToSocket(fromTimer);
-      })) {
+          [this](bool /* ignored */) { invokePeekDataAndCallbacks(); },
+          LooperType::PeekLooper)),
+      writeLooper_(new FunctionLooper(
+          evb,
+          [this](bool fromTimer) { pacedWriteDataToSocket(fromTimer); },
+          LooperType::WriteLooper)) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
       conn_->congestionController->markPacerTimeoutScheduled(Clock::now());
@@ -677,6 +680,7 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
       readCallbacks_.erase(streamId);
       // if there is an error on the stream - it's not readable anymore, so
       // we cannot peek into it as well.
+      VLOG(10) << "Erasing peek callback for stream=" << streamId;
       self->conn_->streamManager->peekableStreams().erase(streamId);
       peekCallbacks_.erase(streamId);
       VLOG(10) << "invoking read error callbacks on stream=" << streamId << " "
@@ -732,20 +736,27 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setPeekCallback(
   return folly::unit;
 }
 
-void QuicTransportBase::setPeekCallbackInternal(
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setPeekCallbackInternal(
     StreamId id,
     PeekCallback* cb) noexcept {
   VLOG(4) << "Setting setPeekCallback for stream=" << id << " cb=" << cb << " "
           << *this;
   auto peekCbIt = peekCallbacks_.find(id);
   if (peekCbIt == peekCallbacks_.end()) {
+    // Don't allow initial setting of a nullptr callback.
     if (!cb) {
-      return;
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
     peekCbIt = peekCallbacks_.emplace(id, PeekCallbackData(cb)).first;
   }
+  if (!cb) {
+    VLOG(10) << "Resetting the peek callback to nullptr "
+             << "stream=" << id << " peekCb=" << peekCbIt->second.peekCb;
+  }
   peekCbIt->second.peekCb = cb;
   updatePeekLooper();
+  return folly::unit;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::pausePeek(
@@ -792,13 +803,18 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
   // to 0 we can execute "consume" calls that were done during "peek", for that,
   // we would need to keep stack of them.
   auto peekableListCopy = self->conn_->streamManager->peekableStreams();
+  VLOG(10) << __func__
+           << " peekableListCopy.size()=" << peekableListCopy.size();
   for (const auto& streamId : peekableListCopy) {
     auto callback = self->peekCallbacks_.find(streamId);
+    // This is a likely bug. Need to think more on whether events can
+    // be dropped
     // remove streamId from list of peekable - as opposed to "read",  "peek" is
     // only called once per streamId and not on every EVB loop until application
     // reads the data.
     self->conn_->streamManager->peekableStreams().erase(streamId);
     if (callback == self->peekCallbacks_.end()) {
+      VLOG(10) << " No peek callback for stream=" << streamId;
       continue;
     }
     auto peekCb = callback->second.peekCb;
@@ -815,6 +831,8 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
           [&](StreamId id, const folly::Range<PeekIterator>& peekRange) {
             peekCb->onDataAvailable(id, peekRange);
           });
+    } else {
+      VLOG(10) << "Not invoking peek callbacks on stream=" << streamId;
     }
   }
 }
@@ -1006,13 +1024,25 @@ void QuicTransportBase::updatePeekLooper() {
     peekLooper_->stop();
     return;
   }
+  VLOG(10) << "Updating peek looper, has "
+           << conn_->streamManager->peekableStreams().size()
+           << " peekable streams";
   auto iter = std::find_if(
       conn_->streamManager->peekableStreams().begin(),
       conn_->streamManager->peekableStreams().end(),
       [& peekCallbacks = peekCallbacks_](StreamId s) {
+        VLOG(10) << "Checking stream=" << s;
         auto peekCb = peekCallbacks.find(s);
         if (peekCb == peekCallbacks.end()) {
+          VLOG(10) << "No peek callbacks for stream=" << s;
           return false;
+        }
+        if (!peekCb->second.resumed) {
+          VLOG(10) << "peek callback for stream=" << s << " not resumed";
+        }
+
+        if (!peekCb->second.peekCb) {
+          VLOG(10) << "no peekCb in peekCb stream=" << s;
         }
         return peekCb->second.peekCb && peekCb->second.resumed;
       });
@@ -1844,28 +1874,48 @@ void QuicTransportBase::checkForClosedStream() {
   }
   auto itr = conn_->streamManager->closedStreams().begin();
   while (itr != conn_->streamManager->closedStreams().end()) {
-    auto callbackIt = readCallbacks_.find(*itr);
+    // We may be in an active read cb when we close the stream
+    auto readCbIt = readCallbacks_.find(*itr);
+    if (readCbIt != readCallbacks_.end() &&
+        readCbIt->second.readCb != nullptr && !readCbIt->second.deliveredEOM) {
+      VLOG(10) << "Not closing stream=" << *itr
+               << " because it has active read callback";
+      ++itr;
+      continue;
+    }
+    // We may be in the active peek cb when we close the stream
+    auto peekCbIt = peekCallbacks_.find(*itr);
+    if (peekCbIt != peekCallbacks_.end() &&
+        peekCbIt->second.peekCb != nullptr) {
+      VLOG(10) << "Not closing stream=" << *itr
+               << " because it has active peek callback";
+      ++itr;
+      continue;
+    }
     // We might be in the process of delivering all the delivery callbacks for
     // the stream when we receive close stream.
     auto deliveryCbCount = deliveryCallbacks_.count(*itr);
-    if (deliveryCbCount == 0 &&
-        (callbackIt == readCallbacks_.end() ||
-         callbackIt->second.readCb == nullptr ||
-         callbackIt->second.deliveredEOM)) {
-      FOLLY_MAYBE_UNUSED auto stream = conn_->streamManager->findStream(*itr);
-      QUIC_TRACE(
-          holb_time,
-          *conn_,
-          stream->id,
-          stream->totalHolbTime.count(),
-          stream->holbCount);
-      conn_->streamManager->removeClosedStream(*itr);
-      readCallbacks_.erase(*itr);
-      itr = conn_->streamManager->closedStreams().erase(itr);
-    } else {
+    if (deliveryCbCount > 0) {
+      VLOG(10) << "Not closing stream=" << *itr
+               << " because it is waiting for the delivery callback";
       ++itr;
+      continue;
     }
-  }
+
+    VLOG(10) << "Closing stream=" << *itr;
+    FOLLY_MAYBE_UNUSED auto stream = conn_->streamManager->findStream(*itr);
+    QUIC_TRACE(
+        holb_time,
+        *conn_,
+        stream->id,
+        stream->totalHolbTime.count(),
+        stream->holbCount);
+    conn_->streamManager->removeClosedStream(*itr);
+    readCallbacks_.erase(*itr);
+    peekCallbacks_.erase(*itr);
+    itr = conn_->streamManager->closedStreams().erase(itr);
+  } // while
+
   if (closeState_ == CloseState::GRACEFUL_CLOSING &&
       conn_->streamManager->streamCount() == 0) {
     closeImpl(folly::none);
@@ -2032,6 +2082,8 @@ void QuicTransportBase::cancelAllAppCallbacks(
   // structure of read callbacks.
   // TODO: this approach will make the app unable to setReadCallback to
   // nullptr during the loop. Need to fix that.
+  // TODO: setReadCallback to nullptr closes the stream, so the app
+  // may just do that...
   auto readCallbacksCopy = readCallbacks_;
   for (auto& cb : readCallbacksCopy) {
     readCallbacks_.erase(cb.first);
@@ -2040,6 +2092,7 @@ void QuicTransportBase::cancelAllAppCallbacks(
           cb.first, std::make_pair(err.first, folly::StringPiece(err.second)));
     }
   }
+  VLOG(4) << "Clearing " << peekCallbacks_.size() << " peek callbacks";
   peekCallbacks_.clear();
   dataExpiredCallbacks_.clear();
   dataRejectedCallbacks_.clear();

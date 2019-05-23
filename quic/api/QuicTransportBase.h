@@ -465,7 +465,9 @@ class QuicTransportBase : public QuicSocket {
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
       ReadCallback* cb) noexcept;
-  void setPeekCallbackInternal(StreamId id, PeekCallback* cb) noexcept;
+  folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
+      StreamId id,
+      PeekCallback* cb) noexcept;
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
       bool bidirectional);
 

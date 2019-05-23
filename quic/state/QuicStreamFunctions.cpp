@@ -272,6 +272,7 @@ std::pair<Buf, bool> readDataFromQuicStream(
       stream.currentReadOffset += 1;
     }
     stream.conn.streamManager->updateReadableStreams(stream);
+    stream.conn.streamManager->updatePeekableStreams(stream);
     return std::make_pair(nullptr, true);
   }
 
@@ -288,6 +289,7 @@ std::pair<Buf, bool> readDataFromQuicStream(
     stream.currentReadOffset += 1;
   }
   stream.conn.streamManager->updateReadableStreams(stream);
+  stream.conn.streamManager->updatePeekableStreams(stream);
   return std::make_pair(std::move(data), eof);
 }
 
@@ -315,6 +317,7 @@ void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
       stream.currentReadOffset++;
     }
     stream.conn.streamManager->updateReadableStreams(stream);
+    stream.conn.streamManager->updatePeekableStreams(stream);
     return;
   }
 
@@ -330,6 +333,7 @@ void consumeDataFromQuicStream(QuicStreamState& stream, uint64_t amount) {
     stream.currentReadOffset += 1;
   }
   stream.conn.streamManager->updateReadableStreams(stream);
+  stream.conn.streamManager->updatePeekableStreams(stream);
 }
 
 bool allBytesTillFinAcked(const QuicStreamState& stream) {

@@ -21,7 +21,8 @@ TEST(FunctionLooperTest, LooperNotRunning) {
   EventBase evb;
   bool called = false;
   auto func = [&](bool) { called = true; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   evb.loopOnce();
   EXPECT_FALSE(called);
   evb.loopOnce();
@@ -33,7 +34,8 @@ TEST(FunctionLooperTest, LooperStarted) {
   EventBase evb;
   bool called = false;
   auto func = [&](bool) { called = true; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->run();
   EXPECT_TRUE(looper->isRunning());
   evb.loopOnce();
@@ -47,7 +49,8 @@ TEST(FunctionLooperTest, LooperStopped) {
   EventBase evb;
   bool called = false;
   auto func = [&](bool) { called = true; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->run();
   evb.loopOnce();
   EXPECT_TRUE(called);
@@ -62,7 +65,8 @@ TEST(FunctionLooperTest, LooperRestarted) {
   EventBase evb;
   bool called = false;
   auto func = [&](bool) { called = true; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->run();
   evb.loopOnce();
   EXPECT_TRUE(called);
@@ -85,7 +89,8 @@ TEST(FunctionLooperTest, DestroyLooperDuringFunc) {
     called = true;
     *looperPtr = nullptr;
   };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looperPtr = &looper;
 
   looper->run();
@@ -103,7 +108,8 @@ TEST(FunctionLooperTest, StopLooperDuringFunc) {
     called = true;
     (*looperPtr)->stop();
   };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looperPtr = &looper;
 
   looper->run();
@@ -123,7 +129,8 @@ TEST(FunctionLooperTest, RunLooperDuringFunc) {
     called = true;
     (*looperPtr)->run();
   };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looperPtr = &looper;
 
   looper->run();
@@ -138,7 +145,8 @@ TEST(FunctionLooperTest, DetachStopsLooper) {
   EventBase evb;
   bool called = false;
   auto func = [&](bool) { called = true; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->run();
   EXPECT_TRUE(looper->isRunning());
   looper->detachEventBase();
@@ -160,7 +168,8 @@ TEST(FunctionLooperTest, PacingOnce) {
     }
     return std::chrono::milliseconds::zero();
   };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   looper->setPacingFunction(std::move(pacingFunc));
   looper->run();
@@ -186,7 +195,8 @@ TEST(FunctionLooperTest, KeepPacing) {
     }
     return 3600000ms;
   };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(func)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(func), LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   looper->setPacingFunction(std::move(pacingFunc));
   looper->run();
@@ -223,7 +233,8 @@ TEST(FunctionLooperTest, KeepPacing) {
 TEST(FunctionLooperTest, TimerTickSize) {
   EventBase evb;
   TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, [&](bool) {}));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, [&](bool) {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
@@ -231,7 +242,8 @@ TEST(FunctionLooperTest, TimerTickSize) {
 TEST(FunctionLooperTest, TimerTickSizeAfterNewEvb) {
   EventBase evb;
   TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, [&](bool) {}));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, [&](bool) {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
   looper->detachEventBase();
@@ -252,7 +264,8 @@ TEST(FunctionLooperTest, NoLoopCallbackInPacingMode) {
     }
   };
   auto pacingFunc = [&]() { return 3600000ms; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(runFunc)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(runFunc), LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   looper->setPacingFunction(std::move(pacingFunc));
   // bootstrap the looper
@@ -278,7 +291,8 @@ TEST(FunctionLooperTest, RunConditions) {
     (*looperPtr)->run();
   };
   auto pacingFunc = [&]() { return 3600000ms; };
-  FunctionLooper::Ptr looper(new FunctionLooper(&evb, std::move(runFunc)));
+  FunctionLooper::Ptr looper(
+      new FunctionLooper(&evb, std::move(runFunc), LooperType::ReadLooper));
   looperPtr = &looper;
   looper->setPacingTimer(std::move(pacingTimer));
   looper->setPacingFunction(std::move(pacingFunc));

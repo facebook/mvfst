@@ -31,6 +31,7 @@ Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, ReadStreamFrame>::
     }
   }
   stream.conn.streamManager->updateReadableStreams(stream);
+  stream.conn.streamManager->updatePeekableStreams(stream);
 }
 
 inline void

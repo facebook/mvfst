@@ -7,12 +7,21 @@
  */
 
 #pragma once
+#include <ostream>
 
 #include <folly/Function.h>
 #include <folly/io/async/EventBase.h>
 #include <quic/common/Timers.h>
 
 namespace quic {
+enum class LooperType : uint8_t {
+  ReadLooper = 1,
+  PeekLooper = 2,
+  WriteLooper = 3
+};
+
+std::ostream& operator<<(std::ostream& /* out */, const LooperType& /*rhs*/);
+
 /**
  * A loop callback that provides convenience functions for calling a functions
  * in multiple evb loops. Calling run() will cause the loop to start and stop()
@@ -27,7 +36,8 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
 
   explicit FunctionLooper(
       folly::EventBase* evb,
-      folly::Function<void(bool)>&& func);
+      folly::Function<void(bool)>&& func,
+      LooperType type);
 
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
 
@@ -82,5 +92,6 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
   TimerHighRes::SharedPtr pacingTimer_;
   bool running_{false};
   bool inLoopBody_{false};
+  const LooperType type_;
 };
 } // namespace quic

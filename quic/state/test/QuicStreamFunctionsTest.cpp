@@ -1282,7 +1282,7 @@ TEST_F(QuicStreamFunctionsTest, UpdatesLastHolbTime) {
 }
 
 TEST_F(QuicStreamFunctionsTest, HolbTimingUpdateReadingListIdempotentWrtHolb) {
-  // test that calling uRL consequtevily (without new data or readsd)
+  // test that calling uRL in succession (without new data or readsd)
   // does not affect the HOLB state
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto buf1 = IOBuf::copyBuffer("just");

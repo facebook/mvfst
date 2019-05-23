@@ -155,7 +155,7 @@ class TestQuicTransport
     return lossTimeout_.getTimeRemaining();
   }
 
-  void onReadData(const folly::SocketAddress&, NetworkData&& data) {
+  void onReadData(const folly::SocketAddress&, NetworkData&& data) override {
     if (!data.data) {
       return;
     }
@@ -194,8 +194,8 @@ class TestQuicTransport
           continue;
         }
         appendDataToReadBuffer(*stream, std::move(buffer.second));
-        conn_->streamManager->updatePeekableStreams(*stream);
         conn_->streamManager->updateReadableStreams(*stream);
+        conn_->streamManager->updatePeekableStreams(*stream);
       }
     }
   }
@@ -276,6 +276,7 @@ class TestQuicTransport
     QuicStreamState* stream = conn_->streamManager->getStream(id);
     stream->streamReadError = ex;
     conn_->streamManager->updateReadableStreams(*stream);
+    conn_->streamManager->updatePeekableStreams(*stream);
     updateReadLooper();
   }
 
@@ -1847,17 +1848,18 @@ TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
   EXPECT_CALL(peekCb, onDataAvailable(stream1, _));
   transport->driveReadCallbacks();
 
-  // Only read should be called.
+  // Only read should be called
   EXPECT_CALL(readCb, readAvailable(stream1));
-  EXPECT_CALL(peekCb, onDataAvailable(stream1, _)).Times(0);
   transport->driveReadCallbacks();
 
   // Consume 5 bytes.
   transport->consume(stream1, 5);
 
-  // Only read should be called.
+  // Both peek and read should be called.
+  // Read - because it is called every time
+  // Peek - because the peekable range has changed
   EXPECT_CALL(readCb, readAvailable(stream1));
-  EXPECT_CALL(peekCb, onDataAvailable(stream1, _)).Times(0);
+  EXPECT_CALL(peekCb, onDataAvailable(stream1, _));
   transport->driveReadCallbacks();
 
   // Read 10 bytes.
@@ -1865,9 +1867,15 @@ TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
     EXPECT_EQ("l stream d", data.first->moveToFbString().toStdString());
   });
 
+  // Both peek and read should be called.
+  // Read - because it is called every time
+  // Peek - because the peekable range has changed
+  EXPECT_CALL(readCb, readAvailable(stream1));
+  EXPECT_CALL(peekCb, onDataAvailable(stream1, _));
+  transport->driveReadCallbacks();
+
   // Only read should be called.
   EXPECT_CALL(readCb, readAvailable(stream1));
-  EXPECT_CALL(peekCb, onDataAvailable(stream1, _)).Times(0);
   transport->driveReadCallbacks();
 
   // Consume the rest of the data.
@@ -1898,9 +1906,8 @@ TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
   // Consume left part.
   transport->consume(stream1, buf1->computeChainDataLength());
 
-  // Neither read nor peek should be called.
-  EXPECT_CALL(readCb, readAvailable(stream1)).Times(0);
-  EXPECT_CALL(peekCb, onDataAvailable(stream1, _)).Times(0);
+  // Only peek should be called.
+  EXPECT_CALL(peekCb, onDataAvailable(stream1, _));
   transport->driveReadCallbacks();
 
   // Fill in the gap.
@@ -1983,21 +1990,18 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListEmptyListTest) {
 TEST_F(QuicTransportImplTest, UpdatePeekableListWithStreamErrorTest) {
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
-  auto stream = transport->getStream(streamId);
-
   // Add some data to the stream.
   transport->addDataToStream(
       streamId,
       StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
 
-  transport->addStreamReadError(streamId, LocalErrorCode::NO_ERROR);
-
   // streamId is in the list.
   EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
 
+  transport->addStreamReadError(streamId, LocalErrorCode::NO_ERROR);
+
   // streamId is removed from the list after the call
   // because there is an error on the stream.
-  conn->streamManager->updatePeekableStreams(*stream);
   EXPECT_EQ(0, conn->streamManager->peekableStreams().count(streamId));
 }
 

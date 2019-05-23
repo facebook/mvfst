@@ -14,8 +14,9 @@ using namespace std::chrono_literals;
 
 FunctionLooper::FunctionLooper(
     folly::EventBase* evb,
-    folly::Function<void(bool)>&& func)
-    : evb_(evb), func_(std::move(func)) {}
+    folly::Function<void(bool)>&& func,
+    LooperType type)
+    : evb_(evb), func_(std::move(func)), type_(type) {}
 
 void FunctionLooper::setPacingTimer(
     TimerHighRes::SharedPtr pacingTimer) noexcept {
@@ -32,9 +33,12 @@ void FunctionLooper::commonLoopBody(bool fromTimer) noexcept {
   SCOPE_EXIT {
     inLoopBody_ = false;
   };
+  auto hasBeenRunning = running_;
   func_(fromTimer);
   // callback could cause us to stop ourselves.
   // Someone could have also called run() in the callback.
+  VLOG(10) << __func__ << ": " << type_ << " fromTimer=" << fromTimer
+           << " hasBeenRunning=" << hasBeenRunning << " running_=" << running_;
   if (!running_) {
     return;
   }
@@ -60,16 +64,24 @@ void FunctionLooper::runLoopCallback() noexcept {
 }
 
 void FunctionLooper::run(bool thisIteration) noexcept {
+  VLOG(10) << __func__ << ": " << type_;
   running_ = true;
   // Caller can call run() in func_. But if we are in pacing mode, we should
   // prevent such loop.
-  if (inLoopBody_ || isLoopCallbackScheduled() || isScheduled()) {
+  if (pacingTimer_ && inLoopBody_) {
+    VLOG(4) << __func__ << ": " << type_
+            << " in loop body and using pacing - not rescheduling";
+    return;
+  }
+  if (isLoopCallbackScheduled() || isScheduled()) {
+    VLOG(10) << __func__ << ": " << type_ << " already scheduled";
     return;
   }
   evb_->runInLoop(this, thisIteration);
 }
 
 void FunctionLooper::stop() noexcept {
+  VLOG(10) << __func__ << ": " << type_;
   running_ = false;
   cancelLoopCallback();
   cancelTimeout();
@@ -80,12 +92,14 @@ bool FunctionLooper::isRunning() const {
 }
 
 void FunctionLooper::attachEventBase(folly::EventBase* evb) {
+  VLOG(10) << __func__ << ": " << type_;
   DCHECK(!evb_);
   DCHECK(evb && evb->isInEventBaseThread());
   evb_ = evb;
 }
 
 void FunctionLooper::detachEventBase() {
+  VLOG(10) << __func__ << ": " << type_;
   DCHECK(evb_ && evb_->isInEventBaseThread());
   stop();
   cancelTimeout();
@@ -107,5 +121,23 @@ FunctionLooper::getTimerTickInterval() noexcept {
     return pacingTimer_->getTickInterval();
   }
   return folly::none;
+}
+
+std::ostream& operator<<(std::ostream& out, const LooperType& rhs) {
+  switch (rhs) {
+    case LooperType::ReadLooper:
+      out << "ReadLooper";
+      break;
+    case LooperType::PeekLooper:
+      out << "PeekLooper";
+      break;
+    case LooperType::WriteLooper:
+      out << "WriteLooper";
+      break;
+    default:
+      out << "unknown";
+      break;
+  }
+  return out;
 }
 } // namespace quic
