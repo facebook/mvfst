@@ -158,7 +158,10 @@ std::chrono::microseconds NewReno::getPacingInterval() const noexcept {
 
 void NewReno::setMinimalPacingInterval(std::chrono::microseconds) noexcept {}
 
-void NewReno::setAppLimited(bool, TimePoint) noexcept { /* unsupported */
+void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
+}
+
+void NewReno::setAppLimited() { /* unsupported */
 }
 
 bool NewReno::isAppLimited() const noexcept {

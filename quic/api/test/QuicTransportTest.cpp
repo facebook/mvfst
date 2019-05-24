@@ -358,8 +358,96 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
   loopForWrites();
   // Pending numProbePackets is cleared:
   EXPECT_EQ(0, conn.pendingEvents.numProbePackets);
-  // both write and onPacketSent will inquire getWritableBytes
-  EXPECT_EQ(onPacketSentCounter + socketWriteCounter, getWritableBytesCounter);
+  transport_->close(folly::none);
+}
+
+TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(5000));
+
+  auto stream = transport_->createBidirectionalStream().value();
+  auto lossStream = transport_->createBidirectionalStream().value();
+  conn.streamManager->addLoss(lossStream);
+  conn.streamManager->getStream(lossStream)
+      ->lossBuffer.emplace_back(
+          IOBuf::copyBuffer("Mountains may depart"), 0, false);
+  transport_->writeChain(
+      stream,
+      IOBuf::copyBuffer("An elephant sitting still"),
+      false,
+      false,
+      nullptr);
+  EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  loopForWrites();
+  transport_->close(folly::none);
+}
+
+TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Invoke([&]() {
+        if (conn.outstandingPackets.empty()) {
+          return 5000;
+        }
+        return 0;
+      }));
+
+  auto stream = transport_->createBidirectionalStream().value();
+  transport_->writeChain(
+      stream,
+      IOBuf::copyBuffer("An elephant sitting still"),
+      false,
+      false,
+      nullptr);
+  EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  loopForWrites();
+  transport_->close(folly::none);
+}
+
+TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(5000));
+
+  auto stream = transport_->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(100 * 2000);
+  transport_->writeChain(stream, buf->clone(), false, false, nullptr);
+  EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  loopForWrites();
+  transport_->close(folly::none);
+}
+
+TEST_F(QuicTransportTest, AppLimited) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(5000));
+
+  auto stream = transport_->createBidirectionalStream().value();
+  transport_->writeChain(
+      stream,
+      IOBuf::copyBuffer("An elephant sitting still"),
+      false,
+      false,
+      nullptr);
+  EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(1);
+  loopForWrites();
   transport_->close(folly::none);
 }
 

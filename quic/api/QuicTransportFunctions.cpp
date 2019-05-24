@@ -366,7 +366,8 @@ void updateConnection(
       packetNum,
       (uint64_t)encodedSize,
       (int)isHandshake,
-      (int)pureAck);
+      (int)pureAck,
+      pkt.isAppLimited);
   conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
   if (conn.congestionController && !pureAck) {
     conn.congestionController->onPacketSent(pkt);

@@ -97,7 +97,8 @@ class Cubic : public CongestionController {
   uint64_t getCongestionWindow() const noexcept override;
   bool canBePaced() const noexcept override;
   void setConnectionEmulation(uint8_t) noexcept override;
-  void setAppLimited(bool limited, TimePoint eventTime) noexcept override;
+  void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
+  void setAppLimited() override;
 
   bool isAppLimited() const noexcept override;
 
@@ -116,6 +117,7 @@ class Cubic : public CongestionController {
   CubicStates state_{CubicStates::Hystart};
 
  private:
+  bool isAppIdle() const noexcept;
   void onPacketAcked(const AckEvent& ack);
   void onPacketAckedInHystart(const AckEvent& ack);
   void onPacketAckedInSteady(const AckEvent& ack);

@@ -563,16 +563,16 @@ class QuicStreamManager {
     dataRejectedStreams_.clear();
   }
 
-  bool isAppLimited() const;
+  bool isAppIdle() const;
 
  private:
-  // Updates the congestion controller app limited state, after a change in the
+  // Updates the congestion controller app-idle state, after a change in the
   // number of streams.
-  // App limited state is set to true if there was at least one non-control
+  // App-idle state is set to true if there was at least one non-control
   // before the update and there are none after. It is set to false if instead
   // there were no non-control streams before and there is at least one at the
   // time of calling
-  void updateAppLimitedState();
+  void updateAppIdleState();
 
   QuicStreamState* FOLLY_NULLABLE
   getOrCreateOpenedLocalStream(StreamId streamId);
@@ -666,8 +666,8 @@ class QuicStreamManager {
   // Data structure to keep track of stream that have detected lost data
   std::vector<StreamId> lossStreams_;
 
-  // Record whether or not we are app limited.
-  bool isAppLimited_{false};
+  // Record whether or not we are app-idle.
+  bool isAppIdle_{false};
 };
 
 } // namespace quic

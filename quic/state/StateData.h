@@ -219,14 +219,20 @@ struct CongestionController {
    */
   virtual bool canBePaced() const = 0;
   /**
+   * Notify congestion controller that the connection has become idle or active
+   * in the sense that there are active non-control streams.
+   * idle: true if the connection has become app-idle, false if the
+   *          connection has become not app-idle.
+   * eventTime: the time point when the app-idle state changed.
+   */
+  virtual void setAppIdle(bool idle, TimePoint eventTime) = 0;
+
+  /**
    * Notify congestion controller that the connection has become app-limited or
    * not app-limited.
    *
-   * limited: true if the connection has become app-limited, false if the
-   *          connection has become not app-limited.
-   * eventTime: the time point when the app-limited state changed.
    */
-  virtual void setAppLimited(bool limited, TimePoint eventTime) = 0;
+  virtual void setAppLimited() = 0;
   virtual CongestionControlType type() const = 0;
 
   /**
@@ -246,8 +252,7 @@ struct CongestionController {
 
   /**
    * Whether the congestion controller thinks it's currently in app-limited
-   * state. For some congestion controllers, e.g. BBR, the app-limited state may
-   * not be the same as the app.
+   * state.
    */
   virtual bool isAppLimited() const = 0;
 };

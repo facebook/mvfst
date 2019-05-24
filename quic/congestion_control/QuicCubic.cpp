@@ -154,11 +154,11 @@ bool Cubic::canBePaced() const noexcept {
   return pacingEnabled;
 }
 
-void Cubic::setAppLimited(bool limited, TimePoint eventTime) noexcept {
+void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
   QUIC_TRACE(
-      cubic_applimited,
+      cubic_appidle,
       conn_,
-      limited,
+      idle,
       std::chrono::duration_cast<std::chrono::milliseconds>(
           eventTime.time_since_epoch())
           .count(),
@@ -167,22 +167,32 @@ void Cubic::setAppLimited(bool limited, TimePoint eventTime) noexcept {
                 steadyState_.lastReductionTime->time_since_epoch())
                 .count()
           : -1);
-  bool currentAppLimited = isAppLimited();
-  if (!currentAppLimited && limited) {
+  bool currentAppIdle = isAppIdle();
+  if (!currentAppIdle && idle) {
     quiescenceStart_ = eventTime;
   }
-  if (!limited && currentAppLimited && *quiescenceStart_ <= eventTime &&
+  if (!idle && currentAppIdle && *quiescenceStart_ <= eventTime &&
       steadyState_.lastReductionTime) {
     *steadyState_.lastReductionTime +=
         std::chrono::duration_cast<std::chrono::milliseconds>(
             eventTime - *quiescenceStart_);
   }
-  if (!limited) {
+  if (!idle) {
     quiescenceStart_ = folly::none;
   }
 }
 
+void Cubic::setAppLimited() {
+  // we use app-idle for Cubic
+}
+
 bool Cubic::isAppLimited() const noexcept {
+  // Or maybe always false. This doesn't really matter for Cubic. Channeling
+  // isAppIdle() makes testing easier.
+  return isAppIdle();
+}
+
+bool Cubic::isAppIdle() const noexcept {
   return quiescenceStart_.hasValue();
 }
 

@@ -124,7 +124,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 
-TEST_F(CubicTest, AppLimited) {
+TEST_F(CubicTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1500;
   TestingCubic cubic(conn);
@@ -150,7 +150,7 @@ TEST_F(CubicTest, AppLimited) {
   EXPECT_GT(cubic.getCongestionWindow(), cwnd);
   cwnd = cubic.getCongestionWindow();
 
-  cubic.setAppLimited(true, reductionTime + 1100ms);
+  cubic.setAppIdle(true, reductionTime + 1100ms);
   EXPECT_TRUE(cubic.isAppLimited());
   auto packet2 = makeTestingWritePacket(2, 1000, 3000);
   cubic.onPacketSent(packet2);
@@ -159,7 +159,7 @@ TEST_F(CubicTest, AppLimited) {
   EXPECT_EQ(cubic.getCongestionWindow(), cwnd);
 
   // 1 seconds of quiescence
-  cubic.setAppLimited(false, reductionTime + 2100ms);
+  cubic.setAppIdle(false, reductionTime + 2100ms);
   EXPECT_FALSE(cubic.isAppLimited());
   auto packet3 = makeTestingWritePacket(3, 1000, 4000);
   cubic.onPacketSent(packet3);

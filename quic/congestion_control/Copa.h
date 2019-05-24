@@ -43,7 +43,8 @@ class Copa : public CongestionController {
   uint64_t getBytesInFlight() const noexcept;
 
   void setConnectionEmulation(uint8_t) noexcept override;
-  void setAppLimited(bool, TimePoint) noexcept override;
+  void setAppIdle(bool, TimePoint) noexcept override;
+  void setAppLimited() override;
 
   // pacing related functions, not implemented for copa
   bool canBePaced() const noexcept override;

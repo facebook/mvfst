@@ -1467,26 +1467,26 @@ INSTANTIATE_TEST_CASE_P(
     QuicTransportImplTestUniBidi,
     Values(true, false));
 
-TEST_P(QuicTransportImplTestUniBidi, AppLimitedTest) {
+TEST_P(QuicTransportImplTestUniBidi, AppIdleTest) {
   auto& conn = transport->getConnectionState();
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
-  EXPECT_CALL(*rawCongestionController, setAppLimited(false, _)).Times(0);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(false, _)).Times(0);
   auto stream = createStream(transport, GetParam());
 
-  EXPECT_CALL(*rawCongestionController, setAppLimited(true, _));
+  EXPECT_CALL(*rawCongestionController, setAppIdle(true, _));
   transport->closeStream(stream);
 }
 
-TEST_P(QuicTransportImplTestUniBidi, AppLimitedTestControlStreams) {
+TEST_P(QuicTransportImplTestUniBidi, AppIdleTestControlStreams) {
   auto& conn = transport->getConnectionState();
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
-  EXPECT_CALL(*rawCongestionController, setAppLimited(false, _)).Times(0);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(false, _)).Times(0);
   auto stream = createStream(transport, GetParam());
   ASSERT_TRUE(stream);
 
@@ -1497,25 +1497,25 @@ TEST_P(QuicTransportImplTestUniBidi, AppLimitedTestControlStreams) {
   ASSERT_TRUE(ctrlStream2);
   transport->setControlStream(ctrlStream2);
 
-  EXPECT_CALL(*rawCongestionController, setAppLimited(true, _));
+  EXPECT_CALL(*rawCongestionController, setAppIdle(true, _));
   transport->closeStream(stream);
 }
 
-TEST_P(QuicTransportImplTestUniBidi, AppLimitedTestOnlyControlStreams) {
+TEST_P(QuicTransportImplTestUniBidi, AppIdleTestOnlyControlStreams) {
   auto& conn = transport->getConnectionState();
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
   auto ctrlStream1 = createStream(transport, GetParam());
-  EXPECT_CALL(*rawCongestionController, setAppLimited(true, _)).Times(1);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(true, _)).Times(1);
   transport->setControlStream(ctrlStream1);
-  EXPECT_CALL(*rawCongestionController, setAppLimited(false, _)).Times(1);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(false, _)).Times(1);
   auto ctrlStream2 = createStream(transport, GetParam());
-  EXPECT_CALL(*rawCongestionController, setAppLimited(true, _)).Times(1);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(true, _)).Times(1);
   transport->setControlStream(ctrlStream2);
 
-  EXPECT_CALL(*rawCongestionController, setAppLimited(_, _)).Times(0);
+  EXPECT_CALL(*rawCongestionController, setAppIdle(_, _)).Times(0);
   transport->closeStream(ctrlStream1);
   transport->closeStream(ctrlStream2);
 }

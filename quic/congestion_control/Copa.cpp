@@ -308,7 +308,10 @@ std::chrono::microseconds Copa::getPacingInterval() const noexcept {
 
 void Copa::setMinimalPacingInterval(std::chrono::microseconds) noexcept {}
 
-void Copa::setAppLimited(bool, TimePoint) noexcept { /* unsupported */
+void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
+}
+
+void Copa::setAppLimited() { /* unsupported */
 }
 
 bool Copa::isAppLimited() const noexcept {

@@ -37,7 +37,8 @@ class MockCongestionController : public CongestionController {
       ,
       setMinimalPacingInterval,
       void(std::chrono::microseconds));
-  GMOCK_METHOD2_(, , , setAppLimited, void(bool, TimePoint));
+  GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
+  MOCK_METHOD0(setAppLimited, void());
   MOCK_CONST_METHOD0(isAppLimited, bool());
 };
 } // namespace test

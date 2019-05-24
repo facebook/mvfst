@@ -2127,6 +2127,17 @@ void QuicTransportBase::writeSocketData() {
         setIdleTimer();
         conn_->receivedNewPacketBeforeWrite = false;
       }
+      // Check if we are app-limited after finish this round of sending
+      auto currentSendBufLen = conn_->flowControlState.sumCurStreamBufferLen;
+      auto lossBufferEmpty = !conn_->streamManager->hasLoss() &&
+          conn_->cryptoState->initialStream.lossBuffer.empty() &&
+          conn_->cryptoState->handshakeStream.lossBuffer.empty() &&
+          conn_->cryptoState->oneRttStream.lossBuffer.empty();
+      if (conn_->congestionController &&
+          currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
+          conn_->congestionController->getWritableBytes()) {
+        conn_->congestionController->setAppLimited();
+      }
     }
   }
   // Writing data could write out an ack which could cause us to cancel

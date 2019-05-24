@@ -27,7 +27,9 @@ class NewReno : public CongestionController {
   uint64_t getCongestionWindow() const noexcept override;
   void setConnectionEmulation(uint8_t) noexcept override;
   bool canBePaced() const noexcept override;
-  void setAppLimited(bool, TimePoint) noexcept override;
+  void setAppIdle(bool, TimePoint) noexcept override;
+  void setAppLimited() override;
+
   CongestionControlType type() const noexcept override;
 
   bool inSlowStart() const noexcept;
