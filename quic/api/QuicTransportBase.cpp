@@ -455,6 +455,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
       conn_->lossState.totalBytesRetransmitted;
   transportInfo.pto = calculatePTO(*conn_);
   transportInfo.bytesSent = conn_->lossState.totalBytesSent;
+  transportInfo.bytesAcked = conn_->lossState.totalBytesAcked;
   transportInfo.bytesRecvd = conn_->lossState.totalBytesRecvd;
   transportInfo.ptoCount = conn_->lossState.ptoCount;
   transportInfo.totalPTOCount = conn_->lossState.totalPTOCount;

@@ -132,6 +132,7 @@ class QuicSocket {
     uint32_t timeoutBasedLoss;
     std::chrono::microseconds pto;
     uint64_t bytesSent;
+    uint64_t bytesAcked;
     uint64_t bytesRecvd;
     uint64_t totalBytesRetransmitted;
     uint32_t ptoCount;
