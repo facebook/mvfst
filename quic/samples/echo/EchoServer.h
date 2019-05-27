@@ -78,7 +78,7 @@ class EchoServer {
   }
 
   void start() {
-    // Create a SocketAddress and the default or passed in host.
+    // Create a SocketAddress and use the default or passed in host.
     folly::SocketAddress addr1(host_.c_str(), port_);
     addr1.setFromHostPort(host_, port_);
     server_->start(addr1, 0);

@@ -143,7 +143,6 @@ void QuicClientTransport::processPacketData(
     QUIC_TRACE(packet_drop, *conn_, "non_regular");
     return;
   }
-
   bool longHeader = folly::variant_match(
       regularOptional->header,
       [](const LongHeader&) { return true; },
@@ -189,6 +188,9 @@ void QuicClientTransport::processPacketData(
     std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
     auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
 
+    // While in a retry state set the client connection not to use early data.
+    // Based off of Section 2.3 of RFC 8446.
+    tempConn->transportSettings.attemptEarlyData = false;
     clientConn_ = tempConn.get();
     conn_ = std::move(tempConn);
 
@@ -778,8 +780,8 @@ folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
   if (!quicCachedPsk) {
     return folly::none;
   }
-
-  // TODO T32658838 better API to disable early data for current connection
+  // Early data is allowed on the first flight only.
+  // Any retry or retransmission of handshake will not allow it.
   if (!conn_->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
   } else if (
@@ -803,8 +805,11 @@ void QuicClientTransport::startCryptoHandshake() {
   // Set idle timer whenever crypto starts so that we can restart the idle timer
   // after a version negotiation as well.
   setIdleTimer();
-  // TODO: no need to close the transport if there is an error in the
-  // handshake.
+
+  // No need to close the transport if there is an error in the handshake. 
+  // An error in the transport will bubble up and get caught in the 
+  // try/catch block.
+  //
   // We need to update the flow control settings every time we start a crypto
   // handshake. This is so that we can reset the flow control settings when
   // we go through version negotiation as well.
@@ -879,7 +884,7 @@ void QuicClientTransport::startCryptoHandshake() {
         clientPtr->connCallback_->onTransportReady();
       }
     });
-  }
+  } 
 }
 
 void QuicClientTransport::cacheServerInitialParams(
