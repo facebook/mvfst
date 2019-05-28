@@ -362,7 +362,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   // Create few frames
   ConnectionCloseFrame connCloseFrame(
       TransportErrorCode::FRAME_ENCODING_ERROR, "The sun is in the sky.");
-  MaxStreamsFrame maxStreamIdFrame(0x1024, true);
+  MaxStreamsFrame maxStreamFrame(999, true);
   PingFrame pingFrame;
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
@@ -371,7 +371,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   // Write those framses with a regular builder
   writeFrame(connCloseFrame, regularBuilder);
-  writeFrame(maxStreamIdFrame, regularBuilder);
+  writeFrame(maxStreamFrame, regularBuilder);
   writeFrame(pingFrame, regularBuilder);
   writeAckFrame(ackMeta, regularBuilder);
 

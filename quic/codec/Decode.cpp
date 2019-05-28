@@ -376,27 +376,25 @@ MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor) {
 }
 
 MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId || !isBidirectionalStream(streamId->first))) {
+  auto streamCount = decodeQuicInteger(cursor);
+  if (UNLIKELY(!streamCount)) {
     throw QuicTransportException(
         "Invalid Bi-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::MAX_STREAMS_BIDI);
   }
-  return MaxStreamsFrame(
-      folly::to<StreamId>(streamId->first), true /* isBidirectional*/);
+  return MaxStreamsFrame(streamCount->first, true /* isBidirectional*/);
 }
 
 MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId || !isUnidirectionalStream(streamId->first))) {
+  auto streamCount = decodeQuicInteger(cursor);
+  if (UNLIKELY(!streamCount)) {
     throw QuicTransportException(
         "Invalid Uni-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::MAX_STREAMS_UNI);
   }
-  return MaxStreamsFrame(
-      folly::to<StreamId>(streamId->first), false /* isBidirectional */);
+  return MaxStreamsFrame(streamCount->first, false /* isUnidirectional */);
 }
 
 DataBlockedFrame decodeDataBlockedFrame(folly::io::Cursor& cursor) {

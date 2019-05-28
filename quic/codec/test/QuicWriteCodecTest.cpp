@@ -945,49 +945,55 @@ TEST_F(QuicWriteCodecTest, NoSpaceForMaxData) {
 }
 
 TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
-  MockQuicPacketBuilder pktBuilder;
-  setupCommonExpects(pktBuilder);
-  StreamId maxStream = 0x1234;
-  bool isBidirectional = true;
-  MaxStreamsFrame maxStreamIdFrame(maxStream, isBidirectional);
-  auto bytesWritten = writeFrame(maxStreamIdFrame, pktBuilder);
+  for (uint64_t i = 0; i < 100; i++) {
+    MockQuicPacketBuilder pktBuilder;
+    setupCommonExpects(pktBuilder);
+    uint64_t maxStream = i;
+    bool isBidirectional = true;
+    MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
+    auto bytesWritten = writeFrame(maxStreamsFrame, pktBuilder);
 
-  auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
-  // 1 byte for the type and 2 bytes for the stream id.
-  EXPECT_EQ(1 + 2, bytesWritten);
-  auto resultMaxStreamIdFrame =
-      boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
-  EXPECT_EQ(0x1234, resultMaxStreamIdFrame.maxStreams);
+    auto builtOut = std::move(pktBuilder).buildPacket();
+    auto regularPacket = builtOut.first;
+    auto streamCountSize = i < 64 ? 1 : 2;
+    // 1 byte for the type and up to 2 bytes for the stream count.
+    EXPECT_EQ(1 + streamCountSize, bytesWritten);
+    auto resultMaxStreamIdFrame =
+        boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
+    EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
-  auto wireBuf = std::move(builtOut.second);
-  folly::io::Cursor cursor(wireBuf.get());
-  auto wireStreamIdFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
-  EXPECT_EQ(0x1234, wireStreamIdFrame.maxStreams);
-  EXPECT_TRUE(cursor.isAtEnd());
+    auto wireBuf = std::move(builtOut.second);
+    folly::io::Cursor cursor(wireBuf.get());
+    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
+    EXPECT_EQ(i, wireStreamsFrame.maxStreams);
+    EXPECT_TRUE(cursor.isAtEnd());
+  }
 }
 
 TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
-  MockQuicPacketBuilder pktBuilder;
-  setupCommonExpects(pktBuilder);
-  StreamId maxStream = 0x1233;
-  bool isBidirectional = false;
-  MaxStreamsFrame maxStreamIdFrame(maxStream, isBidirectional);
-  auto bytesWritten = writeFrame(maxStreamIdFrame, pktBuilder);
+  for (uint64_t i = 0; i < 100; i++) {
+    MockQuicPacketBuilder pktBuilder;
+    setupCommonExpects(pktBuilder);
+    uint64_t maxStream = i;
+    bool isBidirectional = false;
+    MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
+    auto bytesWritten = writeFrame(maxStreamsFrame, pktBuilder);
 
-  auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
-  // 1 byte for the type and 2 bytes for the stream id.
-  EXPECT_EQ(1 + 2, bytesWritten);
-  auto resultMaxStreamIdFrame =
-      boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
-  EXPECT_EQ(0x1233, resultMaxStreamIdFrame.maxStreams);
+    auto builtOut = std::move(pktBuilder).buildPacket();
+    auto regularPacket = builtOut.first;
+    auto streamCountSize = i < 64 ? 1 : 2;
+    // 1 byte for the type and up to 2 bytes for the stream count.
+    EXPECT_EQ(1 + streamCountSize, bytesWritten);
+    auto resultMaxStreamIdFrame =
+        boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
+    EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
-  auto wireBuf = std::move(builtOut.second);
-  folly::io::Cursor cursor(wireBuf.get());
-  auto wireStreamIdFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
-  EXPECT_EQ(0x1233, wireStreamIdFrame.maxStreams);
-  EXPECT_TRUE(cursor.isAtEnd());
+    auto wireBuf = std::move(builtOut.second);
+    folly::io::Cursor cursor(wireBuf.get());
+    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
+    EXPECT_EQ(i, wireStreamsFrame.maxStreams);
+    EXPECT_TRUE(cursor.isAtEnd());
+  }
 }
 
 TEST_F(QuicWriteCodecTest, NoSpaceForMaxStreamId) {

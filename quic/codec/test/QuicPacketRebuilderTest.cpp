@@ -63,7 +63,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       TransportErrorCode::FRAME_ENCODING_ERROR,
       "The sun is in the sky.",
       FrameType::ACK);
-  MaxStreamsFrame maxStreamIdFrame(0x1024, true);
+  MaxStreamsFrame maxStreamsFrame(4321, true);
   PingFrame pingFrame;
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
@@ -83,7 +83,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
 
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
-  writeFrame(maxStreamIdFrame, regularBuilder1);
+  writeFrame(maxStreamsFrame, regularBuilder1);
   writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrame(streamMeta, regularBuilder1);
@@ -125,7 +125,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
           EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
         },
         [](const MaxStreamsFrame& maxStreamFrame) {
-          EXPECT_EQ(0x1024, maxStreamFrame.maxStreams);
+          EXPECT_EQ(4321, maxStreamFrame.maxStreams);
         },
         [](const PingFrame& ping) { EXPECT_EQ(PingFrame(), ping); },
         [](const WriteAckFrame& ack) {

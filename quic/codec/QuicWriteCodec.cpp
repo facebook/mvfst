@@ -474,11 +474,11 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
             ? FrameType::MAX_STREAMS_BIDI
             : FrameType::MAX_STREAMS_UNI;
         QuicInteger packetType(static_cast<FrameTypeType>(frameType));
-        QuicInteger streamId(maxStreamsFrame.maxStreams);
-        auto maxStreamsFrameSize = packetType.getSize() + streamId.getSize();
+        QuicInteger streamCount(maxStreamsFrame.maxStreams);
+        auto maxStreamsFrameSize = packetType.getSize() + streamCount.getSize();
         if (packetSpaceCheck(spaceLeft, maxStreamsFrameSize)) {
           builder.write(packetType);
-          builder.write(streamId);
+          builder.write(streamCount);
           builder.appendFrame(std::move(maxStreamsFrame));
           return maxStreamsFrameSize;
         }
