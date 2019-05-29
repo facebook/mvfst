@@ -57,13 +57,6 @@ bool isUnidirectionalStream(quic::StreamId stream) {
   return stream & 0b10;
 }
 
-/**
- * Returns whether the given StreamId identifies a bidirectional stream.
- */
-bool isBidirectionalStream(quic::StreamId stream) {
-  return !isUnidirectionalStream(stream);
-}
-
 // The octet following the version contains the lengths of the two connection ID
 // fields that follow it
 constexpr size_t kConnIdLengthOctet = 1;
