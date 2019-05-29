@@ -20,17 +20,21 @@ cat 1>&2 <<EOF
 Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -p BUILD_DIR                           (optional): Path of the base dir for mvfst
   -i INSTALL_PREFIX                      (optional): install prefix path
+  -m                                     (optional): Build folly without jemalloc
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:" arg; do
+while getopts ":hp:i:m" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
       ;;
     i)
       INSTALL_PREFIX="${OPTARG}"
+      ;;
+    m)
+      MVFST_FOLLY_USE_JEMALLOC="n"
       ;;
     h | *) # Display help.
       usage
@@ -44,6 +48,12 @@ if [ -z "${BUILD_DIR-}" ] ; then
   echo -e "${COLOR_RED}[ INFO ] Build dir is not set. So going to build into _build ${COLOR_OFF}"
   BUILD_DIR=_build
   mkdir -p $BUILD_DIR
+fi
+
+if [[ ! -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+    if [[ "$MVFST_FOLLY_USE_JEMALLOC" != "n" ]]; then
+        unset $MVFST_FOLLY_USE_JEMALLOC
+    fi
 fi
 
 ### configure necessary build and install directories
@@ -157,10 +167,20 @@ function setup_folly() {
   echo -e "${COLOR_GREEN}Building Folly ${COLOR_OFF}"
   mkdir -p "$FOLLY_BUILD_DIR"
   cd "$FOLLY_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-    -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
-    -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
-    ..
+
+  # check for environment variable. If 
+  if [[ -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
+      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
+      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
+      ..
+  else 
+    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
+      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
+      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
+      -DFOLLY_USE_JEMALLOC=0                        \
+      ..
+  fi
   make -j "$nproc"
   make install
   echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
