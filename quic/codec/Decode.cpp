@@ -50,13 +50,6 @@ quic::PacketNum nextAckedPacketLen(
   return packetNum - ackBlockLen;
 }
 
-/**
- * Returns whether the given StreamId identifies a unidirectional stream.
- */
-bool isUnidirectionalStream(quic::StreamId stream) {
-  return stream & 0b10;
-}
-
 // The octet following the version contains the lengths of the two connection ID
 // fields that follow it
 constexpr size_t kConnIdLengthOctet = 1;
