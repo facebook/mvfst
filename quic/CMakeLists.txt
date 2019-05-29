@@ -56,6 +56,7 @@ target_compile_options(
 target_link_libraries(
   mvfst_exception PUBLIC
   Folly::folly
+  ${LIBFIZZ_LIBRARY}
 )
 
 install(FILES QuicException.h DESTINATION include/quic/)

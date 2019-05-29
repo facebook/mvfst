@@ -8,6 +8,7 @@
 
 #include <quic/QuicException.h>
 
+#include <fizz/record/Types.h>
 #include <folly/Overload.h>
 #include <glog/logging.h>
 
@@ -140,9 +141,20 @@ std::string toString(TransportErrorCode code) {
       return "Invalid migration";
     case TransportErrorCode::SERVER_BUSY:
       return "Server busy";
-    case TransportErrorCode::TLS_HANDSHAKE_FAILED:
-      return "Handshake Failed";
+    case TransportErrorCode::CRYPTO_ERROR:
+      return cryptoErrorToString(code);
+    case TransportErrorCode::CRYPTO_ERROR_MAX:
+      return cryptoErrorToString(code);
   }
+
+  auto codeVal =
+      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
+  if ((codeVal &
+       static_cast<std::underlying_type<TransportErrorCode>::type>(
+           TransportErrorCode::CRYPTO_ERROR_MAX)) == codeVal) {
+    return cryptoErrorToString(code);
+  }
+
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";
 }
@@ -174,4 +186,15 @@ std::string toString(
           }),
       error.second.value_or(folly::StringPiece()).toString());
 }
+
+std::string cryptoErrorToString(TransportErrorCode code) {
+  auto codeVal =
+      static_cast<std::underlying_type<TransportErrorCode>::type>(code);
+  auto alertDescNum = codeVal -
+      static_cast<std::underlying_type<TransportErrorCode>::type>(
+                          TransportErrorCode::CRYPTO_ERROR);
+  return "Crypto error: " +
+      toString(static_cast<fizz::AlertDescription>(alertDescNum));
+}
+
 } // namespace quic

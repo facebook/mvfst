@@ -376,6 +376,28 @@ TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
   eventbase_.loopForever();
 }
 
+TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
+  EXPECT_CALL(clientConnCallback, onConnectionError(_))
+      .WillOnce(Invoke([&](const auto& errorCode) {
+        LOG(ERROR) << "error: " << errorCode.second;
+        EXPECT_TRUE(folly::variant_match(
+            errorCode.first,
+            [](const TransportErrorCode& err) {
+              return static_cast<fizz::AlertDescription>(err) ==
+                  fizz::AlertDescription::bad_certificate;
+            },
+            [](const auto&) { return false; }));
+        client->close(folly::none);
+        eventbase_.terminateLoopSoon();
+      }));
+
+  ASSERT_EQ(client->getAppProtocol(), folly::none);
+
+  client->setCertificateVerifier(nullptr);
+  client->start(&clientConnCallback);
+  eventbase_.loopForever();
+}
+
 TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   // Point the client to a bad server.
   client->addNewPeerAddress(SocketAddress("127.0.0.1", 14114));

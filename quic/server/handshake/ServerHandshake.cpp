@@ -351,8 +351,22 @@ void ServerHandshake::ActionMoveVisitor::operator()(fizz::ReportError& err) {
   if (errMsg.empty()) {
     errMsg = "Error during handshake";
   }
-  server_.onError(std::make_pair(
-      errMsg.toStdString(), TransportErrorCode::TLS_HANDSHAKE_FAILED));
+
+  auto fe = err.error.get_exception<fizz::FizzException>();
+
+  if (fe && fe->getAlert()) {
+    auto alertNum = static_cast<std::underlying_type<TransportErrorCode>::type>(
+        fe->getAlert().value());
+    alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
+        TransportErrorCode::CRYPTO_ERROR);
+    server_.onError(std::make_pair(
+        errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum)));
+  } else {
+    server_.onError(std::make_pair(
+        errMsg.toStdString(),
+        static_cast<TransportErrorCode>(
+            fizz::AlertDescription::internal_error)));
+  }
 }
 
 void ServerHandshake::ActionMoveVisitor::operator()(fizz::WaitForData&) {

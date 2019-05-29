@@ -86,6 +86,8 @@ std::string toString(QuicErrorCode code);
 std::string toString(
     const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>& error);
 
+std::string cryptoErrorToString(TransportErrorCode code);
+
 inline std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error) {
   os << toString(error);
   return os;

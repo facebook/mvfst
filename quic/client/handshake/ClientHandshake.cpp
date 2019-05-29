@@ -232,14 +232,8 @@ void ClientHandshake::computeOneRttCipher(
 
 void ClientHandshake::computeZeroRttCipher() {
   VLOG(10) << "Computing Client zero rtt keys";
-  auto& earlyDataParams = state_.earlyDataParams();
-  if (!earlyDataParams) {
-    error_ = folly::make_exception_wrapper<QuicTransportException>(
-        "Invalid early data params", TransportErrorCode::TLS_HANDSHAKE_FAILED);
-    return;
-  }
-  earlyDataAttempted_ = true;
   CHECK(state_.earlyDataParams().hasValue());
+  earlyDataAttempted_ = true;
 }
 
 void ClientHandshake::processActions(fizz::client::Actions actions) {
@@ -290,8 +284,22 @@ void ClientHandshake::ActionMoveVisitor::operator()(fizz::ReportError& err) {
   if (errMsg.empty()) {
     errMsg = "Error during handshake";
   }
-  client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
-      errMsg.toStdString(), TransportErrorCode::TLS_HANDSHAKE_FAILED);
+
+  auto fe = err.error.get_exception<fizz::FizzException>();
+
+  if (fe && fe->getAlert()) {
+    auto alertNum = static_cast<std::underlying_type<TransportErrorCode>::type>(
+        fe->getAlert().value());
+    alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
+        TransportErrorCode::CRYPTO_ERROR);
+    client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
+        errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum));
+  } else {
+    client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
+        errMsg.toStdString(),
+        static_cast<TransportErrorCode>(
+            fizz::AlertDescription::internal_error));
+  }
 }
 
 void ClientHandshake::ActionMoveVisitor::operator()(fizz::WaitForData&) {
