@@ -65,31 +65,31 @@ class ClientHandshake : public Handshake {
    * An edge triggered API to get the oneRttWriteCipher. Once you receive the
    * write cipher subsequent calls will return null.
    */
-  std::unique_ptr<fizz::Aead> getOneRttWriteCipher();
+  std::unique_ptr<Aead> getOneRttWriteCipher();
 
   /**
    * An edge triggered API to get the oneRttReadCipher. Once you receive the
    * read cipher subsequent calls will return null.
    */
-  std::unique_ptr<fizz::Aead> getOneRttReadCipher();
+  std::unique_ptr<Aead> getOneRttReadCipher();
 
   /**
    * An edge triggered API to get the zeroRttWriteCipher. Once you receive the
    * zero rtt write cipher subsequent calls will return null.
    */
-  std::unique_ptr<fizz::Aead> getZeroRttWriteCipher();
+  std::unique_ptr<Aead> getZeroRttWriteCipher();
 
   /**
    * An edge triggered API to get the handshakeReadCipher. Once you
    * receive the handshake read cipher subsequent calls will return null.
    */
-  std::unique_ptr<fizz::Aead> getHandshakeReadCipher();
+  std::unique_ptr<Aead> getHandshakeReadCipher();
 
   /**
    * An edge triggered API to get the handshakeWriteCipher. Once you
    * receive the handshake write cipher subsequent calls will return null.
    */
-  std::unique_ptr<fizz::Aead> getHandshakeWriteCipher();
+  std::unique_ptr<Aead> getHandshakeWriteCipher();
 
   /**
    * An edge triggered API to get the one rtt read header cpher. Once you

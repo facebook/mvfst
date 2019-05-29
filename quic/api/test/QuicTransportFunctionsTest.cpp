@@ -28,7 +28,7 @@ uint64_t writeProbingDataToSocketForTest(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
@@ -57,7 +57,7 @@ void writeCryptoDataProbesToSocketForTest(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& conn,
     uint8_t probesToSend,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     LongHeader::Types type = LongHeader::Types::Initial) {
@@ -171,7 +171,7 @@ class QuicTransportFunctionsTest : public Test {
     return conn.version.value_or(*conn.originalVersion);
   }
 
-  std::unique_ptr<fizz::Aead> aead;
+  std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> transportInfoCb_;
 };

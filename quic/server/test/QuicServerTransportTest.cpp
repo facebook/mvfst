@@ -314,7 +314,7 @@ class QuicServerTransportTest : public Test {
     fakeHandshake = new FakeServerHandshake(server->getNonConstConn());
   }
 
-  std::unique_ptr<fizz::Aead> getInitialCipher() {
+  std::unique_ptr<Aead> getInitialCipher() {
     QuicFizzFactory fizzFactory;
     return getClientInitialCipher(
         &fizzFactory, *initialDestinationConnectionId);
@@ -2961,7 +2961,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
 Buf getHandshakePacketWithFrame(
     QuicWriteFrame frame,
     ConnectionId connId,
-    fizz::Aead& clientWriteCipher,
+    Aead& clientWriteCipher,
     PacketNumberCipher& headerCipher) {
   PacketNum clientPacketNum = folly::Random::rand32();
   LongHeader header(

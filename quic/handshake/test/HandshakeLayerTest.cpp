@@ -9,7 +9,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/HandshakeLayer.h>
@@ -36,7 +35,7 @@ class QuicTestFizzFactory : public QuicFizzFactory {
     return std::move(packetNumberCipher_);
   }
 
-  void setMockAead(std::unique_ptr<fizz::test::MockAead> aead) {
+  void setMockAead(std::unique_ptr<fizz::Aead> aead) {
     aead_ = std::move(aead);
   }
 

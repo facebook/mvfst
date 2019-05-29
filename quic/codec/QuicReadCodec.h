@@ -56,11 +56,11 @@ class QuicReadCodec {
       folly::IOBufQueue& queue,
       const AckStates& ackStates);
 
-  const fizz::Aead* getOneRttReadCipher() const;
-  const fizz::Aead* getZeroRttReadCipher() const;
-  const fizz::Aead* getHandshakeReadCipher() const;
+  const Aead* getOneRttReadCipher() const;
+  const Aead* getZeroRttReadCipher() const;
+  const Aead* getHandshakeReadCipher() const;
 
-  const fizz::Aead* getInitialCipher() const;
+  const Aead* getInitialCipher() const;
 
   const PacketNumberCipher* getInitialHeaderCipher() const;
   const PacketNumberCipher* getOneRttHeaderCipher() const;
@@ -69,10 +69,10 @@ class QuicReadCodec {
 
   const folly::Optional<StatelessResetToken>& getStatelessResetToken() const;
 
-  void setInitialReadCipher(std::unique_ptr<fizz::Aead> initialReadCipher);
-  void setOneRttReadCipher(std::unique_ptr<fizz::Aead> oneRttReadCipher);
-  void setZeroRttReadCipher(std::unique_ptr<fizz::Aead> zeroRttReadCipher);
-  void setHandshakeReadCipher(std::unique_ptr<fizz::Aead> handshakeReadCipher);
+  void setInitialReadCipher(std::unique_ptr<Aead> initialReadCipher);
+  void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher);
+  void setZeroRttReadCipher(std::unique_ptr<Aead> zeroRttReadCipher);
+  void setHandshakeReadCipher(std::unique_ptr<Aead> handshakeReadCipher);
 
   void setInitialHeaderCipher(
       std::unique_ptr<PacketNumberCipher> initialHeaderCipher);
@@ -110,11 +110,11 @@ class QuicReadCodec {
   folly::Optional<ConnectionId> serverConnectionId_;
 
   // Cipher used to decrypt handshake packets.
-  std::unique_ptr<fizz::Aead> initialReadCipher_;
+  std::unique_ptr<Aead> initialReadCipher_;
 
-  std::unique_ptr<fizz::Aead> oneRttReadCipher_;
-  std::unique_ptr<fizz::Aead> zeroRttReadCipher_;
-  std::unique_ptr<fizz::Aead> handshakeReadCipher_;
+  std::unique_ptr<Aead> oneRttReadCipher_;
+  std::unique_ptr<Aead> zeroRttReadCipher_;
+  std::unique_ptr<Aead> handshakeReadCipher_;
 
   std::unique_ptr<PacketNumberCipher> initialHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttHeaderCipher_;

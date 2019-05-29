@@ -1302,7 +1302,7 @@ class QuicClientTransportTest : public Test {
       bool handshakeCipher = false) {
     QuicFizzFactory fizzFactory;
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-    std::unique_ptr<fizz::Aead> handshakeReadCipher;
+    std::unique_ptr<Aead> handshakeReadCipher;
     codec->setClientConnectionId(*originalConnId);
     codec->setOneRttReadCipher(test::createNoOpAead());
     codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
@@ -1319,7 +1319,7 @@ class QuicClientTransportTest : public Test {
     return codec;
   }
 
-  const fizz::Aead& getInitialCipher() {
+  const Aead& getInitialCipher() {
     return *client->getConn().readCodec->getInitialCipher();
   }
 
@@ -3422,7 +3422,7 @@ Buf getHandshakePacketWithFrame(
     QuicWriteFrame frame,
     ConnectionId srcConnId,
     ConnectionId destConnId,
-    const fizz::Aead& serverWriteCipher,
+    const Aead& serverWriteCipher,
     const PacketNumberCipher& headerCipher) {
   PacketNum packetNum = folly::Random::rand32();
   LongHeader header(

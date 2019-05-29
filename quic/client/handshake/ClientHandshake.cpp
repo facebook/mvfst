@@ -90,35 +90,35 @@ void ClientHandshake::doHandshake(
   }
 }
 
-std::unique_ptr<fizz::Aead> ClientHandshake::getOneRttWriteCipher() {
+std::unique_ptr<Aead> ClientHandshake::getOneRttWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }
   return std::move(oneRttWriteCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ClientHandshake::getOneRttReadCipher() {
+std::unique_ptr<Aead> ClientHandshake::getOneRttReadCipher() {
   if (error_) {
     error_.throw_exception();
   }
   return std::move(oneRttReadCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ClientHandshake::getZeroRttWriteCipher() {
+std::unique_ptr<Aead> ClientHandshake::getZeroRttWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }
   return std::move(zeroRttWriteCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ClientHandshake::getHandshakeReadCipher() {
+std::unique_ptr<Aead> ClientHandshake::getHandshakeReadCipher() {
   if (error_) {
     error_.throw_exception();
   }
   return std::move(handshakeReadCipher_);
 }
 
-std::unique_ptr<fizz::Aead> ClientHandshake::getHandshakeWriteCipher() {
+std::unique_ptr<Aead> ClientHandshake::getHandshakeWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }

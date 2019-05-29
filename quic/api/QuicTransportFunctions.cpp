@@ -476,7 +476,7 @@ uint64_t writeQuicDataToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit) {
@@ -550,7 +550,7 @@ uint64_t writeCryptoAndAckDataToSocket(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     LongHeader::Types packetType,
-    fizz::Aead& cleartextCipher,
+    Aead& cleartextCipher,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit,
@@ -595,7 +595,7 @@ uint64_t writeQuicDataExceptCryptoStreamToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit) {
@@ -663,7 +663,7 @@ uint64_t writeZeroRttDataToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit) {
@@ -711,7 +711,7 @@ void writeCloseCommon(
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
     folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   // close is special, we're going to bypass all the packet sent logic for all
   // packets we send with a connection close frame.
@@ -796,7 +796,7 @@ void writeLongClose(
     const ConnectionId& dstConnId,
     LongHeader::Types headerType,
     folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
   if (!connection.serverConnectionId) {
@@ -825,7 +825,7 @@ void writeShortClose(
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
     folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   auto header = ShortHeader(
       ProtectionType::KeyPhaseZero,
@@ -881,7 +881,7 @@ uint64_t writeConnectionDataToSocket(
     QuicPacketScheduler& scheduler,
     const WritableBytesFunc& writableBytesFunc,
     uint64_t packetLimit,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     Buf token) {
@@ -984,7 +984,7 @@ uint64_t writeProbingDataToSocket(
     PacketNumberSpace pnSpace,
     FrameScheduler scheduler,
     uint8_t probesToSend,
-    const fizz::Aead& aead,
+    const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
   CloningScheduler cloningScheduler(

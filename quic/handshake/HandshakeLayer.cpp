@@ -45,7 +45,7 @@ Buf makeClientInitialTrafficSecret(
       factory, kClientInitialLabel, clientDestinationConnId);
 }
 
-std::unique_ptr<fizz::Aead> makeInitialAead(
+std::unique_ptr<Aead> makeInitialAead(
     fizz::Factory* factory,
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId) {
@@ -70,13 +70,13 @@ std::unique_ptr<fizz::Aead> makeInitialAead(
   return aead;
 }
 
-std::unique_ptr<fizz::Aead> getClientInitialCipher(
+std::unique_ptr<Aead> getClientInitialCipher(
     fizz::Factory* factory,
     const ConnectionId& clientDestinationConnId) {
   return makeInitialAead(factory, kClientInitialLabel, clientDestinationConnId);
 }
 
-std::unique_ptr<fizz::Aead> getServerInitialCipher(
+std::unique_ptr<Aead> getServerInitialCipher(
     fizz::Factory* factory,
     const ConnectionId& clientDestinationConnId) {
   return makeInitialAead(factory, kServerInitialLabel, clientDestinationConnId);

@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <fizz/crypto/aead/Aead.h>
 #include <fizz/protocol/Exporter.h>
 #include <fizz/protocol/Factory.h>
 #include <fizz/protocol/Types.h>
@@ -18,6 +17,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/QuicFizzFactory.h>
 
 namespace fizz {
@@ -45,16 +45,16 @@ constexpr folly::StringPiece kQuicDraft17Salt =
 constexpr folly::StringPiece kClientInitialLabel = "client in";
 constexpr folly::StringPiece kServerInitialLabel = "server in";
 
-std::unique_ptr<fizz::Aead> makeInitialAead(
+std::unique_ptr<Aead> makeInitialAead(
     fizz::Factory* factory,
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId);
 
-std::unique_ptr<fizz::Aead> getClientInitialCipher(
+std::unique_ptr<Aead> getClientInitialCipher(
     fizz::Factory* factory,
     const ConnectionId& clientDestinationConnId);
 
-std::unique_ptr<fizz::Aead> getServerInitialCipher(
+std::unique_ptr<Aead> getServerInitialCipher(
     fizz::Factory* factory,
     const ConnectionId& clientDestinationConnId);
 
