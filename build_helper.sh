@@ -50,7 +50,7 @@ if [ -z "${BUILD_DIR-}" ] ; then
   mkdir -p $BUILD_DIR
 fi
 
-if [[ ! -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+if [[ ! -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
     if [[ "$MVFST_FOLLY_USE_JEMALLOC" != "n" ]]; then
         unset $MVFST_FOLLY_USE_JEMALLOC
     fi
@@ -169,7 +169,7 @@ function setup_folly() {
   cd "$FOLLY_BUILD_DIR" || exit
 
   # check for environment variable. If 
-  if [[ -z $MVFST_FOLLY_USE_JEMALLOC ]]; then 
+  if [[ -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
       -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
       -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
