@@ -43,6 +43,7 @@ add_library(
 
 target_include_directories(
   mvfst_exception PUBLIC
+  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
   $<INSTALL_INTERFACE:include/>
 )
@@ -51,6 +52,11 @@ target_compile_options(
   mvfst_exception
   PRIVATE
   ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_exception
+  ${FIZZ_TARGET}
 )
 
 target_link_libraries(
