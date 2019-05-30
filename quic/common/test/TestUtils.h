@@ -12,6 +12,7 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/common/test/QuicCodecUtils.h>
+#include <quic/handshake/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/StateData.h>
@@ -135,7 +136,8 @@ QuicCachedPsk setupZeroRttOnClientCtx(
     std::string hostname,
     QuicVersion version);
 
-std::unique_ptr<fizz::test::MockAead> createNoOpAead();
+std::unique_ptr<MockAead> createNoOpAead();
+std::unique_ptr<fizz::test::MockAead> createNoOpFizzAead();
 
 std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher();
 

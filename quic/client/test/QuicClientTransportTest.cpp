@@ -14,7 +14,6 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
-#include <fizz/crypto/aead/test/Mocks.h>
 #include <folly/futures/Future.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
@@ -24,6 +23,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/handshake/TransportParameters.h>
+#include <quic/handshake/test/Mocks.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
@@ -1028,10 +1028,10 @@ class QuicClientTransportTest : public Test {
   }
 
   virtual void setFakeHandshakeCiphers() {
-    auto readAead = test::createNoOpAead();
-    auto writeAead = test::createNoOpAead();
-    auto handshakeReadAead = test::createNoOpAead();
-    auto handshakeWriteAead = test::createNoOpAead();
+    auto readAead = test::createNoOpFizzAead();
+    auto writeAead = test::createNoOpFizzAead();
+    auto handshakeReadAead = test::createNoOpFizzAead();
+    auto handshakeWriteAead = test::createNoOpFizzAead();
     mockClientHandshake->setHandshakeReadCipher(std::move(handshakeReadAead));
     mockClientHandshake->setHandshakeWriteCipher(std::move(handshakeWriteAead));
     mockClientHandshake->setOneRttReadCipher(std::move(readAead));
@@ -4011,11 +4011,11 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTest {
   ~QuicZeroRttClientTest() override = default;
 
   void setFakeHandshakeCiphers() override {
-    auto readAead = test::createNoOpAead();
-    auto writeAead = test::createNoOpAead();
-    auto zeroAead = test::createNoOpAead();
-    auto handshakeReadAead = test::createNoOpAead();
-    auto handshakeWriteAead = test::createNoOpAead();
+    auto readAead = test::createNoOpFizzAead();
+    auto writeAead = test::createNoOpFizzAead();
+    auto zeroAead = test::createNoOpFizzAead();
+    auto handshakeReadAead = test::createNoOpFizzAead();
+    auto handshakeWriteAead = test::createNoOpFizzAead();
     mockClientHandshake->setOneRttReadCipher(std::move(readAead));
     mockClientHandshake->setOneRttWriteCipher(std::move(writeAead));
     mockClientHandshake->setZeroRttWriteCipher(std::move(zeroAead));

@@ -6,6 +6,9 @@
  *
  */
 
+#pragma once
+
+#include <fizz/crypto/aead/test/Mocks.h>
 #include <gmock/gmock.h>
 #include <quic/codec/PacketNumberCipher.h>
 
@@ -20,5 +23,7 @@ class MockPacketNumberCipher : public PacketNumberCipher {
   MOCK_CONST_METHOD1(mask, HeaderProtectionMask(folly::ByteRange));
   MOCK_CONST_METHOD0(keyLength, size_t());
 };
+
+using MockAead = fizz::test::MockAead;
 } // namespace test
 } // namespace quic

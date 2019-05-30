@@ -192,7 +192,7 @@ TEST_F(QuicReadCodecTest, StreamWithShortHeaderOnlyHeader) {
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   auto packetBuf = packetToBuf(std::move(builder).buildPacket());
 
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   // The size is not large enough.
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _)).Times(0);
   AckStates ackStates;
@@ -207,7 +207,7 @@ TEST_F(QuicReadCodecTest, PacketDecryptFail) {
   PacketNum packetNum = 12321;
   StreamId streamId = 2;
 
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   EXPECT_CALL(*aead, _tryDecrypt(_, _, _))
       .WillOnce(Invoke([](auto&, const auto, auto) { return folly::none; }));
   auto data = folly::IOBuf::copyBuffer("hello");
@@ -321,7 +321,7 @@ TEST_F(QuicReadCodecTest, KeyPhaseOnePacket) {
 
 TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
   auto connId = getTestConnectionId();
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
   StatelessResetToken tok(
@@ -355,7 +355,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
 
 TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
   auto connId = getTestConnectionId();
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
   StatelessResetToken tok(
       {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
@@ -389,7 +389,7 @@ TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
 
 TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
   auto connId = getTestConnectionId();
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
   StatelessResetToken tok(
@@ -422,7 +422,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
 
 TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
   auto connId = getTestConnectionId();
-  auto aead = std::make_unique<fizz::test::MockAead>();
+  auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
   auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
