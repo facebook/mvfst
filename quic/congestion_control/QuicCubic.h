@@ -138,7 +138,7 @@ class Cubic : public CongestionController {
   int64_t calculateCubicCwndDelta(TimePoint timePoint) noexcept;
   uint64_t calculateCubicCwnd(int64_t delta) noexcept;
 
-  bool isRecovered(PacketNum) noexcept;
+  bool isRecovered(TimePoint packetSentTime) noexcept;
 
   QuicConnectionStateBase& conn_;
   uint64_t cwndBytes_;
@@ -170,9 +170,9 @@ class Cubic : public CongestionController {
     folly::Optional<std::chrono::microseconds> delayMin;
     // Ack sampling count
     uint8_t ackCount{0};
-    // When a packet with >= rttRoundEndTarget is acked, end the current RTT
-    // round
-    PacketNum rttRoundEndTarget{0};
+    // When a packet with sent time >= rttRoundEndTarget is acked, end the
+    // current RTT round
+    TimePoint rttRoundEndTarget;
   };
 
   struct SteadyState {
@@ -193,8 +193,8 @@ class Cubic : public CongestionController {
   };
 
   struct RecoveryState {
-    // The PacketNum after which Quic will no longer be in recovery
-    folly::Optional<PacketNum> endOfRecovery;
+    // The time point after which Quic will no longer be in current recovery
+    folly::Optional<TimePoint> endOfRecovery;
   };
 
   // if quiescenceStart_ has a value, then the connection is app limited

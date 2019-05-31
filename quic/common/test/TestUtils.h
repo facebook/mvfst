@@ -236,10 +236,16 @@ OutstandingPacket makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
-    bool pureAck = false);
+    bool pureAck = false,
+    TimePoint sentTime = Clock::now());
 
-CongestionController::AckEvent
-makeAck(PacketNum seq, uint64_t ackedSize, TimePoint ackedTime = Clock::now());
+// TODO: The way we setup packet sent, ack, loss in test cases can use some
+// major refactor.
+CongestionController::AckEvent makeAck(
+    PacketNum seq,
+    uint64_t ackedSize,
+    TimePoint ackedTime,
+    TimePoint sendTime);
 
 folly::IOBufQueue bufToQueue(Buf buf);
 

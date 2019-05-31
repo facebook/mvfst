@@ -46,7 +46,7 @@ TEST_F(CubicRecoveryTest, LossBurst) {
   // Still in recovery:
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
   // Cwnd should be reduced.
-  EXPECT_TRUE(cwndAfterLoss > cubic.getCongestionWindow());
+  EXPECT_GT(cwndAfterLoss, cubic.getCongestionWindow());
 }
 
 TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
@@ -55,9 +55,11 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   uint64_t totalSent = 0;
 
   // Send/ack one packet.
-  cubic.onPacketSent(makeTestingWritePacket(0, 1000, 1000 + totalSent));
+  auto packet = makeTestingWritePacket(0, 1000, 1000 + totalSent);
+  cubic.onPacketSent(packet);
   totalSent += 1000;
-  cubic.onPacketAckOrLoss(makeAck(0, 1000), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), packet.time), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 
   // Send three packets, lose second immediately.
@@ -82,8 +84,10 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   cubic.onPacketSent(packet4);
   totalSent += 1000;
   conn.lossState.largestSent = 4;
-  cubic.onPacketAckOrLoss(makeAck(3, 1000), folly::none);
-  cubic.onPacketAckOrLoss(makeAck(4, 1000), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(3, 1000, Clock::now(), packet3.time), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(4, 1000, Clock::now(), packet4.time), folly::none);
   auto cwndAfterRecovery = cubic.getCongestionWindow();
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
@@ -100,8 +104,10 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   Cubic cubic(conn);
 
   // Send/ack one packet.
-  cubic.onPacketSent(makeTestingWritePacket(0, 1000, 1000));
-  cubic.onPacketAckOrLoss(makeAck(0, 1000), folly::none);
+  auto packet = makeTestingWritePacket(0, 1000, 1000);
+  cubic.onPacketSent(packet);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), packet.time), folly::none);
   // Lose one packet.
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   cubic.onPacketSent(packet1);
@@ -147,10 +153,14 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
   auto cwndAfterLoss = cubic.getWritableBytes() + 4000; // 4k are in flight
 
   // the the rest are acked:
-  cubic.onPacketAckOrLoss(makeAck(0, 1000, Clock::now()), folly::none);
-  cubic.onPacketAckOrLoss(makeAck(1, 1000, Clock::now()), folly::none);
-  cubic.onPacketAckOrLoss(makeAck(2, 1000, Clock::now()), folly::none);
-  cubic.onPacketAckOrLoss(makeAck(3, 1000, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), packet1.time), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(1, 1000, Clock::now(), packet2.time), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(2, 1000, Clock::now(), packet3.time), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(3, 1000, Clock::now(), packet4.time), folly::none);
 
   // Still in recovery:
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());

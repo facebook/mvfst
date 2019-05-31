@@ -86,14 +86,16 @@ void Cubic::onPacketSent(const OutstandingPacket& packet) {
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
   quiescenceStart_ = folly::none;
-  DCHECK(loss.largestLostPacketNum.hasValue());
+  DCHECK(
+      loss.largestLostPacketNum.hasValue() &&
+      loss.largestLostSentTime.hasValue());
   onRemoveBytesFromInflight(loss.lostBytes);
   // If the loss occurred past the endOfRecovery then we need to move the
   // endOfRecovery back and invoke the state machine, otherwise ignore the loss
   // as it was already accounted for in a recovery period.
-  if (*loss.largestLostPacketNum >=
-      recoveryState_.endOfRecovery.value_or(*loss.largestLostPacketNum)) {
-    recoveryState_.endOfRecovery = conn_.lossState.largestSent;
+  if (*loss.largestLostSentTime >=
+      recoveryState_.endOfRecovery.value_or(*loss.largestLostSentTime)) {
+    recoveryState_.endOfRecovery = Clock::now();
     cubicReduction(loss.lossTime);
     if (state_ == CubicStates::Hystart || state_ == CubicStates::Steady) {
       state_ = CubicStates::FastRecovery;
@@ -354,6 +356,7 @@ void Cubic::onPacketAckOrLoss(
     onPacketLoss(*lossEvent);
   }
   if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
+    CHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent);
   }
 }
@@ -363,7 +366,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
   DCHECK_LE(ack.ackedBytes, inflightBytes_);
   inflightBytes_ -= ack.ackedBytes;
   if (recoveryState_.endOfRecovery.hasValue() &&
-      *recoveryState_.endOfRecovery >= *ack.largestAckedPacket) {
+      *recoveryState_.endOfRecovery >= ack.ackedPackets.back().time) {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_ack");
     return;
   }
@@ -397,14 +400,14 @@ void Cubic::startHystartRttRound(TimePoint time) noexcept {
   hystartState_.ackCount = 0;
   hystartState_.lastSampledRtt = hystartState_.currSampledRtt;
   hystartState_.currSampledRtt = folly::none;
-  hystartState_.rttRoundEndTarget = conn_.lossState.largestSent;
+  hystartState_.rttRoundEndTarget = Clock::now();
   hystartState_.inRttRound = true;
   hystartState_.found = HystartFound::No;
 }
 
-bool Cubic::isRecovered(PacketNum packetNum) noexcept {
+bool Cubic::isRecovered(TimePoint packetSentTime) noexcept {
   CHECK(recoveryState_.endOfRecovery.hasValue());
-  return packetNum > *recoveryState_.endOfRecovery;
+  return packetSentTime > *recoveryState_.endOfRecovery;
 }
 
 CongestionControlType Cubic::type() const noexcept {
@@ -549,9 +552,9 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
     } else {
       // No exit yet, but we may still need to end this RTT round
       VLOG(20) << "Cubic Hystart, mayEndHystartRttRound, largestAckedPacketNum="
-               << *ack.largestAckedPacket
-               << ", rttRoundEndTarget=" << hystartState_.rttRoundEndTarget;
-      if (*ack.largestAckedPacket > hystartState_.rttRoundEndTarget) {
+               << *ack.largestAckedPacket << ", rttRoundEndTarget="
+               << hystartState_.rttRoundEndTarget.time_since_epoch().count();
+      if (ack.ackedPackets.back().time > hystartState_.rttRoundEndTarget) {
         hystartState_.inRttRound = false;
       }
     }
@@ -703,7 +706,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
 
 void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
   CHECK_EQ(cwndBytes_, ssthresh_);
-  if (isRecovered(*ack.largestAckedPacket)) {
+  if (isRecovered(ack.ackedPackets.back().time)) {
     state_ = CubicStates::Steady;
 
     // We do a Cubic cwnd pre-calculation here so that all Ack events from

@@ -35,20 +35,26 @@ CongestionController::LossEvent createLossEvent(
 
 CongestionController::AckEvent createAckEvent(
     PacketNum largestAcked,
-    uint64_t ackedSize) {
+    uint64_t ackedSize,
+    TimePoint packetSentTime) {
+  RegularQuicWritePacket packet(ShortHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), largestAcked));
   CongestionController::AckEvent ack;
   ack.largestAckedPacket = largestAcked;
   ack.ackTime = Clock::now();
   ack.ackedBytes = ackedSize;
+  ack.ackedPackets.emplace_back(
+      std::move(packet), packetSentTime, ackedSize, false, false, ackedSize);
   return ack;
 }
 
-OutstandingPacket createPacket(PacketNum packetNum, uint32_t size) {
+OutstandingPacket
+createPacket(PacketNum packetNum, uint32_t size, TimePoint sendTime) {
   auto connId = getTestConnectionId();
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
   return OutstandingPacket(
-      std::move(packet), Clock::now(), size, false, false, size);
+      std::move(packet), sendTime, size, false, false, size);
 }
 
 TEST_F(NewRenoTest, TestLoss) {
@@ -63,9 +69,9 @@ TEST_F(NewRenoTest, TestLoss) {
   PacketNum loss2 = 3;
   // Lose packet greater than previous loss.
   PacketNum loss3 = 11;
-  reno.onPacketSent(createPacket(loss2, 10));
-  reno.onPacketSent(createPacket(loss1, 11));
-  reno.onPacketSent(createPacket(loss3, 20));
+  reno.onPacketSent(createPacket(loss2, 10, Clock::now()));
+  reno.onPacketSent(createPacket(loss1, 11, Clock::now()));
+  reno.onPacketSent(createPacket(loss3, 20, Clock::now()));
   EXPECT_EQ(reno.getBytesInFlight(), 41);
   auto originalWritableBytes = reno.getWritableBytes();
 
@@ -97,7 +103,8 @@ TEST_F(NewRenoTest, SendMoreThanWritable) {
 
   PacketNum loss = 10;
   auto originalWritableBytes = reno.getWritableBytes();
-  reno.onPacketSent(createPacket(loss, originalWritableBytes + 20));
+  reno.onPacketSent(
+      createPacket(loss, originalWritableBytes + 20, Clock::now()));
   EXPECT_EQ(reno.getBytesInFlight(), originalWritableBytes + 20);
   EXPECT_EQ(reno.getWritableBytes(), 0);
   reno.onPacketAckOrLoss(
@@ -115,9 +122,11 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
   PacketNum ackPacketNum1 = 10;
   uint64_t ackedSize = 10;
 
-  reno.onPacketSent(createPacket(ackPacketNum1, ackedSize));
+  auto packet = createPacket(ackPacketNum1, ackedSize, Clock::now());
+  reno.onPacketSent(packet);
   EXPECT_EQ(reno.getBytesInFlight(), ackedSize);
-  reno.onPacketAckOrLoss(createAckEvent(ackPacketNum1, ackedSize), folly::none);
+  reno.onPacketAckOrLoss(
+      createAckEvent(ackPacketNum1, ackedSize, packet.time), folly::none);
   EXPECT_TRUE(reno.inSlowStart());
   auto newWritableBytes = reno.getWritableBytes();
 
@@ -129,12 +138,11 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
-  uint64_t inflightBytes = 0;
 
   conn.lossState.largestSent = 5;
   auto originalWritableBytes = reno.getWritableBytes();
-  PacketNum loss1 = 5;
-  reno.onPacketSent(createPacket(loss1, 10));
+  PacketNum loss1 = 4;
+  reno.onPacketSent(createPacket(loss1, 10, Clock::now()));
   reno.onPacketAckOrLoss(
       folly::none, createLossEvent({std::make_pair(loss1, 10)}));
   EXPECT_FALSE(reno.inSlowStart());
@@ -143,21 +151,24 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
 
   PacketNum ackPacketNum1 = 4;
   uint64_t ackedSize = 10;
-  inflightBytes += ackedSize;
-  reno.onPacketSent(createPacket(ackPacketNum1, ackedSize));
-  reno.onPacketAckOrLoss(createAckEvent(ackPacketNum1, ackedSize), folly::none);
+  auto packet1 = createPacket(
+      ackPacketNum1, ackedSize, Clock::now() - std::chrono::milliseconds(10));
+  reno.onPacketSent(packet1);
+  reno.onPacketAckOrLoss(
+      createAckEvent(ackPacketNum1, ackedSize, packet1.time), folly::none);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes2 = reno.getWritableBytes();
   EXPECT_EQ(newWritableBytes2, newWritableBytes1);
 
   PacketNum ackPacketNum2 = 6;
-  reno.onPacketSent(createPacket(ackPacketNum2, ackedSize));
-  reno.onPacketAckOrLoss(createAckEvent(ackPacketNum2, ackedSize), folly::none);
+  auto packet2 = createPacket(ackPacketNum2, ackedSize, Clock::now());
+  reno.onPacketSent(packet2);
+  reno.onPacketAckOrLoss(
+      createAckEvent(ackPacketNum2, ackedSize, packet2.time), folly::none);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes3 = reno.getWritableBytes();
-  // TODO: see comments in NewReno::onPacketAcked
   EXPECT_EQ(
       newWritableBytes3,
       newWritableBytes2 +
@@ -172,9 +183,10 @@ TEST_F(NewRenoTest, TestWritableBytes) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint64_t writableBytes = reno.getWritableBytes();
-  reno.onPacketSent(createPacket(ackPacketNum, writableBytes - 10));
+  reno.onPacketSent(
+      createPacket(ackPacketNum, writableBytes - 10, Clock::now()));
   EXPECT_EQ(reno.getWritableBytes(), 10);
-  reno.onPacketSent(createPacket(ackPacketNum, 20));
+  reno.onPacketSent(createPacket(ackPacketNum, 20, Clock::now()));
   EXPECT_EQ(reno.getWritableBytes(), 0);
 }
 
@@ -186,7 +198,7 @@ TEST_F(NewRenoTest, PersistentCongestion) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
-  auto pkt = createPacket(ackPacketNum, ackedSize);
+  auto pkt = createPacket(ackPacketNum, ackedSize, Clock::now());
   reno.onPacketSent(pkt);
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
@@ -207,18 +219,9 @@ TEST_F(NewRenoTest, RemoveBytesWithoutLossOrAck) {
   conn.lossState.largestSent = 5;
   PacketNum ackPacketNum = 6;
   uint32_t ackedSize = 10;
-  reno.onPacketSent(createPacket(ackPacketNum, ackedSize));
+  reno.onPacketSent(createPacket(ackPacketNum, ackedSize, Clock::now()));
   reno.onRemoveBytesFromInflight(2);
   EXPECT_EQ(reno.getWritableBytes(), originalWritableBytes - ackedSize + 2);
-}
-
-TEST_F(NewRenoTest, NoLargestAckedPacketNoCrash) {
-  QuicServerConnectionState conn;
-  NewReno reno(conn);
-  CongestionController::LossEvent loss;
-  loss.largestLostPacketNum = 0;
-  CongestionController::AckEvent ack;
-  reno.onPacketAckOrLoss(ack, loss);
 }
 } // namespace test
 } // namespace quic

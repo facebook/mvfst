@@ -42,31 +42,36 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
            << " " << conn_;
 }
 
-void NewReno::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.hasValue());
+void NewReno::onAckEvent(const AckEvent& ack) {
+  DCHECK(ack.largestAckedPacket.hasValue() && !ack.ackedPackets.empty());
   subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
            << conn_;
-
-  if (*ack.largestAckedPacket < endOfRecovery_) {
-    return;
-  }
-  if (cwndBytes_ < ssthresh_) {
-    addAndCheckOverflow(cwndBytes_, ack.ackedBytes);
-  } else {
-    // TODO: I think this may be a bug in the specs. We should use
-    // conn_.udpSendPacketLen for the cwnd calculation. But I need to
-    // check how Linux handles this.
-    uint64_t additionFactor =
-        (kDefaultUDPSendPacketLen * ack.ackedBytes) / cwndBytes_;
-    addAndCheckOverflow(cwndBytes_, additionFactor);
+  for (const auto& packet : ack.ackedPackets) {
+    onPacketAcked(packet);
   }
   cwndBytes_ = boundedCwnd(
       cwndBytes_,
       conn_.udpSendPacketLen,
       conn_.transportSettings.maxCwndInMss,
       conn_.transportSettings.minCwndInMss);
+}
+
+void NewReno::onPacketAcked(const OutstandingPacket& packet) {
+  if (endOfRecovery_ && packet.time < *endOfRecovery_) {
+    return;
+  }
+  if (cwndBytes_ < ssthresh_) {
+    addAndCheckOverflow(cwndBytes_, packet.encodedSize);
+  } else {
+    // TODO: I think this may be a bug in the specs. We should use
+    // conn_.udpSendPacketLen for the cwnd calculation. But I need to
+    // check how Linux handles this.
+    uint64_t additionFactor =
+        (kDefaultUDPSendPacketLen * packet.encodedSize) / cwndBytes_;
+    addAndCheckOverflow(cwndBytes_, additionFactor);
+  }
 }
 
 void NewReno::onPacketAckOrLoss(
@@ -76,16 +81,17 @@ void NewReno::onPacketAckOrLoss(
     onPacketLoss(*lossEvent);
   }
   if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
-    onPacketAcked(*ackEvent);
+    onAckEvent(*ackEvent);
   }
 }
 
 void NewReno::onPacketLoss(const LossEvent& loss) {
-  DCHECK(loss.largestLostPacketNum.hasValue());
+  DCHECK(
+      loss.largestLostPacketNum.hasValue() &&
+      loss.largestLostSentTime.hasValue());
   subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
-  if (endOfRecovery_ < *loss.largestLostPacketNum) {
-    endOfRecovery_ = conn_.lossState.largestSent;
-
+  if (!endOfRecovery_ || *endOfRecovery_ < *loss.largestLostSentTime) {
+    endOfRecovery_ = Clock::now();
     cwndBytes_ = (cwndBytes_ >> kRenoLossReductionFactorShift);
     cwndBytes_ = boundedCwnd(
         cwndBytes_,
@@ -150,6 +156,7 @@ uint64_t NewReno::getPacingRate(TimePoint /* currentTime */) noexcept {
 void NewReno::markPacerTimeoutScheduled(TimePoint /* currentTime */) noexcept {
   // Pacing is not supported on NewReno currently
 }
+
 std::chrono::microseconds NewReno::getPacingInterval() const noexcept {
   // Pacing is not supported on NewReno currently
   return std::chrono::microseconds(

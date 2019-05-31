@@ -48,11 +48,14 @@ class NewReno : public CongestionController {
 
  private:
   void onPacketLoss(const LossEvent&);
-  void onPacketAcked(const AckEvent&);
+  void onAckEvent(const AckEvent&);
+  void onPacketAcked(const OutstandingPacket&);
+
+ private:
   QuicConnectionStateBase& conn_;
   uint64_t bytesInFlight_{0};
   uint64_t ssthresh_;
   uint64_t cwndBytes_;
-  PacketNum endOfRecovery_{0};
+  folly::Optional<TimePoint> endOfRecovery_;
 };
 } // namespace quic

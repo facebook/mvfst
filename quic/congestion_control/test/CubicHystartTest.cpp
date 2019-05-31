@@ -31,7 +31,8 @@ TEST_F(CubicHystartTest, SendAndAck) {
   conn.lossState.srtt = 100us;
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(makeAck(0, 1000, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), packet.time), folly::none);
 
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
@@ -47,7 +48,8 @@ TEST_F(CubicHystartTest, CwndLargerThanSSThresh) {
   // Packet 0 is acked:
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(makeAck(0, 1000), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), packet.time), folly::none);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
@@ -66,7 +68,8 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(makeAck(0, 1000, realNow + 2us), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 1000, realNow + 2us, packet.time), folly::none);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
@@ -85,18 +88,33 @@ TEST_F(CubicHystartTest, AckTrain) {
   conn.lossState.largestSent = 0;
   // Packet 0 is sent:
   auto packetSize = kLowSsthreshInMss * conn.udpSendPacketLen;
-  auto packet0 = makeTestingWritePacket(0, packetSize, packetSize);
+  auto packet0 = makeTestingWritePacket(
+      0,
+      packetSize,
+      packetSize,
+      false,
+      realNow - std::chrono::milliseconds(10));
   cubic.onPacketSent(packet0);
   // Packet 1 is sent:
-  auto packet1 = makeTestingWritePacket(1, packetSize, packetSize * 2);
+  auto packet1 = makeTestingWritePacket(
+      1,
+      packetSize,
+      packetSize * 2,
+      false,
+      realNow - std::chrono::milliseconds(5));
   cubic.onPacketSent(packet1);
   // Packet 0 is acked:
   cubic.onPacketAckOrLoss(
-      makeAck(0, kLowSsthreshInMss * conn.udpSendPacketLen, realNow),
+      makeAck(
+          0, kLowSsthreshInMss * conn.udpSendPacketLen, realNow, packet0.time),
       folly::none);
   // Packet 1 is acked:
   cubic.onPacketAckOrLoss(
-      makeAck(1, kLowSsthreshInMss * conn.udpSendPacketLen, realNow + 2us),
+      makeAck(
+          1,
+          kLowSsthreshInMss * conn.udpSendPacketLen,
+          realNow + 2us,
+          packet1.time),
       folly::none);
   EXPECT_EQ(
       initCwnd + kLowSsthreshInMss * conn.udpSendPacketLen * 2,
@@ -116,10 +134,11 @@ TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
   conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
-  auto packet = makeTestingWritePacket(0, 1000, 1000);
+  auto packet = makeTestingWritePacket(0, 1000, 1000, false, realNow);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, realNow + kAckCountingGap + 2us), folly::none);
+      makeAck(0, 1000, realNow + kAckCountingGap + 2us, packet.time),
+      folly::none);
   EXPECT_EQ(initCwnd + 1000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
@@ -136,43 +155,50 @@ TEST_F(CubicHystartTest, DelayIncrease) {
     auto packet =
         makeTestingWritePacket(packetNum, fullSize, fullSize + totalSent);
     cubic.onPacketSent(packet);
-    cubic.onPacketAckOrLoss(makeAck(packetNum++, fullSize), folly::none);
+    cubic.onPacketAckOrLoss(
+        makeAck(packetNum++, fullSize, Clock::now(), packet.time), folly::none);
     totalSent += fullSize;
   }
 
+  auto packetsSentTime = Clock::now();
   auto firstPacketNum = packetNum++;
-  auto packet0 = makeTestingWritePacket(packetNum, 1000, totalSent + 1000);
+  auto packet0 = makeTestingWritePacket(
+      packetNum, 1000, totalSent + 1000, false, packetsSentTime);
   totalSent += 1000;
   conn.lossState.largestSent = firstPacketNum;
   cubic.onPacketSent(packet0);
 
   auto secondPacketNum = packetNum++;
-  auto packet1 =
-      makeTestingWritePacket(secondPacketNum, 1000, totalSent + 1000);
+  auto packet1 = makeTestingWritePacket(
+      secondPacketNum, 1000, totalSent + 1000, false, packetsSentTime);
   totalSent += 1000;
   // Packet 1 is sent:
   conn.lossState.largestSent = secondPacketNum;
   cubic.onPacketSent(packet1);
 
   conn.lossState.srtt = 100us;
-  auto realNow = quic::Clock::now();
 
   // First onPacketAcked will set up lastSampledRtt = 200us for next round. It
   // will also set up rttRoundEndTarget = 1 since largestSent = 1.
-  auto ackTime = realNow;
+  auto ackTime = packetsSentTime + 1us;
   auto ackTimeIncrease = 2us;
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(firstPacketNum, 1000, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(firstPacketNum, 1000, ackTime, packet0.time), folly::none);
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(secondPacketNum, 1000, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(secondPacketNum, 1000, ackTime, packet1.time), folly::none);
+  auto estimatedRttEndTarget = Clock::now();
 
-  auto packet2 = makeTestingWritePacket(packetNum, 1000, totalSent + 1000);
+  auto packet2 = makeTestingWritePacket(
+      packetNum, 1000, totalSent + 1000, false, estimatedRttEndTarget + 1us);
   totalSent += 1000;
   conn.lossState.largestSent = packetNum;
   cubic.onPacketSent(packet2);
   // This will end current RTT round and start a new one next time Ack happens:
-  ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(packetNum, 1000, ackTime), folly::none);
+  ackTime = packet2.time + ackTimeIncrease;
+  cubic.onPacketAckOrLoss(
+      makeAck(packetNum, 1000, ackTime, packet2.time), folly::none);
   packetNum++;
   auto cwndEndRound = cubic.getWritableBytes();
 
@@ -182,11 +208,12 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {
     conn.lossState.largestSent = i + packetNum;
-    auto packet = makeTestingWritePacket(i + packetNum, 1000, totalSent + 1000);
+    auto packet = makeTestingWritePacket(
+        i + packetNum, 1000, totalSent + 1000, false, packetsSentTime);
     cubic.onPacketSent(packet);
     totalSent += 1000;
     ackTime += ackTimeIncrease;
-    moreAcks.push_back(makeAck(1 + packetNum, 1000, ackTime));
+    moreAcks.push_back(makeAck(1 + packetNum, 1000, ackTime, packet.time));
     packetNum++;
   }
   for (auto& ack : moreAcks) {
@@ -195,11 +222,13 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   // kAckSampling-th onPacketAcked in this round. This will trigger
   // DelayIncrease:
   conn.lossState.largestSent = packetNum;
-  auto packetEnd = makeTestingWritePacket(packetNum, 1000, totalSent + 1000);
+  auto packetEnd = makeTestingWritePacket(
+      packetNum, 1000, totalSent + 1000, false, packetsSentTime);
   cubic.onPacketSent(packetEnd);
   totalSent += 1000;
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(packetNum, 1000, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(packetNum, 1000, ackTime, packetEnd.time), folly::none);
 
   EXPECT_EQ(cwndEndRound + 1000 * kAckSampling, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
@@ -208,36 +237,36 @@ TEST_F(CubicHystartTest, DelayIncrease) {
 TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   Cubic cubic(conn);
+  auto realNow = quic::Clock::now();
 
   uint64_t totalSent = 0;
-  auto packet0 = makeTestingWritePacket(0, 1, totalSent + 1);
+  auto packet0 = makeTestingWritePacket(0, 1, totalSent + 1, false, realNow);
   // Packet 0 is sent:
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
   totalSent += 1;
 
-  auto packet1 = makeTestingWritePacket(1, 1, totalSent + 1);
+  auto packet1 = makeTestingWritePacket(1, 1, totalSent + 1, false, realNow);
   conn.lossState.largestSent = 1;
   cubic.onPacketSent(packet1);
   totalSent += 1;
 
   conn.lossState.srtt = 100us;
-  auto realNow = quic::Clock::now();
 
   // First onPacketAcked will set up lastSampledRtt = 200us for next round:
   auto ackTime = realNow;
   auto ackTimeIncrease = 2us;
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(0, 1, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(makeAck(0, 1, ackTime, packet0.time), folly::none);
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(1, 1, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(makeAck(1, 1, ackTime, packet1.time), folly::none);
 
-  auto packet2 = makeTestingWritePacket(2, 10, 10 + totalSent);
+  auto packet2 = makeTestingWritePacket(2, 10, 10 + totalSent, false, realNow);
   conn.lossState.largestSent = 2;
   cubic.onPacketSent(packet2);
   totalSent += 10;
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(2, 1, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(makeAck(2, 1, ackTime, packet2.time), folly::none);
   auto cwndEndRound = cubic.getWritableBytes();
 
   // New RTT round, give currSampledRtt a value larger than previous RTT:
@@ -246,9 +275,10 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {
     conn.lossState.largestSent = i + 3;
-    auto packet = makeTestingWritePacket(i + 3, 1, 1 + totalSent);
+    auto packet =
+        makeTestingWritePacket(i + 3, 1, 1 + totalSent, false, realNow);
     ackTime += ackTimeIncrease;
-    moreAcks.push_back(makeAck(i + 3, 1, ackTime));
+    moreAcks.push_back(makeAck(i + 3, 1, ackTime, packet.time));
     cubic.onPacketSent(packet);
     totalSent += 1;
   }
@@ -258,11 +288,13 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   // kAckSampling-th onPacketAcked in this round. This will trigger
   // DelayIncrease:
   conn.lossState.largestSent = kAckSampling;
-  auto packetEnd = makeTestingWritePacket(kAckSampling, 1, 1 + totalSent);
+  auto packetEnd =
+      makeTestingWritePacket(kAckSampling, 1, 1 + totalSent, false, realNow);
   cubic.onPacketSent(packetEnd);
   totalSent += 1;
   ackTime += ackTimeIncrease;
-  cubic.onPacketAckOrLoss(makeAck(kAckSampling, 1, ackTime), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(kAckSampling, 1, ackTime, packetEnd.time), folly::none);
   auto expectedCwnd = cwndEndRound + 1 * kAckSampling;
   // Cwnd < kLowSsthresh, won't exit Hystart state:
   ASSERT_LT(expectedCwnd, kLowSsthreshInMss * conn.udpSendPacketLen);

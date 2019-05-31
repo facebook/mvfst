@@ -36,7 +36,8 @@ TEST_F(CubicStateTest, HystartAck) {
   TestingCubic cubic(conn);
   auto packet = makeTestingWritePacket(0, 0, 0);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(makeAck(0, 0, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 0, Clock::now(), packet.time), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
 
@@ -56,15 +57,16 @@ TEST_F(CubicStateTest, FastRecoveryAck) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::FastRecovery);
-  auto packet = makeTestingWritePacket(2, 1000, 1000);
+  auto packet = makeTestingWritePacket(1, 1000, 1000);
+  auto packet1 = makeTestingWritePacket(2, 1000, 2000);
   conn.lossState.largestSent = 2;
   cubic.onPacketSent(packet);
+  cubic.onPacketSent(packet1);
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet);
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-  auto packet1 = makeTestingWritePacket(1, 1000, 2000);
-  cubic.onPacketSent(packet1);
-  cubic.onPacketAckOrLoss(makeAck(1, 1000, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(2, 1000, Clock::now(), packet1.time), folly::none);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
 
@@ -80,7 +82,8 @@ TEST_F(CubicStateTest, FastRecoveryAckToSteady) {
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
   auto packet1 = makeTestingWritePacket(1, 1, 2);
   cubic.onPacketSent(packet1);
-  cubic.onPacketAckOrLoss(makeAck(1, 1, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(1, 1, Clock::now(), packet1.time), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 
@@ -113,7 +116,8 @@ TEST_F(CubicStateTest, SteadyAck) {
   cubic.setStateForTest(CubicStates::Steady);
   auto packet = makeTestingWritePacket(0, 0, 0);
   cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(makeAck(0, 0, Clock::now()), folly::none);
+  cubic.onPacketAckOrLoss(
+      makeAck(0, 0, Clock::now(), packet.time), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 

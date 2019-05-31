@@ -550,7 +550,8 @@ OutstandingPacket makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
-    bool pureAck) {
+    bool pureAck,
+    TimePoint sentTime) {
   LongHeader longHeader(
       LongHeader::Types::ZeroRtt,
       getTestConnectionId(1),
@@ -559,15 +560,23 @@ OutstandingPacket makeTestingWritePacket(
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
   return OutstandingPacket(
-      packet, Clock::now(), desiredSize, false, pureAck, totalBytesSent);
+      packet, sentTime, desiredSize, false, pureAck, totalBytesSent);
 }
 
-CongestionController::AckEvent
-makeAck(PacketNum seq, uint64_t ackedSize, TimePoint ackedTime) {
+CongestionController::AckEvent makeAck(
+    PacketNum seq,
+    uint64_t ackedSize,
+    TimePoint ackedTime,
+    TimePoint sentTime) {
+  CHECK(sentTime < ackedTime);
+  RegularQuicWritePacket packet(
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), seq));
   CongestionController::AckEvent ack;
   ack.ackedBytes = ackedSize;
   ack.ackTime = ackedTime;
   ack.largestAckedPacket = seq;
+  ack.ackedPackets.emplace_back(
+      std::move(packet), sentTime, ackedSize, false, false, ackedSize);
   return ack;
 }
 
