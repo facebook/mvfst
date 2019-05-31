@@ -19,7 +19,7 @@ namespace test {
 
 class StreamStateFunctionsTests : public Test {};
 
-TEST_F(StreamStateFunctionsTests, SanityTest) {
+TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   QuicServerConnectionState conn;
   StreamId streamId = 0xbaad;
   QuicStreamState stream(streamId, conn);
@@ -44,7 +44,6 @@ TEST_F(StreamStateFunctionsTests, SanityTest) {
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_TRUE(stream.retransmissionBuffer.empty());
   EXPECT_TRUE(stream.readBuffer.empty());
-  EXPECT_TRUE(stream.streamReadError.hasValue());
 
   // The rest are untouched:
   EXPECT_EQ(stream.id, streamId);

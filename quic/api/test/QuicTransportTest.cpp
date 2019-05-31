@@ -1188,6 +1188,37 @@ TEST_F(QuicTransportTest, SendPathResponse) {
   EXPECT_TRUE(foundPathResponse);
 }
 
+TEST_F(QuicTransportTest, CloneAfterRecvReset) {
+  auto& conn = transport_->getConnectionState();
+  auto streamId = transport_->createBidirectionalStream().value();
+  transport_->writeChain(streamId, IOBuf::create(0), true, false);
+  loopForWrites();
+  EXPECT_EQ(1, conn.outstandingPackets.size());
+  auto stream = conn.streamManager->getStream(streamId);
+  EXPECT_EQ(1, stream->retransmissionBuffer.size());
+  EXPECT_EQ(0, stream->retransmissionBuffer.back().offset);
+  EXPECT_EQ(0, stream->retransmissionBuffer.back().data.chainLength());
+  EXPECT_TRUE(stream->retransmissionBuffer.back().eof);
+  EXPECT_TRUE(stream->lossBuffer.empty());
+  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(1, stream->currentWriteOffset);
+  EXPECT_EQ(0, *stream->finalWriteOffset);
+
+  RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
+  invokeStreamReceiveStateMachine(conn, *stream, std::move(rstFrame));
+
+  // This will clone twice. :/ Maybe we should change this to clone only once in
+  // the future, thus the EXPECT were written with LT and LE. But it will clone
+  // for sure and we shouldn't crash.
+  transport_->lossTimeout().timeoutExpired();
+  EXPECT_LT(1, conn.outstandingPackets.size());
+  size_t cloneCounter = std::count_if(
+      conn.outstandingPackets.begin(),
+      conn.outstandingPackets.end(),
+      [](const auto& packet) { return packet.associatedEvent.hasValue(); });
+  EXPECT_LE(1, cloneCounter);
+}
+
 TEST_F(QuicTransportTest, ClonePathResponse) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out

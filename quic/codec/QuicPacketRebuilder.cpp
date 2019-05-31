@@ -84,10 +84,10 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
             notPureAck |= ret;
             return ret;
           }
-          // If a stream is already Closed, or HalfClosedLocal, we should not
-          // clone and resend this stream data. But should we abort the cloning
-          // of this packet and move on to the next packet? I'm gonna err on the
-          // aggressive side for now and call it success.
+          // If a stream is already Closed, we should not clone and resend this
+          // stream data. But should we abort the cloning of this packet and
+          // move on to the next packet? I'm gonna err on the aggressive side
+          // for now and call it success.
           return true;
         },
         [&](const WriteCryptoFrame& cryptoFrame) {

@@ -19,7 +19,6 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   stream.readBuffer.clear();
   stream.lossBuffer.clear();
   stream.streamWriteError = error;
-  stream.streamReadError = error;
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
   stream.conn.streamManager->updateLossStreams(stream);
@@ -41,17 +40,10 @@ void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame) {
   }
   // Verify that the flow control is consistent.
   updateFlowControlOnStreamData(stream, stream.maxOffsetObserved, frame.offset);
-  auto writeBufferLen = stream.writeBuffer.chainLength();
-  updateFlowControlOnWriteToSocket(stream, writeBufferLen);
   // Drop read buffer:
   stream.readBuffer.clear();
-  // We can also drop retx buffer and writeBuffer:
-  stream.retransmissionBuffer.clear();
-  stream.writeBuffer.clear();
-  stream.lossBuffer.clear();
   stream.finalReadOffset = frame.offset;
   stream.streamReadError = frame.errorCode;
-  stream.streamWriteError = frame.errorCode;
   bool appReadAllBytes = stream.finalReadOffset &&
       stream.currentReadOffset > *stream.finalReadOffset;
   if (!appReadAllBytes) {

@@ -3500,7 +3500,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendReset) {
 
   const auto& readCbs = client->getReadCallbacks();
   const auto& conn = client->getConn();
-  EXPECT_EQ(0, readCbs.count(streamId));
+  // ReadCallbacks are not affected by reseting send state
+  EXPECT_EQ(1, readCbs.count(streamId));
   // readable list can still be populated after a reset.
   EXPECT_FALSE(conn.streamManager->writableContains(streamId));
   auto packet = packetToBuf(createAckPacket(
@@ -3605,7 +3606,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   verifyShortPackets(sentPackets);
   const auto& readCbs = client->getReadCallbacks();
   const auto& conn = client->getConn();
-  EXPECT_EQ(readCbs.count(streamId), 0);
+  // ReadCallback are not affected by reseting send state.
+  EXPECT_EQ(1, readCbs.count(streamId));
   // readable list can still be populated after a reset.
   EXPECT_FALSE(conn.streamManager->writableContains(streamId));
 

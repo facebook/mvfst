@@ -1208,33 +1208,17 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
 
-  // Verify pendingEvents on connection:
-  EXPECT_TRUE(stream->streamWriteError.hasValue());
-  const RstStreamFrame* rstStreamFrame = nullptr;
-  for (auto& outstandingPacket : server->getNonConstConn().outstandingPackets) {
-    auto& frames = outstandingPacket.packet.frames;
-    for (auto& frame : frames) {
-      auto rstFramePtr = boost::get<RstStreamFrame>(&frame);
-      if (rstFramePtr && rstFramePtr->streamId == streamId) {
-        rstStreamFrame = rstFramePtr;
-        break;
-      }
-    }
-  }
-
-  // Verify stream state is cleaned up:
+  // Verify stream receive state is cleaned up but send state isn't:
   auto updatedStream =
       server->getNonConstConn().streamManager->findStream(streamId);
   ASSERT_TRUE(updatedStream);
   EXPECT_TRUE(updatedStream->readBuffer.empty());
-  EXPECT_TRUE(updatedStream->writeBuffer.empty());
-  EXPECT_TRUE(updatedStream->retransmissionBuffer.empty());
+  // We can verify retx buffer isn't empty here. The writeBuffer though could be
+  // empty since deliverData can cause a write synchrously.
+  EXPECT_FALSE(updatedStream->retransmissionBuffer.empty());
   EXPECT_EQ(
       words.at(0).length() + words.at(1).length(),
       updatedStream->finalReadOffset.value());
-  EXPECT_EQ(
-      words.at(2).length() + words.at(3).length(),
-      updatedStream->currentWriteOffset);
   // updatedStream still writable since receiving rst has no impact on egress
   EXPECT_TRUE(updatedStream->writable());
 }
