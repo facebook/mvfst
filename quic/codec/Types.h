@@ -874,6 +874,8 @@ inline std::ostream& operator<<(std::ostream& os, const PacketHeader& header) {
 
 std::string toString(PacketNumberSpace pnSpace);
 
+std::string toString(FrameType frame);
+
 inline std::ostream& operator<<(std::ostream& os, PacketNumberSpace pnSpace) {
   return os << toString(pnSpace);
 }

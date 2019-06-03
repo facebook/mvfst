@@ -265,4 +265,62 @@ std::string toString(ProtectionType protectionType) {
   }
   CHECK(false) << "Unknown protection type";
 }
+
+std::string toString(FrameType frame) {
+  switch (frame) {
+    case FrameType::PADDING:
+      return "PADDING";
+    case FrameType::PING:
+      return "PING";
+    case FrameType::ACK:
+      return "ACK";
+    case FrameType::ACK_ECN:
+      return "ACK_ECN";
+    case FrameType::RST_STREAM:
+      return "RST_STREAM";
+    case FrameType::STOP_SENDING:
+      return "STOP_SENDING";
+    case FrameType::CRYPTO_FRAME:
+      return "CRYPTO_FRAME";
+    case FrameType::NEW_TOKEN:
+      return "NEW_TOKEN";
+    case FrameType::STREAM:
+      return "STREAM";
+    case FrameType::MAX_DATA:
+      return "MAX_DATA";
+    case FrameType::MAX_STREAM_DATA:
+      return "MAX_STREAM_DATA";
+    case FrameType::MAX_STREAMS_BIDI:
+      return "MAX_STREAMS_BIDI";
+    case FrameType::MAX_STREAMS_UNI:
+      return "MAX_STREAMS_UNI";
+    case FrameType::DATA_BLOCKED:
+      return "DATA_BLOCKED";
+    case FrameType::STREAM_DATA_BLOCKED:
+      return "STREAM_DATA_BLOCKED";
+    case FrameType::STREAMS_BLOCKED_BIDI:
+      return "STREAMS_BLOCKED_BIDI";
+    case FrameType::STREAMS_BLOCKED_UNI:
+      return "STREAMS_BLOCKED_UNI";
+    case FrameType::NEW_CONNECTION_ID:
+      return "NEW_CONNECTION_ID";
+    case FrameType::RETIRE_CONNECTION_ID:
+      return "RETIRE_CONNECTION_ID";
+    case FrameType::PATH_CHALLENGE:
+      return "PATH_CHALLENGE";
+    case FrameType::PATH_RESPONSE:
+      return "PATH_RESPONSE";
+    case FrameType::CONNECTION_CLOSE:
+      return "CONNECTION_CLOSE";
+    case FrameType::APPLICATION_CLOSE:
+      return "APPLICATION_CLOSE";
+    case FrameType::MIN_STREAM_DATA:
+      return "MIN_STREAM_DATA";
+    case FrameType::EXPIRED_STREAM_DATA:
+      return "EXPIRED_STREAM_DATA";
+  }
+  LOG(WARNING) << "toString has unhandled frame type";
+  return "UNKNOWN";
+}
+
 } // namespace quic
