@@ -84,6 +84,8 @@ std::string toString(LocalErrorCode code) {
       return "New version negotiatied";
     case LocalErrorCode::INVALID_WRITE_CALLBACK:
       return "Invalid write callback";
+    case LocalErrorCode::CALLBACK_ALREADY_INSTALLED:
+      return "Callback already installed";
     case LocalErrorCode::TLS_HANDSHAKE_FAILED:
       return "TLS handshake failed";
     case LocalErrorCode::APP_ERROR:
