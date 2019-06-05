@@ -1636,10 +1636,19 @@ QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
   if (!qStream->writable()) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
   }
+
+  if (wcb == nullptr) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+  }
   // Add the callback to the pending write callbacks so that if we are closed
   // while we are scheduled in the loop, the close will error out the callbacks.
-  if (!pendingWriteCallbacks_.emplace(id, wcb).second) {
-    return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+  auto wcbEmplaceResult = pendingWriteCallbacks_.emplace(id, wcb);
+  if (!wcbEmplaceResult.second) {
+    if ((wcbEmplaceResult.first)->second != wcb) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_CALLBACK);
+    } else {
+      return folly::makeUnexpected(LocalErrorCode::CALLBACK_ALREADY_INSTALLED);
+    }
   }
   runOnEvbAsync([id](auto self) {
     auto wcbIt = self->pendingWriteCallbacks_.find(id);

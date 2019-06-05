@@ -1214,6 +1214,17 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
   evb->loopOnce();
 }
 
+TEST_F(QuicTransportImplTest, TestNotifyPendingWriteWithActiveCallback) {
+  auto stream = transport->createBidirectionalStream().value();
+  MockWriteCallback wcb;
+  EXPECT_CALL(wcb, onStreamWriteReady(stream, _));
+  auto ok1 = transport->notifyPendingWriteOnStream(stream, &wcb);
+  EXPECT_TRUE(ok1.hasValue());
+  auto ok2 = transport->notifyPendingWriteOnStream(stream, &wcb);
+  EXPECT_EQ(ok2.error(), quic::LocalErrorCode::CALLBACK_ALREADY_INSTALLED);
+  evb->loopOnce();
+}
+
 TEST_F(QuicTransportImplTest, TestNotifyPendingWriteOnCloseWithoutError) {
   auto stream = transport->createBidirectionalStream().value();
   MockWriteCallback wcb;
