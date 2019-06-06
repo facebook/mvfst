@@ -876,6 +876,8 @@ std::string toString(PacketNumberSpace pnSpace);
 
 std::string toString(FrameType frame);
 
+std::string toString(QuicVersion version);
+
 inline std::ostream& operator<<(std::ostream& os, PacketNumberSpace pnSpace) {
   return os << toString(pnSpace);
 }

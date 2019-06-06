@@ -323,4 +323,19 @@ std::string toString(FrameType frame) {
   return "UNKNOWN";
 }
 
+std::string toString(QuicVersion version) {
+  switch (version) {
+    case QuicVersion::VERSION_NEGOTIATION:
+      return "VERSION_NEGOTIATION";
+    case QuicVersion::MVFST:
+      return "MVFST";
+    case QuicVersion::QUIC_DRAFT:
+      return "QUIC_DRAFT";
+    case QuicVersion::MVFST_INVALID:
+      return "MVFST_INVALID";
+  }
+  LOG(WARNING) << "toString has unhandled version type";
+  return "UNKNOWN";
+}
+
 } // namespace quic
