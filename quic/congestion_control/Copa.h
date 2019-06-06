@@ -62,6 +62,7 @@ class Copa : public CongestionController {
  private:
   void onPacketAcked(const AckEvent&);
   void onPacketLoss(const LossEvent&);
+  void updatePacing() noexcept;
 
   struct VelocityState {
     uint64_t velocity{1};
@@ -110,5 +111,10 @@ class Copa : public CongestionController {
    * it will minimize delay at expense of throughput.
    */
   double latencyFactor_{0.50};
+
+  uint64_t pacingBurstSize_{0};
+  std::chrono::microseconds pacingInterval_;
+  std::chrono::microseconds minimalPacingInterval_{
+      folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL};
 };
 } // namespace quic

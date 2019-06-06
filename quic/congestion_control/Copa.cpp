@@ -245,6 +245,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
             cwndBytes_ -
                 conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen));
   }
+  updatePacing();
 }
 
 void Copa::onPacketLoss(const LossEvent& loss) {
@@ -259,6 +260,7 @@ void Copa::onPacketLoss(const LossEvent& loss) {
              << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
              << conn_;
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
+    updatePacing();
   }
 }
 
@@ -284,9 +286,27 @@ CongestionControlType Copa::type() const noexcept {
 
 void Copa::setConnectionEmulation(uint8_t) noexcept {}
 
+void Copa::updatePacing() noexcept {
+  std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
+      conn_,
+      cwndBytes_ * 2,
+      conn_.transportSettings.minCwndInMss,
+      minimalPacingInterval_,
+      conn_.lossState.srtt);
+  if (pacingInterval_ == std::chrono::milliseconds::zero()) {
+    return;
+  }
+  if (conn_.transportSettings.pacingEnabled) {
+    VLOG(10) << "updatePacing pacingInterval_ = " << pacingInterval_.count()
+             << ", pacingBurstSize_ " << pacingBurstSize_ << " " << conn_;
+  }
+}
+
 bool Copa::canBePaced() const noexcept {
-  // Pacing is not supported on Copa currently
-  return false;
+  if (conn_.lossState.srtt < minimalPacingInterval_) {
+    return false;
+  }
+  return true;
 }
 
 uint64_t Copa::getBytesInFlight() const noexcept {
@@ -294,19 +314,19 @@ uint64_t Copa::getBytesInFlight() const noexcept {
 }
 
 uint64_t Copa::getPacingRate(TimePoint /* currentTime */) noexcept {
-  // Pacing is not supported on Copa currently
-  return conn_.transportSettings.writeConnectionDataPacketsLimit;
+  return pacingBurstSize_;
 }
 
 void Copa::markPacerTimeoutScheduled(TimePoint /* currentTime*/) noexcept {}
 
 std::chrono::microseconds Copa::getPacingInterval() const noexcept {
-  // Pacing is not supported on Copa currently
-  return std::chrono::microseconds(
-      folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL);
+  return pacingInterval_;
 }
 
-void Copa::setMinimalPacingInterval(std::chrono::microseconds) noexcept {}
+void Copa::setMinimalPacingInterval(
+    std::chrono::microseconds interval) noexcept {
+  minimalPacingInterval_ = interval;
+}
 
 void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
 }
