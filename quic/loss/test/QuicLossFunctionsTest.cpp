@@ -1332,11 +1332,26 @@ TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
 
 TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
   auto conn = createConn();
-  EXPECT_FALSE(isPersistentCongestion(*conn, Clock::now() - 10s, Clock::now()));
+  auto currentTime = Clock::now();
   conn->lossState.srtt = 1s;
-  EXPECT_TRUE(isPersistentCongestion(*conn, Clock::now() - 10s, Clock::now()));
+  EXPECT_TRUE(isPersistentCongestion(*conn, currentTime - 10s, currentTime));
+  EXPECT_TRUE(isPersistentCongestion(*conn, currentTime - 3s, currentTime));
+  EXPECT_TRUE(isPersistentCongestion(
+      *conn, currentTime - (1s * kPersistentCongestionThreshold), currentTime));
+  EXPECT_FALSE(isPersistentCongestion(
+      *conn,
+      currentTime - (1s * kPersistentCongestionThreshold) + 1us,
+      currentTime));
+  EXPECT_FALSE(isPersistentCongestion(*conn, currentTime - 2s, currentTime));
+  EXPECT_FALSE(isPersistentCongestion(*conn, currentTime - 100ms, currentTime));
+
+  conn->lossState.rttvar = 2s;
+  conn->lossState.maxAckDelay = 5s;
+  EXPECT_TRUE(isPersistentCongestion(*conn, currentTime - 42s, currentTime));
+  EXPECT_TRUE(isPersistentCongestion(*conn, currentTime - 43s, currentTime));
   EXPECT_FALSE(
-      isPersistentCongestion(*conn, Clock::now() - 100ms, Clock::now()));
+      isPersistentCongestion(*conn, currentTime - 42s + 1ms, currentTime));
+  EXPECT_FALSE(isPersistentCongestion(*conn, currentTime - 100us, currentTime));
 }
 
 INSTANTIATE_TEST_CASE_P(

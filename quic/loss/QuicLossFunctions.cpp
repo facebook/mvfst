@@ -24,7 +24,7 @@ bool isPersistentCongestion(
   }
   auto pto = calculatePTO(conn);
   return (lostPeriodEnd - lostPeriodStart) >=
-      pto * kPersistentCongestionPeriodFactor;
+      pto * kPersistentCongestionThreshold;
 }
 
 void onPTOAlarm(QuicConnectionStateBase& conn) {
