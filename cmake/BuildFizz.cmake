@@ -36,7 +36,12 @@ ExternalProject_Get_Property(fizz_project binary_dir)
 set(FIZZ_BINARY_DIR ${binary_dir})
 
 # Setup fizz libraries and include dirs
-set(LIBFIZZ_LIBRARY
+set(LIBFIZZ_LIBRARY_LOCATION
   "${FIZZ_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}fizz${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
+add_library(mvfst_fizz STATIC IMPORTED)
+set_target_properties(mvfst_fizz PROPERTIES IMPORTED_LOCATION "${LIBFIZZ_LIBRARY_LOCATION}")
+set_target_properties(mvfst_fizz PROPERTIES INTERFACE_LINK_LIBRARIES Folly::folly)
+
+set(LIBFIZZ_LIBRARY mvfst_fizz)
 set(LIBFIZZ_INCLUDE_DIR "${source_dir}")
