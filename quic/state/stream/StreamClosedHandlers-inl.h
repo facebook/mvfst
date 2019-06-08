@@ -80,7 +80,7 @@ inline void Handler<
         StreamEvents::SendReset&&,
         QuicStreamState& stream) {
   // TODO: remove this as a valid state transition
-  LOG(ERROR) << "Ignoring SendReset from closed state.  This may be a bug";
+  VLOG(4) << "Ignoring SendReset from closed state.";
   // Discard the send reset.
 }
 } // namespace quic
