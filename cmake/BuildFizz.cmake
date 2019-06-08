@@ -17,7 +17,10 @@ if(UNIX AND APPLE)
       -DOPENSSL_ROOT_DIR:STRING=${OPENSSL_ROOT_DIR}
       -DOPENSSL_LIBRARIES:STRING=${OPENSSL_LIBRARIES}
 )
+else()
+  find_package(OpenSSL REQUIRED)
 endif()
+find_package(Sodium REQUIRED)
 
 # Consume Fizz as an external project
 ExternalProject_Add(
@@ -42,7 +45,7 @@ set(LIBFIZZ_LIBRARY_LOCATION
 )
 add_library(mvfst_fizz STATIC IMPORTED)
 set_target_properties(mvfst_fizz PROPERTIES IMPORTED_LOCATION "${LIBFIZZ_LIBRARY_LOCATION}")
-set_target_properties(mvfst_fizz PROPERTIES INTERFACE_LINK_LIBRARIES Folly::folly)
+set_target_properties(mvfst_fizz PROPERTIES INTERFACE_LINK_LIBRARIES Folly::folly ${OPENSSL_LIBRARIES} ${sodium_LIBRARIES})
 
 set(LIBFIZZ_LIBRARY mvfst_fizz)
 set(LIBFIZZ_INCLUDE_DIR "${source_dir}")
