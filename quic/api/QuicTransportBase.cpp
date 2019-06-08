@@ -438,9 +438,19 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
 QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
   uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
+  uint64_t burstSize = 0;
+  std::chrono::microseconds pacingInterval = 0ms;
   if (conn_->congestionController) {
     writableBytes = conn_->congestionController->getWritableBytes();
     congestionWindow = conn_->congestionController->getCongestionWindow();
+    // Do not collect pacing stats for Cubic, since getPacingRate() call
+    // modifies some internal state. TODO(yangchi): Remove this check after
+    // changing Cubic implementation.
+    if (conn_->congestionController->type() != CongestionControlType::Cubic &&
+        isConnectionPaced(*conn_)) {
+      burstSize = conn_->congestionController->getPacingRate(Clock::now());
+      pacingInterval = conn_->congestionController->getPacingInterval();
+    }
   }
   TransportInfo transportInfo;
   transportInfo.srtt = conn_->lossState.srtt;
@@ -449,6 +459,8 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.mrtt = conn_->lossState.mrtt;
   transportInfo.writableBytes = writableBytes;
   transportInfo.congestionWindow = congestionWindow;
+  transportInfo.pacingBurstSize = burstSize;
+  transportInfo.pacingInterval = pacingInterval;
   transportInfo.packetsRetransmitted = conn_->lossState.rtxCount;
   transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRtxCount;
   transportInfo.totalBytesRetransmitted =

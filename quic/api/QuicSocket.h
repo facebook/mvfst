@@ -128,6 +128,8 @@ class QuicSocket {
     std::chrono::microseconds mrtt;
     uint64_t writableBytes;
     uint64_t congestionWindow;
+    uint64_t pacingBurstSize;
+    std::chrono::microseconds pacingInterval;
     uint32_t packetsRetransmitted;
     uint32_t timeoutBasedLoss;
     std::chrono::microseconds pto;
