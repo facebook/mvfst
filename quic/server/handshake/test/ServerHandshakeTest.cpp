@@ -14,6 +14,7 @@
 
 #include <fizz/client/test/Mocks.h>
 #include <fizz/crypto/test/TestUtil.h>
+#include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/protocol/test/Mocks.h>
 #include <fizz/server/test/Mocks.h>
 
@@ -77,6 +78,7 @@ class ServerHandshakeTest : public Test {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setOmitEarlyRecordLayer(true);
     clientCtx->setFactory(std::make_shared<QuicFizzFactory>());
+    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = quic::test::createServerCtx();
     setupClientAndServerContext();
     handshake.reset(new TestingServerHandshake(*cryptoState));
@@ -504,8 +506,10 @@ class ServerHandshakePskTest : public ServerHandshakeTest {
     psk.serverCert = std::make_shared<fizz::test::MockCert>();
     psk.alpn = std::string("h1q-fb");
     psk.ticketAgeAdd = 1;
-    psk.ticketIssueTime = std::chrono::system_clock::now();
-    psk.ticketExpirationTime = std::chrono::system_clock::now() + 20s;
+    psk.ticketIssueTime = std::chrono::system_clock::time_point();
+    psk.ticketExpirationTime =
+        std::chrono::system_clock::time_point(std::chrono::seconds(20));
+    psk.ticketHandshakeTime = std::chrono::system_clock::time_point();
     psk.maxEarlyDataSize = 2;
     ServerHandshakeTest::SetUp();
   }
@@ -731,7 +735,8 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
       resState.cipher = psk.cipher;
       resState.resumptionSecret = folly::IOBuf::copyBuffer(psk.secret);
       resState.alpn = psk.alpn;
-      resState.ticketIssueTime = std::chrono::system_clock::now();
+      resState.ticketIssueTime = std::chrono::system_clock::time_point();
+      resState.handshakeTime = std::chrono::system_clock::time_point();
       resState.serverCert = psk.serverCert;
     }
 

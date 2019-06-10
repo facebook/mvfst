@@ -14,6 +14,8 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
+#include <fizz/crypto/aead/test/Mocks.h>
+#include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
@@ -175,6 +177,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
     auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setSupportedAlpns({"h1q-fb"});
+    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     client = std::make_shared<TestingQuicClientTransport>(
         &eventbase_, std::move(sock));
     client->setSupportedVersions({getVersion()});
