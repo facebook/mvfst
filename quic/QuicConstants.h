@@ -196,7 +196,7 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val);
 
 // default QUIC batching size - currently used only
 // by BATCHING_MODE_GSO
-constexpr uint32_t kDefaultQuicMaxBatchSize = 64;
+constexpr uint32_t kDefaultQuicMaxBatchSize = 16;
 
 // rfc6298:
 constexpr int kRttAlpha = 8;
