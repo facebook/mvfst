@@ -118,7 +118,7 @@ class BatchWriterFactory {
   static std::unique_ptr<BatchWriter> makeBatchWriter(
       folly::AsyncUDPSocket& sock,
       const quic::QuicBatchingMode& batchingMode,
-      uint32_t batchingNum);
+      uint32_t batchSize);
 };
 
 } // namespace quic

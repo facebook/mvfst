@@ -153,19 +153,19 @@ ssize_t SendmmsgPacketBatchWriter::write(
 std::unique_ptr<BatchWriter> BatchWriterFactory::makeBatchWriter(
     folly::AsyncUDPSocket& sock,
     const quic::QuicBatchingMode& batchingMode,
-    uint32_t batchingNum) {
+    uint32_t batchSize) {
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
       return std::make_unique<SinglePacketBatchWriter>();
     case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
       if (sock.getGSO() >= 0) {
-        return std::make_unique<GSOPacketBatchWriter>(batchingNum);
+        return std::make_unique<GSOPacketBatchWriter>(batchSize);
       }
 
       return std::make_unique<SinglePacketBatchWriter>();
     }
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
-      return std::make_unique<SendmmsgPacketBatchWriter>(batchingNum);
+      return std::make_unique<SendmmsgPacketBatchWriter>(batchSize);
       // no default so we can catch missing case at compile time
   }
 

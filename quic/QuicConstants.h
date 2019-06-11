@@ -194,9 +194,9 @@ enum class QuicBatchingMode : uint32_t {
 
 QuicBatchingMode getQuicBatchingMode(uint32_t val);
 
-// default QUIC batching mode - currently used only
+// default QUIC batching size - currently used only
 // by BATCHING_MODE_GSO
-constexpr uint32_t kDefaultQuicBatchingNum = 64;
+constexpr uint32_t kDefaultQuicMaxBatchSize = 64;
 
 // rfc6298:
 constexpr int kRttAlpha = 8;

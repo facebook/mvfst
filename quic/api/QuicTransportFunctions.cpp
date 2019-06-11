@@ -892,7 +892,7 @@ uint64_t writeConnectionDataToSocket(
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
       sock,
       connection.transportSettings.batchingMode,
-      connection.transportSettings.batchingNum);
+      connection.transportSettings.maxBatchSize);
 
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),

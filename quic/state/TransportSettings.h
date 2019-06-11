@@ -75,9 +75,9 @@ struct TransportSettings {
   uint16_t flowControlWindowFrequency{2};
   // batching mode
   QuicBatchingMode batchingMode{QuicBatchingMode::BATCHING_MODE_NONE};
-  // maximum number of packets we can batch
-  // does not apply to BATCHING_MODE_NONE
-  uint32_t batchingNum{kDefaultQuicBatchingNum};
+  // maximum number of packets we can batch. This does not apply to
+  // BATCHING_MODE_NONE
+  uint32_t maxBatchSize{kDefaultQuicMaxBatchSize};
   // Sets network unreachable to be a non fatal error. In some environments,
   // EHOSTUNREACH or ENETUNREACH could just be because the routing table is
   // being setup. This option makes those non fatal connection errors.
