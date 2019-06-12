@@ -6,13 +6,14 @@
  *
  */
 
-#include <quic/QuicConstants.h>
-#include <quic/QuicException.h>
-#include <quic/codec/QuicInteger.h>
 #include <quic/codec/QuicWriteCodec.h>
 
 #include <algorithm>
 #include <limits>
+
+#include <quic/QuicConstants.h>
+#include <quic/QuicException.h>
+#include <quic/codec/QuicInteger.h>
 
 namespace {
 
@@ -132,12 +133,12 @@ folly::Optional<StreamFrameWriteResult> writeStreamFrame(
 folly::Optional<WriteCryptoFrame>
 writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
-  QuicInteger packetType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));
+  QuicInteger intFrameType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));
   QuicInteger offsetInteger(offsetIn);
 
   size_t lengthBytes = 2;
   size_t cryptoFrameHeaderSize =
-      packetType.getSize() + offsetInteger.getSize() + lengthBytes;
+      intFrameType.getSize() + offsetInteger.getSize() + lengthBytes;
 
   if (spaceLeftInPkt <= cryptoFrameHeaderSize) {
     VLOG(3) << "No space left in packet to write cryptoFrame header of size: "
@@ -157,7 +158,7 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
   data->coalesce();
   data->trimEnd(dataLength - writeableData);
 
-  builder.write(packetType);
+  builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
   builder.insert(std::move(data));
@@ -237,8 +238,8 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
 
   // Required fields are Type, LargestAcked, AckDelay, AckBlockCount,
   // firstAckBlockLength
-  QuicInteger encodedPacketType(static_cast<uint8_t>(FrameType::ACK));
-  auto headerSize = encodedPacketType.getSize() +
+  QuicInteger encodedintFrameType(static_cast<uint8_t>(FrameType::ACK));
+  auto headerSize = encodedintFrameType.getSize() +
       largestAckedPacketInt.getSize() + ackDelayInt.getSize() +
       minAdditionalAckBlockCount.getSize() + firstAckBlockLengthInt.getSize();
   if (spaceLeft < headerSize) {
@@ -250,7 +251,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
       fillFrameWithAckBlocks(ackFrameMetaData.ackBlocks, ackFrame, spaceLeft);
 
   QuicInteger numAdditionalAckBlocksInt(numAdditionalAckBlocks);
-  builder.write(encodedPacketType);
+  builder.write(encodedintFrameType);
   builder.write(largestAckedPacketInt);
   builder.write(ackDelayInt);
   builder.write(numAdditionalAckBlocksInt);
@@ -290,12 +291,12 @@ size_t writeSimpleFrame(
   return folly::variant_match(
       frame,
       [&](StopSendingFrame& stopSendingFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::STOP_SENDING));
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::STOP_SENDING));
         QuicInteger streamId(stopSendingFrame.streamId);
-        auto stopSendingFrameSize = packetType.getSize() + streamId.getSize() +
-            sizeof(ApplicationErrorCode);
+        auto stopSendingFrameSize = intFrameType.getSize() +
+            streamId.getSize() + sizeof(ApplicationErrorCode);
         if (packetSpaceCheck(spaceLeft, stopSendingFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamId);
           builder.writeBE(
               static_cast<ApplicationErrorCode>(stopSendingFrame.errorCode));
@@ -402,33 +403,33 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
   return folly::variant_match(
       frame,
       [&](PaddingFrame& paddingFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::PADDING));
-        if (packetSpaceCheck(spaceLeft, packetType.getSize())) {
-          builder.write(packetType);
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PADDING));
+        if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+          builder.write(intFrameType);
           builder.appendFrame(std::move(paddingFrame));
-          return packetType.getSize();
+          return intFrameType.getSize();
         }
         return size_t(0);
       },
       [&](PingFrame& pingFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::PING));
-        if (packetSpaceCheck(spaceLeft, packetType.getSize())) {
-          builder.write(packetType);
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PING));
+        if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+          builder.write(intFrameType);
           builder.appendFrame(std::move(pingFrame));
-          return packetType.getSize();
+          return intFrameType.getSize();
         }
         // no space left in packet
         return size_t(0);
       },
       [&](RstStreamFrame& rstStreamFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::RST_STREAM));
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::RST_STREAM));
         QuicInteger streamId(rstStreamFrame.streamId);
         QuicInteger offset(rstStreamFrame.offset);
-        auto rstStreamFrameSize = packetType.getSize() +
+        auto rstStreamFrameSize = intFrameType.getSize() +
             sizeof(ApplicationErrorCode) + streamId.getSize() +
             offset.getSize();
         if (packetSpaceCheck(spaceLeft, rstStreamFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamId);
           builder.writeBE(
               static_cast<ApplicationErrorCode>(rstStreamFrame.errorCode));
@@ -440,11 +441,11 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](MaxDataFrame& maxDataFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::MAX_DATA));
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::MAX_DATA));
         QuicInteger maximumData(maxDataFrame.maximumData);
-        auto frameSize = packetType.getSize() + maximumData.getSize();
+        auto frameSize = intFrameType.getSize() + maximumData.getSize();
         if (packetSpaceCheck(spaceLeft, frameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(maximumData);
           builder.appendFrame(std::move(maxDataFrame));
           return frameSize;
@@ -453,14 +454,14 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](MaxStreamDataFrame& maxStreamDataFrame) {
-        QuicInteger packetType(
+        QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::MAX_STREAM_DATA));
         QuicInteger streamId(maxStreamDataFrame.streamId);
         QuicInteger maximumData(maxStreamDataFrame.maximumData);
         auto maxStreamDataFrameSize =
-            packetType.getSize() + streamId.getSize() + maximumData.getSize();
+            intFrameType.getSize() + streamId.getSize() + maximumData.getSize();
         if (packetSpaceCheck(spaceLeft, maxStreamDataFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamId);
           builder.write(maximumData);
           builder.appendFrame(std::move(maxStreamDataFrame));
@@ -473,11 +474,12 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         auto frameType = maxStreamsFrame.isForBidirectionalStream()
             ? FrameType::MAX_STREAMS_BIDI
             : FrameType::MAX_STREAMS_UNI;
-        QuicInteger packetType(static_cast<FrameTypeType>(frameType));
+        QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
         QuicInteger streamCount(maxStreamsFrame.maxStreams);
-        auto maxStreamsFrameSize = packetType.getSize() + streamCount.getSize();
+        auto maxStreamsFrameSize =
+            intFrameType.getSize() + streamCount.getSize();
         if (packetSpaceCheck(spaceLeft, maxStreamsFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamCount);
           builder.appendFrame(std::move(maxStreamsFrame));
           return maxStreamsFrameSize;
@@ -486,11 +488,11 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](DataBlockedFrame& blockedFrame) {
-        QuicInteger packetType(static_cast<uint8_t>(FrameType::DATA_BLOCKED));
+        QuicInteger intFrameType(static_cast<uint8_t>(FrameType::DATA_BLOCKED));
         QuicInteger dataLimit(blockedFrame.dataLimit);
-        auto blockedFrameSize = packetType.getSize() + dataLimit.getSize();
+        auto blockedFrameSize = intFrameType.getSize() + dataLimit.getSize();
         if (packetSpaceCheck(spaceLeft, blockedFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(dataLimit);
           builder.appendFrame(std::move(blockedFrame));
           return blockedFrameSize;
@@ -499,14 +501,14 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](StreamDataBlockedFrame& streamBlockedFrame) {
-        QuicInteger packetType(
+        QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::STREAM_DATA_BLOCKED));
         QuicInteger streamId(streamBlockedFrame.streamId);
         QuicInteger dataLimit(streamBlockedFrame.dataLimit);
         auto blockedFrameSize =
-            packetType.getSize() + streamId.getSize() + dataLimit.getSize();
+            intFrameType.getSize() + streamId.getSize() + dataLimit.getSize();
         if (packetSpaceCheck(spaceLeft, blockedFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamId);
           builder.write(dataLimit);
           builder.appendFrame(std::move(streamBlockedFrame));
@@ -519,11 +521,12 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         auto frameType = streamsBlockedFrame.isForBidirectionalStream()
             ? FrameType::STREAMS_BLOCKED_BIDI
             : FrameType::STREAMS_BLOCKED_UNI;
-        QuicInteger packetType(static_cast<FrameTypeType>(frameType));
+        QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
         QuicInteger streamId(streamsBlockedFrame.streamLimit);
-        auto streamBlockedFrameSize = packetType.getSize() + streamId.getSize();
+        auto streamBlockedFrameSize =
+            intFrameType.getSize() + streamId.getSize();
         if (packetSpaceCheck(spaceLeft, streamBlockedFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.write(streamId);
           builder.appendFrame(std::move(streamsBlockedFrame));
           return streamBlockedFrameSize;
@@ -532,15 +535,15 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](ConnectionCloseFrame& connectionCloseFrame) {
-        QuicInteger packetType(
+        QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::CONNECTION_CLOSE));
         QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
-        auto connCloseFrameSize = packetType.getSize() +
+        auto connCloseFrameSize = intFrameType.getSize() +
             sizeof(TransportErrorCode) +
             sizeof(connectionCloseFrame.closingFrameType) +
             reasonLength.getSize() + connectionCloseFrame.reasonPhrase.size();
         if (packetSpaceCheck(spaceLeft, connCloseFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.writeBE(
               static_cast<std::underlying_type<TransportErrorCode>::type>(
                   connectionCloseFrame.errorCode));
@@ -558,14 +561,14 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         return size_t(0);
       },
       [&](ApplicationCloseFrame& applicationCloseFrame) {
-        QuicInteger packetType(
+        QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::APPLICATION_CLOSE));
         QuicInteger reasonLength(applicationCloseFrame.reasonPhrase.size());
-        auto applicationCloseFrameSize = packetType.getSize() +
+        auto applicationCloseFrameSize = intFrameType.getSize() +
             sizeof(ApplicationErrorCode) + reasonLength.getSize() +
             applicationCloseFrame.reasonPhrase.size();
         if (packetSpaceCheck(spaceLeft, applicationCloseFrameSize)) {
-          builder.write(packetType);
+          builder.write(intFrameType);
           builder.writeBE(static_cast<ApplicationErrorCode>(
               applicationCloseFrame.errorCode));
           builder.write(reasonLength);
