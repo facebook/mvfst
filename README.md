@@ -97,15 +97,15 @@ By default the build script `build_helper.sh` enables the building of test targe
 ## Run a sample client and server
 Building the test targets of `mvfst` (or via `build_helper.sh`) should automatically build the sample client and server binaries as well. The server will automatically bind to `::1` by default if no host is used, but you can then spin a simple echo server by running:
 ```
-./quic/samples/echo -mode=server -host=<host> -port=<port>
+./_build/build/quic/samples/echo -mode=server -host=<host> -port=<port>
 ```
 and to run a client:
 ```
-./quic/samples/echo -mode=client -host=<host> -port=<port>
+./_build/build/quic/samples/echo -mode=client -host=<host> -port=<port>
 ```
 For more options, see
 ```
-./quic/samples/echo --help
+./_build/build/quic/samples/echo --help
 ```
 ## Contributing
 
