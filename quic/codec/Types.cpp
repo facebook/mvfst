@@ -338,4 +338,19 @@ std::string toString(QuicVersion version) {
   return "UNKNOWN";
 }
 
+std::string toString(LongHeader::Types type) {
+  switch (type) {
+    case LongHeader::Types::Initial:
+      return "INITIAL";
+    case LongHeader::Types::Retry:
+      return "RETRY";
+    case LongHeader::Types::Handshake:
+      return "HANDSHAKE";
+    case LongHeader::Types::ZeroRtt:
+      return "ZERORTT";
+  }
+  LOG(WARNING) << "toString has unhandled long header type";
+  return "UNKNOWN";
+}
+
 } // namespace quic

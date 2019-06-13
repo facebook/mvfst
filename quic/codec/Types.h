@@ -836,23 +836,12 @@ using QuicWritePacket =
  */
 HeaderForm getHeaderForm(uint8_t headerValue);
 
+std::string toString(LongHeader::Types type);
+
 inline std::ostream& operator<<(
     std::ostream& os,
     const LongHeader::Types& type) {
-  switch (type) {
-    case LongHeader::Types::Initial:
-      os << "Initial";
-      break;
-    case LongHeader::Types::Retry:
-      os << "Retry";
-      break;
-    case LongHeader::Types::Handshake:
-      os << "Handshake";
-      break;
-    case LongHeader::Types::ZeroRtt:
-      os << "ZeroRtt";
-      break;
-  }
+  os << toString(type);
   return os;
 }
 
