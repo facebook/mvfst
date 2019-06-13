@@ -23,6 +23,7 @@
 #include <folly/io/async/test/MockAsyncTransport.h>
 #include <folly/ssl/Init.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/HandshakeLayer.h>
@@ -116,7 +117,8 @@ class ServerHandshakeTest : public Test {
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,
-        kDefaultPartialReliability);
+        kDefaultPartialReliability,
+        generateStatelessResetToken());
     initialize();
     handshake->accept(params);
 

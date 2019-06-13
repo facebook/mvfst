@@ -431,6 +431,19 @@ void onServerReadDataFromOpen(
       return;
     }
 
+    CHECK(conn.connIdAlgo) << "ConnectionIdAlgo is not set.";
+    CHECK(!conn.serverConnectionId.hasValue());
+    // serverConnIdParams must be set by the QuicServerTransport
+    CHECK(conn.serverConnIdParams);
+
+    conn.serverConnectionId =
+        conn.connIdAlgo->encodeConnectionId(*conn.serverConnIdParams);
+    StatelessResetGenerator generator(
+        conn.transportSettings.statelessResetTokenSecret.value(),
+        conn.serverAddr.getFullyQualified());
+    StatelessResetToken token =
+        generator.generateToken(*conn.serverConnectionId);
+
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,
@@ -444,7 +457,8 @@ void onServerReadDataFromOpen(
             conn.transportSettings.idleTimeout,
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,
-            conn.transportSettings.partialReliabilityEnabled));
+            conn.transportSettings.partialReliabilityEnabled,
+            token));
     QuicFizzFactory fizzFactory;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     conn.readCodec->setInitialReadCipher(
@@ -593,8 +607,6 @@ void onServerReadDataFromOpen(
 
     // TODO: remove this when we actually negotiate connid and version
     if (!conn.clientConnectionId) {
-      // serverConnIdParams must be set by the QuicServerTransport
-      CHECK(conn.serverConnIdParams);
       conn.clientConnectionId = folly::variant_match(
           regularPacket.header,
           [](const LongHeader& longHeader) {
@@ -607,10 +619,9 @@ void onServerReadDataFromOpen(
       CHECK(conn.clientConnectionId);
       // TODO: if conn.serverConnIdParams->clientConnId != conn.clientConnId,
       // we need to update sourceAddressMap_.
+      // TODO: need to remove ServerConnectionIdParams::clientConnId, it is no
+      // longer needed.
       conn.serverConnIdParams->clientConnId = *conn.clientConnectionId;
-      CHECK(conn.connIdAlgo) << "ConnectionIdAlgo is not set.";
-      conn.serverConnectionId =
-          conn.connIdAlgo->encodeConnectionId(*conn.serverConnIdParams);
       conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     }
     QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);

@@ -110,6 +110,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // limited until CFIN depending on matching policy.
   folly::Optional<bool> sourceTokenMatching;
 
+  // Server address of VIP. Currently used as input for stateless reset token.
+  folly::SocketAddress serverAddr;
+
   QuicServerConnectionState() : QuicConnectionStateBase(QuicNodeType::Server) {
     state = ServerState::Open;
     // Create the crypto stream.

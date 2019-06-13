@@ -12,7 +12,6 @@
 #include <folly/Conv.h>
 #include <folly/Optional.h>
 #include <folly/Overload.h>
-#include <folly/container/Array.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>

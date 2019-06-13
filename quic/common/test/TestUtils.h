@@ -249,5 +249,9 @@ CongestionController::AckEvent makeAck(
 
 folly::IOBufQueue bufToQueue(Buf buf);
 
+StatelessResetToken generateStatelessResetToken();
+
+std::array<uint8_t, kStatelessResetTokenSecretLength> getRandSecret();
+
 } // namespace test
 } // namespace quic

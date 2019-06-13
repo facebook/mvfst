@@ -18,6 +18,7 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
 
 using namespace testing;
@@ -92,14 +93,16 @@ std::unique_ptr<folly::IOBuf> createData(size_t size) {
 class QuicServerWorkerTest : public Test {
  public:
   void SetUp() override {
+    fakeAddress_ = folly::SocketAddress("111.111.111.111", 44444);
     auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
     DCHECK(sock->getEventBase());
-    EXPECT_CALL(*sock, getNetworkSocket())
-        .WillRepeatedly(Return(folly::NetworkSocket()));
     socketPtr_ = sock.get();
     workerCb_ = std::make_shared<MockWorkerCallback>();
     worker_ = std::make_unique<QuicServerWorker>(workerCb_);
     auto transportInfoCb = std::make_unique<MockQuicStats>();
+    TransportSettings settings;
+    settings.statelessResetTokenSecret = getRandSecret();
+    worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
     worker_->setWorkerId(42);
     worker_->setProcessId(ProcessId::ONE);
@@ -126,6 +129,7 @@ class QuicServerWorkerTest : public Test {
     MockConnectionCallback connCb;
     auto mockSock =
         std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
+    EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
     transport_.reset(new MockQuicTransport(
         worker_->getEventBase(), std::move(mockSock), connCb, nullptr));
     factory_ = std::make_unique<MockQuicServerTransportFactory>();
@@ -155,6 +159,7 @@ class QuicServerWorkerTest : public Test {
       QuicTransportStatsCallback::PacketDropReason dropReason);
 
  protected:
+  folly::SocketAddress fakeAddress_;
   std::unique_ptr<QuicServerWorker> worker_;
   folly::EventBase eventbase_;
   MockQuicTransport::Ptr transport_;
@@ -238,8 +243,7 @@ void QuicServerWorkerTest::testSendReset(
                 Invoke([&](auto&, auto, auto) { return folly::none; }));
         codec.setOneRttReadCipher(std::move(aead));
         codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
-        StatelessResetToken token;
-        memcpy(token.data(), kTestStatelessResetToken.data(), token.size());
+        StatelessResetToken token = generateStatelessResetToken();
         codec.setStatelessResetToken(token);
         AckStates ackStates;
         auto packetQueue = bufToQueue(buf->clone());
@@ -267,6 +271,7 @@ void QuicServerWorkerTest::testSendReset(
 
 TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
   auto data = folly::IOBuf::copyBuffer("data");
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   PacketNum num = 2;
   // create packet with connId with different hostId encoded
   ShortHeader shortHeaderConnId(
@@ -279,6 +284,7 @@ TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
 }
 
 TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto data = folly::IOBuf::copyBuffer("data");
   PacketNum num = 2;
   // create packet with connId with different hostId encoded
@@ -293,6 +299,7 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
 }
 
 TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);
 
@@ -351,6 +358,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   MockConnectionCallback connCb;
   auto mockSock =
       std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
+
+  EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   MockQuicTransport::Ptr transport2 = std::make_shared<MockQuicTransport>(
       worker_->getEventBase(), std::move(mockSock), connCb, nullptr);
   EXPECT_CALL(*transport2, getEventBase()).WillRepeatedly(Return(&eventbase_));
@@ -933,6 +942,7 @@ class QuicServerTest : public Test {
         kDefaultStreamWindowSize * 2;
     transportSettings_.advertisedInitialUniStreamWindowSize =
         kDefaultStreamWindowSize * 2;
+    transportSettings_.statelessResetTokenSecret = getRandSecret();
     server_->setTransportSettings(transportSettings_);
     server_->setConnectionIdAlgoFactory(
         std::make_unique<DefaultConnectionIdAlgoFactory>());
@@ -1006,6 +1016,7 @@ class QuicServerTest : public Test {
       MockConnectionCallback cb;
       auto mockSock =
           std::make_unique<folly::test::MockAsyncUDPSocket>(eventBase);
+      EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(serverAddr));
       transport = std::make_shared<MockQuicTransport>(
           eventBase, std::move(mockSock), cb, quic::test::createServerCtx());
     });
@@ -1634,8 +1645,7 @@ void QuicServerTest::testReset(Buf packet) {
       .WillRepeatedly(Invoke([&](auto&, auto, auto) { return folly::none; }));
   codec.setOneRttReadCipher(std::move(aead));
   codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
-  StatelessResetToken token;
-  memcpy(token.data(), kTestStatelessResetToken.data(), token.size());
+  StatelessResetToken token = generateStatelessResetToken();
   codec.setStatelessResetToken(token);
   AckStates ackStates;
   auto packetQueue = bufToQueue(serverData->clone());

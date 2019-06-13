@@ -6,8 +6,9 @@
  *
  */
 
-#include <algorithm>
+#include <quic/server/QuicServer.h>
 
+#include <folly/Random.h>
 #include <folly/io/async/EventBaseManager.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
@@ -109,6 +110,14 @@ void QuicServer::initialize(
       << std::numeric_limits<uint8_t>::max() << " workers";
   CHECK(shutdown_);
   shutdown_ = false;
+
+  // setting default stateless reset token if not set
+  if (!transportSettings_.statelessResetTokenSecret) {
+    std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+    folly::Random::secureRandom(secret.data(), secret.size());
+    transportSettings_.statelessResetTokenSecret = secret;
+  }
+
   // it the connid algo factory is not set, use default impl
   if (!connIdAlgoFactory_) {
     connIdAlgoFactory_ = std::make_unique<DefaultConnectionIdAlgoFactory>();

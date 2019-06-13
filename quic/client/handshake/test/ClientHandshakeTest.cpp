@@ -97,7 +97,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultPartialReliability);
+            kDefaultPartialReliability,
+            generateStatelessResetToken());
     fizzServer.reset(
         new fizz::server::
             FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(

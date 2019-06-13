@@ -265,6 +265,7 @@ class QuicServerTransportTest : public Test {
   void SetUp() override {
     QuicFizzFactory fizzFactory;
     clientAddr = folly::SocketAddress("127.0.0.1", 1000);
+    auto fakeServerAddr = folly::SocketAddress("1.2.3.4", 8080);
     clientConnectionId = getTestConnectionId();
     initialDestinationConnectionId = clientConnectionId;
     // change the initialDestinationConnectionId to be different
@@ -281,6 +282,7 @@ class QuicServerTransportTest : public Test {
           serverWrites.push_back(buf->clone());
           return buf->computeChainDataLength();
         }));
+    EXPECT_CALL(*sock, address()).WillRepeatedly(ReturnRef(fakeServerAddr));
     supportedVersions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
     serverCtx = createServerCtx();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
@@ -292,6 +294,8 @@ class QuicServerTransportTest : public Test {
     server->setSupportedVersions(supportedVersions);
     server->setOriginalPeerAddress(clientAddr);
     server->setServerConnectionIdParams(params);
+    server->getNonConstConn().transportSettings.statelessResetTokenSecret =
+        getRandSecret();
     transportInfoCb_ = std::make_unique<MockQuicStats>();
     server->setTransportInfoCallback(transportInfoCb_.get());
     initializeServerHandshake();

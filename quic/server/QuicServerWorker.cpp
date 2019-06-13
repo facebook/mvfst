@@ -12,6 +12,7 @@
 #include <quic/common/Timers.h>
 
 #include <quic/server/QuicServerWorker.h>
+#include <quic/server/handshake/StatelessResetGenerator.h>
 
 namespace quic {
 
@@ -406,13 +407,21 @@ void QuicServerWorker::dispatchPacketData(
         infoCallback_,
         onPacketDropped,
         PacketDropReason::ROUTING_ERROR_WRONG_HOST);
-    return sendResetPacket(routingData.headerForm, client, networkData);
+    return sendResetPacket(
+        routingData.headerForm,
+        client,
+        networkData,
+        routingData.destinationConnId);
   }
 
   if (!packetForwardingEnabled_) {
     QUIC_STATS(
         infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
-    return sendResetPacket(routingData.headerForm, client, networkData);
+    return sendResetPacket(
+        routingData.headerForm,
+        client,
+        networkData,
+        routingData.destinationConnId);
   }
 
   // There's no existing connection for the packet's CID or the client's
@@ -420,7 +429,11 @@ void QuicServerWorker::dispatchPacketData(
   if (connIdParam.processId == static_cast<uint8_t>(processId_)) {
     QUIC_STATS(
         infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
-    return sendResetPacket(routingData.headerForm, client, networkData);
+    return sendResetPacket(
+        routingData.headerForm,
+        client,
+        networkData,
+        routingData.destinationConnId);
   }
 
   // Optimistically route to another server
@@ -437,7 +450,8 @@ void QuicServerWorker::dispatchPacketData(
 void QuicServerWorker::sendResetPacket(
     const HeaderForm& headerForm,
     const folly::SocketAddress& client,
-    const NetworkData& networkData) {
+    const NetworkData& networkData,
+    const ConnectionId& connId) {
   if (headerForm != HeaderForm::Short) {
     // Only send resets in response to short header packets.
     return;
@@ -446,12 +460,11 @@ void QuicServerWorker::sendResetPacket(
   uint16_t maxResetPacketSize = std::min<uint16_t>(
       std::max<uint16_t>(kMinStatelessPacketSize, packetSize),
       kDefaultUDPSendPacketLen);
-  // TODO: replace with real token.
-  StatelessResetToken token;
-  static_assert(
-      kTestStatelessResetToken.size() == sizeof(StatelessResetToken),
-      "Token size does not match");
-  memcpy(&token, kTestStatelessResetToken.data(), token.size());
+  CHECK(transportSettings_.statelessResetTokenSecret.hasValue());
+  StatelessResetGenerator generator(
+      *transportSettings_.statelessResetTokenSecret,
+      getAddress().getFullyQualified());
+  StatelessResetToken token = generator.generateToken(connId);
   StatelessResetPacketBuilder builder(maxResetPacketSize, token);
   auto resetData = std::move(builder).buildPacket();
   socket_->write(client, std::move(resetData));

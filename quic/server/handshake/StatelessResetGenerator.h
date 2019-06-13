@@ -14,17 +14,18 @@
 
 namespace quic {
 
-using StatelessResetSecret = std::array<uint8_t, 32>;
+using StatelessResetSecret =
+    std::array<uint8_t, kStatelessResetTokenSecretLength>;
 
 /**
  * A StatelessResetToken generator.
  *
- * This generator takes in a StatelessResetSecret, a string that represent
- * address. It generates different StatelessResetToken given different
- * ConnectionId.
+ * This generator takes in a StatelessResetSecret, and a string that represents
+ * the server address. It generates a different StatelessResetToken given a
+ * different ConnectionId.
  *
  * The StatelessResetSecret is provided to HKDF to generate a pesudorandom key.
- * Address string and ConnectionId are concated together to as app specific
+ * Address string and ConnectionId are concated together, as app specific
  * input in HKDF-Expand. The output of HKDF will be the StatelessResetToken.
  *
  * PRK = HKDF-Extract(Salt, secret)
@@ -33,7 +34,7 @@ using StatelessResetSecret = std::array<uint8_t, 32>;
  */
 class StatelessResetGenerator {
  public:
-  StatelessResetGenerator(
+  explicit StatelessResetGenerator(
       StatelessResetSecret secret,
       const std::string& addressStr);
 

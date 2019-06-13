@@ -48,7 +48,8 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultPartialReliability);
+      kDefaultPartialReliability,
+      generateStatelessResetToken());
   auto extensions = ext.getExtensions(getClientHello(folly::none));
 
   EXPECT_EQ(extensions.size(), 1);
@@ -58,6 +59,7 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
+  StatelessResetToken token = generateStatelessResetToken();
   ServerTransportParametersExtension ext(
       QuicVersion::MVFST,
       {MVFST1, QuicVersion::MVFST},
@@ -70,13 +72,21 @@ TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultPartialReliability);
+      kDefaultPartialReliability,
+      token);
   auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
   EXPECT_TRUE(serverParams.hasValue());
   EXPECT_TRUE(serverParams->negotiated_version.hasValue());
+
+  folly::Optional<StatelessResetToken> tokWrapper =
+      getStatelessResetTokenParameter(serverParams->parameters);
+
+  StatelessResetToken expectedToken;
+  EXPECT_NO_THROW(expectedToken = *tokWrapper);
+  EXPECT_EQ(token, expectedToken);
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
@@ -92,8 +102,9 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultPartialReliability);
+      kDefaultPartialReliability,
+      generateStatelessResetToken());
   EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
 }
-}
-}
+} // namespace test
+} // namespace quic

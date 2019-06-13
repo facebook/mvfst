@@ -301,7 +301,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void sendResetPacket(
       const HeaderForm& headerForm,
       const folly::SocketAddress& client,
-      const NetworkData& networkData);
+      const NetworkData& networkData,
+      const ConnectionId& connId);
 
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   std::shared_ptr<WorkerCallback> callback_;

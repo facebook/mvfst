@@ -332,9 +332,6 @@ constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;
 // and 16 bytes of the token and 16 bytes of randomness
 constexpr uint16_t kMinStatelessPacketSize = 13 + 16 + 16;
 
-// TODO: remove this when we have a stateless reset generator.
-constexpr folly::StringPiece kTestStatelessResetToken = "aaaabbbbccccdddd";
-
 constexpr std::chrono::milliseconds kHappyEyeballsV4Delay = 150ms;
 
 constexpr std::chrono::milliseconds kHappyEyeballsConnAttemptDelayWithCache =
@@ -355,6 +352,8 @@ constexpr std::chrono::seconds kTimeToRetainLastCongestionAndRttState = 60s;
 constexpr uint32_t kMaxNumMigrationsAllowed = 6;
 
 constexpr auto kExpectedNumOfParamsInTheTicket = 8;
+
+constexpr auto kStatelessResetTokenSecretLength = 32;
 
 // default capability of QUIC partial reliability
 constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;

@@ -14,6 +14,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/handshake/test/Mocks.h>
+#include <quic/server/handshake/StatelessResetGenerator.h>
 
 namespace {
 std::deque<quic::OutstandingPacket>::reverse_iterator
@@ -589,6 +590,21 @@ folly::IOBufQueue bufToQueue(Buf buf) {
   buf->coalesce();
   queue.append(std::move(buf));
   return queue;
+}
+
+StatelessResetToken generateStatelessResetToken() {
+  StatelessResetSecret secret;
+  folly::Random::secureRandom(secret.data(), secret.size());
+  folly::SocketAddress address("1.2.3.4", 8080);
+  StatelessResetGenerator generator(secret, address.getFullyQualified());
+
+  return generator.generateToken(ConnectionId({0x14, 0x35, 0x22, 0x11}));
+}
+
+std::array<uint8_t, kStatelessResetTokenSecretLength> getRandSecret() {
+  std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+  folly::Random::secureRandom(secret.data(), secret.size());
+  return secret;
 }
 
 } // namespace test

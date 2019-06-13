@@ -8,7 +8,6 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <iostream>
 
 #include <quic/state/StateMachine.h>
 
@@ -182,5 +181,5 @@ TEST_F(StateMachineTest, TestTemplateInvalid) {
       invokeHandler<TestMachineT<int>>(stateT, Event1(), stateT),
       InvalidHandlerException);
 }
-}
-}
+} // namespace test
+} // namespace quic

@@ -107,6 +107,9 @@ struct TransportSettings {
   bool partialReliabilityEnabled{false};
   // Whether the endpoint allows peer to migrate to new address
   bool disableMigration{true};
+  // default stateless reset secret for stateless reset token
+  folly::Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
+      statelessResetTokenSecret;
 };
 
 } // namespace quic

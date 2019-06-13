@@ -10,7 +10,7 @@
 
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
-#include <quic/server/state/ServerStateMachine.h>
+#include <quic/server/handshake/StatelessResetGenerator.h>
 
 namespace quic {
 
@@ -21,6 +21,7 @@ QuicServerTransport::QuicServerTransport(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx)
     : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>();
+  tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_ = std::move(tempConn);
   // TODO: generate this when we can encode the packet sequence number

@@ -5,7 +5,6 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
-
 #include <quic/client/QuicClientTransport.h>
 #include <quic/server/QuicServer.h>
 
@@ -29,7 +28,6 @@
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
-#include <quic/state/test/Mocks.h>
 
 using namespace testing;
 using namespace folly;
@@ -732,6 +730,55 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
   EXPECT_TRUE(resetRecvd);
 }
 
+TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
+  folly::Optional<StatelessResetToken> token1, token2;
+
+  expectTransportCallbacks();
+  auto server2 = createServer(ProcessId::ONE);
+  SCOPE_EXIT {
+    server2->shutdown();
+    server2 = nullptr;
+  };
+
+  client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    token1 = client->getConn().statelessResetToken;
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  // change the address to a new server which does not have the connection.
+  auto server2Addr = server2->getAddress();
+  client->getNonConstConn().peerAddress = server2Addr;
+
+  MockReadCallback readCb2;
+  bool resetRecvd = false;
+  auto streamId2 = client->createBidirectionalStream().value();
+  sendRequestAndResponse(data->clone(), streamId2, &readCb2)
+      .thenValue([&](StreamPair) { resetRecvd = false; })
+      .thenError(
+          folly::tag_t<std::runtime_error>{},
+          [&](const std::runtime_error& e) {
+            LOG(INFO) << e.what();
+            resetRecvd = true;
+            token2 = client->getConn().statelessResetToken;
+          })
+      .ensure([&] { eventbase_.terminateLoopSoon(); });
+  eventbase_.loopForever();
+
+  EXPECT_TRUE(resetRecvd);
+  EXPECT_TRUE(token1.hasValue());
+  EXPECT_TRUE(token2.hasValue());
+  EXPECT_EQ(token1.value(), token2.value());
+}
+
 TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest) {
   expectTransportCallbacks();
   TransportSettings settings;
@@ -741,6 +788,7 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest) {
 
   TransportSettings serverSettings;
   serverSettings.partialReliabilityEnabled = false;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
@@ -768,6 +816,7 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest2) {
 
   TransportSettings serverSettings;
   serverSettings.partialReliabilityEnabled = false;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
@@ -795,6 +844,7 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityDisabledTest3) {
 
   TransportSettings serverSettings;
   serverSettings.partialReliabilityEnabled = true;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
@@ -822,6 +872,7 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
 
   TransportSettings serverSettings;
   serverSettings.partialReliabilityEnabled = true;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
   server_->setTransportSettings(serverSettings);
 
   client->start(&clientConnCallback);
@@ -897,14 +948,13 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     params.negotiated_version = negotiatedVersion;
     params.supported_versions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
 
-    // TODO: replace this with a real stateless reset token.
+    StatelessResetToken testStatelessResetToken = generateStatelessResetToken();
     TransportParameter statelessReset;
     statelessReset.parameter = TransportParameterId::stateless_reset_token;
-    statelessReset.value = folly::IOBuf::copyBuffer(kTestStatelessResetToken);
+    statelessReset.value = folly::IOBuf::copyBuffer(testStatelessResetToken);
     parameters.push_back(std::move(statelessReset));
 
     params.parameters = std::move(parameters);
-    // TODO: stateless reset token.
     params_ = std::move(params);
   }
 
@@ -1015,6 +1065,7 @@ class QuicClientTransportTest : public Test {
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));
+    ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
   }
 
   virtual void setupCryptoLayer() {
@@ -1450,6 +1501,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
             socketWrites.push_back(buf->clone());
             return buf->computeChainDataLength();
           }));
+  ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
 
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
@@ -2211,6 +2263,8 @@ class QuicClientTransportAfterStartTest : public QuicClientTransportTest {
           socketWrites.push_back(buf->clone());
           return buf->computeChainDataLength();
         }));
+    ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
+
     setupCryptoLayer();
     start();
     client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
