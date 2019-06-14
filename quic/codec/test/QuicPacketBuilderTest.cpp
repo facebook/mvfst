@@ -20,15 +20,6 @@ using namespace quic;
 using namespace quic::test;
 using namespace testing;
 
-std::vector<QuicVersion> versionList(
-    std::initializer_list<QuicVersionType> types) {
-  std::vector<QuicVersion> versions;
-  for (auto type : types) {
-    versions.push_back(static_cast<QuicVersion>(type));
-  }
-  return versions;
-}
-
 Buf packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
     Aead* aead = nullptr) {

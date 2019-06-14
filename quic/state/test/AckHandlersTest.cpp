@@ -27,28 +27,6 @@ namespace test {
 
 class AckHandlersTest : public TestWithParam<PacketNumberSpace> {};
 
-auto createNewPacket(PacketNum packetNum, PacketNumberSpace pnSpace) {
-  switch (pnSpace) {
-    case PacketNumberSpace::Initial:
-      return RegularQuicWritePacket(LongHeader(
-          LongHeader::Types::Initial,
-          getTestConnectionId(1),
-          getTestConnectionId(2),
-          packetNum,
-          QuicVersion::QUIC_DRAFT));
-    case PacketNumberSpace::Handshake:
-      return RegularQuicWritePacket(LongHeader(
-          LongHeader::Types::Handshake,
-          getTestConnectionId(0),
-          getTestConnectionId(4),
-          packetNum,
-          QuicVersion::QUIC_DRAFT));
-    case PacketNumberSpace::AppData:
-      return RegularQuicWritePacket(ShortHeader(
-          ProtectionType::KeyPhaseOne, getTestConnectionId(), packetNum));
-  }
-}
-
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
   return [&lostPackets](
              QuicConnectionStateBase&, auto& packet, bool, PacketNum) {
@@ -70,7 +48,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   StreamId current = 10;
   auto sentTime = Clock::now();
   for (PacketNum packetNum = 10; packetNum <= 101; packetNum++) {
-    auto regularPacket = createNewPacket(packetNum, GetParam());
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
     WriteStreamFrame frame(current++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(

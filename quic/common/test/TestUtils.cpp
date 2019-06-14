@@ -607,5 +607,38 @@ std::array<uint8_t, kStatelessResetTokenSecretLength> getRandSecret() {
   return secret;
 }
 
+RegularQuicWritePacket createNewPacket(
+    PacketNum packetNum,
+    PacketNumberSpace pnSpace) {
+  switch (pnSpace) {
+    case PacketNumberSpace::Initial:
+      return RegularQuicWritePacket(LongHeader(
+          LongHeader::Types::Initial,
+          getTestConnectionId(1),
+          getTestConnectionId(2),
+          packetNum,
+          QuicVersion::QUIC_DRAFT));
+    case PacketNumberSpace::Handshake:
+      return RegularQuicWritePacket(LongHeader(
+          LongHeader::Types::Handshake,
+          getTestConnectionId(0),
+          getTestConnectionId(4),
+          packetNum,
+          QuicVersion::QUIC_DRAFT));
+    case PacketNumberSpace::AppData:
+      return RegularQuicWritePacket(ShortHeader(
+          ProtectionType::KeyPhaseOne, getTestConnectionId(), packetNum));
+  }
+}
+
+std::vector<QuicVersion> versionList(
+    std::initializer_list<QuicVersionType> types) {
+  std::vector<QuicVersion> versions;
+  for (auto type : types) {
+    versions.push_back(static_cast<QuicVersion>(type));
+  }
+  return versions;
+}
+
 } // namespace test
 } // namespace quic
