@@ -17,7 +17,7 @@ inline void Handler<
     StreamReceiveStates::Closed,
     ReadStreamFrame>::
     handle(
-        QuicStreamState::Recv& state,
+        QuicStreamState::Recv& /*state*/,
         ReadStreamFrame&& frame,
         QuicStreamState& stream) {
   CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
@@ -41,7 +41,7 @@ inline void Handler<
     StreamReceiveStates::Closed,
     RstStreamFrame>::
     handle(
-        QuicStreamState::Recv& state,
+        QuicStreamState::Recv& /*state*/,
         RstStreamFrame&& rst,
         QuicStreamState& stream) {
   // This will check whether the reset is still consistent with the stream.
@@ -76,9 +76,9 @@ inline void Handler<
     StreamSendStates::Closed,
     StreamEvents::SendReset>::
     handle(
-        QuicStreamState::Send& state,
+        QuicStreamState::Send& /*state*/,
         StreamEvents::SendReset&&,
-        QuicStreamState& stream) {
+        QuicStreamState& /*stream*/) {
   // TODO: remove this as a valid state transition
   VLOG(4) << "Ignoring SendReset from closed state.";
   // Discard the send reset.

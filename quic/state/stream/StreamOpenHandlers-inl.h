@@ -37,7 +37,7 @@ Handler<StreamReceiveStateMachine, StreamReceiveStates::Open, ReadStreamFrame>::
 inline void
 Handler<StreamSendStateMachine, StreamSendStates::Open, StopSendingFrame>::
     handle(
-        QuicStreamState::Send& state,
+        QuicStreamState::Send& /*state*/,
         StopSendingFrame&& frame,
         QuicStreamState& stream) {
   CHECK(
