@@ -1001,7 +1001,9 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.lossTime.clear();
+  conn.lossState.initialLossTime.clear();
+  conn.lossState.handshakeLossTime.clear();
+  conn.lossState.appDataLossTime.clear();
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -1062,7 +1064,9 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.lossTime.clear();
+  conn.lossState.initialLossTime.clear();
+  conn.lossState.handshakeLossTime.clear();
+  conn.lossState.appDataLossTime.clear();
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -1225,7 +1229,9 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.lossTime.clear();
+  conn.lossState.initialLossTime.clear();
+  conn.lossState.handshakeLossTime.clear();
+  conn.lossState.appDataLossTime.clear();
 
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
   PathResponseFrame pathResponse(123);
@@ -1337,7 +1343,9 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.lossTime.clear();
+  conn.lossState.initialLossTime.clear();
+  conn.lossState.handshakeLossTime.clear();
+  conn.lossState.appDataLossTime.clear();
 
   NewConnectionIdFrame newConnId(
       1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());

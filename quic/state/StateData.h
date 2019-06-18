@@ -313,9 +313,10 @@ struct LossState {
   // Reordering threshold used
   uint32_t reorderingThreshold{kReorderingThreshold};
   // Timer for time reordering detection or early retransmit alarm.
-  folly::Optional<TimePoint> lossTime;
+  folly::Optional<TimePoint> initialLossTime, handshakeLossTime,
+      appDataLossTime;
   // Current method by which the loss detection alarm is set.
-  AlarmMethod currentAlarmMethod{AlarmMethod::Handshake};
+  AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
   // Total number of packet retransmitted on this connection, including packet
   // clones, retransmitted clones, handshake and rejected zero rtt packets.
   uint32_t rtxCount{0};

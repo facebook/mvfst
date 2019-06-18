@@ -529,6 +529,24 @@ TEST_P(QuicStateFunctionsTest, HasNotReceivedNewPacketsSinceLastClose) {
   EXPECT_TRUE(hasReceivedPacketsAtLastCloseSent(conn));
 }
 
+TEST_F(QuicStateFunctionsTest, EarliestLossTimer) {
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+  EXPECT_FALSE(earliestLossTimer(conn).first.hasValue());
+  auto currentTime = Clock::now();
+  conn.lossState.initialLossTime = currentTime;
+  EXPECT_EQ(PacketNumberSpace::Initial, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime, earliestLossTimer(conn).first.value());
+  conn.lossState.appDataLossTime = currentTime - 1s;
+  EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
+  conn.lossState.handshakeLossTime = currentTime + 1s;
+  EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
+  conn.lossState.appDataLossTime= currentTime + 1s;
+  EXPECT_EQ(PacketNumberSpace::Initial, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime, earliestLossTimer(conn).first.value());
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicStateFunctionsTests,
     QuicStateFunctionsTest,

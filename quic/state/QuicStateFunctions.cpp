@@ -11,6 +11,24 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/logging/QuicLogger.h>
 
+namespace {
+template <typename V, typename A>
+std::pair<folly::Optional<V>, A> minOptional(
+    std::pair<folly::Optional<V>, A> p1,
+    std::pair<folly::Optional<V>, A> p2) {
+  if (!p1.first && !p2.first) {
+    return std::make_pair(folly::none, p1.second);
+  }
+  if (!p1.first) {
+    return p2;
+  }
+  if (!p2.first) {
+    return p1;
+  }
+  return *p1.first < *p2.first ? p1 : p2;
+}
+} // namespace
+
 namespace quic {
 
 void updateRtt(
@@ -239,5 +257,31 @@ bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept {
   return conn.ackStates.initialAckState.largestReceivedPacketNum ||
       conn.ackStates.handshakeAckState.largestReceivedPacketNum ||
       conn.ackStates.appDataAckState.largestReceivedPacketNum;
+}
+
+folly::Optional<TimePoint>& getLossTime(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace) noexcept {
+  switch (pnSpace) {
+    case PacketNumberSpace::Initial:
+      return conn.lossState.initialLossTime;
+    case PacketNumberSpace::Handshake:
+      return conn.lossState.handshakeLossTime;
+    case PacketNumberSpace::AppData:
+      return conn.lossState.appDataLossTime;
+  }
+  folly::assume_unreachable();
+}
+
+std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
+    const QuicConnectionStateBase& conn) noexcept {
+  return minOptional(
+      minOptional(
+          std::make_pair(
+              conn.lossState.initialLossTime, PacketNumberSpace::Initial),
+          std::make_pair(
+              conn.lossState.handshakeLossTime, PacketNumberSpace::Handshake)),
+      std::make_pair(
+          conn.lossState.appDataLossTime, PacketNumberSpace::AppData));
 }
 } // namespace quic

@@ -766,7 +766,52 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
           ->packet.header,
       [](const auto& h) { return h.getPacketSequenceNum(); });
   EXPECT_EQ(packetNum, 6);
-  EXPECT_TRUE(conn->lossState.lossTime);
+  EXPECT_TRUE(conn->lossState.appDataLossTime);
+}
+
+TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
+  std::vector<PacketNum> lostPackets;
+  auto conn = createConn();
+  conn->lossState.srtt = 100ms;
+  conn->lossState.lrtt = 100ms;
+  auto expectedDelayUntilLost = 900000us / 8;
+  auto sendTime = Clock::now();
+  // Send two:
+  sendPacket(*conn, sendTime, false, folly::none, PacketType::Handshake);
+  PacketNum second = sendPacket(
+      *conn, sendTime + 1ms, false, folly::none, PacketType::Handshake);
+  auto lossTime = sendTime + 50ms;
+  detectLossPackets<decltype(testingLossMarkFunc(lostPackets))>(
+      *conn,
+      second,
+      testingLossMarkFunc(lostPackets),
+      lossTime,
+      PacketNumberSpace::Handshake);
+  EXPECT_TRUE(lostPackets.empty());
+  EXPECT_TRUE(conn->lossState.handshakeLossTime.hasValue());
+  EXPECT_EQ(
+      expectedDelayUntilLost + sendTime,
+      conn->lossState.handshakeLossTime.value());
+
+  MockClock::mockNow = [=]() { return sendTime; };
+  auto alarm = calculateAlarmDuration<MockClock>(*conn);
+  EXPECT_EQ(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          expectedDelayUntilLost),
+      alarm.first);
+  EXPECT_EQ(LossState::AlarmMethod::EarlyRetransmitOrReordering, alarm.second);
+  // Manual set lossState. Calling setLossDetectionAlarm requries a Timeout
+  conn->lossState.currentAlarmMethod = alarm.second;
+
+  // Second packet gets acked:
+  getAckState(*conn, PacketNumberSpace::Handshake).largestAckedByPeer = second;
+  conn->outstandingPackets.pop_back();
+  MockClock::mockNow = [=]() { return sendTime + expectedDelayUntilLost + 5s; };
+  onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
+      *conn, testingLossMarkFunc(lostPackets));
+  EXPECT_EQ(1, lostPackets.size());
+  EXPECT_FALSE(conn->lossState.handshakeLossTime.hasValue());
+  EXPECT_TRUE(conn->outstandingPackets.empty());
 }
 
 TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
@@ -805,6 +850,7 @@ TEST_F(
       .WillRepeatedly(Return());
   std::vector<PacketNum> lostPackets;
   PacketNum expectedLargestLostNum = 0;
+  conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
   for (auto i = 0; i < 10; i++) {
     // Half are handshakes
     auto sentPacketNum = sendPacket(
@@ -840,6 +886,7 @@ TEST_F(
 TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   auto conn = createClientConn();
   conn->oneRttWriteCipher = createNoOpAead();
+  conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
   std::vector<PacketNum> lostPackets;
   sendPacket(
       *conn, TimePoint(100ms), false, folly::none, PacketType::Handshake);
@@ -933,7 +980,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHasLossTime) {
   TimePoint lastPacketSentTime = Clock::now();
   auto thisMoment = lastPacketSentTime;
   MockClock::mockNow = [=]() { return thisMoment; };
-  conn->lossState.lossTime = thisMoment + 100ms;
+  conn->lossState.appDataLossTime = thisMoment + 100ms;
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
@@ -951,7 +998,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationLossTimeIsZero) {
   TimePoint lastPacketSentTime = Clock::now();
   auto thisMoment = lastPacketSentTime + 200ms;
   MockClock::mockNow = [=]() { return thisMoment; };
-  conn->lossState.lossTime = lastPacketSentTime + 100ms;
+  conn->lossState.appDataLossTime = lastPacketSentTime + 100ms;
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 

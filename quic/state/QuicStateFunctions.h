@@ -114,4 +114,11 @@ bool hasNotReceivedNewPacketsSinceLastCloseSent(
 
 void updateLargestReceivedPacketsAtLastCloseSent(
     QuicConnectionStateBase& conn) noexcept;
+
+folly::Optional<TimePoint>& getLossTime(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace pnSpace) noexcept;
+
+std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
+    const QuicConnectionStateBase& conn) noexcept;
 } // namespace quic
