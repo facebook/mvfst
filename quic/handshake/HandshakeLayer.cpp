@@ -11,6 +11,7 @@
 #include <fizz/crypto/KeyDerivation.h>
 #include <fizz/crypto/Sha256.h>
 #include <fizz/protocol/Factory.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
@@ -67,7 +68,7 @@ std::unique_ptr<Aead> makeInitialAead(
 
   fizz::TrafficKey trafficKey = {std::move(key), std::move(iv)};
   aead->setKey(std::move(trafficKey));
-  return aead;
+  return FizzAead::wrap(std::move(aead));
 }
 
 std::unique_ptr<Aead> getClientInitialCipher(

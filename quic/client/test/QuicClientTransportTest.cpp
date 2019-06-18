@@ -23,6 +23,7 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
@@ -3303,9 +3304,17 @@ TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
   client->close(folly::none);
 }
 
+static const fizz::test::MockAead* extractMockAead(const quic::Aead* aead) {
+  if (auto fizzAead = dynamic_cast<const FizzAead*>(aead)) {
+    return dynamic_cast<const fizz::test::MockAead*>(fizzAead->getFizzAead());
+  }
+
+  return nullptr;
+}
+
 TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
   // Make decrypt fail for the reset token
-  auto aead = dynamic_cast<const fizz::test::MockAead*>(
+  auto aead = extractMockAead(
       client->getNonConstConn().readCodec->getOneRttReadCipher());
   ASSERT_TRUE(aead);
 
@@ -3324,7 +3333,7 @@ TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
-  auto aead = dynamic_cast<const fizz::test::MockAead*>(
+  auto aead = extractMockAead(
       client->getNonConstConn().readCodec->getOneRttReadCipher());
   ASSERT_TRUE(aead);
   // Make the decrypt fail

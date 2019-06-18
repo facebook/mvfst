@@ -17,7 +17,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
-#include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/Aead.h>
 #include <quic/handshake/QuicFizzFactory.h>
 
 namespace fizz {
