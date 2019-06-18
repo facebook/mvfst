@@ -664,6 +664,7 @@ RegularQuicWritePacket generatePacketWithAckFrames() {
   RegularQuicWritePacket packet =
       createNewPacket(100, PacketNumberSpace::Initial);
   WriteAckFrame ackFrame;
+  ackFrame.ackDelay = 111us;
   ackFrame.ackBlocks.insert(900, 1000);
   ackFrame.ackBlocks.insert(500, 700);
 
