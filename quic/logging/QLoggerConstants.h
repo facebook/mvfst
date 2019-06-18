@@ -12,4 +12,6 @@
 
 namespace quic {
 constexpr folly::StringPiece kShortHeaderPacketType = "1RTT";
+constexpr folly::StringPiece kVersionNegotiationPacketType =
+    "VersionNegotiation";
 } // namespace quic

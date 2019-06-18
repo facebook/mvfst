@@ -640,5 +640,36 @@ std::vector<QuicVersion> versionList(
   return versions;
 }
 
+RegularQuicWritePacket generateRegularQuicWritePacket(
+    StreamId streamId,
+    uint64_t offset,
+    uint64_t len,
+    bool fin) {
+  auto regularWritePacket = createNewPacket(10, PacketNumberSpace::Initial);
+  WriteStreamFrame frame(streamId, offset, len, fin);
+  regularWritePacket.frames.emplace_back(frame);
+  return regularWritePacket;
+}
+
+VersionNegotiationPacket generateVersionNegotiationPacket() {
+  auto versions = {QuicVersion::VERSION_NEGOTIATION, QuicVersion::MVFST};
+  auto packet = VersionNegotiationPacketBuilder(
+                    getTestConnectionId(0), getTestConnectionId(1), versions)
+                    .buildPacket()
+                    .first;
+  return packet;
+}
+
+RegularQuicWritePacket generatePacketWithAckFrames() {
+  RegularQuicWritePacket packet =
+      createNewPacket(100, PacketNumberSpace::Initial);
+  WriteAckFrame ackFrame;
+  ackFrame.ackBlocks.insert(900, 1000);
+  ackFrame.ackBlocks.insert(500, 700);
+
+  packet.frames.emplace_back(std::move(ackFrame));
+  return packet;
+}
+
 } // namespace test
 } // namespace quic

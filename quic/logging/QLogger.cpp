@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
-
 #include <quic/logging/QLogger.h>
+#include <folly/json.h>
 
 #include <quic/logging/QLoggerConstants.h>
 
@@ -74,12 +74,12 @@ void QLogger::add(const RegularQuicPacket& regularPacket, uint64_t packetSize) {
               frame.streamId, frame.dataLimit));
         },
         [&](const WriteAckFrame& frame) {
-          event->frames.push_back(std::make_unique<AckFrameLog>(
-              frame.ackBlocks.back().end, frame.ackDelay));
+          event->frames.push_back(std::make_unique<WriteAckFrameLog>(
+              frame.ackBlocks, frame.ackDelay));
         },
         [&](const ReadAckFrame& frame) {
-          event->frames.push_back(std::make_unique<AckFrameLog>(
-              frame.largestAcked, frame.ackDelay));
+          event->frames.push_back(std::make_unique<ReadAckFrameLog>(
+              frame.ackBlocks, frame.ackDelay));
         },
         [&](const WriteStreamFrame& frame) {
           event->frames.push_back(std::make_unique<StreamFrameLog>(
@@ -149,7 +149,6 @@ void QLogger::add(
       });
 
   // looping through the packet to store logs created from frames in the packet
-  std::vector<std::unique_ptr<QLogFrame>> frames;
   for (const auto& quicFrame : writePacket.frames) {
     folly::variant_match(
         quicFrame,
@@ -196,12 +195,12 @@ void QLogger::add(
               frame.streamId, frame.dataLimit));
         },
         [&](const WriteAckFrame& frame) {
-          event->frames.push_back(std::make_unique<AckFrameLog>(
-              frame.ackBlocks.back().end, frame.ackDelay));
+          event->frames.push_back(std::make_unique<WriteAckFrameLog>(
+              frame.ackBlocks, frame.ackDelay));
         },
         [&](const ReadAckFrame& frame) {
-          event->frames.push_back(std::make_unique<AckFrameLog>(
-              frame.largestAcked, frame.ackDelay));
+          event->frames.push_back(std::make_unique<ReadAckFrameLog>(
+              frame.ackBlocks, frame.ackDelay));
         },
         [&](const WriteStreamFrame& frame) {
           event->frames.push_back(std::make_unique<StreamFrameLog>(
@@ -261,13 +260,28 @@ void QLogger::add(
   event->packetSize = packetSize;
   event->eventType =
       isPacketRecvd ? EventType::PacketReceived : EventType::PacketSent;
-  event->packetType = std::to_string(versionPacket.packetType);
+  event->packetType = kVersionNegotiationPacketType;
   event->versionLog = std::make_unique<VersionNegotiationLog>(
       VersionNegotiationLog(versionPacket.versions));
+
   logs.push_back(std::move(event));
 }
 
 folly::dynamic QLogger::toDynamic() {
+  d = folly::dynamic::object;
+  d["traces"] = folly::dynamic::array();
+  folly::dynamic dTrace = folly::dynamic::object;
+
+  // convert stored logs into folly::Dynamic event array
+  auto events = folly::dynamic::array();
+  for (auto& event : logs) {
+    events.push_back(event->toDynamic());
+  }
+  dTrace["events"] = events;
+  dTrace["event_fields"] =
+      folly::dynamic::array("CATEGORY", "EVENT_TYPE", "TRIGGER", "DATA");
+
+  d["traces"].push_back(dTrace);
   return d;
 }
 
