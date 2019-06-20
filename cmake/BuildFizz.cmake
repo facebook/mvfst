@@ -40,9 +40,9 @@ set(FIZZ_BINARY_DIR ${binary_dir})
 set(LIBFIZZ_LIBRARY_LOCATION
   "${FIZZ_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}fizz${CMAKE_STATIC_LIBRARY_SUFFIX}"
 )
-add_library(mvfst_fizz STATIC IMPORTED)
-set_target_properties(mvfst_fizz PROPERTIES IMPORTED_LOCATION "${LIBFIZZ_LIBRARY_LOCATION}")
-set_target_properties(mvfst_fizz PROPERTIES INTERFACE_LINK_LIBRARIES Folly::folly)
+add_library(fizz STATIC IMPORTED)
+set_target_properties(fizz PROPERTIES IMPORTED_LOCATION "${LIBFIZZ_LIBRARY_LOCATION}")
+set_target_properties(fizz PROPERTIES INTERFACE_LINK_LIBRARIES Folly::folly)
 
-set(LIBFIZZ_LIBRARY mvfst_fizz)
+set(LIBFIZZ_LIBRARY fizz)
 set(LIBFIZZ_INCLUDE_DIR "${source_dir}")
