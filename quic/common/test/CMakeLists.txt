@@ -30,7 +30,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_test_utils
-  ${FIZZ_TARGET}
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types

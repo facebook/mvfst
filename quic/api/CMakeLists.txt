@@ -27,7 +27,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
-  ${FIZZ_TARGET}
   mvfst_cc_algo
   mvfst_codec
   mvfst_codec_pktbuilder

@@ -31,7 +31,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_server
-  ${FIZZ_TARGET}
   mvfst_constants
   mvfst_codec
   mvfst_codec_types

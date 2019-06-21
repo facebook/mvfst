@@ -25,7 +25,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_handshake
-  ${FIZZ_TARGET}
   mvfst_constants
   mvfst_exception
   mvfst_codec_types

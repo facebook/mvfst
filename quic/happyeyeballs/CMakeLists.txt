@@ -23,7 +23,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_happyeyeballs
-  ${FIZZ_TARGET}
   mvfst_state_machine
 )
 

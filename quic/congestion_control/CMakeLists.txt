@@ -27,7 +27,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_cc_algo
-  ${FIZZ_TARGET}
   mvfst_constants
   mvfst_exception
   mvfst_state_machine

@@ -65,7 +65,7 @@ function(quic_add_test)
     "${QUIC_FBCODE_ROOT}/quic/common/test/TestMain.cpp"
   )
    # make sure googletest and fizz are built first
-  add_dependencies(${QUIC_TEST_TARGET} googletest ${FIZZ_TARGET})
+  add_dependencies(${QUIC_TEST_TARGET} googletest)
   target_compile_options(
     ${QUIC_TEST_TARGET} PRIVATE
     ${_QUIC_BASE_COMPILE_OPTIONS}

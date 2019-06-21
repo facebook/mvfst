@@ -54,11 +54,6 @@ target_compile_options(
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
-add_dependencies(
-  mvfst_exception
-  ${FIZZ_TARGET}
-)
-
 target_link_libraries(
   mvfst_exception PUBLIC
   Folly::folly

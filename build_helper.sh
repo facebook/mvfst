@@ -50,7 +50,7 @@ if [ -z "${BUILD_DIR-}" ] ; then
   mkdir -p $BUILD_DIR
 fi
 
-if [[ -n "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then 
+if [[ -n "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
     if [[ "$MVFST_FOLLY_USE_JEMALLOC" != "n" ]]; then
         unset $MVFST_FOLLY_USE_JEMALLOC
     fi
@@ -68,9 +68,11 @@ mkdir -p "$MVFST_BUILD_DIR"
 
 if [ -z "${INSTALL_PREFIX-}" ]; then
   FOLLY_INSTALL_DIR=$DEPS_DIR
+  FIZZ_INSTALL_DIR=$DEPS_DIR
   MVFST_INSTALL_DIR=$BWD
 else
   FOLLY_INSTALL_DIR=$INSTALL_PREFIX
+  FIZZ_INSTALL_DIR=$INSTALL_PREFIX
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
 fi
 
@@ -168,13 +170,13 @@ function setup_folly() {
   mkdir -p "$FOLLY_BUILD_DIR"
   cd "$FOLLY_BUILD_DIR" || exit
 
-  # check for environment variable. If 
-  if [[ -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then 
+  # check for environment variable. If
+  if [[ -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
       -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
       -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
       ..
-  else 
+  else
     cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
       -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
       -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
@@ -184,6 +186,28 @@ function setup_folly() {
   make -j "$nproc"
   make install
   echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
+  cd "$BWD" || exit
+}
+
+function setup_fizz() {
+  FIZZ_DIR=$DEPS_DIR/fizz
+  FIZZ_BUILD_DIR=$DEPS_DIR/fizz/build/
+  if [ ! -d "$FIZZ_DIR" ] ; then
+    echo -e "${COLOR_GREEN}[ INFO ] Cloning fizz repo ${COLOR_OFF}"
+    git clone https://github.com/facebookincubator/fizz "$FIZZ_DIR"
+    echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
+  fi
+  echo -e "${COLOR_GREEN}Building Fizz ${COLOR_OFF}"
+  mkdir -p "$FIZZ_BUILD_DIR"
+  cd "$FIZZ_BUILD_DIR" || exit
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo       \
+    -DBUILD_TESTS=ON                            \
+    -DCMAKE_PREFIX_PATH="$FIZZ_INSTALL_DIR"     \
+    -DCMAKE_INSTALL_PREFIX="$FIZZ_INSTALL_DIR"  \
+    "$FIZZ_DIR/fizz"
+  make -j "$nproc"
+  make install
+  echo -e "${COLOR_GREEN}Fizz is installed ${COLOR_OFF}"
   cd "$BWD" || exit
 }
 
@@ -199,6 +223,7 @@ function detect_platform() {
 
 detect_platform
 setup_folly
+setup_fizz
 
 # build mvfst:
 cd "$MVFST_BUILD_DIR" || exit
