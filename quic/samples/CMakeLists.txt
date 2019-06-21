@@ -26,6 +26,8 @@ target_compile_options(
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
+add_dependencies(echo googletest)
+
 target_link_libraries(
   echo PUBLIC
   mvfst_test_utils
