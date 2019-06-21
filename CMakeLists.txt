@@ -75,7 +75,8 @@ list(APPEND
   -Wnon-virtual-dtor
 )
 
-SET(LIBFIZZ_LIBRARY fizz::fizz)
+SET(LIBFIZZ_LIBRARY ${FIZZ_LIBRARIES})
+SET(LIBFIZZ_INCLUDE_DIR ${FIZZ_INCLUDE_DIR})
 if(BUILD_TESTS)
   enable_testing()
   include(QuicTest)
