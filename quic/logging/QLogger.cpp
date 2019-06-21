@@ -5,14 +5,17 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
-#include <quic/logging/QLogger.h>
-#include <folly/json.h>
 
+#include <folly/dynamic.h>
+#include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QLoggerTypes.h>
 
 namespace quic {
 
-void QLogger::add(const RegularQuicPacket& regularPacket, uint64_t packetSize) {
+std::unique_ptr<QLogPacketEvent> createPacketEvent(
+    const RegularQuicPacket& regularPacket,
+    uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
 
   event->packetNum = folly::variant_match(
@@ -128,10 +131,10 @@ void QLogger::add(const RegularQuicPacket& regularPacket, uint64_t packetSize) {
           // Ignore other frames.
         });
   }
-  logs.push_back(std::move(event));
+  return event;
 }
 
-void QLogger::add(
+std::unique_ptr<QLogPacketEvent> createPacketEvent(
     const RegularQuicWritePacket& writePacket,
     uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
@@ -249,40 +252,21 @@ void QLogger::add(
           // Ignore other frames.
         });
   }
-  logs.push_back(std::move(event));
+  return event;
 }
 
-void QLogger::add(
+std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
     const VersionNegotiationPacket& versionPacket,
-    size_t packetSize,
+    uint64_t packetSize,
     bool isPacketRecvd) {
   auto event = std::make_unique<QLogVersionNegotiationEvent>();
   event->packetSize = packetSize;
   event->eventType =
       isPacketRecvd ? EventType::PacketReceived : EventType::PacketSent;
-  event->packetType = kVersionNegotiationPacketType;
+  event->packetType = kVersionNegotiationPacketType.str();
   event->versionLog = std::make_unique<VersionNegotiationLog>(
       VersionNegotiationLog(versionPacket.versions));
-
-  logs.push_back(std::move(event));
-}
-
-folly::dynamic QLogger::toDynamic() {
-  d = folly::dynamic::object;
-  d["traces"] = folly::dynamic::array();
-  folly::dynamic dTrace = folly::dynamic::object;
-
-  // convert stored logs into folly::Dynamic event array
-  auto events = folly::dynamic::array();
-  for (auto& event : logs) {
-    events.push_back(event->toDynamic());
-  }
-  dTrace["events"] = events;
-  dTrace["event_fields"] =
-      folly::dynamic::array("CATEGORY", "EVENT_TYPE", "TRIGGER", "DATA");
-
-  d["traces"].push_back(dTrace);
-  return d;
+  return event;
 }
 
 } // namespace quic

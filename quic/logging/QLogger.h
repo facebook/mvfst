@@ -8,35 +8,37 @@
 
 #pragma once
 
-#include <folly/dynamic.h>
-#include <quic/codec/Types.h>
 #include <quic/logging/QLoggerTypes.h>
-#include <memory>
-#include <string>
-#include <vector>
 
 namespace quic {
 
 class QLogger {
  public:
-  std::vector<std::unique_ptr<QLogEvent>> logs;
-
-  ~QLogger() = default;
   QLogger() = default;
-
-  void add(const RegularQuicPacket& regularPacket, uint64_t packetSize);
-
-  void add(
+  virtual ~QLogger() = default;
+  virtual void add(
+      const RegularQuicPacket& regularPacket,
+      uint64_t packetSize) = 0;
+  virtual void add(
       const VersionNegotiationPacket& versionPacket,
       uint64_t packetSize,
-      bool isPacketRecvd);
-
-  void add(const RegularQuicWritePacket& writePacket, uint64_t packetSize);
-
-  folly::dynamic toDynamic();
-
- private:
-  folly::dynamic d;
+      bool isPacketRecvd) = 0;
+  virtual void add(
+      const RegularQuicWritePacket& writePacket,
+      uint64_t packetSize) = 0;
 };
+
+std::unique_ptr<QLogPacketEvent> createPacketEvent(
+    const RegularQuicPacket& regularPacket,
+    uint64_t packetSize);
+
+std::unique_ptr<QLogPacketEvent> createPacketEvent(
+    const RegularQuicWritePacket& writePacket,
+    uint64_t packetSize);
+
+std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
+    const VersionNegotiationPacket& versionPacket,
+    size_t packetSize,
+    bool isPacketRecvd);
 
 } // namespace quic

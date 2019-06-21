@@ -11,8 +11,7 @@
 #include <folly/json.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/QuicFizzFactory.h>
-#include <memory>
+#include <quic/logging/FileQLogger.h>
 
 using namespace quic;
 using namespace testing;
@@ -32,7 +31,7 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
   RegularQuicWritePacket regularWritePacket =
       generateRegularQuicWritePacket(streamId, offset, len, fin);
 
-  QLogger q;
+  FileQLogger q;
   q.add(regularWritePacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -60,7 +59,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
       offset);
 
   auto regularQuicPacket = packet.packet;
-  QLogger q;
+  FileQLogger q;
   q.add(regularQuicPacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -74,7 +73,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
 
 TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   bool isPacketRecvd = false;
-  QLogger q;
+  FileQLogger q;
   auto packet = generateVersionNegotiationPacket();
   q.add(packet, 10, isPacketRecvd);
 
@@ -123,7 +122,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   RegularQuicWritePacket packet =
       generateRegularQuicWritePacket(streamId, offset, len, fin);
 
-  QLogger q;
+  FileQLogger q;
   q.add(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
 
@@ -176,7 +175,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
  })");
 
   RegularQuicWritePacket packet = generatePacketWithAckFrames();
-  QLogger q;
+  FileQLogger q;
   q.add(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
 
@@ -215,8 +214,8 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
            ]
          })");
 
-  QLogger q;
   auto packet = generateVersionNegotiationPacket();
+  FileQLogger q;
   q.add(packet, 10, isPacketRecvd);
   folly::dynamic gotDynamic = q.toDynamic();
 
@@ -338,7 +337,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
    ]
  })");
 
-  QLogger q;
+  FileQLogger q;
   auto versionPacket = generateVersionNegotiationPacket();
   RegularQuicWritePacket regPacket = generatePacketWithAckFrames();
   auto packet = createStreamPacket(
@@ -417,7 +416,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
    ]
  })");
 
-  QLogger q;
+  FileQLogger q;
   RegularQuicWritePacket packet =
       createNewPacket(100, PacketNumberSpace::Initial);
 
