@@ -647,7 +647,7 @@ std::vector<QuicVersion> versionList(
   return versions;
 }
 
-RegularQuicWritePacket generateRegularQuicWritePacket(
+RegularQuicWritePacket createRegularQuicWritePacket(
     StreamId streamId,
     uint64_t offset,
     uint64_t len,
@@ -658,7 +658,7 @@ RegularQuicWritePacket generateRegularQuicWritePacket(
   return regularWritePacket;
 }
 
-VersionNegotiationPacket generateVersionNegotiationPacket() {
+VersionNegotiationPacket createVersionNegotiationPacket() {
   auto versions = {QuicVersion::VERSION_NEGOTIATION, QuicVersion::MVFST};
   auto packet = VersionNegotiationPacketBuilder(
                     getTestConnectionId(0), getTestConnectionId(1), versions)
@@ -667,7 +667,7 @@ VersionNegotiationPacket generateVersionNegotiationPacket() {
   return packet;
 }
 
-RegularQuicWritePacket generatePacketWithAckFrames() {
+RegularQuicWritePacket createPacketWithAckFrames() {
   RegularQuicWritePacket packet =
       createNewPacket(100, PacketNumberSpace::Initial);
   WriteAckFrame ackFrame;

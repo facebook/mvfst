@@ -29,7 +29,7 @@ class QLoggerTest : public Test {
 
 TEST_F(QLoggerTest, TestRegularWritePacket) {
   RegularQuicWritePacket regularWritePacket =
-      generateRegularQuicWritePacket(streamId, offset, len, fin);
+      createRegularQuicWritePacket(streamId, offset, len, fin);
 
   FileQLogger q;
   q.add(regularWritePacket, 10);
@@ -74,7 +74,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
 TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   bool isPacketRecvd = false;
   FileQLogger q;
-  auto packet = generateVersionNegotiationPacket();
+  auto packet = createVersionNegotiationPacket();
   q.add(packet, 10, isPacketRecvd);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -120,7 +120,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
       })");
 
   RegularQuicWritePacket packet =
-      generateRegularQuicWritePacket(streamId, offset, len, fin);
+      createRegularQuicWritePacket(streamId, offset, len, fin);
 
   FileQLogger q;
   q.add(packet, 10);
@@ -174,7 +174,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
    ]
  })");
 
-  RegularQuicWritePacket packet = generatePacketWithAckFrames();
+  RegularQuicWritePacket packet = createPacketWithAckFrames();
   FileQLogger q;
   q.add(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
@@ -214,7 +214,7 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
            ]
          })");
 
-  auto packet = generateVersionNegotiationPacket();
+  auto packet = createVersionNegotiationPacket();
   FileQLogger q;
   q.add(packet, 10, isPacketRecvd);
   folly::dynamic gotDynamic = q.toDynamic();
@@ -338,8 +338,8 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
  })");
 
   FileQLogger q;
-  auto versionPacket = generateVersionNegotiationPacket();
-  RegularQuicWritePacket regPacket = generatePacketWithAckFrames();
+  auto versionPacket = createVersionNegotiationPacket();
+  RegularQuicWritePacket regPacket = createPacketWithAckFrames();
   auto packet = createStreamPacket(
       getTestConnectionId(0),
       getTestConnectionId(1),

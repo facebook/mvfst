@@ -260,15 +260,15 @@ RegularQuicWritePacket createNewPacket(
 std::vector<QuicVersion> versionList(
     std::initializer_list<QuicVersionType> types);
 
-RegularQuicWritePacket generateRegularQuicWritePacket(
+RegularQuicWritePacket createRegularQuicWritePacket(
     StreamId streamId,
     uint64_t offset,
     uint64_t len,
     bool fin);
 
-VersionNegotiationPacket generateVersionNegotiationPacket();
+VersionNegotiationPacket createVersionNegotiationPacket();
 
-RegularQuicWritePacket generatePacketWithAckFrames();
+RegularQuicWritePacket createPacketWithAckFrames();
 
 } // namespace test
 } // namespace quic
