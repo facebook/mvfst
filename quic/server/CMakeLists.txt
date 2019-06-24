@@ -35,6 +35,7 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
+  mvfst_qlogger
   mvfst_transport
 )
 
@@ -46,6 +47,7 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
+  mvfst_qlogger
   mvfst_transport
 )
 

@@ -248,11 +248,11 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
   return d;
 }
 
-std::string toString(EventType type) {
+std::string toString(QLogEventType type) {
   switch (type) {
-    case EventType::PacketSent:
+    case QLogEventType::PacketSent:
       return "PACKET_SENT";
-    case EventType::PacketReceived:
+    case QLogEventType::PacketReceived:
       return "PACKET_RECEIVED";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";

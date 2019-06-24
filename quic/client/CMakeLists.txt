@@ -27,6 +27,7 @@ add_dependencies(
   mvfst_flowcontrol
   mvfst_happyeyeballs
   mvfst_loss
+  mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_state_pacing_functions
   mvfst_transport
@@ -38,6 +39,7 @@ target_link_libraries(
   mvfst_flowcontrol
   mvfst_happyeyeballs
   mvfst_loss
+  mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_state_pacing_functions
   mvfst_transport

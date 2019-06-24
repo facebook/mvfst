@@ -214,6 +214,9 @@ void QuicClientTransport::processPacketData(
       protectionLevel == ProtectionType::KeyPhaseOne;
 
   auto& regularPacket = *regularOptional;
+  if (conn_->qLogger) {
+    conn_->qLogger->add(regularPacket, packetSize);
+  }
   if (!isProtectedPacket) {
     for (auto& quicFrame : regularPacket.frames) {
       auto isPadding = boost::get<PaddingFrame>(&quicFrame);
@@ -227,7 +230,6 @@ void QuicClientTransport::processPacketData(
       }
     }
   }
-
   QUIC_TRACE(packet_recvd, *conn_, toString(pnSpace), packetNum, packetSize);
 
   // We got a packet that was not the version negotiation packet, that means

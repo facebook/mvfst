@@ -624,6 +624,9 @@ void onServerReadDataFromOpen(
       conn.serverConnIdParams->clientConnId = *conn.clientConnectionId;
       conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     }
+    if (conn.qLogger) {
+      conn.qLogger->add(regularPacket, packetSize);
+    }
     QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
     // We assume that the higher layer takes care of validating that the version
     // is supported.
@@ -988,7 +991,9 @@ void onServerReadDataFromClosed(
   auto pnSpace = folly::variant_match(
       regularOptional->header,
       [](const auto& h) { return h.getPacketNumberSpace(); });
-
+  if (conn.qLogger) {
+    conn.qLogger->add(regularPacket, packetSize);
+  }
   QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
 
   bool isProtectedPacket = protectionLevel == ProtectionType::ZeroRtt ||

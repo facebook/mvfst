@@ -292,12 +292,12 @@ class VersionNegotiationLog {
   folly::dynamic toDynamic() const;
 };
 
-enum class EventType : uint32_t {
+enum class QLogEventType : uint32_t {
   PacketReceived,
   PacketSent,
 };
 
-std::string toString(EventType type);
+std::string toString(QLogEventType type);
 
 class QLogEvent {
  public:
@@ -314,7 +314,7 @@ class QLogPacketEvent : public QLogEvent {
   std::string packetType;
   PacketNum packetNum{0};
   uint64_t packetSize{0};
-  EventType eventType;
+  QLogEventType eventType;
 
   folly::dynamic toDynamic() const override;
 };
@@ -326,11 +326,11 @@ class QLogVersionNegotiationEvent : public QLogEvent {
   std::unique_ptr<VersionNegotiationLog> versionLog;
   std::string packetType;
   uint64_t packetSize{0};
-  EventType eventType;
+  QLogEventType eventType;
 
   folly::dynamic toDynamic() const override;
 };
 
-std::string toString(EventType type);
+std::string toString(QLogEventType type);
 
 } // namespace quic

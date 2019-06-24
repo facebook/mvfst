@@ -206,6 +206,9 @@ void updateConnection(
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize
            << " " << conn;
+  if (conn.qLogger) {
+    conn.qLogger->add(packet, encodedSize);
+  }
   for (const auto& frame : packet.frames) {
     folly::variant_match(
         frame,
@@ -603,13 +606,13 @@ uint64_t writeQuicDataExceptCryptoStreamToSocket(
   uint64_t written = 0;
   if (connection.pendingEvents.numProbePackets) {
     auto probeScheduler = std::move(FrameScheduler::Builder(
-                                      connection,
-                                      fizz::EncryptionLevel::AppTraffic,
-                                      PacketNumberSpace::AppData,
-                                      "ProbeWithoutCrypto")
-                                      .streamFrames()
-                                      .streamRetransmissions())
-                            .build();
+                                        connection,
+                                        fizz::EncryptionLevel::AppTraffic,
+                                        PacketNumberSpace::AppData,
+                                        "ProbeWithoutCrypto")
+                                        .streamFrames()
+                                        .streamRetransmissions())
+                              .build();
     written = writeProbingDataToSocket(
         socket,
         connection,
@@ -764,6 +767,9 @@ void writeCloseCommon(
   auto packetBuf = std::move(packet.header);
   packetBuf->prependChain(std::move(body));
   auto packetSize = packetBuf->computeChainDataLength();
+  if (connection.qLogger) {
+    connection.qLogger->add(packet.packet, packetSize);
+  }
   QUIC_TRACE(
       packet_sent,
       connection,

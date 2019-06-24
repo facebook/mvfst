@@ -19,6 +19,7 @@
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/handshake/HandshakeLayer.h>
+#include <quic/logging/QLogger.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -572,6 +573,9 @@ struct QuicConnectionStateBase {
 
   // Logger for this connection.
   std::shared_ptr<Logger> logger;
+
+  // QLogger for this connection
+  std::shared_ptr<QLogger> qLogger;
 
   // Track stats for various server events
   QuicTransportStatsCallback* infoCallback{nullptr};

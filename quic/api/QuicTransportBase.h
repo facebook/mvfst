@@ -435,6 +435,10 @@ class QuicTransportBase : public QuicSocket {
     conn_->logger = std::move(logger);
   }
 
+  void setQLogger(std::shared_ptr<QLogger> qLogger) {
+    conn_->qLogger = std::move(qLogger);
+  }
+
   virtual void cancelAllAppCallbacks(
       std::pair<QuicErrorCode, std::string> error) noexcept;
 

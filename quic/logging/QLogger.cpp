@@ -22,7 +22,7 @@ std::unique_ptr<QLogPacketEvent> createPacketEvent(
       regularPacket.header,
       [](const auto& h) { return h.getPacketSequenceNum(); });
   event->packetSize = packetSize;
-  event->eventType = EventType::PacketReceived;
+  event->eventType = QLogEventType::PacketReceived;
   event->packetType = folly::variant_match(
       regularPacket.header,
       [](const LongHeader& header) { return toString(header.getHeaderType()); },
@@ -143,7 +143,7 @@ std::unique_ptr<QLogPacketEvent> createPacketEvent(
       writePacket.header,
       [](const auto& h) { return h.getPacketSequenceNum(); });
   event->packetSize = packetSize;
-  event->eventType = EventType::PacketSent;
+  event->eventType = QLogEventType::PacketSent;
   event->packetType = folly::variant_match(
       writePacket.header,
       [](const LongHeader& header) { return toString(header.getHeaderType()); },
@@ -262,7 +262,7 @@ std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
   auto event = std::make_unique<QLogVersionNegotiationEvent>();
   event->packetSize = packetSize;
   event->eventType =
-      isPacketRecvd ? EventType::PacketReceived : EventType::PacketSent;
+      isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
   event->packetType = kVersionNegotiationPacketType.str();
   event->versionLog = std::make_unique<VersionNegotiationLog>(
       VersionNegotiationLog(versionPacket.versions));

@@ -41,24 +41,17 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
   EXPECT_EQ(gotObject.streamId, streamId);
   EXPECT_EQ(gotObject.offset, offset);
   EXPECT_EQ(gotObject.fin, fin);
+  EXPECT_EQ(gotEvent->eventType, QLogEventType::PacketSent);
 }
 
 TEST_F(QLoggerTest, TestRegularPacket) {
-  auto expected = folly::IOBuf::copyBuffer("hello");
-  auto packet = createStreamPacket(
-      getTestConnectionId(0),
-      getTestConnectionId(1),
-      1,
-      streamId,
-      *expected,
-      0 /* cipherOverhead */,
-      0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
-      fin,
-      folly::none /* shortHeaderOverride */,
-      offset);
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(headerIn);
+  ReadStreamFrame frame(streamId, offset, fin);
 
-  auto regularQuicPacket = packet.packet;
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+
   FileQLogger q;
   q.add(regularQuicPacket, 10);
 
@@ -69,6 +62,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
   EXPECT_EQ(gotObject.streamId, streamId);
   EXPECT_EQ(gotObject.offset, offset);
   EXPECT_EQ(gotObject.fin, fin);
+  EXPECT_EQ(gotEvent->eventType, QLogEventType::PacketReceived);
 }
 
 TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
@@ -97,13 +91,65 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
             "events":[
                [
                 "TRANSPORT",
+                "PACKET_RECEIVED",
+                "DEFAULT",
+                {
+                  "packet_type": "1RTT",
+                  "header":{
+                    "packet_number":1,
+                    "packet_size":10
+                },
+                  "frames":[
+                    {"frame_type":"STREAM",
+                    "id":10,
+                    "fin":true,
+                    "length":0,
+                    "offset":0
+                    }
+                  ]
+                }
+              ]
+            ]
+          }
+        ]
+      })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(headerIn);
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+
+  FileQLogger q;
+  q.add(regularQuicPacket, 10);
+
+  folly::dynamic gotDynamic = q.toDynamic();
+
+  EXPECT_EQ(expected, gotDynamic);
+}
+
+TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"({
+        "traces": [
+          {"event_fields":[
+              "CATEGORY",
+              "EVENT_TYPE",
+              "TRIGGER",
+              "DATA"
+            ],
+            "events":[
+               [
+                "TRANSPORT",
                 "PACKET_SENT",
                 "DEFAULT",
                 {
                   "packet_type": "INITIAL",
                   "header":{
                     "packet_number":10,
-                    "packet_size":10},
+                    "packet_size":10
+                },
                   "frames":[
                     {"frame_type":"STREAM",
                     "id":10,
