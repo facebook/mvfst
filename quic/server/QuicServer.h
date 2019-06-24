@@ -28,6 +28,11 @@ namespace quic {
 class QuicServer : public QuicServerWorker::WorkerCallback,
                    public std::enable_shared_from_this<QuicServer> {
  public:
+  using TransportSettingsOverrideFn =
+      std::function<folly::Optional<quic::TransportSettings>(
+          const quic::TransportSettings&,
+          const folly::IPAddress&)>;
+
   static std::shared_ptr<QuicServer> createQuicServer() {
     return std::shared_ptr<QuicServer>(new QuicServer());
   }
@@ -53,6 +58,13 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * Pause reading from the listening socket the server workers are bound to
    */
   void pauseRead();
+
+  /*
+   * Take in a function to supply overrides for transport parameters, given
+   * the client address as input. This can be useful if we are running
+   * experiments.
+   */
+  void setTransportSettingsOverrideFn(TransportSettingsOverrideFn fn);
 
   /*
    * Transport factory to create server-transport.
@@ -332,6 +344,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::unique_ptr<ConnectionIdAlgoFactory> connIdAlgoFactory_;
   // Impl of ConnectionIdAlgo to make routing decisions from ConnectionId
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
+  // Used to override certain transport parameters, given the client address
+  TransportSettingsOverrideFn transportSettingsOverrideFn_;
 };
 
 } // namespace quic

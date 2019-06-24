@@ -37,6 +37,11 @@ void QuicServerWorker::bind(const folly::SocketAddress& address) {
   socket_->dontFragment(true);
 }
 
+void QuicServerWorker::setTransportSettingsOverrideFn(
+    TransportSettingsOverrideFn fn) {
+  transportSettingsOverrideFn_ = std::move(fn);
+}
+
 void QuicServerWorker::setTransportInfoCallback(
     std::unique_ptr<QuicTransportStatsCallback> infoCallback) noexcept {
   CHECK(infoCallback);
@@ -364,7 +369,18 @@ void QuicServerWorker::dispatchPacketData(
         trans->setSupportedVersions(supportedVersions_);
         trans->setOriginalPeerAddress(client);
         trans->setCongestionControllerFactory(ccFactory_);
-        trans->setTransportSettings(transportSettings_);
+        if (transportSettingsOverrideFn_) {
+          folly::Optional<TransportSettings> overridenTransportSettings =
+              transportSettingsOverrideFn_(
+                  transportSettings_, client.getIPAddress());
+          if (overridenTransportSettings) {
+            trans->setTransportSettings(*overridenTransportSettings);
+          } else {
+            trans->setTransportSettings(transportSettings_);
+          }
+        } else {
+          trans->setTransportSettings(transportSettings_);
+        }
         trans->setConnectionIdAlgo(connIdAlgo_.get());
         // parameters to create server chosen connection id
         ServerConnectionIdParams serverConnIdParams(

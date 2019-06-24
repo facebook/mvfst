@@ -24,6 +24,11 @@ namespace quic {
 class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
                          public QuicServerTransport::RoutingCallback {
  public:
+  using TransportSettingsOverrideFn =
+      std::function<folly::Optional<quic::TransportSettings>(
+          const quic::TransportSettings&,
+          const folly::IPAddress&)>;
+
   class WorkerCallback {
    public:
     virtual ~WorkerCallback() = default;
@@ -43,6 +48,13 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   folly::EventBase* getEventBase() const;
 
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
+
+  /*
+   * Take in a function to supply overrides for transport parameters, given
+   * the client address as input. This can be useful if we are running
+   * experiments.
+   */
+  void setTransportSettingsOverrideFn(TransportSettingsOverrideFn fn);
 
   /**
    * Sets the listening socket
@@ -336,6 +348,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   bool packetForwardingEnabled_{false};
   using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
   TimerHighRes::SharedPtr pacingTimer_;
+
+  // Used to override certain transport parameters, given the client address
+  TransportSettingsOverrideFn transportSettingsOverrideFn_;
 };
 
 } // namespace quic

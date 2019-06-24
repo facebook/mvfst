@@ -163,6 +163,7 @@ void QuicServer::initializeWorkers(
     worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
     worker->setCongestionControllerFactory(ccFactory_);
     worker->setWorkerId(workers_.size());
+    worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
     workers_.push_back(std::move(worker));
     evbToWorkers_.emplace(workerEvb, workers_.back().get());
   }
@@ -403,6 +404,13 @@ void QuicServer::runOnAllWorkers(std::function<void(QuicServerWorker*)> func) {
 void QuicServer::setHostId(uint16_t hostId) noexcept {
   CHECK(!initialized_) << "Host id must be set before initializing Quic server";
   hostId_ = hostId;
+}
+
+void QuicServer::setTransportSettingsOverrideFn(
+    TransportSettingsOverrideFn fn) {
+  CHECK(!initialized_) << "Transport settings override function must be"
+                       << "set before initializing Quic server";
+  transportSettingsOverrideFn_ = std::move(fn);
 }
 
 void QuicServer::setHealthCheckToken(const std::string& healthCheckToken) {
