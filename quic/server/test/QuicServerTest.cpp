@@ -1412,6 +1412,11 @@ TEST_F(QuicServerTakeoverTest, TakeoverTest) {
 }
 
 struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
+  UDPReader() {
+    bufPromise_ =
+        std::make_unique<folly::Promise<std::unique_ptr<folly::IOBuf>>>();
+  }
+
   ~UDPReader() override = default;
 
   void start(EventBase* evb, SocketAddress addr) {
@@ -1439,6 +1444,7 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
       const folly::SocketAddress&,
       size_t len,
       bool truncated) noexcept override {
+    std::lock_guard<std::mutex> guard(bufLock_);
     if (truncated) {
       bufPromise_->setException(std::runtime_error("truncated buf"));
       return;
@@ -1450,6 +1456,7 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
   }
 
   void onReadError(const AsyncSocketException& ex) noexcept override {
+    std::lock_guard<std::mutex> guard(bufLock_);
     if (bufPromise_) {
       bufPromise_->setException(ex);
     }
@@ -1462,13 +1469,17 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
   }
 
   folly::Future<std::unique_ptr<folly::IOBuf>> readOne() {
-    bufPromise_ =
-        std::make_unique<folly::Promise<std::unique_ptr<folly::IOBuf>>>();
+    std::lock_guard<std::mutex> guard(bufLock_);
+    if (!bufPromise_) {
+      bufPromise_ =
+          std::make_unique<folly::Promise<std::unique_ptr<folly::IOBuf>>>();
+    }
     return bufPromise_->getFuture().ensure([&]() { bufPromise_ = nullptr; });
   }
 
  private:
   std::unique_ptr<folly::IOBuf> buf_;
+  std::mutex bufLock_;
   std::unique_ptr<folly::Promise<std::unique_ptr<folly::IOBuf>>> bufPromise_;
   std::unique_ptr<folly::AsyncUDPSocket> client;
   EventBase* evb_;
