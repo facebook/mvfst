@@ -179,8 +179,8 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
 
   for (const auto& b : ackBlocks) {
-    folly::dynamic subArray = folly::dynamic::array(b.startPacket, b.endPacket);
-    ackRangeDynamic.push_back(subArray);
+    ackRangeDynamic.push_back(
+        folly::dynamic::array(b.startPacket, b.endPacket));
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toString(FrameType::ACK);
@@ -193,8 +193,7 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
   folly::dynamic ackRangeDynamic = folly::dynamic::array();
 
   for (auto it = ackBlocks.cbegin(); it != ackBlocks.cend(); ++it) {
-    folly::dynamic subArray = folly::dynamic::array(it->start, it->end);
-    ackRangeDynamic.push_back(subArray);
+    ackRangeDynamic.push_back(folly::dynamic::array(it->start, it->end));
   }
   d["acked_ranges"] = ackRangeDynamic;
   d["frame_type"] = toString(FrameType::ACK);
@@ -232,7 +231,7 @@ folly::dynamic QLogPacketEvent::toDynamic() const {
       "packet_number", packetNum);
   data["packet_type"] = packetType;
 
-  d.push_back(data);
+  d.push_back(std::move(data));
   return d;
 }
 
@@ -245,7 +244,7 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
   data["header"] = folly::dynamic::object("packet_size", packetSize);
   data["packet_type"] = packetType;
 
-  d.push_back(data);
+  d.push_back(std::move(data));
   return d;
 }
 
