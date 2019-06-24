@@ -58,7 +58,7 @@ class ConnectionCloseFrameLog : public QLogFrame {
       std::string reasonPhraseIn,
       FrameType closingFrameTypeIn)
       : errorCode{errorCodeIn},
-        reasonPhrase{reasonPhraseIn},
+        reasonPhrase{std::move(reasonPhraseIn)},
         closingFrameType{closingFrameTypeIn} {}
 
   ~ConnectionCloseFrameLog() override = default;
@@ -73,7 +73,7 @@ class ApplicationCloseFrameLog : public QLogFrame {
   ApplicationCloseFrameLog(
       ApplicationErrorCode errorCodeIn,
       std::string reasonPhraseIn)
-      : errorCode{errorCodeIn}, reasonPhrase{reasonPhraseIn} {}
+      : errorCode{errorCodeIn}, reasonPhrase{std::move(reasonPhraseIn)} {}
 
   ~ApplicationCloseFrameLog() override = default;
   folly::dynamic toDynamic() const override;
