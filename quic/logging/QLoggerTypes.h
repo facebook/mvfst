@@ -158,7 +158,7 @@ class ReadAckFrameLog : public QLogFrame {
   std::chrono::microseconds ackDelay;
 
   ReadAckFrameLog(
-      std::vector<AckBlock> ackBlocksIn,
+      const std::vector<AckBlock>& ackBlocksIn,
       std::chrono::microseconds ackDelayIn)
       : ackBlocks{ackBlocksIn}, ackDelay{ackDelayIn} {}
   ~ReadAckFrameLog() override = default;
@@ -286,7 +286,7 @@ class VersionNegotiationLog {
  public:
   std::vector<QuicVersion> versions;
 
-  explicit VersionNegotiationLog(std::vector<QuicVersion> versionsIn)
+  explicit VersionNegotiationLog(const std::vector<QuicVersion>& versionsIn)
       : versions{versionsIn} {}
   ~VersionNegotiationLog() = default;
   folly::dynamic toDynamic() const;
