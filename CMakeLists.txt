@@ -25,6 +25,8 @@ find_package(Boost 1.62
   filesystem
   regex
   context
+  date_time
+  program_options
 )
 find_package(folly REQUIRED)
 find_package(Fizz REQUIRED)
