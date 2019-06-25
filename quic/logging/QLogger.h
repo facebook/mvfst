@@ -38,7 +38,7 @@ std::unique_ptr<QLogPacketEvent> createPacketEvent(
 
 std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
     const VersionNegotiationPacket& versionPacket,
-    size_t packetSize,
+    uint64_t packetSize,
     bool isPacketRecvd);
 
 } // namespace quic
