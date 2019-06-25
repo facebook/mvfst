@@ -66,9 +66,14 @@ function(quic_add_test)
   )
    # make sure googletest and fizz are built first
   add_dependencies(${QUIC_TEST_TARGET} googletest)
+
+  # Per https://github.com/facebookincubator/mvfst/pull/9, disable some warnings
+  # in the tests that come from -Wextra in _QUIC_BASE_COMPILE_OPTIONS.
   target_compile_options(
     ${QUIC_TEST_TARGET} PRIVATE
     ${_QUIC_BASE_COMPILE_OPTIONS}
+    -Wno-sign-compare
+    -Wno-inconsistent-missing-override
   )
   target_link_libraries(${QUIC_TEST_TARGET} PRIVATE
     "${QUIC_TEST_DEPENDS}"

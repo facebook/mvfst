@@ -73,7 +73,7 @@ class QuicStreamManager {
    * Return the stream state or create it if the state has not yet been created.
    * Note that this is only valid for streams that are currently open.
    */
-  QuicStreamState* getStream(StreamId streamId);
+  QuicStreamState* FOLLY_NONNULL getStream(StreamId streamId);
 
   /*
    * Remove all the state for a stream that is being closed.
@@ -109,7 +109,7 @@ class QuicStreamManager {
    * Find a open and active (we have created state for it) stream and return its
    * state.
    */
-  QuicStreamState* findStream(StreamId streamId);
+  QuicStreamState* FOLLY_NULLABLE findStream(StreamId streamId);
 
   /*
    * Check whether the stream exists. This returns false for the crypto stream,
