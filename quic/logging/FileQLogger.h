@@ -28,6 +28,7 @@ class FileQLogger : public QLogger {
       bool isPacketRecvd) override;
   void add(const RegularQuicWritePacket& writePacket, uint64_t packetSize)
       override;
+  void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };
 } // namespace quic

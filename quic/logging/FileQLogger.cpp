@@ -7,6 +7,8 @@
  */
 #include <quic/logging/FileQLogger.h>
 
+#include <fstream>
+
 #include <folly/json.h>
 #include <quic/logging/QLogger.h>
 
@@ -47,6 +49,25 @@ folly::dynamic FileQLogger::toDynamic() const {
 
   d["traces"].push_back(dTrace);
   return d;
+}
+
+void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
+  if (!dcid.hasValue()) {
+    LOG(ERROR) << "Error: No dcid found";
+    return;
+  }
+  std::string outputPath =
+      folly::to<std::string>(path, "/", (dcid.value()).hex(), ".qlog");
+  std::ofstream fileObj(outputPath);
+  if (fileObj) {
+    LOG(INFO) << "Logging QLogger JSON to file: " << outputPath;
+    auto qLog = prettyJson ? folly::toPrettyJson(toDynamic())
+                           : folly::toJson(toDynamic());
+    fileObj << qLog;
+  } else {
+    LOG(ERROR) << "Error: Can't write to provided path: " << path;
+  }
+  fileObj.close();
 }
 
 } // namespace quic
