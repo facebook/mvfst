@@ -73,6 +73,10 @@ folly::EventBase* QuicTransportBase::getEventBase() const {
   return evb_.load();
 }
 
+const std::shared_ptr<QLogger> QuicTransportBase::getQLogger() const {
+  return conn_->qLogger;
+}
+
 folly::Optional<ConnectionId> QuicTransportBase::getClientConnectionId() const {
   return conn_->clientConnectionId;
 }

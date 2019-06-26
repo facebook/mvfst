@@ -55,6 +55,8 @@ class QuicTransportBase : public QuicSocket {
 
   const folly::SocketAddress& getLocalAddress() const override;
 
+  const std::shared_ptr<QLogger> getQLogger() const;
+
   // QuicSocket interface
   bool good() const override;
 
