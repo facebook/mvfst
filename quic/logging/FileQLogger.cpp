@@ -26,7 +26,7 @@ void FileQLogger::add(
 
 void FileQLogger::add(
     const VersionNegotiationPacket& versionPacket,
-    size_t packetSize,
+    uint64_t packetSize,
     bool isPacketRecvd) {
   logs.push_back(createPacketEvent(versionPacket, packetSize, isPacketRecvd));
 }

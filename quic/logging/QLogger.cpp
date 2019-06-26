@@ -6,6 +6,8 @@
  *
  */
 
+#include <quic/logging/QLogger.h>
+
 #include <folly/dynamic.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
