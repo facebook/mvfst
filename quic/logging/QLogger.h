@@ -14,6 +14,8 @@ namespace quic {
 
 class QLogger {
  public:
+  folly::Optional<ConnectionId> dcid;
+  folly::Optional<ConnectionId> scid;
   QLogger() = default;
   virtual ~QLogger() = default;
   virtual void add(

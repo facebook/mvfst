@@ -19,6 +19,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/logging/FileQLogger.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -3067,6 +3068,7 @@ INSTANTIATE_TEST_CASE_P(
 TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessPendingZeroRttData) {
+  server->getNonConstConn().qLogger = std::make_shared<quic::FileQLogger>();
   recvClientHello(false);
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;
@@ -3095,13 +3097,16 @@ TEST_P(
     EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
     EXPECT_EQ(server->getConn().pendingZeroRttData->size(), 1);
   }
+  EXPECT_EQ(
+      server->getConn().qLogger->scid, server->getConn().serverConnectionId);
+  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessPendingOneRttData) {
+  server->getNonConstConn().qLogger = std::make_shared<quic::FileQLogger>();
   recvClientHello();
-
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;
   // Write packet with zero rtt keys
@@ -3123,11 +3128,15 @@ TEST_P(
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 1);
   EXPECT_EQ(server->getConn().pendingZeroRttData, nullptr);
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
+  EXPECT_EQ(
+      server->getConn().qLogger->scid, server->getConn().serverConnectionId);
+  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessingZeroAndOneRttData) {
+  server->getNonConstConn().qLogger = std::make_shared<quic::FileQLogger>();
   recvClientHello(false);
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;
@@ -3180,6 +3189,9 @@ TEST_P(
       GetParam().acceptZeroRtt ? 2 : 1);
   EXPECT_EQ(server->getConn().pendingZeroRttData, nullptr);
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
+  EXPECT_EQ(
+      server->getConn().qLogger->scid, server->getConn().serverConnectionId);
+  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 /**

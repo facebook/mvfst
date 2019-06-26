@@ -464,6 +464,10 @@ void onServerReadDataFromOpen(
     conn.readCodec->setInitialReadCipher(
         getClientInitialCipher(&fizzFactory, initialDestinationConnectionId));
     conn.readCodec->setClientConnectionId(clientConnectionId);
+    if (conn.qLogger) {
+      conn.qLogger->scid = conn.serverConnectionId;
+      conn.qLogger->dcid = clientConnectionId;
+    }
     conn.readCodec->setCodecParameters(
         CodecParameters(conn.peerAckDelayExponent));
     conn.initialWriteCipher =
@@ -623,6 +627,10 @@ void onServerReadDataFromOpen(
       // longer needed.
       conn.serverConnIdParams->clientConnId = *conn.clientConnectionId;
       conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
+      if (conn.qLogger) {
+        conn.qLogger->dcid = conn.clientConnectionId;
+        conn.qLogger->scid = conn.serverConnectionId;
+      }
     }
     if (conn.qLogger) {
       conn.qLogger->add(regularPacket, packetSize);
