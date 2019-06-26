@@ -47,7 +47,7 @@ class FakeServerHandshake : public ServerHandshake {
 
   MOCK_METHOD1(writeNewSessionTicket, void(const AppToken&));
 
-  void doHandshake(std::unique_ptr<IOBuf> data, fizz::EncryptionLevel)
+  void doHandshake(std::unique_ptr<IOBuf> data, EncryptionLevel)
       override {
     IOBufEqualTo eq;
     auto chlo = folly::IOBuf::copyBuffer("CHLO");
@@ -58,7 +58,7 @@ class FakeServerHandshake : public ServerHandshake {
         // Fall through and let the ServerStateMachine to process the event
         writeDataToQuicStream(
             *getCryptoStream(
-                *conn_.cryptoState, fizz::EncryptionLevel::Plaintext),
+                *conn_.cryptoState, EncryptionLevel::Initial),
             IOBuf::copyBuffer("SHLO"));
         if (allowZeroRttKeys_) {
           validateAndUpdateSourceToken(conn_, sourceAddrs_);
@@ -71,7 +71,7 @@ class FakeServerHandshake : public ServerHandshake {
         executor_->add([&] {
           writeDataToQuicStream(
               *getCryptoStream(
-                  *conn_.cryptoState, fizz::EncryptionLevel::Plaintext),
+                  *conn_.cryptoState, EncryptionLevel::Initial),
               IOBuf::copyBuffer("SHLO"));
           if (allowZeroRttKeys_) {
             validateAndUpdateSourceToken(conn_, sourceAddrs_);
@@ -382,7 +382,7 @@ class QuicServerTransportTest : public Test {
     auto headerCipher = test::createNoOpHeaderCipher();
     uint64_t offset =
         getCryptoStream(
-            *server->getConn().cryptoState, fizz::EncryptionLevel::Handshake)
+            *server->getConn().cryptoState, EncryptionLevel::Handshake)
             ->currentReadOffset;
     auto handshakeCipher = test::createNoOpAead();
     auto finishedPacket = packetToBufCleartext(
@@ -470,7 +470,7 @@ class QuicServerTransportTest : public Test {
 
     EXPECT_TRUE(
         getCryptoStream(
-            *server->getConn().cryptoState, fizz::EncryptionLevel::Plaintext)
+            *server->getConn().cryptoState, EncryptionLevel::Initial)
             ->readBuffer.empty());
     EXPECT_NE(server->getConn().initialWriteCipher, nullptr);
     EXPECT_FALSE(server->getConn().localConnectionError.hasValue());

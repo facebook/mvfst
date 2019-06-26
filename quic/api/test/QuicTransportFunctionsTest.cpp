@@ -35,7 +35,7 @@ uint64_t writeProbingDataToSocketForTest(
     QuicVersion version) {
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
                                            conn,
-                                           fizz::EncryptionLevel::AppTraffic,
+                                           EncryptionLevel::AppData,
                                            PacketNumberSpace::AppData,
                                            "test")
                                            .streamFrames()

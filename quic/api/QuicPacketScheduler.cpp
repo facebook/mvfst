@@ -55,7 +55,7 @@ folly::Optional<PacketNum> largestAckToSend(const AckState& ackState) {
 
 FrameScheduler::Builder::Builder(
     const QuicConnectionStateBase& conn,
-    fizz::EncryptionLevel encryptionLevel,
+    EncryptionLevel encryptionLevel,
     PacketNumberSpace packetNumberSpace,
     const std::string& name)
     : conn_(conn),

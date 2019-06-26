@@ -316,7 +316,7 @@ class FrameScheduler : public QuicPacketScheduler {
   struct Builder {
     Builder(
         const QuicConnectionStateBase& conn,
-        fizz::EncryptionLevel encryptionLevel,
+        EncryptionLevel encryptionLevel,
         PacketNumberSpace packetNumberSpace,
         const std::string& name);
 
@@ -333,7 +333,7 @@ class FrameScheduler : public QuicPacketScheduler {
 
    private:
     const QuicConnectionStateBase& conn_;
-    fizz::EncryptionLevel encryptionLevel_;
+    EncryptionLevel encryptionLevel_;
     PacketNumberSpace packetNumberSpace_;
     std::string name_;
 

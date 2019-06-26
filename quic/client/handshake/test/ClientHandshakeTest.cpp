@@ -26,6 +26,7 @@
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
 
@@ -119,8 +120,9 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     evb.loop();
     for (auto& write : serverOutput) {
       for (auto& content : write.contents) {
+        auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
         handshake->doHandshake(
-            std::move(content.data), content.encryptionLevel);
+            std::move(content.data), encryptionLevel);
       }
     }
     processHandshake();

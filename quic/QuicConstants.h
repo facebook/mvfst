@@ -395,4 +395,15 @@ inline std::ostream& operator<<(std::ostream& os, const QuicVersion& v) {
  */
 std::vector<QuicVersion> filterSupportedVersions(
     const std::vector<QuicVersion>&);
+
+/**
+ * Represent the different encryption levels used by QUIC.
+ */
+enum class EncryptionLevel: uint8_t {
+  Initial,
+  Handshake,
+  EarlyData,
+  AppData,
+};
+
 } // namespace quic

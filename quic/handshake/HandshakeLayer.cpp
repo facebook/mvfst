@@ -117,17 +117,17 @@ std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
   return pnCipher;
 }
 
-fizz::EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type) {
+EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type) {
   switch (type) {
     case ProtectionType::Initial:
-      return fizz::EncryptionLevel::Plaintext;
+      return EncryptionLevel::Initial;
     case ProtectionType::Handshake:
-      return fizz::EncryptionLevel::Handshake;
+      return EncryptionLevel::Handshake;
     case ProtectionType::ZeroRtt:
-      return fizz::EncryptionLevel::EarlyData;
+      return EncryptionLevel::EarlyData;
     case ProtectionType::KeyPhaseZero:
     case ProtectionType::KeyPhaseOne:
-      return fizz::EncryptionLevel::AppTraffic;
+      return EncryptionLevel::AppData;
   }
   folly::assume_unreachable();
 }

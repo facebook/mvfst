@@ -59,7 +59,7 @@ class ClientHandshake : public Handshake {
    */
   virtual void doHandshake(
       std::unique_ptr<folly::IOBuf> data,
-      fizz::EncryptionLevel encryptionLevel);
+      EncryptionLevel encryptionLevel);
 
   /**
    * An edge triggered API to get the oneRttWriteCipher. Once you receive the

@@ -26,6 +26,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerHandshake.h>
@@ -163,8 +164,9 @@ class ServerHandshakeTest : public Test {
     try {
       for (auto& clientWrite : clientWrites) {
         for (auto& content : clientWrite.contents) {
+          auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
           handshake->doHandshake(
-              std::move(content.data), content.encryptionLevel);
+              std::move(content.data), encryptionLevel);
         }
       }
       setHandshakeState();

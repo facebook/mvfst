@@ -94,7 +94,7 @@ class ServerHandshake : public Handshake {
    */
   virtual void doHandshake(
       std::unique_ptr<folly::IOBuf> data,
-      fizz::EncryptionLevel encryptionLevel);
+      EncryptionLevel encryptionLevel);
 
   /**
    * Writes a session ticket on the connection.

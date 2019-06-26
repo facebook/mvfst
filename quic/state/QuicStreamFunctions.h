@@ -129,7 +129,7 @@ void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoStream);
  */
 QuicCryptoStream* getCryptoStream(
     QuicCryptoState& cryptoState,
-    fizz::EncryptionLevel encryptionLevel);
+    EncryptionLevel encryptionLevel);
 
 void processCryptoStreamAck(
     QuicCryptoStream& cryptoStream,

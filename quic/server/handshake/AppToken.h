@@ -11,7 +11,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/handshake/TransportParameters.h>
 
-#include <fizz/record/Types.h>
 #include <fizz/server/State.h>
 #include <folly/IPAddress.h>
 #include <folly/Optional.h>
