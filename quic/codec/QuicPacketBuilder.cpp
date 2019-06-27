@@ -88,6 +88,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     appender.push(originalDstConnId->data(), originalDstConnId->size());
 
     // Write the retry token
+    assert(token && "token is nullptr");
     appender.insert(*token);
   }
   // defer write of the packet num and length till payload has been computed
