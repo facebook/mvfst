@@ -698,11 +698,10 @@ void QuicClientTransport::writeData() {
            ? conn_->congestionController->getPacingRate(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
   CryptoStreamScheduler initialScheduler(
-      *conn_,
-      *getCryptoStream(*conn_->cryptoState, fizz::EncryptionLevel::Plaintext));
+      *conn_, *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
   CryptoStreamScheduler handshakeScheduler(
       *conn_,
-      *getCryptoStream(*conn_->cryptoState, fizz::EncryptionLevel::Handshake));
+      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
   if (initialScheduler.hasData() ||
       (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
        hasAcksToSchedule(conn_->ackStates.initialAckState))) {

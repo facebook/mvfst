@@ -42,7 +42,7 @@ void ClientHandshake::connect(
 
 void ClientHandshake::doHandshake(
     std::unique_ptr<folly::IOBuf> data,
-    fizz::EncryptionLevel encryptionLevel) {
+    EncryptionLevel encryptionLevel) {
   if (!data) {
     return;
   }
@@ -59,14 +59,14 @@ void ClientHandshake::doHandshake(
 
   // First add it to the right read buffer.
   switch (encryptionLevel) {
-    case fizz::EncryptionLevel::Plaintext:
+    case EncryptionLevel::Initial:
       initialReadBuf_.append(std::move(data));
       break;
-    case fizz::EncryptionLevel::Handshake:
+    case EncryptionLevel::Handshake:
       handshakeReadBuf_.append(std::move(data));
       break;
-    case fizz::EncryptionLevel::EarlyData:
-    case fizz::EncryptionLevel::AppTraffic:
+    case EncryptionLevel::EarlyData:
+    case EncryptionLevel::AppData:
       appDataReadBuf_.append(std::move(data));
       break;
   }
@@ -256,11 +256,12 @@ void ClientHandshake::ActionMoveVisitor::operator()(
     fizz::WriteToSocket& write) {
   for (auto& content : write.contents) {
     auto& cryptoState = client_.cryptoState_;
-    if (content.encryptionLevel == fizz::EncryptionLevel::AppTraffic) {
+    auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
+    if (encryptionLevel == EncryptionLevel::AppData) {
       // Don't write 1-rtt handshake data on the client.
       continue;
     }
-    auto cryptoStream = getCryptoStream(cryptoState, content.encryptionLevel);
+    auto cryptoStream = getCryptoStream(cryptoState, encryptionLevel);
     writeDataToQuicStream(*cryptoStream, std::move(content.data));
   }
 }

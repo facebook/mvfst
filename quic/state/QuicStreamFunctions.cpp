@@ -396,17 +396,17 @@ void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoState) {
 
 QuicCryptoStream* getCryptoStream(
     QuicCryptoState& cryptoState,
-    fizz::EncryptionLevel encryptionLevel) {
+    EncryptionLevel encryptionLevel) {
   switch (encryptionLevel) {
-    case fizz::EncryptionLevel::Plaintext:
+    case EncryptionLevel::Initial:
       return &cryptoState.initialStream;
-    case fizz::EncryptionLevel::Handshake:
+    case EncryptionLevel::Handshake:
       return &cryptoState.handshakeStream;
-    case fizz::EncryptionLevel::EarlyData:
+    case EncryptionLevel::EarlyData:
       // TODO: remove this when we implement EOED for
       // draft-17.
       return &cryptoState.handshakeStream;
-    case fizz::EncryptionLevel::AppTraffic:
+    case EncryptionLevel::AppData:
       return &cryptoState.oneRttStream;
   }
   folly::assume_unreachable();

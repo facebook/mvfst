@@ -9,6 +9,8 @@
 #pragma once
 
 #include <fizz/crypto/aead/Aead.h>
+#include <fizz/protocol/Types.h>
+#include <quic/QuicConstants.h>
 #include <quic/handshake/Aead.h>
 
 #include <memory>
@@ -62,5 +64,8 @@ class FizzAead final : public Aead {
   FizzAead(std::unique_ptr<fizz::Aead> fizzAeadIn)
       : fizzAead(std::move(fizzAeadIn)) {}
 };
+
+EncryptionLevel getEncryptionLevelFromFizz(
+    const fizz::EncryptionLevel encryptionLevel);
 
 } // namespace quic

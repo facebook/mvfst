@@ -127,8 +127,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
       std::move(longHeader1),
       conn.ackStates.initialAckState.largestAckedByPeer);
   CryptoStreamScheduler scheduler(
-      conn,
-      *getCryptoStream(*conn.cryptoState, fizz::EncryptionLevel::Plaintext));
+      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("chlo"));
   scheduler.writeCryptoData(builder1);
@@ -165,8 +164,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialNotPadded) {
       std::move(longHeader1),
       conn.ackStates.initialAckState.largestAckedByPeer);
   CryptoStreamScheduler scheduler(
-      conn,
-      *getCryptoStream(*conn.cryptoState, fizz::EncryptionLevel::Plaintext));
+      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
   scheduler.writeCryptoData(builder1);
@@ -187,8 +185,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
       std::move(longHeader),
       conn.ackStates.initialAckState.largestAckedByPeer);
   CryptoStreamScheduler scheduler(
-      conn,
-      *getCryptoStream(*conn.cryptoState, fizz::EncryptionLevel::Plaintext));
+      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
   conn.cryptoState->initialStream.lossBuffer.push_back(
       StreamBuffer{folly::IOBuf::copyBuffer("chlo"), 0, false});
   scheduler.writeCryptoData(builder);
@@ -210,8 +207,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
       conn.ackStates.handshakeAckState.largestAckedByPeer);
   PacketBuilderWrapper builderWrapper(builder, 13);
   CryptoStreamScheduler scheduler(
-      conn,
-      *getCryptoStream(*conn.cryptoState, fizz::EncryptionLevel::Handshake));
+      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake));
   conn.cryptoState->handshakeStream.lossBuffer.push_back(
       StreamBuffer{folly::IOBuf::copyBuffer("shlo"), 0, false});
   conn.cryptoState->handshakeStream.lossBuffer.push_back(StreamBuffer{
@@ -236,8 +232,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
       std::move(longHeader),
       conn.ackStates.initialAckState.largestAckedByPeer);
   CryptoStreamScheduler scheduler(
-      conn,
-      *getCryptoStream(*conn.cryptoState, fizz::EncryptionLevel::Plaintext));
+      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
   conn.cryptoState->initialStream.lossBuffer.push_back(StreamBuffer{
       folly::IOBuf::copyBuffer("return the special duration value max"),
       0,

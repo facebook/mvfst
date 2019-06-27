@@ -10,8 +10,6 @@
 
 #include <fizz/protocol/Exporter.h>
 #include <fizz/protocol/Factory.h>
-#include <fizz/protocol/Types.h>
-#include <fizz/record/Types.h>
 #include <folly/Expected.h>
 
 #include <quic/QuicConstants.h>
@@ -91,7 +89,7 @@ std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
     fizz::CipherSuite cipher);
 
 /**
- * Converts the protection type of QUIC to the encryption type of fizz.
+ * Converts the protection type of QUIC to an encryption level.
  */
-fizz::EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type);
+EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type);
 } // namespace quic

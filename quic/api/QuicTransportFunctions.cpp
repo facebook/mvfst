@@ -491,7 +491,7 @@ uint64_t writeQuicDataToSocket(
   if (connection.pendingEvents.numProbePackets) {
     auto probeScheduler = std::move(FrameScheduler::Builder(
                                         connection,
-                                        fizz::EncryptionLevel::AppTraffic,
+                                        EncryptionLevel::AppData,
                                         PacketNumberSpace::AppData,
                                         "ProbeScheduler")
                                         .streamFrames()
@@ -515,7 +515,7 @@ uint64_t writeQuicDataToSocket(
   }
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
                                            connection,
-                                           fizz::EncryptionLevel::AppTraffic,
+                                           EncryptionLevel::AppData,
                                            PacketNumberSpace::AppData,
                                            "FrameScheduler")
                                            .streamFrames()
@@ -607,7 +607,7 @@ uint64_t writeQuicDataExceptCryptoStreamToSocket(
   if (connection.pendingEvents.numProbePackets) {
     auto probeScheduler = std::move(FrameScheduler::Builder(
                                         connection,
-                                        fizz::EncryptionLevel::AppTraffic,
+                                        EncryptionLevel::AppData,
                                         PacketNumberSpace::AppData,
                                         "ProbeWithoutCrypto")
                                         .streamFrames()
@@ -630,7 +630,7 @@ uint64_t writeQuicDataExceptCryptoStreamToSocket(
   }
   FrameScheduler scheduler = std::move(FrameScheduler::Builder(
                                            connection,
-                                           fizz::EncryptionLevel::AppTraffic,
+                                           EncryptionLevel::AppData,
                                            PacketNumberSpace::AppData,
                                            "FrameSchedulerWithoutCrypto")
                                            .streamFrames()

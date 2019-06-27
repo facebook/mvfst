@@ -51,21 +51,21 @@ void ServerHandshake::initialize(
 
 void ServerHandshake::doHandshake(
     std::unique_ptr<folly::IOBuf> data,
-    fizz::EncryptionLevel encryptionLevel) {
+    EncryptionLevel encryptionLevel) {
   SCOPE_EXIT {
     inHandshakeStack_ = false;
   };
   inHandshakeStack_ = true;
   waitForData_ = false;
   switch (encryptionLevel) {
-    case fizz::EncryptionLevel::Plaintext:
+    case EncryptionLevel::Initial:
       initialReadBuf_.append(std::move(data));
       break;
-    case fizz::EncryptionLevel::Handshake:
+    case EncryptionLevel::Handshake:
       handshakeReadBuf_.append(std::move(data));
       break;
-    case fizz::EncryptionLevel::EarlyData:
-    case fizz::EncryptionLevel::AppTraffic:
+    case EncryptionLevel::EarlyData:
+    case EncryptionLevel::AppData:
       appDataReadBuf_.append(std::move(data));
       break;
   }
@@ -213,12 +213,13 @@ void ServerHandshake::onWriteData(fizz::WriteToSocket& write) {
     return;
   }
   for (auto& content : write.contents) {
-    CHECK(content.encryptionLevel != fizz::EncryptionLevel::EarlyData)
+    auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
+    CHECK(encryptionLevel != EncryptionLevel::EarlyData)
         << "Server cannot write early data";
     if (content.contentType != fizz::ContentType::handshake) {
       continue;
     }
-    auto cryptoStream = getCryptoStream(cryptoState_, content.encryptionLevel);
+    auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
     writeDataToQuicStream(*cryptoStream, std::move(content.data));
   }
   handshakeEventAvailable_ = true;

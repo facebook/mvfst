@@ -1010,8 +1010,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     createServerTransportParameters();
   }
 
-  void doHandshake(std::unique_ptr<folly::IOBuf>, fizz::EncryptionLevel)
-      override {
+  void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
     if (getPhase() == Phase::Initial) {
       writeDataToQuicStream(
