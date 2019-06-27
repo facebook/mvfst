@@ -63,3 +63,4 @@ install(
 )
 
 add_subdirectory(test)
+add_subdirectory(handshake/test)
