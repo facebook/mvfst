@@ -1283,10 +1283,10 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
                          [&](auto&) { return false; });
                    }) != p.packet.frames.end();
       });
-  EXPECT_EQ(numPathResponsePackets, 3);
+  EXPECT_EQ(numPathResponsePackets, 1);
 }
 
-TEST_F(QuicTransportTest, ResendPathResponseOnLoss) {
+TEST_F(QuicTransportTest, DoNotResendPathResponseOnLoss) {
   auto& conn = transport_->getConnectionState();
 
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
@@ -1302,11 +1302,7 @@ TEST_F(QuicTransportTest, ResendPathResponseOnLoss) {
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
 
   markPacketLoss(conn, packet, false, 2);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  EXPECT_TRUE(folly::variant_match(
-      conn.pendingEvents.frames.front(),
-      [&](PathResponseFrame& f) { return f == pathResponse; },
-      [&](auto&) { return false; }));
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 }
 
 TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {

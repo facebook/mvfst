@@ -56,8 +56,9 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
         }
         return QuicSimpleFrame(frame);
       },
-      [&](const PathResponseFrame& frame) -> folly::Optional<QuicSimpleFrame> {
-        return QuicSimpleFrame(frame);
+      [&](const PathResponseFrame&) -> folly::Optional<QuicSimpleFrame> {
+        // Do not clone PATH_RESPONSE to avoid buffering
+        return folly::none;
       },
       [&](const NewConnectionIdFrame& frame)
           -> folly::Optional<QuicSimpleFrame> {
@@ -118,8 +119,8 @@ void updateSimpleFrameOnPacketLoss(
           conn.pendingEvents.pathChallenge = frame;
         }
       },
-      [&](const PathResponseFrame& frame) {
-        conn.pendingEvents.frames.push_back(frame);
+      [&](const PathResponseFrame&) {
+        // Do not retransmit PATH_RESPONSE to avoid buffering
       },
       [&](const NewConnectionIdFrame& frame) {
         conn.pendingEvents.frames.push_back(frame);
