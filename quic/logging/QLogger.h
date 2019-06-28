@@ -16,6 +16,8 @@ class QLogger {
  public:
   folly::Optional<ConnectionId> dcid;
   folly::Optional<ConnectionId> scid;
+  std::chrono::steady_clock::time_point refTimePoint{
+      std::chrono::steady_clock::now()};
   QLogger() = default;
   virtual ~QLogger() = default;
   virtual void add(
@@ -28,19 +30,17 @@ class QLogger {
   virtual void add(
       const RegularQuicWritePacket& writePacket,
       uint64_t packetSize) = 0;
+  std::unique_ptr<QLogPacketEvent> createPacketEvent(
+      const RegularQuicPacket& regularPacket,
+      uint64_t packetSize);
+
+  std::unique_ptr<QLogPacketEvent> createPacketEvent(
+      const RegularQuicWritePacket& writePacket,
+      uint64_t packetSize);
+
+  std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
+      const VersionNegotiationPacket& versionPacket,
+      uint64_t packetSize,
+      bool isPacketRecvd);
 };
-
-std::unique_ptr<QLogPacketEvent> createPacketEvent(
-    const RegularQuicPacket& regularPacket,
-    uint64_t packetSize);
-
-std::unique_ptr<QLogPacketEvent> createPacketEvent(
-    const RegularQuicWritePacket& writePacket,
-    uint64_t packetSize);
-
-std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
-    const VersionNegotiationPacket& versionPacket,
-    uint64_t packetSize,
-    bool isPacketRecvd);
-
 } // namespace quic

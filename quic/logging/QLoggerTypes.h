@@ -304,6 +304,7 @@ class QLogEvent {
   QLogEvent() = default;
   virtual ~QLogEvent() = default;
   virtual folly::dynamic toDynamic() const = 0;
+  std::chrono::microseconds refTime;
 };
 
 class QLogPacketEvent : public QLogEvent {

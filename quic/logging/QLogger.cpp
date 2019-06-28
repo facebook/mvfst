@@ -15,11 +15,12 @@
 
 namespace quic {
 
-std::unique_ptr<QLogPacketEvent> createPacketEvent(
+std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
     const RegularQuicPacket& regularPacket,
     uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
-
+  event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
   event->packetNum = folly::variant_match(
       regularPacket.header,
       [](const auto& h) { return h.getPacketSequenceNum(); });
@@ -136,11 +137,12 @@ std::unique_ptr<QLogPacketEvent> createPacketEvent(
   return event;
 }
 
-std::unique_ptr<QLogPacketEvent> createPacketEvent(
+std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
     const RegularQuicWritePacket& writePacket,
     uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
-
+  event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
   event->packetNum = folly::variant_match(
       writePacket.header,
       [](const auto& h) { return h.getPacketSequenceNum(); });
@@ -257,11 +259,13 @@ std::unique_ptr<QLogPacketEvent> createPacketEvent(
   return event;
 }
 
-std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
+std::unique_ptr<QLogVersionNegotiationEvent> QLogger::createPacketEvent(
     const VersionNegotiationPacket& versionPacket,
     uint64_t packetSize,
     bool isPacketRecvd) {
   auto event = std::make_unique<QLogVersionNegotiationEvent>();
+  event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
   event->packetSize = packetSize;
   event->eventType =
       isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
