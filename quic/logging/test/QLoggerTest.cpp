@@ -28,10 +28,12 @@ class QLoggerTest : public Test {
 };
 
 TEST_F(QLoggerTest, TestRegularWritePacket) {
+  std::string fakeProtocolType = "some-fake-protocol-type";
   RegularQuicWritePacket regularWritePacket =
       createRegularQuicWritePacket(streamId, offset, len, fin);
 
-  FileQLogger q;
+  FileQLogger q(fakeProtocolType);
+  EXPECT_EQ(q.protocolType, fakeProtocolType);
   q.add(regularWritePacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -81,38 +83,48 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
-        "traces": [
-          {"event_fields":[
-              "CATEGORY",
-              "EVENT_TYPE",
-              "TRIGGER",
-              "DATA"
-            ],
-            "events":[
-               [
-                "TRANSPORT",
-                "PACKET_RECEIVED",
-                "DEFAULT",
-                {
-                  "packet_type": "1RTT",
-                  "header":{
-                    "packet_number":1,
-                    "packet_size":10
-                },
-                  "frames":[
-                    {"frame_type":"STREAM",
-                    "id":10,
-                    "fin":true,
-                    "length":0,
-                    "offset":0
-                    }
-                  ]
-                }
-              ]
-            ]
-          }
-        ]
-      })");
+   "traces": [
+     {
+       "common_fields": {
+         "dcid": "",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
+       "event_fields": [
+         "relative_time",
+         "category",
+         "event_type",
+         "trigger",
+         "data"
+       ],
+       "events": [
+         [
+           "0",
+           "TRANSPORT",
+           "PACKET_RECEIVED",
+           "DEFAULT",
+           {
+             "frames": [
+               {
+                 "fin": true,
+                 "frame_type": "STREAM",
+                 "id": 10,
+                 "length": 0,
+                 "offset": 0
+               }
+             ],
+             "header": {
+               "packet_number": 1,
+               "packet_size": 10
+             },
+             "packet_type": "1RTT"
+           }
+         ]
+       ]
+     }
+   ]
+  })");
 
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
@@ -125,53 +137,65 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   q.add(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
-
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 
 TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
-        "traces": [
-          {"event_fields":[
-              "CATEGORY",
-              "EVENT_TYPE",
-              "TRIGGER",
-              "DATA"
-            ],
-            "events":[
-               [
-                "TRANSPORT",
-                "PACKET_SENT",
-                "DEFAULT",
-                {
-                  "packet_type": "INITIAL",
-                  "header":{
-                    "packet_number":10,
-                    "packet_size":10
-                },
-                  "frames":[
-                    {"frame_type":"STREAM",
-                    "id":10,
-                    "fin":true,
-                    "length":0,
-                    "offset":0
-                    }
-                  ]
-                }
-              ]
-            ]
-          }
-        ]
-      })");
+     "traces": [
+       {
+         "common_fields": {
+           "dcid": "4000000304050607",
+           "protocol_type": "QUIC_HTTP3",
+           "reference_time": "0",
+           "scid": "4000400304050607"
+         },
+         "event_fields": [
+           "relative_time",
+           "category",
+           "event_type",
+           "trigger",
+           "data"
+         ],
+         "events": [
+           [
+             "0",
+             "TRANSPORT",
+             "PACKET_SENT",
+             "DEFAULT",
+             {
+               "frames": [
+                 {
+                   "fin": true,
+                   "frame_type": "STREAM",
+                   "id": 10,
+                   "length": 0,
+                   "offset": 0
+                 }
+               ],
+               "header": {
+                 "packet_number": 10,
+                 "packet_size": 10
+               },
+               "packet_type": "INITIAL"
+             }
+           ]
+         ]
+       }
+     ]
+  })");
 
   RegularQuicWritePacket packet =
       createRegularQuicWritePacket(streamId, offset, len, fin);
 
   FileQLogger q;
+  q.dcid = getTestConnectionId(0);
+  q.scid = getTestConnectionId(1);
   q.add(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
-
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 
@@ -180,14 +204,22 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
       R"({
    "traces": [
      {
+       "common_fields": {
+         "dcid": "",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
        "event_fields": [
-         "CATEGORY",
-         "EVENT_TYPE",
-         "TRIGGER",
-         "DATA"
+         "relative_time",
+         "category",
+         "event_type",
+         "trigger",
+         "data"
        ],
        "events": [
          [
+           "0",
            "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
@@ -224,7 +256,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
   FileQLogger q;
   q.add(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
-
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 
@@ -233,15 +265,23 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
       R"({
            "traces": [
              {
-               "event_fields": [
-                 "CATEGORY",
-                 "EVENT_TYPE",
-                 "TRIGGER",
-                 "DATA"
-               ],
+              "common_fields": {
+                "reference_time": "0",
+                "dcid": "4000000304050607",
+                "protocol_type": "QUIC_HTTP3",
+                "scid": "4000400304050607"
+              },
+              "event_fields": [
+                "relative_time",
+                "category",
+                "event_type",
+                "trigger",
+                "data"
+              ],
                "events": [
                  [
-                   "TRANSPORT",
+                  "0",
+                  "TRANSPORT",
                    "PACKET_SENT",
                    "DEFAULT",
                    {
@@ -262,9 +302,11 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
 
   auto packet = createVersionNegotiationPacket();
   FileQLogger q;
+  q.dcid = getTestConnectionId(0);
+  q.scid = getTestConnectionId(1);
   q.add(packet, 10, isPacketRecvd);
   folly::dynamic gotDynamic = q.toDynamic();
-
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 
@@ -274,15 +316,23 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
       R"( {
    "traces": [
      {
+      "common_fields": {
+         "dcid": "",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
        "event_fields": [
-         "CATEGORY",
-         "EVENT_TYPE",
-         "TRIGGER",
-         "DATA"
+         "relative_time",
+         "category",
+         "event_type",
+         "trigger",
+         "data"
        ],
        "events": [
          [
-           "TRANSPORT",
+          "0",
+          "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
            {
@@ -297,6 +347,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
            }
          ],
          [
+           "1",
            "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
@@ -325,6 +376,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
            }
          ],
          [
+           "2",
            "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
@@ -406,6 +458,9 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
   q.add(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  gotDynamic["traces"][0]["events"][1][0] = "1"; // hardcode reference time
+  gotDynamic["traces"][0]["events"][2][0] = "2"; // hardcode reference time
 
   EXPECT_EQ(expected, gotDynamic);
 }
@@ -415,14 +470,22 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
       R"( {
    "traces": [
      {
+      "common_fields": {
+        "dcid": "",
+        "protocol_type": "QUIC_HTTP3",
+        "reference_time": "0",
+        "scid": ""
+       },
        "event_fields": [
-         "CATEGORY",
-         "EVENT_TYPE",
-         "TRIGGER",
-         "DATA"
+         "relative_time",
+         "category",
+         "event_type",
+         "trigger",
+         "data"
        ],
        "events": [
          [
+           "0",
            "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
@@ -459,8 +522,8 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
          ]
        ]
      }
-   ]
- })");
+  ]
+  })");
 
   FileQLogger q;
   RegularQuicWritePacket packet =
@@ -477,7 +540,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
 
   q.add(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
-
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
 }
 

@@ -38,14 +38,23 @@ folly::dynamic FileQLogger::toDynamic() const {
   d["traces"] = folly::dynamic::array();
   folly::dynamic dTrace = folly::dynamic::object;
 
+  std::string dcidStr = dcid.hasValue() ? dcid.value().hex() : "";
+  std::string scidStr = scid.hasValue() ? scid.value().hex() : "";
+  folly::dynamic commonFieldsObj = folly::dynamic::object;
+  commonFieldsObj["reference_time"] = "0";
+  commonFieldsObj["dcid"] = std::move(dcidStr);
+  commonFieldsObj["scid"] = std::move(scidStr);
+  commonFieldsObj["protocol_type"] = protocolType;
+  dTrace["common_fields"] = std::move(commonFieldsObj);
+
   // convert stored logs into folly::Dynamic event array
   auto events = folly::dynamic::array();
   for (auto& event : logs) {
     events.push_back(event->toDynamic());
   }
   dTrace["events"] = events;
-  dTrace["event_fields"] =
-      folly::dynamic::array("CATEGORY", "EVENT_TYPE", "TRIGGER", "DATA");
+  dTrace["event_fields"] = folly::dynamic::array(
+      "relative_time", "category", "event_type", "trigger", "data");
 
   d["traces"].push_back(dTrace);
   return d;

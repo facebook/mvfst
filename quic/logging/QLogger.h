@@ -18,6 +18,7 @@ class QLogger {
   folly::Optional<ConnectionId> scid;
   std::chrono::steady_clock::time_point refTimePoint{
       std::chrono::steady_clock::now()};
+  std::string protocolType;
   QLogger() = default;
   virtual ~QLogger() = default;
   virtual void add(

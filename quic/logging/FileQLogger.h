@@ -11,6 +11,7 @@
 #include <folly/dynamic.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/QLogger.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerTypes.h>
 
 namespace quic {
@@ -18,7 +19,9 @@ namespace quic {
 class FileQLogger : public QLogger {
  public:
   std::vector<std::unique_ptr<QLogEvent>> logs;
-  FileQLogger() = default;
+  FileQLogger(std::string protocolTypeIn = kHTTP3ProtocolType.str()) {
+    protocolType = std::move(protocolTypeIn);
+  }
   ~FileQLogger() override = default;
   void add(const RegularQuicPacket& regularPacket, uint64_t packetSize)
       override;

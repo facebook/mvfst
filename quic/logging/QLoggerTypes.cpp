@@ -217,8 +217,13 @@ folly::dynamic VersionNegotiationLog::toDynamic() const {
 }
 
 folly::dynamic QLogPacketEvent::toDynamic() const {
-  folly::dynamic d =
-      folly::dynamic::array("TRANSPORT", toString(eventType), "DEFAULT");
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, EVENT_TYPE, TRIGGER, DATA
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
   folly::dynamic data = folly::dynamic::object();
 
   data["frames"] = folly::dynamic::array();
@@ -236,8 +241,13 @@ folly::dynamic QLogPacketEvent::toDynamic() const {
 }
 
 folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
-  folly::dynamic d =
-      folly::dynamic::array("TRANSPORT", toString(eventType), "DEFAULT");
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, EVENT_TYPE, TRIGGER, DATA
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
   folly::dynamic data = folly::dynamic::object();
 
   data["versions"] = versionLog->toDynamic();
