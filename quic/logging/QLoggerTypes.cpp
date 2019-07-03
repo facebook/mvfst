@@ -218,7 +218,7 @@ folly::dynamic VersionNegotiationLog::toDynamic() const {
 
 folly::dynamic QLogPacketEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
-  // the event fields relative_time, category, EVENT_TYPE, TRIGGER, DATA
+  // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
       "TRANSPORT",
@@ -242,7 +242,8 @@ folly::dynamic QLogPacketEvent::toDynamic() const {
 
 folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
-  // the event fields relative_time, category, EVENT_TYPE, TRIGGER, DATA
+  // the event fields relative_time, category, event_type, trigger, data
+
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
       "TRANSPORT",

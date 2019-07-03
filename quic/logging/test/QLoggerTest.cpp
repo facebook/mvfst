@@ -280,8 +280,8 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
               ],
                "events": [
                  [
-                  "0",
-                  "TRANSPORT",
+                   "0",
+                   "TRANSPORT",
                    "PACKET_SENT",
                    "DEFAULT",
                    {
