@@ -14,19 +14,19 @@
 
 namespace quic {
 
-void FileQLogger::add(
+void FileQLogger::addPacket(
     const RegularQuicPacket& regularPacket,
     uint64_t packetSize) {
   logs.push_back(createPacketEvent(regularPacket, packetSize));
 }
 
-void FileQLogger::add(
+void FileQLogger::addPacket(
     const RegularQuicWritePacket& writePacket,
     uint64_t packetSize) {
   logs.push_back(createPacketEvent(writePacket, packetSize));
 }
 
-void FileQLogger::add(
+void FileQLogger::addPacket(
     const VersionNegotiationPacket& versionPacket,
     uint64_t packetSize,
     bool isPacketRecvd) {

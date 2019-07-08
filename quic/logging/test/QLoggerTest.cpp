@@ -34,7 +34,7 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
 
   FileQLogger q(fakeProtocolType);
   EXPECT_EQ(q.protocolType, fakeProtocolType);
-  q.add(regularWritePacket, 10);
+  q.addPacket(regularWritePacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogPacketEvent*>(p.get());
@@ -55,7 +55,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
   regularQuicPacket.frames.emplace_back(std::move(frame));
 
   FileQLogger q;
-  q.add(regularQuicPacket, 10);
+  q.addPacket(regularQuicPacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogPacketEvent*>(p.get());
@@ -71,7 +71,7 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   bool isPacketRecvd = false;
   FileQLogger q;
   auto packet = createVersionNegotiationPacket();
-  q.add(packet, 10, isPacketRecvd);
+  q.addPacket(packet, 10, isPacketRecvd);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogVersionNegotiationEvent*>(p.get());
@@ -134,7 +134,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   regularQuicPacket.frames.emplace_back(std::move(frame));
 
   FileQLogger q;
-  q.add(regularQuicPacket, 10);
+  q.addPacket(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -193,7 +193,7 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
   FileQLogger q;
   q.dcid = getTestConnectionId(0);
   q.scid = getTestConnectionId(1);
-  q.add(packet, 10);
+  q.addPacket(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
@@ -254,7 +254,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
 
   RegularQuicWritePacket packet = createPacketWithAckFrames();
   FileQLogger q;
-  q.add(packet, 1001);
+  q.addPacket(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
@@ -304,7 +304,7 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
   FileQLogger q;
   q.dcid = getTestConnectionId(0);
   q.scid = getTestConnectionId(1);
-  q.add(packet, 10, isPacketRecvd);
+  q.addPacket(packet, 10, isPacketRecvd);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
@@ -453,9 +453,9 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
 
   auto regularQuicPacket = packet.packet;
 
-  q.add(versionPacket, 10, isPacketRecvd);
-  q.add(regPacket, 100);
-  q.add(regularQuicPacket, 10);
+  q.addPacket(versionPacket, 10, isPacketRecvd);
+  q.addPacket(regPacket, 100);
+  q.addPacket(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -538,7 +538,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
   packet.frames.emplace_back(std::move(ackFrame));
   packet.frames.emplace_back(std::move(streamFrame));
 
-  q.add(packet, 10);
+  q.addPacket(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);

@@ -21,14 +21,14 @@ class QLogger {
   std::string protocolType;
   QLogger() = default;
   virtual ~QLogger() = default;
-  virtual void add(
+  virtual void addPacket(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize) = 0;
-  virtual void add(
+  virtual void addPacket(
       const VersionNegotiationPacket& versionPacket,
       uint64_t packetSize,
       bool isPacketRecvd) = 0;
-  virtual void add(
+  virtual void addPacket(
       const RegularQuicWritePacket& writePacket,
       uint64_t packetSize) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(

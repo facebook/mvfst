@@ -215,7 +215,7 @@ void QuicClientTransport::processPacketData(
 
   auto& regularPacket = *regularOptional;
   if (conn_->qLogger) {
-    conn_->qLogger->add(regularPacket, packetSize);
+    conn_->qLogger->addPacket(regularPacket, packetSize);
   }
   if (!isProtectedPacket) {
     for (auto& quicFrame : regularPacket.frames) {

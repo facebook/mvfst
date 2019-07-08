@@ -207,7 +207,7 @@ void updateConnection(
            << " in space=" << packetNumberSpace << " size=" << encodedSize
            << " " << conn;
   if (conn.qLogger) {
-    conn.qLogger->add(packet, encodedSize);
+    conn.qLogger->addPacket(packet, encodedSize);
   }
   for (const auto& frame : packet.frames) {
     folly::variant_match(
@@ -768,7 +768,7 @@ void writeCloseCommon(
   packetBuf->prependChain(std::move(body));
   auto packetSize = packetBuf->computeChainDataLength();
   if (connection.qLogger) {
-    connection.qLogger->add(packet.packet, packetSize);
+    connection.qLogger->addPacket(packet.packet, packetSize);
   }
   QUIC_TRACE(
       packet_sent,

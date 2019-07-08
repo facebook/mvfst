@@ -633,7 +633,7 @@ void onServerReadDataFromOpen(
       }
     }
     if (conn.qLogger) {
-      conn.qLogger->add(regularPacket, packetSize);
+      conn.qLogger->addPacket(regularPacket, packetSize);
     }
     QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
     // We assume that the higher layer takes care of validating that the version
@@ -1000,7 +1000,7 @@ void onServerReadDataFromClosed(
       regularOptional->header,
       [](const auto& h) { return h.getPacketNumberSpace(); });
   if (conn.qLogger) {
-    conn.qLogger->add(regularPacket, packetSize);
+    conn.qLogger->addPacket(regularPacket, packetSize);
   }
   QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
 

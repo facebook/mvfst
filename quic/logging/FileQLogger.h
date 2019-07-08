@@ -23,13 +23,13 @@ class FileQLogger : public QLogger {
     protocolType = std::move(protocolTypeIn);
   }
   ~FileQLogger() override = default;
-  void add(const RegularQuicPacket& regularPacket, uint64_t packetSize)
+  void addPacket(const RegularQuicPacket& regularPacket, uint64_t packetSize)
       override;
-  void add(
+  void addPacket(
       const VersionNegotiationPacket& versionPacket,
       uint64_t packetSize,
       bool isPacketRecvd) override;
-  void add(const RegularQuicWritePacket& writePacket, uint64_t packetSize)
+  void addPacket(const RegularQuicWritePacket& writePacket, uint64_t packetSize)
       override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
