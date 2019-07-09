@@ -5,6 +5,9 @@
 
 add_library(
   mvfst_cc_algo STATIC
+  Bbr.cpp
+  BbrBandwidthSampler.cpp
+  BbrRttSampler.cpp
   CongestionControlFunctions.cpp
   CongestionControllerFactory.cpp
   Copa.cpp
