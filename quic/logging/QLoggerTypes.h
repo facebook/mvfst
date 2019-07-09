@@ -295,6 +295,7 @@ class VersionNegotiationLog {
 enum class QLogEventType : uint32_t {
   PacketReceived,
   PacketSent,
+  ConnectionClose,
 };
 
 std::string toString(QLogEventType type);
@@ -305,6 +306,7 @@ class QLogEvent {
   virtual ~QLogEvent() = default;
   virtual folly::dynamic toDynamic() const = 0;
   std::chrono::microseconds refTime;
+  QLogEventType eventType;
 };
 
 class QLogPacketEvent : public QLogEvent {
@@ -315,7 +317,6 @@ class QLogPacketEvent : public QLogEvent {
   std::string packetType;
   PacketNum packetNum{0};
   uint64_t packetSize{0};
-  QLogEventType eventType;
 
   folly::dynamic toDynamic() const override;
 };
@@ -327,7 +328,23 @@ class QLogVersionNegotiationEvent : public QLogEvent {
   std::unique_ptr<VersionNegotiationLog> versionLog;
   std::string packetType;
   uint64_t packetSize{0};
-  QLogEventType eventType;
+
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogConnectionCloseEvent : public QLogEvent {
+ public:
+  QLogConnectionCloseEvent(
+      std::string errorIn,
+      std::string reasonIn,
+      bool drainConnectionIn,
+      bool sendCloseImmediatelyIn,
+      std::chrono::microseconds refTimeIn);
+  ~QLogConnectionCloseEvent() override = default;
+  std::string error;
+  std::string reason;
+  bool drainConnection;
+  bool sendCloseImmediately;
 
   folly::dynamic toDynamic() const override;
 };

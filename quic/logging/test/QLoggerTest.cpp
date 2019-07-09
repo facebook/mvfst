@@ -80,6 +80,18 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   EXPECT_EQ(gotObject.versions, packet.versions);
 }
 
+TEST_F(QLoggerTest, ConnectionCloseEvent) {
+  FileQLogger q;
+  auto error = toString(LocalErrorCode::CONNECTION_RESET);
+  q.addConnectionClose(error, "Connection close", true, false);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogConnectionCloseEvent*>(p.get());
+  EXPECT_EQ(gotEvent->error, error);
+  EXPECT_EQ(gotEvent->drainConnection, true);
+  EXPECT_EQ(gotEvent->sendCloseImmediately, false);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -542,6 +554,30 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   EXPECT_EQ(expected, gotDynamic);
+}
+
+TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([[
+           "0",
+           "CONNECTIVITY",
+           "CONNECTION_CLOSE",
+           "DEFAULT",
+           {
+             "drain_connection": true,
+             "error": "Connection reset",
+             "reason": "Connection changed",
+             "send_close_immediately": false
+           }
+         ]])");
+
+  FileQLogger q;
+  auto error = toString(LocalErrorCode::CONNECTION_RESET);
+  q.addConnectionClose(error, "Connection changed", true, false);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 } // namespace quic::test

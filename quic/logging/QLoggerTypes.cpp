@@ -259,12 +259,47 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
   return d;
 }
 
+QLogConnectionCloseEvent::QLogConnectionCloseEvent(
+    std::string errorIn,
+    std::string reasonIn,
+    bool drainConnectionIn,
+    bool sendCloseImmediatelyIn,
+    std::chrono::microseconds refTimeIn)
+    : error{std::move(errorIn)},
+      reason{std::move(reasonIn)},
+      drainConnection{drainConnectionIn},
+      sendCloseImmediately{sendCloseImmediatelyIn} {
+  eventType = QLogEventType::ConnectionClose;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogConnectionCloseEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "CONNECTIVITY",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["error"] = error;
+  data["reason"] = reason;
+  data["drain_connection"] = drainConnection;
+  data["send_close_immediately"] = sendCloseImmediately;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
       return "PACKET_SENT";
     case QLogEventType::PacketReceived:
       return "PACKET_RECEIVED";
+    case QLogEventType::ConnectionClose:
+      return "CONNECTION_CLOSE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

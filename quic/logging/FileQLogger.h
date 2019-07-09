@@ -31,6 +31,11 @@ class FileQLogger : public QLogger {
       bool isPacketRecvd) override;
   void addPacket(const RegularQuicWritePacket& writePacket, uint64_t packetSize)
       override;
+  void addConnectionClose(
+      std::string error,
+      std::string reason,
+      bool drainConnection,
+      bool sendCloseImmediately) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };

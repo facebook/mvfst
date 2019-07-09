@@ -31,6 +31,11 @@ class QLogger {
   virtual void addPacket(
       const RegularQuicWritePacket& writePacket,
       uint64_t packetSize) = 0;
+  virtual void addConnectionClose(
+      std::string error,
+      std::string reason,
+      bool drainConnection,
+      bool sendCloseImmediately) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

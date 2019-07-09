@@ -33,6 +33,21 @@ void FileQLogger::addPacket(
   logs.push_back(createPacketEvent(versionPacket, packetSize, isPacketRecvd));
 }
 
+void FileQLogger::addConnectionClose(
+    std::string error,
+    std::string reason,
+    bool drainConnection,
+    bool sendCloseImmediately) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+  logs.push_back(std::make_unique<quic::QLogConnectionCloseEvent>(
+      std::move(error),
+      std::move(reason),
+      drainConnection,
+      sendCloseImmediately,
+      refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();
