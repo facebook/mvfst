@@ -40,8 +40,8 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
       conn, 100, conn.transportSettings.minCwndInMss, 1ms, 100000us);
-  EXPECT_EQ(2ms, result.first);
-  EXPECT_EQ(conn.transportSettings.minCwndInMss, result.second);
+  EXPECT_EQ(1ms, result.first);
+  EXPECT_EQ(1, result.second);
 }
 
 TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
@@ -49,8 +49,8 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   conn.udpSendPacketLen = 1;
   auto result = calculatePacingRate(
       conn, 10, conn.transportSettings.minCwndInMss, 1ms, 100000us);
-  EXPECT_EQ(20ms, result.first);
-  EXPECT_EQ(conn.transportSettings.minCwndInMss, result.second);
+  EXPECT_EQ(10ms, result.first);
+  EXPECT_EQ(1, result.second);
 }
 
 TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {

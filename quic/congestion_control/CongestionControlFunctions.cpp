@@ -40,11 +40,10 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
   // number of packets.
   uint64_t burstPerInterval = std::min(
       conn.transportSettings.maxBurstPackets,
-      std::max(
-          minCwndInMss,
-          (uint64_t)std::ceil(
-              (double)cwndInPackets * (double)minimalInterval.count() /
-              (double)rtt.count())));
+      static_cast<uint64_t>(std::ceil(
+          static_cast<double>(cwndInPackets) *
+          static_cast<double>(minimalInterval.count()) /
+          static_cast<double>(rtt.count()))));
   auto interval =
       timeMax(minimalInterval, rtt * burstPerInterval / cwndInPackets);
   return std::make_pair(interval, burstPerInterval);

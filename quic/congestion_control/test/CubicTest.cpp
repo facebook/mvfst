@@ -234,8 +234,8 @@ TEST_F(CubicTest, PacingSpread) {
         makeAck(i, 1500, Clock::now(), packet.time), folly::none);
   }
   ASSERT_EQ(1500 * 15, cubic->getCongestionWindow());
-  EXPECT_EQ(2, cubic->getPacingRate(Clock::now()));
-  EXPECT_EQ(4ms, cubic->getPacingInterval());
+  EXPECT_EQ(1, cubic->getPacingRate(Clock::now()));
+  EXPECT_EQ(2ms, cubic->getPacingInterval());
 }
 
 TEST_F(CubicTest, LatePacingTimer) {
