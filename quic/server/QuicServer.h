@@ -148,6 +148,13 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void rejectNewConnections(bool reject);
 
   /**
+   * Tells the server to disable partial reliability in transport settings.
+   * Any new connections negotiated after will have partial reliability enabled
+   * or disabled accordingly.
+   */
+  void enablePartialReliability(bool enabled);
+
+  /**
    * Returns listening address of this server
    */
   const folly::SocketAddress& getAddress() const;

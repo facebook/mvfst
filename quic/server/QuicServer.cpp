@@ -460,6 +460,13 @@ void QuicServer::rejectNewConnections(bool reject) {
       [reject](auto worker) mutable { worker->rejectNewConnections(reject); });
 }
 
+void QuicServer::enablePartialReliability(bool enabled) {
+  transportSettings_.partialReliabilityEnabled = enabled;
+  runOnAllWorkers([enabled](auto worker) mutable {
+    worker->enablePartialReliability(enabled);
+  });
+}
+
 void QuicServer::setEventBaseObserver(
     std::shared_ptr<folly::EventBaseObserver> observer) {
   if (shutdown_ || workerEvbs_.empty()) {

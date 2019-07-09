@@ -173,10 +173,21 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
     ON_CALL(clientConnCallback, onTransportReady()).WillByDefault(Invoke([&] {
       connected_ = true;
     }));
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
+
+    client = createClient();
+  }
+
+  QuicVersion getVersion() {
+    return GetParam();
+  }
+
+  std::shared_ptr<TestingQuicClientTransport> createClient() {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setSupportedAlpns({"h1q-fb"});
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
+    pskCache_ = std::make_shared<BasicQuicPskCache>();
+
+    auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
     client = std::make_shared<TestingQuicClientTransport>(
         &eventbase_, std::move(sock));
     client->setSupportedVersions({getVersion()});
@@ -186,12 +197,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
     client->setFizzClientContext(clientCtx);
     client->setCertificateVerifier(createTestCertificateVerifier());
     client->addNewPeerAddress(serverAddr);
-    pskCache_ = std::make_shared<BasicQuicPskCache>();
     client->setPskCache(pskCache_);
-  }
-
-  QuicVersion getVersion() {
-    return GetParam();
+    return client;
   }
 
   std::shared_ptr<QuicServer> createServer(ProcessId processId) {
@@ -890,6 +897,59 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
   expected->prependChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->isPartiallyReliableTransport());
+}
+
+TEST_P(
+    QuicClientTransportIntegrationTest,
+    PartialReliabilityEnableDisableRunTimeTest) {
+  expectTransportCallbacks();
+  TransportSettings settings;
+  settings.connectUDP = true;
+  settings.partialReliabilityEnabled = true;
+  client->setTransportSettings(settings);
+
+  // Enable PR on server.
+  TransportSettings serverSettings;
+  serverSettings.partialReliabilityEnabled = true;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
+  server_->setTransportSettings(serverSettings);
+
+  client->start(&clientConnCallback);
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  // Client successfully negotiated partial reliability on connection.
+  EXPECT_TRUE(client->isPartiallyReliableTransport());
+
+  // Disable PR on server.
+  server_->enablePartialReliability(false);
+
+  // Re-connect.
+  client = createClient();
+  expectTransportCallbacks();
+  client->setTransportSettings(settings);
+  client->start(&clientConnCallback);
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  streamId = client->createBidirectionalStream().value();
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  // Second connection should not successfully negotiate partial reliability,
+  // even though client still has it locally enabled.
+  EXPECT_FALSE(client->isPartiallyReliableTransport());
 }
 
 INSTANTIATE_TEST_CASE_P(
