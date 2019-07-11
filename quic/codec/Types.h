@@ -718,7 +718,7 @@ struct ShortHeader {
   void setPacketNumber(PacketNum packetNum);
 
  private:
-  ShortHeader() = default;
+  ShortHeader() = delete;
   bool readInitialByte(uint8_t initalByte);
   bool readConnectionId(folly::io::Cursor& cursor);
   bool readPacketNum(
