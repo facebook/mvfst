@@ -27,6 +27,7 @@
 #include <quic/handshake/TransportParameters.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
+#include <quic/logging/FileQLogger.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 
@@ -2550,7 +2551,8 @@ bool verifyFramePresent(
 
 TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   StreamId streamId = client->createBidirectionalStream().value();
-
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
   client->writeChain(streamId, expected->clone(), true, false);
@@ -2600,6 +2602,34 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   deliverData(packet->coalesce());
   EXPECT_TRUE(
       verifyFramePresent<ConnectionCloseFrame>(socketWrites, *serverReadCodec));
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
+  // expecting that connection close called twice
+  EXPECT_EQ(indices.size(), 2);
+
+  // event called in closeGracefully()
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogConnectionCloseEvent*>(tmp.get());
+  EXPECT_EQ(event->error, kNoError);
+  EXPECT_EQ(event->reason, kGracefulExit);
+  EXPECT_TRUE(event->drainConnection);
+  EXPECT_FALSE(event->sendCloseImmediately);
+
+  // event called in closeImpl(), right before transport is closed
+  auto tmp2 = std::move(qLogger->logs[indices[1]]);
+  auto event2 = dynamic_cast<QLogConnectionCloseEvent*>(tmp2.get());
+  EXPECT_EQ(event2->error, kNoError);
+  auto reason = folly::to<std::string>(
+      "Server: ",
+      kNoError.str(),
+      ", Peer: isReset: ",
+      0,
+      ", Peer: isAbandon: ",
+      0);
+  EXPECT_EQ(event2->reason, reason);
+  EXPECT_TRUE(event2->drainConnection);
+  EXPECT_TRUE(event2->sendCloseImmediately);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
@@ -2667,7 +2697,8 @@ TEST_P(
     QuicClientTransportAfterStartTestClose,
     CloseConnectionWithErrorCleartext) {
   StreamId streamId = client->createBidirectionalStream().value();
-
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
   client->writeChain(streamId, expected->clone(), true, false);
@@ -2681,10 +2712,39 @@ TEST_P(
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
         socketWrites, *makeHandshakeCodec()));
+
+    std::vector<int> indices =
+        getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
+    // expecting that connection close called once
+    EXPECT_EQ(indices.size(), 1);
+    auto tmp = std::move(qLogger->logs[indices[0]]);
+    auto event = dynamic_cast<QLogConnectionCloseEvent*>(tmp.get());
+    EXPECT_EQ(event->error, "stopping");
+    EXPECT_EQ(event->reason, "stopping");
+    EXPECT_TRUE(event->drainConnection);
+    EXPECT_TRUE(event->sendCloseImmediately);
+
   } else {
     client->close(folly::none);
     EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
         socketWrites, *makeHandshakeCodec()));
+    std::vector<int> indices =
+        getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
+    // expecting that connection close called once
+    EXPECT_EQ(indices.size(), 1);
+    auto tmp = std::move(qLogger->logs[indices[0]]);
+    auto event = dynamic_cast<QLogConnectionCloseEvent*>(tmp.get());
+    EXPECT_EQ(event->error, kNoError.str());
+    auto reason = folly::to<std::string>(
+        "Server: ",
+        kNoError.str(),
+        ", Peer: isReset: ",
+        0,
+        ", Peer: isAbandon: ",
+        0);
+    EXPECT_EQ(event->reason, reason);
+    EXPECT_TRUE(event->drainConnection);
+    EXPECT_TRUE(event->sendCloseImmediately);
   }
 }
 

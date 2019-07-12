@@ -15,4 +15,7 @@ constexpr folly::StringPiece kShortHeaderPacketType = "1RTT";
 constexpr folly::StringPiece kVersionNegotiationPacketType =
     "VersionNegotiation";
 constexpr folly::StringPiece kHTTP3ProtocolType = "QUIC_HTTP3";
+constexpr folly::StringPiece kNoError = "no error";
+constexpr folly::StringPiece kGracefulExit = "graceful exit";
+
 } // namespace quic

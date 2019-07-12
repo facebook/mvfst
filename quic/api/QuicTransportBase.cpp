@@ -11,6 +11,7 @@
 #include <folly/ScopeGuard.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -173,7 +174,10 @@ void QuicTransportBase::closeGracefully() {
   connCallback_ = nullptr;
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
-
+  if (conn_->qLogger) {
+    conn_->qLogger->addConnectionClose(
+        kNoError.str(), kGracefulExit.str(), true, false);
+  }
   QUIC_TRACE(
       conn_close,
       *conn_,
@@ -235,24 +239,6 @@ void QuicTransportBase::closeImpl(
   // TODO: truncate the error code string to be 1MSS only.
   closeState_ = CloseState::CLOSED;
   updatePacingOnClose(*conn_);
-  if (errorCode) {
-    conn_->localConnectionError = errorCode;
-    QUIC_TRACE(
-        conn_close,
-        *conn_,
-        (uint64_t)drainConnection,
-        (uint64_t)sendCloseImmediately,
-        conn_->localConnectionError->second.c_str(),
-        errorCode->second.c_str());
-  } else {
-    QUIC_TRACE(
-        conn_close,
-        *conn_,
-        (uint64_t)drainConnection,
-        (uint64_t)sendCloseImmediately,
-        "no_error",
-        "no_error");
-  }
   auto cancelCode = std::make_pair(
       QuicErrorCode(LocalErrorCode::NO_ERROR),
       toString(LocalErrorCode::NO_ERROR));
@@ -273,6 +259,41 @@ void QuicTransportBase::closeImpl(
   VLOG_IF(4, isReset) << "Closing transport due to stateless reset " << *this;
   VLOG_IF(4, isAbandon) << "Closing transport due to abandoned connection "
                         << *this;
+  if (errorCode) {
+    conn_->localConnectionError = errorCode;
+    std::string errorStr = conn_->localConnectionError->second;
+    std::string errorCodeStr = errorCode->second;
+    if (conn_->qLogger) {
+      conn_->qLogger->addConnectionClose(
+          errorStr, errorCodeStr, drainConnection, sendCloseImmediately);
+    }
+    QUIC_TRACE(
+        conn_close,
+        *conn_,
+        (uint64_t)drainConnection,
+        (uint64_t)sendCloseImmediately,
+        errorStr,
+        errorCode->second.c_str());
+  } else {
+    auto reason = folly::to<std::string>(
+        "Server: ",
+        kNoError.str(),
+        ", Peer: isReset: ",
+        isReset,
+        ", Peer: isAbandon: ",
+        isAbandon);
+    if (conn_->qLogger) {
+      conn_->qLogger->addConnectionClose(
+          kNoError.str(), reason, drainConnection, sendCloseImmediately);
+    }
+    QUIC_TRACE(
+        conn_close,
+        *conn_,
+        (uint64_t)drainConnection,
+        (uint64_t)sendCloseImmediately,
+        "no_error",
+        "no_error");
+  }
   cancelLossTimeout();
   if (ackTimeout_.isScheduled()) {
     ackTimeout_.cancelTimeout();

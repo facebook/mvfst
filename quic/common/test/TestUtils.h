@@ -13,6 +13,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/test/QuicCodecUtils.h>
 #include <quic/handshake/test/Mocks.h>
+#include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/StateData.h>
@@ -269,6 +270,12 @@ RegularQuicWritePacket createRegularQuicWritePacket(
 VersionNegotiationPacket createVersionNegotiationPacket();
 
 RegularQuicWritePacket createPacketWithAckFrames();
+
+// Helper function which takes in a specific event type and fetches all the
+// instances of that type in QLogger
+std::vector<int> getQLogEventIndices(
+    QLogEventType type,
+    const std::shared_ptr<FileQLogger>& q);
 
 } // namespace test
 } // namespace quic

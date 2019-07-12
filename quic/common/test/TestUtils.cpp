@@ -679,5 +679,17 @@ RegularQuicWritePacket createPacketWithAckFrames() {
   return packet;
 }
 
+std::vector<int> getQLogEventIndices(
+    QLogEventType type,
+    const std::shared_ptr<FileQLogger>& q) {
+  std::vector<int> indices;
+  for (uint64_t i = 0; i < q->logs.size(); ++i) {
+    if (q->logs[i]->eventType == type) {
+      indices.push_back(i);
+    }
+  }
+  return indices;
+}
+
 } // namespace test
 } // namespace quic
