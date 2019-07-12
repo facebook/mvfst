@@ -92,6 +92,25 @@ TEST_F(QLoggerTest, ConnectionCloseEvent) {
   EXPECT_EQ(gotEvent->sendCloseImmediately, false);
 }
 
+TEST_F(QLoggerTest, TransportSummaryEvent) {
+  FileQLogger q;
+  q.addTransportSummary(8, 9, 5, 3, 2, 554, 100, 32, 134, 238);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogTransportSummaryEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->totalBytesSent, 8);
+  EXPECT_EQ(gotEvent->totalBytesRecvd, 9);
+  EXPECT_EQ(gotEvent->sumCurWriteOffset, 5);
+  EXPECT_EQ(gotEvent->sumMaxObservedOffset, 3);
+  EXPECT_EQ(gotEvent->sumCurStreamBufferLen, 2);
+  EXPECT_EQ(gotEvent->totalBytesRetransmitted, 554);
+  EXPECT_EQ(gotEvent->totalStreamBytesCloned, 100);
+  EXPECT_EQ(gotEvent->totalBytesCloned, 32);
+  EXPECT_EQ(gotEvent->totalCryptoDataWritten, 134);
+  EXPECT_EQ(gotEvent->totalCryptoDataRecvd, 238);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -574,6 +593,37 @@ TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
   FileQLogger q;
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
   q.addConnectionClose(error, "Connection changed", true, false);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+   [
+     "0",
+     "TRANSPORT",
+     "TRANSPORT_SUMMARY",
+     "DEFAULT",
+     {
+       "total_bytes_sent": 1,
+       "total_bytes_recvd": 2,
+       "sum_cur_write_offset": 3,
+       "sum_max_observed_offset": 4,
+       "sum_cur_stream_buffer_len": 5,
+       "total_bytes_retransmitted": 6,
+       "total_stream_bytes_cloned": 7,
+       "total_bytes_cloned": 8,
+       "total_crypto_data_written": 9,
+       "total_crypto_data_recvd": 10
+     }
+   ]
+ ])");
+
+  FileQLogger q;
+  q.addTransportSummary(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

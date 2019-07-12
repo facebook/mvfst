@@ -48,6 +48,34 @@ void FileQLogger::addConnectionClose(
       refTime));
 }
 
+void FileQLogger::addTransportSummary(
+    uint64_t totalBytesSent,
+    uint64_t totalBytesRecvd,
+    uint64_t sumCurWriteOffset,
+    uint64_t sumMaxObservedOffset,
+    uint64_t sumCurStreamBufferLen,
+    uint64_t totalBytesRetransmitted,
+    uint64_t totalStreamBytesCloned,
+    uint64_t totalBytesCloned,
+    uint64_t totalCryptoDataWritten,
+    uint64_t totalCryptoDataRecvd) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogTransportSummaryEvent>(
+      totalBytesSent,
+      totalBytesRecvd,
+      sumCurWriteOffset,
+      sumMaxObservedOffset,
+      sumCurStreamBufferLen,
+      totalBytesRetransmitted,
+      totalStreamBytesCloned,
+      totalBytesCloned,
+      totalCryptoDataWritten,
+      totalCryptoDataRecvd,
+      refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

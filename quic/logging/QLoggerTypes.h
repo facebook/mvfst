@@ -296,6 +296,7 @@ enum class QLogEventType : uint32_t {
   PacketReceived,
   PacketSent,
   ConnectionClose,
+  TransportSummary
 };
 
 std::string toString(QLogEventType type);
@@ -345,6 +346,35 @@ class QLogConnectionCloseEvent : public QLogEvent {
   std::string reason;
   bool drainConnection;
   bool sendCloseImmediately;
+
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogTransportSummaryEvent : public QLogEvent {
+ public:
+  QLogTransportSummaryEvent(
+      uint64_t totalBytesSent,
+      uint64_t totalBytesRecvd,
+      uint64_t sumCurWriteOffset,
+      uint64_t sumMaxObservedOffset,
+      uint64_t sumCurStreamBufferLen,
+      uint64_t totalBytesRetransmitted,
+      uint64_t totalStreamBytesCloned,
+      uint64_t totalBytesCloned,
+      uint64_t totalCryptoDataWritten,
+      uint64_t totalCryptoDataRecvd,
+      std::chrono::microseconds refTimeIn);
+  ~QLogTransportSummaryEvent() override = default;
+  uint64_t totalBytesSent;
+  uint64_t totalBytesRecvd;
+  uint64_t sumCurWriteOffset;
+  uint64_t sumMaxObservedOffset;
+  uint64_t sumCurStreamBufferLen;
+  uint64_t totalBytesRetransmitted;
+  uint64_t totalStreamBytesCloned;
+  uint64_t totalBytesCloned;
+  uint64_t totalCryptoDataWritten;
+  uint64_t totalCryptoDataRecvd;
 
   folly::dynamic toDynamic() const override;
 };

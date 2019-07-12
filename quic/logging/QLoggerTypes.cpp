@@ -292,6 +292,57 @@ folly::dynamic QLogConnectionCloseEvent::toDynamic() const {
   return d;
 }
 
+QLogTransportSummaryEvent::QLogTransportSummaryEvent(
+    uint64_t totalBytesSentIn,
+    uint64_t totalBytesRecvdIn,
+    uint64_t sumCurWriteOffsetIn,
+    uint64_t sumMaxObservedOffsetIn,
+    uint64_t sumCurStreamBufferLenIn,
+    uint64_t totalBytesRetransmittedIn,
+    uint64_t totalStreamBytesClonedIn,
+    uint64_t totalBytesClonedIn,
+    uint64_t totalCryptoDataWrittenIn,
+    uint64_t totalCryptoDataRecvdIn,
+    std::chrono::microseconds refTimeIn)
+    : totalBytesSent{totalBytesSentIn},
+      totalBytesRecvd{totalBytesRecvdIn},
+      sumCurWriteOffset{sumCurWriteOffsetIn},
+      sumMaxObservedOffset{sumMaxObservedOffsetIn},
+      sumCurStreamBufferLen{sumCurStreamBufferLenIn},
+      totalBytesRetransmitted{totalBytesRetransmittedIn},
+      totalStreamBytesCloned{totalStreamBytesClonedIn},
+      totalBytesCloned{totalBytesClonedIn},
+      totalCryptoDataWritten{totalCryptoDataWrittenIn},
+      totalCryptoDataRecvd{totalCryptoDataRecvdIn} {
+  eventType = QLogEventType::TransportSummary;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["total_bytes_sent"] = totalBytesSent;
+  data["total_bytes_recvd"] = totalBytesRecvd;
+  data["sum_cur_write_offset"] = sumCurWriteOffset;
+  data["sum_max_observed_offset"] = sumMaxObservedOffset;
+  data["sum_cur_stream_buffer_len"] = sumCurStreamBufferLen;
+  data["total_bytes_retransmitted"] = totalBytesRetransmitted;
+  data["total_stream_bytes_cloned"] = totalStreamBytesCloned;
+  data["total_bytes_cloned"] = totalBytesCloned;
+  data["total_crypto_data_written"] = totalCryptoDataWritten;
+  data["total_crypto_data_recvd"] = totalCryptoDataRecvd;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -300,6 +351,8 @@ std::string toString(QLogEventType type) {
       return "PACKET_RECEIVED";
     case QLogEventType::ConnectionClose:
       return "CONNECTION_CLOSE";
+    case QLogEventType::TransportSummary:
+      return "TRANSPORT_SUMMARY";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

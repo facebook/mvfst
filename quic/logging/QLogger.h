@@ -36,6 +36,17 @@ class QLogger {
       std::string reason,
       bool drainConnection,
       bool sendCloseImmediately) = 0;
+  virtual void addTransportSummary(
+      uint64_t totalBytesSent,
+      uint64_t totalBytesRecvd,
+      uint64_t sumCurWriteOffset,
+      uint64_t sumMaxObservedOffset,
+      uint64_t sumCurStreamBufferLen,
+      uint64_t totalBytesRetransmitted,
+      uint64_t totalStreamBytesCloned,
+      uint64_t totalBytesCloned,
+      uint64_t totalCryptoDataWritten,
+      uint64_t totalCryptoDataRecvd) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);
