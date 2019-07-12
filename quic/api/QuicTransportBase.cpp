@@ -236,6 +236,21 @@ void QuicTransportBase::closeImpl(
       conn_->lossState.totalBytesCloned,
       totalCryptoDataWritten,
       totalCryptoDataRecvd);
+
+  if (conn_->qLogger) {
+    conn_->qLogger->addTransportSummary(
+        conn_->lossState.totalBytesSent,
+        conn_->lossState.totalBytesRecvd,
+        conn_->flowControlState.sumCurWriteOffset,
+        conn_->flowControlState.sumMaxObservedOffset,
+        conn_->flowControlState.sumCurStreamBufferLen,
+        conn_->lossState.totalBytesRetransmitted,
+        conn_->lossState.totalStreamBytesCloned,
+        conn_->lossState.totalBytesCloned,
+        totalCryptoDataWritten,
+        totalCryptoDataRecvd);
+  }
+
   // TODO: truncate the error code string to be 1MSS only.
   closeState_ = CloseState::CLOSED;
   updatePacingOnClose(*conn_);

@@ -250,6 +250,50 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
       StreamId streamid,
       MockReadCallback* readCb);
 
+  void checkTransportSummaryEvent(QLogTransportSummaryEvent* event) {
+    uint64_t totalCryptoDataWritten = 0;
+    uint64_t totalCryptoDataRecvd = 0;
+
+    if (client->getConn().cryptoState) {
+      totalCryptoDataWritten +=
+          client->getConn().cryptoState->initialStream.currentWriteOffset;
+      totalCryptoDataWritten +=
+          client->getConn().cryptoState->handshakeStream.currentWriteOffset;
+      totalCryptoDataWritten +=
+          client->getConn().cryptoState->oneRttStream.currentWriteOffset;
+      totalCryptoDataRecvd +=
+          client->getConn().cryptoState->initialStream.maxOffsetObserved;
+      totalCryptoDataRecvd +=
+          client->getConn().cryptoState->handshakeStream.maxOffsetObserved;
+      totalCryptoDataRecvd +=
+          client->getConn().cryptoState->oneRttStream.maxOffsetObserved;
+    }
+
+    EXPECT_EQ(
+        event->totalBytesSent, client->getConn().lossState.totalBytesSent);
+    EXPECT_EQ(
+        event->totalBytesRecvd, client->getConn().lossState.totalBytesRecvd);
+    EXPECT_EQ(
+        event->sumCurWriteOffset,
+        client->getConn().flowControlState.sumCurWriteOffset);
+    EXPECT_EQ(
+        event->sumMaxObservedOffset,
+        client->getConn().flowControlState.sumMaxObservedOffset);
+    EXPECT_EQ(
+        event->sumCurStreamBufferLen,
+        client->getConn().flowControlState.sumCurStreamBufferLen);
+    EXPECT_EQ(
+        event->totalBytesRetransmitted,
+        client->getConn().lossState.totalBytesRetransmitted);
+    EXPECT_EQ(
+        event->totalStreamBytesCloned,
+        client->getConn().lossState.totalStreamBytesCloned);
+    EXPECT_EQ(
+        event->totalBytesCloned, client->getConn().lossState.totalBytesCloned);
+    EXPECT_EQ(event->totalCryptoDataWritten, totalCryptoDataWritten);
+    EXPECT_EQ(event->totalCryptoDataRecvd, totalCryptoDataRecvd);
+  }
+
  protected:
   std::string hostname;
   folly::EventBase eventbase_;
@@ -387,6 +431,8 @@ TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
@@ -398,6 +444,13 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
             },
             [](const auto&) { return false; }));
         client->close(folly::none);
+        std::vector<int> indices =
+            getQLogEventIndices(QLogEventType::TransportSummary, qLogger);
+        EXPECT_EQ(indices.size(), 1);
+        auto tmp = std::move(qLogger->logs[indices[0]]);
+        auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
+        checkTransportSummaryEvent(event);
+
         eventbase_.terminateLoopSoon();
       }));
 
@@ -409,6 +462,8 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   // Point the client to a bad server.
   client->addNewPeerAddress(SocketAddress("127.0.0.1", 14114));
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
@@ -420,6 +475,12 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
               return err == LocalErrorCode::CONNECT_FAILED;
             },
             [](const auto&) { return false; }));
+        std::vector<int> indices =
+            getQLogEventIndices(QLogEventType::TransportSummary, qLogger);
+        EXPECT_EQ(indices.size(), 1);
+        auto tmp = std::move(qLogger->logs[indices[0]]);
+        auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
+        checkTransportSummaryEvent(event);
       }));
   client->start(&clientConnCallback);
   eventbase_.loop();
@@ -427,6 +488,8 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
 
 TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   expectTransportCallbacks();
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   TransportSettings settings;
   settings.connectUDP = true;
   client->setTransportSettings(settings);
