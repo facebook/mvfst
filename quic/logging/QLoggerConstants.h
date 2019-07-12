@@ -17,5 +17,7 @@ constexpr folly::StringPiece kVersionNegotiationPacketType =
 constexpr folly::StringPiece kHTTP3ProtocolType = "QUIC_HTTP3";
 constexpr folly::StringPiece kNoError = "no error";
 constexpr folly::StringPiece kGracefulExit = "graceful exit";
+constexpr folly::StringPiece cubicPersistentCongestion =
+    "cubic persistent congestion";
 
 } // namespace quic

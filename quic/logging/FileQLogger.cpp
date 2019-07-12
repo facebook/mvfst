@@ -76,6 +76,24 @@ void FileQLogger::addTransportSummary(
       refTime));
 }
 
+void FileQLogger::addCongestionMetricUpdate(
+    uint64_t bytesInFlight,
+    uint64_t currentCwnd,
+    std::string congestionEvent,
+    std::string state,
+    std::string recoveryState) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogCongestionMetricUpdateEvent>(
+      bytesInFlight,
+      currentCwnd,
+      std::move(congestionEvent),
+      std::move(state),
+      std::move(recoveryState),
+      refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

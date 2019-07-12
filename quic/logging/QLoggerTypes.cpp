@@ -343,6 +343,42 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   return d;
 }
 
+QLogCongestionMetricUpdateEvent::QLogCongestionMetricUpdateEvent(
+    uint64_t bytesInFlightIn,
+    uint64_t currentCwndIn,
+    std::string congestionEventIn,
+    std::string stateIn,
+    std::string recoveryStateIn,
+    std::chrono::microseconds refTimeIn)
+    : bytesInFlight{bytesInFlightIn},
+      currentCwnd{currentCwndIn},
+      congestionEvent{std::move(congestionEventIn)},
+      state{std::move(stateIn)},
+      recoveryState{std::move(recoveryStateIn)} {
+  eventType = QLogEventType::CongestionMetricUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogCongestionMetricUpdateEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "METRIC_UPDATE",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["bytes_in_flight"] = bytesInFlight;
+  data["current_cwnd"] = currentCwnd;
+  data["congestion_event"] = congestionEvent;
+  data["state"] = state;
+  data["recovery_state"] = recoveryState;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -353,6 +389,8 @@ std::string toString(QLogEventType type) {
       return "CONNECTION_CLOSE";
     case QLogEventType::TransportSummary:
       return "TRANSPORT_SUMMARY";
+    case QLogEventType::CongestionMetricUpdate:
+      return "CONGESTION_METRIC_UPDATE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

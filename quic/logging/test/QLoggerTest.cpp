@@ -11,6 +11,7 @@
 #include <folly/json.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/Bbr.h>
 #include <quic/logging/FileQLogger.h>
 
 using namespace quic;
@@ -109,6 +110,29 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->totalBytesCloned, 32);
   EXPECT_EQ(gotEvent->totalCryptoDataWritten, 134);
   EXPECT_EQ(gotEvent->totalCryptoDataRecvd, 238);
+}
+
+TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
+  FileQLogger q;
+  q.addCongestionMetricUpdate(
+      20,
+      30,
+      cubicPersistentCongestion.str(),
+      cubicStateToString(CubicStates::Steady).str(),
+      bbrRecoveryStateToString(
+          BbrCongestionController::RecoveryState::NOT_RECOVERY));
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogCongestionMetricUpdateEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->bytesInFlight, 20);
+  EXPECT_EQ(gotEvent->currentCwnd, 30);
+  EXPECT_EQ(gotEvent->congestionEvent, cubicPersistentCongestion.str());
+  EXPECT_EQ(gotEvent->state, cubicStateToString(CubicStates::Steady).str());
+  EXPECT_EQ(
+      gotEvent->recoveryState,
+      bbrRecoveryStateToString(
+          BbrCongestionController::RecoveryState::NOT_RECOVERY));
 }
 
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
@@ -624,6 +648,36 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
 
   FileQLogger q;
   q.addTransportSummary(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+      [
+        "0",
+        "METRIC_UPDATE",
+        "CONGESTION_METRIC_UPDATE",
+        "DEFAULT",
+        {
+          "bytes_in_flight": 20,
+          "congestion_event": "cubic persistent congestion",
+          "current_cwnd": 30,
+          "recovery_state": "",
+          "state": "Steady"
+        }
+      ]
+ ])");
+
+  FileQLogger q;
+  q.addCongestionMetricUpdate(
+      20,
+      30,
+      cubicPersistentCongestion.str(),
+      cubicStateToString(CubicStates::Steady).str());
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

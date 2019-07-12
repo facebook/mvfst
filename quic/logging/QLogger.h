@@ -47,6 +47,12 @@ class QLogger {
       uint64_t totalBytesCloned,
       uint64_t totalCryptoDataWritten,
       uint64_t totalCryptoDataRecvd) = 0;
+  virtual void addCongestionMetricUpdate(
+      uint64_t bytesInFlight,
+      uint64_t currentCwnd,
+      std::string congestionEvent,
+      std::string state,
+      std::string recoveryState = "") = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

@@ -296,7 +296,8 @@ enum class QLogEventType : uint32_t {
   PacketReceived,
   PacketSent,
   ConnectionClose,
-  TransportSummary
+  TransportSummary,
+  CongestionMetricUpdate,
 };
 
 std::string toString(QLogEventType type);
@@ -375,6 +376,25 @@ class QLogTransportSummaryEvent : public QLogEvent {
   uint64_t totalBytesCloned;
   uint64_t totalCryptoDataWritten;
   uint64_t totalCryptoDataRecvd;
+
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogCongestionMetricUpdateEvent : public QLogEvent {
+ public:
+  QLogCongestionMetricUpdateEvent(
+      uint64_t bytesInFlight,
+      uint64_t currentCwnd,
+      std::string congestionEvent,
+      std::string state,
+      std::string recoveryState,
+      std::chrono::microseconds refTimeIn);
+  ~QLogCongestionMetricUpdateEvent() override = default;
+  uint64_t bytesInFlight;
+  uint64_t currentCwnd;
+  std::string congestionEvent;
+  std::string state;
+  std::string recoveryState;
 
   folly::dynamic toDynamic() const override;
 };

@@ -47,6 +47,12 @@ class FileQLogger : public QLogger {
       uint64_t totalBytesCloned,
       uint64_t totalCryptoDataWritten,
       uint64_t totalCryptoDataRecvd) override;
+  void addCongestionMetricUpdate(
+      uint64_t bytesInFlight,
+      uint64_t currentCwnd,
+      std::string congestionEvent,
+      std::string state,
+      std::string recoveryState = "") override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };
