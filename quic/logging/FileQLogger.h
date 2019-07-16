@@ -51,8 +51,11 @@ class FileQLogger : public QLogger {
       uint64_t bytesInFlight,
       uint64_t currentCwnd,
       std::string congestionEvent,
-      std::string state,
+      std::string state = "",
       std::string recoveryState = "") override;
+  void addPacingMetricUpdate(
+      uint64_t pacingBurstSizeIn,
+      std::chrono::microseconds pacingIntervalIn) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };

@@ -94,6 +94,16 @@ void FileQLogger::addCongestionMetricUpdate(
       refTime));
 }
 
+void FileQLogger::addPacingMetricUpdate(
+    uint64_t pacingBurstSizeIn,
+    std::chrono::microseconds pacingIntervalIn) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogPacingMetricUpdateEvent>(
+      pacingBurstSizeIn, pacingIntervalIn, refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();
