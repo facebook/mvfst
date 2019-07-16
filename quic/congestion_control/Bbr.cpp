@@ -275,6 +275,10 @@ void BbrCongestionController::updatePacing() noexcept {
   // TODO: slower pacing if we are in STARTUP and loss has happened
   std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
       conn_, pacingWindow_, kMinCwndInMssForBbr, minimalPacingInterval_, mrtt);
+
+  if (conn_.transportSettings.pacingEnabled && conn_.qLogger) {
+    conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
+  }
 }
 
 void BbrCongestionController::handleAckInProbeBw(

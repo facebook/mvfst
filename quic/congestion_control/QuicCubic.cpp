@@ -555,6 +555,9 @@ void Cubic::updatePacing() noexcept {
     pacingInterval_ = minimalPacingInterval_;
   }
   if (conn_.transportSettings.pacingEnabled) {
+    if (conn_.qLogger) {
+      conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
+    }
     QUIC_TRACE(
         pacing_update,
         conn_,

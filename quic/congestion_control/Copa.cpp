@@ -321,6 +321,9 @@ void Copa::updatePacing() noexcept {
   if (conn_.transportSettings.pacingEnabled) {
     VLOG(10) << "updatePacing pacingInterval_ = " << pacingInterval_.count()
              << ", pacingBurstSize_ " << pacingBurstSize_ << " " << conn_;
+    if (conn_.qLogger) {
+      conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
+    }
   }
 }
 

@@ -600,6 +600,10 @@ TEST_F(BbrTest, Pacing) {
   conn.udpSendPacketLen = 1000;
   conn.transportSettings.maxBurstPackets = std::numeric_limits<decltype(
       conn.transportSettings.maxBurstPackets)>::max();
+  conn.transportSettings.pacingEnabled = true;
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   BbrCongestionController::BbrConfig config;
   BbrCongestionController bbr(conn, config);
   bbr.setMinimalPacingInterval(1ms);
@@ -657,9 +661,22 @@ TEST_F(BbrTest, Pacing) {
   };
 
   // Take it to ProbeBw first
-  for (size_t i = 0; i < kStartupSlowGrowRoundLimit + 2; i++) {
+  std::vector<uint64_t> pacingRateVec;
+  for (uint32_t i = 0; i < kStartupSlowGrowRoundLimit + 2; i++) {
     sendAckGrow(Clock::now());
+    pacingRateVec.push_back(bbr.getPacingRate(Clock::now()));
   }
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacingMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), kStartupSlowGrowRoundLimit + 2);
+  for (uint32_t i = 0; i < kStartupSlowGrowRoundLimit + 2; i++) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogPacingMetricUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->pacingBurstSize, pacingRateVec[i]);
+    EXPECT_EQ(event->pacingInterval, bbr.getPacingInterval());
+  }
+
   for (size_t i = 0; i < 5; i++) {
     sendFunc();
   }
