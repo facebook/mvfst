@@ -10,6 +10,7 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
+#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -129,9 +130,11 @@ void Copa::onPacketAckOrLoss(
     folly::Optional<LossEvent> loss) {
   if (loss) {
     onPacketLoss(*loss);
+    QUIC_TRACE(copa_loss, conn_, cwndBytes_, bytesInFlight_);
   }
   if (ack && ack->largestAckedPacket.hasValue()) {
     onPacketAcked(*ack);
+    QUIC_TRACE(copa_ack, conn_, cwndBytes_, bytesInFlight_);
   }
 }
 
