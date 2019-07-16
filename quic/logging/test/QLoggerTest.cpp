@@ -117,7 +117,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
   q.addCongestionMetricUpdate(
       20,
       30,
-      cubicPersistentCongestion.str(),
+      kPersistentCongestion.str(),
       cubicStateToString(CubicStates::Steady).str(),
       bbrRecoveryStateToString(
           BbrCongestionController::RecoveryState::NOT_RECOVERY));
@@ -127,7 +127,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
 
   EXPECT_EQ(gotEvent->bytesInFlight, 20);
   EXPECT_EQ(gotEvent->currentCwnd, 30);
-  EXPECT_EQ(gotEvent->congestionEvent, cubicPersistentCongestion.str());
+  EXPECT_EQ(gotEvent->congestionEvent, kPersistentCongestion.str());
   EXPECT_EQ(gotEvent->state, cubicStateToString(CubicStates::Steady).str());
   EXPECT_EQ(
       gotEvent->recoveryState,
@@ -664,7 +664,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
         "DEFAULT",
         {
           "bytes_in_flight": 20,
-          "congestion_event": "cubic persistent congestion",
+          "congestion_event": "persistent congestion",
           "current_cwnd": 30,
           "recovery_state": "",
           "state": "Steady"
@@ -676,7 +676,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
   q.addCongestionMetricUpdate(
       20,
       30,
-      cubicPersistentCongestion.str(),
+      kPersistentCongestion.str(),
       cubicStateToString(CubicStates::Steady).str());
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time

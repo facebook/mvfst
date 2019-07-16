@@ -13,6 +13,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QuicLogger.h>
 
 using namespace std::chrono_literals;
@@ -97,7 +98,14 @@ void BbrCongestionController::onPacketLoss(const LossEvent& loss) {
 
   if (loss.persistentCongestion) {
     recoveryWindow_ = conn_.udpSendPacketLen * kMinCwndInMssForBbr;
-
+    if (conn_.qLogger) {
+      conn_.qLogger->addCongestionMetricUpdate(
+          inflightBytes_,
+          getCongestionWindow(),
+          kPersistentCongestion.str(),
+          bbrStateToString(state_),
+          bbrRecoveryStateToString(recoveryState_));
+    }
     QUIC_TRACE(
         bbr_persistent_congestion,
         conn_,
@@ -220,7 +228,14 @@ void BbrCongestionController::onPacketAcked(
 
   updateCwnd(ack.ackedBytes, excessiveBytes);
   updatePacing();
-
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        inflightBytes_,
+        getCongestionWindow(),
+        kCongestionPacketAck.str(),
+        bbrStateToString(state_),
+        bbrRecoveryStateToString(recoveryState_));
+  }
   QUIC_TRACE(
       bbr_ack,
       conn_,

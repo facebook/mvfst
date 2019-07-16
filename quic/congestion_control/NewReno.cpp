@@ -8,6 +8,7 @@
 
 #include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
 
@@ -29,6 +30,10 @@ void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
            << conn_;
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        bytesInFlight_, getCongestionWindow(), kRemoveInflight.str());
+  }
 }
 
 void NewReno::onPacketSent(const OutstandingPacket& packet) {
@@ -40,6 +45,10 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
                   packet.packet.header,
                   [](auto& h) { return h.getPacketSequenceNum(); })
            << " " << conn_;
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent.str());
+  }
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
@@ -48,6 +57,10 @@ void NewReno::onAckEvent(const AckEvent& ack) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
            << conn_;
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck.str());
+  }
   for (const auto& packet : ack.ackedPackets) {
     onPacketAcked(packet);
   }
@@ -109,10 +122,19 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
              << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
              << " inflight=" << bytesInFlight_ << " " << conn_;
   }
+
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss.str());
+  }
   if (loss.persistentCongestion) {
     VLOG(10) << __func__ << " writable=" << getWritableBytes()
              << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
              << conn_;
+    if (conn_.qLogger) {
+      conn_.qLogger->addCongestionMetricUpdate(
+          bytesInFlight_, getCongestionWindow(), kPersistentCongestion.str());
+    }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   }
 }

@@ -145,6 +145,8 @@ TEST_F(CopaTest, TestWritableBytes) {
 TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn;
   Copa copa(conn);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
 
   conn.lossState.largestSent = 5;
@@ -152,6 +154,16 @@ TEST_F(CopaTest, PersistentCongestion) {
   uint32_t ackedSize = 10;
   auto pkt = createPacket(ackPacketNum, ackedSize, ackedSize);
   copa.onPacketSent(pkt);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, 10);
+  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent.str());
+
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
   loss.addLostPacket(pkt);
@@ -165,6 +177,8 @@ TEST_F(CopaTest, PersistentCongestion) {
 TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn;
   Copa copa(conn);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
 
   auto originalWritableBytes = copa.getWritableBytes();
@@ -174,11 +188,28 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   copa.onPacketSent(createPacket(ackPacketNum, ackedSize, ackedSize));
   copa.onRemoveBytesFromInflight(2);
   EXPECT_EQ(copa.getWritableBytes(), originalWritableBytes - ackedSize + 2);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, ackedSize);
+  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent.str());
+
+  auto tmp2 = std::move(qLogger->logs[indices[1]]);
+  auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
+  EXPECT_EQ(event2->bytesInFlight, ackedSize - 2);
+  EXPECT_EQ(event2->currentCwnd, kDefaultCwnd);
+  EXPECT_EQ(event2->congestionEvent, kRemoveInflight.str());
 }
 
 TEST_F(CopaTest, TestSlowStartAck) {
   QuicServerConnectionState conn;
   Copa copa(conn);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
   // initial cwnd = 10 packets
   EXPECT_EQ(
@@ -212,6 +243,15 @@ TEST_F(CopaTest, TestSlowStartAck) {
       createAckEvent(packetNumToAck, packetSize, now), folly::none);
   numPacketsInFlight--;
   EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 11); // mostly congestionPacketSent logs
+  auto tmp = std::move(qLogger->logs[indices[10]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
+  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck.str());
 
   now += 50ms;
   packetNumToAck++;
@@ -393,10 +433,21 @@ TEST_F(CopaTest, TestVelocity) {
 TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   QuicServerConnectionState conn;
   Copa copa(conn);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
   CongestionController::AckEvent ack;
   copa.onPacketAckOrLoss(ack, loss);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
+  EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketLoss.str());
 }
 
 } // namespace test

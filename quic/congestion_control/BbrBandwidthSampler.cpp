@@ -9,6 +9,7 @@
 // Copyright 2004-present Facebook.  All rights reserved.
 
 #include <quic/congestion_control/BbrBandwidthSampler.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QuicLogger.h>
 
 namespace quic {
@@ -31,6 +32,12 @@ void BbrBandwidthSampler::onPacketAcked(
           conn_,
           *ackEvent.largestAckedPacket,
           appLimitedExitTarget_.time_since_epoch().count());
+      if (conn_.qLogger) {
+        conn_.qLogger->addCongestionMetricUpdate(
+            getBandwidth().bytes,
+            getBandwidth().bytes,
+            kCongestionAppUnlimited.str());
+      }
     }
   }
   // TODO: If i'm smart enough, maybe we don't have to loop through the acked
@@ -104,6 +111,12 @@ void BbrBandwidthSampler::onAppLimited() {
   appLimitedExitTarget_ = Clock::now();
   QUIC_TRACE(
       bbr_applimited, conn_, appLimitedExitTarget_.time_since_epoch().count());
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        getBandwidth().bytes,
+        getBandwidth().bytes,
+        kCongestionAppLimited.str());
+  }
 }
 
 bool BbrBandwidthSampler::isAppLimited() const noexcept {

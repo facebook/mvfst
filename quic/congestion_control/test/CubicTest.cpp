@@ -43,6 +43,8 @@ TEST_F(CubicTest, AckIncreaseWritable) {
 
 TEST_F(CubicTest, PersistentCongestion) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), false);
   auto initCwnd = cubic.getWritableBytes();
   auto packet = makeTestingWritePacket(0, 1000, 1000);
@@ -74,6 +76,83 @@ TEST_F(CubicTest, PersistentCongestion) {
   cubic.onPacketSent(packet3);
   cubic.onPacketAckOrLoss(
       makeAck(2, 3000, Clock::now(), packet3.time), folly::none);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 9);
+
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, 0);
+  EXPECT_EQ(event->currentCwnd, initCwnd);
+  EXPECT_EQ(event->congestionEvent, kRemoveInflight.str());
+  EXPECT_EQ(event->state, cubicStateToString(CubicStates::Hystart));
+  EXPECT_EQ(event->recoveryState, "");
+
+  auto tmp2 = std::move(qLogger->logs[indices[1]]);
+  auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
+  EXPECT_EQ(event2->bytesInFlight, 0);
+  EXPECT_EQ(event2->currentCwnd, 11088);
+  EXPECT_EQ(event2->congestionEvent, kCubicLoss.str());
+  EXPECT_EQ(event2->state, cubicStateToString(CubicStates::FastRecovery));
+  EXPECT_EQ(event2->recoveryState, "");
+
+  auto tmp3 = std::move(qLogger->logs[indices[2]]);
+  auto event3 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp3.get());
+  EXPECT_EQ(event3->bytesInFlight, 0);
+  EXPECT_EQ(event3->currentCwnd, 2464);
+  EXPECT_EQ(event3->congestionEvent, kPersistentCongestion.str());
+  EXPECT_EQ(event3->state, cubicStateToString(CubicStates::Hystart));
+  EXPECT_EQ(event3->recoveryState, "");
+
+  auto tmp4 = std::move(qLogger->logs[indices[3]]);
+  auto event4 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp4.get());
+  EXPECT_EQ(event4->bytesInFlight, 0);
+  EXPECT_EQ(event4->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event4->congestionEvent, kCongestionPacketAck.str());
+  EXPECT_EQ(event4->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event4->recoveryState, "");
+
+  auto tmp5 = std::move(qLogger->logs[indices[4]]);
+  auto event5 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp5.get());
+  EXPECT_EQ(event5->bytesInFlight, 0);
+  EXPECT_EQ(event5->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event5->congestionEvent, kResetTimeToOrigin.str());
+  EXPECT_EQ(event5->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event5->recoveryState, "");
+
+  auto tmp6 = std::move(qLogger->logs[indices[5]]);
+  auto event6 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp6.get());
+  EXPECT_EQ(event6->bytesInFlight, 0);
+  EXPECT_EQ(event6->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event6->congestionEvent, kResetLastReductionTime.str());
+  EXPECT_EQ(event6->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event6->recoveryState, "");
+
+  auto tmp7 = std::move(qLogger->logs[indices[6]]);
+  auto event7 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp7.get());
+  EXPECT_EQ(event7->bytesInFlight, 0);
+  EXPECT_EQ(event7->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event7->congestionEvent, kCubicSteadyCwnd.str());
+  EXPECT_EQ(event7->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event7->recoveryState, "");
+
+  auto tmp8 = std::move(qLogger->logs[indices[7]]);
+  auto event8 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp8.get());
+  EXPECT_EQ(event8->bytesInFlight, 0);
+  EXPECT_EQ(event8->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event8->congestionEvent, kCwndNoChange.str());
+  EXPECT_EQ(event8->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event8->recoveryState, "");
+
+  auto tmp9 = std::move(qLogger->logs[indices[8]]);
+  auto event9 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp9.get());
+  EXPECT_EQ(event9->bytesInFlight, 0);
+  EXPECT_EQ(event9->currentCwnd, cubic.getCongestionWindow());
+  EXPECT_EQ(event9->congestionEvent, kCongestionPacketAck.str());
+  EXPECT_EQ(event9->state, cubicStateToString(CubicStates::Steady));
+  EXPECT_EQ(event9->recoveryState, "");
+
   EXPECT_EQ(currentCwnd, cubic.getWritableBytes());
 }
 

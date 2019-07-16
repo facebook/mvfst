@@ -51,7 +51,7 @@ class QLogger {
       uint64_t bytesInFlight,
       uint64_t currentCwnd,
       std::string congestionEvent,
-      std::string state,
+      std::string state = "",
       std::string recoveryState = "") = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,

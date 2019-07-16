@@ -122,17 +122,35 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
 
 TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   BbrBandwidthSampler sampler(conn);
   EXPECT_FALSE(sampler.isAppLimited());
   sampler.onAppLimited();
   EXPECT_TRUE(sampler.isAppLimited());
   CongestionController::AckEvent ackEvent;
   ackEvent.largestAckedPacket = ++conn.lossState.largestSent;
-  auto packet = makeTestingWritePacket(
-      *ackEvent.largestAckedPacket, 1000, 1000, false);
+  auto packet =
+      makeTestingWritePacket(*ackEvent.largestAckedPacket, 1000, 1000, false);
   ackEvent.ackedPackets.push_back(std::move(packet));
   sampler.onPacketAcked(ackEvent, 0);
   EXPECT_FALSE(sampler.isAppLimited());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, 0);
+  EXPECT_EQ(event->currentCwnd, 0);
+  EXPECT_EQ(event->congestionEvent, kCongestionAppLimited.str());
+
+  auto tmp2 = std::move(qLogger->logs[indices[1]]);
+  auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
+  EXPECT_EQ(event2->bytesInFlight, 0);
+  EXPECT_EQ(event2->currentCwnd, 0);
+  EXPECT_EQ(event2->congestionEvent, kCongestionAppUnlimited.str());
 }
 
 TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {

@@ -66,6 +66,8 @@ TEST_F(BbrTest, InitStates) {
 
 TEST_F(BbrTest, Recovery) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
   BbrCongestionController::BbrConfig config;
   conn.transportSettings.initCwndInMss = 500; // Make a really large initCwnd
@@ -90,6 +92,22 @@ TEST_F(BbrTest, Recovery) {
   auto estimatedEndOfRoundTrip = Clock::now();
   EXPECT_TRUE(bbr.inRecovery());
   EXPECT_EQ(expectedRecoveryWindow, bbr.getCongestionWindow());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, inflightBytes);
+  EXPECT_EQ(event->currentCwnd, 449900);
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
+  EXPECT_EQ(
+      event->state,
+      bbrStateToString(BbrCongestionController::BbrState::Startup));
+  EXPECT_EQ(
+      event->recoveryState,
+      bbrRecoveryStateToString(
+          BbrCongestionController::RecoveryState::CONSERVATIVE));
 
   // Sleep 1ms to make next now() a bit far from previous now().
   std::this_thread::sleep_for(1ms);
@@ -409,6 +427,8 @@ TEST_F(BbrTest, NoLargestAckedPacketNoCrash) {
 
 TEST_F(BbrTest, AckAggregation) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
   BbrCongestionController::BbrConfig config;
   BbrCongestionController bbr(conn, config);
@@ -446,6 +466,23 @@ TEST_F(BbrTest, AckAggregation) {
   };
 
   sendAckGrow(true);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->bytesInFlight, 0);
+  EXPECT_EQ(event->currentCwnd, bbr.getCongestionWindow());
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
+  EXPECT_EQ(
+      event->state,
+      bbrStateToString(BbrCongestionController::BbrState::Startup));
+  EXPECT_EQ(
+      event->recoveryState,
+      bbrRecoveryStateToString(
+          BbrCongestionController::RecoveryState::NOT_RECOVERY));
+
   // kStartupSlowGrowRoundLimit consecutive slow growth to leave Startup
   for (int i = 0; i <= kStartupSlowGrowRoundLimit; i++) {
     sendAckGrow(false);
