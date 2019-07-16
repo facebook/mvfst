@@ -104,6 +104,14 @@ void FileQLogger::addPacingMetricUpdate(
       pacingBurstSizeIn, pacingIntervalIn, refTime));
 }
 
+void FileQLogger::addAppIdleUpdate(std::string idleEvent, bool idle) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogAppIdleUpdateEvent>(
+      std::move(idleEvent), idle, refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

@@ -405,6 +405,32 @@ folly::dynamic QLogPacingMetricUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogAppIdleUpdateEvent::QLogAppIdleUpdateEvent(
+    std::string idleEventIn,
+    bool idleIn,
+    std::chrono::microseconds refTimeIn)
+    : idleEvent{std::move(idleEventIn)}, idle{idleIn} {
+  eventType = QLogEventType::AppIdleUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogAppIdleUpdateEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "IDLE_UPDATE",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["idle_event"] = idleEvent;
+  data["idle"] = idle;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -419,6 +445,8 @@ std::string toString(QLogEventType type) {
       return "CONGESTION_METRIC_UPDATE";
     case QLogEventType::PacingMetricUpdate:
       return "PACING_METRIC_UPDATE";
+    case QLogEventType::AppIdleUpdate:
+      return "APP_IDLE_UPDATE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

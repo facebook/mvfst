@@ -42,5 +42,6 @@ constexpr folly::StringPiece kCongestionAppLimited = "congestion app limited";
 constexpr folly::StringPiece kCongestionAppUnlimited =
     "congestion app unlimited";
 constexpr uint64_t kDefaultCwnd = 12320;
+constexpr folly::StringPiece kAppIdle = "app idle";
 
 } // namespace quic

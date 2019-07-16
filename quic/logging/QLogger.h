@@ -56,6 +56,7 @@ class QLogger {
   virtual void addPacingMetricUpdate(
       uint64_t pacingBurstSizeIn,
       std::chrono::microseconds pacingIntervalIn) = 0;
+  virtual void addAppIdleUpdate(std::string idleEvent, bool idle) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

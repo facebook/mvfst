@@ -299,6 +299,7 @@ enum class QLogEventType : uint32_t {
   TransportSummary,
   CongestionMetricUpdate,
   PacingMetricUpdate,
+  AppIdleUpdate
 };
 
 std::string toString(QLogEventType type);
@@ -409,6 +410,19 @@ class QLogPacingMetricUpdateEvent : public QLogEvent {
   ~QLogPacingMetricUpdateEvent() override = default;
   uint64_t pacingBurstSize;
   std::chrono::microseconds pacingInterval;
+
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogAppIdleUpdateEvent : public QLogEvent {
+ public:
+  QLogAppIdleUpdateEvent(
+      std::string idleEvent,
+      bool idle,
+      std::chrono::microseconds refTime);
+  ~QLogAppIdleUpdateEvent() override = default;
+  std::string idleEvent;
+  bool idle;
 
   folly::dynamic toDynamic() const override;
 };

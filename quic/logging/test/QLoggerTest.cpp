@@ -146,6 +146,17 @@ TEST_F(QLoggerTest, PacingMetricUpdateEvent) {
   EXPECT_EQ(gotEvent->pacingInterval, 30us);
 }
 
+TEST_F(QLoggerTest, AppIdleUpdateEvent) {
+  FileQLogger q;
+  q.addAppIdleUpdate(kAppIdle.str(), false);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogAppIdleUpdateEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->idleEvent, kAppIdle.str());
+  EXPECT_FALSE(gotEvent->idle);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -712,6 +723,29 @@ TEST_F(QLoggerTest, PacingMetricUpdateFollyDynamic) {
 
   FileQLogger q;
   q.addPacingMetricUpdate(20, 30us);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, AppIdleFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+      [
+        "0",
+        "IDLE_UPDATE",
+        "APP_IDLE_UPDATE",
+        "DEFAULT",
+        {
+         "idle_event": "app idle",
+         "idle": true
+        }
+      ]
+ ])");
+
+  FileQLogger q;
+  q.addAppIdleUpdate(kAppIdle.str(), true);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
