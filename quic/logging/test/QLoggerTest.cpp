@@ -135,6 +135,17 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
           BbrCongestionController::RecoveryState::NOT_RECOVERY));
 }
 
+TEST_F(QLoggerTest, PacingMetricUpdateEvent) {
+  FileQLogger q;
+  q.addPacingMetricUpdate(10, 30us);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacingMetricUpdateEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->pacingBurstSize, 10);
+  EXPECT_EQ(gotEvent->pacingInterval, 30us);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -678,6 +689,29 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
       30,
       kPersistentCongestion.str(),
       cubicStateToString(CubicStates::Steady).str());
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PacingMetricUpdateFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+      [
+        "0",
+        "METRIC_UPDATE",
+        "PACING_METRIC_UPDATE",
+        "DEFAULT",
+        {
+         "pacing_burst_size": 20,
+         "pacing_interval": 30
+        }
+      ]
+ ])");
+
+  FileQLogger q;
+  q.addPacingMetricUpdate(20, 30us);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
