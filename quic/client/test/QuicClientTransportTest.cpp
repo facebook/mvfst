@@ -548,11 +548,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   expected->prependChain(data->clone());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  if (getVersion() == QuicVersion::MVFST) {
-    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
-  } else {
-    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
-  }
+  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
@@ -1019,7 +1015,10 @@ TEST_P(
 INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,
-    ::testing::Values(QuicVersion::MVFST, QuicVersion::QUIC_DRAFT));
+    ::testing::Values(
+        QuicVersion::MVFST,
+        QuicVersion::MVFST_OLD,
+        QuicVersion::QUIC_DRAFT));
 
 // Simulates a simple 1rtt handshake without needing to get any handshake bytes
 // from the server.
@@ -1070,7 +1069,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     parameters.push_back(encodeIntegerParameter(
         TransportParameterId::max_packet_size, maxRecvPacketSize));
     ServerTransportParameters params;
-    params.negotiated_version = negotiatedVersion;
+    params.negotiated_version = folly::none;
     params.supported_versions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
 
     StatelessResetToken testStatelessResetToken = generateStatelessResetToken();
@@ -1490,9 +1489,13 @@ class QuicClientTransportTest : public Test {
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     codec->setClientConnectionId(*originalConnId);
     codec->setInitialReadCipher(getClientInitialCipher(
-        &fizzFactory, *client->getConn().initialDestinationConnectionId));
+        &fizzFactory,
+        *client->getConn().initialDestinationConnectionId,
+        QuicVersion::MVFST));
     codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-        &fizzFactory, *client->getConn().initialDestinationConnectionId));
+        &fizzFactory,
+        *client->getConn().initialDestinationConnectionId,
+        QuicVersion::MVFST));
     codec->setHandshakeReadCipher(test::createNoOpAead());
     codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
     return codec;
@@ -1510,9 +1513,13 @@ class QuicClientTransportTest : public Test {
     codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
     if (handshakeCipher) {
       codec->setInitialReadCipher(getClientInitialCipher(
-          &fizzFactory, *client->getConn().initialDestinationConnectionId));
+          &fizzFactory,
+          *client->getConn().initialDestinationConnectionId,
+          QuicVersion::MVFST));
       codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-          &fizzFactory, *client->getConn().initialDestinationConnectionId));
+          &fizzFactory,
+          *client->getConn().initialDestinationConnectionId,
+          QuicVersion::MVFST));
       codec->setHandshakeReadCipher(test::createNoOpAead());
       codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
     }
@@ -2493,8 +2500,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
 
   QuicFizzFactory fizzFactory;
   auto garbage = IOBuf::copyBuffer("garbage");
-  auto initialCipher =
-      getServerInitialCipher(&fizzFactory, *serverChosenConnId);
+  auto initialCipher = getServerInitialCipher(
+      &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
   auto firstPacketNum = appDataPacketNum++;
   auto packet1 = packetToBufCleartext(
       createStreamPacket(
@@ -2537,8 +2544,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   IOBufQueue packets{IOBufQueue::cacheChainLength()};
   for (int i = 0; i < kMaxNumCoalescedPackets; i++) {
     auto garbage = IOBuf::copyBuffer("garbage");
-    auto initialCipher =
-        getServerInitialCipher(&fizzFactory, *serverChosenConnId);
+    auto initialCipher = getServerInitialCipher(
+        &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
     auto packetNum = appDataPacketNum++;
     auto packet1 = packetToBufCleartext(
         createStreamPacket(
@@ -3203,8 +3210,8 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
   // throws on getting unencrypted stream data.
   PacketNum nextPacketNum = appDataPacketNum++;
 
-  auto initialCipher =
-      getServerInitialCipher(&fizzFactory, *serverChosenConnId);
+  auto initialCipher = getServerInitialCipher(
+      &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
   auto packet = packetToBufCleartext(
       createStreamPacket(
           *serverChosenConnId /* src */,
@@ -3716,8 +3723,6 @@ Buf getHandshakePacketWithFrame(
 
 TEST_F(QuicClientTransportVersionAndRetryTest, FrameNotAllowed) {
   StreamId streamId = *client->createBidirectionalStream();
-  auto data = IOBuf::copyBuffer("data");
-
   auto clientConnectionId = *client->getConn().clientConnectionId;
   auto serverConnId = *serverChosenConnId;
   serverConnId.data()[0] = ~serverConnId.data()[0];

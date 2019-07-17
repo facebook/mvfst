@@ -61,8 +61,8 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
   StatelessResetToken token = generateStatelessResetToken();
   ServerTransportParametersExtension ext(
-      QuicVersion::MVFST,
-      {MVFST1, QuicVersion::MVFST},
+      QuicVersion::MVFST_OLD,
+      {MVFST1, QuicVersion::MVFST_OLD},
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -74,7 +74,7 @@ TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
       kDefaultUDPSendPacketLen,
       kDefaultPartialReliability,
       token);
-  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST));
+  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST_OLD));
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);

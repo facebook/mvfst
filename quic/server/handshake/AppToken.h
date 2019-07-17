@@ -33,11 +33,11 @@ namespace quic {
 struct AppToken {
   TicketTransportParameters transportParams;
   std::vector<folly::IPAddress> sourceAddresses;
+  folly::Optional<QuicVersion> version;
   Buf appParams;
 };
 
 TicketTransportParameters createTicketTransportParameters(
-    QuicVersion negotiatedVersion,
     uint64_t idleTimeout,
     uint64_t maxRecvPacketSize,
     uint64_t initialMaxData,

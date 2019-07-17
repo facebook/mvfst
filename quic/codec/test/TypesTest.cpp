@@ -115,9 +115,9 @@ TEST_F(TypesTest, LongHeaderSmallInput) {
   auto buf = folly::IOBuf::create(15);
   buf->append(15);
   folly::io::RWPrivateCursor wcursor(buf.get());
+  wcursor.writeBE<uint32_t>(789);
   auto connId = getTestConnectionId();
   wcursor.push(connId.data(), connId.size());
-  wcursor.writeBE<uint32_t>(789);
   wcursor.writeBE<uint8_t>(1);
   wcursor.writeBE<uint8_t>(2);
   wcursor.writeBE<uint8_t>(3);

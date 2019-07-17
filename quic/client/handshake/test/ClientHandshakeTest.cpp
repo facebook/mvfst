@@ -352,7 +352,7 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
-            getVersion(),
+            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -454,7 +454,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
         hostname,
         psk.cachedPsk,
         std::make_shared<ClientTransportParametersExtension>(
-            getVersion(),
+            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),

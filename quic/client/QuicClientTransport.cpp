@@ -820,14 +820,15 @@ void QuicClientTransport::startCryptoHandshake() {
   }
 
   QuicFizzFactory fizzFactory;
+  auto version = conn_->originalVersion.value();
   conn_->initialWriteCipher = getClientInitialCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId);
+      &fizzFactory, *clientConn_->initialDestinationConnectionId, version);
   conn_->readCodec->setInitialReadCipher(getServerInitialCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId));
+      &fizzFactory, *clientConn_->initialDestinationConnectionId, version));
   conn_->readCodec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId));
+      &fizzFactory, *clientConn_->initialDestinationConnectionId, version));
   conn_->initialHeaderCipher = makeClientInitialHeaderCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId);
+      &fizzFactory, *clientConn_->initialDestinationConnectionId, version);
 
   // Add partial reliability parameter to customTransportParameters_.
   setPartialReliabilityTransportParameter();

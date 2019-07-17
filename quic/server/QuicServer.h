@@ -311,7 +311,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       const std::vector<folly::EventBase*>& evbs);
 
   std::vector<QuicVersion> supportedVersions_{
-      {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT}};
+      {QuicVersion::MVFST, QuicVersion::MVFST_OLD, QuicVersion::QUIC_DRAFT}};
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   TransportSettings transportSettings_;

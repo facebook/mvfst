@@ -198,7 +198,7 @@ inline folly::Optional<quic::ClientTransportParameters> getExtension(
   if (cursor.canAdvance(sizeof(tryVersion))) {
     detail::read(tryVersion, versionCursor);
   }
-  if (tryVersion == quic::QuicVersion::MVFST) {
+  if (tryVersion == quic::QuicVersion::MVFST_OLD) {
     parameters.initial_version = tryVersion;
     cursor.skip(sizeof(tryVersion));
   }
@@ -220,7 +220,7 @@ inline folly::Optional<quic::ServerTransportParameters> getExtension(
   if (cursor.canAdvance(sizeof(tryVersion))) {
     detail::read(tryVersion, versionCursor);
   }
-  if (tryVersion == quic::QuicVersion::MVFST) {
+  if (tryVersion == quic::QuicVersion::MVFST_OLD) {
     parameters.negotiated_version = tryVersion;
     cursor.skip(sizeof(tryVersion));
     detail::readVector<uint8_t>(parameters.supported_versions, cursor);
@@ -243,7 +243,7 @@ inline folly::Optional<quic::TicketTransportParameters> getExtension(
   if (versionCursor.canAdvance(sizeof(tryVersion))) {
     detail::read(tryVersion, versionCursor);
   }
-  if (tryVersion == quic::QuicVersion::MVFST) {
+  if (tryVersion == quic::QuicVersion::MVFST_OLD) {
     parameters.negotiated_version = tryVersion;
     cursor.skip(sizeof(tryVersion));
   }

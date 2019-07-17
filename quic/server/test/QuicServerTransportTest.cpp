@@ -319,13 +319,13 @@ class QuicServerTransportTest : public Test {
   std::unique_ptr<Aead> getInitialCipher() {
     QuicFizzFactory fizzFactory;
     return getClientInitialCipher(
-        &fizzFactory, *initialDestinationConnectionId);
+        &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST);
   }
 
   std::unique_ptr<PacketNumberCipher> getInitialHeaderCipher() {
     QuicFizzFactory fizzFactory;
     return makeClientInitialHeaderCipher(
-        &fizzFactory, *initialDestinationConnectionId);
+        &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST);
   }
 
   Buf recvEncryptedStream(
@@ -403,10 +403,10 @@ class QuicServerTransportTest : public Test {
     QuicFizzFactory fizzFactory;
     clientReadCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
     clientReadCodec->setClientConnectionId(*clientConnectionId);
-    clientReadCodec->setInitialReadCipher(
-        getServerInitialCipher(&fizzFactory, *initialDestinationConnectionId));
+    clientReadCodec->setInitialReadCipher(getServerInitialCipher(
+        &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST));
     clientReadCodec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
-        &fizzFactory, *initialDestinationConnectionId));
+        &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST));
     clientReadCodec->setCodecParameters(
         CodecParameters(kDefaultAckDelayExponent));
   }
@@ -573,9 +573,9 @@ class QuicServerTransportTest : public Test {
     readCodec->setClientConnectionId(*clientConnectionId);
     if (handshakeCipher) {
       readCodec->setInitialReadCipher(getServerInitialCipher(
-          &fizzFactory, *initialDestinationConnectionId));
+          &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST));
       readCodec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
-          &fizzFactory, *initialDestinationConnectionId));
+          &fizzFactory, *initialDestinationConnectionId, QuicVersion::MVFST));
     }
     return readCodec;
   }
@@ -2694,7 +2694,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {
 TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
   QuicFizzFactory fizzFactory;
   PacketNum nextPacket = clientNextInitialPacketNum++;
-  auto aead = getServerInitialCipher(&fizzFactory, *clientConnectionId);
+  auto aead = getServerInitialCipher(
+      &fizzFactory, *clientConnectionId, QuicVersion::MVFST);
   auto packetData = packetToBufCleartext(
       createInitialCryptoPacket(
           *clientConnectionId,

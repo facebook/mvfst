@@ -461,8 +461,8 @@ void onServerReadDataFromOpen(
             token));
     QuicFizzFactory fizzFactory;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-    conn.readCodec->setInitialReadCipher(
-        getClientInitialCipher(&fizzFactory, initialDestinationConnectionId));
+    conn.readCodec->setInitialReadCipher(getClientInitialCipher(
+        &fizzFactory, initialDestinationConnectionId, version));
     conn.readCodec->setClientConnectionId(clientConnectionId);
     if (conn.qLogger) {
       conn.qLogger->scid = conn.serverConnectionId;
@@ -470,17 +470,13 @@ void onServerReadDataFromOpen(
     }
     conn.readCodec->setCodecParameters(
         CodecParameters(conn.peerAckDelayExponent));
-    conn.initialWriteCipher =
-        getServerInitialCipher(&fizzFactory, initialDestinationConnectionId);
+    conn.initialWriteCipher = getServerInitialCipher(
+        &fizzFactory, initialDestinationConnectionId, version);
 
-    auto serverInitialTrafficSecret = makeServerInitialTrafficSecret(
-        &fizzFactory, initialDestinationConnectionId);
-    auto clientInitialTrafficSecret = makeClientInitialTrafficSecret(
-        &fizzFactory, initialDestinationConnectionId);
     conn.readCodec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-        &fizzFactory, initialDestinationConnectionId));
+        &fizzFactory, initialDestinationConnectionId, version));
     conn.initialHeaderCipher = makeServerInitialHeaderCipher(
-        &fizzFactory, initialDestinationConnectionId);
+        &fizzFactory, initialDestinationConnectionId, version);
     conn.peerAddress = conn.originalPeerAddress;
   }
   folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};

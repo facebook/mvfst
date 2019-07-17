@@ -35,7 +35,6 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -44,6 +43,7 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
+  appToken.version = conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -62,7 +62,6 @@ TEST(
       conn.transportSettings.advertisedInitialConnectionWindowSize;
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       initialMaxData - 1,
@@ -71,6 +70,7 @@ TEST(
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
+  appToken.version = conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -94,14 +94,13 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   EXPECT_FALSE(validator.validate(resState));
 }
 
-TEST(DefaultAppTokenValidatorTest, TestInvalidVersionMismatch) {
+TEST(DefaultAppTokenValidatorTest, TestNoVersionMismatch) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::QUIC_DRAFT;
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -110,6 +109,30 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidVersionMismatch) {
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
+  appToken.version = conn.version;
+  ResumptionState resState;
+  resState.appToken = encodeAppToken(appToken);
+
+  DefaultAppTokenValidator validator(&conn);
+  EXPECT_TRUE(validator.validate(resState));
+}
+
+TEST(DefaultAppTokenValidatorTest, TestVersionMismatch) {
+  QuicServerConnectionState conn;
+  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
+  conn.version = QuicVersion::QUIC_DRAFT;
+
+  AppToken appToken;
+  appToken.transportParams = createTicketTransportParameters(
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
+      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
+      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
+      conn.transportSettings.advertisedInitialUniStreamWindowSize,
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
+  appToken.version = QuicVersion::MVFST;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -169,7 +192,6 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -194,7 +216,6 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -217,7 +238,6 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count() + 100,
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -240,7 +260,6 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
       conn.transportSettings.idleTimeout.count(),
       conn.transportSettings.maxRecvPacketSize,
       conn.transportSettings.advertisedInitialConnectionWindowSize,
@@ -289,7 +308,6 @@ class SourceAddressTokenTest : public Test {
     conn_.version = QuicVersion::MVFST;
 
     appToken_.transportParams = createTicketTransportParameters(
-        *conn_.version,
         conn_.transportSettings.idleTimeout.count(),
         conn_.transportSettings.maxRecvPacketSize,
         conn_.transportSettings.advertisedInitialConnectionWindowSize,
@@ -298,6 +316,7 @@ class SourceAddressTokenTest : public Test {
         conn_.transportSettings.advertisedInitialUniStreamWindowSize,
         conn_.transportSettings.advertisedInitialMaxStreamsBidi,
         conn_.transportSettings.advertisedInitialMaxStreamsUni);
+    appToken_.version = QuicVersion::MVFST;
   }
 
   void encodeAndValidate(bool acceptZeroRtt = true) {

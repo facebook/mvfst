@@ -22,9 +22,10 @@ constexpr auto kReservedPacketLenSize = sizeof(uint16_t);
 constexpr auto kReservedPacketNumSize = kMaxPacketNumEncodingSize;
 
 // Note a full PacketNum has 64 bits, but LongHeader only uses 32 bits of them
-// This is based on Draft-15
+// This is based on Draft-22
 constexpr auto kLongHeaderHeaderSize = sizeof(uint8_t) /* Type bytes */ +
-    sizeof(QuicVersionType) /* Version */ + sizeof(uint8_t) /* DCIL + SCIL */ +
+    sizeof(QuicVersionType) /* Version */ +
+    2 * sizeof(uint8_t) /* DCIL + SCIL */ +
     kDefaultConnectionIdSize * 2 /* 2 connection IDs */ +
     kReservedPacketLenSize /* minimal size of length */ +
     kReservedPacketNumSize /* packet number */;

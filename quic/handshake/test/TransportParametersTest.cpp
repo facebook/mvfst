@@ -45,7 +45,7 @@ TEST_F(ExtensionsTest, TestClientParams) {
 TEST_F(ExtensionsTest, TestD18ClientParams) {
   auto exts = getExtensions(d18ClientParams);
   auto ext = getExtension<ClientTransportParameters>(exts);
-  EXPECT_EQ(ext->initial_version.value(), QuicVersion::MVFST);
+  EXPECT_EQ(ext->initial_version.value(), QuicVersion::MVFST_OLD);
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
@@ -89,7 +89,7 @@ TEST_F(ExtensionsTest, TestD18TicketParams) {
   auto exts = getExtensions(d18TicketParams);
   auto ext = getExtension<TicketTransportParameters>(exts);
 
-  EXPECT_EQ(ext->negotiated_version.value(), QuicVersion::MVFST);
+  EXPECT_EQ(ext->negotiated_version.value(), QuicVersion::MVFST_OLD);
   EXPECT_EQ(ext->parameters.size(), 1);
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);

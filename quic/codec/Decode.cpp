@@ -762,33 +762,64 @@ parseLongHeaderInvariant(uint8_t initialByte, folly::io::Cursor& cursor) {
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   auto version = static_cast<QuicVersion>(cursor.readBE<QuicVersionType>());
-  if (!cursor.canAdvance(kConnIdLengthOctet)) {
-    VLOG(5) << "Not enough input bytes to read ConnectionId lengths";
-    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-  }
-  // Octet with source and destination connId lens encoded as: DCIL(4)|SCIL(4)
-  uint8_t encodedConnIdlens = cursor.readBE<uint8_t>();
-  auto connIdLens = decodeConnectionIdLengths(encodedConnIdlens);
-  uint8_t destConnIdLen = connIdLens.first;
-  uint8_t srcConnIdLen = connIdLens.second;
+  if (version == QuicVersion::MVFST_OLD) {
+    if (!cursor.canAdvance(kConnIdLengthOctet)) {
+      VLOG(5) << "Not enough input bytes to read ConnectionId lengths";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    // Octet with source and destination connId lens encoded as: DCIL(4)|SCIL(4)
+    uint8_t encodedConnIdlens = cursor.readBE<uint8_t>();
+    auto connIdLens = decodeConnectionIdLengths(encodedConnIdlens);
+    uint8_t destConnIdLen = connIdLens.first;
+    uint8_t srcConnIdLen = connIdLens.second;
 
-  if (!cursor.canAdvance(destConnIdLen)) {
-    VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
-    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-  }
-  ConnectionId destConnId(cursor, destConnIdLen);
+    if (!cursor.canAdvance(destConnIdLen)) {
+      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    ConnectionId destConnId(cursor, destConnIdLen);
 
-  if (!cursor.canAdvance(srcConnIdLen)) {
-    VLOG(5) << "Not enough input bytes to read Source ConnectionId";
-    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    if (!cursor.canAdvance(srcConnIdLen)) {
+      VLOG(5) << "Not enough input bytes to read Source ConnectionId";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    ConnectionId srcConnId(cursor, srcConnIdLen);
+    size_t currentLength = cursor.totalLength();
+    size_t bytesRead = initialLength - currentLength;
+    return ParsedLongHeaderInvariant(
+        initialByte,
+        LongHeaderInvariant(
+            version, std::move(srcConnId), std::move(destConnId)),
+        bytesRead);
+  } else {
+    if (!cursor.canAdvance(1)) {
+      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId length";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    uint8_t destConnIdLen = cursor.readBE<uint8_t>();
+    if (!cursor.canAdvance(destConnIdLen)) {
+      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    ConnectionId destConnId(cursor, destConnIdLen);
+    if (!cursor.canAdvance(1)) {
+      VLOG(5) << "Not enough input bytes to read Source ConnectionId length";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    uint8_t srcConnIdLen = cursor.readBE<uint8_t>();
+    if (!cursor.canAdvance(srcConnIdLen)) {
+      VLOG(5) << "Not enough input bytes to read Source ConnectionId";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    ConnectionId srcConnId(cursor, srcConnIdLen);
+    size_t currentLength = cursor.totalLength();
+    size_t bytesRead = initialLength - currentLength;
+    return ParsedLongHeaderInvariant(
+        initialByte,
+        LongHeaderInvariant(
+            version, std::move(srcConnId), std::move(destConnId)),
+        bytesRead);
   }
-  ConnectionId srcConnId(cursor, srcConnIdLen);
-  size_t currentLength = cursor.totalLength();
-  size_t bytesRead = initialLength - currentLength;
-  return ParsedLongHeaderInvariant(
-      initialByte,
-      LongHeaderInvariant(version, std::move(srcConnId), std::move(destConnId)),
-      bytesRead);
 }
 
 LongHeader::Types parseLongHeaderType(uint8_t initialByte) {

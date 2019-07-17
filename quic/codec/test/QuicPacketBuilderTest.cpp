@@ -68,14 +68,14 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   codec->setClientConnectionId(clientConnId);
   if (nodeType == QuicNodeType::Client) {
     codec->setInitialReadCipher(
-        getServerInitialCipher(&fizzFactory, clientConnId));
-    codec->setInitialHeaderCipher(
-        makeServerInitialHeaderCipher(&fizzFactory, clientConnId));
+        getServerInitialCipher(&fizzFactory, clientConnId, QuicVersion::MVFST));
+    codec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
+        &fizzFactory, clientConnId, QuicVersion::MVFST));
   } else {
     codec->setInitialReadCipher(
-        getClientInitialCipher(&fizzFactory, clientConnId));
-    codec->setInitialHeaderCipher(
-        makeClientInitialHeaderCipher(&fizzFactory, clientConnId));
+        getClientInitialCipher(&fizzFactory, clientConnId, QuicVersion::MVFST));
+    codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
+        &fizzFactory, clientConnId, QuicVersion::MVFST));
   }
   return codec;
 }
@@ -191,8 +191,9 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   QuicVersion ver = QuicVersion::QUIC_DRAFT;
   // create a server cleartext write codec.
   QuicFizzFactory fizzFactory;
-  auto cleartextAead = getClientInitialCipher(&fizzFactory, serverConnId);
-  auto headerCipher = makeClientInitialHeaderCipher(&fizzFactory, serverConnId);
+  auto cleartextAead = getClientInitialCipher(&fizzFactory, serverConnId, ver);
+  auto headerCipher =
+      makeClientInitialHeaderCipher(&fizzFactory, serverConnId, ver);
 
   auto resultRegularPacket = createInitialCryptoPacket(
       serverConnId,

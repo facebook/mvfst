@@ -19,11 +19,14 @@ namespace quic {
 Buf makeInitialTrafficSecret(
     fizz::Factory* factory,
     folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId) {
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
   auto deriver =
       factory->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto connIdRange = folly::range(clientDestinationConnId);
-  auto initialSecret = deriver->hkdfExtract(kQuicDraft17Salt, connIdRange);
+  auto salt =
+      version == QuicVersion::MVFST_OLD ? kQuicDraft17Salt : kQuicDraft22Salt;
+  auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
   auto trafficSecret = deriver->expandLabel(
       folly::range(initialSecret),
       label,
@@ -34,24 +37,27 @@ Buf makeInitialTrafficSecret(
 
 Buf makeServerInitialTrafficSecret(
     fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId) {
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
   return makeInitialTrafficSecret(
-      factory, kServerInitialLabel, clientDestinationConnId);
+      factory, kServerInitialLabel, clientDestinationConnId, version);
 }
 
 Buf makeClientInitialTrafficSecret(
     fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId) {
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
   return makeInitialTrafficSecret(
-      factory, kClientInitialLabel, clientDestinationConnId);
+      factory, kClientInitialLabel, clientDestinationConnId, version);
 }
 
 std::unique_ptr<Aead> makeInitialAead(
     fizz::Factory* factory,
     folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId) {
-  auto trafficSecret =
-      makeInitialTrafficSecret(factory, label, clientDestinationConnId);
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
+  auto trafficSecret = makeInitialTrafficSecret(
+      factory, label, clientDestinationConnId, version);
   auto deriver =
       factory->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto aead = factory->makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
@@ -73,21 +79,26 @@ std::unique_ptr<Aead> makeInitialAead(
 
 std::unique_ptr<Aead> getClientInitialCipher(
     fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId) {
-  return makeInitialAead(factory, kClientInitialLabel, clientDestinationConnId);
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
+  return makeInitialAead(
+      factory, kClientInitialLabel, clientDestinationConnId, version);
 }
 
 std::unique_ptr<Aead> getServerInitialCipher(
     fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId) {
-  return makeInitialAead(factory, kServerInitialLabel, clientDestinationConnId);
+    const ConnectionId& clientDestinationConnId,
+    QuicVersion version) {
+  return makeInitialAead(
+      factory, kServerInitialLabel, clientDestinationConnId, version);
 }
 
 std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
     QuicFizzFactory* factory,
-    const ConnectionId& initialDestinationConnectionId) {
-  auto clientInitialTrafficSecret =
-      makeClientInitialTrafficSecret(factory, initialDestinationConnectionId);
+    const ConnectionId& initialDestinationConnectionId,
+    QuicVersion version) {
+  auto clientInitialTrafficSecret = makeClientInitialTrafficSecret(
+      factory, initialDestinationConnectionId, version);
   return makePacketNumberCipher(
       factory,
       clientInitialTrafficSecret->coalesce(),
@@ -96,9 +107,10 @@ std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
 
 std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
     QuicFizzFactory* factory,
-    const ConnectionId& initialDestinationConnectionId) {
-  auto serverInitialTrafficSecret =
-      makeServerInitialTrafficSecret(factory, initialDestinationConnectionId);
+    const ConnectionId& initialDestinationConnectionId,
+    QuicVersion version) {
+  auto serverInitialTrafficSecret = makeServerInitialTrafficSecret(
+      factory, initialDestinationConnectionId, version);
   return makePacketNumberCipher(
       factory,
       serverInitialTrafficSecret->coalesce(),

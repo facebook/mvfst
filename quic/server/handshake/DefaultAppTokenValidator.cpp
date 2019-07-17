@@ -46,8 +46,7 @@ bool DefaultAppTokenValidator::validate(
     return false;
   }
 
-  if (!conn_->version ||
-      appToken->transportParams.negotiated_version != *conn_->version) {
+  if (conn_->version != appToken->version) {
     VLOG(10) << "QuicVersion mismatch";
     return false;
   }

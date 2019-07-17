@@ -39,8 +39,8 @@ class MockClock {
   }
 };
 
-constexpr QuicVersion MVFST1 = static_cast<QuicVersion>(0xfaceb001);
-constexpr QuicVersion MVFST2 = static_cast<QuicVersion>(0xfaceb002);
+constexpr QuicVersion MVFST1 = static_cast<QuicVersion>(0xfaceb002);
+constexpr QuicVersion MVFST2 = static_cast<QuicVersion>(0xfaceb003);
 
 constexpr folly::StringPiece kTestHost = "host";
 

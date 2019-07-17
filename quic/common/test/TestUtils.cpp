@@ -195,9 +195,9 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     resState.ticketAgeAdd = 0;
     resState.ticketIssueTime = std::chrono::system_clock::time_point();
     resState.handshakeTime = std::chrono::system_clock::time_point();
+    auto version = cachedPsk_.transportParams.negotiatedVersion;
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
-        cachedPsk_.transportParams.negotiatedVersion,
         kDefaultIdleTimeout.count(),
         kDefaultUDPReadBufferSize,
         kDefaultConnectionWindowSize,
@@ -206,6 +206,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
         kDefaultStreamWindowSize,
         std::numeric_limits<uint32_t>::max(),
         std::numeric_limits<uint32_t>::max());
+    appToken.version = version;
     resState.appToken = encodeAppToken(appToken);
     return resState;
   }

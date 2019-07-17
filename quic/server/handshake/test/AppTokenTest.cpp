@@ -100,7 +100,6 @@ void expectAppTokenEqual(
 TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -109,6 +108,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
       kDefaultStreamWindowSize,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -117,7 +117,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeNoSourceAddresses) {
 TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -128,6 +127,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {
       folly::IPAddress("2401:db00:2111:7283:face::46:0")};
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -136,7 +136,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv6Address) {
 TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -149,6 +148,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("2401:db00:2111:7283:face::46:1"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -157,7 +157,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv6Addresses) {
 TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -167,6 +166,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4")};
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -175,7 +175,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeSingleIPv4Address) {
 TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -187,6 +186,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
   appToken.sourceAddresses = {folly::IPAddress("1.2.3.4"),
                               folly::IPAddress("1.2.3.5"),
                               folly::IPAddress("1.2.3.6")};
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -195,7 +195,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
 TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -208,6 +207,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -216,7 +216,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4Addresses) {
 TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -225,6 +224,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
       kDefaultStreamWindowSize,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
+  appToken.version = QuicVersion::MVFST;
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   Buf buf = encodeAppToken(appToken);
 
@@ -234,7 +234,6 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
 TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      QuicVersion::MVFST,
       kDefaultIdleTimeout.count(),
       kDefaultUDPReadBufferSize,
       kDefaultConnectionWindowSize,
@@ -247,6 +246,7 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
+  appToken.version = QuicVersion::MVFST;
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
   Buf buf = encodeAppToken(appToken);
 

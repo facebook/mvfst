@@ -88,7 +88,8 @@ TEST_F(HandshakeLayerTest, TestDraft17ClearTextCipher) {
   ConnectionId destinationConnid(destinationConnidVector);
   QuicTestFizzFactory factory;
   factory.setMockAead(createMockAead());
-  auto aead = getClientInitialCipher(&factory, destinationConnid);
+  auto aead = getClientInitialCipher(
+      &factory, destinationConnid, QuicVersion::MVFST_OLD);
 
   std::string expectedKey = "86d1830480b40f86cf9d68dcadf35dfe";
   std::string expectedIv = "12f3938aca34aa02543163d4";

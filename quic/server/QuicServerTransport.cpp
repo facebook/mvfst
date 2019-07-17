@@ -362,7 +362,6 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     newSessionTicketWritten_ = true;
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
-        *conn_->version,
         conn_->transportSettings.idleTimeout.count(),
         conn_->transportSettings.maxRecvPacketSize,
         conn_->transportSettings.advertisedInitialConnectionWindowSize,
@@ -372,6 +371,7 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
         std::numeric_limits<uint32_t>::max(),
         std::numeric_limits<uint32_t>::max());
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
+    appToken.version = conn_->version;
     // If a client connects to server for the first time and doesn't attempt
     // early data, tokenSourceAddresses will not be set because
     // validateAndUpdateSourceAddressToken is not called in this case.
