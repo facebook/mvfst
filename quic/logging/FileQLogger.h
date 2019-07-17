@@ -57,6 +57,7 @@ class FileQLogger : public QLogger {
       uint64_t pacingBurstSizeIn,
       std::chrono::microseconds pacingIntervalIn) override;
   void addAppIdleUpdate(std::string idleEvent, bool idle) override;
+  void addPacketDrop(size_t packetSize, std::string dropReasonIn) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };

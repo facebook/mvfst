@@ -299,7 +299,8 @@ enum class QLogEventType : uint32_t {
   TransportSummary,
   CongestionMetricUpdate,
   PacingMetricUpdate,
-  AppIdleUpdate
+  AppIdleUpdate,
+  PacketDrop,
 };
 
 std::string toString(QLogEventType type);
@@ -426,6 +427,19 @@ class QLogAppIdleUpdateEvent : public QLogEvent {
 
   folly::dynamic toDynamic() const override;
 };
+
+class QLogPacketDropEvent : public QLogEvent {
+ public:
+  QLogPacketDropEvent(
+      size_t packetSize,
+      std::string dropReason,
+      std::chrono::microseconds refTime);
+  ~QLogPacketDropEvent() override = default;
+  size_t packetSize;
+  std::string dropReason;
+
+  folly::dynamic toDynamic() const override;
+}; // namespace quic
 
 std::string toString(QLogEventType type);
 

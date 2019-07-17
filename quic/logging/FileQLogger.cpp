@@ -112,6 +112,14 @@ void FileQLogger::addAppIdleUpdate(std::string idleEvent, bool idle) {
       std::move(idleEvent), idle, refTime));
 }
 
+void FileQLogger::addPacketDrop(size_t packetSize, std::string dropReason) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogPacketDropEvent>(
+      packetSize, std::move(dropReason), refTime));
+} // namespace quic
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();
