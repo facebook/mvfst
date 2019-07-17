@@ -199,6 +199,9 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
                 steadyState_.lastReductionTime->time_since_epoch())
                 .count()
           : -1);
+  if (conn_.qLogger) {
+    conn_.qLogger->addAppIdleUpdate(kAppIdle.str(), idle);
+  }
   bool currentAppIdle = isAppIdle();
   if (!currentAppIdle && idle) {
     quiescenceStart_ = eventTime;

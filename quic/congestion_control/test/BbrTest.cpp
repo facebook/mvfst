@@ -728,5 +728,23 @@ TEST_F(BbrTest, BytesCounting) {
   EXPECT_EQ(1200, conn.lossState.totalBytesAcked);
 }
 
+TEST_F(BbrTest, AppIdle) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+  BbrCongestionController::BbrConfig config;
+  BbrCongestionController bbr(conn, config);
+
+  bbr.setAppIdle(true, Clock::now());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::AppIdleUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->idleEvent, kAppIdle.str());
+  EXPECT_TRUE(event->idle);
+}
+
 } // namespace test
 } // namespace quic

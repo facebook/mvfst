@@ -213,6 +213,8 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
 
 TEST_F(CubicTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1500;
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::Steady);
@@ -258,6 +260,20 @@ TEST_F(CubicTest, AppIdle) {
       conn.udpSendPacketLen * kTimeScalingFactor *
       std::pow((2 * 1000 - timeToOrigin), 3.0) / 1000 / 1000 / 1000));
   EXPECT_EQ(maxCwnd + expectedDelta, cubic.getCongestionWindow());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::AppIdleUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->idleEvent, kAppIdle.str());
+  EXPECT_TRUE(event->idle);
+
+  auto tmp2 = std::move(qLogger->logs[indices[1]]);
+  auto event2 = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp2.get());
+  EXPECT_EQ(event2->idleEvent, kAppIdle.str());
+  EXPECT_FALSE(event2->idle);
 }
 
 TEST_F(CubicTest, PacingGain) {
