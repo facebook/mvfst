@@ -9,6 +9,7 @@
 #include <quic/api/QuicTransportBase.h>
 
 #include <folly/ScopeGuard.h>
+#include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -1117,16 +1118,22 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
   }
   // TODO: Also listens to write event from libevent. Only schedule write when
   // the socket itself is writable.
-  if (shouldWriteData(*conn_)) {
+  auto writeDataReason = shouldWriteData(*conn_);
+  if (writeDataReason != WriteDataReason::NO_WRITE) {
     VLOG(10) << nodeToString(conn_->nodeType)
              << " running write looper thisIteration=" << thisIteration << " "
              << *this;
     writeLooper_->run(thisIteration);
+    conn_->debugState.needsWriteLoopDetect =
+        (conn_->loopDetectorCallback != nullptr);
   } else {
     VLOG(10) << nodeToString(conn_->nodeType) << " stopping write looper "
              << *this;
     writeLooper_->stop();
+    conn_->debugState.needsWriteLoopDetect = false;
+    conn_->debugState.currentEmptyLoopCount = 0;
   }
+  conn_->debugState.writeDataReason = writeDataReason;
 }
 
 void QuicTransportBase::cancelDeliveryCallbacksForStream(StreamId streamId) {
@@ -2181,7 +2188,23 @@ void QuicTransportBase::writeSocketData() {
     if (closeState_ != CloseState::CLOSED) {
       setLossDetectionAlarm(*conn_, *this);
       auto packetsAfter = conn_->outstandingPackets.size();
-      // If we sent a new packet and the new packet was either the first packet
+      bool packetWritten = (packetsAfter > packetsBefore);
+      if (packetWritten) {
+        conn_->debugState.currentEmptyLoopCount = 0;
+      } else if (
+          conn_->debugState.needsWriteLoopDetect &&
+          conn_->loopDetectorCallback) {
+        // TODO: Currently we will to get some stats first. Then we may filter
+        // out some errors here. For example, socket fail to write might be a
+        // legit case to filter out.
+        conn_->loopDetectorCallback->onSuspiciousLoops(
+            ++conn_->debugState.currentEmptyLoopCount,
+            conn_->debugState.writeDataReason,
+            conn_->debugState.noWriteReason,
+            conn_->debugState.schedulerName);
+      }
+      // If we sent a new packet and the new packet was either the first
+      // packet
       // after quiescence or after receiving a new packet.
       if (packetsAfter > packetsBefore &&
           (packetsBefore == 0 || conn_->receivedNewPacketBeforeWrite)) {

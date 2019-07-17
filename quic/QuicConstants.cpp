@@ -37,4 +37,50 @@ std::vector<QuicVersion> filterSupportedVersions(
       });
   return filteredVersions;
 }
+
+std::string writeDataReasonString(WriteDataReason reason) {
+  switch (reason) {
+    case WriteDataReason::PROBES:
+      return "Probes";
+    case WriteDataReason::ACK:
+      return "Ack";
+    case WriteDataReason::CRYPTO_STREAM:
+      return "Crypto";
+    case WriteDataReason::STREAM:
+      return "Stream";
+    case WriteDataReason::LOSS:
+      return "Loss";
+    case WriteDataReason::BLOCKED:
+      return "Blocked";
+    case WriteDataReason::STREAM_WINDOW_UPDATE:
+      return "StreamWindowUpdate";
+    case WriteDataReason::CONN_WINDOW_UPDATE:
+      return "ConnWindowUpdate";
+    case WriteDataReason::SIMPLE:
+      return "Simple";
+    case WriteDataReason::RESET:
+      return "Reset";
+    case WriteDataReason::PATHCHALLENGE:
+      return "PathChallenge";
+    case WriteDataReason::NO_WRITE:
+      return "NoWrite";
+  }
+  folly::assume_unreachable();
+}
+
+std::string writeNoWriteReasonString(NoWriteReason reason) {
+  switch (reason) {
+    case NoWriteReason::WRITE_OK:
+      return "WriteOk";
+    case NoWriteReason::EMPTY_SCHEDULER:
+      return "EmptyScheduler";
+    case NoWriteReason::NO_FRAME:
+      return "NoFrame";
+    case NoWriteReason::NO_BODY:
+      return "NoBody";
+    case NoWriteReason::SOCKET_FAILURE:
+      return "SocketFailure";
+  }
+  folly::assume_unreachable();
+}
 } // namespace quic

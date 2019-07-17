@@ -476,7 +476,7 @@ TEST_F(QuicTransportTest, WriteSmall) {
       conn.transportSettings.writeConnectionDataPacketsLimit);
 
   verifyCorrectness(conn, 0, stream, *buf);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteLarge) {
@@ -511,7 +511,7 @@ TEST_F(QuicTransportTest, WriteLarge) {
       conn.transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(NumFullPackets + 1, conn.outstandingPackets.size());
   verifyCorrectness(conn, 0, stream, *buf);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteMultipleTimes) {
@@ -532,7 +532,7 @@ TEST_F(QuicTransportTest, WriteMultipleTimes) {
   transport_->writeChain(stream, buf->clone(), false, false);
   loopForWrites();
   verifyCorrectness(conn, originalWriteOffset, stream, *buf);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteMultipleStreams) {
@@ -695,7 +695,7 @@ TEST_F(QuicTransportTest, WriteFin) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   verifyCorrectness(conn, 0, stream, *buf, true);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteOnlyFin) {
@@ -723,7 +723,7 @@ TEST_F(QuicTransportTest, WriteOnlyFin) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   verifyCorrectness(conn, 0, stream, *buf, true);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteDataWithRetransmission) {
@@ -744,7 +744,7 @@ TEST_F(QuicTransportTest, WriteDataWithRetransmission) {
   // lost data and new data
   buf->appendChain(std::move(buf2));
   verifyCorrectness(conn, 0, stream, *buf);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, WriteImmediateAcks) {
@@ -780,7 +780,7 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, end);
   EXPECT_FALSE(conn.ackStates.appDataAckState.needsToSendAckImmediately);
   EXPECT_EQ(0, conn.ackStates.appDataAckState.numNonRxPacketsRecvd);
-  EXPECT_FALSE(shouldWriteData(conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
 TEST_F(QuicTransportTest, NotWriteAcksIfNoData) {
@@ -1395,6 +1395,56 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
                    }) != p.packet.frames.end();
       });
   EXPECT_EQ(numNewConnIdPackets, 3);
+}
+
+TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.writeConnectionDataPacketsLimit = 1;
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+  ASSERT_FALSE(conn.debugState.needsWriteLoopDetect);
+  ASSERT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(1000));
+
+  // There should be no data to send at this point
+  transport_->updateWriteLooper(true);
+  EXPECT_FALSE(conn.debugState.needsWriteLoopDetect);
+  EXPECT_EQ(WriteDataReason::NO_WRITE, conn.debugState.writeDataReason);
+  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  loopForWrites();
+
+  auto stream = transport_->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(100);
+  transport_->writeChain(stream, buf->clone(), true, false);
+  transport_->updateWriteLooper(true);
+  EXPECT_TRUE(conn.debugState.needsWriteLoopDetect);
+  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  EXPECT_EQ(WriteDataReason::STREAM, conn.debugState.writeDataReason);
+  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(1000));
+  loopForWrites();
+  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
+
+  // Queue a window update for a stream doesn't exist
+  conn.streamManager->queueWindowUpdate(stream + 1);
+  transport_->updateWriteLooper(true);
+  EXPECT_TRUE(
+      WriteDataReason::STREAM_WINDOW_UPDATE == conn.debugState.writeDataReason);
+  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousLoops(1, WriteDataReason::STREAM_WINDOW_UPDATE, _, _))
+      .Times(1);
+  loopForWrites();
+  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.debugState.currentEmptyLoopCount);
+
+  transport_->close(folly::none);
 }
 
 TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
@@ -2389,7 +2439,9 @@ TEST_F(QuicTransportTest, CloseWithDrainWillKeepSocketAround) {
 }
 
 TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {
-  ASSERT_FALSE(shouldWriteData(transport_->getConnectionState()));
+  ASSERT_EQ(
+      WriteDataReason::NO_WRITE,
+      shouldWriteData(transport_->getConnectionState()));
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
   transport_->pacedWrite(true);
 }
@@ -2441,7 +2493,7 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   // schedule a pacing timeout.
   loopForWrites();
 
-  ASSERT_TRUE(shouldWriteData(conn));
+  ASSERT_NE(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_TRUE(transport_->isPacingScheduled());
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
   transport_->pacedWrite(true);
@@ -2469,7 +2521,7 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   // FunctionLooper won't schedule a pacing timeout.
   transport_->pacedWrite(true);
 
-  ASSERT_FALSE(shouldWriteData(conn));
+  ASSERT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
   EXPECT_FALSE(transport_->isPacingScheduled());
 }
 

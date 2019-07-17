@@ -909,6 +909,11 @@ uint64_t writeConnectionDataToSocket(
   ioBufBatch.setContinueOnNetworkUnreachable(
       connection.transportSettings.continueOnNetworkUnreachable);
 
+  connection.debugState.schedulerName = scheduler.name();
+  connection.debugState.noWriteReason = NoWriteReason::WRITE_OK;
+  if (!scheduler.hasData()) {
+    connection.debugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
+  }
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(
@@ -935,11 +940,13 @@ uint64_t writeConnectionDataToSocket(
     auto& packet = result.second;
     if (!packet || packet->packet.frames.empty()) {
       ioBufBatch.flush();
+      connection.debugState.noWriteReason = NoWriteReason::NO_FRAME;
       return ioBufBatch.getPktSent();
     }
     if (!packet->body) {
       // No more space remaining.
       ioBufBatch.flush();
+      connection.debugState.noWriteReason = NoWriteReason::NO_BODY;
       return ioBufBatch.getPktSent();
     }
     auto body =
@@ -973,6 +980,7 @@ uint64_t writeConnectionDataToSocket(
     // if ioBufBatch.write returns false
     // it is because a flush() call failed
     if (!ret) {
+      connection.debugState.noWriteReason = NoWriteReason::SOCKET_FAILURE;
       return ioBufBatch.getPktSent();
     }
   }
@@ -1014,16 +1022,16 @@ uint64_t writeProbingDataToSocket(
   return written;
 }
 
-bool shouldWriteData(const QuicConnectionStateBase& conn) {
+WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
   if (conn.pendingEvents.numProbePackets) {
     VLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"
              << conn;
-    return true;
+    return WriteDataReason::PROBES;
   }
   if (hasAckDataToWrite(conn)) {
     VLOG(10) << nodeToString(conn.nodeType) << " needs write because of ACKs "
              << conn;
-    return true;
+    return WriteDataReason::ACK;
   }
   const size_t minimumDataSize = std::max(
       kLongHeaderHeaderSize + kCipherOverheadHeuristic, sizeof(Sample));
@@ -1032,12 +1040,12 @@ bool shouldWriteData(const QuicConnectionStateBase& conn) {
        *conn.writableBytesLimit - conn.lossState.totalBytesSent <=
            minimumDataSize)) {
     QUIC_STATS(conn.infoCallback, onCwndBlocked);
-    return false;
+    return WriteDataReason::NO_WRITE;
   }
   if (conn.congestionController &&
       conn.congestionController->getWritableBytes() <= minimumDataSize) {
     QUIC_STATS(conn.infoCallback, onCwndBlocked);
-    return false;
+    return WriteDataReason::NO_WRITE;
   }
   return hasNonAckDataToWrite(conn);
 }
@@ -1061,28 +1069,43 @@ bool hasAckDataToWrite(const QuicConnectionStateBase& conn) {
   return writeAcks;
 }
 
-bool hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
+WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (cryptoHasWritableData(conn)) {
     VLOG(10) << nodeToString(conn.nodeType)
              << " needs write because of crypto stream"
              << " " << conn;
-    return true;
+    return WriteDataReason::CRYPTO_STREAM;
   }
   if (!conn.oneRttWriteCipher && !conn.zeroRttWriteCipher) {
     // All the rest of the types of data need either a 1-rtt or 0-rtt cipher to
     // be written.
-    return false;
+    return WriteDataReason::NO_WRITE;
   }
-  bool hasStreamData = getSendConnFlowControlBytesWire(conn) != 0 &&
-      conn.streamManager->hasWritable();
-  bool hasLoss = conn.streamManager->hasLoss();
-  bool hasBlocked = conn.streamManager->hasBlocked();
-  bool hasStreamWindowUpdates = conn.streamManager->hasWindowUpdates();
-  bool hasConnWindowUpdate = conn.pendingEvents.connWindowUpdate;
-  bool hasSimple = !conn.pendingEvents.frames.empty();
-  bool hasResets = !conn.pendingEvents.resets.empty();
-  bool hasPathChallenge = (conn.pendingEvents.pathChallenge != folly::none);
-  return hasStreamData || hasLoss || hasBlocked || hasStreamWindowUpdates ||
-      hasConnWindowUpdate || hasResets || hasSimple || hasPathChallenge;
+  if (!conn.pendingEvents.resets.empty()) {
+    return WriteDataReason::RESET;
+  }
+  if (conn.streamManager->hasWindowUpdates()) {
+    return WriteDataReason::STREAM_WINDOW_UPDATE;
+  }
+  if (conn.pendingEvents.connWindowUpdate) {
+    return WriteDataReason::CONN_WINDOW_UPDATE;
+  }
+  if (conn.streamManager->hasBlocked()) {
+    return WriteDataReason::BLOCKED;
+  }
+  if (conn.streamManager->hasLoss()) {
+    return WriteDataReason::LOSS;
+  }
+  if (getSendConnFlowControlBytesWire(conn) != 0 &&
+      conn.streamManager->hasWritable()) {
+    return WriteDataReason::STREAM;
+  }
+  if (!conn.pendingEvents.frames.empty()) {
+    return WriteDataReason::SIMPLE;
+  }
+  if ((conn.pendingEvents.pathChallenge != folly::none)) {
+    return WriteDataReason::PATHCHALLENGE;
+  }
+  return WriteDataReason::NO_WRITE;
 }
 } // namespace quic

@@ -95,9 +95,9 @@ uint64_t writeZeroRttDataToSocket(
  *
  * TODO: We should probably split "should" and "can" into two APIs.
  */
-bool shouldWriteData(const QuicConnectionStateBase& conn);
+WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
-bool hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
+WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 
 /**
  * Invoked when the written stream data was new stream data.

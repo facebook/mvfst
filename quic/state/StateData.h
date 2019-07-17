@@ -358,6 +358,7 @@ struct LossState {
 
 class Logger;
 class CongestionControllerFactory;
+class LoopDetectorCallback;
 
 struct QuicConnectionStateBase {
   virtual ~QuicConnectionStateBase() = default;
@@ -616,6 +617,20 @@ struct QuicConnectionStateBase {
 
   // Whether or not both ends agree to use partial reliability
   bool partialReliabilityEnabled{false};
+
+  // Debug information. Currently only used to debug busy loop of Transport
+  // WriteLooper.
+  struct DebugState {
+    bool needsWriteLoopDetect{false};
+    uint64_t currentEmptyLoopCount{0};
+    WriteDataReason writeDataReason{WriteDataReason::NO_WRITE};
+    NoWriteReason noWriteReason{NoWriteReason::WRITE_OK};
+    std::string schedulerName;
+  };
+
+  DebugState debugState;
+
+  std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

@@ -391,6 +391,32 @@ inline std::ostream& operator<<(std::ostream& os, const QuicVersion& v) {
   return os;
 }
 
+enum class WriteDataReason {
+  NO_WRITE,
+  PROBES,
+  ACK,
+  CRYPTO_STREAM,
+  STREAM,
+  LOSS,
+  BLOCKED,
+  STREAM_WINDOW_UPDATE,
+  CONN_WINDOW_UPDATE,
+  SIMPLE,
+  RESET,
+  PATHCHALLENGE,
+};
+
+enum class NoWriteReason {
+  WRITE_OK,
+  EMPTY_SCHEDULER,
+  NO_FRAME,
+  NO_BODY,
+  SOCKET_FAILURE,
+};
+
+std::string writeDataReasonString(WriteDataReason reason);
+std::string writeNoWriteReasonString(NoWriteReason reason);
+
 /**
  * Filter the versions that are currently supported.
  */

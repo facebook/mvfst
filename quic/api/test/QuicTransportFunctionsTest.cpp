@@ -1107,7 +1107,7 @@ TEST_F(
         writableBytes -= iobuf->computeChainDataLength();
         return iobuf->computeChainDataLength();
       }));
-  EXPECT_TRUE(shouldWriteData(*conn));
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -1117,7 +1117,7 @@ TEST_F(
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
@@ -1542,16 +1542,16 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   CHECK(!conn->oneRttWriteCipher);
   conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
   addAckStatesWithCurrentTimestamps(conn->ackStates.appDataAckState, 1, 20);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   conn->oneRttWriteCipher = test::createNoOpAead();
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked()).Times(0);
-  EXPECT_TRUE(shouldWriteData(*conn));
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
   writeDataToQuicStream(*stream1, buf->clone(), false);
-  EXPECT_TRUE(shouldWriteData(*conn));
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   writeQuicDataToSocket(
       *rawSocket,
@@ -1562,14 +1562,14 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // Congestion control
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(0));
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
   writeDataToQuicStream(*stream1, buf->clone(), true);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
   writeQuicDataToSocket(
@@ -1581,7 +1581,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
       *headerCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, ShouldWriteStreamsNoCipher) {
@@ -1595,7 +1595,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteStreamsNoCipher) {
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
   writeDataToQuicStream(*stream1, buf->clone(), false);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, ShouldWritePureAcksNoCipher) {
@@ -1608,7 +1608,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWritePureAcksNoCipher) {
 
   conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
   addAckStatesWithCurrentTimestamps(conn->ackStates.appDataAckState, 1, 20);
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControl) {
@@ -1621,10 +1621,10 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControl) {
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
   auto buf = IOBuf::copyBuffer("0123456789");
   writeDataToQuicStream(*stream1, buf->clone(), false);
-  EXPECT_TRUE(shouldWriteData(*conn));
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
   // Artificially limit the connection flow control.
   conn->flowControlState.peerAdvertisedMaxOffset = 0;
-  EXPECT_FALSE(shouldWriteData(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteCipherAndAckStateMatch) {
@@ -1681,23 +1681,23 @@ TEST_F(QuicTransportFunctionsTest, HasCryptoDataToWrite) {
   auto conn = createConn();
   conn->cryptoState->initialStream.lossBuffer.emplace_back(
       folly::IOBuf::copyBuffer("Grab your coat and get your hat"), 0, false);
-  EXPECT_TRUE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::CRYPTO_STREAM, hasNonAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasControlFramesToWrite) {
   auto conn = createConn();
   conn->streamManager->queueBlocked(1, 100);
-  EXPECT_FALSE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 
   conn->oneRttWriteCipher = test::createNoOpAead();
-  EXPECT_TRUE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::BLOCKED, hasNonAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, FlowControlBlocked) {
   auto conn = createConn();
   conn->flowControlState.peerAdvertisedMaxOffset = 1000;
   conn->flowControlState.sumCurWriteOffset = 1000;
-  EXPECT_FALSE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
@@ -1705,10 +1705,10 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   conn->flowControlState.peerAdvertisedMaxOffset = 1000;
   conn->flowControlState.sumCurWriteOffset = 800;
   conn->streamManager->addWritable(0);
-  EXPECT_FALSE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 
   conn->oneRttWriteCipher = test::createNoOpAead();
-  EXPECT_TRUE(hasNonAckDataToWrite(*conn));
+  EXPECT_EQ(WriteDataReason::STREAM, hasNonAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounter) {

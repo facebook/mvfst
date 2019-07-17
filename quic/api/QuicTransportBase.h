@@ -441,6 +441,10 @@ class QuicTransportBase : public QuicSocket {
     conn_->qLogger = std::move(qLogger);
   }
 
+  void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
+    conn_->loopDetectorCallback = std::move(callback);
+  }
+
   virtual void cancelAllAppCallbacks(
       std::pair<QuicErrorCode, std::string> error) noexcept;
 

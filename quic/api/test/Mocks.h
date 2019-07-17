@@ -12,6 +12,7 @@
 
 #include <folly/io/async/EventBase.h>
 #include <quic/QuicException.h>
+#include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/Timers.h>
@@ -264,6 +265,14 @@ class MockQuicTransport : public QuicServerTransport {
       void(QuicTransportStatsCallback*));
 
   GMOCK_METHOD1_(, noexcept, , setConnectionIdAlgo, void(ConnectionIdAlgo*));
+};
+
+class MockLoopDetectorCallback : public LoopDetectorCallback {
+ public:
+  ~MockLoopDetectorCallback() override = default;
+  MOCK_METHOD4(
+      onSuspiciousLoops,
+      void(uint64_t, WriteDataReason, NoWriteReason, const std::string&));
 };
 
 inline std::ostream& operator<<(std::ostream& os, const MockQuicTransport&) {
