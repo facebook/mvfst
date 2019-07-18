@@ -12,6 +12,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QuicLogger.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
@@ -319,6 +320,13 @@ void onHandshakeAlarm(
   // Alternatively we can experiment with only retransmit them without marking
   // loss
   VLOG(10) << __func__ << " " << conn;
+  if (conn.qLogger) {
+    conn.qLogger->addLossAlarm(
+        conn.lossState.largestSent,
+        conn.lossState.handshakeAlarmCount,
+        (uint64_t)conn.outstandingPackets.size(),
+        kHandshakeAlarm.str());
+  }
   QUIC_TRACE(
       handshake_alarm,
       conn,

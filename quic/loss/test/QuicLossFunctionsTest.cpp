@@ -843,6 +843,8 @@ TEST_F(
     QuicLossFunctionsTest,
     WhenHandshakeOutstandingAlarmMarksAllHandshakeAsLoss) {
   auto conn = createConn();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn->qLogger = qLogger;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
@@ -881,10 +883,22 @@ TEST_F(
   EXPECT_EQ(5, conn->lossState.timeoutBasedRtxCount);
   EXPECT_EQ(conn->pendingEvents.numProbePackets, 0);
   EXPECT_EQ(5, conn->lossState.rtxCount);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::LossAlarm, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogLossAlarmEvent*>(tmp.get());
+  EXPECT_EQ(event->largestSent, 5);
+  EXPECT_EQ(event->alarmCount, 0);
+  EXPECT_EQ(event->outstandingPackets, 10);
+  EXPECT_EQ(event->type, kHandshakeAlarm.str());
 }
 
 TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   auto conn = createClientConn();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn->qLogger = qLogger;
   conn->oneRttWriteCipher = createNoOpAead();
   conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
   std::vector<PacketNum> lostPackets;
@@ -897,6 +911,16 @@ TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   EXPECT_EQ(lostPackets.size(), 1);
   EXPECT_EQ(conn->lossState.handshakeAlarmCount, 1);
   EXPECT_EQ(conn->pendingEvents.numProbePackets, kPacketToSendForPTO);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::LossAlarm, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogLossAlarmEvent*>(tmp.get());
+  EXPECT_EQ(event->largestSent, 1);
+  EXPECT_EQ(event->alarmCount, 0);
+  EXPECT_EQ(event->outstandingPackets, 1);
+  EXPECT_EQ(event->type, kHandshakeAlarm.str());
 }
 
 TEST_F(QuicLossFunctionsTest, PureAckSkipsCongestionControl) {
@@ -1195,19 +1219,45 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
 
 TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
   auto conn = createConn();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn->qLogger = qLogger;
   conn->lossState.totalPTOCount = 100;
   EXPECT_CALL(*transportInfoCb_, onPTO());
   onPTOAlarm(*conn);
   EXPECT_EQ(101, conn->lossState.totalPTOCount);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::LossAlarm, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogLossAlarmEvent*>(tmp.get());
+  EXPECT_EQ(event->largestSent, 0);
+  EXPECT_EQ(event->alarmCount, 1);
+  EXPECT_EQ(event->outstandingPackets, 0);
+  EXPECT_EQ(event->type, kPtoAlarm.str());
 }
 
 TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {
   auto conn = createConn();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn->qLogger = qLogger;
   conn->transportSettings.maxNumPTOs = 3;
   EXPECT_CALL(*transportInfoCb_, onPTO()).Times(3);
   onPTOAlarm(*conn);
   onPTOAlarm(*conn);
   EXPECT_THROW(onPTOAlarm(*conn), QuicInternalException);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::LossAlarm, qLogger);
+  EXPECT_EQ(indices.size(), 3);
+
+  for (int i = 0; i < 3; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogLossAlarmEvent*>(tmp.get());
+    EXPECT_EQ(event->largestSent, 0);
+    EXPECT_EQ(event->alarmCount, i + 1);
+    EXPECT_EQ(event->outstandingPackets, 0);
+    EXPECT_EQ(event->type, kPtoAlarm.str());
+  }
 }
 
 TEST_F(QuicLossFunctionsTest, TotalLossCount) {

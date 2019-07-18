@@ -38,6 +38,13 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
   QUIC_STATS(conn.infoCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;
+  if (conn.qLogger) {
+    conn.qLogger->addLossAlarm(
+        conn.lossState.largestSent,
+        conn.lossState.ptoCount,
+        (uint64_t)conn.outstandingPackets.size(),
+        kPtoAlarm.str());
+  }
   if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
     throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
   }
