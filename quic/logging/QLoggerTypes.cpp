@@ -514,6 +514,36 @@ folly::dynamic QLogLossAlarmEvent::toDynamic() const {
   return d;
 }
 
+QLogPacketsLostEvent::QLogPacketsLostEvent(
+    PacketNum largestLostPacketNumIn,
+    uint64_t lostBytesIn,
+    uint64_t lostPacketsIn,
+    std::chrono::microseconds refTimeIn)
+    : largestLostPacketNum{largestLostPacketNumIn},
+      lostBytes{lostBytesIn},
+      lostPackets{lostPacketsIn} {
+  eventType = QLogEventType::PacketsLost;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogPacketsLostEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "LOSS",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["largest_lost_packet_num"] = largestLostPacketNum;
+  data["lost_bytes"] = lostBytes;
+  data["lost_packets"] = lostPackets;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -536,6 +566,8 @@ std::string toString(QLogEventType type) {
       return "DATAGRAM_RECEIVED";
     case QLogEventType::LossAlarm:
       return "LOSS_ALARM";
+    case QLogEventType::PacketsLost:
+      return "PACKETS_LOST";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

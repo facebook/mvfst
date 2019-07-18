@@ -64,6 +64,10 @@ class FileQLogger : public QLogger {
       uint64_t alarmCount,
       uint64_t outstandingPackets,
       std::string type) override;
+  void addPacketsLost(
+      PacketNum largestLostPacketNum,
+      uint64_t lostBytes,
+      uint64_t lostPackets) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };

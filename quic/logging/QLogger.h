@@ -64,6 +64,10 @@ class QLogger {
       uint64_t alarmCount,
       uint64_t outstandingPackets,
       std::string type) = 0;
+  virtual void addPacketsLost(
+      PacketNum largestLostPacketNum,
+      uint64_t lostBytes,
+      uint64_t lostPackets) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

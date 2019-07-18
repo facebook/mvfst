@@ -191,6 +191,18 @@ TEST_F(QLoggerTest, LossAlarmEvent) {
   EXPECT_EQ(gotEvent->type, kPtoAlarm.str());
 }
 
+TEST_F(QLoggerTest, PacketsLostEvent) {
+  FileQLogger q;
+  q.addPacketsLost(PacketNum{42}, 332, 89);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacketsLostEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->largestLostPacketNum, 42);
+  EXPECT_EQ(gotEvent->lostBytes, 332);
+  EXPECT_EQ(gotEvent->lostPackets, 89);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -850,6 +862,30 @@ TEST_F(QLoggerTest, LossAlarmFollyDynamic) {
 
   FileQLogger q;
   q.addLossAlarm(PacketNum{100}, 14, 38, kHandshakeAlarm.str());
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PacketsLostFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+      [
+      "0",
+       "LOSS",
+       "PACKETS_LOST",
+       "DEFAULT",
+       {
+         "largest_lost_packet_num": 10,
+         "lost_bytes": 9,
+         "lost_packets": 8
+       }
+      ]
+ ])");
+
+  FileQLogger q;
+  q.addPacketsLost(PacketNum{10}, 9, 8);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

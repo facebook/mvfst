@@ -140,6 +140,17 @@ void FileQLogger::addLossAlarm(
       largestSent, alarmCount, outstandingPackets, std::move(type), refTime));
 }
 
+void FileQLogger::addPacketsLost(
+    PacketNum largestLostPacketNum,
+    uint64_t lostBytes,
+    uint64_t lostPackets) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogPacketsLostEvent>(
+      largestLostPacketNum, lostBytes, lostPackets, refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();
