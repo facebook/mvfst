@@ -166,7 +166,17 @@ TEST_F(QLoggerTest, PacketDropEvent) {
 
   EXPECT_EQ(gotEvent->packetSize, 5);
   EXPECT_EQ(gotEvent->dropReason, kCipherUnavailable.str());
-} // namespace quic::test
+}
+
+TEST_F(QLoggerTest, DatagramReceivedEvent) {
+  FileQLogger q;
+  q.addDatagramReceived(100);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogDatagramReceivedEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->dataLen, 100);
+}
 
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
@@ -780,6 +790,28 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
 
   FileQLogger q;
   q.addPacketDrop(100, kMaxBuffered.str());
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, DatagramReceivedFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+      [
+      "0",
+       "TRANSPORT",
+       "DATAGRAM_RECEIVED",
+       "DEFAULT",
+       {
+         "data_len": 8
+       }
+      ]
+ ])");
+
+  FileQLogger q;
+  q.addDatagramReceived(8);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

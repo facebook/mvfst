@@ -457,6 +457,30 @@ folly::dynamic QLogPacketDropEvent::toDynamic() const {
   return d;
 } // namespace quic
 
+QLogDatagramReceivedEvent::QLogDatagramReceivedEvent(
+    uint64_t dataLen,
+    std::chrono::microseconds refTimeIn)
+    : dataLen{dataLen} {
+  eventType = QLogEventType::DatagramReceived;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogDatagramReceivedEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["data_len"] = dataLen;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -475,6 +499,8 @@ std::string toString(QLogEventType type) {
       return "APP_IDLE_UPDATE";
     case QLogEventType::PacketDrop:
       return "PACKET_DROP";
+    case QLogEventType::DatagramReceived:
+      return "DATAGRAM_RECEIVED";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

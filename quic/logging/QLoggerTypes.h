@@ -301,6 +301,7 @@ enum class QLogEventType : uint32_t {
   PacingMetricUpdate,
   AppIdleUpdate,
   PacketDrop,
+  DatagramReceived,
 };
 
 std::string toString(QLogEventType type);
@@ -439,7 +440,18 @@ class QLogPacketDropEvent : public QLogEvent {
   std::string dropReason;
 
   folly::dynamic toDynamic() const override;
-}; // namespace quic
+};
+
+class QLogDatagramReceivedEvent : public QLogEvent {
+ public:
+  QLogDatagramReceivedEvent(
+      uint64_t dataLen,
+      std::chrono::microseconds refTime);
+  ~QLogDatagramReceivedEvent() override = default;
+  uint64_t dataLen;
+
+  folly::dynamic toDynamic() const override;
+};
 
 std::string toString(QLogEventType type);
 
