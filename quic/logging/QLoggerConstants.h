@@ -45,5 +45,14 @@ constexpr uint64_t kDefaultCwnd = 12320;
 constexpr folly::StringPiece kAppIdle = "app idle";
 constexpr folly::StringPiece kMaxBuffered = "max buffered";
 constexpr folly::StringPiece kCipherUnavailable = "cipher unavailable";
+constexpr folly::StringPiece kParse = "parse";
+constexpr folly::StringPiece kNonRegular = "non regular";
+constexpr folly::StringPiece kAlreadyClosed = "already closed";
+constexpr folly::StringPiece kUdpTruncated = "udp truncated";
+constexpr folly::StringPiece kNoData = "no data";
+constexpr folly::StringPiece kUnexpectedProtectionLevel =
+    "unexpected protection level";
+constexpr folly::StringPiece kBufferUnavailable = "buffer unavailable";
+constexpr folly::StringPiece kReset = "reset";
 
 } // namespace quic

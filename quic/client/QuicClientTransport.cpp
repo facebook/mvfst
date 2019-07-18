@@ -15,6 +15,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -113,6 +114,9 @@ void QuicClientTransport::processPacketData(
       },
       [&](auto&) { return false; });
   if (!parseSuccess) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketDrop(packetSize, kParse.str());
+    }
     QUIC_TRACE(packet_drop, *conn_, "parse");
     return;
   }
@@ -140,6 +144,9 @@ void QuicClientTransport::processPacketData(
   auto regularOptional = boost::get<RegularQuicPacket>(&packet);
   if (!regularOptional) {
     VLOG(4) << "Dropping non-regular packet " << *conn_;
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketDrop(packetSize, kNonRegular.str());
+    }
     QUIC_TRACE(packet_drop, *conn_, "non_regular");
     return;
   }
@@ -632,6 +639,9 @@ void QuicClientTransport::onReadData(
     // If we are closed, then we shoudn't process new network data.
     // TODO: we might want to process network data if we decide that we should
     // exit draining state early
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketDrop(0, kAlreadyClosed.str());
+    }
     QUIC_TRACE(packet_drop, *conn_, "already_closed");
     return;
   }
@@ -1001,6 +1011,9 @@ void QuicClientTransport::onDataAvailable(
   Buf data = std::move(readBuffer_);
   if (truncated) {
     // This is an error, drop the packet.
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketDrop(len, kUdpTruncated.str());
+    }
     QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
     return;
   }

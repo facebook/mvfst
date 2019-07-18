@@ -2484,6 +2484,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   StreamId streamId = client->createBidirectionalStream().value();
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
 
   client->setReadCallback(streamId, &readCb);
   bool dataDelivered = false;
@@ -2532,6 +2534,13 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   }
   EXPECT_TRUE(dataDelivered);
   client->close(folly::none);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(event->packetSize, 81);
+  EXPECT_EQ(event->dropReason, kParse.str());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
@@ -3076,6 +3085,8 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
 }
 
 TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
@@ -3103,6 +3114,14 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
   ASSERT_FALSE(client->lossTimeout().isScheduled());
   ASSERT_FALSE(client->ackTimeout().isScheduled());
   ASSERT_TRUE(client->drainTimeout().isScheduled());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(event->packetSize, 0);
+  EXPECT_EQ(event->dropReason, kAlreadyClosed.str());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
@@ -3168,6 +3187,8 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(*sock, close());
   client->idleTimeout().timeoutExpired();
 
@@ -3185,6 +3206,13 @@ TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
   deliverData(packet->coalesce());
   EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
       socketWrites, *makeEncryptedCodec(true)));
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(event->packetSize, 0);
+  EXPECT_EQ(event->dropReason, kAlreadyClosed.str());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvalidStream) {
@@ -4547,6 +4575,8 @@ class QuicProcessDataTest : public QuicClientTransportAfterStartTest {
 };
 
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
@@ -4569,6 +4599,13 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       mockClientHandshake->maxRecvPacketSize);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(event->packetSize, 10);
+  EXPECT_EQ(event->dropReason, kParse.str());
 }
 
 TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
