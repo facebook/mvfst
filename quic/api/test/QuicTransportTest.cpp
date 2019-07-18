@@ -882,7 +882,7 @@ TEST_F(QuicTransportTest, StopSending) {
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
-  EXPECT_EQ(16, packet.frames.size());
+  EXPECT_EQ(14, packet.frames.size());
   bool foundStopSending = false;
   for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
     folly::variant_match(

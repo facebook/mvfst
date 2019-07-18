@@ -293,13 +293,23 @@ size_t writeSimpleFrame(
       [&](StopSendingFrame& stopSendingFrame) {
         QuicInteger intFrameType(static_cast<uint8_t>(FrameType::STOP_SENDING));
         QuicInteger streamId(stopSendingFrame.streamId);
-        auto stopSendingFrameSize = intFrameType.getSize() +
-            streamId.getSize() + sizeof(ApplicationErrorCode);
+        QuicInteger errorCode(
+            static_cast<uint64_t>(stopSendingFrame.errorCode));
+        auto version = builder.getVersion();
+        size_t errorSize = version == QuicVersion::MVFST_OLD
+            ? sizeof(ApplicationErrorCode)
+            : errorCode.getSize();
+        auto stopSendingFrameSize =
+            intFrameType.getSize() + streamId.getSize() + errorSize;
         if (packetSpaceCheck(spaceLeft, stopSendingFrameSize)) {
           builder.write(intFrameType);
           builder.write(streamId);
-          builder.writeBE(
-              static_cast<ApplicationErrorCode>(stopSendingFrame.errorCode));
+          if (version == QuicVersion::MVFST_OLD) {
+            builder.writeBE(
+                static_cast<ApplicationErrorCode>(stopSendingFrame.errorCode));
+          } else {
+            builder.write(errorCode);
+          }
           builder.appendFrame(std::move(stopSendingFrame));
           return stopSendingFrameSize;
         }
@@ -425,14 +435,22 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         QuicInteger intFrameType(static_cast<uint8_t>(FrameType::RST_STREAM));
         QuicInteger streamId(rstStreamFrame.streamId);
         QuicInteger offset(rstStreamFrame.offset);
-        auto rstStreamFrameSize = intFrameType.getSize() +
-            sizeof(ApplicationErrorCode) + streamId.getSize() +
-            offset.getSize();
+        QuicInteger errorCode(static_cast<uint64_t>(rstStreamFrame.errorCode));
+        auto version = builder.getVersion();
+        size_t errorSize = version == QuicVersion::MVFST_OLD
+            ? sizeof(ApplicationErrorCode)
+            : errorCode.getSize();
+        auto rstStreamFrameSize = intFrameType.getSize() + errorSize +
+            streamId.getSize() + offset.getSize();
         if (packetSpaceCheck(spaceLeft, rstStreamFrameSize)) {
           builder.write(intFrameType);
           builder.write(streamId);
-          builder.writeBE(
-              static_cast<ApplicationErrorCode>(rstStreamFrame.errorCode));
+          if (version == QuicVersion::MVFST_OLD) {
+            builder.writeBE(
+                static_cast<ApplicationErrorCode>(rstStreamFrame.errorCode));
+          } else {
+            builder.write(errorCode);
+          }
           builder.write(offset);
           builder.appendFrame(std::move(rstStreamFrame));
           return rstStreamFrameSize;
@@ -538,17 +556,26 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::CONNECTION_CLOSE));
         QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
-        auto connCloseFrameSize = intFrameType.getSize() +
-            sizeof(TransportErrorCode) +
-            sizeof(connectionCloseFrame.closingFrameType) +
-            reasonLength.getSize() + connectionCloseFrame.reasonPhrase.size();
+        QuicInteger closingFrameType(
+            static_cast<FrameTypeType>(connectionCloseFrame.closingFrameType));
+        QuicInteger errorCode(
+            static_cast<uint64_t>(connectionCloseFrame.errorCode));
+        auto version = builder.getVersion();
+        size_t errorSize = version == QuicVersion::MVFST_OLD
+            ? sizeof(TransportErrorCode)
+            : errorCode.getSize();
+        auto connCloseFrameSize = intFrameType.getSize() + errorSize +
+            closingFrameType.getSize() + reasonLength.getSize() +
+            connectionCloseFrame.reasonPhrase.size();
         if (packetSpaceCheck(spaceLeft, connCloseFrameSize)) {
           builder.write(intFrameType);
-          builder.writeBE(
-              static_cast<std::underlying_type<TransportErrorCode>::type>(
-                  connectionCloseFrame.errorCode));
-          QuicInteger closingFrameType(static_cast<FrameTypeType>(
-              connectionCloseFrame.closingFrameType));
+          if (version == QuicVersion::MVFST_OLD) {
+            builder.writeBE(
+                static_cast<std::underlying_type<TransportErrorCode>::type>(
+                    connectionCloseFrame.errorCode));
+          } else {
+            builder.write(errorCode);
+          }
           builder.write(closingFrameType);
           builder.write(reasonLength);
           builder.push(
@@ -564,13 +591,22 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         QuicInteger intFrameType(
             static_cast<uint8_t>(FrameType::APPLICATION_CLOSE));
         QuicInteger reasonLength(applicationCloseFrame.reasonPhrase.size());
-        auto applicationCloseFrameSize = intFrameType.getSize() +
-            sizeof(ApplicationErrorCode) + reasonLength.getSize() +
-            applicationCloseFrame.reasonPhrase.size();
+        QuicInteger errorCode(
+            static_cast<uint64_t>(applicationCloseFrame.errorCode));
+        auto version = builder.getVersion();
+        size_t errorSize = version == QuicVersion::MVFST_OLD
+            ? sizeof(ApplicationErrorCode)
+            : errorCode.getSize();
+        auto applicationCloseFrameSize = intFrameType.getSize() + errorSize +
+            reasonLength.getSize() + applicationCloseFrame.reasonPhrase.size();
         if (packetSpaceCheck(spaceLeft, applicationCloseFrameSize)) {
           builder.write(intFrameType);
-          builder.writeBE(static_cast<ApplicationErrorCode>(
-              applicationCloseFrame.errorCode));
+          if (version == QuicVersion::MVFST_OLD) {
+            builder.writeBE(static_cast<ApplicationErrorCode>(
+                applicationCloseFrame.errorCode));
+          } else {
+            builder.write(errorCode);
+          }
           builder.write(reasonLength);
           builder.push(
               (const uint8_t*)applicationCloseFrame.reasonPhrase.data(),

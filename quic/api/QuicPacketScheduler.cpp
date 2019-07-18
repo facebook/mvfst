@@ -560,7 +560,8 @@ CloningScheduler::scheduleFramesForPacket(
     RegularQuicPacketBuilder regularBuilder(
         conn_.udpSendPacketLen,
         builder.getPacketHeader(),
-        getAckState(conn_, builderPnSpace).largestAckedByPeer);
+        getAckState(conn_, builderPnSpace).largestAckedByPeer,
+        conn_.version.value_or(*conn_.originalVersion));
     PacketRebuilder rebuilder(regularBuilder, conn_);
     // We shouldn't clone Handshake packet. For PureAcks, cloning them bring
     // perf down as shown by load test.

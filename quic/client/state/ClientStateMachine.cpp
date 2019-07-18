@@ -44,8 +44,8 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
   newConn->initialWriteCipher = std::move(conn->initialWriteCipher);
   newConn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   newConn->readCodec->setClientConnectionId(*conn->clientConnectionId);
-  newConn->readCodec->setCodecParameters(
-      CodecParameters(conn->peerAckDelayExponent));
+  newConn->readCodec->setCodecParameters(CodecParameters(
+      conn->peerAckDelayExponent, conn->originalVersion.value()));
   return newConn;
 }
 

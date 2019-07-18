@@ -191,7 +191,9 @@ ReadAckFrame decodeAckFrameWithECN(
   return readAckFrame;
 }
 
-RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
+RstStreamFrame decodeRstStreamFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params) {
   auto streamId = decodeQuicInteger(cursor);
   if (UNLIKELY(!streamId)) {
     throw QuicTransportException(
@@ -199,8 +201,21 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::RST_STREAM);
   }
-  auto errorCode =
-      static_cast<ApplicationErrorCode>(cursor.readBE<ApplicationErrorCode>());
+  ApplicationErrorCode errorCode;
+  if (params.version == QuicVersion::MVFST_OLD) {
+    errorCode = static_cast<ApplicationErrorCode>(
+        cursor.readBE<ApplicationErrorCode>());
+  } else {
+    auto varCode = decodeQuicInteger(cursor);
+    if (varCode) {
+      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
+    } else {
+      throw QuicTransportException(
+          "Cannot decode error code",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          quic::FrameType::RST_STREAM);
+    }
+  }
   auto offset = decodeQuicInteger(cursor);
   if (UNLIKELY(!offset)) {
     throw QuicTransportException(
@@ -212,7 +227,9 @@ RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
       folly::to<StreamId>(streamId->first), errorCode, offset->first);
 }
 
-StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
+StopSendingFrame decodeStopSendingFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params) {
   auto streamId = decodeQuicInteger(cursor);
   if (UNLIKELY(!streamId)) {
     throw QuicTransportException(
@@ -220,14 +237,21 @@ StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::STOP_SENDING);
   }
-  if (!cursor.canAdvance(sizeof(ApplicationErrorCode))) {
-    throw QuicTransportException(
-        "Not enough input bytes to read application error code.",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::STOP_SENDING);
+  ApplicationErrorCode errorCode;
+  if (params.version == QuicVersion::MVFST_OLD) {
+    errorCode = static_cast<ApplicationErrorCode>(
+        cursor.readBE<ApplicationErrorCode>());
+  } else {
+    auto varCode = decodeQuicInteger(cursor);
+    if (varCode) {
+      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
+    } else {
+      throw QuicTransportException(
+          "Cannot decode error code",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          quic::FrameType::STOP_SENDING);
+    }
   }
-  auto errorCode =
-      static_cast<ApplicationErrorCode>(cursor.readBE<ApplicationErrorCode>());
   return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
 }
 
@@ -512,10 +536,25 @@ PathResponseFrame decodePathResponseFrame(folly::io::Cursor& cursor) {
   return PathResponseFrame(pathData);
 }
 
-ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor) {
-  auto detailedCode =
-      cursor.readBE<std::underlying_type<TransportErrorCode>::type>();
-  auto errorCode = static_cast<TransportErrorCode>(detailedCode);
+ConnectionCloseFrame decodeConnectionCloseFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params) {
+  TransportErrorCode errorCode{};
+  if (params.version == QuicVersion::MVFST_OLD) {
+    auto detailedCode =
+        cursor.readBE<std::underlying_type<TransportErrorCode>::type>();
+    errorCode = static_cast<TransportErrorCode>(detailedCode);
+  } else {
+    auto varCode = decodeQuicInteger(cursor);
+    if (varCode) {
+      errorCode = static_cast<TransportErrorCode>(varCode->first);
+    } else {
+      throw QuicTransportException(
+          "Failed to parse error code.",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          quic::FrameType::CONNECTION_CLOSE);
+    }
+  }
   auto frameTypeField = decodeQuicInteger(cursor);
   if (UNLIKELY(!frameTypeField || frameTypeField->second != sizeof(uint8_t))) {
     throw QuicTransportException(
@@ -539,9 +578,24 @@ ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor) {
       errorCode, std::move(reasonPhrase), triggeringFrameType);
 }
 
-ApplicationCloseFrame decodeApplicationCloseFrame(folly::io::Cursor& cursor) {
-  auto detailedCode = cursor.readBE<ApplicationErrorCode>();
-  auto errorCode = static_cast<ApplicationErrorCode>(detailedCode);
+ApplicationCloseFrame decodeApplicationCloseFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params) {
+  ApplicationErrorCode errorCode{};
+  if (params.version == QuicVersion::MVFST_OLD) {
+    auto detailedCode = cursor.readBE<ApplicationErrorCode>();
+    errorCode = static_cast<ApplicationErrorCode>(detailedCode);
+  } else {
+    auto varCode = decodeQuicInteger(cursor);
+    if (varCode) {
+      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
+    } else {
+      throw QuicTransportException(
+          "Failed to parse error code.",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          quic::FrameType::APPLICATION_CLOSE);
+    }
+  }
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (UNLIKELY(
           !reasonPhraseLength ||
@@ -630,9 +684,9 @@ QuicFrame parseFrame(
       case FrameType::ACK_ECN:
         return QuicFrame(decodeAckFrameWithECN(cursor, header, params));
       case FrameType::RST_STREAM:
-        return QuicFrame(decodeRstStreamFrame(cursor));
+        return QuicFrame(decodeRstStreamFrame(cursor, params));
       case FrameType::STOP_SENDING:
-        return QuicFrame(decodeStopSendingFrame(cursor));
+        return QuicFrame(decodeStopSendingFrame(cursor, params));
       case FrameType::CRYPTO_FRAME:
         return QuicFrame(decodeCryptoFrame(cursor));
       case FrameType::NEW_TOKEN:
@@ -665,9 +719,9 @@ QuicFrame parseFrame(
       case FrameType::PATH_RESPONSE:
         return QuicFrame(decodePathResponseFrame(cursor));
       case FrameType::CONNECTION_CLOSE:
-        return QuicFrame(decodeConnectionCloseFrame(cursor));
+        return QuicFrame(decodeConnectionCloseFrame(cursor, params));
       case FrameType::APPLICATION_CLOSE:
-        return QuicFrame(decodeApplicationCloseFrame(cursor));
+        return QuicFrame(decodeApplicationCloseFrame(cursor, params));
       case FrameType::MIN_STREAM_DATA:
         return QuicFrame(decodeMinStreamDataFrame(cursor));
       case FrameType::EXPIRED_STREAM_DATA:

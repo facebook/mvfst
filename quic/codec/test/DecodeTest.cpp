@@ -211,7 +211,9 @@ TEST_F(DecodeTest, ValidAckFrame) {
       ackBlocks);
   folly::io::Cursor cursor(result.get());
   auto ackFrame = decodeAckFrame(
-      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   EXPECT_EQ(ackFrame.largestAcked, 1000);
   // Since 100 is the encoded value, we use the decoded value.
@@ -233,7 +235,9 @@ TEST_F(DecodeTest, AckFrameLargestAckExceedsRange) {
       true);
   folly::io::Cursor cursor(result.get());
   auto ackFrame = decodeAckFrame(
-      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   // it will interpret this as a 8 byte range with the max value.
   EXPECT_EQ(ackFrame.largestAcked, 4611686018427387903);
 }
@@ -254,7 +258,9 @@ TEST_F(DecodeTest, AckFrameLargestAckInvalid) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -275,7 +281,9 @@ TEST_F(DecodeTest, AckFrameDelayEncodingInvalid) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -290,7 +298,9 @@ TEST_F(DecodeTest, AckFrameDelayExceedsRange) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -312,7 +322,9 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksUnderflow) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -335,7 +347,9 @@ TEST_F(DecodeTest, AckFrameAdditionalBlocksOverflow) {
       ackBlocks);
   folly::io::Cursor cursor(result.get());
   decodeAckFrame(
-      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
 }
 
 TEST_F(DecodeTest, AckFrameMissingFields) {
@@ -359,7 +373,9 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
 
   EXPECT_THROW(
       decodeAckFrame(
-          cursor1, header, CodecParameters(kDefaultAckDelayExponent)),
+          cursor1,
+          header,
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
   auto result2 = createAckFrame(
@@ -367,7 +383,9 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   folly::io::Cursor cursor2(result2.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor2, header, CodecParameters(kDefaultAckDelayExponent)),
+          cursor2,
+          header,
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
   auto result3 = createAckFrame(
@@ -375,7 +393,9 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   folly::io::Cursor cursor3(result3.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor3, header, CodecParameters(kDefaultAckDelayExponent)),
+          cursor3,
+          header,
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
   auto result4 = createAckFrame(
@@ -383,7 +403,9 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   folly::io::Cursor cursor4(result4.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor4, header, CodecParameters(kDefaultAckDelayExponent)),
+          cursor4,
+          header,
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
   auto result5 = createAckFrame(
@@ -391,7 +413,9 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   folly::io::Cursor cursor5(result5.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor5, header, CodecParameters(kDefaultAckDelayExponent)),
+          cursor5,
+          header,
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -406,7 +430,9 @@ TEST_F(DecodeTest, AckFrameFirstBlockLengthInvalid) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -429,7 +455,9 @@ TEST_F(DecodeTest, AckFrameBlockLengthInvalid) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -452,7 +480,9 @@ TEST_F(DecodeTest, AckFrameBlockGapInvalid) {
   folly::io::Cursor cursor(result.get());
   EXPECT_THROW(
       decodeAckFrame(
-          cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent)),
+          cursor,
+          makeHeader(),
+          CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
 
@@ -476,7 +506,9 @@ TEST_F(DecodeTest, AckFrameBlockLengthZero) {
   folly::io::Cursor cursor(result.get());
 
   auto readAckFrame = decodeAckFrame(
-      cursor, makeHeader(), CodecParameters(kDefaultAckDelayExponent));
+      cursor,
+      makeHeader(),
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   EXPECT_EQ(readAckFrame.ackBlocks[0].endPacket, 1000);
   EXPECT_EQ(readAckFrame.ackBlocks[0].startPacket, 990);
   EXPECT_EQ(readAckFrame.ackBlocks[1].endPacket, 978);

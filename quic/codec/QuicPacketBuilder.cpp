@@ -122,11 +122,13 @@ PacketNumEncodingResult encodeLongHeaderHelper(
 RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     uint32_t remainingBytes,
     PacketHeader header,
-    PacketNum largestAckedPacketNum)
+    PacketNum largestAckedPacketNum,
+    QuicVersion version)
     : remainingBytes_(remainingBytes),
       packet_(std::move(header)),
       headerAppender_(&header_, kLongHeaderHeaderSize),
-      bodyAppender_(&outputQueue_, kAppenderGrowthSize) {
+      bodyAppender_(&outputQueue_, kAppenderGrowthSize),
+      version_(version) {
   writeHeaderBytes(largestAckedPacketNum);
 }
 
@@ -274,6 +276,10 @@ const PacketHeader& RegularQuicPacketBuilder::getPacketHeader() const {
 
 void RegularQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
   cipherOverhead_ = overhead;
+}
+
+QuicVersion RegularQuicPacketBuilder::getVersion() const {
+  return version_;
 }
 
 StatelessResetPacketBuilder::StatelessResetPacketBuilder(

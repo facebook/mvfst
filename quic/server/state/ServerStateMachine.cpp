@@ -494,7 +494,7 @@ void onServerReadDataFromOpen(
       conn.qLogger->dcid = clientConnectionId;
     }
     conn.readCodec->setCodecParameters(
-        CodecParameters(conn.peerAckDelayExponent));
+        CodecParameters(conn.peerAckDelayExponent, version));
     conn.initialWriteCipher = getServerInitialCipher(
         &fizzFactory, initialDestinationConnectionId, version);
 

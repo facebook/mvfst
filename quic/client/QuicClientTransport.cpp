@@ -42,8 +42,8 @@ QuicClientTransport::QuicClientTransport(
   clientConn_->initialDestinationConnectionId = ConnectionId(connIdData);
   conn_->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
   conn_->readCodec->setClientConnectionId(*conn_->clientConnectionId);
-  conn_->readCodec->setCodecParameters(
-      CodecParameters(conn_->peerAckDelayExponent));
+  conn_->readCodec->setCodecParameters(CodecParameters(
+      conn_->peerAckDelayExponent, conn_->originalVersion.value()));
   // TODO: generate this once we can generate the packet sequence number
   // correctly.
   // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();

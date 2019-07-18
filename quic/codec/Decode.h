@@ -21,11 +21,12 @@ namespace quic {
 struct CodecParameters {
   // This must not be set to zero.
   uint8_t peerAckDelayExponent{kDefaultAckDelayExponent};
+  QuicVersion version{QuicVersion::MVFST};
 
   CodecParameters() = default;
 
-  explicit CodecParameters(uint8_t peerAckDelayExponentIn)
-      : peerAckDelayExponent(peerAckDelayExponentIn) {}
+  CodecParameters(uint8_t peerAckDelayExponentIn, QuicVersion versionIn)
+      : peerAckDelayExponent(peerAckDelayExponentIn), version(versionIn) {}
 };
 
 struct ParsedLongHeaderInvariant {
@@ -73,11 +74,17 @@ QuicFrame parseFrame(
  */
 PaddingFrame decodePaddingFrame(folly::io::Cursor&);
 
-RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor);
+RstStreamFrame decodeRstStreamFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params);
 
-ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor);
+ConnectionCloseFrame decodeConnectionCloseFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params);
 
-ApplicationCloseFrame decodeApplicationCloseFrame(folly::io::Cursor& cursor);
+ApplicationCloseFrame decodeApplicationCloseFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params);
 
 MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor);
 
@@ -105,7 +112,9 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor);
 
 NoopFrame decodeRetireConnectionIdFrame(folly::io::Cursor& cursor);
 
-StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor);
+StopSendingFrame decodeStopSendingFrame(
+    folly::io::Cursor& cursor,
+    const CodecParameters& params);
 
 PathChallengeFrame decodePathChallengeFrame(folly::io::Cursor& cursor);
 

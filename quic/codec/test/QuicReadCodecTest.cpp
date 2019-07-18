@@ -34,7 +34,8 @@ class QuicReadCodecTest : public Test {};
 
 std::unique_ptr<QuicReadCodec> makeUnencryptedCodec() {
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-  codec->setCodecParameters(CodecParameters(kDefaultAckDelayExponent));
+  codec->setCodecParameters(
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
   return codec;
 }
 

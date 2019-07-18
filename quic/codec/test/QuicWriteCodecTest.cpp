@@ -31,7 +31,7 @@ QuicFrame parseQuicFrame(folly::io::Cursor& cursor) {
   return quic::parseFrame(
       cursor,
       buildTestShortHeader(),
-      CodecParameters(kDefaultAckDelayExponent));
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
 }
 
 namespace quic {
@@ -259,14 +259,18 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   auto decodedStreamFrame1 = boost::get<ReadStreamFrame>(quic::parseFrame(
-      cursor, regularPacket.header, CodecParameters(kDefaultAckDelayExponent)));
+      cursor,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(decodedStreamFrame1.streamId, streamId1);
   EXPECT_EQ(decodedStreamFrame1.offset, offset1);
   EXPECT_EQ(decodedStreamFrame1.data->computeChainDataLength(), 30);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, decodedStreamFrame1.data));
   // Read another one from wire output:
   auto decodedStreamFrame2 = boost::get<ReadStreamFrame>(quic::parseFrame(
-      cursor, regularPacket.header, CodecParameters(kDefaultAckDelayExponent)));
+      cursor,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(decodedStreamFrame2.streamId, streamId2);
   EXPECT_EQ(decodedStreamFrame2.offset, offset2);
   EXPECT_EQ(decodedStreamFrame2.data->computeChainDataLength(), 40);
@@ -395,7 +399,9 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   auto decodedStreamFrame = boost::get<ReadStreamFrame>(quic::parseFrame(
-      cursor, regularPacket.header, CodecParameters(kDefaultAckDelayExponent)));
+      cursor,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
   EXPECT_EQ(decodedStreamFrame.data->computeChainDataLength(), 1);
@@ -434,7 +440,9 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   auto decodedStreamFrame = boost::get<ReadStreamFrame>(quic::parseFrame(
-      cursor, regularPacket.header, CodecParameters(kDefaultAckDelayExponent)));
+      cursor,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(decodedStreamFrame.streamId, streamId);
   EXPECT_EQ(decodedStreamFrame.offset, offset);
   EXPECT_EQ(
@@ -721,7 +729,9 @@ TEST_F(QuicWriteCodecTest, WriteWithDifferentAckDelayExponent) {
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   auto decodedAckFrame = boost::get<ReadAckFrame>(quic::parseFrame(
-      cursor, builtOut.first.header, CodecParameters(ackDelayExponent)));
+      cursor,
+      builtOut.first.header,
+      CodecParameters(ackDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
       computeExpectedDelay(ackMetadata.ackDelay, ackDelayExponent));
@@ -740,7 +750,9 @@ TEST_F(QuicWriteCodecTest, WriteExponentInLongHeaderPacket) {
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   auto decodedAckFrame = boost::get<ReadAckFrame>(quic::parseFrame(
-      cursor, builtOut.first.header, CodecParameters(ackDelayExponent)));
+      cursor,
+      builtOut.first.header,
+      CodecParameters(ackDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(
       decodedAckFrame.ackDelay.count(),
       (uint64_t(ackMetadata.ackDelay.count()) >> ackDelayExponent)
@@ -1015,8 +1027,8 @@ TEST_F(QuicWriteCodecTest, WriteConnClose) {
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  // 5 == ErrorCode(2) + FrameType(1) + reasonPhrase-len(2)
-  EXPECT_EQ(5 + reasonPhrase.size(), connCloseBytesWritten);
+  // 6 == ErrorCode(2) + FrameType(1) + reasonPhrase-len(2)
+  EXPECT_EQ(4 + reasonPhrase.size(), connCloseBytesWritten);
   auto resultConnCloseFrame =
       boost::get<ConnectionCloseFrame>(regularPacket.frames[0]);
   EXPECT_EQ(
@@ -1192,7 +1204,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(11, rstStreamBytesWritten);
+  EXPECT_EQ(13, rstStreamBytesWritten);
   auto resultRstStreamFrame =
       boost::get<RstStreamFrame>(regularPacket.frames[0]);
   EXPECT_EQ(errorCode, resultRstStreamFrame.errorCode);
@@ -1314,7 +1326,7 @@ TEST_F(QuicWriteCodecTest, WriteStopSending) {
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 4);
+  EXPECT_EQ(bytesWritten, 6);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
