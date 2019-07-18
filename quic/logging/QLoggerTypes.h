@@ -302,6 +302,7 @@ enum class QLogEventType : uint32_t {
   AppIdleUpdate,
   PacketDrop,
   DatagramReceived,
+  LossAlarm,
 };
 
 std::string toString(QLogEventType type);
@@ -450,6 +451,22 @@ class QLogDatagramReceivedEvent : public QLogEvent {
   ~QLogDatagramReceivedEvent() override = default;
   uint64_t dataLen;
 
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogLossAlarmEvent : public QLogEvent {
+ public:
+  QLogLossAlarmEvent(
+      PacketNum largestSent,
+      uint64_t alarmCount,
+      uint64_t outstandingPackets,
+      std::string type,
+      std::chrono::microseconds refTime);
+  ~QLogLossAlarmEvent() override = default;
+  PacketNum largestSent;
+  uint64_t alarmCount;
+  uint64_t outstandingPackets;
+  std::string type;
   folly::dynamic toDynamic() const override;
 };
 

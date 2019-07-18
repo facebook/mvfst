@@ -54,5 +54,7 @@ constexpr folly::StringPiece kUnexpectedProtectionLevel =
     "unexpected protection level";
 constexpr folly::StringPiece kBufferUnavailable = "buffer unavailable";
 constexpr folly::StringPiece kReset = "reset";
+constexpr folly::StringPiece kPtoAlarm = "pto alarm";
+constexpr folly::StringPiece kHandshakeAlarm = "handshake alarm";
 
 } // namespace quic
