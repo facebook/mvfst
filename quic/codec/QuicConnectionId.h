@@ -19,7 +19,7 @@
 namespace quic {
 
 constexpr size_t kMinConnectionIdSize = 4;
-constexpr size_t kMaxConnectionIdSize = 18;
+constexpr size_t kMaxConnectionIdSize = 20;
 // set conn id version at the first 4 bits
 constexpr uint8_t kShortVersionId = 0x1;
 
