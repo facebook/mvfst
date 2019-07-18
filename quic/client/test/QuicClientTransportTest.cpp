@@ -4609,6 +4609,8 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
 }
 
 TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();
@@ -4629,6 +4631,13 @@ TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
           .largestReceivedPacketNum,
       largestReceivedPacketNum);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::DatagramReceived, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogDatagramReceivedEvent*>(tmp.get());
+  EXPECT_EQ(event->dataLen, 26);
 }
 
 TEST(AsyncUDPSocketTest, CloseMultipleTimes) {

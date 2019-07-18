@@ -1019,6 +1019,9 @@ void QuicClientTransport::onDataAvailable(
   }
   data->append(len);
   QUIC_TRACE(udp_recvd, *conn_, (uint64_t)len);
+  if (conn_->qLogger) {
+    conn_->qLogger->addDatagramReceived(len);
+  }
   NetworkData networkData(std::move(data), packetReceiveTime);
   onNetworkData(server, std::move(networkData));
 }
