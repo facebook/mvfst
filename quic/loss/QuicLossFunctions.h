@@ -295,6 +295,12 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   }
   if (lossEvent.largestLostPacketNum.hasValue()) {
     DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
+    if (conn.qLogger) {
+      conn.qLogger->addPacketsLost(
+          lossEvent.largestLostPacketNum.value(),
+          lossEvent.lostBytes,
+          lossEvent.lostPackets);
+    }
     QUIC_TRACE(
         packets_lost,
         conn,

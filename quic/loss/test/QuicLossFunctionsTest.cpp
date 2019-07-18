@@ -529,6 +529,8 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
 
 TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   auto conn = createConn();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn->qLogger = qLogger;
   conn->lossState.ptoCount = 100;
   conn->lossState.reorderingThreshold = 10;
 
@@ -559,6 +561,15 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_TRUE(testLossMarkFuncCalled);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketsLost, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketsLostEvent*>(tmp.get());
+  EXPECT_EQ(event->largestLostPacketNum, 1);
+  EXPECT_EQ(event->lostBytes, 0);
+  EXPECT_EQ(event->lostPackets, 1);
 }
 
 TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {

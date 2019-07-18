@@ -840,6 +840,9 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
 // Ack only acks packets aren't outstanding, but TimeReordering still finds loss
 TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   QuicServerConnectionState conn;
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   conn.lossState.srtt = 200ms;
   conn.lossState.lrtt = 150ms;
   // Packet 2 has been sent and acked:
@@ -896,6 +899,15 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
           PacketNum) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(0, ackVisitorCounter);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketsLost, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketsLostEvent*>(tmp.get());
+  EXPECT_EQ(event->largestLostPacketNum, 1);
+  EXPECT_EQ(event->lostBytes, 1);
+  EXPECT_EQ(event->lostPackets, 1);
 }
 
 TEST_P(AckHandlersTest, UpdatePendingAckStates) {
