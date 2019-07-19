@@ -15,6 +15,7 @@
 #include <quic/server/state/ServerStateMachine.h>
 
 #include <fizz/server/ResumptionState.h>
+#include <folly/Function.h>
 #include <folly/IPAddress.h>
 #include <folly/Optional.h>
 
@@ -22,16 +23,22 @@
 
 #include <chrono>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace quic {
 
 DefaultAppTokenValidator::DefaultAppTokenValidator(
-    QuicServerConnectionState* conn)
-    : conn_(conn) {}
+    QuicServerConnectionState* conn,
+    folly::Function<bool(
+        const folly::Optional<std::string>& alpn,
+        const std::unique_ptr<folly::IOBuf>& appParams)>
+        earlyDataAppParamsValidator)
+    : conn_(conn),
+      earlyDataAppParamsValidator_(std::move(earlyDataAppParamsValidator)) {}
 
 bool DefaultAppTokenValidator::validate(
-    const fizz::server::ResumptionState& resumptionState) const {
+    const fizz::server::ResumptionState& resumptionState) {
   conn_->transportParamsMatching = false;
   conn_->sourceTokenMatching = false;
 
@@ -133,6 +140,15 @@ bool DefaultAppTokenValidator::validate(
   if (!validateAndUpdateSourceToken(
           *conn_, std::move(appToken->sourceAddresses))) {
     VLOG(10) << "No exact match from source address token";
+    return false;
+  }
+
+  // If application has set validator and the token is invalid, reject 0-RTT.
+  // If application did not set validator, it's valid.
+  if (earlyDataAppParamsValidator_ &&
+      !earlyDataAppParamsValidator_(
+          resumptionState.alpn, appToken->appParams)) {
+    VLOG(10) << "Invalid app params";
     return false;
   }
 

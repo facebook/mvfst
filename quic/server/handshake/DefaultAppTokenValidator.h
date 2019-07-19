@@ -8,9 +8,14 @@
 
 #pragma once
 
-#include <quic/api/QuicSocket.h>
-
 #include <fizz/server/State.h>
+
+#include <folly/Function.h>
+#include <folly/Optional.h>
+#include <folly/io/IOBuf.h>
+
+#include <memory>
+#include <string>
 
 namespace fizz {
 namespace server {
@@ -23,12 +28,21 @@ struct QuicServerConnectionState;
 
 class DefaultAppTokenValidator : public fizz::server::AppTokenValidator {
  public:
-  explicit DefaultAppTokenValidator(QuicServerConnectionState* conn);
+  explicit DefaultAppTokenValidator(
+      QuicServerConnectionState* conn,
+      folly::Function<bool(
+          const folly::Optional<std::string>& alpn,
+          const std::unique_ptr<folly::IOBuf>& appParams)>
+          earlyDataAppParamsValidator);
 
-  bool validate(const fizz::server::ResumptionState&) const override;
+  bool validate(const fizz::server::ResumptionState&) override;
 
  private:
   QuicServerConnectionState* conn_;
+  folly::Function<bool(
+      const folly::Optional<std::string>& alpn,
+      const std::unique_ptr<folly::IOBuf>& appParams)>
+      earlyDataAppParamsValidator_;
 };
 
 } // namespace quic

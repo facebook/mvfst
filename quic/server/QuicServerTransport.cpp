@@ -124,7 +124,8 @@ void QuicServerTransport::accept() {
       evb_,
       ctx_,
       this,
-      std::make_unique<DefaultAppTokenValidator>(serverConn_));
+      std::make_unique<DefaultAppTokenValidator>(
+          serverConn_, std::move(earlyDataAppParamsValidator_)));
 }
 
 void QuicServerTransport::writeData() {

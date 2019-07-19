@@ -47,7 +47,9 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) { return true; };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_TRUE(validator.validate(resState));
 }
 
@@ -74,7 +76,9 @@ TEST(
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) { return true; };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_TRUE(validator.validate(resState));
 
   EXPECT_EQ(
@@ -90,7 +94,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   conn.version = QuicVersion::MVFST;
 
   ResumptionState resState;
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -113,7 +122,9 @@ TEST(DefaultAppTokenValidatorTest, TestNoVersionMismatch) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) { return true; };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_TRUE(validator.validate(resState));
 }
 
@@ -136,7 +147,12 @@ TEST(DefaultAppTokenValidatorTest, TestVersionMismatch) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -150,7 +166,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -181,7 +202,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -205,7 +231,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -227,7 +258,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -249,7 +285,12 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
@@ -271,11 +312,15 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) {
+    EXPECT_TRUE(false);
+    return true;
+  };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
 
-/* TODO junqiw change validateEarlyAppParam to folly::Function
 TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
@@ -285,21 +330,22 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
-      *conn.version,
+      conn.transportSettings.idleTimeout.count(),
+      conn.transportSettings.maxRecvPacketSize,
+      conn.transportSettings.advertisedInitialConnectionWindowSize,
       conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.ackDelayExponent);
+      conn.transportSettings.advertisedInitialMaxStreamsBidi,
+      conn.transportSettings.advertisedInitialMaxStreamsUni);
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
-  DefaultAppTokenValidator validator(&conn, &connCallback);
+  auto appParamsValidator = [](const folly::Optional<std::string>&,
+                               const Buf&) { return false; };
+  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
   EXPECT_FALSE(validator.validate(resState));
 }
-*/
 
 class SourceAddressTokenTest : public Test {
  public:
@@ -323,7 +369,9 @@ class SourceAddressTokenTest : public Test {
     ResumptionState resState;
     resState.appToken = encodeAppToken(appToken_);
 
-    DefaultAppTokenValidator validator(&conn_);
+    auto appParamsValidator = [=](const folly::Optional<std::string>&,
+                                  const Buf&) { return acceptZeroRtt; };
+    DefaultAppTokenValidator validator(&conn_, std::move(appParamsValidator));
     EXPECT_EQ(validator.validate(resState), acceptZeroRtt);
   }
 
