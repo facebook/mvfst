@@ -416,7 +416,13 @@ class QuicServerTransportTest : public Test {
   }
 
   virtual void expectWriteNewSessionTicket() {
-    EXPECT_CALL(connCallback, serializeEarlyDataAppParams()).Times(0);
+    server->setEarlyDataAppParamsFunctions(
+        [](const folly::Optional<std::string>&, const Buf&) { return false; },
+        []() -> Buf {
+          // This function shouldn't be called
+          EXPECT_TRUE(false);
+          return nullptr;
+        });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_)).Times(0);
   }
 
@@ -3316,10 +3322,10 @@ class QuicServerTransportHandshakeTest
   }
 
   void expectWriteNewSessionTicket() override {
-    std::string qpackToken("QPACK params");
-    EXPECT_CALL(connCallback, serializeEarlyDataAppParams())
-        .WillOnce(
-            Invoke([=]() { return folly::IOBuf::copyBuffer(qpackToken); }));
+    std::string appParams("APP params");
+    server->setEarlyDataAppParamsFunctions(
+        [](const folly::Optional<std::string>&, const Buf&) { return false; },
+        [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams); });
     EXPECT_CALL(*getFakeHandshakeLayer(), writeNewSessionTicket(_))
         .WillOnce(Invoke([=](const AppToken& appToken) {
           auto& params = appToken.transportParams.parameters;
@@ -3377,7 +3383,7 @@ class QuicServerTransportHandshakeTest
               appToken.sourceAddresses, ContainerEq(expectedSourceToken_));
 
           EXPECT_TRUE(folly::IOBufEqualTo()(
-              appToken.appParams, folly::IOBuf::copyBuffer(qpackToken)));
+              appToken.appParams, folly::IOBuf::copyBuffer(appParams)));
         }));
   }
 

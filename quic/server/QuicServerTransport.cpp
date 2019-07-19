@@ -381,7 +381,9 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     if (appToken.sourceAddresses.empty()) {
       appToken.sourceAddresses.push_back(conn_->peerAddress.getIPAddress());
     }
-    appToken.appParams = connCallback_->serializeEarlyDataAppParams();
+    if (earlyDataAppParamsGetter_) {
+      appToken.appParams = earlyDataAppParamsGetter_();
+    }
     serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);
   }
 }
