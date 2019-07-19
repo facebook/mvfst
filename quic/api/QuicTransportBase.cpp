@@ -2134,6 +2134,14 @@ void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
   connCallback_ = CHECK_NOTNULL(callback);
 }
 
+void QuicTransportBase::setEarlyDataAppParamsFunctions(
+    folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
+        validator,
+    folly::Function<Buf()> getter) {
+  earlyDataAppParamsValidator_ = std::move(validator);
+  earlyDataAppParamsGetter_ = std::move(getter);
+}
+
 void QuicTransportBase::cancelAllAppCallbacks(
     std::pair<QuicErrorCode, std::string> err) noexcept {
   SCOPE_EXIT {

@@ -163,6 +163,55 @@ class QuicSocket {
    */
   virtual void setConnectionCallback(ConnectionCallback* callback) = 0;
 
+  /**
+   * Sets the functions that mvfst will invoke to validate early data params
+   * and encode early data params to NewSessionTicket.
+   * It's up to the application's responsibility to make sure captured objects
+   * (if any) are alive when the functions are called.
+   *
+   * validator:
+   *   On server side:
+   *     Called during handshake while negotiating early data.
+   *     @param alpn
+   *       The negotiated ALPN. Optional because it may be absent from
+   *       ClientHello.
+   *     @param appParams
+   *       The encoded and encrypted application parameters from PSK.
+   *     @return
+   *       Whether application accepts parameters from resumption state for
+   *       0-RTT.
+   *   On client side:
+   *     Called when transport is applying psk from cache.
+   *     @param alpn
+   *       The ALPN client is going to use for this connection. Optional
+   *       because client may not set ALPN.
+   *     @param appParams
+   *       The encoded (not encrypted) application parameter from local cache.
+   *     @return
+   *       Whether application will attempt early data based on the cached
+   *       application parameters. This is useful when client updates to use a
+   *       new binary but still reads PSK from an old cache. Client may choose
+   *       to not attempt 0-RTT at all given client thinks server will likely
+   *       reject it.
+   *
+   * getter:
+   *   On server side:
+   *     Called when transport is writing NewSessionTicket.
+   *     @return
+   *       The encoded application parameters that will be included in
+   *       NewSessionTicket.
+   *   On client side:
+   *     Called when client receives NewSessionTicket and is going to write to
+   *     cache.
+   *     @return
+   *       Encoded application parameters that will be written to cache.
+   */
+  virtual void setEarlyDataAppParamsFunctions(
+      folly::Function<
+          bool(const folly::Optional<std::string>& alpn, const Buf& appParams)>
+          validator,
+      folly::Function<Buf()> getter) = 0;
+
   virtual ~QuicSocket() = default;
 
   /**

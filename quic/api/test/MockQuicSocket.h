@@ -84,6 +84,13 @@ class MockQuicSocket : public QuicSocket {
       setReadCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, ReadCallback*));
   MOCK_METHOD1(setConnectionCallback, void(ConnectionCallback*));
+  void setEarlyDataAppParamsFunctions(
+      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
+          validator,
+      folly::Function<Buf()> getter) override {
+    earlyDataAppParamsValidator_ = std::move(validator);
+    earlyDataAppParamsGetter_ = std::move(getter);
+  }
   MOCK_METHOD1(
       pauseRead,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId));
@@ -222,5 +229,9 @@ class MockQuicSocket : public QuicSocket {
           uint64_t offset));
 
   ConnectionCallback* cb_;
+
+  folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
+      earlyDataAppParamsValidator_;
+  folly::Function<Buf()> earlyDataAppParamsGetter_;
 };
 } // namespace quic
