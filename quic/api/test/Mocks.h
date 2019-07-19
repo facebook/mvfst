@@ -118,13 +118,6 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       void(std::pair<QuicErrorCode, std::string>));
   GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
   GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
-      validateEarlyDataAppParams,
-      bool(const folly::Optional<std::string>&, const Buf&));
-  GMOCK_METHOD0_(, noexcept, , serializeEarlyDataAppParams, Buf());
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {

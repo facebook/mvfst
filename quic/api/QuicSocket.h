@@ -81,41 +81,6 @@ class QuicSocket {
      * Called when the transport is ready to send/receive data.
      */
     virtual void onTransportReady() noexcept {}
-
-    /**
-     * On server side:
-     * Called during handshake while negotiating early data.
-     * Returns wether application accepts parameters from besumption state.
-     *
-     * On client side:
-     * Called when transport is applying psk from cache.
-     * Returns whether application will attempt early data based on params.
-     *
-     * Default implementation is provided for applications that do not require
-     * additional parameters in order to use 0-RTT.
-     */
-    virtual bool validateEarlyDataAppParams(
-        const folly::Optional<std::string>& /* alpn */,
-        const Buf& /* appParams */) noexcept {
-      return true;
-    }
-
-    /**
-     * On server side:
-     * Called when transport is writing NewSessionTicket.
-     * Returns application parameters that will be included in NewSessionTicket.
-     *
-     * On client side:
-     * Called when client receives NewSessionTicket and is going to write to
-     * cache.
-     * Returns application parameters that will be written to cache.
-     *
-     * Default implementation is provided for applications that do not require
-     * additional parameters in order to use 0-RTT.
-     */
-    virtual Buf serializeEarlyDataAppParams() noexcept {
-      return nullptr;
-    }
   };
 
   /**
