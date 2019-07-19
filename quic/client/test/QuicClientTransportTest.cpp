@@ -515,9 +515,16 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   // Change the ctx
   server_->setFizzContext(serverCtx);
   folly::Optional<std::string> alpn = std::string("h1q-fb");
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(alpn, _))
-      .WillOnce(Return(true));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
+        performedValidation = true;
+        EXPECT_EQ(alpnToValidate, alpn);
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   client->start(&clientConnCallback);
+  EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
@@ -557,9 +564,15 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _))
-      .WillOnce(Return(true));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   client->start(&clientConnCallback);
+  EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
   EXPECT_EQ(
@@ -616,7 +629,12 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
   // This needs to be a version that's not in getVersion() but in server's
   // supported version list.
   client->getNonConstConn().originalVersion = MVFST1;
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _)).Times(0);
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        EXPECT_TRUE(false);
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   client->start(&clientConnCallback);
   EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
   EXPECT_FALSE(client->serverInitialParamsSet());
@@ -654,7 +672,12 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   // Change the ctx
   server_->setFizzContext(serverCtx);
   client->getNonConstConn().transportSettings.attemptEarlyData = false;
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _)).Times(0);
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        EXPECT_TRUE(false);
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   client->start(&clientConnCallback);
 
   EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
@@ -689,9 +712,15 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _))
-      .WillOnce(Return(false));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return false;
+      },
+      []() -> Buf { return nullptr; });
   client->start(&clientConnCallback);
+  EXPECT_TRUE(performedValidation);
 
   EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
@@ -4377,8 +4406,15 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   startClient();
+  EXPECT_TRUE(performedValidation);
 
   auto initialUDPSendPacketLen = client->getConn().udpSendPacketLen;
   socketWrites.clear();
@@ -4441,8 +4477,15 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   startClient();
+  EXPECT_TRUE(performedValidation);
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
@@ -4486,8 +4529,15 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   startClient();
+  EXPECT_TRUE(performedValidation);
 
   mockClientHandshake->maxInitialStreamData = 10;
   socketWrites.clear();
@@ -4524,8 +4574,15 @@ TEST_F(
             std::numeric_limits<uint32_t>::max();
         return quicCachedPsk;
       }));
-  EXPECT_CALL(clientConnCallback, validateEarlyDataAppParams(_, _));
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
   startClient();
+  EXPECT_TRUE(performedValidation);
 
   EXPECT_TRUE(client->lossTimeout().isScheduled());
   auto timeRemaining1 = client->lossTimeout().getTimeRemaining();

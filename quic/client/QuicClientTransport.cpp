@@ -798,10 +798,11 @@ folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
       conn_->originalVersion) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
     removePsk();
-  } else if (!CHECK_NOTNULL(connCallback_)
-                  ->validateEarlyDataAppParams(
-                      quicCachedPsk->cachedPsk.alpn,
-                      folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
+  } else if (
+      earlyDataAppParamsValidator_ &&
+      !earlyDataAppParamsValidator_(
+          quicCachedPsk->cachedPsk.alpn,
+          folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
     // Do not remove psk here, will let application decide
   }
