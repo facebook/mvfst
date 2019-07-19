@@ -4266,9 +4266,10 @@ class QuicClientTransportPskCacheTest
 };
 
 TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
-  std::string appParams = "QPACK params";
-  EXPECT_CALL(clientConnCallback, serializeEarlyDataAppParams())
-      .WillOnce(Invoke([=]() { return folly::IOBuf::copyBuffer(appParams); }));
+  std::string appParams = "APP params";
+  client->setEarlyDataAppParamsFunctions(
+      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         EXPECT_EQ(psk.appParams, appParams);
@@ -4277,9 +4278,10 @@ TEST_F(QuicClientTransportPskCacheTest, TestOnNewCachedPsk) {
 }
 
 TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
-  std::string appParams1 = "QPACK params1";
-  EXPECT_CALL(clientConnCallback, serializeEarlyDataAppParams())
-      .WillOnce(Invoke([=]() { return folly::IOBuf::copyBuffer(appParams1); }));
+  std::string appParams1 = "APP params1";
+  client->setEarlyDataAppParamsFunctions(
+      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams1); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;
@@ -4301,9 +4303,10 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   client->getNonConstConn()
       .flowControlState.peerAdvertisedInitialMaxStreamOffsetUni = 123;
 
-  std::string appParams2 = "QPACK params2";
-  EXPECT_CALL(clientConnCallback, serializeEarlyDataAppParams())
-      .WillOnce(Invoke([=]() { return folly::IOBuf::copyBuffer(appParams2); }));
+  std::string appParams2 = "APP params2";
+  client->setEarlyDataAppParamsFunctions(
+      [](const folly::Optional<std::string>&, const Buf&) { return true; },
+      [=]() -> Buf { return folly::IOBuf::copyBuffer(appParams2); });
   EXPECT_CALL(*mockPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
         auto& params = psk.transportParams;

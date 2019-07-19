@@ -949,9 +949,11 @@ void QuicClientTransport::onNewCachedPsk(
   quicCachedPsk.transportParams.initialMaxStreamsUni =
       clientConn_->peerAdvertisedInitialMaxStreamsUni;
 
-  auto appParams = CHECK_NOTNULL(connCallback_)->serializeEarlyDataAppParams();
-  if (appParams) {
-    quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
+  if (earlyDataAppParamsGetter_) {
+    auto appParams = earlyDataAppParamsGetter_();
+    if (appParams) {
+      quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
+    }
   }
 
   pskCache_->putPsk(*hostname_, std::move(quicCachedPsk));
