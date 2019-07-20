@@ -203,6 +203,17 @@ TEST_F(QLoggerTest, PacketsLostEvent) {
   EXPECT_EQ(gotEvent->lostPackets, 89);
 }
 
+TEST_F(QLoggerTest, TransportStateUpdateEvent) {
+  FileQLogger q;
+  std::string update = "start";
+  q.addTransportStateUpdate(update);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogTransportStateUpdateEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->update, update);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -886,6 +897,28 @@ TEST_F(QLoggerTest, PacketsLostFollyDynamic) {
 
   FileQLogger q;
   q.addPacketsLost(PacketNum{10}, 9, 8);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, TransportStateUpdateFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+    "0",
+     "TRANSPORT",
+     "TRANSPORT_STATE_UPDATE",
+     "DEFAULT",
+     {
+       "update": "transport ready"
+     }
+    ]
+])");
+
+  FileQLogger q;
+  q.addTransportStateUpdate("transport ready");
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

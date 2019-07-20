@@ -151,6 +151,14 @@ void FileQLogger::addPacketsLost(
       largestLostPacketNum, lostBytes, lostPackets, refTime));
 }
 
+void FileQLogger::addTransportStateUpdate(std::string update) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogTransportStateUpdateEvent>(
+      std::move(update), refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

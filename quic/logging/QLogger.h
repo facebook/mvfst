@@ -68,6 +68,7 @@ class QLogger {
       PacketNum largestLostPacketNum,
       uint64_t lostBytes,
       uint64_t lostPackets) = 0;
+  virtual void addTransportStateUpdate(std::string update) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);
