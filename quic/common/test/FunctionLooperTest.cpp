@@ -17,6 +17,8 @@ using namespace testing;
 namespace quic {
 namespace test {
 
+class FunctionLooperTest : public Test {};
+
 TEST(FunctionLooperTest, LooperNotRunning) {
   EventBase evb;
   bool called = false;
@@ -175,11 +177,11 @@ TEST(FunctionLooperTest, PacingOnce) {
   looper->run();
   evb.loopOnce();
   EXPECT_EQ(1, fromTimerVec.size());
-  EXPECT_EQ(false, fromTimerVec.back());
+  EXPECT_FALSE(fromTimerVec.back());
   EXPECT_TRUE(looper->isScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(2, fromTimerVec.size());
-  EXPECT_EQ(true, fromTimerVec.back());
+  EXPECT_TRUE(fromTimerVec.back());
   looper->stop();
 }
 
@@ -202,21 +204,21 @@ TEST(FunctionLooperTest, KeepPacing) {
   looper->run();
   evb.loopOnce();
   EXPECT_EQ(1, fromTimerVec.size());
-  EXPECT_EQ(false, fromTimerVec.back());
+  EXPECT_FALSE(fromTimerVec.back());
   EXPECT_TRUE(looper->isScheduled());
 
   looper->cancelTimeout();
   EXPECT_FALSE(looper->isScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(2, fromTimerVec.size());
-  EXPECT_EQ(true, fromTimerVec.back());
+  EXPECT_TRUE(fromTimerVec.back());
   EXPECT_TRUE(looper->isScheduled());
 
   looper->cancelTimeout();
   EXPECT_FALSE(looper->isScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(3, fromTimerVec.size());
-  EXPECT_EQ(true, fromTimerVec.back());
+  EXPECT_TRUE(fromTimerVec.back());
   EXPECT_TRUE(looper->isScheduled());
 
   stopPacing = true;
@@ -224,7 +226,7 @@ TEST(FunctionLooperTest, KeepPacing) {
   EXPECT_FALSE(looper->isScheduled());
   looper->timeoutExpired();
   EXPECT_EQ(4, fromTimerVec.size());
-  EXPECT_EQ(true, fromTimerVec.back());
+  EXPECT_TRUE(fromTimerVec.back());
   EXPECT_FALSE(looper->isScheduled());
 
   looper->stop();

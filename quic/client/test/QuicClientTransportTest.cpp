@@ -449,7 +449,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
         EXPECT_EQ(indices.size(), 1);
         auto tmp = std::move(qLogger->logs[indices[0]]);
         auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
-        checkTransportSummaryEvent(event);
+        this->checkTransportSummaryEvent(event);
 
         eventbase_.terminateLoopSoon();
       }));
@@ -480,7 +480,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
         EXPECT_EQ(indices.size(), 1);
         auto tmp = std::move(qLogger->logs[indices[0]]);
         auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
-        checkTransportSummaryEvent(event);
+        this->checkTransportSummaryEvent(event);
       }));
   client->start(&clientConnCallback);
   eventbase_.loop();
