@@ -21,9 +21,6 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
   auto event = std::make_unique<QLogPacketEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now() - refTimePoint);
-  event->packetNum = folly::variant_match(
-      regularPacket.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
   event->packetSize = packetSize;
   event->eventType = QLogEventType::PacketReceived;
   event->packetType = folly::variant_match(
@@ -32,6 +29,12 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
       [](const ShortHeader& /* unused*/) {
         return kShortHeaderPacketType.toString();
       });
+  if (event->packetType != toString(LongHeader::Types::Retry)) {
+    // A Retry packet does not include a packet number.
+    event->packetNum = folly::variant_match(
+        regularPacket.header,
+        [](const auto& h) { return h.getPacketSequenceNum(); });
+  }
 
   // looping through the packet to store logs created from frames in the packet
   for (const auto& quicFrame : regularPacket.frames) {

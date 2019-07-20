@@ -200,6 +200,11 @@ void QuicClientTransport::processPacketData(
     conn_ = std::move(tempConn);
 
     clientConn_->retryToken_ = header.getToken()->clone();
+
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacket(*regularOptional, packetSize);
+    }
+
     startCryptoHandshake();
     return;
   }

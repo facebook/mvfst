@@ -3601,6 +3601,9 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   // Create a stream and attempt to send some data to the server
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
+
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");
   client->writeChain(streamId, write->clone(), true, false, nullptr);
@@ -3650,6 +3653,14 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   auto quicPacket = boost::get<QuicPacket>(&codecResult);
   auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
   auto header = boost::get<LongHeader>(regularQuicPacket->header);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketReceived, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Retry));
+
   EXPECT_EQ(header.getHeaderType(), LongHeader::Types::Initial);
   EXPECT_TRUE(header.hasToken());
   folly::IOBufEqualTo eq;
