@@ -25,3 +25,13 @@ quic_add_test(TARGET HandshakeLayerTest
   mvfst_handshake
   mvfst_test_utils
 )
+
+quic_add_test(TARGET FizzCryptoFactoryTest
+  SOURCES
+  FizzCryptoFactoryTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_handshake
+  mvfst_test_utils
+)
+

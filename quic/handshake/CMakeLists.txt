@@ -5,7 +5,9 @@
 
 add_library(
   mvfst_handshake STATIC
+  CryptoFactory.cpp
   FizzBridge.cpp
+  FizzCryptoFactory.cpp
   HandshakeLayer.cpp
   QuicFizzFactory.cpp
   TransportParameters.cpp

@@ -12,93 +12,18 @@
 #include <fizz/crypto/Sha256.h>
 #include <fizz/protocol/Factory.h>
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
-
-Buf makeInitialTrafficSecret(
-    fizz::Factory* factory,
-    folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  auto deriver =
-      factory->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto connIdRange = folly::range(clientDestinationConnId);
-  auto salt =
-      version == QuicVersion::MVFST_OLD ? kQuicDraft17Salt : kQuicDraft22Salt;
-  auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
-  auto trafficSecret = deriver->expandLabel(
-      folly::range(initialSecret),
-      label,
-      folly::IOBuf::create(0),
-      fizz::Sha256::HashLen);
-  return trafficSecret;
-}
-
-Buf makeServerInitialTrafficSecret(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  return makeInitialTrafficSecret(
-      factory, kServerInitialLabel, clientDestinationConnId, version);
-}
-
-Buf makeClientInitialTrafficSecret(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  return makeInitialTrafficSecret(
-      factory, kClientInitialLabel, clientDestinationConnId, version);
-}
-
-std::unique_ptr<Aead> makeInitialAead(
-    fizz::Factory* factory,
-    folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  auto trafficSecret = makeInitialTrafficSecret(
-      factory, label, clientDestinationConnId, version);
-  auto deriver =
-      factory->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto aead = factory->makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto key = deriver->expandLabel(
-      trafficSecret->coalesce(),
-      kQuicKeyLabel,
-      folly::IOBuf::create(0),
-      aead->keyLength());
-  auto iv = deriver->expandLabel(
-      trafficSecret->coalesce(),
-      kQuicIVLabel,
-      folly::IOBuf::create(0),
-      aead->ivLength());
-
-  fizz::TrafficKey trafficKey = {std::move(key), std::move(iv)};
-  aead->setKey(std::move(trafficKey));
-  return FizzAead::wrap(std::move(aead));
-}
-
-std::unique_ptr<Aead> getClientInitialCipher(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  return makeInitialAead(
-      factory, kClientInitialLabel, clientDestinationConnId, version);
-}
-
-std::unique_ptr<Aead> getServerInitialCipher(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version) {
-  return makeInitialAead(
-      factory, kServerInitialLabel, clientDestinationConnId, version);
-}
 
 std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
     QuicFizzFactory* factory,
     const ConnectionId& initialDestinationConnectionId,
     QuicVersion version) {
-  auto clientInitialTrafficSecret = makeClientInitialTrafficSecret(
-      factory, initialDestinationConnectionId, version);
+  auto clientInitialTrafficSecret =
+      FizzCryptoFactory(factory).makeClientInitialTrafficSecret(
+          initialDestinationConnectionId, version);
   return makePacketNumberCipher(
       factory,
       clientInitialTrafficSecret->coalesce(),
@@ -109,8 +34,9 @@ std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
     QuicFizzFactory* factory,
     const ConnectionId& initialDestinationConnectionId,
     QuicVersion version) {
-  auto serverInitialTrafficSecret = makeServerInitialTrafficSecret(
-      factory, initialDestinationConnectionId, version);
+  auto serverInitialTrafficSecret =
+      FizzCryptoFactory(factory).makeServerInitialTrafficSecret(
+          initialDestinationConnectionId, version);
   return makePacketNumberCipher(
       factory,
       serverInitialTrafficSecret->coalesce(),

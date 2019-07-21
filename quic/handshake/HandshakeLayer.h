@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <fizz/protocol/Exporter.h>
-#include <fizz/protocol/Factory.h>
 #include <folly/Expected.h>
 
 #include <quic/QuicConstants.h>
@@ -17,10 +15,6 @@
 #include <quic/codec/Types.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/QuicFizzFactory.h>
-
-namespace fizz {
-class Factory;
-}
 
 namespace quic {
 
@@ -45,29 +39,6 @@ constexpr folly::StringPiece kQuicDraft22Salt =
 constexpr folly::StringPiece kClientInitialLabel = "client in";
 constexpr folly::StringPiece kServerInitialLabel = "server in";
 
-// TODO remove version parameter when we don't need to support MVFST_OLD anymore
-std::unique_ptr<Aead> makeInitialAead(
-    fizz::Factory* factory,
-    folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version);
-
-std::unique_ptr<Aead> getClientInitialCipher(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version);
-
-std::unique_ptr<Aead> getServerInitialCipher(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version);
-
-Buf makeInitialTrafficSecret(
-    fizz::Factory* factory,
-    folly::StringPiece label,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version);
-
 /**
  * Makes the header cipher for writing client initial packets.
  */
@@ -82,16 +53,6 @@ std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
 std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
     QuicFizzFactory* factory,
     const ConnectionId& initialDestinationConnectionId,
-    QuicVersion version);
-
-Buf makeServerInitialTrafficSecret(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
-    QuicVersion version);
-
-Buf makeClientInitialTrafficSecret(
-    fizz::Factory* factory,
-    const ConnectionId& clientDestinationConnId,
     QuicVersion version);
 
 std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
