@@ -51,8 +51,8 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
   codec->setClientConnectionId(clientConnId);
   codec->setInitialReadCipher(
       cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST));
-  codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-      &fizzFactory, clientConnId, QuicVersion::MVFST));
+  codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
+      clientConnId, QuicVersion::MVFST));
   codec->setZeroRttReadCipher(std::move(zeroRttAead));
   codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
   codec->setOneRttReadCipher(std::move(oneRttAead));
@@ -463,7 +463,7 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   uint64_t offset = 0;
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
   auto headerCipher =
-      makeClientInitialHeaderCipher(&fizzFactory, connId, QuicVersion::MVFST);
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
   auto packet = createInitialCryptoPacket(
       getTestConnectionId(),
       connId,
@@ -501,7 +501,7 @@ TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   uint64_t offset = 0;
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
   auto headerCipher =
-      makeClientInitialHeaderCipher(&fizzFactory, connId, QuicVersion::MVFST);
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
   auto packet = createInitialCryptoPacket(
       getTestConnectionId(),
       connId,

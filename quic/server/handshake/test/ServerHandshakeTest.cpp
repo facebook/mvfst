@@ -28,6 +28,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/HandshakeLayer.h>
+#include <quic/handshake/QuicFizzFactory.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/StateData.h>

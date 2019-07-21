@@ -495,6 +495,7 @@ void onServerReadDataFromOpen(
             conn.transportSettings.partialReliabilityEnabled,
             token));
     QuicFizzFactory fizzFactory;
+    FizzCryptoFactory cryptoFactory(&fizzFactory);
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     conn.readCodec->setInitialReadCipher(
         FizzCryptoFactory(&fizzFactory)
@@ -506,14 +507,14 @@ void onServerReadDataFromOpen(
     }
     conn.readCodec->setCodecParameters(
         CodecParameters(conn.peerAckDelayExponent, version));
-    conn.initialWriteCipher =
-        FizzCryptoFactory(&fizzFactory)
-            .getServerInitialCipher(initialDestinationConnectionId, version);
+    conn.initialWriteCipher = cryptoFactory.getServerInitialCipher(
+        initialDestinationConnectionId, version);
 
-    conn.readCodec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-        &fizzFactory, initialDestinationConnectionId, version));
-    conn.initialHeaderCipher = makeServerInitialHeaderCipher(
-        &fizzFactory, initialDestinationConnectionId, version);
+    conn.readCodec->setInitialHeaderCipher(
+        cryptoFactory.makeClientInitialHeaderCipher(
+            initialDestinationConnectionId, version));
+    conn.initialHeaderCipher = cryptoFactory.makeServerInitialHeaderCipher(
+        initialDestinationConnectionId, version);
     conn.peerAddress = conn.originalPeerAddress;
   }
   folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};

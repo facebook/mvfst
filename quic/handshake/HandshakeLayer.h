@@ -13,7 +13,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
-#include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
 
@@ -39,28 +38,8 @@ constexpr folly::StringPiece kClientInitialLabel = "client in";
 constexpr folly::StringPiece kServerInitialLabel = "server in";
 
 /**
- * Makes the header cipher for writing client initial packets.
- */
-std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
-    QuicFizzFactory* factory,
-    const ConnectionId& initialDestinationConnectionId,
-    QuicVersion version);
-
-/**
- * Makes the header cipher for writing server initial packets.
- */
-std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
-    QuicFizzFactory* factory,
-    const ConnectionId& initialDestinationConnectionId,
-    QuicVersion version);
-
-std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-    QuicFizzFactory* factory,
-    folly::ByteRange baseSecret,
-    fizz::CipherSuite cipher);
-
-/**
  * Converts the protection type of QUIC to an encryption level.
  */
 EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type);
+
 } // namespace quic

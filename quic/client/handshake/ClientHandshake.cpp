@@ -10,6 +10,7 @@
 
 #include <fizz/protocol/Protocol.h>
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -328,7 +329,8 @@ void ClientHandshake::ActionMoveVisitor::operator()(fizz::EndOfData&) {
 
 void ClientHandshake::ActionMoveVisitor::operator()(
     fizz::SecretAvailable& secretAvailable) {
-  QuicFizzFactory factory;
+  QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   folly::variant_match(
       secretAvailable.secret.type,
       [&](fizz::EarlySecrets earlySecrets) {
@@ -346,8 +348,9 @@ void ClientHandshake::ActionMoveVisitor::operator()(
                     folly::range(secretAvailable.secret.secret),
                     kQuicKeyLabel,
                     kQuicIVLabel));
-            client_.zeroRttWriteHeaderCipher_ = makePacketNumberCipher(
-                &factory, folly::range(secretAvailable.secret.secret), cipher);
+            client_.zeroRttWriteHeaderCipher_ =
+                cryptoFactory.makePacketNumberCipher(
+                    folly::range(secretAvailable.secret.secret));
             break;
           }
           default:
@@ -362,10 +365,8 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             folly::range(secretAvailable.secret.secret),
             kQuicKeyLabel,
             kQuicIVLabel);
-        auto headerCipher = makePacketNumberCipher(
-            &factory,
-            folly::range(secretAvailable.secret.secret),
-            *client_.state_.cipher());
+        auto headerCipher = cryptoFactory.makePacketNumberCipher(
+            folly::range(secretAvailable.secret.secret));
         switch (handshakeSecrets) {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
             client_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
@@ -385,10 +386,8 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             folly::range(secretAvailable.secret.secret),
             kQuicKeyLabel,
             kQuicIVLabel);
-        auto appHeaderCipher = makePacketNumberCipher(
-            &factory,
-            folly::range(secretAvailable.secret.secret),
-            *client_.state_.cipher());
+        auto appHeaderCipher = cryptoFactory.makePacketNumberCipher(
+            folly::range(secretAvailable.secret.secret));
         switch (appSecrets) {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
             client_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));

@@ -855,10 +855,11 @@ void QuicClientTransport::startCryptoHandshake() {
       *clientConn_->initialDestinationConnectionId, version);
   conn_->readCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
       *clientConn_->initialDestinationConnectionId, version));
-  conn_->readCodec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId, version));
-  conn_->initialHeaderCipher = makeClientInitialHeaderCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId, version);
+  conn_->readCodec->setInitialHeaderCipher(
+      cryptoFactory.makeServerInitialHeaderCipher(
+          *clientConn_->initialDestinationConnectionId, version));
+  conn_->initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
+      *clientConn_->initialDestinationConnectionId, version);
 
   // Add partial reliability parameter to customTransportParameters_.
   setPartialReliabilityTransportParameter();

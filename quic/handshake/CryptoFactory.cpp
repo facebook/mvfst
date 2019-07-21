@@ -38,4 +38,22 @@ Buf CryptoFactory::makeClientInitialTrafficSecret(
       kClientInitialLabel, clientDestinationConnId, version);
 }
 
+std::unique_ptr<PacketNumberCipher>
+CryptoFactory::makeClientInitialHeaderCipher(
+    const ConnectionId &initialDestinationConnectionId,
+    QuicVersion version) const {
+  auto clientInitialTrafficSecret =
+      makeClientInitialTrafficSecret(initialDestinationConnectionId, version);
+  return makePacketNumberCipher(clientInitialTrafficSecret->coalesce());
+}
+
+std::unique_ptr<PacketNumberCipher>
+CryptoFactory::makeServerInitialHeaderCipher(
+    const ConnectionId &initialDestinationConnectionId,
+    QuicVersion version) const {
+  auto serverInitialTrafficSecret =
+      makeServerInitialTrafficSecret(initialDestinationConnectionId, version);
+  return makePacketNumberCipher(serverInitialTrafficSecret->coalesce());
+}
+
 } // namespace quic
