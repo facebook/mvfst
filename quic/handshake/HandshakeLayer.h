@@ -8,12 +8,11 @@
 
 #pragma once
 
-#include <folly/Expected.h>
+#include <folly/io/async/DelayedDestruction.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
-#include <quic/handshake/Aead.h>
 #include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
