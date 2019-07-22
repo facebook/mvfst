@@ -80,79 +80,46 @@ TEST_F(CubicTest, PersistentCongestion) {
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 9);
+  std::array<uint64_t, 9> cwdArr = {initCwnd,
+                                    11088,
+                                    2464,
+                                    cubic.getCongestionWindow(),
+                                    cubic.getCongestionWindow(),
+                                    cubic.getCongestionWindow(),
+                                    cubic.getCongestionWindow(),
+                                    cubic.getCongestionWindow(),
+                                    cubic.getCongestionWindow()};
+  std::array<std::string, 9> congestionEventArr = {
+      kRemoveInflight.str(),
+      kCubicLoss.str(),
+      kPersistentCongestion.str(),
+      kCongestionPacketAck.str(),
+      kResetTimeToOrigin.str(),
+      kResetLastReductionTime.str(),
+      kCubicSteadyCwnd.str(),
+      kCwndNoChange.str(),
+      kCongestionPacketAck.str()};
 
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->bytesInFlight, 0);
-  EXPECT_EQ(event->currentCwnd, initCwnd);
-  EXPECT_EQ(event->congestionEvent, kRemoveInflight.str());
-  EXPECT_EQ(event->state, cubicStateToString(CubicStates::Hystart));
-  EXPECT_EQ(event->recoveryState, "");
+  std::array<folly::StringPiece, 9> stateArr = {
+      cubicStateToString(CubicStates::Hystart),
+      cubicStateToString(CubicStates::FastRecovery),
+      cubicStateToString(CubicStates::Hystart),
+      cubicStateToString(CubicStates::Steady),
+      cubicStateToString(CubicStates::Steady),
+      cubicStateToString(CubicStates::Steady),
+      cubicStateToString(CubicStates::Steady),
+      cubicStateToString(CubicStates::Steady),
+      cubicStateToString(CubicStates::Steady)};
 
-  auto tmp2 = std::move(qLogger->logs[indices[1]]);
-  auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
-  EXPECT_EQ(event2->bytesInFlight, 0);
-  EXPECT_EQ(event2->currentCwnd, 11088);
-  EXPECT_EQ(event2->congestionEvent, kCubicLoss.str());
-  EXPECT_EQ(event2->state, cubicStateToString(CubicStates::FastRecovery));
-  EXPECT_EQ(event2->recoveryState, "");
-
-  auto tmp3 = std::move(qLogger->logs[indices[2]]);
-  auto event3 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp3.get());
-  EXPECT_EQ(event3->bytesInFlight, 0);
-  EXPECT_EQ(event3->currentCwnd, 2464);
-  EXPECT_EQ(event3->congestionEvent, kPersistentCongestion.str());
-  EXPECT_EQ(event3->state, cubicStateToString(CubicStates::Hystart));
-  EXPECT_EQ(event3->recoveryState, "");
-
-  auto tmp4 = std::move(qLogger->logs[indices[3]]);
-  auto event4 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp4.get());
-  EXPECT_EQ(event4->bytesInFlight, 0);
-  EXPECT_EQ(event4->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event4->congestionEvent, kCongestionPacketAck.str());
-  EXPECT_EQ(event4->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event4->recoveryState, "");
-
-  auto tmp5 = std::move(qLogger->logs[indices[4]]);
-  auto event5 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp5.get());
-  EXPECT_EQ(event5->bytesInFlight, 0);
-  EXPECT_EQ(event5->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event5->congestionEvent, kResetTimeToOrigin.str());
-  EXPECT_EQ(event5->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event5->recoveryState, "");
-
-  auto tmp6 = std::move(qLogger->logs[indices[5]]);
-  auto event6 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp6.get());
-  EXPECT_EQ(event6->bytesInFlight, 0);
-  EXPECT_EQ(event6->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event6->congestionEvent, kResetLastReductionTime.str());
-  EXPECT_EQ(event6->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event6->recoveryState, "");
-
-  auto tmp7 = std::move(qLogger->logs[indices[6]]);
-  auto event7 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp7.get());
-  EXPECT_EQ(event7->bytesInFlight, 0);
-  EXPECT_EQ(event7->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event7->congestionEvent, kCubicSteadyCwnd.str());
-  EXPECT_EQ(event7->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event7->recoveryState, "");
-
-  auto tmp8 = std::move(qLogger->logs[indices[7]]);
-  auto event8 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp8.get());
-  EXPECT_EQ(event8->bytesInFlight, 0);
-  EXPECT_EQ(event8->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event8->congestionEvent, kCwndNoChange.str());
-  EXPECT_EQ(event8->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event8->recoveryState, "");
-
-  auto tmp9 = std::move(qLogger->logs[indices[8]]);
-  auto event9 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp9.get());
-  EXPECT_EQ(event9->bytesInFlight, 0);
-  EXPECT_EQ(event9->currentCwnd, cubic.getCongestionWindow());
-  EXPECT_EQ(event9->congestionEvent, kCongestionPacketAck.str());
-  EXPECT_EQ(event9->state, cubicStateToString(CubicStates::Steady));
-  EXPECT_EQ(event9->recoveryState, "");
-
+  for (int i = 0; i < 9; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->bytesInFlight, 0);
+    EXPECT_EQ(event->currentCwnd, cwdArr[i]);
+    EXPECT_EQ(event->congestionEvent, congestionEventArr[i]);
+    EXPECT_EQ(event->state, stateArr[i]);
+    EXPECT_EQ(event->recoveryState, "");
+  }
   EXPECT_EQ(currentCwnd, cubic.getWritableBytes());
 }
 
@@ -264,16 +231,13 @@ TEST_F(CubicTest, AppIdle) {
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::AppIdleUpdate, qLogger);
   EXPECT_EQ(indices.size(), 2);
-
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->idleEvent, kAppIdle.str());
-  EXPECT_TRUE(event->idle);
-
-  auto tmp2 = std::move(qLogger->logs[indices[1]]);
-  auto event2 = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp2.get());
-  EXPECT_EQ(event2->idleEvent, kAppIdle.str());
-  EXPECT_FALSE(event2->idle);
+  std::array<bool, 2> idleArr = {true, false};
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->idleEvent, kAppIdle.str());
+    EXPECT_EQ(event->idle, idleArr[i]);
+  }
 }
 
 TEST_F(CubicTest, PacingGain) {

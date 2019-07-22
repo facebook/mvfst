@@ -250,7 +250,13 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
       StreamId streamid,
       MockReadCallback* readCb);
 
-  void checkTransportSummaryEvent(QLogTransportSummaryEvent* event) {
+  void checkTransportSummaryEvent(const std::shared_ptr<FileQLogger>& qLogger) {
+    std::vector<int> indices =
+        getQLogEventIndices(QLogEventType::TransportSummary, qLogger);
+    EXPECT_EQ(indices.size(), 1);
+    auto tmp = std::move(qLogger->logs[indices[0]]);
+    auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
+
     uint64_t totalCryptoDataWritten = 0;
     uint64_t totalCryptoDataRecvd = 0;
 
@@ -444,12 +450,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
             },
             [](const auto&) { return false; }));
         client->close(folly::none);
-        std::vector<int> indices =
-            getQLogEventIndices(QLogEventType::TransportSummary, qLogger);
-        EXPECT_EQ(indices.size(), 1);
-        auto tmp = std::move(qLogger->logs[indices[0]]);
-        auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
-        this->checkTransportSummaryEvent(event);
+        this->checkTransportSummaryEvent(qLogger);
 
         eventbase_.terminateLoopSoon();
       }));
@@ -475,12 +476,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
               return err == LocalErrorCode::CONNECT_FAILED;
             },
             [](const auto&) { return false; }));
-        std::vector<int> indices =
-            getQLogEventIndices(QLogEventType::TransportSummary, qLogger);
-        EXPECT_EQ(indices.size(), 1);
-        auto tmp = std::move(qLogger->logs[indices[0]]);
-        auto event = dynamic_cast<QLogTransportSummaryEvent*>(tmp.get());
-        this->checkTransportSummaryEvent(event);
+        this->checkTransportSummaryEvent(qLogger);
       }));
   client->start(&clientConnCallback);
   eventbase_.loop();
