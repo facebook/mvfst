@@ -109,6 +109,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
 
   if (longHeader.getHeaderType() == LongHeader::Types::Retry) {
     auto& originalDstConnId = longHeader.getOriginalDstConnId();
+    appender.writeBE<uint8_t>(longHeader.getOriginalDstConnId()->size());
     appender.push(originalDstConnId->data(), originalDstConnId->size());
 
     // Write the retry token

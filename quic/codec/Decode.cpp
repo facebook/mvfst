@@ -951,24 +951,24 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     ParsedLongHeaderInvariant parsedLongHeaderInvariant,
     folly::io::Cursor& cursor) {
   if (type == LongHeader::Types::Retry) {
-    auto cursorLength = cursor.totalLength();
-    auto odcidLenField = parsedLongHeaderInvariant.initialByte & 0X0F;
-    uint8_t originalDstConnIdLen = odcidLenField == 0 ? 0 : odcidLenField + 3;
-    if (cursorLength < originalDstConnIdLen) {
+    if (!cursor.canAdvance(sizeof(uint8_t))) {
+      VLOG(5) << "Not enough bytes for ODCID length";
+      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+    }
+    uint8_t originalDstConnIdLen = cursor.readBE<uint8_t>();
+    if (!cursor.canAdvance(originalDstConnIdLen)) {
       VLOG(5) << "Not enough bytes for ODCID";
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
     ConnectionId originalDstConnId(cursor, originalDstConnIdLen);
 
-    if (cursorLength - originalDstConnId.size() == 0) {
+    if (cursor.totalLength() == 0) {
       VLOG(5) << "Not enough bytes for retry token";
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
 
-    cursorLength -= originalDstConnId.size();
-
     Buf token;
-    cursor.clone(token, cursorLength);
+    cursor.clone(token, cursor.totalLength());
 
     return ParsedLongHeader(
         LongHeader(
