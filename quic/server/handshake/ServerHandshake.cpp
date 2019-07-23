@@ -36,6 +36,7 @@ void ServerHandshake::initialize(
   executor_ = executor;
   auto ctx = std::make_shared<fizz::server::FizzServerContext>(*context);
   ctx->setFactory(std::make_shared<QuicFizzFactory>());
+  ctx->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
   ctx->setVersionFallbackEnabled(false);
   // Since Draft-17, client won't sent EOED
   ctx->setOmitEarlyRecordLayer(true);
