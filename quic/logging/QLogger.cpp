@@ -131,7 +131,7 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         },
         [&](const NewConnectionIdFrame& frame) {
           event->frames.push_back(std::make_unique<NewConnectionIdFrameLog>(
-              frame.sequence, frame.token));
+              frame.sequenceNumber, frame.token));
         },
         [&](const auto& /* unused */) {
           // Ignore other frames.
@@ -253,7 +253,7 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         },
         [&](const NewConnectionIdFrame& frame) {
           event->frames.push_back(std::make_unique<NewConnectionIdFrameLog>(
-              frame.sequence, frame.token));
+              frame.sequenceNumber, frame.token));
         },
         [&](const auto& /* unused */) {
           // Ignore other frames.

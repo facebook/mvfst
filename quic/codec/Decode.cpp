@@ -462,10 +462,17 @@ StreamsBlockedFrame decodeUniStreamsBlockedFrame(folly::io::Cursor& cursor) {
 }
 
 NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
-  auto sequence = decodeQuicInteger(cursor);
-  if (UNLIKELY(!sequence)) {
+  auto sequenceNumber = decodeQuicInteger(cursor);
+  if (UNLIKELY(!sequenceNumber)) {
     throw QuicTransportException(
         "Bad sequence",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::NEW_CONNECTION_ID);
+  }
+  auto retirePriorTo = decodeQuicInteger(cursor);
+  if (UNLIKELY(!retirePriorTo)) {
+    throw QuicTransportException(
+        "Bad retire prior to",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::NEW_CONNECTION_ID);
   }
@@ -492,7 +499,8 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
   StatelessResetToken statelessResetToken;
   cursor.pull(statelessResetToken.data(), statelessResetToken.size());
   return NewConnectionIdFrame(
-      folly::to<uint16_t>(sequence->first),
+      sequenceNumber->first,
+      retirePriorTo->first,
       std::move(connId),
       std::move(statelessResetToken));
 }

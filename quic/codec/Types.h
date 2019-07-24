@@ -452,29 +452,33 @@ struct StreamsBlockedFrame {
 };
 
 struct NewConnectionIdFrame {
-  uint16_t sequence;
+  uint64_t sequenceNumber;
+  uint64_t retirePriorTo;
   ConnectionId connectionId;
   StatelessResetToken token;
 
   NewConnectionIdFrame(
-      uint16_t sequenceIn,
+      uint64_t sequenceNumberIn,
+      uint64_t retirePriorToIn,
       ConnectionId connectionIdIn,
       StatelessResetToken tokenIn)
-      : sequence(sequenceIn),
+      : sequenceNumber(sequenceNumberIn),
+        retirePriorTo(retirePriorToIn),
         connectionId(connectionIdIn),
         token(std::move(tokenIn)) {}
 
   bool operator==(const NewConnectionIdFrame& rhs) const {
-    return sequence == rhs.sequence && connectionId == rhs.connectionId &&
-        token == rhs.token;
+    return sequenceNumber == rhs.sequenceNumber &&
+        retirePriorTo == rhs.retirePriorTo &&
+        connectionId == rhs.connectionId && token == rhs.token;
   }
 };
 
 struct RetireConnectionIdFrame {
-  uint64_t sequenceId;
+  uint64_t sequenceNumber;
 
-  explicit RetireConnectionIdFrame(uint64_t sequenceIn)
-      : sequenceId(sequenceIn) {}
+  explicit RetireConnectionIdFrame(uint64_t sequenceNumberIn)
+      : sequenceNumber(sequenceNumberIn) {}
 };
 
 struct PathChallengeFrame {

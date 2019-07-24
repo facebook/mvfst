@@ -1294,15 +1294,16 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   setupCommonExpects(pktBuilder);
   StatelessResetToken token;
   memset(token.data(), 'a', token.size());
-  NewConnectionIdFrame newConnId(1, getTestConnectionId(), token);
+  NewConnectionIdFrame newConnId(1, 0, getTestConnectionId(), token);
   auto bytesWritten = writeFrame(newConnId, pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 27);
+  EXPECT_EQ(bytesWritten, 28);
   auto resultNewConnIdFrame = boost::get<NewConnectionIdFrame>(
       boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
-  EXPECT_EQ(resultNewConnIdFrame.sequence, 1);
+  EXPECT_EQ(resultNewConnIdFrame.sequenceNumber, 1);
+  EXPECT_EQ(resultNewConnIdFrame.retirePriorTo, 0);
   EXPECT_EQ(resultNewConnIdFrame.connectionId, getTestConnectionId());
   EXPECT_EQ(resultNewConnIdFrame.token, token);
 
@@ -1310,7 +1311,8 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   folly::io::Cursor cursor(wireBuf.get());
   auto wireNewConnIdFrame = boost::get<NewConnectionIdFrame>(
       boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
-  EXPECT_EQ(1, wireNewConnIdFrame.sequence);
+  EXPECT_EQ(1, wireNewConnIdFrame.sequenceNumber);
+  EXPECT_EQ(0, wireNewConnIdFrame.retirePriorTo);
   EXPECT_EQ(getTestConnectionId(), wireNewConnIdFrame.connectionId);
   EXPECT_TRUE(cursor.isAtEnd());
 }
@@ -1342,7 +1344,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForNewConnId) {
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
   NewConnectionIdFrame newConnId(
-      1, getTestConnectionId(), StatelessResetToken());
+      1, 0, getTestConnectionId(), StatelessResetToken());
   EXPECT_EQ(0, writeFrame(newConnId, pktBuilder));
 }
 

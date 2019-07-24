@@ -1322,7 +1322,7 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   auto& conn = transport_->getConnectionState();
   NewConnectionIdFrame newConnId(
-      1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
@@ -1357,7 +1357,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   conn.lossState.appDataLossTime.clear();
 
   NewConnectionIdFrame newConnId(
-      1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
@@ -1464,7 +1464,7 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
   auto& conn = transport_->getConnectionState();
 
   NewConnectionIdFrame newConnId(
-      1, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
   sendSimpleFrame(conn, newConnId);
   transport_->updateWriteLooper(true);
   loopForWrites();
