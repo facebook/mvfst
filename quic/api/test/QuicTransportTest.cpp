@@ -571,6 +571,9 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
 
 TEST_F(QuicTransportTest, WriteFlowControl) {
   auto& conn = transport_->getConnectionState();
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   auto streamId = transport_->createBidirectionalStream().value();
   auto stream = conn.streamManager->getStream(streamId);
   stream->flowControlState.peerAdvertisedMaxOffset = 100;
@@ -643,6 +646,16 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   verifyCorrectness(conn, 100, streamId, *buf, false, false);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 3);
+  std::array<int, 3> offsets = {100, 200, 220};
+  for (int i = 0; i < 3; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, getFlowControlEvent(offsets[i]));
+  }
 }
 
 TEST_F(QuicTransportTest, WriteErrorEagain) {

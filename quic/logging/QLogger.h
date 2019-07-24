@@ -82,4 +82,14 @@ class QLogger {
       uint64_t packetSize,
       bool isPacketRecvd);
 };
+
+std::string getFlowControlEvent(int offset);
+
+std::string
+getRxStreamWU(StreamId streamId, PacketNum packetNum, uint64_t maximumData);
+
+std::string getRxConnWU(PacketNum packetNum, uint64_t maximumData);
+
+std::string getPeerClose(const std::string& errMsg);
+
 } // namespace quic

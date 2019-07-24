@@ -261,6 +261,9 @@ void Cubic::updateTimeToOrigin() noexcept {
   // The following calculation can be converted to pure integer calculation if
   // we change the equation a bit to remove all decimals. It's also possible
   // to remove the cbrt calculation by changing the equation.
+  if (conn_.qLogger) {
+    conn_.qLogger->addTransportStateUpdate(kRecalculateTimeToOrigin.str());
+  }
   QUIC_TRACE(fst_trace, conn_, "recalculate_timetoorigin");
   if (*steadyState_.lastMaxCwndBytes <= cwndBytes_) {
     steadyState_.timeToOrigin = 0.0;

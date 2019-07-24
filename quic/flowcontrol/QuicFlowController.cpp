@@ -7,10 +7,10 @@
  */
 
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/logging/QuicLogger.h>
-
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/logging/QLogger.h>
+#include <quic/logging/QuicLogger.h>
 #include <limits>
 
 namespace quic {
@@ -80,8 +80,11 @@ bool maybeSendConnWindowUpdate(
   if (newAdvertisedOffset) {
     conn.pendingEvents.connWindowUpdate = true;
     QUIC_STATS(conn.infoCallback, onConnFlowControlUpdate);
-    QUIC_TRACE(
-        flow_control_event, conn, "tx_conn", newAdvertisedOffset.value());
+    if (conn.qLogger) {
+      conn.qLogger->addTransportStateUpdate(
+          getFlowControlEvent(newAdvertisedOffset.value()));
+    }
+    QUIC_TRACE(flow_control_event, conn, "tx_conn", newAdvertisedOffset.value())
     return true;
   }
   return false;
@@ -172,6 +175,10 @@ void updateFlowControlOnWriteToSocket(
   stream.conn.flowControlState.sumCurStreamBufferLen -= length;
   if (stream.conn.flowControlState.sumCurWriteOffset ==
       stream.conn.flowControlState.peerAdvertisedMaxOffset) {
+    if (stream.conn.qLogger) {
+      stream.conn.qLogger->addTransportStateUpdate(
+          getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
+    }
     QUIC_TRACE(
         flow_control_event,
         stream.conn,
@@ -195,6 +202,10 @@ void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
       stream.writeBuffer.empty()) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
+    if (stream.conn.qLogger) {
+      stream.conn.qLogger->addTransportStateUpdate(
+          getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
+    }
     QUIC_TRACE(
         flow_control_event,
         stream.conn,
@@ -216,6 +227,10 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
       !stream.writeBuffer.empty()) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
+    if (stream.conn.qLogger) {
+      stream.conn.qLogger->addTransportStateUpdate(
+          getFlowControlEvent(stream.flowControlState.peerAdvertisedMaxOffset));
+    }
     QUIC_TRACE(
         flow_control_event,
         stream.conn,
@@ -237,6 +252,10 @@ void handleStreamWindowUpdate(
       updateFlowControlList(stream);
     }
     stream.conn.streamManager->updateWritableStreams(stream);
+    if (stream.conn.qLogger) {
+      stream.conn.qLogger->addTransportStateUpdate(
+          getRxStreamWU(stream.id, packetNum, maximumData));
+    }
     QUIC_TRACE(
         flow_control_event,
         stream.conn,
@@ -255,6 +274,10 @@ void handleConnWindowUpdate(
     PacketNum packetNum) {
   if (conn.flowControlState.peerAdvertisedMaxOffset <= frame.maximumData) {
     conn.flowControlState.peerAdvertisedMaxOffset = frame.maximumData;
+    if (conn.qLogger) {
+      conn.qLogger->addTransportStateUpdate(
+          getRxConnWU(packetNum, frame.maximumData));
+    }
     QUIC_TRACE(
         flow_control_event, conn, "rx_conn", frame.maximumData, packetNum);
   }

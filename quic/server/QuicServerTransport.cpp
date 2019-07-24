@@ -359,6 +359,9 @@ void QuicServerTransport::processPendingData(bool async) {
 void QuicServerTransport::maybeWriteNewSessionTicket() {
   if (!newSessionTicketWritten_ && !ctx_->getSendNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(kWriteNst.str());
+    }
     QUIC_TRACE(fst_trace, *conn_, "write nst");
     newSessionTicketWritten_ = true;
     AppToken appToken;
@@ -400,6 +403,9 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
 
 void QuicServerTransport::maybeNotifyTransportReady() {
   if (!transportReadyNotified_ && connCallback_ && hasWriteCipher()) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(kTransportReady.str());
+    }
     QUIC_TRACE(fst_trace, *conn_, "transport ready");
     transportReadyNotified_ = true;
     connCallback_->onTransportReady();

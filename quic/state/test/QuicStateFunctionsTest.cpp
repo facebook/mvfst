@@ -388,6 +388,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
 
 TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   QuicServerConnectionState conn;
+
   // First rtt sample, will be assign to both srtt and mrtt
   auto rttSample = 100us;
   updateRtt(conn, rttSample, 0us);
@@ -542,7 +543,7 @@ TEST_F(QuicStateFunctionsTest, EarliestLossTimer) {
   conn.lossState.handshakeLossTime = currentTime + 1s;
   EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
   EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
-  conn.lossState.appDataLossTime= currentTime + 1s;
+  conn.lossState.appDataLossTime = currentTime + 1s;
   EXPECT_EQ(PacketNumberSpace::Initial, earliestLossTimer(conn).second);
   EXPECT_EQ(currentTime, earliestLossTimer(conn).first.value());
 }

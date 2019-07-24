@@ -179,6 +179,9 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   auto oneRttReadHeaderCipher = handshakeLayer->getOneRttReadHeaderCipher();
 
   if (zeroRttReadCipher) {
+    if (conn.qLogger) {
+      conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher.str());
+    }
     QUIC_TRACE(fst_trace, conn, "derived 0-rtt read cipher");
     conn.readCodec->setZeroRttReadCipher(std::move(zeroRttReadCipher));
   }
@@ -193,6 +196,9 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   }
 
   if (oneRttWriteCipher) {
+    if (conn.qLogger) {
+      conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher.str());
+    }
     QUIC_TRACE(fst_trace, conn, "derived 1-rtt write cipher");
     CHECK(!conn.oneRttWriteCipher.get());
     conn.oneRttWriteCipher = std::move(oneRttWriteCipher);
@@ -210,6 +216,9 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     processClientInitialParams(conn, std::move(*clientParams));
   }
   if (oneRttReadCipher) {
+    if (conn.qLogger) {
+      conn.qLogger->addTransportStateUpdate(kDerivedOneRttReadCipher.str());
+    }
     QUIC_TRACE(fst_trace, conn, "derived 1-rtt read cipher");
     // Clear limit because CFIN is received at this point
     conn.writableBytesLimit = folly::none;
@@ -914,6 +923,9 @@ void onServerReadDataFromOpen(
             // we want to deliver app callbacks with the peer supplied error,
             // but send a NO_ERROR to the peer.
             QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+            if (conn.qLogger) {
+              conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+            }
             conn.peerConnectionError = std::make_pair(
                 QuicErrorCode(connFrame.errorCode), std::move(errMsg));
             throw QuicTransportException(
@@ -927,6 +939,9 @@ void onServerReadDataFromOpen(
             // we want to deliver app callbacks with the peer supplied error,
             // but send a NO_ERROR to the peer.
             QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+            if (conn.qLogger) {
+              conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+            }
             conn.peerConnectionError = std::make_pair(
                 QuicErrorCode(appClose.errorCode), std::move(errMsg));
             throw QuicTransportException(
@@ -1128,6 +1143,9 @@ void onServerReadDataFromClosed(
           auto errMsg = folly::to<std::string>(
               "Server closed by peer reason=", connFrame.reasonPhrase);
           VLOG(4) << errMsg << " " << conn;
+          if (conn.qLogger) {
+            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
           QUIC_TRACE(recvd_close, conn, errMsg.c_str());
@@ -1141,6 +1159,9 @@ void onServerReadDataFromClosed(
           auto errMsg = folly::to<std::string>(
               "Server closed by peer reason=", appClose.reasonPhrase);
           VLOG(10) << errMsg << " " << conn;
+          if (conn.qLogger) {
+            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
           QUIC_TRACE(recvd_close, conn, errMsg.c_str());

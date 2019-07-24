@@ -125,6 +125,8 @@ TEST_F(CubicTest, PersistentCongestion) {
 
 TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
   conn.udpSendPacketLen = 200;
   // initCwnd > initSsthresh: an ack will immediately make the state machine
   // transit to Steady state:
@@ -176,6 +178,13 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
       makeAck(4, 1000, Clock::now(), packet4.time), folly::none);
   EXPECT_GE(cubic.getWritableBytes(), 2400);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, kRecalculateTimeToOrigin.str());
 }
 
 TEST_F(CubicTest, AppIdle) {
@@ -242,6 +251,9 @@ TEST_F(CubicTest, AppIdle) {
 
 TEST_F(CubicTest, PacingGain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   conn.udpSendPacketLen = 1500;
   Cubic cubic(conn);
   cubic.setMinimalPacingInterval(1ms);
@@ -275,6 +287,13 @@ TEST_F(CubicTest, PacingGain) {
   // 9 / (3 / 1)
   EXPECT_EQ(1ms, cubic.getPacingInterval());
   EXPECT_NEAR(3, cubic.getPacingRate(Clock::now()), 1);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, kRecalculateTimeToOrigin.str());
 }
 
 TEST_F(CubicTest, PacingSpread) {

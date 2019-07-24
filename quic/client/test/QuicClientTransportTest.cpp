@@ -556,6 +556,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   expectTransportCallbacks();
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
@@ -614,6 +616,23 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 6);
+
+  std::array<std::string, 6> stateUpdates = {
+      kStart.str(),
+      kZeroRttAttempted.str(),
+      kZeroRttAccepted.str(),
+      kZeroRttRejected.str(),
+      getRxStreamWU(0, 0, kDefaultStreamWindowSize),
+      kClosingStream("0")};
+  for (int i = 0; i < 6; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    LOG(INFO) << event->update;
+    EXPECT_EQ(event->update, stateUpdates[i]);
+  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
@@ -1695,6 +1714,9 @@ TEST_F(
     NetworkUnreachableIsFatalIfContinueAfterDeadline) {
   TransportSettings settings;
   settings.continueOnNetworkUnreachable = true;
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
+
   client->setTransportSettings(settings);
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
@@ -1709,6 +1731,18 @@ TEST_F(
              .count());
   EXPECT_CALL(clientConnCallback, onConnectionError(_));
   loopForWrites();
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+
+  std::array<std::string, 2> updates = {kStart.str(),
+                                        kLossTimeoutExpired.str()};
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, updates[i]);
+  }
 }
 
 TEST_F(
@@ -4114,6 +4148,9 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
+
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
@@ -4139,6 +4176,16 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
   EXPECT_TRUE(client->isClosed());
   EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
       socketWrites, *makeHandshakeCodec()));
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(
+      event->update,
+      getPeerClose(
+          "Client closed by peer reason=Stand clear of the closing doors, please"));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, DestroyWithoutClosing) {

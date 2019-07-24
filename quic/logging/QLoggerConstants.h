@@ -56,5 +56,24 @@ constexpr folly::StringPiece kBufferUnavailable = "buffer unavailable";
 constexpr folly::StringPiece kReset = "reset";
 constexpr folly::StringPiece kPtoAlarm = "pto alarm";
 constexpr folly::StringPiece kHandshakeAlarm = "handshake alarm";
+constexpr folly::StringPiece kLossTimeoutExpired = "loss timeout expired";
+constexpr folly::StringPiece kStart = "start";
+constexpr folly::StringPiece kWriteNst = "write nst";
+constexpr folly::StringPiece kTransportReady = "transport ready";
+constexpr folly::StringPiece kDerivedZeroRttReadCipher =
+    "derived 0-rtt read cipher";
+constexpr folly::StringPiece kDerivedOneRttReadCipher =
+    "derived 1-rtt read cipher";
+constexpr folly::StringPiece kDerivedOneRttWriteCipher =
+    "derived 1-rtt write cipher";
+auto kClosingStream = [](const std::string& streamId) {
+  return "closing stream, stream id: " + streamId;
+};
+constexpr folly::StringPiece kZeroRttRejected = "zerortt rejected";
+constexpr folly::StringPiece kZeroRttAccepted = "zerortt accepted";
+constexpr folly::StringPiece kZeroRttAttempted = "zerortt attempted";
+constexpr folly::StringPiece kRecalculateTimeToOrigin =
+    "recalculate time to origin";
+constexpr folly::StringPiece kAbort = "abort";
 
 } // namespace quic

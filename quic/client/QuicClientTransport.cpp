@@ -469,6 +469,9 @@ void QuicClientTransport::processPacketData(
           VLOG(4) << errMsg << " " << *this;
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
+          if (conn_->qLogger) {
+            conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
           QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
           conn_->peerConnectionError = std::make_pair(
               QuicErrorCode(connFrame.errorCode), std::move(errMsg));
@@ -479,6 +482,9 @@ void QuicClientTransport::processPacketData(
           auto errMsg = folly::to<std::string>(
               "Client closed by peer reason=", appClose.reasonPhrase);
           VLOG(4) << errMsg << " " << *this;
+          if (conn_->qLogger) {
+            conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
           QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
           conn_->peerConnectionError = std::make_pair(
               QuicErrorCode(appClose.errorCode), std::move(errMsg));
@@ -541,9 +547,15 @@ void QuicClientTransport::processPacketData(
     }
     bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
     if (zeroRttRejected) {
+      if (conn_->qLogger) {
+        conn_->qLogger->addTransportStateUpdate(kZeroRttRejected.str());
+      }
       QUIC_TRACE(zero_rtt, *conn_, "rejected");
       removePsk();
     } else if (conn_->zeroRttWriteCipher) {
+      if (conn_->qLogger) {
+        conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted.str());
+      }
       QUIC_TRACE(zero_rtt, *conn_, "accepted");
     }
     bool shouldNegotiateParameters = false;
@@ -871,6 +883,9 @@ void QuicClientTransport::startCryptoHandshake() {
   auto zeroRttWriteCipher = handshakeLayer->getZeroRttWriteCipher();
   auto zeroRttWriteHeaderCipher = handshakeLayer->getZeroRttWriteHeaderCipher();
   if (zeroRttWriteCipher) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted.str());
+    }
     QUIC_TRACE(zero_rtt, *conn_, "attempted");
     clientConn_->zeroRttWriteCipher = std::move(zeroRttWriteCipher);
     clientConn_->zeroRttWriteHeaderCipher = std::move(zeroRttWriteHeaderCipher);
@@ -1065,6 +1080,9 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
         fizz::VerificationContext::Client);
   }
 
+  if (conn_->qLogger) {
+    conn_->qLogger->addTransportStateUpdate(kStart.str());
+  }
   QUIC_TRACE(fst_trace, *conn_, "start");
   setConnectionCallback(cb);
   try {

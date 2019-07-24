@@ -26,6 +26,7 @@ add_dependencies(
   mvfst_exception
   mvfst_codec_types
   mvfst_state_machine
+  mvfst_qlogger
 )
 
 target_link_libraries(

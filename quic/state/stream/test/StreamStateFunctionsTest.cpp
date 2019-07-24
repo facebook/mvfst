@@ -8,6 +8,8 @@
 
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <gtest/gtest.h>
+#include <quic/common/test/TestUtils.h>
+#include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamStateMachine.h>
@@ -185,6 +187,9 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
 
 TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   QuicServerConnectionState conn;
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
+
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
@@ -203,6 +208,16 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   EXPECT_EQ(stream.currentReadOffset, 100);
   EXPECT_EQ(conn.flowControlState.sumCurReadOffset, 100);
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  std::array<int, 2> offsets = {0, 200};
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, getFlowControlEvent(offsets[i]));
+  }
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {

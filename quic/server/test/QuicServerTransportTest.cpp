@@ -597,6 +597,17 @@ class QuicServerTransportTest : public Test {
         server->getNonConstConn().handshakeLayer.get()));
   }
 
+  void checkTransportStateUpdate(
+      const std::shared_ptr<FileQLogger>& qLogger,
+      const std::string& msg) {
+    std::vector<int> indices =
+        getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+    EXPECT_EQ(indices.size(), 1);
+    auto tmp = std::move(qLogger->logs[indices[0]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, getPeerClose(msg));
+  }
+
   EventBase evb;
   SocketAddress clientAddr;
   MockConnectionCallback connCallback;
@@ -931,6 +942,9 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
+
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -982,6 +996,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       server->getConn().ackStates.appDataAckState.largestReceivedPacketNum);
   EXPECT_FALSE(verifyFramePresent<ConnectionCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
+  checkTransportStateUpdate(qLogger, "Server closed by peer reason=");
 }
 
 TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
@@ -1564,6 +1579,8 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
 
 TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto streamId = server->createBidirectionalStream().value();
+  auto qLogger = std::make_shared<quic::FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().streamManager->getStream(streamId);
   // knock every handshake outstanding packets out
   server->getNonConstConn().outstandingHandshakePacketsCount = 0;
@@ -1619,6 +1636,13 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
                    }) != p.packet.frames.end();
       });
   EXPECT_GT(numStopSendingPackets, 1);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, kLossTimeoutExpired.str());
 }
 
 TEST_F(QuicServerTransportTest, TestAckStopSending) {
@@ -1700,6 +1724,9 @@ TEST_F(QuicServerTransportTest, TestAckRstStream) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
+
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -1728,9 +1755,13 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
+  checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
 TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
+
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
       *server->getConn().serverConnectionId,
@@ -1762,6 +1793,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
       serverWrites, *makeClientEncryptedCodec()));
+  checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
@@ -2993,6 +3025,8 @@ TEST_F(QuicUnencryptedServerTransportTest, TestEncryptedDataBeforeCFIN) {
 TEST_F(
     QuicUnencryptedServerTransportTest,
     TestClearInFlightBytesLimitationAfterCFIN) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
   getFakeHandshakeLayer()->allowZeroRttKeys();
   auto originalUdpSize = server->getConn().udpSendPacketLen;
 
@@ -3007,11 +3041,26 @@ TEST_F(
   recvClientFinished();
   loopForWrites();
   EXPECT_EQ(server->getConn().writableBytesLimit, folly::none);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 4);
+  std::array<::std::string, 4> updateArray = {kDerivedZeroRttReadCipher.str(),
+                                              kDerivedOneRttWriteCipher.str(),
+                                              kTransportReady.str(),
+                                              kDerivedOneRttReadCipher.str()};
+  for (int i = 0; i < 4; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, updateArray[i]);
+  }
 }
 
 TEST_F(
     QuicUnencryptedServerTransportTest,
     IncreaseLimitAfterReceivingNewPacket) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
   getFakeHandshakeLayer()->allowZeroRttKeys();
 
   auto originalUdpSize = server->getConn().udpSendPacketLen;
@@ -3030,6 +3079,17 @@ TEST_F(
       server->getConn().transportSettings.limitedCwndInMss *
           server->getConn().udpSendPacketLen;
   EXPECT_EQ(*server->getNonConstConn().writableBytesLimit, expectedLen);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 3);
+  std::array<::std::string, 3> updateArray = {kDerivedZeroRttReadCipher.str(),
+                                              kDerivedOneRttWriteCipher.str(),
+                                              kTransportReady.str()};
+  for (int i = 0; i < 3; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->update, updateArray[i]);
+  }
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {

@@ -592,6 +592,9 @@ TEST_F(QuicFlowControlTest, UpdateBadFlowControlOnStreamData) {
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnRead) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn_.qLogger = qLogger;
+
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
   stream.currentReadOffset = 200;
@@ -608,6 +611,13 @@ TEST_F(QuicFlowControlTest, UpdateFlowControlOnRead) {
 
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   EXPECT_EQ(generateMaxStreamDataFrame(stream).maximumData, 400);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, getFlowControlEvent(700));
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnWrite) {
@@ -667,6 +677,8 @@ TEST_F(QuicFlowControlTest, HandleStreamWindowUpdate) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
   stream.flowControlState.peerAdvertisedMaxOffset = 200;
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn_.qLogger = qLogger;
 
   handleStreamWindowUpdate(stream, 300, 2);
   EXPECT_EQ(stream.flowControlState.peerAdvertisedMaxOffset, 300);
@@ -680,6 +692,13 @@ TEST_F(QuicFlowControlTest, HandleStreamWindowUpdate) {
 
   EXPECT_NO_THROW(handleStreamWindowUpdate(stream, 200, 3));
   EXPECT_EQ(stream.flowControlState.peerAdvertisedMaxOffset, 300);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, getRxStreamWU(id, 2, 300));
 }
 
 TEST_F(QuicFlowControlTest, HandleConnWindowUpdate) {

@@ -1972,7 +1972,11 @@ void QuicTransportBase::checkForClosedStream() {
     }
 
     VLOG(10) << "Closing stream=" << *itr;
-    FOLLY_MAYBE_UNUSED auto stream = conn_->streamManager->findStream(*itr);
+    auto stream = conn_->streamManager->findStream(*itr);
+    if (conn_->qLogger && stream) {
+      conn_->qLogger->addTransportStateUpdate(
+          kClosingStream(folly::to<std::string>(stream->id)));
+    }
     QUIC_TRACE(
         holb_time,
         *conn_,
@@ -2003,6 +2007,9 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
     onLossDetectionAlarm(*conn_, markPacketLoss);
     // TODO: remove this trace when Pacing is ready to land
     QUIC_TRACE(fst_trace, *conn_, "LossTimeoutExpired");
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired.str());
+    }
     pacedWriteDataToSocket(false);
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;

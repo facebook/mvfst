@@ -993,6 +993,8 @@ TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
 }
 
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  transport->transportConn->qLogger = qLogger;
   auto stream1 = transport->createBidirectionalStream().value();
 
   MockReadCallback readCb1;
@@ -1006,6 +1008,13 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
 
   EXPECT_FALSE(transport->transportConn->streamManager->streamExists(stream1));
   transport.reset();
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
+  EXPECT_EQ(event->update, kClosingStream("1"));
 }
 
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
