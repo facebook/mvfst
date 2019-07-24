@@ -217,8 +217,8 @@ class QuicTransportBase : public QuicSocket {
   void setConnectionCallback(ConnectionCallback* callback) final;
 
   void setEarlyDataAppParamsFunctions(
-      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
-          validator,
+      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
+                          const> validator,
       folly::Function<Buf()> getter) final;
 
   bool isDetachable() override;
@@ -592,7 +592,7 @@ class QuicTransportBase : public QuicSocket {
   // CongestionController factory
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
 
-  folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
+  folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
       earlyDataAppParamsValidator_;
 
   folly::Function<Buf()> earlyDataAppParamsGetter_;

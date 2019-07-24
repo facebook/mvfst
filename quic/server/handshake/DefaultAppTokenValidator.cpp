@@ -32,13 +32,13 @@ DefaultAppTokenValidator::DefaultAppTokenValidator(
     QuicServerConnectionState* conn,
     folly::Function<bool(
         const folly::Optional<std::string>& alpn,
-        const std::unique_ptr<folly::IOBuf>& appParams)>
+        const std::unique_ptr<folly::IOBuf>& appParams) const>
         earlyDataAppParamsValidator)
     : conn_(conn),
       earlyDataAppParamsValidator_(std::move(earlyDataAppParamsValidator)) {}
 
 bool DefaultAppTokenValidator::validate(
-    const fizz::server::ResumptionState& resumptionState) {
+    const fizz::server::ResumptionState& resumptionState) const {
   conn_->transportParamsMatching = false;
   conn_->sourceTokenMatching = false;
 

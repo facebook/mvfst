@@ -2135,7 +2135,7 @@ void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(
-    folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
+    folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
         validator,
     folly::Function<Buf()> getter) {
   earlyDataAppParamsValidator_ = std::move(validator);

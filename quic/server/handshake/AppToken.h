@@ -52,7 +52,7 @@ fizz::Buf encodeAppToken(const AppToken& appToken);
 folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
 
 class FailingAppTokenValidator : public fizz::server::AppTokenValidator {
-  bool validate(const fizz::server::ResumptionState&) override {
+  bool validate(const fizz::server::ResumptionState&) const override {
     return false;
   }
 };

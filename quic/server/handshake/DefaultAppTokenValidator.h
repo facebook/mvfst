@@ -32,16 +32,16 @@ class DefaultAppTokenValidator : public fizz::server::AppTokenValidator {
       QuicServerConnectionState* conn,
       folly::Function<bool(
           const folly::Optional<std::string>& alpn,
-          const std::unique_ptr<folly::IOBuf>& appParams)>
+          const std::unique_ptr<folly::IOBuf>& appParams) const>
           earlyDataAppParamsValidator);
 
-  bool validate(const fizz::server::ResumptionState&) override;
+  bool validate(const fizz::server::ResumptionState&) const override;
 
  private:
   QuicServerConnectionState* conn_;
   folly::Function<bool(
       const folly::Optional<std::string>& alpn,
-      const std::unique_ptr<folly::IOBuf>& appParams)>
+      const std::unique_ptr<folly::IOBuf>& appParams) const>
       earlyDataAppParamsValidator_;
 };
 

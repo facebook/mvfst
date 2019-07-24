@@ -85,8 +85,8 @@ class MockQuicSocket : public QuicSocket {
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, ReadCallback*));
   MOCK_METHOD1(setConnectionCallback, void(ConnectionCallback*));
   void setEarlyDataAppParamsFunctions(
-      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
-          validator,
+      folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
+                          const> validator,
       folly::Function<Buf()> getter) override {
     earlyDataAppParamsValidator_ = std::move(validator);
     earlyDataAppParamsGetter_ = std::move(getter);

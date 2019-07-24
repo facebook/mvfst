@@ -173,8 +173,8 @@ class QuicSocket {
    */
   virtual void setEarlyDataAppParamsFunctions(
       folly::Function<
-          bool(const folly::Optional<std::string>& alpn, const Buf& appParams)>
-          validator,
+          bool(const folly::Optional<std::string>& alpn, const Buf& appParams)
+              const> validator,
       folly::Function<Buf()> getter) = 0;
 
   virtual ~QuicSocket() = default;
