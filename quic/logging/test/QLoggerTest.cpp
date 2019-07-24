@@ -214,6 +214,18 @@ TEST_F(QLoggerTest, TransportStateUpdateEvent) {
   EXPECT_EQ(gotEvent->update, update);
 }
 
+TEST_F(QLoggerTest, PacketBufferedEvent) {
+  FileQLogger q;
+  q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacketBufferedEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->packetNum, PacketNum{10});
+  EXPECT_EQ(gotEvent->protectionType, ProtectionType::Handshake);
+  EXPECT_EQ(gotEvent->packetSize, 100);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -919,6 +931,30 @@ TEST_F(QLoggerTest, TransportStateUpdateFollyDynamic) {
 
   FileQLogger q;
   q.addTransportStateUpdate("transport ready");
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+    "0",
+     "TRANSPORT",
+     "PACKET_BUFFERED",
+     "DEFAULT",
+     {
+       "packet_num": 10,
+       "protection_type": "Handshake",
+       "packet_size": 100
+     }
+    ]
+])");
+
+  FileQLogger q;
+  q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

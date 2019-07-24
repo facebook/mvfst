@@ -159,6 +159,17 @@ void FileQLogger::addTransportStateUpdate(std::string update) {
       std::move(update), refTime));
 }
 
+void FileQLogger::addPacketBuffered(
+    PacketNum packetNum,
+    ProtectionType protectionType,
+    uint64_t packetSize) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogPacketBufferedEvent>(
+      packetNum, protectionType, packetSize, refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

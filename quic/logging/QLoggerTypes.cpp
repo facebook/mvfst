@@ -571,6 +571,36 @@ folly::dynamic QLogTransportStateUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogPacketBufferedEvent::QLogPacketBufferedEvent(
+    PacketNum packetNumIn,
+    ProtectionType protectionTypeIn,
+    uint64_t packetSizeIn,
+    std::chrono::microseconds refTimeIn)
+    : packetNum{packetNumIn},
+      protectionType{protectionTypeIn},
+      packetSize{packetSizeIn} {
+  eventType = QLogEventType::PacketBuffered;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogPacketBufferedEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["packet_num"] = packetNum;
+  data["protection_type"] = toString(protectionType);
+  data["packet_size"] = packetSize;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -597,6 +627,8 @@ std::string toString(QLogEventType type) {
       return "PACKETS_LOST";
     case QLogEventType::TransportStateUpdate:
       return "TRANSPORT_STATE_UPDATE";
+    case QLogEventType::PacketBuffered:
+      return "PACKET_BUFFERED";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";
