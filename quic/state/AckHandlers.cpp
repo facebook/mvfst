@@ -96,6 +96,9 @@ void processAckFrame(
       if (currentPacketNum == frame.largestAcked && !packetItEnd->pureAck) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
+      if (conn.qLogger) {
+        conn.qLogger->addPacketAck(currentPacketNumberSpace, currentPacketNum);
+      }
       QUIC_TRACE(
           packet_acked,
           conn,
