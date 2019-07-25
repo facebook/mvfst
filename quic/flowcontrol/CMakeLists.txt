@@ -36,6 +36,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_exception
   mvfst_state_machine
+  mvfst_qlogger
 )
 
 file(

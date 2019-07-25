@@ -575,6 +575,12 @@ void onServerReadDataFromOpen(
                 originalData->packetNum,
                 originalData->protectionType,
                 packetSize);
+            if (conn.qLogger) {
+              conn.qLogger->addPacketBuffered(
+                  originalData->packetNum,
+                  originalData->protectionType,
+                  packetSize);
+            }
             ServerEvents::ReadData pendingReadData;
             pendingReadData.peer = readData.peer;
             pendingReadData.networkData = NetworkData(

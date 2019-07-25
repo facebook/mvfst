@@ -3093,6 +3093,9 @@ TEST_F(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
+  auto qLogger = std::make_shared<FileQLogger>();
+  server->getNonConstConn().qLogger = qLogger;
+
   QuicFizzFactory fizzFactory;
   auto data = IOBuf::copyBuffer("bad data");
   PacketNum nextPacket = clientNextInitialPacketNum++;
@@ -3113,6 +3116,15 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   deliverData(std::move(packetData));
   EXPECT_NE(server->getConn().readCodec, nullptr);
   EXPECT_NE(server->getConn().initialWriteCipher, nullptr);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketBuffered, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketBufferedEvent*>(tmp.get());
+  EXPECT_EQ(event->packetNum, nextPacket);
+  EXPECT_EQ(event->protectionType, ProtectionType::KeyPhaseZero);
+  EXPECT_EQ(event->packetSize, 10);
 }
 
 Buf getHandshakePacketWithFrame(
