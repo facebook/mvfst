@@ -73,6 +73,9 @@ class QLogger {
       PacketNum packetNum,
       ProtectionType protectionType,
       uint64_t packetSize) = 0;
+  virtual void addPacketAck(
+      PacketNumberSpace packetNumSpace,
+      PacketNum packetNum) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

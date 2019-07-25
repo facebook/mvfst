@@ -601,6 +601,32 @@ folly::dynamic QLogPacketBufferedEvent::toDynamic() const {
   return d;
 }
 
+QLogPacketAckEvent::QLogPacketAckEvent(
+    PacketNumberSpace packetNumSpaceIn,
+    PacketNum packetNumIn,
+    std::chrono::microseconds refTimeIn)
+    : packetNumSpace{packetNumSpaceIn}, packetNum{packetNumIn} {
+  eventType = QLogEventType::PacketAck;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogPacketAckEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["packet_num_space"] = folly::to<std::string>(packetNumSpace);
+  data["packet_num"] = packetNum;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -629,6 +655,8 @@ std::string toString(QLogEventType type) {
       return "TRANSPORT_STATE_UPDATE";
     case QLogEventType::PacketBuffered:
       return "PACKET_BUFFERED";
+    case QLogEventType::PacketAck:
+      return "PACKET_ACK";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";
