@@ -180,6 +180,18 @@ void FileQLogger::addPacketAck(
       packetNumSpace, packetNum, refTime));
 }
 
+void FileQLogger::addMetricUpdate(
+    std::chrono::microseconds latestRtt,
+    std::chrono::microseconds mrtt,
+    std::chrono::microseconds srtt,
+    std::chrono::microseconds ackDelay) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogMetricUpdateEvent>(
+      latestRtt, mrtt, srtt, ackDelay, refTime));
+}
+
 folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic d = folly::dynamic::object;
   d["traces"] = folly::dynamic::array();

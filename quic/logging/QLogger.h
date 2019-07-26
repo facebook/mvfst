@@ -76,6 +76,11 @@ class QLogger {
   virtual void addPacketAck(
       PacketNumberSpace packetNumSpace,
       PacketNum packetNum) = 0;
+  virtual void addMetricUpdate(
+      std::chrono::microseconds latestRtt,
+      std::chrono::microseconds mrtt,
+      std::chrono::microseconds srtt,
+      std::chrono::microseconds ackDelay) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

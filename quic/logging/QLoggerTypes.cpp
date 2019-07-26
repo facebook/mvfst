@@ -627,6 +627,36 @@ folly::dynamic QLogPacketAckEvent::toDynamic() const {
   return d;
 }
 
+QLogMetricUpdateEvent::QLogMetricUpdateEvent(
+    std::chrono::microseconds latestRttIn,
+    std::chrono::microseconds mrttIn,
+    std::chrono::microseconds srttIn,
+    std::chrono::microseconds ackDelayIn,
+    std::chrono::microseconds refTimeIn)
+    : latestRtt{latestRttIn}, mrtt{mrttIn}, srtt{srttIn}, ackDelay{ackDelayIn} {
+  eventType = QLogEventType::MetricUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "RECOVERY",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["latest_rtt"] = latestRtt.count();
+  data["min_rtt"] = mrtt.count();
+  data["smoothed_rtt"] = srtt.count();
+  data["ack_delay"] = ackDelay.count();
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -657,6 +687,8 @@ std::string toString(QLogEventType type) {
       return "PACKET_BUFFERED";
     case QLogEventType::PacketAck:
       return "PACKET_ACK";
+    case QLogEventType::MetricUpdate:
+      return "METRIC_UPDATE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

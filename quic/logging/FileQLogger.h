@@ -75,6 +75,11 @@ class FileQLogger : public QLogger {
       uint64_t packetSize) override;
   void addPacketAck(PacketNumberSpace packetNumSpace, PacketNum packetNum)
       override;
+  void addMetricUpdate(
+      std::chrono::microseconds latestRtt,
+      std::chrono::microseconds mrtt,
+      std::chrono::microseconds srtt,
+      std::chrono::microseconds ackDelay) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };
