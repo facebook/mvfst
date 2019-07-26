@@ -109,6 +109,9 @@ For more options, see
 ```
 ./_build/build/quic/samples/echo --help
 ```
+## HTTP/3
+This repo implements the QUIC trasnport. For an HTTP/3 implementation that uses Mvfst, please check out [Proxygen](https://github.com/facebook/proxygen).
+
 ## Contributing
 
 We'd love to have your help in making `mvfst` better. If you're interested, please
