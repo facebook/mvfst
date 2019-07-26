@@ -309,14 +309,6 @@ std::unique_ptr<MockAead> createNoOpAead() {
   return createNoOpAeadImpl<MockAead>();
 }
 
-std::unique_ptr<fizz::test::MockAead> createNoOpFizzAead() {
-  // Fake that the handshake has already occured
-  auto aead = createNoOpAeadImpl<fizz::test::MockAead>();
-  ON_CALL(*aead, keyLength()).WillByDefault(Return(16));
-  ON_CALL(*aead, ivLength()).WillByDefault(Return(16));
-  return aead;
-}
-
 std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher() {
   auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
   ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
