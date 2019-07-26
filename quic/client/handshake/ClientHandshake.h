@@ -183,11 +183,11 @@ class ClientHandshake : public Handshake {
   // in the stream.
   Phase phase_{Phase::Initial};
 
-  std::unique_ptr<fizz::Aead> handshakeWriteCipher_;
-  std::unique_ptr<fizz::Aead> handshakeReadCipher_;
-  std::unique_ptr<fizz::Aead> oneRttReadCipher_;
-  std::unique_ptr<fizz::Aead> oneRttWriteCipher_;
-  std::unique_ptr<fizz::Aead> zeroRttWriteCipher_;
+  std::unique_ptr<Aead> handshakeWriteCipher_;
+  std::unique_ptr<Aead> handshakeReadCipher_;
+  std::unique_ptr<Aead> oneRttReadCipher_;
+  std::unique_ptr<Aead> oneRttWriteCipher_;
+  std::unique_ptr<Aead> zeroRttWriteCipher_;
 
   std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
