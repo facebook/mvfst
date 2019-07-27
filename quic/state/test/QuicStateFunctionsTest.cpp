@@ -388,6 +388,8 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
 
 TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   QuicServerConnectionState conn;
+  auto qLogger = std::make_shared<FileQLogger>();
+  conn.qLogger = qLogger;
 
   // First rtt sample, will be assign to both srtt and mrtt
   auto rttSample = 100us;
@@ -406,6 +408,22 @@ TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   rttSample = 20us;
   updateRtt(conn, rttSample, 0us);
   EXPECT_EQ(20us, conn.lossState.mrtt);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::MetricUpdate, qLogger);
+  EXPECT_EQ(indices.size(), 3);
+  std::array<std::chrono::microseconds, 3> rttSampleArr = {100us, 550us, 20us};
+  std::array<std::chrono::microseconds, 3> mrttArr = {oldMrtt, oldMrtt, 20us};
+  std::array<std::chrono::microseconds, 3> srttArr = {100us, 155us, 137us};
+
+  for (int i = 0; i < 3; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogMetricUpdateEvent*>(tmp.get());
+    EXPECT_EQ(event->latestRtt, rttSampleArr[i]);
+    EXPECT_EQ(event->mrtt, mrttArr[i]);
+    EXPECT_EQ(event->srtt, srttArr[i]);
+    EXPECT_EQ(event->ackDelay, 0us);
+  }
 }
 
 TEST_F(QuicStateFunctionsTest, UpdateMaxAckDelay) {

@@ -52,6 +52,10 @@ void updateRtt(
     conn.lossState.srtt = conn.lossState.srtt * (kRttAlpha - 1) / kRttAlpha +
         rttSample / kRttAlpha;
   }
+  if (conn.qLogger) {
+    conn.qLogger->addMetricUpdate(
+        rttSample, conn.lossState.mrtt, conn.lossState.srtt, ackDelay);
+  }
   QUIC_TRACE(
       update_rtt,
       conn,
