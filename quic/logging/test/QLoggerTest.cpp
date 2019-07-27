@@ -250,6 +250,17 @@ TEST_F(QLoggerTest, MetricUpdateEvent) {
   EXPECT_EQ(gotEvent->ackDelay, 13us);
 }
 
+TEST_F(QLoggerTest, StreamStateUpdateEvent) {
+  FileQLogger q;
+  q.addStreamStateUpdate(streamId, kAbort.str());
+
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogStreamStateUpdateEvent*>(p.get());
+
+  EXPECT_EQ(gotEvent->id, streamId);
+  EXPECT_EQ(gotEvent->update, kAbort.str());
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -1027,6 +1038,29 @@ TEST_F(QLoggerTest, MetricUpdateFollyDynamic) {
 
   FileQLogger q;
   q.addMetricUpdate(10us, 11us, 12us, 13us);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "HTTP3",
+      "STREAM_STATE_UPDATE",
+      "DEFAULT",
+      {
+        "id": 10,
+        "update": "abort"
+      }
+    ]
+])");
+
+  FileQLogger q;
+  q.addStreamStateUpdate(streamId, kAbort.str());
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

@@ -81,6 +81,9 @@ class QLogger {
       std::chrono::microseconds mrtt,
       std::chrono::microseconds srtt,
       std::chrono::microseconds ackDelay) = 0;
+  virtual void addStreamStateUpdate(
+      quic::StreamId streamId,
+      std::string update) = 0;
   std::unique_ptr<QLogPacketEvent> createPacketEvent(
       const RegularQuicPacket& regularPacket,
       uint64_t packetSize);

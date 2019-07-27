@@ -308,6 +308,7 @@ enum class QLogEventType : uint32_t {
   PacketBuffered,
   PacketAck,
   MetricUpdate,
+  StreamStateUpdate,
 };
 
 std::string toString(QLogEventType type);
@@ -538,6 +539,18 @@ class QLogMetricUpdateEvent : public QLogEvent {
   std::chrono::microseconds mrtt;
   std::chrono::microseconds srtt;
   std::chrono::microseconds ackDelay;
+  folly::dynamic toDynamic() const override;
+};
+
+class QLogStreamStateUpdateEvent : public QLogEvent {
+ public:
+  QLogStreamStateUpdateEvent(
+      StreamId id,
+      std::string update,
+      std::chrono::microseconds refTime);
+  ~QLogStreamStateUpdateEvent() override = default;
+  StreamId id;
+  std::string update;
   folly::dynamic toDynamic() const override;
 };
 

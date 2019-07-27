@@ -219,6 +219,14 @@ folly::dynamic FileQLogger::toDynamic() const {
   return d;
 }
 
+void FileQLogger::addStreamStateUpdate(quic::StreamId id, std::string update) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+
+  logs.push_back(std::make_unique<quic::QLogStreamStateUpdateEvent>(
+      id, std::move(update), refTime));
+}
+
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (!dcid.hasValue()) {
     LOG(ERROR) << "Error: No dcid found";

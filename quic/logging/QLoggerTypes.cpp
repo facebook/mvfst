@@ -657,6 +657,32 @@ folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogStreamStateUpdateEvent::QLogStreamStateUpdateEvent(
+    StreamId idIn,
+    std::string updateIn,
+    std::chrono::microseconds refTimeIn)
+    : id{idIn}, update{std::move(updateIn)} {
+  eventType = QLogEventType::StreamStateUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogStreamStateUpdateEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "HTTP3",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["id"] = id;
+  data["update"] = update;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -689,6 +715,8 @@ std::string toString(QLogEventType type) {
       return "PACKET_ACK";
     case QLogEventType::MetricUpdate:
       return "METRIC_UPDATE";
+    case QLogEventType::StreamStateUpdate:
+      return "STREAM_STATE_UPDATE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

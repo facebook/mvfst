@@ -80,6 +80,7 @@ class FileQLogger : public QLogger {
       std::chrono::microseconds mrtt,
       std::chrono::microseconds srtt,
       std::chrono::microseconds ackDelay) override;
+  void addStreamStateUpdate(StreamId id, std::string update) override;
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };
