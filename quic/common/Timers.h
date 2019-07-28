@@ -9,7 +9,7 @@
 #pragma once
 #include "folly/io/async/HHWheelTimer.h"
 
-#ifndef FOLLY_MOBILE
+#if !FOLLY_MOBILE
 #define QUIC_USE_TIMERFD_TIMEOUT_MGR
 #include <folly/experimental/STTimerFDTimeoutManager.h>
 #endif
