@@ -36,13 +36,12 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         [](const auto& h) { return h.getPacketSequenceNum(); });
   }
 
+  uint64_t numPaddingFrames = 0;
   // looping through the packet to store logs created from frames in the packet
   for (const auto& quicFrame : regularPacket.frames) {
     folly::variant_match(
         quicFrame,
-        [&](const PaddingFrame& /* unused */) {
-          event->frames.push_back(std::make_unique<PaddingFrameLog>());
-        },
+        [&](const PaddingFrame& /* unused */) { ++numPaddingFrames; },
         [&](const RstStreamFrame& frame) {
           event->frames.push_back(std::make_unique<RstStreamFrameLog>(
               frame.streamId, frame.errorCode, frame.offset));
@@ -137,6 +136,10 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           // Ignore other frames.
         });
   }
+  if (numPaddingFrames > 0) {
+    event->frames.push_back(
+        std::make_unique<PaddingFrameLog>(numPaddingFrames));
+  }
   return event;
 }
 
@@ -158,13 +161,12 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         return kShortHeaderPacketType.toString();
       });
 
+  uint64_t numPaddingFrames = 0;
   // looping through the packet to store logs created from frames in the packet
   for (const auto& quicFrame : writePacket.frames) {
     folly::variant_match(
         quicFrame,
-        [&](const PaddingFrame& /* unused */) {
-          event->frames.push_back(std::make_unique<PaddingFrameLog>());
-        },
+        [&](const PaddingFrame& /* unused */) { ++numPaddingFrames; },
         [&](const RstStreamFrame& frame) {
           event->frames.push_back(std::make_unique<RstStreamFrameLog>(
               frame.streamId, frame.errorCode, frame.offset));
@@ -258,6 +260,10 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         [&](const auto& /* unused */) {
           // Ignore other frames.
         });
+  }
+  if (numPaddingFrames > 0) {
+    event->frames.push_back(
+        std::make_unique<PaddingFrameLog>(numPaddingFrames));
   }
   return event;
 }

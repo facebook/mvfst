@@ -12,6 +12,7 @@ namespace quic {
 folly::dynamic PaddingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toString(FrameType::PADDING);
+  d["num_frames"] = numFrames;
   return d;
 }
 

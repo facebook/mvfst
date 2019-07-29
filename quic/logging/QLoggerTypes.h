@@ -25,7 +25,8 @@ class QLogFrame {
 
 class PaddingFrameLog : public QLogFrame {
  public:
-  PaddingFrameLog() = default;
+  uint64_t numFrames;
+  explicit PaddingFrameLog(uint64_t numFramesIn) : numFrames{numFramesIn} {}
 
   ~PaddingFrameLog() override = default;
   folly::dynamic toDynamic() const override;

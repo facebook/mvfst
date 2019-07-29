@@ -680,6 +680,16 @@ RegularQuicWritePacket createPacketWithAckFrames() {
   return packet;
 }
 
+RegularQuicWritePacket createPacketWithPaddingFrames() {
+  RegularQuicWritePacket packet =
+      createNewPacket(100, PacketNumberSpace::Initial);
+  for (int i = 0; i < 20; ++i) {
+    PaddingFrame paddingFrame;
+    packet.frames.emplace_back(paddingFrame);
+  }
+  return packet;
+}
+
 std::vector<int> getQLogEventIndices(
     QLogEventType type,
     const std::shared_ptr<FileQLogger>& q) {

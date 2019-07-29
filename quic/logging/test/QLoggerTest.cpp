@@ -261,6 +261,19 @@ TEST_F(QLoggerTest, StreamStateUpdateEvent) {
   EXPECT_EQ(gotEvent->update, kAbort.str());
 }
 
+TEST_F(QLoggerTest, PacketPaddingFrameEvent) {
+  FileQLogger q;
+  auto packet = createPacketWithPaddingFrames();
+  q.addPacket(packet, 100);
+
+  EXPECT_EQ(q.logs.size(), 1);
+  std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
+  auto gotEvent = dynamic_cast<QLogPacketEvent*>(p.get());
+  auto gotObject = *static_cast<PaddingFrameLog*>(gotEvent->frames[0].get());
+
+  EXPECT_EQ(gotObject.numFrames, 20);
+}
+
 TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
@@ -571,37 +584,8 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                  "offset": 0
                },
                {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
-               },
-               {
-                 "frame_type": "PADDING"
+                 "frame_type": "PADDING",
+                  "num_frames": 11
                }
              ],
              "header": {
@@ -1061,6 +1045,39 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
 
   FileQLogger q;
   q.addStreamStateUpdate(streamId, kAbort.str());
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PaddingFramesFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+   [
+     "0",
+     "TRANSPORT",
+     "PACKET_SENT",
+     "DEFAULT",
+     {
+       "frames": [
+         {
+           "frame_type": "PADDING",
+           "num_frames": 20
+         }
+       ],
+       "header": {
+         "packet_number": 100,
+         "packet_size": 100
+       },
+       "packet_type": "INITIAL"
+     }
+   ]
+ ])");
+
+  FileQLogger q;
+  auto packet = createPacketWithPaddingFrames();
+  q.addPacket(packet, 100);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

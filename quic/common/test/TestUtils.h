@@ -271,6 +271,8 @@ VersionNegotiationPacket createVersionNegotiationPacket();
 
 RegularQuicWritePacket createPacketWithAckFrames();
 
+RegularQuicWritePacket createPacketWithPaddingFrames();
+
 // Helper function which takes in a specific event type and fetches all the
 // instances of that type in QLogger
 std::vector<int> getQLogEventIndices(
