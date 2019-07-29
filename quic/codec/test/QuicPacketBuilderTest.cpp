@@ -14,6 +14,7 @@
 #include <quic/codec/Types.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 using namespace quic;
@@ -56,6 +57,7 @@ std::unique_ptr<QuicReadCodec> makeCodec(
     std::unique_ptr<Aead> zeroRttCipher = nullptr,
     std::unique_ptr<Aead> oneRttCipher = nullptr) {
   QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
   if (nodeType != QuicNodeType::Client) {
     codec->setZeroRttReadCipher(std::move(zeroRttCipher));
@@ -68,12 +70,12 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   codec->setClientConnectionId(clientConnId);
   if (nodeType == QuicNodeType::Client) {
     codec->setInitialReadCipher(
-        getServerInitialCipher(&fizzFactory, clientConnId, QuicVersion::MVFST));
+        cryptoFactory.getServerInitialCipher(clientConnId, QuicVersion::MVFST));
     codec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
         &fizzFactory, clientConnId, QuicVersion::MVFST));
   } else {
     codec->setInitialReadCipher(
-        getClientInitialCipher(&fizzFactory, clientConnId, QuicVersion::MVFST));
+        cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST));
     codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
         &fizzFactory, clientConnId, QuicVersion::MVFST));
   }
@@ -191,7 +193,8 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   QuicVersion ver = QuicVersion::QUIC_DRAFT;
   // create a server cleartext write codec.
   QuicFizzFactory fizzFactory;
-  auto cleartextAead = getClientInitialCipher(&fizzFactory, serverConnId, ver);
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  auto cleartextAead = cryptoFactory.getClientInitialCipher(serverConnId, ver);
   auto headerCipher =
       makeClientInitialHeaderCipher(&fizzFactory, serverConnId, ver);
 

@@ -24,6 +24,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
@@ -1530,12 +1531,11 @@ class QuicClientTransportTest : public Test {
 
   std::unique_ptr<QuicReadCodec> makeHandshakeCodec() {
     QuicFizzFactory fizzFactory;
+    FizzCryptoFactory cryptoFactory(&fizzFactory);
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     codec->setClientConnectionId(*originalConnId);
-    codec->setInitialReadCipher(getClientInitialCipher(
-        &fizzFactory,
-        *client->getConn().initialDestinationConnectionId,
-        QuicVersion::MVFST));
+    codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
+        *client->getConn().initialDestinationConnectionId, QuicVersion::MVFST));
     codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
         &fizzFactory,
         *client->getConn().initialDestinationConnectionId,
@@ -1548,6 +1548,7 @@ class QuicClientTransportTest : public Test {
   std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
       bool handshakeCipher = false) {
     QuicFizzFactory fizzFactory;
+    FizzCryptoFactory cryptoFactory(&fizzFactory);
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     std::unique_ptr<Aead> handshakeReadCipher;
     codec->setClientConnectionId(*originalConnId);
@@ -1556,8 +1557,7 @@ class QuicClientTransportTest : public Test {
     codec->setZeroRttReadCipher(test::createNoOpAead());
     codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
     if (handshakeCipher) {
-      codec->setInitialReadCipher(getClientInitialCipher(
-          &fizzFactory,
+      codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
           *client->getConn().initialDestinationConnectionId,
           QuicVersion::MVFST));
       codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
@@ -2560,9 +2560,10 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   }));
 
   QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   auto garbage = IOBuf::copyBuffer("garbage");
-  auto initialCipher = getServerInitialCipher(
-      &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
+  auto initialCipher = cryptoFactory.getServerInitialCipher(
+      *serverChosenConnId, QuicVersion::MVFST);
   auto firstPacketNum = appDataPacketNum++;
   auto packet1 = packetToBufCleartext(
       createStreamPacket(
@@ -2609,11 +2610,12 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
   QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   IOBufQueue packets{IOBufQueue::cacheChainLength()};
   for (int i = 0; i < kMaxNumCoalescedPackets; i++) {
     auto garbage = IOBuf::copyBuffer("garbage");
-    auto initialCipher = getServerInitialCipher(
-        &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
+    auto initialCipher = cryptoFactory.getServerInitialCipher(
+        *serverChosenConnId, QuicVersion::MVFST);
     auto packetNum = appDataPacketNum++;
     auto packet1 = packetToBufCleartext(
         createStreamPacket(
@@ -3290,6 +3292,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvalidStream) {
 
 TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
   QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
@@ -3297,8 +3300,8 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
   // throws on getting unencrypted stream data.
   PacketNum nextPacketNum = appDataPacketNum++;
 
-  auto initialCipher = getServerInitialCipher(
-      &fizzFactory, *serverChosenConnId, QuicVersion::MVFST);
+  auto initialCipher = cryptoFactory.getServerInitialCipher(
+      *serverChosenConnId, QuicVersion::MVFST);
   auto packet = packetToBufCleartext(
       createStreamPacket(
           *serverChosenConnId /* src */,

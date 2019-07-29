@@ -10,6 +10,7 @@
 
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -495,8 +496,9 @@ void onServerReadDataFromOpen(
             token));
     QuicFizzFactory fizzFactory;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-    conn.readCodec->setInitialReadCipher(getClientInitialCipher(
-        &fizzFactory, initialDestinationConnectionId, version));
+    conn.readCodec->setInitialReadCipher(
+        FizzCryptoFactory(&fizzFactory)
+            .getClientInitialCipher(initialDestinationConnectionId, version));
     conn.readCodec->setClientConnectionId(clientConnectionId);
     if (conn.qLogger) {
       conn.qLogger->scid = conn.serverConnectionId;
@@ -504,8 +506,9 @@ void onServerReadDataFromOpen(
     }
     conn.readCodec->setCodecParameters(
         CodecParameters(conn.peerAckDelayExponent, version));
-    conn.initialWriteCipher = getServerInitialCipher(
-        &fizzFactory, initialDestinationConnectionId, version);
+    conn.initialWriteCipher =
+        FizzCryptoFactory(&fizzFactory)
+            .getServerInitialCipher(initialDestinationConnectionId, version);
 
     conn.readCodec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
         &fizzFactory, initialDestinationConnectionId, version));

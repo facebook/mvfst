@@ -14,6 +14,7 @@
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
@@ -848,11 +849,12 @@ void QuicClientTransport::startCryptoHandshake() {
   }
 
   QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
   auto version = conn_->originalVersion.value();
-  conn_->initialWriteCipher = getClientInitialCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId, version);
-  conn_->readCodec->setInitialReadCipher(getServerInitialCipher(
-      &fizzFactory, *clientConn_->initialDestinationConnectionId, version));
+  conn_->initialWriteCipher = cryptoFactory.getClientInitialCipher(
+      *clientConn_->initialDestinationConnectionId, version);
+  conn_->readCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
+      *clientConn_->initialDestinationConnectionId, version));
   conn_->readCodec->setInitialHeaderCipher(makeServerInitialHeaderCipher(
       &fizzFactory, *clientConn_->initialDestinationConnectionId, version));
   conn_->initialHeaderCipher = makeClientInitialHeaderCipher(

@@ -26,17 +26,9 @@ class QuicTestFizzFactory : public QuicFizzFactory {
  public:
   ~QuicTestFizzFactory() override = default;
 
-  std::unique_ptr<fizz::Aead> makeAead(fizz::CipherSuite) const override {
-    return std::move(aead_);
-  }
-
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       fizz::CipherSuite) const override {
     return std::move(packetNumberCipher_);
-  }
-
-  void setMockAead(std::unique_ptr<fizz::Aead> aead) {
-    aead_ = std::move(aead);
   }
 
   void setMockPacketNumberCipher(
@@ -44,24 +36,11 @@ class QuicTestFizzFactory : public QuicFizzFactory {
     packetNumberCipher_ = std::move(packetNumberCipher);
   }
 
-  mutable std::unique_ptr<fizz::Aead> aead_;
   mutable std::unique_ptr<MockPacketNumberCipher> packetNumberCipher_;
 };
 
 class HandshakeLayerTest : public Test {
  public:
-  std::unique_ptr<fizz::test::MockAead> createMockAead() {
-    auto mockAead = std::make_unique<StrictMock<fizz::test::MockAead>>();
-    EXPECT_CALL(*mockAead, _setKey(_)).WillOnce(Invoke([&](auto& trafficKey) {
-      trafficKey_ = std::move(trafficKey);
-    }));
-    EXPECT_CALL(*mockAead, keyLength())
-        .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
-    EXPECT_CALL(*mockAead, ivLength())
-        .WillRepeatedly(Return(fizz::AESGCM128::kIVLength));
-    return mockAead;
-  }
-
   std::unique_ptr<MockPacketNumberCipher> createMockPacketNumberCipher() {
     auto mockPacketNumberCipher = std::make_unique<MockPacketNumberCipher>();
     EXPECT_CALL(*mockPacketNumberCipher, setKey(_))
@@ -73,31 +52,8 @@ class HandshakeLayerTest : public Test {
     return mockPacketNumberCipher;
   }
 
-  folly::Optional<fizz::TrafficKey> trafficKey_;
   folly::Optional<std::unique_ptr<folly::IOBuf>> packetCipherKey_;
 };
-
-TEST_F(HandshakeLayerTest, TestDraft17ClearTextCipher) {
-  // test vector taken from
-  // https://github.com/quicwg/base-drafts/wiki/Test-Vector-for-the-Clear-Text-AEAD-key-derivation
-  auto connid = folly::unhexlify("c654efd8a31b4792");
-  std::vector<uint8_t> destinationConnidVector;
-  for (size_t i = 0; i < connid.size(); ++i) {
-    destinationConnidVector.push_back(connid.data()[i]);
-  }
-  ConnectionId destinationConnid(destinationConnidVector);
-  QuicTestFizzFactory factory;
-  factory.setMockAead(createMockAead());
-  auto aead = getClientInitialCipher(
-      &factory, destinationConnid, QuicVersion::MVFST_OLD);
-
-  std::string expectedKey = "86d1830480b40f86cf9d68dcadf35dfe";
-  std::string expectedIv = "12f3938aca34aa02543163d4";
-  auto trafficKeyHex = folly::hexlify(trafficKey_->key->coalesce());
-  auto trafficIvHex = folly::hexlify(trafficKey_->iv->coalesce());
-  EXPECT_EQ(trafficKeyHex, expectedKey);
-  EXPECT_EQ(trafficIvHex, expectedIv);
-}
 
 TEST_F(HandshakeLayerTest, TestPacketEncryptionKey) {
   QuicTestFizzFactory factory;
