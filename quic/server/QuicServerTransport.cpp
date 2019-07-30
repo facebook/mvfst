@@ -360,7 +360,7 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
   if (!newSessionTicketWritten_ && !ctx_->getSendNewSessionTicket() &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kWriteNst.str());
+      conn_->qLogger->addTransportStateUpdate(kWriteNst);
     }
     QUIC_TRACE(fst_trace, *conn_, "write nst");
     newSessionTicketWritten_ = true;
@@ -404,7 +404,7 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
 void QuicServerTransport::maybeNotifyTransportReady() {
   if (!transportReadyNotified_ && connCallback_ && hasWriteCipher()) {
     if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kTransportReady.str());
+      conn_->qLogger->addTransportStateUpdate(kTransportReady);
     }
     QUIC_TRACE(fst_trace, *conn_, "transport ready");
     transportReadyNotified_ = true;

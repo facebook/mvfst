@@ -102,7 +102,7 @@ void BbrCongestionController::onPacketLoss(const LossEvent& loss) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kPersistentCongestion.str(),
+          kPersistentCongestion,
           bbrStateToString(state_),
           bbrRecoveryStateToString(recoveryState_));
     }
@@ -232,7 +232,7 @@ void BbrCongestionController::onPacketAcked(
     conn_.qLogger->addCongestionMetricUpdate(
         inflightBytes_,
         getCongestionWindow(),
-        kCongestionPacketAck.str(),
+        kCongestionPacketAck,
         bbrStateToString(state_),
         bbrRecoveryStateToString(recoveryState_));
   }
@@ -510,7 +510,7 @@ void BbrCongestionController::setAppIdle(
     bool idle,
     TimePoint /* eventTime */) noexcept {
   if (conn_.qLogger) {
-    conn_.qLogger->addAppIdleUpdate(kAppIdle.str(), idle);
+    conn_.qLogger->addAppIdleUpdate(kAppIdle, idle);
   }
   QUIC_TRACE(bbr_appidle, conn_, idle);
   /*

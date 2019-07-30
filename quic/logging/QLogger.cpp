@@ -278,7 +278,7 @@ std::unique_ptr<QLogVersionNegotiationEvent> QLogger::createPacketEvent(
   event->packetSize = packetSize;
   event->eventType =
       isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
-  event->packetType = kVersionNegotiationPacketType.str();
+  event->packetType = kVersionNegotiationPacketType;
   event->versionLog = std::make_unique<VersionNegotiationLog>(
       VersionNegotiationLog(versionPacket.versions));
   return event;

@@ -12,68 +12,69 @@
 
 namespace quic {
 constexpr folly::StringPiece kShortHeaderPacketType = "1RTT";
-constexpr folly::StringPiece kVersionNegotiationPacketType =
-    "VersionNegotiation";
-constexpr folly::StringPiece kHTTP3ProtocolType = "QUIC_HTTP3";
-constexpr folly::StringPiece kNoError = "no error";
-constexpr folly::StringPiece kGracefulExit = "graceful exit";
-constexpr folly::StringPiece kPersistentCongestion = "persistent congestion";
-constexpr folly::StringPiece kRemoveInflight = "remove bytes in flight";
-constexpr folly::StringPiece kCubicSkipLoss = "cubic skip loss";
-constexpr folly::StringPiece kCubicLoss = "cubic loss";
-constexpr folly::StringPiece kCubicSteadyCwnd = "cubic steady cwnd";
-constexpr folly::StringPiece kCubicSkipAck = "cubic skip ack";
-constexpr folly::StringPiece kCongestionPacketAck = "congestion packet ack";
-constexpr folly::StringPiece kCwndNoChange = "cwnd no change";
-constexpr folly::StringPiece kAckInQuiescence = "ack in quiescence";
-constexpr folly::StringPiece kResetTimeToOrigin = "reset time to origin";
-constexpr folly::StringPiece kResetLastReductionTime =
-    "reset last reduction time";
-constexpr folly::StringPiece kRenoCwndEstimation = "reno cwnd estimation";
-constexpr folly::StringPiece kPacketAckedInRecovery =
-    "packet acked in recovery";
-constexpr folly::StringPiece kCopaInit = "copa init";
-constexpr folly::StringPiece kCongestionPacketSent =
-    "congestion on packet sent";
-constexpr folly::StringPiece kCopaCheckAndUpdateDirection =
-    "copa check and update direction";
-constexpr folly::StringPiece kCongestionPacketLoss = "congestion packet loss";
-constexpr folly::StringPiece kCongestionAppLimited = "congestion app limited";
-constexpr folly::StringPiece kCongestionAppUnlimited =
-    "congestion app unlimited";
+constexpr auto kVersionNegotiationPacketType = "VersionNegotiation";
+constexpr auto kHTTP3ProtocolType = "QUIC_HTTP3";
+constexpr auto kNoError = "no error";
+constexpr auto kGracefulExit = "graceful exit";
+constexpr auto kPersistentCongestion = "persistent congestion";
+constexpr auto kRemoveInflight = "remove bytes in flight";
+constexpr auto kCubicSkipLoss = "cubic skip loss";
+constexpr auto kCubicLoss = "cubic loss";
+constexpr auto kCubicSteadyCwnd = "cubic steady cwnd";
+constexpr auto kCubicSkipAck = "cubic skip ack";
+constexpr auto kCongestionPacketAck = "congestion packet ack";
+constexpr auto kCwndNoChange = "cwnd no change";
+constexpr auto kAckInQuiescence = "ack in quiescence";
+constexpr auto kResetTimeToOrigin = "reset time to origin";
+constexpr auto kResetLastReductionTime = "reset last reduction time";
+constexpr auto kRenoCwndEstimation = "reno cwnd estimation";
+constexpr auto kPacketAckedInRecovery = "packet acked in recovery";
+constexpr auto kCopaInit = "copa init";
+constexpr auto kCongestionPacketSent = "congestion on packet sent";
+constexpr auto kCopaCheckAndUpdateDirection = "copa check and update direction";
+constexpr auto kCongestionPacketLoss = "congestion packet loss";
+constexpr auto kCongestionAppLimited = "congestion app limited";
+constexpr auto kCongestionAppUnlimited = "congestion app unlimited";
 constexpr uint64_t kDefaultCwnd = 12320;
-constexpr folly::StringPiece kAppIdle = "app idle";
-constexpr folly::StringPiece kMaxBuffered = "max buffered";
-constexpr folly::StringPiece kCipherUnavailable = "cipher unavailable";
-constexpr folly::StringPiece kParse = "parse";
-constexpr folly::StringPiece kNonRegular = "non regular";
-constexpr folly::StringPiece kAlreadyClosed = "already closed";
-constexpr folly::StringPiece kUdpTruncated = "udp truncated";
-constexpr folly::StringPiece kNoData = "no data";
-constexpr folly::StringPiece kUnexpectedProtectionLevel =
-    "unexpected protection level";
-constexpr folly::StringPiece kBufferUnavailable = "buffer unavailable";
-constexpr folly::StringPiece kReset = "reset";
-constexpr folly::StringPiece kPtoAlarm = "pto alarm";
-constexpr folly::StringPiece kHandshakeAlarm = "handshake alarm";
-constexpr folly::StringPiece kLossTimeoutExpired = "loss timeout expired";
-constexpr folly::StringPiece kStart = "start";
-constexpr folly::StringPiece kWriteNst = "write nst";
-constexpr folly::StringPiece kTransportReady = "transport ready";
-constexpr folly::StringPiece kDerivedZeroRttReadCipher =
-    "derived 0-rtt read cipher";
-constexpr folly::StringPiece kDerivedOneRttReadCipher =
-    "derived 1-rtt read cipher";
-constexpr folly::StringPiece kDerivedOneRttWriteCipher =
-    "derived 1-rtt write cipher";
+constexpr auto kAppIdle = "app idle";
+constexpr auto kMaxBuffered = "max buffered";
+constexpr auto kCipherUnavailable = "cipher unavailable";
+constexpr auto kParse = "parse";
+constexpr auto kNonRegular = "non regular";
+constexpr auto kAlreadyClosed = "already closed";
+constexpr auto kUdpTruncated = "udp truncated";
+constexpr auto kNoData = "no data";
+constexpr auto kUnexpectedProtectionLevel = "unexpected protection level";
+constexpr auto kBufferUnavailable = "buffer unavailable";
+constexpr auto kReset = "reset";
+constexpr auto kPtoAlarm = "pto alarm";
+constexpr auto kHandshakeAlarm = "handshake alarm";
+constexpr auto kLossTimeoutExpired = "loss timeout expired";
+constexpr auto kStart = "start";
+constexpr auto kWriteNst = "write nst";
+constexpr auto kTransportReady = "transport ready";
+constexpr auto kDerivedZeroRttReadCipher = "derived 0-rtt read cipher";
+constexpr auto kDerivedOneRttReadCipher = "derived 1-rtt read cipher";
+constexpr auto kDerivedOneRttWriteCipher = "derived 1-rtt write cipher";
 auto kClosingStream = [](const std::string& streamId) {
   return "closing stream, stream id: " + streamId;
 };
-constexpr folly::StringPiece kZeroRttRejected = "zerortt rejected";
-constexpr folly::StringPiece kZeroRttAccepted = "zerortt accepted";
-constexpr folly::StringPiece kZeroRttAttempted = "zerortt attempted";
-constexpr folly::StringPiece kRecalculateTimeToOrigin =
-    "recalculate time to origin";
-constexpr folly::StringPiece kAbort = "abort";
+constexpr auto kZeroRttRejected = "zerortt rejected";
+constexpr auto kZeroRttAccepted = "zerortt accepted";
+constexpr auto kZeroRttAttempted = "zerortt attempted";
+constexpr auto kRecalculateTimeToOrigin = "recalculate time to origin";
+constexpr auto kAbort = "abort";
+constexpr auto kQLogVersion = "draft-00";
+constexpr auto kQLogTitle = "mvfst qlog";
+constexpr auto kQLogDescription = "Converted from file";
+constexpr auto kQLogServerVantagePoint = "SERVER";
+constexpr auto kQLogClientVantagePoint = "CLIENT";
+constexpr auto kQLogTraceTitle = "mvfst qlog from single connection";
+constexpr auto kQLogTraceDescription = "Generated qlog from connection";
+constexpr auto kQLogTimeUnits = "us";
+constexpr auto kQLogVersionField = "qlog_version";
+constexpr auto kQLogTitleField = "title";
+constexpr auto kQLogDescriptionField = "description";
+constexpr auto kQLogTraceCountField = "trace_count";
 
 } // namespace quic

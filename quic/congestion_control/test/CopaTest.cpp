@@ -162,7 +162,7 @@ TEST_F(CopaTest, PersistentCongestion) {
   auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->bytesInFlight, 10);
   EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent.str());
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent);
 
   CongestionController::LossEvent loss;
   loss.persistentCongestion = true;
@@ -196,13 +196,13 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->bytesInFlight, ackedSize);
   EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent.str());
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketSent);
 
   auto tmp2 = std::move(qLogger->logs[indices[1]]);
   auto event2 = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp2.get());
   EXPECT_EQ(event2->bytesInFlight, ackedSize - 2);
   EXPECT_EQ(event2->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event2->congestionEvent, kRemoveInflight.str());
+  EXPECT_EQ(event2->congestionEvent, kRemoveInflight);
 }
 
 TEST_F(CopaTest, TestSlowStartAck) {
@@ -251,7 +251,7 @@ TEST_F(CopaTest, TestSlowStartAck) {
   auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
   EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck.str());
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
 
   now += 50ms;
   packetNumToAck++;
@@ -463,7 +463,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
   EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
-  EXPECT_EQ(event->congestionEvent, kCongestionPacketLoss.str());
+  EXPECT_EQ(event->congestionEvent, kCongestionPacketLoss);
 }
 
 } // namespace test

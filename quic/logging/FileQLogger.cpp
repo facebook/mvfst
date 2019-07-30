@@ -193,30 +193,55 @@ void FileQLogger::addMetricUpdate(
 }
 
 folly::dynamic FileQLogger::toDynamic() const {
-  folly::dynamic d = folly::dynamic::object;
-  d["traces"] = folly::dynamic::array();
-  folly::dynamic dTrace = folly::dynamic::object;
+  folly::dynamic dynamicObj = folly::dynamic::object;
+  dynamicObj[kQLogVersionField] = kQLogVersion;
+  dynamicObj[kQLogTitleField] = kQLogTitle;
+  dynamicObj[kQLogDescriptionField] = kQLogDescription;
+
+  folly::dynamic summaryObj = folly::dynamic::object;
+  summaryObj[kQLogTraceCountField] =
+      1; // hardcoded, we only support 1 trace right now
+
+  // max duration is calculated like this:
+  // if there is <= 1 event, max_duration is 0
+  // otherwise, it is the (time of the last event - time of the  first event)
+  summaryObj["max_duration"] = (logs.size() == 0)
+      ? 0
+      : (logs.back()->refTime - logs[0]->refTime).count();
+  summaryObj["max_outgoing_loss_rate"] = "";
+  summaryObj["total_event_count"] = logs.size();
+  dynamicObj["summary"] = summaryObj;
+
+  dynamicObj["traces"] = folly::dynamic::array();
+  folly::dynamic dynamicTrace = folly::dynamic::object;
+
+  dynamicTrace["vantage_point"] =
+      folly::dynamic::object("type", vantagePoint)("name", vantagePoint);
+  dynamicTrace["title"] = kQLogTraceTitle;
+  dynamicTrace["description"] = kQLogTraceDescription;
+  dynamicTrace["configuration"] =
+      folly::dynamic::object("time_offset", 0)("time_units", kQLogTimeUnits);
 
   std::string dcidStr = dcid.hasValue() ? dcid.value().hex() : "";
   std::string scidStr = scid.hasValue() ? scid.value().hex() : "";
   folly::dynamic commonFieldsObj = folly::dynamic::object;
   commonFieldsObj["reference_time"] = "0";
-  commonFieldsObj["dcid"] = std::move(dcidStr);
-  commonFieldsObj["scid"] = std::move(scidStr);
+  commonFieldsObj["dcid"] = dcidStr;
+  commonFieldsObj["scid"] = scidStr;
   commonFieldsObj["protocol_type"] = protocolType;
-  dTrace["common_fields"] = std::move(commonFieldsObj);
+  dynamicTrace["common_fields"] = std::move(commonFieldsObj);
 
   // convert stored logs into folly::Dynamic event array
   auto events = folly::dynamic::array();
   for (auto& event : logs) {
     events.push_back(event->toDynamic());
   }
-  dTrace["events"] = events;
-  dTrace["event_fields"] = folly::dynamic::array(
-      "relative_time", "category", "event_type", "trigger", "data");
+  dynamicTrace["events"] = events;
+  dynamicTrace["event_fields"] = folly::dynamic::array(
+      "relative_time", "CATEGORY", "EVENT_TYPE", "TRIGGER", "DATA");
 
-  d["traces"].push_back(dTrace);
-  return d;
+  dynamicObj["traces"].push_back(dynamicTrace);
+  return dynamicObj;
 }
 
 void FileQLogger::addStreamStateUpdate(quic::StreamId id, std::string update) {

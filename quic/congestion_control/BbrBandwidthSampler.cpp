@@ -36,7 +36,7 @@ void BbrBandwidthSampler::onPacketAcked(
         conn_.qLogger->addCongestionMetricUpdate(
             getBandwidth().bytes,
             getBandwidth().bytes,
-            kCongestionAppUnlimited.str());
+            kCongestionAppUnlimited);
       }
     }
   }
@@ -113,9 +113,7 @@ void BbrBandwidthSampler::onAppLimited() {
       bbr_applimited, conn_, appLimitedExitTarget_.time_since_epoch().count());
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        getBandwidth().bytes,
-        getBandwidth().bytes,
-        kCongestionAppLimited.str());
+        getBandwidth().bytes, getBandwidth().bytes, kCongestionAppLimited);
   }
 }
 

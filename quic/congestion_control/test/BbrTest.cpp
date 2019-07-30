@@ -742,7 +742,7 @@ TEST_F(BbrTest, AppIdle) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->idleEvent, kAppIdle.str());
+  EXPECT_EQ(event->idleEvent, kAppIdle);
   EXPECT_TRUE(event->idle);
 }
 

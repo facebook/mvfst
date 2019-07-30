@@ -32,7 +32,7 @@ void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
            << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kRemoveInflight.str());
+        bytesInFlight_, getCongestionWindow(), kRemoveInflight);
   }
 }
 
@@ -47,7 +47,7 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
            << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent);
   }
 }
 
@@ -59,7 +59,7 @@ void NewReno::onAckEvent(const AckEvent& ack) {
            << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck);
   }
   for (const auto& packet : ack.ackedPackets) {
     onPacketAcked(packet);
@@ -125,7 +125,7 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
 
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss);
   }
   if (loss.persistentCongestion) {
     VLOG(10) << __func__ << " writable=" << getWritableBytes()
@@ -133,7 +133,7 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
              << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          bytesInFlight_, getCongestionWindow(), kPersistentCongestion.str());
+          bytesInFlight_, getCongestionWindow(), kPersistentCongestion);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   }

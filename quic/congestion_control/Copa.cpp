@@ -40,7 +40,7 @@ void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
            << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kRemoveInflight.str());
+        bytesInFlight_, getCongestionWindow(), kRemoveInflight);
   }
 }
 
@@ -57,7 +57,7 @@ void Copa::onPacketSent(const OutstandingPacket& packet) {
            << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent);
   }
 }
 
@@ -168,7 +168,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck);
   }
 
   auto delayInMicroSec =
@@ -271,7 +271,7 @@ void Copa::onPacketLoss(const LossEvent& loss) {
            << " inflight=" << bytesInFlight_ << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss.str());
+        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss);
   }
   DCHECK(loss.largestLostPacketNum.hasValue());
   subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
@@ -282,7 +282,7 @@ void Copa::onPacketLoss(const LossEvent& loss) {
              << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          bytesInFlight_, getCongestionWindow(), kPersistentCongestion.str());
+          bytesInFlight_, getCongestionWindow(), kPersistentCongestion);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
     updatePacing();

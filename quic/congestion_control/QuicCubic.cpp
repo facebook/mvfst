@@ -77,7 +77,7 @@ void Cubic::onPersistentCongestion() {
     conn_.qLogger->addCongestionMetricUpdate(
         inflightBytes_,
         getCongestionWindow(),
-        kPersistentCongestion.str(),
+        kPersistentCongestion,
         cubicStateToString(state_).str());
   }
 }
@@ -113,7 +113,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
     QUIC_TRACE(
         cubic_loss,
         conn_,
-        cubicStateToString(state_).data(),
+        cubicStateToString(state_).str().data(),
         cwndBytes_,
         inflightBytes_,
         steadyState_.lastMaxCwndBytes.value_or(0));
@@ -121,7 +121,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kCubicLoss.str(),
+          kCubicLoss,
           cubicStateToString(state_).str());
     }
 
@@ -131,7 +131,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kCubicSkipLoss.str(),
+          kCubicSkipLoss,
           cubicStateToString(state_).str());
     }
   }
@@ -147,7 +147,7 @@ void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
   QUIC_TRACE(
       cubic_remove_inflight,
       conn_,
-      cubicStateToString(state_).data(),
+      cubicStateToString(state_).str().data(),
       cwndBytes_,
       inflightBytes_,
       steadyState_.lastMaxCwndBytes.value_or(0));
@@ -155,7 +155,7 @@ void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
     conn_.qLogger->addCongestionMetricUpdate(
         inflightBytes_,
         getCongestionWindow(),
-        kRemoveInflight.str(),
+        kRemoveInflight,
         cubicStateToString(state_).str());
   }
 }
@@ -200,7 +200,7 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
                 .count()
           : -1);
   if (conn_.qLogger) {
-    conn_.qLogger->addAppIdleUpdate(kAppIdle.str(), idle);
+    conn_.qLogger->addAppIdleUpdate(kAppIdle, idle);
   }
   bool currentAppIdle = isAppIdle();
   if (!currentAppIdle && idle) {
@@ -262,7 +262,7 @@ void Cubic::updateTimeToOrigin() noexcept {
   // we change the equation a bit to remove all decimals. It's also possible
   // to remove the cbrt calculation by changing the equation.
   if (conn_.qLogger) {
-    conn_.qLogger->addTransportStateUpdate(kRecalculateTimeToOrigin.str());
+    conn_.qLogger->addTransportStateUpdate(kRecalculateTimeToOrigin);
   }
   QUIC_TRACE(fst_trace, conn_, "recalculate_timetoorigin");
   if (*steadyState_.lastMaxCwndBytes <= cwndBytes_) {
@@ -334,7 +334,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
     conn_.qLogger->addCongestionMetricUpdate(
         inflightBytes_,
         getCongestionWindow(),
-        kCubicSteadyCwnd.str(),
+        kCubicSteadyCwnd,
         cubicStateToString(state_).str());
   }
   return delta;
@@ -415,7 +415,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kCubicSkipAck.str(),
+          kCubicSkipAck,
           cubicStateToString(state_).str());
     }
     return;
@@ -438,14 +438,14 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kCwndNoChange.str(),
+          kCwndNoChange,
           cubicStateToString(state_).str());
     }
   }
   QUIC_TRACE(
       cubic_ack,
       conn_,
-      cubicStateToString(state_).data(),
+      cubicStateToString(state_).str().data(),
       cwndBytes_,
       inflightBytes_,
       steadyState_.lastMaxCwndBytes.value_or(0));
@@ -453,7 +453,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
     conn_.qLogger->addCongestionMetricUpdate(
         inflightBytes_,
         getCongestionWindow(),
-        kCongestionPacketAck.str(),
+        kCongestionPacketAck,
         cubicStateToString(state_).str());
   }
 }
@@ -721,7 +721,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kAckInQuiescence.str(),
+          kAckInQuiescence,
           cubicStateToString(state_).str());
     }
     return;
@@ -742,7 +742,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kResetTimeToOrigin.str(),
+          kResetTimeToOrigin,
           cubicStateToString(state_).str());
     }
     steadyState_.timeToOrigin = 0.0;
@@ -763,7 +763,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kResetLastReductionTime.str(),
+          kResetLastReductionTime,
           cubicStateToString(state_).str());
     }
   }
@@ -793,7 +793,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kRenoCwndEstimation.str(),
+          kRenoCwndEstimation,
           cubicStateToString(state_).str());
     }
   }
@@ -819,7 +819,7 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
           getCongestionWindow(),
-          kPacketAckedInRecovery.str(),
+          kPacketAckedInRecovery,
           cubicStateToString(state_).str());
     }
   }

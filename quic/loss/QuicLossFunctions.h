@@ -331,7 +331,7 @@ void onHandshakeAlarm(
         conn.lossState.largestSent,
         conn.lossState.handshakeAlarmCount,
         (uint64_t)conn.outstandingPackets.size(),
-        kHandshakeAlarm.str());
+        kHandshakeAlarm);
   }
   QUIC_TRACE(
       handshake_alarm,

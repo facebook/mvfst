@@ -176,8 +176,7 @@ void QuicTransportBase::closeGracefully() {
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
   if (conn_->qLogger) {
-    conn_->qLogger->addConnectionClose(
-        kNoError.str(), kGracefulExit.str(), true, false);
+    conn_->qLogger->addConnectionClose(kNoError, kGracefulExit, true, false);
   }
   QUIC_TRACE(
       conn_close,
@@ -293,14 +292,14 @@ void QuicTransportBase::closeImpl(
   } else {
     auto reason = folly::to<std::string>(
         "Server: ",
-        kNoError.str(),
+        kNoError,
         ", Peer: isReset: ",
         isReset,
         ", Peer: isAbandon: ",
         isAbandon);
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionClose(
-          kNoError.str(), reason, drainConnection, sendCloseImmediately);
+          kNoError, reason, drainConnection, sendCloseImmediately);
     }
     QUIC_TRACE(
         conn_close,
@@ -2008,7 +2007,7 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
     // TODO: remove this trace when Pacing is ready to land
     QUIC_TRACE(fst_trace, *conn_, "LossTimeoutExpired");
     if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired.str());
+      conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired);
     }
     pacedWriteDataToSocket(false);
   } catch (const QuicTransportException& ex) {

@@ -33,7 +33,8 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
   RegularQuicWritePacket regularWritePacket =
       createRegularQuicWritePacket(streamId, offset, len, fin);
 
-  FileQLogger q(fakeProtocolType);
+  FileQLogger q(fakeProtocolType, kQLogClientVantagePoint);
+  EXPECT_EQ(q.vantagePoint, kQLogClientVantagePoint);
   EXPECT_EQ(q.protocolType, fakeProtocolType);
   q.addPacket(regularWritePacket, 10);
 
@@ -117,7 +118,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
   q.addCongestionMetricUpdate(
       20,
       30,
-      kPersistentCongestion.str(),
+      kPersistentCongestion,
       cubicStateToString(CubicStates::Steady).str(),
       bbrRecoveryStateToString(
           BbrCongestionController::RecoveryState::NOT_RECOVERY));
@@ -127,7 +128,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
 
   EXPECT_EQ(gotEvent->bytesInFlight, 20);
   EXPECT_EQ(gotEvent->currentCwnd, 30);
-  EXPECT_EQ(gotEvent->congestionEvent, kPersistentCongestion.str());
+  EXPECT_EQ(gotEvent->congestionEvent, kPersistentCongestion);
   EXPECT_EQ(gotEvent->state, cubicStateToString(CubicStates::Steady).str());
   EXPECT_EQ(
       gotEvent->recoveryState,
@@ -148,24 +149,24 @@ TEST_F(QLoggerTest, PacingMetricUpdateEvent) {
 
 TEST_F(QLoggerTest, AppIdleUpdateEvent) {
   FileQLogger q;
-  q.addAppIdleUpdate(kAppIdle.str(), false);
+  q.addAppIdleUpdate(kAppIdle, false);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogAppIdleUpdateEvent*>(p.get());
 
-  EXPECT_EQ(gotEvent->idleEvent, kAppIdle.str());
+  EXPECT_EQ(gotEvent->idleEvent, kAppIdle);
   EXPECT_FALSE(gotEvent->idle);
 }
 
 TEST_F(QLoggerTest, PacketDropEvent) {
   FileQLogger q;
-  q.addPacketDrop(5, kCipherUnavailable.str());
+  q.addPacketDrop(5, kCipherUnavailable);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogPacketDropEvent*>(p.get());
 
   EXPECT_EQ(gotEvent->packetSize, 5);
-  EXPECT_EQ(gotEvent->dropReason, kCipherUnavailable.str());
+  EXPECT_EQ(gotEvent->dropReason, kCipherUnavailable);
 }
 
 TEST_F(QLoggerTest, DatagramReceivedEvent) {
@@ -180,7 +181,7 @@ TEST_F(QLoggerTest, DatagramReceivedEvent) {
 
 TEST_F(QLoggerTest, LossAlarmEvent) {
   FileQLogger q;
-  q.addLossAlarm(PacketNum{1}, 3983, 893, kPtoAlarm.str());
+  q.addLossAlarm(PacketNum{1}, 3983, 893, kPtoAlarm);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogLossAlarmEvent*>(p.get());
@@ -188,7 +189,7 @@ TEST_F(QLoggerTest, LossAlarmEvent) {
   EXPECT_EQ(gotEvent->largestSent, 1);
   EXPECT_EQ(gotEvent->alarmCount, 3983);
   EXPECT_EQ(gotEvent->outstandingPackets, 893);
-  EXPECT_EQ(gotEvent->type, kPtoAlarm.str());
+  EXPECT_EQ(gotEvent->type, kPtoAlarm);
 }
 
 TEST_F(QLoggerTest, PacketsLostEvent) {
@@ -252,13 +253,13 @@ TEST_F(QLoggerTest, MetricUpdateEvent) {
 
 TEST_F(QLoggerTest, StreamStateUpdateEvent) {
   FileQLogger q;
-  q.addStreamStateUpdate(streamId, kAbort.str());
+  q.addStreamStateUpdate(streamId, kAbort);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogStreamStateUpdateEvent*>(p.get());
 
   EXPECT_EQ(gotEvent->id, streamId);
-  EXPECT_EQ(gotEvent->update, kAbort.str());
+  EXPECT_EQ(gotEvent->update, kAbort);
 }
 
 TEST_F(QLoggerTest, PacketPaddingFrameEvent) {
@@ -274,9 +275,18 @@ TEST_F(QLoggerTest, PacketPaddingFrameEvent) {
   EXPECT_EQ(gotObject.numFrames, 20);
 }
 
-TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
+TEST_F(QLoggerTest, QLoggerFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "summary": {
+     "max_duration": 0,
+     "max_outgoing_loss_rate": "",
+     "total_event_count": 1,
+     "trace_count": 1
+   },
+   "title": "mvfst qlog",
    "traces": [
      {
        "common_fields": {
@@ -285,16 +295,21 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
          "reference_time": "0",
          "scid": ""
        },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
        "event_fields": [
          "relative_time",
-         "category",
-         "event_type",
-         "trigger",
-         "data"
+         "CATEGORY",
+         "EVENT_TYPE",
+         "TRIGGER",
+         "DATA"
        ],
        "events": [
          [
-           "0",
+           "31",
            "TRANSPORT",
            "PACKET_RECEIVED",
            "DEFAULT",
@@ -315,10 +330,58 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
              "packet_type": "1RTT"
            }
          ]
-       ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "SERVER",
+         "type": "SERVER"
+       }
      }
    ]
-  })");
+ })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(headerIn);
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+
+  FileQLogger q;
+  q.addPacket(regularQuicPacket, 10);
+
+  q.logs[0]->refTime = 31us;
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  EXPECT_EQ(expected, gotDynamic);
+}
+
+TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+       [
+         "0",
+         "TRANSPORT",
+         "PACKET_RECEIVED",
+         "DEFAULT",
+         {
+           "frames": [
+             {
+               "fin": true,
+               "frame_type": "STREAM",
+               "id": 10,
+               "length": 0,
+               "offset": 0
+             }
+           ],
+           "header": {
+             "packet_number": 1,
+             "packet_size": 10
+           },
+           "packet_type": "1RTT"
+         }
+       ]
+     ])");
 
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
@@ -332,28 +395,13 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
 
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
-  EXPECT_EQ(expected, gotDynamic);
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
-      R"({
-     "traces": [
-       {
-         "common_fields": {
-           "dcid": "4000000304050607",
-           "protocol_type": "QUIC_HTTP3",
-           "reference_time": "0",
-           "scid": "4000400304050607"
-         },
-         "event_fields": [
-           "relative_time",
-           "category",
-           "event_type",
-           "trigger",
-           "data"
-         ],
-         "events": [
+      R"([
            [
              "0",
              "TRANSPORT",
@@ -376,10 +424,7 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
                "packet_type": "INITIAL"
              }
            ]
-         ]
-       }
-     ]
-  })");
+         ])");
 
   RegularQuicWritePacket packet =
       createRegularQuicWritePacket(streamId, offset, len, fin);
@@ -390,28 +435,13 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
   q.addPacket(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
-  EXPECT_EQ(expected, gotDynamic);
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
-      R"({
-   "traces": [
-     {
-       "common_fields": {
-         "dcid": "",
-         "protocol_type": "QUIC_HTTP3",
-         "reference_time": "0",
-         "scid": ""
-       },
-       "event_fields": [
-         "relative_time",
-         "category",
-         "event_type",
-         "trigger",
-         "data"
-       ],
-       "events": [
+      R"([
          [
            "0",
            "TRANSPORT",
@@ -441,58 +471,37 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
              "packet_type": "INITIAL"
            }
          ]
-       ]
-     }
-   ]
- })");
+       ])");
 
   RegularQuicWritePacket packet = createPacketWithAckFrames();
   FileQLogger q;
   q.addPacket(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
-  EXPECT_EQ(expected, gotDynamic);
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
-      R"({
-           "traces": [
+      R"([
+           [
+             "0",
+             "TRANSPORT",
+             "PACKET_SENT",
+             "DEFAULT",
              {
-              "common_fields": {
-                "reference_time": "0",
-                "dcid": "4000000304050607",
-                "protocol_type": "QUIC_HTTP3",
-                "scid": "4000400304050607"
-              },
-              "event_fields": [
-                "relative_time",
-                "category",
-                "event_type",
-                "trigger",
-                "data"
-              ],
-               "events": [
-                 [
-                   "0",
-                   "TRANSPORT",
-                   "PACKET_SENT",
-                   "DEFAULT",
-                   {
-                     "header": {
-                       "packet_size": 10
-                     },
-                     "packet_type": "VersionNegotiation",
-                      "versions": [
-                        "VERSION_NEGOTIATION",
-                        "MVFST"
-                      ]
-                   }
-                 ]
-               ]
+               "header": {
+                 "packet_size": 10
+               },
+               "packet_type": "VersionNegotiation",
+                "versions": [
+                  "VERSION_NEGOTIATION",
+                  "MVFST"
+                ]
              }
-           ]
-         })");
+         ]
+   ])");
 
   auto packet = createVersionNegotiationPacket();
   FileQLogger q;
@@ -501,32 +510,47 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
   q.addPacket(packet, 10, isPacketRecvd);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
-  EXPECT_EQ(expected, gotDynamic);
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
   auto buf = folly::IOBuf::copyBuffer("hello");
   folly::dynamic expected = folly::parseJson(
-      R"( {
+      R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "summary": {
+     "max_duration": "300",
+     "max_outgoing_loss_rate": "",
+     "total_event_count": 3,
+     "trace_count": 1
+   },
+   "title": "mvfst qlog",
    "traces": [
      {
-      "common_fields": {
+       "common_fields": {
          "dcid": "",
          "protocol_type": "QUIC_HTTP3",
          "reference_time": "0",
          "scid": ""
        },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
        "event_fields": [
          "relative_time",
-         "category",
-         "event_type",
-         "trigger",
-         "data"
+         "CATEGORY",
+         "EVENT_TYPE",
+         "TRIGGER",
+         "DATA"
        ],
        "events": [
          [
-          "0",
-          "TRANSPORT",
+           "0",
+           "TRANSPORT",
            "PACKET_SENT",
            "DEFAULT",
            {
@@ -585,7 +609,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                },
                {
                  "frame_type": "PADDING",
-                  "num_frames": 11
+                 "num_frames": 11
                }
              ],
              "header": {
@@ -595,7 +619,12 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
              "packet_type": "1RTT"
            }
          ]
-       ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "SERVER",
+         "type": "SERVER"
+       }
      }
    ]
  })");
@@ -623,6 +652,8 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
   q.addPacket(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["summary"]["max_duration"] = "300"; // hardcode reference time
+
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   gotDynamic["traces"][0]["events"][1][0] = "1"; // hardcode reference time
   gotDynamic["traces"][0]["events"][2][0] = "2"; // hardcode reference time
@@ -632,63 +663,44 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
 
 TEST_F(QLoggerTest, AddingMultipleFrames) {
   folly::dynamic expected = folly::parseJson(
-      R"( {
-   "traces": [
-     {
-      "common_fields": {
-        "dcid": "",
-        "protocol_type": "QUIC_HTTP3",
-        "reference_time": "0",
-        "scid": ""
-       },
-       "event_fields": [
-         "relative_time",
-         "category",
-         "event_type",
-         "trigger",
-         "data"
-       ],
-       "events": [
-         [
-           "0",
-           "TRANSPORT",
-           "PACKET_SENT",
-           "DEFAULT",
-           {
-             "frames": [
-               {
-                 "ack_delay": 111,
-                 "acked_ranges": [
-                   [
-                     100,
-                     200
+      R"([
+           [
+             "0",
+             "TRANSPORT",
+             "PACKET_SENT",
+             "DEFAULT",
+             {
+               "frames": [
+                 {
+                   "ack_delay": 111,
+                   "acked_ranges": [
+                     [
+                       100,
+                       200
+                     ],
+                     [
+                       300,
+                       400
+                     ]
                    ],
-                   [
-                     300,
-                     400
-                   ]
-                 ],
-                 "frame_type": "ACK"
+                   "frame_type": "ACK"
+                 },
+                 {
+                   "fin": true,
+                   "frame_type": "STREAM",
+                   "id": 10,
+                   "length": 0,
+                   "offset": 0
+                 }
+               ],
+               "header": {
+                 "packet_number": 100,
+                 "packet_size": 10
                },
-               {
-                 "fin": true,
-                 "frame_type": "STREAM",
-                 "id": 10,
-                 "length": 0,
-                 "offset": 0
-               }
-             ],
-             "header": {
-               "packet_number": 100,
-               "packet_size": 10
-             },
-             "packet_type": "INITIAL"
-           }
-         ]
-       ]
-     }
-  ]
-  })");
+               "packet_type": "INITIAL"
+             }
+           ]
+  ])");
 
   FileQLogger q;
   RegularQuicWritePacket packet =
@@ -706,7 +718,8 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
   q.addPacket(packet, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
-  EXPECT_EQ(expected, gotDynamic);
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
 }
 
 TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
@@ -786,7 +799,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
   q.addCongestionMetricUpdate(
       20,
       30,
-      kPersistentCongestion.str(),
+      kPersistentCongestion,
       cubicStateToString(CubicStates::Steady).str());
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -833,7 +846,7 @@ TEST_F(QLoggerTest, AppIdleFollyDynamic) {
  ])");
 
   FileQLogger q;
-  q.addAppIdleUpdate(kAppIdle.str(), true);
+  q.addAppIdleUpdate(kAppIdle, true);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
@@ -856,7 +869,7 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
  ])");
 
   FileQLogger q;
-  q.addPacketDrop(100, kMaxBuffered.str());
+  q.addPacketDrop(100, kMaxBuffered);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
@@ -903,7 +916,7 @@ TEST_F(QLoggerTest, LossAlarmFollyDynamic) {
  ])");
 
   FileQLogger q;
-  q.addLossAlarm(PacketNum{100}, 14, 38, kHandshakeAlarm.str());
+  q.addLossAlarm(PacketNum{100}, 14, 38, kHandshakeAlarm);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
@@ -1044,7 +1057,7 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
 ])");
 
   FileQLogger q;
-  q.addStreamStateUpdate(streamId, kAbort.str());
+  q.addStreamStateUpdate(streamId, kAbort);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

@@ -1646,7 +1646,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, kLossTimeoutExpired.str());
+  EXPECT_EQ(event->update, kLossTimeoutExpired);
 }
 
 TEST_F(QuicServerTransportTest, TestAckStopSending) {
@@ -2795,7 +2795,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 45);
-  EXPECT_EQ(event->dropReason, kCipherUnavailable.str());
+  EXPECT_EQ(event->dropReason, kCipherUnavailable);
 
   auto tmp2 = std::move(qLogger->logs[indices[1]]);
   auto event2 = dynamic_cast<QLogPacketDropEvent*>(tmp2.get());
@@ -3050,10 +3050,10 @@ TEST_F(
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
   EXPECT_EQ(indices.size(), 4);
-  std::array<::std::string, 4> updateArray = {kDerivedZeroRttReadCipher.str(),
-                                              kDerivedOneRttWriteCipher.str(),
-                                              kTransportReady.str(),
-                                              kDerivedOneRttReadCipher.str()};
+  std::array<::std::string, 4> updateArray = {kDerivedZeroRttReadCipher,
+                                              kDerivedOneRttWriteCipher,
+                                              kTransportReady,
+                                              kDerivedOneRttReadCipher};
   for (int i = 0; i < 4; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
@@ -3087,9 +3087,8 @@ TEST_F(
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
   EXPECT_EQ(indices.size(), 3);
-  std::array<::std::string, 3> updateArray = {kDerivedZeroRttReadCipher.str(),
-                                              kDerivedOneRttWriteCipher.str(),
-                                              kTransportReady.str()};
+  std::array<::std::string, 3> updateArray = {
+      kDerivedZeroRttReadCipher, kDerivedOneRttWriteCipher, kTransportReady};
   for (int i = 0; i < 3; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());

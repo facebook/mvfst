@@ -19,8 +19,11 @@ namespace quic {
 class FileQLogger : public QLogger {
  public:
   std::vector<std::unique_ptr<QLogEvent>> logs;
-  FileQLogger(std::string protocolTypeIn = kHTTP3ProtocolType.str()) {
-    protocolType = std::move(protocolTypeIn);
+  FileQLogger(
+      std::string protocolTypeIn = kHTTP3ProtocolType,
+      std::string vantagePointIn = kQLogServerVantagePoint) {
+    protocolType = protocolTypeIn;
+    vantagePoint = vantagePointIn;
   }
   ~FileQLogger() override = default;
   void addPacket(const RegularQuicPacket& regularPacket, uint64_t packetSize)

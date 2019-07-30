@@ -913,7 +913,7 @@ TEST_F(
   EXPECT_EQ(event->largestSent, 5);
   EXPECT_EQ(event->alarmCount, 0);
   EXPECT_EQ(event->outstandingPackets, 10);
-  EXPECT_EQ(event->type, kHandshakeAlarm.str());
+  EXPECT_EQ(event->type, kHandshakeAlarm);
 }
 
 TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
@@ -941,7 +941,7 @@ TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   EXPECT_EQ(event->largestSent, 1);
   EXPECT_EQ(event->alarmCount, 0);
   EXPECT_EQ(event->outstandingPackets, 1);
-  EXPECT_EQ(event->type, kHandshakeAlarm.str());
+  EXPECT_EQ(event->type, kHandshakeAlarm);
 }
 
 TEST_F(QuicLossFunctionsTest, PureAckSkipsCongestionControl) {
@@ -1255,7 +1255,7 @@ TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
   EXPECT_EQ(event->largestSent, 0);
   EXPECT_EQ(event->alarmCount, 1);
   EXPECT_EQ(event->outstandingPackets, 0);
-  EXPECT_EQ(event->type, kPtoAlarm.str());
+  EXPECT_EQ(event->type, kPtoAlarm);
 }
 
 TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {
@@ -1277,7 +1277,7 @@ TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {
     EXPECT_EQ(event->largestSent, 0);
     EXPECT_EQ(event->alarmCount, i + 1);
     EXPECT_EQ(event->outstandingPackets, 0);
-    EXPECT_EQ(event->type, kPtoAlarm.str());
+    EXPECT_EQ(event->type, kPtoAlarm);
   }
 }
 

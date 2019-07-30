@@ -622,10 +622,10 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   EXPECT_EQ(indices.size(), 6);
 
   std::array<std::string, 6> stateUpdates = {
-      kStart.str(),
-      kZeroRttAttempted.str(),
-      kZeroRttAccepted.str(),
-      kZeroRttRejected.str(),
+      kStart,
+      kZeroRttAttempted,
+      kZeroRttAccepted,
+      kZeroRttRejected,
       getRxStreamWU(0, 0, kDefaultStreamWindowSize),
       kClosingStream("0")};
   for (int i = 0; i < 6; ++i) {
@@ -1736,8 +1736,7 @@ TEST_F(
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
   EXPECT_EQ(indices.size(), 2);
 
-  std::array<std::string, 2> updates = {kStart.str(),
-                                        kLossTimeoutExpired.str()};
+  std::array<std::string, 2> updates = {kStart, kLossTimeoutExpired};
   for (int i = 0; i < 2; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
@@ -2600,7 +2599,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 81);
-  EXPECT_EQ(event->dropReason, kParse.str());
+  EXPECT_EQ(event->dropReason, kParse);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
@@ -2761,12 +2760,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   auto event2 = dynamic_cast<QLogConnectionCloseEvent*>(tmp2.get());
   EXPECT_EQ(event2->error, kNoError);
   auto reason = folly::to<std::string>(
-      "Server: ",
-      kNoError.str(),
-      ", Peer: isReset: ",
-      0,
-      ", Peer: isAbandon: ",
-      0);
+      "Server: ", kNoError, ", Peer: isReset: ", 0, ", Peer: isAbandon: ", 0);
   EXPECT_EQ(event2->reason, reason);
   EXPECT_TRUE(event2->drainConnection);
   EXPECT_TRUE(event2->sendCloseImmediately);
@@ -2874,14 +2868,9 @@ TEST_P(
     EXPECT_EQ(indices.size(), 1);
     auto tmp = std::move(qLogger->logs[indices[0]]);
     auto event = dynamic_cast<QLogConnectionCloseEvent*>(tmp.get());
-    EXPECT_EQ(event->error, kNoError.str());
+    EXPECT_EQ(event->error, kNoError);
     auto reason = folly::to<std::string>(
-        "Server: ",
-        kNoError.str(),
-        ", Peer: isReset: ",
-        0,
-        ", Peer: isAbandon: ",
-        0);
+        "Server: ", kNoError, ", Peer: isReset: ", 0, ", Peer: isAbandon: ", 0);
     EXPECT_EQ(event->reason, reason);
     EXPECT_TRUE(event->drainConnection);
     EXPECT_TRUE(event->sendCloseImmediately);
@@ -3182,7 +3171,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 0);
-  EXPECT_EQ(event->dropReason, kAlreadyClosed.str());
+  EXPECT_EQ(event->dropReason, kAlreadyClosed);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
@@ -3273,7 +3262,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 0);
-  EXPECT_EQ(event->dropReason, kAlreadyClosed.str());
+  EXPECT_EQ(event->dropReason, kAlreadyClosed);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvalidStream) {
@@ -4722,7 +4711,7 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 10);
-  EXPECT_EQ(event->dropReason, kParse.str());
+  EXPECT_EQ(event->dropReason, kParse);
 }
 
 TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {

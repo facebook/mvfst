@@ -181,7 +181,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
 
   if (zeroRttReadCipher) {
     if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher.str());
+      conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher);
     }
     QUIC_TRACE(fst_trace, conn, "derived 0-rtt read cipher");
     conn.readCodec->setZeroRttReadCipher(std::move(zeroRttReadCipher));
@@ -198,7 +198,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
 
   if (oneRttWriteCipher) {
     if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher.str());
+      conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher);
     }
     QUIC_TRACE(fst_trace, conn, "derived 1-rtt write cipher");
     CHECK(!conn.oneRttWriteCipher.get());
@@ -218,7 +218,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   }
   if (oneRttReadCipher) {
     if (conn.qLogger) {
-      conn.qLogger->addTransportStateUpdate(kDerivedOneRttReadCipher.str());
+      conn.qLogger->addTransportStateUpdate(kDerivedOneRttReadCipher);
     }
     QUIC_TRACE(fst_trace, conn, "derived 1-rtt read cipher");
     // Clear limit because CFIN is received at this point
@@ -531,7 +531,7 @@ void onServerReadDataFromOpen(
           if (!originalData.hasValue()) {
             VLOG(10) << "drop cipher unavailable, no data " << conn;
             if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable.str());
+              conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
             }
             QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
             return false;
@@ -539,7 +539,7 @@ void onServerReadDataFromOpen(
           if (!originalData->packet || originalData->packet->empty()) {
             VLOG(10) << "drop because no data " << conn;
             if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kNoData.str());
+              conn.qLogger->addPacketDrop(packetSize, kNoData);
             }
             QUIC_TRACE(packet_drop, conn, "no_data");
             return false;
@@ -549,7 +549,7 @@ void onServerReadDataFromOpen(
             VLOG(10) << "drop because unexpected protection level " << conn;
             if (conn.qLogger) {
               conn.qLogger->addPacketDrop(
-                  packetSize, kUnexpectedProtectionLevel.str());
+                  packetSize, kUnexpectedProtectionLevel);
             }
             QUIC_TRACE(packet_drop, conn, "unexpected_protection_level");
             return false;
@@ -561,7 +561,7 @@ void onServerReadDataFromOpen(
           if (combinedSize >= conn.transportSettings.maxPacketsToBuffer) {
             VLOG(10) << "drop because max buffered " << conn;
             if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kMaxBuffered.str());
+              conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
             }
             QUIC_TRACE(packet_drop, conn, "max_buffered");
             return false;
@@ -598,7 +598,7 @@ void onServerReadDataFromOpen(
                      << toString(originalData->protectionType)
                      << " buffer no longer available " << conn;
             if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable.str());
+              conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
             }
             QUIC_TRACE(packet_drop, conn, "buffer_unavailable");
           }
@@ -607,7 +607,7 @@ void onServerReadDataFromOpen(
         [&](const auto&) {
           VLOG(10) << "drop because reset " << conn;
           if (conn.qLogger) {
-            conn.qLogger->addPacketDrop(packetSize, kReset.str());
+            conn.qLogger->addPacketDrop(packetSize, kReset);
           }
           QUIC_TRACE(packet_drop, conn, "reset");
           return false;
@@ -1081,7 +1081,7 @@ void onServerReadDataFromClosed(
       [&](folly::Optional<CipherUnavailable>&) {
         VLOG(10) << "drop cipher unavailable " << conn;
         if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable.str());
+          conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
         }
         QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
         return false;
@@ -1089,7 +1089,7 @@ void onServerReadDataFromClosed(
       [&](const auto&) {
         VLOG(10) << "drop because reset " << conn;
         if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kReset.str());
+          conn.qLogger->addPacketDrop(packetSize, kReset);
         }
         QUIC_TRACE(packet_drop, conn, "reset");
         return false;

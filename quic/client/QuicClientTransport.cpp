@@ -116,7 +116,7 @@ void QuicClientTransport::processPacketData(
       [&](auto&) { return false; });
   if (!parseSuccess) {
     if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(packetSize, kParse.str());
+      conn_->qLogger->addPacketDrop(packetSize, kParse);
     }
     QUIC_TRACE(packet_drop, *conn_, "parse");
     return;
@@ -146,7 +146,7 @@ void QuicClientTransport::processPacketData(
   if (!regularOptional) {
     VLOG(4) << "Dropping non-regular packet " << *conn_;
     if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(packetSize, kNonRegular.str());
+      conn_->qLogger->addPacketDrop(packetSize, kNonRegular);
     }
     QUIC_TRACE(packet_drop, *conn_, "non_regular");
     return;
@@ -549,13 +549,13 @@ void QuicClientTransport::processPacketData(
     bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
     if (zeroRttRejected) {
       if (conn_->qLogger) {
-        conn_->qLogger->addTransportStateUpdate(kZeroRttRejected.str());
+        conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
       }
       QUIC_TRACE(zero_rtt, *conn_, "rejected");
       removePsk();
     } else if (conn_->zeroRttWriteCipher) {
       if (conn_->qLogger) {
-        conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted.str());
+        conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
       }
       QUIC_TRACE(zero_rtt, *conn_, "accepted");
     }
@@ -658,7 +658,7 @@ void QuicClientTransport::onReadData(
     // TODO: we might want to process network data if we decide that we should
     // exit draining state early
     if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(0, kAlreadyClosed.str());
+      conn_->qLogger->addPacketDrop(0, kAlreadyClosed);
     }
     QUIC_TRACE(packet_drop, *conn_, "already_closed");
     return;
@@ -886,7 +886,7 @@ void QuicClientTransport::startCryptoHandshake() {
   auto zeroRttWriteHeaderCipher = handshakeLayer->getZeroRttWriteHeaderCipher();
   if (zeroRttWriteCipher) {
     if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted.str());
+      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
     }
     QUIC_TRACE(zero_rtt, *conn_, "attempted");
     clientConn_->zeroRttWriteCipher = std::move(zeroRttWriteCipher);
@@ -1037,7 +1037,7 @@ void QuicClientTransport::onDataAvailable(
   if (truncated) {
     // This is an error, drop the packet.
     if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(len, kUdpTruncated.str());
+      conn_->qLogger->addPacketDrop(len, kUdpTruncated);
     }
     QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
     return;
@@ -1083,7 +1083,7 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
   }
 
   if (conn_->qLogger) {
-    conn_->qLogger->addTransportStateUpdate(kStart.str());
+    conn_->qLogger->addTransportStateUpdate(kStart);
   }
   QUIC_TRACE(fst_trace, *conn_, "start");
   setConnectionCallback(cb);
