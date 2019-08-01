@@ -108,4 +108,6 @@ std::string getRxConnWU(PacketNum packetNum, uint64_t maximumData);
 
 std::string getPeerClose(const std::string& errMsg);
 
+std::string getFlowControlWindowAvailable(uint64_t windowAvailable);
+
 } // namespace quic

@@ -76,5 +76,10 @@ constexpr auto kQLogVersionField = "qlog_version";
 constexpr auto kQLogTitleField = "title";
 constexpr auto kQLogDescriptionField = "description";
 constexpr auto kQLogTraceCountField = "trace_count";
+constexpr auto kEOM = "eom";
+constexpr auto kStreamBlocked = "stream blocked";
+constexpr auto kOnHeaders = "on headers";
+constexpr auto kOnError = "on error";
+constexpr auto kPushPromise = "push promise";
 
 } // namespace quic

@@ -304,4 +304,9 @@ std::string getPeerClose(const std::string& peerCloseReason) {
   return "error message: " + peerCloseReason;
 };
 
+std::string getFlowControlWindowAvailable(uint64_t windowAvailable) {
+  return "on flow control, window available: " +
+      folly::to<std::string>(windowAvailable);
+};
+
 } // namespace quic
