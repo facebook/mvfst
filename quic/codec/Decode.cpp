@@ -123,7 +123,8 @@ ReadAckFrame decodeAckFrame(
   uint64_t adjustedAckDelay = ackDelay->first << ackDelayExponentToUse;
   if (UNLIKELY(
           adjustedAckDelay >
-          std::numeric_limits<std::chrono::microseconds::rep>::max())) {
+          static_cast<uint64_t>(
+              std::numeric_limits<std::chrono::microseconds::rep>::max()))) {
     throw QuicTransportException(
         "Bad ack delay",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
