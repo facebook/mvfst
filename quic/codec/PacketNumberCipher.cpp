@@ -119,7 +119,7 @@ HeaderProtectionMask Aes128PacketNumberCipher::mask(
           &outLen,
           sample.data(),
           sample.size()) != 1 ||
-      outLen != outMask.size()) {
+      static_cast<HeaderProtectionMask::size_type>(outLen) != outMask.size()) {
     throw std::runtime_error("Encryption error");
   }
   return outMask;
