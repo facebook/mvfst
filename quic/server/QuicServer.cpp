@@ -364,7 +364,9 @@ void QuicServer::shutdown(LocalErrorCode error) {
     return;
   }
   for (auto& worker : workers_) {
-    DCHECK(!worker->getEventBase()->isInEventBaseThread());
+    DCHECK(
+        !worker->getEventBase()->isRunning() ||
+        !worker->getEventBase()->isInEventBaseThread());
   }
   shutdown_ = true;
   for (auto& worker : workers_) {
