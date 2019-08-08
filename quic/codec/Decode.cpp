@@ -701,8 +701,15 @@ QuicFrame parseFrame(
       case FrameType::NEW_TOKEN:
         return QuicFrame(decodeNewTokenFrame(cursor));
       case FrameType::STREAM:
-        // Stream frames are special and have several values.
-        break;
+      case FrameType::STREAM_FIN:
+      case FrameType::STREAM_LEN:
+      case FrameType::STREAM_LEN_FIN:
+      case FrameType::STREAM_OFF:
+      case FrameType::STREAM_OFF_FIN:
+      case FrameType::STREAM_OFF_LEN:
+      case FrameType::STREAM_OFF_LEN_FIN:
+        return QuicFrame(
+            decodeStreamFrame(cursor, StreamTypeField(initialByte->first)));
       case FrameType::MAX_DATA:
         return QuicFrame(decodeMaxDataFrame(cursor));
       case FrameType::MAX_STREAM_DATA:
@@ -735,10 +742,6 @@ QuicFrame parseFrame(
         return QuicFrame(decodeMinStreamDataFrame(cursor));
       case FrameType::EXPIRED_STREAM_DATA:
         return QuicFrame(decodeExpiredStreamDataFrame(cursor));
-    }
-    auto streamFieldType = StreamTypeField::tryStream(initialByte->first);
-    if (streamFieldType) {
-      return QuicFrame(decodeStreamFrame(cursor, *streamFieldType));
     }
   } catch (const std::exception& e) {
     throw QuicTransportException(

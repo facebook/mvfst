@@ -3356,7 +3356,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */);
+      0,
+      QuicVersion::MVFST);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(rstFrame, builder);
   auto packet2 = packetToBuf(std::move(builder).buildPacket());
@@ -4123,7 +4124,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */);
+      0,
+      QuicVersion::MVFST);
   ConnectionCloseFrame connClose(
       TransportErrorCode::NO_ERROR, "Stand clear of the closing doors, please");
   writeFrame(std::move(connClose), builder);
@@ -4148,7 +4150,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */);
+      0,
+      QuicVersion::MVFST);
   ApplicationCloseFrame appClose(
       GenericApplicationErrorCode::UNKNOWN,
       "Stand clear of the closing doors, please");

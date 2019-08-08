@@ -67,8 +67,16 @@ enum class FrameType : uint8_t {
   STOP_SENDING = 0x05,
   CRYPTO_FRAME = 0x06, // librtmp has a #define CRYPTO
   NEW_TOKEN = 0x07,
-  // STREAM frame can have values from 0x08 to 0x0f
+  // STREAM frame can have values from 0x08 to 0x0f which indicate which fields
+  // are present in the frame.
   STREAM = 0x08,
+  STREAM_FIN = 0x09,
+  STREAM_LEN = 0x0a,
+  STREAM_LEN_FIN = 0x0b,
+  STREAM_OFF = 0x0c,
+  STREAM_OFF_FIN = 0x0d,
+  STREAM_OFF_LEN = 0x0e,
+  STREAM_OFF_LEN_FIN = 0x0f,
   MAX_DATA = 0x10,
   MAX_STREAM_DATA = 0x11,
   MAX_STREAMS_BIDI = 0x12,

@@ -1217,4 +1217,12 @@ void QuicClientTransport::closeTransport() {
 void QuicClientTransport::unbindConnection() {
   selfOwning_ = nullptr;
 }
+
+void QuicClientTransport::setSupportedVersions(
+    const std::vector<QuicVersion>& versions) {
+  conn_->originalVersion = versions.at(0);
+  auto params = conn_->readCodec->getCodecParameters();
+  params.version = conn_->originalVersion.value();
+  conn_->readCodec->setCodecParameters(params);
+}
 } // namespace quic

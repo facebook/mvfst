@@ -211,7 +211,6 @@ class QuicTransportBase : public QuicSocket {
       const folly::SocketAddress& peer,
       NetworkData&& data) noexcept;
 
-  // TODO: move only to the server api.
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
 
   void setConnectionCallback(ConnectionCallback* callback) final;

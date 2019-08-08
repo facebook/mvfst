@@ -351,6 +351,10 @@ QuicReadCodec::getStatelessResetToken() const {
   return statelessResetToken_;
 }
 
+CodecParameters QuicReadCodec::getCodecParameters() const {
+  return params_;
+}
+
 void QuicReadCodec::setInitialReadCipher(
     std::unique_ptr<Aead> initialReadCipher) {
   initialReadCipher_ = std::move(initialReadCipher);

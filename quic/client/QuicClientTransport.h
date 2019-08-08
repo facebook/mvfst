@@ -111,6 +111,8 @@ class QuicClientTransport
   void errMessage(const cmsghdr& cmsg) noexcept override;
   void errMessageError(const folly::AsyncSocketException&) noexcept override {}
 
+  void setSupportedVersions(const std::vector<QuicVersion>& versions) override;
+
   /**
    * Make QuicClient transport self owning.
    */

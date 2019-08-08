@@ -194,15 +194,6 @@ void ShortHeader::setPacketNumber(PacketNum packetNum) {
   packetSequenceNum_ = packetNum;
 }
 
-StreamTypeField::StreamTypeField(uint8_t field) : field_(field) {}
-
-folly::Optional<StreamTypeField> StreamTypeField::tryStream(uint8_t field) {
-  if ((field & kStreamFrameMask) == kStreamFrameMask) {
-    return StreamTypeField(field);
-  }
-  return folly::none;
-}
-
 bool StreamTypeField::hasDataLength() const {
   return field_ & kDataLengthBit;
 }
@@ -285,6 +276,13 @@ std::string toString(FrameType frame) {
     case FrameType::NEW_TOKEN:
       return "NEW_TOKEN";
     case FrameType::STREAM:
+    case FrameType::STREAM_FIN:
+    case FrameType::STREAM_LEN:
+    case FrameType::STREAM_LEN_FIN:
+    case FrameType::STREAM_OFF:
+    case FrameType::STREAM_OFF_FIN:
+    case FrameType::STREAM_OFF_LEN:
+    case FrameType::STREAM_OFF_LEN_FIN:
       return "STREAM";
     case FrameType::MAX_DATA:
       return "MAX_DATA";

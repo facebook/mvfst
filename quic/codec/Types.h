@@ -743,11 +743,7 @@ using PacketHeader = boost::variant<LongHeader, ShortHeader>;
 
 struct StreamTypeField {
  public:
-  /**
-   * Returns a StreamTypeField if the field is a stream type.
-   */
-  static folly::Optional<StreamTypeField> tryStream(uint8_t field);
-
+  explicit StreamTypeField(uint8_t field) : field_(field) {}
   bool hasFin() const;
   bool hasDataLength() const;
   bool hasOffset() const;
@@ -755,6 +751,7 @@ struct StreamTypeField {
 
   struct Builder {
    public:
+    Builder() : field_(static_cast<uint8_t>(FrameType::STREAM)) {}
     Builder& setFin();
     Builder& setOffset();
     Builder& setLength();
@@ -762,18 +759,14 @@ struct StreamTypeField {
     StreamTypeField build();
 
    private:
-    uint8_t field_{kStreamFrameMask};
+    uint8_t field_;
   };
 
  private:
-  static constexpr uint8_t kStreamFrameMask = 0x08;
-
   // Stream Frame specific:
   static constexpr uint8_t kFinBit = 0x01;
   static constexpr uint8_t kDataLengthBit = 0x02;
   static constexpr uint8_t kOffsetBit = 0x04;
-
-  explicit StreamTypeField(uint8_t field);
 
   uint8_t field_;
 };

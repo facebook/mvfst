@@ -69,6 +69,8 @@ class QuicReadCodec {
 
   const folly::Optional<StatelessResetToken>& getStatelessResetToken() const;
 
+  CodecParameters getCodecParameters() const;
+
   void setInitialReadCipher(std::unique_ptr<Aead> initialReadCipher);
   void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher);
   void setZeroRttReadCipher(std::unique_ptr<Aead> zeroRttReadCipher);
