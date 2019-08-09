@@ -637,6 +637,8 @@ RegularQuicWritePacket createNewPacket(
       return RegularQuicWritePacket(ShortHeader(
           ProtectionType::KeyPhaseOne, getTestConnectionId(), packetNum));
   }
+
+  folly::assume_unreachable();
 }
 
 std::vector<QuicVersion> versionList(
