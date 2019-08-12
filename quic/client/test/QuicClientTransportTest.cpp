@@ -23,7 +23,6 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
-#include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/handshake/test/Mocks.h>
@@ -1127,24 +1126,23 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     params_ = std::move(params);
   }
 
-  void setOneRttWriteCipher(std::unique_ptr<fizz::Aead> oneRttWriteCipher) {
+  void setOneRttWriteCipher(std::unique_ptr<Aead> oneRttWriteCipher) {
     oneRttWriteCipher_ = std::move(oneRttWriteCipher);
   }
 
-  void setOneRttReadCipher(std::unique_ptr<fizz::Aead> oneRttReadCipher) {
+  void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher) {
     oneRttReadCipher_ = std::move(oneRttReadCipher);
   }
 
-  void setHandshakeReadCipher(std::unique_ptr<fizz::Aead> handshakeReadCipher) {
+  void setHandshakeReadCipher(std::unique_ptr<Aead> handshakeReadCipher) {
     handshakeReadCipher_ = std::move(handshakeReadCipher);
   }
 
-  void setHandshakeWriteCipher(
-      std::unique_ptr<fizz::Aead> handshakeWriteCipher) {
+  void setHandshakeWriteCipher(std::unique_ptr<Aead> handshakeWriteCipher) {
     handshakeWriteCipher_ = std::move(handshakeWriteCipher);
   }
 
-  void setZeroRttWriteCipher(std::unique_ptr<fizz::Aead> zeroRttWriteCipher) {
+  void setZeroRttWriteCipher(std::unique_ptr<Aead> zeroRttWriteCipher) {
     zeroRttWriteCipher_ = std::move(zeroRttWriteCipher);
   }
 
@@ -1250,10 +1248,10 @@ class QuicClientTransportTest : public Test {
   }
 
   virtual void setFakeHandshakeCiphers() {
-    auto readAead = test::createNoOpFizzAead();
-    auto writeAead = test::createNoOpFizzAead();
-    auto handshakeReadAead = test::createNoOpFizzAead();
-    auto handshakeWriteAead = test::createNoOpFizzAead();
+    auto readAead = test::createNoOpAead();
+    auto writeAead = test::createNoOpAead();
+    auto handshakeReadAead = test::createNoOpAead();
+    auto handshakeWriteAead = test::createNoOpAead();
     mockClientHandshake->setHandshakeReadCipher(std::move(handshakeReadAead));
     mockClientHandshake->setHandshakeWriteCipher(std::move(handshakeWriteAead));
     mockClientHandshake->setOneRttReadCipher(std::move(readAead));
@@ -3573,17 +3571,9 @@ TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
   client->close(folly::none);
 }
 
-static const fizz::test::MockAead* extractMockAead(const quic::Aead* aead) {
-  if (auto fizzAead = dynamic_cast<const FizzAead*>(aead)) {
-    return dynamic_cast<const fizz::test::MockAead*>(fizzAead->getFizzAead());
-  }
-
-  return nullptr;
-}
-
 TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
   // Make decrypt fail for the reset token
-  auto aead = extractMockAead(
+  auto aead = dynamic_cast<const MockAead*>(
       client->getNonConstConn().readCodec->getOneRttReadCipher());
   ASSERT_TRUE(aead);
 
@@ -3602,7 +3592,7 @@ TEST_F(QuicClientTransportAfterStartTest, StatelessResetClosesTransport) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
-  auto aead = extractMockAead(
+  auto aead = dynamic_cast<const MockAead*>(
       client->getNonConstConn().readCodec->getOneRttReadCipher());
   ASSERT_TRUE(aead);
   // Make the decrypt fail
@@ -4375,11 +4365,11 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTest {
   ~QuicZeroRttClientTest() override = default;
 
   void setFakeHandshakeCiphers() override {
-    auto readAead = test::createNoOpFizzAead();
-    auto writeAead = test::createNoOpFizzAead();
-    auto zeroAead = test::createNoOpFizzAead();
-    auto handshakeReadAead = test::createNoOpFizzAead();
-    auto handshakeWriteAead = test::createNoOpFizzAead();
+    auto readAead = test::createNoOpAead();
+    auto writeAead = test::createNoOpAead();
+    auto zeroAead = test::createNoOpAead();
+    auto handshakeReadAead = test::createNoOpAead();
+    auto handshakeWriteAead = test::createNoOpAead();
     mockClientHandshake->setOneRttReadCipher(std::move(readAead));
     mockClientHandshake->setOneRttWriteCipher(std::move(writeAead));
     mockClientHandshake->setZeroRttWriteCipher(std::move(zeroAead));

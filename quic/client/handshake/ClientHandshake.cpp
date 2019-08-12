@@ -96,35 +96,35 @@ std::unique_ptr<Aead> ClientHandshake::getOneRttWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }
-  return FizzAead::wrap(std::move(oneRttWriteCipher_));
+  return std::move(oneRttWriteCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getOneRttReadCipher() {
   if (error_) {
     error_.throw_exception();
   }
-  return FizzAead::wrap(std::move(oneRttReadCipher_));
+  return std::move(oneRttReadCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getZeroRttWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }
-  return FizzAead::wrap(std::move(zeroRttWriteCipher_));
+  return std::move(zeroRttWriteCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getHandshakeReadCipher() {
   if (error_) {
     error_.throw_exception();
   }
-  return FizzAead::wrap(std::move(handshakeReadCipher_));
+  return std::move(handshakeReadCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getHandshakeWriteCipher() {
   if (error_) {
     error_.throw_exception();
   }
-  return FizzAead::wrap(std::move(handshakeWriteCipher_));
+  return std::move(handshakeWriteCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
@@ -339,13 +339,13 @@ void ClientHandshake::ActionMoveVisitor::operator()(
                 client_.state_.context()->getFactory()->makeKeyScheduler(
                     cipher);
             client_.zeroRttWriteCipher_ =
-                fizz::Protocol::deriveRecordAeadWithLabel(
+                FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
                     *client_.state_.context()->getFactory(),
                     *keyScheduler,
                     cipher,
                     folly::range(secretAvailable.secret.secret),
                     kQuicKeyLabel,
-                    kQuicIVLabel);
+                    kQuicIVLabel));
             client_.zeroRttWriteHeaderCipher_ = makePacketNumberCipher(
                 &factory, folly::range(secretAvailable.secret.secret), cipher);
             break;
@@ -368,11 +368,11 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             *client_.state_.cipher());
         switch (handshakeSecrets) {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-            client_.handshakeWriteCipher_ = std::move(aead);
+            client_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
             client_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
             break;
           case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-            client_.handshakeReadCipher_ = std::move(aead);
+            client_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
             client_.handshakeReadHeaderCipher_ = std::move(headerCipher);
             break;
         }
@@ -391,11 +391,11 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             *client_.state_.cipher());
         switch (appSecrets) {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
-            client_.oneRttWriteCipher_ = std::move(aead);
+            client_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
             client_.oneRttWriteHeaderCipher_ = std::move(appHeaderCipher);
             break;
           case fizz::AppTrafficSecrets::ServerAppTraffic:
-            client_.oneRttReadCipher_ = std::move(aead);
+            client_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
             client_.oneRttReadHeaderCipher_ = std::move(appHeaderCipher);
             break;
         }
