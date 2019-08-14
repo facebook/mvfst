@@ -138,6 +138,11 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void setHostId(uint16_t hostId) noexcept;
 
   /**
+   * Get transport settings.
+   */
+  const TransportSettings& getTransportSettings() const noexcept;
+
+  /**
    * Set initial flow control settings for the connection.
    */
   void setTransportSettings(TransportSettings transportSettings);

@@ -449,6 +449,10 @@ void QuicServer::setFizzContext(
   });
 }
 
+const TransportSettings& QuicServer::getTransportSettings() const noexcept {
+  return transportSettings_;
+}
+
 void QuicServer::setTransportSettings(TransportSettings transportSettings) {
   transportSettings_ = transportSettings;
   runOnAllWorkers([transportSettings](auto worker) mutable {
