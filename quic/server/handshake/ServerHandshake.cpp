@@ -94,35 +94,35 @@ std::unique_ptr<Aead> ServerHandshake::getHandshakeWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return FizzAead::wrap(std::move(handshakeWriteCipher_));
+  return std::move(handshakeWriteCipher_);
 }
 
 std::unique_ptr<Aead> ServerHandshake::getHandshakeReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return FizzAead::wrap(std::move(handshakeReadCipher_));
+  return std::move(handshakeReadCipher_);
 }
 
 std::unique_ptr<Aead> ServerHandshake::getOneRttWriteCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return FizzAead::wrap(std::move(oneRttWriteCipher_));
+  return std::move(oneRttWriteCipher_);
 }
 
 std::unique_ptr<Aead> ServerHandshake::getOneRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return FizzAead::wrap(std::move(oneRttReadCipher_));
+  return std::move(oneRttReadCipher_);
 }
 
 std::unique_ptr<Aead> ServerHandshake::getZeroRttReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
   }
-  return FizzAead::wrap(std::move(zeroRttReadCipher_));
+  return std::move(zeroRttReadCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
@@ -410,7 +410,7 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       [&](fizz::EarlySecrets earlySecrets) {
         switch (earlySecrets) {
           case fizz::EarlySecrets::ClientEarlyTraffic:
-            server_.zeroRttReadCipher_ = std::move(aead);
+            server_.zeroRttReadCipher_ = FizzAead::wrap(std::move(aead));
             server_.zeroRttReadHeaderCipher_ = std::move(headerCipher);
             break;
           default:
@@ -420,11 +420,11 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       [&](fizz::HandshakeSecrets handshakeSecrets) {
         switch (handshakeSecrets) {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-            server_.handshakeReadCipher_ = std::move(aead);
+            server_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
             server_.handshakeReadHeaderCipher_ = std::move(headerCipher);
             break;
           case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-            server_.handshakeWriteCipher_ = std::move(aead);
+            server_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
             server_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
             break;
         }
@@ -432,11 +432,11 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       [&](fizz::AppTrafficSecrets appSecrets) {
         switch (appSecrets) {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
-            server_.oneRttReadCipher_ = std::move(aead);
+            server_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
             server_.oneRttReadHeaderCipher_ = std::move(headerCipher);
             break;
           case fizz::AppTrafficSecrets::ServerAppTraffic:
-            server_.oneRttWriteCipher_ = std::move(aead);
+            server_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
             server_.oneRttWriteHeaderCipher_ = std::move(headerCipher);
             break;
         }
@@ -444,4 +444,5 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       [&](auto) {});
   server_.handshakeEventAvailable_ = true;
 }
+
 } // namespace quic
