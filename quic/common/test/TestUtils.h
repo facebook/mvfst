@@ -19,7 +19,6 @@
 #include <quic/state/StateData.h>
 
 #include <fizz/client/FizzClientContext.h>
-#include <fizz/crypto/aead/test/Mocks.h>
 #include <fizz/server/FizzServerContext.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 
@@ -138,7 +137,6 @@ QuicCachedPsk setupZeroRttOnClientCtx(
     QuicVersion version);
 
 std::unique_ptr<MockAead> createNoOpAead();
-std::unique_ptr<fizz::test::MockAead> createNoOpFizzAead();
 
 std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher();
 

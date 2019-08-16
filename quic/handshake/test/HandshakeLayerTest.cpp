@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/HandshakeLayer.h>

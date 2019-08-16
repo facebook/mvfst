@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/QuicFizzFactory.h>
