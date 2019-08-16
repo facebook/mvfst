@@ -10,6 +10,7 @@
 
 #include <fizz/protocol/Protocol.h>
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -400,11 +401,10 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       folly::range(secretAvailable.secret.secret),
       kQuicKeyLabel,
       kQuicIVLabel);
-  QuicFizzFactory factory;
-  auto headerCipher = makePacketNumberCipher(
-      &factory,
-      folly::range(secretAvailable.secret.secret),
-      *server_.state_.cipher());
+  QuicFizzFactory fizzFactory;
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  auto headerCipher = cryptoFactory.makePacketNumberCipher(
+      folly::range(secretAvailable.secret.secret));
   folly::variant_match(
       secretAvailable.secret.type,
       [&](fizz::EarlySecrets earlySecrets) {

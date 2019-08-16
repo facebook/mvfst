@@ -13,6 +13,7 @@
 #include <fizz/protocol/test/Mocks.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/handshake/QuicFizzFactory.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 

@@ -33,7 +33,18 @@ class QuicTestFizzFactory : public QuicFizzFactory {
     aead_ = std::move(aead);
   }
 
+  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      fizz::CipherSuite) const override {
+    return std::move(packetNumberCipher_);
+  }
+
+  void setMockPacketNumberCipher(
+      std::unique_ptr<MockPacketNumberCipher> packetNumberCipher) {
+    packetNumberCipher_ = std::move(packetNumberCipher);
+  }
+
   mutable std::unique_ptr<fizz::Aead> aead_;
+  mutable std::unique_ptr<MockPacketNumberCipher> packetNumberCipher_;
 };
 
 class FizzCryptoFactoryTest : public Test {
@@ -50,7 +61,19 @@ class FizzCryptoFactoryTest : public Test {
     return mockAead;
   }
 
+  std::unique_ptr<MockPacketNumberCipher> createMockPacketNumberCipher() {
+    auto mockPacketNumberCipher = std::make_unique<MockPacketNumberCipher>();
+    EXPECT_CALL(*mockPacketNumberCipher, setKey(_))
+        .WillOnce(Invoke([&](folly::ByteRange key) {
+          packetCipherKey_ = folly::IOBuf::copyBuffer(key);
+        }));
+    EXPECT_CALL(*mockPacketNumberCipher, keyLength())
+        .WillRepeatedly(Return(fizz::AESGCM128::kKeyLength));
+    return mockPacketNumberCipher;
+  }
+
   folly::Optional<fizz::TrafficKey> trafficKey_;
+  folly::Optional<std::unique_ptr<folly::IOBuf>> packetCipherKey_;
 };
 
 TEST_F(FizzCryptoFactoryTest, TestDraft17ClearTextCipher) {
@@ -74,6 +97,35 @@ TEST_F(FizzCryptoFactoryTest, TestDraft17ClearTextCipher) {
   auto trafficIvHex = folly::hexlify(trafficKey_->iv->coalesce());
   EXPECT_EQ(trafficKeyHex, expectedKey);
   EXPECT_EQ(trafficIvHex, expectedIv);
+}
+
+TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
+  QuicTestFizzFactory fizzFactory;
+  fizzFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
+  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  auto clientKey = std::vector<uint8_t>(
+      {0x0c, 0x74, 0xbb, 0x95, 0xa1, 0x04, 0x8e, 0x52, 0xef, 0x3b, 0x72,
+       0xe1, 0x28, 0x89, 0x35, 0x1c, 0xd7, 0x3a, 0x55, 0x0f, 0xb6, 0x2c,
+       0x4b, 0xb0, 0x87, 0xe9, 0x15, 0xcc, 0xe9, 0x6c, 0xe3, 0xa0});
+  auto expectedHex = "cd253a36ff93937c469384a823af6c56";
+  auto packetCipher =
+      cryptoFactory.makePacketNumberCipher(folly::range(clientKey));
+  auto secretHex = folly::hexlify(packetCipherKey_.value()->coalesce());
+  EXPECT_EQ(secretHex, expectedHex);
+
+  // reset the cipher
+  fizzFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
+  auto serverKey = std::vector<uint8_t>(
+      {0x4c, 0x9e, 0xdf, 0x24, 0xb0, 0xe5, 0xe5, 0x06, 0xdd, 0x3b, 0xfa,
+       0x4e, 0x0a, 0x03, 0x11, 0xe8, 0xc4, 0x1f, 0x35, 0x42, 0x73, 0xd8,
+       0xcb, 0x49, 0xdd, 0xd8, 0x46, 0x41, 0x38, 0xd4, 0x7e, 0xc6});
+
+  auto expectedKey2 = "2579d8696f85eda68d3502b65596586b";
+
+  auto packetCipher2 =
+      cryptoFactory.makePacketNumberCipher(folly::range(serverKey));
+  auto secretHex2 = folly::hexlify(packetCipherKey_.value()->coalesce());
+  EXPECT_EQ(secretHex2, expectedKey2);
 }
 
 } // namespace test

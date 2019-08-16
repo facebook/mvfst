@@ -58,4 +58,16 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
   return FizzAead::wrap(std::move(aead));
 }
 
+std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
+    folly::ByteRange baseSecret) const {
+  auto pnCipher = factory_->makePacketNumberCipher(
+      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto deriver =
+      factory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto pnKey = deriver->expandLabel(
+      baseSecret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
+  pnCipher->setKey(pnKey->coalesce());
+  return pnCipher;
+}
+
 } // namespace quic

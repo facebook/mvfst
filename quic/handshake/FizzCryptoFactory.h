@@ -10,13 +10,13 @@
 
 #include <quic/handshake/CryptoFactory.h>
 
-#include <fizz/protocol/Factory.h>
+#include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
 
 class FizzCryptoFactory : public CryptoFactory {
  public:
-  explicit FizzCryptoFactory(fizz::Factory* factory) : factory_(factory) {}
+  explicit FizzCryptoFactory(QuicFizzFactory* factory) : factory_(factory) {}
 
   Buf makeInitialTrafficSecret(
       folly::StringPiece label,
@@ -28,8 +28,11 @@ class FizzCryptoFactory : public CryptoFactory {
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const override;
 
+  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      folly::ByteRange baseSecret) const override;
+
  private:
-  fizz::Factory* factory_{nullptr};
+  QuicFizzFactory* factory_{nullptr};
 };
 
 } // namespace quic

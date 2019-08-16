@@ -9,6 +9,7 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
 #include <quic/handshake/Aead.h>
@@ -37,6 +38,20 @@ class CryptoFactory {
       QuicVersion version) const;
 
   /**
+   * Makes the header cipher for writing client initial packets.
+   */
+  std::unique_ptr<PacketNumberCipher> makeClientInitialHeaderCipher(
+      const ConnectionId& initialDestinationConnectionId,
+      QuicVersion version) const;
+
+  /**
+   * Makes the header cipher for writing server initial packets.
+   */
+  std::unique_ptr<PacketNumberCipher> makeServerInitialHeaderCipher(
+      const ConnectionId& initialDestinationConnectionId,
+      QuicVersion version) const;
+
+  /**
    * Crypto layer specifc methods.
    */
   virtual Buf makeInitialTrafficSecret(
@@ -48,6 +63,9 @@ class CryptoFactory {
       folly::StringPiece label,
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const = 0;
+
+  virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      folly::ByteRange baseSecret) const = 0;
 
   virtual ~CryptoFactory() = default;
 };

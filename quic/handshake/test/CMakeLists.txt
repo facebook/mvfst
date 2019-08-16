@@ -16,21 +16,12 @@ quic_add_test(TARGET TransportParametersTest
   mvfst_test_utils
 )
 
-quic_add_test(TARGET HandshakeLayerTest
-  SOURCES
-  HandshakeLayerTest.cpp
-  DEPENDS
-  Folly::folly
-  mvfst_codec_types
-  mvfst_handshake
-  mvfst_test_utils
-)
-
 quic_add_test(TARGET FizzCryptoFactoryTest
   SOURCES
   FizzCryptoFactoryTest.cpp
   DEPENDS
   Folly::folly
+  mvfst_codec_types
   mvfst_handshake
   mvfst_test_utils
 )

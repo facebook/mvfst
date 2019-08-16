@@ -1534,10 +1534,8 @@ class QuicClientTransportTest : public Test {
     codec->setClientConnectionId(*originalConnId);
     codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
         *client->getConn().initialDestinationConnectionId, QuicVersion::MVFST));
-    codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-        &fizzFactory,
-        *client->getConn().initialDestinationConnectionId,
-        QuicVersion::MVFST));
+    codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
+        *client->getConn().initialDestinationConnectionId, QuicVersion::MVFST));
     codec->setHandshakeReadCipher(test::createNoOpAead());
     codec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
     return codec;
@@ -1558,8 +1556,7 @@ class QuicClientTransportTest : public Test {
       codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
           *client->getConn().initialDestinationConnectionId,
           QuicVersion::MVFST));
-      codec->setInitialHeaderCipher(makeClientInitialHeaderCipher(
-          &fizzFactory,
+      codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
           *client->getConn().initialDestinationConnectionId,
           QuicVersion::MVFST));
       codec->setHandshakeReadCipher(test::createNoOpAead());
