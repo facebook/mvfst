@@ -221,7 +221,6 @@ class ClientHandshake : public Handshake {
   folly::exception_wrapper error_;
 
   ActionMoveVisitor visitor_;
-  std::shared_ptr<const fizz::client::FizzClientContext> fizzClientContext_;
   folly::Optional<std::string> pskIdentity_;
 
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
