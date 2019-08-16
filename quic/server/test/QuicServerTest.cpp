@@ -230,6 +230,7 @@ void QuicServerWorkerTest::testSendReset(
   // should write reset packet
   EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
   EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onStatelessReset()).Times(1);
 
   // verify that the packet that gets written is stateless reset packet
   EXPECT_CALL(*socketPtr_, write(_, _))

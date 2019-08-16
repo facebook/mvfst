@@ -92,6 +92,8 @@ class QuicTransportStatsCallback {
 
   virtual void onConnFlowControlBlocked() = 0;
 
+  virtual void onStatelessReset() = 0;
+
   virtual void onStreamFlowControlUpdate() = 0;
 
   virtual void onStreamFlowControlBlocked() = 0;

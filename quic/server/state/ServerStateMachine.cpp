@@ -478,7 +478,7 @@ void onServerReadDataFromOpen(
         conn.serverAddr.getFullyQualified());
     StatelessResetToken token =
         generator.generateToken(*conn.serverConnectionId);
-
+    QUIC_STATS(conn.infoCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,

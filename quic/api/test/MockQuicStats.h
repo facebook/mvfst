@@ -34,6 +34,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onQuicStreamReset, void());
   MOCK_METHOD0(onConnFlowControlUpdate, void());
   MOCK_METHOD0(onConnFlowControlBlocked, void());
+  MOCK_METHOD0(onStatelessReset, void());
   MOCK_METHOD0(onStreamFlowControlUpdate, void());
   MOCK_METHOD0(onStreamFlowControlBlocked, void());
   MOCK_METHOD0(onCwndBlocked, void());

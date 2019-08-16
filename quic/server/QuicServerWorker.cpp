@@ -486,6 +486,7 @@ void QuicServerWorker::sendResetPacket(
   socket_->write(client, std::move(resetData));
   QUIC_STATS(infoCallback_, onWrite, resetData->computeChainDataLength());
   QUIC_STATS(infoCallback_, onPacketSent);
+  QUIC_STATS(infoCallback_, onStatelessReset);
 }
 
 void QuicServerWorker::allowBeingTakenOver(
