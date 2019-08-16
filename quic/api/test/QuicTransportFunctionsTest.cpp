@@ -213,24 +213,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint{}, getEncodedSize(packet));
 
-  // verify handshake packet is stored in QLogger
-  std::shared_ptr<quic::FileQLogger> qLogger =
-      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-
-  EXPECT_EQ(qLogger->logs.size(), 1);
-  auto p1 = std::move(qLogger->logs[0]);
-  auto event1 = dynamic_cast<QLogPacketEvent*>(p1.get());
-  EXPECT_EQ(event1->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(event1->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(event1->eventType, QLogEventType::PacketSent);
-  EXPECT_EQ(event1->frames.size(), 2);
-  // verify contents of writeStreamFrame in QLogger
-  auto frame = static_cast<StreamFrameLog*>(event1->frames[0].get());
-  EXPECT_EQ(frame->streamId, stream1->id);
-  EXPECT_EQ(frame->offset, 0);
-  EXPECT_EQ(frame->len, 5);
-  EXPECT_EQ(frame->fin, false);
-
   EXPECT_EQ(
       conn->ackStates.initialAckState.nextPacketNum,
       currentNextInitialPacketNum);
@@ -324,12 +306,36 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_EQ(rt6.offset, 6);
   EXPECT_EQ(rt6.eof, 1);
 
-  // another handshake packet was sent
-  EXPECT_EQ(qLogger->logs.size(), 2);
-  auto p2 = std::move(qLogger->logs[1]);
-  auto event2 = dynamic_cast<QLogPacketEvent*>(p2.get());
-  EXPECT_EQ(event2->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(event2->frames.size(), 3);
+  // verify handshake packets stored in QLogger
+  std::shared_ptr<quic::FileQLogger> qLogger =
+      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+
+  for (int i = 0; i < 2; ++i) {
+    auto p1 = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogPacketEvent*>(p1.get());
+    EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
+    EXPECT_EQ(event->packetSize, getEncodedSize(packet));
+    EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
+
+    if (i == 0) {
+      EXPECT_EQ(event->frames.size(), 2);
+      auto frame = static_cast<StreamFrameLog*>(event->frames[0].get());
+      EXPECT_EQ(frame->streamId, stream1->id);
+      EXPECT_EQ(frame->offset, 0);
+      EXPECT_EQ(frame->len, 5);
+      EXPECT_FALSE(frame->fin);
+    } else if (i == 1) {
+      EXPECT_EQ(event->frames.size(), 3);
+      auto frame = static_cast<StreamFrameLog*>(event->frames[0].get());
+      EXPECT_EQ(frame->streamId, stream1->id);
+      EXPECT_EQ(frame->offset, 5);
+      EXPECT_EQ(frame->len, 7);
+      EXPECT_TRUE(frame->fin);
+    }
+  }
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
@@ -363,11 +369,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   // verify qLogger added correct logs
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 3);
 
-  EXPECT_EQ(3, qLogger->logs.size());
-  auto l1 = std::move(qLogger->logs[0]);
-  auto l2 = std::move(qLogger->logs[1]);
-  auto l3 = std::move(qLogger->logs[2]);
+  auto l1 = std::move(qLogger->logs[indices[0]]);
+  auto l2 = std::move(qLogger->logs[indices[1]]);
+  auto l3 = std::move(qLogger->logs[indices[2]]);
   auto event1 = dynamic_cast<QLogPacketEvent*>(l1.get());
   auto event2 = dynamic_cast<QLogPacketEvent*>(l2.get());
   auto event3 = dynamic_cast<QLogPacketEvent*>(l3.get());
@@ -416,10 +424,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
 
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, getEncodedSize(packet));
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -430,7 +440,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   EXPECT_EQ(frame->streamId, stream1->id);
   EXPECT_EQ(frame->offset, 0);
   EXPECT_EQ(frame->len, 0);
-  EXPECT_EQ(frame->fin, true);
+  EXPECT_TRUE(frame->fin);
 
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
   auto& rt1 = stream1->retransmissionBuffer.front();
@@ -459,9 +469,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, getEncodedSize(packet));
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -472,7 +485,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   EXPECT_EQ(frame->streamId, stream1->id);
   EXPECT_EQ(frame->offset, 0);
   EXPECT_EQ(frame->len, buf->computeChainDataLength());
-  EXPECT_EQ(frame->fin, false);
+  EXPECT_FALSE(frame->fin);
 
   EXPECT_EQ(stream1->currentWriteOffset, buf->computeChainDataLength());
 
@@ -500,9 +513,11 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, getEncodedSize(packet));
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -531,17 +546,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
 
-  //  verify QLogger contains correct packet and frame information
-  std::shared_ptr<quic::FileQLogger> qLogger =
-      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
-  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(event->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
-  EXPECT_EQ(event->frames.size(), 1);
-
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   packetEncodedSize =
       nonHandshake.header ? nonHandshake.header->computeChainDataLength() : 0;
@@ -560,20 +564,19 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
       *conn, folly::none, packet2.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
 
-  // verify QLogger contains correct packet information
-  EXPECT_EQ(2, qLogger->logs.size());
-  auto p2 = std::move(qLogger->logs[1]);
-  auto event2 = dynamic_cast<QLogPacketEvent*>(p2.get());
-  EXPECT_EQ(event2->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(event2->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(event2->eventType, QLogEventType::PacketSent);
-
-  // verify QLogger contains correct frame information
-  EXPECT_EQ(event2->frames.size(), 1);
-  auto frame = static_cast<RstStreamFrameLog*>(event2->frames[0].get());
-  EXPECT_EQ(frame->streamId, 1);
-  EXPECT_EQ(frame->errorCode, GenericApplicationErrorCode::UNKNOWN);
-  EXPECT_EQ(frame->offset, 0);
+  //  verify QLogger contains correct packet and frame information
+  std::shared_ptr<quic::FileQLogger> qLogger =
+      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+    EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
+    EXPECT_EQ(event->packetSize, getEncodedSize(packet));
+    EXPECT_EQ(event->frames.size(), 1);
+  }
 }
 
 TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
@@ -595,9 +598,12 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   // verify QLogger contains correct packet and frames information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, getEncodedSize(packet));
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -621,22 +627,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
 
-  // verify QLogger contains correct packet information
-  std::shared_ptr<quic::FileQLogger> qLogger =
-      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p1 = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p1.get());
-  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(event->packetSize, packetEncodedSize);
-  EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
-
-  // verify QLogger contains correct frame information
-  EXPECT_EQ(event->frames.size(), 1);
-  auto frame = static_cast<CryptoFrameLog*>(event->frames[0].get());
-  EXPECT_EQ(frame->offset, 0);
-  EXPECT_EQ(frame->len, 0);
-
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packetEncodedSize =
       nonHandshake.header ? nonHandshake.header->computeChainDataLength() : 0;
@@ -653,22 +643,38 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       nonHandshake.packet,
       TimePoint(),
       getEncodedSize(packet));
-  // verify QLogger contains correct packet information
-  EXPECT_EQ(2, qLogger->logs.size());
-  auto p2 = std::move(qLogger->logs[1]);
-  auto event2 = dynamic_cast<QLogPacketEvent*>(p2.get());
-  EXPECT_EQ(event2->packetType, toString(LongHeader::Types::ZeroRtt));
-  EXPECT_EQ(event2->packetSize, packetEncodedSize);
-  EXPECT_EQ(event2->eventType, QLogEventType::PacketSent);
 
-  // verify QLogger contains correct frame information
-  EXPECT_EQ(event2->frames.size(), 1);
-  auto gotStreamFrame = static_cast<StreamFrameLog*>(event2->frames[0].get());
-  EXPECT_EQ(gotStreamFrame->streamId, stream1->id);
-  EXPECT_EQ(gotStreamFrame->offset, 0);
-  EXPECT_EQ(gotStreamFrame->len, 0);
-  EXPECT_EQ(gotStreamFrame->fin, true);
-  EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
+  // verify QLogger contains correct packet information
+  std::shared_ptr<quic::FileQLogger> qLogger =
+      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  std::vector<std::string> packetTypes = {
+      toString(LongHeader::Types::Handshake),
+      toString(LongHeader::Types::ZeroRtt)};
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+    EXPECT_EQ(event->packetType, packetTypes[i]);
+    EXPECT_EQ(event->packetSize, packetEncodedSize);
+    EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
+
+    if (i == 0) {
+      EXPECT_EQ(event->frames.size(), 1);
+      auto gotFrame = static_cast<CryptoFrameLog*>(event->frames[0].get());
+      gotFrame->offset = 0;
+      gotFrame->len = 0;
+    } else if (i == 1) {
+      EXPECT_EQ(event->frames.size(), 1);
+      auto gotFrame = static_cast<StreamFrameLog*>(event->frames[0].get());
+      EXPECT_EQ(gotFrame->streamId, stream1->id);
+      EXPECT_EQ(gotFrame->offset, 0);
+      EXPECT_EQ(gotFrame->len, 0);
+      EXPECT_TRUE(gotFrame->fin);
+      EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
+    }
+  }
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
@@ -687,22 +693,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
-
-  // verify QLogger contains correct packet information
-  std::shared_ptr<quic::FileQLogger> qLogger =
-      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
-  EXPECT_EQ(event->packetType, kShortHeaderPacketType);
-  EXPECT_EQ(event->packetSize, packetEncodedSize);
-  EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
-
-  // verify QLogger contains correct frame information
-  EXPECT_EQ(event->frames.size(), 1);
-  auto frame = static_cast<CryptoFrameLog*>(event->frames[0].get());
-  EXPECT_EQ(frame->offset, 0);
-  EXPECT_EQ(frame->len, 0);
 
   EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
   EXPECT_EQ(1, conn->outstandingPackets.size());
@@ -725,20 +715,34 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
       getEncodedSize(packet));
 
   // verify QLogger contains correct packet information
-  EXPECT_EQ(2, qLogger->logs.size());
-  auto p2 = std::move(qLogger->logs[1]);
-  auto event2 = dynamic_cast<QLogPacketEvent*>(p2.get());
-  EXPECT_EQ(event2->packetType, toString(LongHeader::Types::ZeroRtt));
-  EXPECT_EQ(event2->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(event2->eventType, QLogEventType::PacketSent);
+  std::shared_ptr<quic::FileQLogger> qLogger =
+      std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 2);
+  std::vector<std::string> packetTypes = {kShortHeaderPacketType.str(),
+                                          toString(LongHeader::Types::ZeroRtt)};
+  for (int i = 0; i < 2; ++i) {
+    auto tmp = std::move(qLogger->logs[indices[i]]);
+    auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+    EXPECT_EQ(event->packetType, packetTypes[i]);
+    EXPECT_EQ(event->packetSize, getEncodedSize(packet));
+    EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
 
-  // verify QLogger contains correct frame information
-  EXPECT_EQ(event2->frames.size(), 1);
-  auto frame2 = static_cast<StreamFrameLog*>(event2->frames[0].get());
-  EXPECT_EQ(frame2->streamId, stream1->id);
-  EXPECT_EQ(frame2->offset, 0);
-  EXPECT_EQ(frame2->len, 0);
-  EXPECT_EQ(frame2->fin, true);
+    if (i == 0) {
+      EXPECT_EQ(event->frames.size(), 1);
+      auto frame = static_cast<CryptoFrameLog*>(event->frames[0].get());
+      EXPECT_EQ(frame->offset, 0);
+      EXPECT_EQ(frame->len, 0);
+    } else if (i == 1) {
+      EXPECT_EQ(event->frames.size(), 1);
+      auto frame = static_cast<StreamFrameLog*>(event->frames[0].get());
+      EXPECT_EQ(frame->streamId, stream1->id);
+      EXPECT_EQ(frame->offset, 0);
+      EXPECT_EQ(frame->len, 0);
+      EXPECT_TRUE(frame->fin);
+    }
+  }
 
   EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
   EXPECT_EQ(2, conn->outstandingPackets.size());
@@ -765,9 +769,11 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
   // verify QLogger contains correct packet information
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, getEncodedSize(packet));
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -793,9 +799,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto event = dynamic_cast<QLogPacketEvent*>(p.get());
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+
   EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
   EXPECT_EQ(event->packetSize, 555);
   EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
@@ -852,10 +861,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto qLogEvent = dynamic_cast<QLogPacketEvent*>(p.get());
-  EXPECT_EQ(qLogEvent->packetType, kShortHeaderPacketType);
+
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto qLogEvent = dynamic_cast<QLogPacketEvent*>(tmp.get());
+  EXPECT_EQ(qLogEvent->packetType, kShortHeaderPacketType.str());
   EXPECT_EQ(qLogEvent->packetSize, 1500);
   EXPECT_EQ(qLogEvent->eventType, QLogEventType::PacketSent);
 
@@ -893,16 +905,19 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto qLogEvent = dynamic_cast<QLogPacketEvent*>(p.get());
-  EXPECT_EQ(qLogEvent->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(qLogEvent->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(qLogEvent->eventType, QLogEventType::PacketSent);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+
+  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
+  EXPECT_EQ(event->packetSize, getEncodedSize(packet));
+  EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
 
   // verify QLogger contains correct frame information
-  EXPECT_EQ(qLogEvent->frames.size(), 1);
-  auto frame = static_cast<MaxStreamDataFrameLog*>(qLogEvent->frames[0].get());
+  EXPECT_EQ(event->frames.size(), 1);
+  auto frame = static_cast<MaxStreamDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->streamId, stream->id);
   EXPECT_EQ(frame->maximumData, 0);
 
@@ -927,15 +942,18 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
-  EXPECT_EQ(1, qLogger->logs.size());
-  auto p = std::move(qLogger->logs[0]);
-  auto qLogEvent = dynamic_cast<QLogPacketEvent*>(p.get());
-  EXPECT_EQ(qLogEvent->packetType, toString(LongHeader::Types::Handshake));
-  EXPECT_EQ(qLogEvent->packetSize, getEncodedSize(packet));
-  EXPECT_EQ(qLogEvent->eventType, QLogEventType::PacketSent);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketSent, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
+
+  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Handshake));
+  EXPECT_EQ(event->packetSize, getEncodedSize(packet));
+  EXPECT_EQ(event->eventType, QLogEventType::PacketSent);
   // verify QLogger contains correct frame information
-  EXPECT_EQ(qLogEvent->frames.size(), 1);
-  auto frame = static_cast<MaxDataFrameLog*>(qLogEvent->frames[0].get());
+  EXPECT_EQ(event->frames.size(), 1);
+  auto frame = static_cast<MaxDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
 
   EXPECT_FALSE(stream->latestMaxStreamDataPacket.hasValue());
