@@ -100,16 +100,6 @@ TEST_F(CubicStateTest, FastRecoveryLoss) {
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
 
-TEST_F(CubicStateTest, RecoveryNoPace) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = 2000000us;
-  TestingCubic cubic(conn);
-  cubic.setStateForTest(CubicStates::FastRecovery);
-  EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
-  EXPECT_FALSE(cubic.canBePaced());
-}
-
 // ======= Steady =======
 
 TEST_F(CubicStateTest, SteadyAck) {

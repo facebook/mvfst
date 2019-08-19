@@ -171,16 +171,7 @@ bool Cubic::canBePaced() const noexcept {
   if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
     return false;
   }
-  bool pacingEnabled = false;
-  switch (state_) {
-    case CubicStates::Hystart:
-    case CubicStates::Steady:
-      pacingEnabled = true;
-      break;
-    case CubicStates::FastRecovery:
-      pacingEnabled = conn_.transportSettings.pacingEnabledForRecovery;
-  }
-  return pacingEnabled;
+  return true;
 }
 
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {

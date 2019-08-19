@@ -53,8 +53,6 @@ struct TransportSettings {
   bool enableSocketErrMsgCallback{true};
   // Whether pacing is enabled.
   bool pacingEnabled{false};
-  // Whether pacing is also used in Recovery state in congestion controller
-  bool pacingEnabledForRecovery{false};
   // The maximum number of packets to burst out during pacing
   uint64_t maxBurstPackets{kDefaultMaxBurstPackets};
   // Pacing timer tick interval
