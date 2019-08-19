@@ -382,10 +382,10 @@ void QuicServerWorker::dispatchPacketData(
           trans->setTransportSettings(transportSettings_);
         }
         trans->setConnectionIdAlgo(connIdAlgo_.get());
+        trans->setClientConnectionId(*routingData.sourceConnId);
         // parameters to create server chosen connection id
         ServerConnectionIdParams serverConnIdParams(
             hostId_, static_cast<uint8_t>(processId_), workerId_);
-        serverConnIdParams.clientConnId = *routingData.sourceConnId;
         trans->setServerConnectionIdParams(std::move(serverConnIdParams));
         if (infoCallback_) {
           trans->setTransportInfoCallback(infoCallback_.get());

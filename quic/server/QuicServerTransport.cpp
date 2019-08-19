@@ -258,16 +258,9 @@ void QuicServerTransport::unbindConnection() {
   if (routingCb_) {
     auto routingCb = routingCb_;
     routingCb_ = nullptr;
-    // TODO: we need a better way to solve the case that a QuicServerTransport
-    // is created and added to the map, but conn.ClientConnectionId doesn't get
-    // a legit value.
-    const ConnectionId* connId =
-        &(*serverConn_->serverConnIdParams->clientConnId);
-    if (conn_->clientConnectionId) {
-      connId = &(*conn_->clientConnectionId);
-    }
+    CHECK(conn_->clientConnectionId);
     routingCb->onConnectionUnbound(
-        std::make_pair(getOriginalPeerAddress(), *connId),
+        std::make_pair(getOriginalPeerAddress(), *conn_->clientConnectionId),
         conn_->serverConnectionId);
   }
 }
@@ -278,6 +271,11 @@ bool QuicServerTransport::hasWriteCipher() const {
 
 std::shared_ptr<QuicTransportBase> QuicServerTransport::sharedGuard() {
   return shared_from_this();
+}
+
+void QuicServerTransport::setClientConnectionId(
+    const ConnectionId& clientConnectionId) {
+  conn_->clientConnectionId.assign(clientConnectionId);
 }
 
 void QuicServerTransport::onCryptoEventAvailable() noexcept {

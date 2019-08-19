@@ -186,9 +186,9 @@ void QuicServerWorkerTest::expectConnectionCreation(
   EXPECT_CALL(*transport, setOriginalPeerAddress(addr));
   EXPECT_CALL(*transport, setRoutingCallback(worker_.get()));
   EXPECT_CALL(*transport, setConnectionIdAlgo(_));
+
   EXPECT_CALL(*transport, setServerConnectionIdParams(_))
       .WillOnce(Invoke([connId](ServerConnectionIdParams params) {
-        EXPECT_EQ(*params.clientConnId, connId);
         EXPECT_EQ(params.processId, 1);
         EXPECT_EQ(params.workerId, 42);
       }));
@@ -600,7 +600,6 @@ ConnectionId createConnIdForServer(ProcessId server) {
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
   uint8_t processId = (server == ProcessId::ONE) ? 1 : 0;
   ServerConnectionIdParams params(0, processId, 0);
-  params.clientConnId.assign(getTestConnectionId());
   return connIdAlgo->encodeConnectionId(params);
 }
 
@@ -1213,6 +1212,7 @@ class QuicServerTakeoverTest : public Test {
         std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
       transport = std::make_shared<MockQuicTransport>(
           eventBase, std::move(socket), cb, ctx);
+      transport->setClientConnectionId(clientConnId);
       // setup expectations
       EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(eventBase));
       EXPECT_CALL(*transport, setTransportSettings(_));
@@ -1223,7 +1223,6 @@ class QuicServerTakeoverTest : public Test {
       EXPECT_CALL(*transport, setTransportInfoCallback(_));
       EXPECT_CALL(*transport, setServerConnectionIdParams(_))
           .WillOnce(Invoke([&](ServerConnectionIdParams params) {
-            EXPECT_EQ(*params.clientConnId, clientConnId);
             EXPECT_EQ(params.processId, 0);
             EXPECT_EQ(params.workerId, 0);
           }));

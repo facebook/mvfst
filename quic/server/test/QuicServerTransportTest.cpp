@@ -276,7 +276,6 @@ class QuicServerTransportTest : public Test {
     initialDestinationConnectionId->data()[0] ^= 0x1;
     // set server chosen connId with processId = 0 and workerId = 1
     ServerConnectionIdParams params(0, 0, 1);
-    params.clientConnId = clientConnectionId;
     auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
     socket = sock.get();
     EXPECT_CALL(*sock, write(_, _))
@@ -307,6 +306,7 @@ class QuicServerTransportTest : public Test {
     // Allow ignoring path mtu for testing negotiation.
     server->getNonConstConn().transportSettings.canIgnorePathMTU = true;
     server->setConnectionIdAlgo(connIdAlgo_.get());
+    server->setClientConnectionId(*clientConnectionId);
     VLOG(20) << __func__ << " client connId=" << clientConnectionId->hex()
              << ", server connId="
              << (server->getConn().serverConnectionId
@@ -450,9 +450,6 @@ class QuicServerTransportTest : public Test {
 
     EXPECT_FALSE(server->getConn().localConnectionError.hasValue());
     EXPECT_EQ(server->getConn().version, QuicVersion::MVFST);
-    EXPECT_EQ(
-        *server->getConn().serverConnIdParams->clientConnId,
-        *clientConnectionId);
     EXPECT_EQ(server->getConn().serverConnIdParams->processId, 0);
     EXPECT_EQ(server->getConn().serverConnIdParams->workerId, 1);
     EXPECT_TRUE(server->getConn().serverConnectionId.hasValue());

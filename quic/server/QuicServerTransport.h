@@ -87,6 +87,8 @@ class QuicServerTransport
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory) override;
 
+  virtual void setClientConnectionId(const ConnectionId& clientConnectionId);
+
   // From QuicTransportBase
   void onReadData(const folly::SocketAddress& peer, NetworkData&& networkData)
       override;
