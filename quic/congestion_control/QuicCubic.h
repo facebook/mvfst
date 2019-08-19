@@ -110,9 +110,6 @@ class Cubic : public CongestionController {
 
   uint64_t getPacingRate(TimePoint currentTime) noexcept override;
 
-  void setMinimalPacingInterval(
-      std::chrono::microseconds interval) noexcept override;
-
  protected:
   CubicStates state_{CubicStates::Hystart};
 
@@ -211,9 +208,6 @@ class Cubic : public CongestionController {
   // Pacing interval. One rtt is split into multiple inverals when pacing is on
   // and the spreadAcrossRtt_ option it set.
   std::chrono::microseconds pacingInterval_{0};
-  // The minimal pacing interval that's limited by the timer's tick size
-  std::chrono::microseconds minimalPacingInterval_{
-      folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL};
   // Pacing burst size
   uint8_t pacingBurstSize_{0};
 

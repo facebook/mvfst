@@ -601,12 +601,12 @@ TEST_F(BbrTest, Pacing) {
   conn.transportSettings.maxBurstPackets = std::numeric_limits<decltype(
       conn.transportSettings.maxBurstPackets)>::max();
   conn.transportSettings.pacingEnabled = true;
+  conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto qLogger = std::make_shared<FileQLogger>();
   conn.qLogger = qLogger;
 
   BbrCongestionController::BbrConfig config;
   BbrCongestionController bbr(conn, config);
-  bbr.setMinimalPacingInterval(1ms);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));

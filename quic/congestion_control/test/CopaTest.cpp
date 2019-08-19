@@ -344,11 +344,11 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
 
 TEST_F(CopaTest, TestVelocity) {
   QuicServerConnectionState conn;
+  conn.transportSettings.pacingTimerTickInterval = 10ms;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>();
   conn.qLogger = qLogger;
   conn.transportSettings.pacingEnabled = true;
-  copa.setMinimalPacingInterval(10ms);
 
   // lastCwnd = 9.8 packets
   auto now = Clock::now();
