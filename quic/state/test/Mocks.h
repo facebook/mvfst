@@ -31,6 +31,12 @@ class MockCongestionController : public CongestionController {
   GMOCK_METHOD1_(, , , getPacingRate, uint64_t(TimePoint));
   GMOCK_METHOD1_(, , , markPacerTimeoutScheduled, void(TimePoint));
   MOCK_CONST_METHOD0(getPacingInterval, std::chrono::microseconds());
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      setMinimalPacingInterval,
+      void(std::chrono::microseconds));
   GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
   MOCK_METHOD0(setAppLimited, void());
   MOCK_CONST_METHOD0(isAppLimited, bool());

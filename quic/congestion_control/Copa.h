@@ -55,6 +55,8 @@ class Copa : public CongestionController {
 
   std::chrono::microseconds getPacingInterval() const noexcept override;
 
+  void setMinimalPacingInterval(std::chrono::microseconds) noexcept override;
+
   bool isAppLimited() const noexcept override;
 
  private:
@@ -112,5 +114,7 @@ class Copa : public CongestionController {
 
   uint64_t pacingBurstSize_{0};
   std::chrono::microseconds pacingInterval_;
+  std::chrono::microseconds minimalPacingInterval_{
+      folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL};
 };
 } // namespace quic

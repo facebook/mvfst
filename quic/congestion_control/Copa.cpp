@@ -316,7 +316,7 @@ void Copa::updatePacing() noexcept {
       conn_,
       cwndBytes_ * 2,
       conn_.transportSettings.minCwndInMss,
-      conn_.transportSettings.pacingTimerTickInterval,
+      minimalPacingInterval_,
       conn_.lossState.srtt);
   if (pacingInterval_ == std::chrono::milliseconds::zero()) {
     return;
@@ -331,7 +331,7 @@ void Copa::updatePacing() noexcept {
 }
 
 bool Copa::canBePaced() const noexcept {
-  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
+  if (conn_.lossState.srtt < minimalPacingInterval_) {
     return false;
   }
   return true;
@@ -349,6 +349,11 @@ void Copa::markPacerTimeoutScheduled(TimePoint /* currentTime*/) noexcept {}
 
 std::chrono::microseconds Copa::getPacingInterval() const noexcept {
   return pacingInterval_;
+}
+
+void Copa::setMinimalPacingInterval(
+    std::chrono::microseconds interval) noexcept {
+  minimalPacingInterval_ = interval;
 }
 
 void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */

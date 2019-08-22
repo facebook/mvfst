@@ -249,6 +249,8 @@ struct CongestionController {
    */
   virtual void markPacerTimeoutScheduled(TimePoint currentTime) = 0;
 
+  virtual void setMinimalPacingInterval(std::chrono::microseconds) = 0;
+
   /**
    * Whether the congestion controller thinks it's currently in app-limited
    * state.

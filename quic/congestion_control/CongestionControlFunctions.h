@@ -21,7 +21,6 @@ uint64_t boundedCwnd(
     uint64_t maxCwndInMss,
     uint64_t minCwndInMss) noexcept;
 
-// TODO: remove minimalInterval, use transportSettings from conn
 std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
