@@ -28,8 +28,9 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
     uint64_t minCwndInMss,
+    std::chrono::microseconds minimalInterval,
     std::chrono::microseconds rtt) {
-  if (conn.transportSettings.pacingTimerTickInterval > rtt) {
+  if (minimalInterval > rtt) {
     // We cannot really pace in this case.
     return std::make_pair(
         0us, conn.transportSettings.writeConnectionDataPacketsLimit);
@@ -41,12 +42,10 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
       conn.transportSettings.maxBurstPackets,
       static_cast<uint64_t>(std::ceil(
           static_cast<double>(cwndInPackets) *
-          static_cast<double>(
-              conn.transportSettings.pacingTimerTickInterval.count()) /
+          static_cast<double>(minimalInterval.count()) /
           static_cast<double>(rtt.count()))));
-  auto interval = timeMax(
-      conn.transportSettings.pacingTimerTickInterval,
-      rtt * burstPerInterval / cwndInPackets);
+  auto interval =
+      timeMax(minimalInterval, rtt * burstPerInterval / cwndInPackets);
   return std::make_pair(interval, burstPerInterval);
 }
 } // namespace quic

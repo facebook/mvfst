@@ -316,6 +316,7 @@ void Copa::updatePacing() noexcept {
       conn_,
       cwndBytes_ * 2,
       conn_.transportSettings.minCwndInMss,
+      conn_.transportSettings.pacingTimerTickInterval,
       conn_.lossState.srtt);
   if (pacingInterval_ == std::chrono::milliseconds::zero()) {
     return;
