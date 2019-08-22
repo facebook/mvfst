@@ -65,10 +65,6 @@ class RetransmissionScheduler {
   bool hasPendingData() const;
 
  private:
-  StreamFrameMetaData makeStreamFrameMetaDataFromStreamBufer(
-      StreamId id,
-      const StreamBuffer& buffer,
-      bool moreFrames) const;
   const QuicConnectionStateBase& conn_;
 };
 
@@ -175,11 +171,6 @@ class StreamFrameScheduler {
       PacketBuilderInterface& builder,
       WritableStreamItr& writableStreamItr,
       uint64_t& connWritableBytes);
-
-  StreamFrameMetaData makeStreamFrameMetaData(
-      const QuicStreamState& streamData,
-      bool hasMoreData,
-      uint64_t connWritableBytes);
 
   const QuicConnectionStateBase& conn_;
 };

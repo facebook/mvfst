@@ -30,104 +30,134 @@ bool packetSpaceCheck(uint64_t limit, size_t require) {
 
 namespace quic {
 
-folly::Optional<StreamFrameWriteResult> writeStreamFrame(
-    const StreamFrameMetaData& streamFrameMetaData,
-    PacketBuilderInterface& builder) {
-  if (!builder.remainingSpaceInPkt()) {
+folly::Optional<uint64_t> writeStreamFrameHeader(
+    PacketBuilderInterface& builder,
+    StreamId id,
+    uint64_t offset,
+    uint64_t writeBufferLen,
+    uint64_t flowControlLen,
+    bool fin) {
+  if (builder.remainingSpaceInPkt() == 0) {
     return folly::none;
   }
-  if ((!streamFrameMetaData.data ||
-       streamFrameMetaData.data->computeChainDataLength() == 0) &&
-      !streamFrameMetaData.fin) {
-    VLOG(2) << "No data or FIN supplied while writing stream "
-            << streamFrameMetaData.id;
+  if (writeBufferLen == 0 && !fin) {
     throw QuicInternalException(
-        "No data or FIN supplied", LocalErrorCode::INVALID_WRITE_DATA);
+        "No data or fin supplied when writing stream.",
+        LocalErrorCode::INTERNAL_ERROR);
   }
-
-  StreamTypeField::Builder initialByte;
-  QuicInteger streamId(streamFrameMetaData.id);
-  QuicInteger offset(streamFrameMetaData.offset);
-
-  size_t headerSize = sizeof(FrameType::STREAM) + streamId.getSize();
-  if (LIKELY(streamFrameMetaData.hasMoreFrames)) {
-    initialByte.setLength();
-    // We use the size remaining for simplicity here. 2 bytes should be enough
-    // for almost anything. We could save 1 byte by deciding whether or not we
-    // have < 100 bytes to write, however that seems a bit overkill.
-    auto size = getQuicIntegerSize(builder.remainingSpaceInPkt());
-    if (size.hasError()) {
-      throw QuicTransportException(
-          folly::to<std::string>(
-              "Stream Frame: Value too large ", builder.remainingSpaceInPkt()),
-          size.error());
-    }
-    headerSize += *size;
+  StreamTypeField::Builder streamTypeBuilder;
+  QuicInteger idInt(id);
+  QuicInteger offsetInt(offset);
+  // First account for the things that are non-optional: frame type and stream
+  // id.
+  uint64_t headerSize = sizeof(FrameType::STREAM) + idInt.getSize();
+  if (offset != 0) {
+    streamTypeBuilder.setOffset();
+    headerSize += offsetInt.getSize();
   }
-  if (streamFrameMetaData.offset != 0) {
-    initialByte.setOffset();
-    headerSize += offset.getSize();
-  }
-  uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
-  if (spaceLeftInPkt < headerSize) {
-    // We don't have enough space, this can happen often so exception is too
-    // expensive for this. Just return empty result.
-    VLOG(4) << "No space in packet for stream header. stream="
-            << streamFrameMetaData.id
+  if (builder.remainingSpaceInPkt() < headerSize) {
+    VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
     return folly::none;
   }
-  spaceLeftInPkt -= headerSize;
-  uint64_t dataInStream = 0;
-  if (streamFrameMetaData.data) {
-    dataInStream = streamFrameMetaData.data->computeChainDataLength();
+  // Next we have to deal with the data length. This is trickier. The length of
+  // data we are able to send depends on 3 things: how much we have in the
+  // buffer, how much flow control we have, and the remaining size in the
+  // packet. If the amount we want to send is >= the remaining packet size after
+  // the header so far we can omit the length field and consume the rest of the
+  // packet. If it is not then we need to use the minimal varint encoding
+  // possible to avoid sending not-full packets.
+  // Note: we don't bother with one potential optimization, which is writing
+  // a zero length fin-only stream frame and omitting the length field.
+  uint64_t dataLen = std::min(writeBufferLen, flowControlLen);
+  uint64_t dataLenLen = 0;
+  if (dataLen > 0 && dataLen >= builder.remainingSpaceInPkt() - headerSize) {
+    // We can fill this entire packet with the rest of this stream frame.
+    dataLen = builder.remainingSpaceInPkt() - headerSize;
+  } else {
+    if (dataLen <= kOneByteLimit - 1) {
+      dataLenLen = 1;
+    } else if (dataLen <= kTwoByteLimit - 2) {
+      dataLenLen = 2;
+    } else if (dataLen <= kFourByteLimit - 4) {
+      dataLenLen = 4;
+    } else if (dataLen <= kEightByteLimit - 8) {
+      dataLenLen = 8;
+    } else {
+      // This should never really happen as dataLen is bounded by the remaining
+      // space in the packet which should be << kEightByteLimit.
+      throw QuicInternalException(
+          "Stream frame length too large.", LocalErrorCode::INTERNAL_ERROR);
+    }
   }
-  auto dataCanWrite = std::min<uint64_t>(spaceLeftInPkt, dataInStream);
-  bool canWrite = (dataInStream > 0 && dataCanWrite > 0) ||
-      (dataInStream == 0 && streamFrameMetaData.fin);
-  if (!canWrite) {
-    VLOG(4) << "No space in packet for stream=" << streamFrameMetaData.id
-            << " dataInStream=" << dataInStream
-            << " fin=" << streamFrameMetaData.fin
-            << " remaining=" << spaceLeftInPkt;
+  if (dataLenLen > 0) {
+    if (dataLen != 0 &&
+        headerSize + dataLenLen >= builder.remainingSpaceInPkt()) {
+      VLOG(4) << "No space in packet for stream header. stream=" << id
+              << " remaining=" << builder.remainingSpaceInPkt();
+      return folly::none;
+    }
+    // We have to encode the actual data length in the header.
+    headerSize += dataLenLen;
+    if (builder.remainingSpaceInPkt() < dataLen + headerSize) {
+      dataLen = builder.remainingSpaceInPkt() - headerSize;
+    }
+  }
+  bool shouldSetFin = fin && dataLen == writeBufferLen;
+  if (dataLen == 0 && !shouldSetFin) {
+    // This would be an empty non-fin stream frame.
+    return folly::none;
+  }
+  if (builder.remainingSpaceInPkt() < headerSize) {
+    VLOG(4) << "No space in packet for stream header. stream=" << id
+            << " remaining=" << builder.remainingSpaceInPkt();
     return folly::none;
   }
 
-  QuicInteger actualLength(dataCanWrite);
-  bool writtenFin = false;
-  if (streamFrameMetaData.fin && dataCanWrite == dataInStream) {
-    // We can only write a FIN if we ended up writing all the bytes
-    // in the input data.
-    initialByte.setFin();
-    writtenFin = true;
+  // Done with the accounting, set the bits and write the actual frame header.
+  if (dataLenLen > 0) {
+    streamTypeBuilder.setLength();
   }
-  builder.writeBE(initialByte.build().fieldValue());
-  builder.write(streamId);
-  if (streamFrameMetaData.offset != 0) {
-    builder.write(offset);
+  if (shouldSetFin) {
+    streamTypeBuilder.setFin();
   }
-  if (LIKELY(streamFrameMetaData.hasMoreFrames)) {
-    builder.write(actualLength);
+  auto streamType = streamTypeBuilder.build();
+  builder.writeBE(streamType.fieldValue());
+  builder.write(idInt);
+  if (offset != 0) {
+    builder.write(offsetInt);
   }
-  Buf bufToWrite;
-  if (dataCanWrite > 0) {
-    folly::io::Cursor cursor(streamFrameMetaData.data.get());
-    cursor.clone(bufToWrite, dataCanWrite);
-  } else {
-    bufToWrite = folly::IOBuf::create(0);
+  if (dataLenLen > 0) {
+    builder.write(QuicInteger(dataLen));
   }
-  VLOG(4) << "writing frame stream=" << streamFrameMetaData.id
-          << " offset=" << streamFrameMetaData.offset
-          << " data=" << dataCanWrite << " fin=" << writtenFin;
-  builder.insert(bufToWrite->clone());
-  builder.appendFrame(WriteStreamFrame(
-      streamFrameMetaData.id,
-      streamFrameMetaData.offset,
-      dataCanWrite,
-      writtenFin));
-  StreamFrameWriteResult result(
-      dataCanWrite, writtenFin, std::move(bufToWrite));
-  return folly::make_optional(std::move(result));
+  builder.appendFrame(
+      WriteStreamFrame(id, offset, dataLen, streamType.hasFin()));
+  DCHECK(dataLen <= builder.remainingSpaceInPkt());
+  return folly::make_optional(dataLen);
+}
+
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    const folly::IOBufQueue& writeBuffer,
+    uint64_t dataLen) {
+  if (dataLen > 0) {
+    Buf streamData;
+    folly::io::Cursor cursor(writeBuffer.front());
+    cursor.clone(streamData, dataLen);
+    builder.insert(std::move(streamData));
+  }
+}
+
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    Buf writeBuffer,
+    uint64_t dataLen) {
+  if (dataLen > 0) {
+    Buf streamData;
+    folly::io::Cursor cursor(writeBuffer.get());
+    cursor.clone(streamData, dataLen);
+    builder.insert(std::move(streamData));
+  }
 }
 
 folly::Optional<WriteCryptoFrame>

@@ -115,14 +115,13 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = false;
-  bool hasMoreFrames = true;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  auto outputBuf = std::move(streamFrameWriteResult->writtenData);
-  EXPECT_EQ(10, outputBuf->computeChainDataLength());
-  EXPECT_EQ(10, streamFrameWriteResult->bytesWritten);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 10, 10, fin);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 10);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  EXPECT_EQ(13, outputBuf->computeChainDataLength());
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - 3 - 10, pktBuilder.remainingSpaceInPkt());
   auto builtOut = std::move(pktBuilder).buildPacket();
@@ -133,6 +132,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 10);
+  outputBuf->trimStart(3);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto wireBuf = std::move(builtOut.second);
@@ -153,21 +153,20 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
   StreamId streamId = 200;
   uint64_t offset = 65535;
   bool fin = false;
-  bool hasMoreFrames = false;
-
   auto inputBuf = buildRandomInputData(20);
   // 1 byte for type
   // 2 bytes for stream id
   // 4 bytes offset
-  // => 7 bytes of header
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  auto outputBuf = std::move(streamFrameWriteResult->writtenData);
-  EXPECT_EQ(20, outputBuf->computeChainDataLength());
-  EXPECT_EQ(20, streamFrameWriteResult->bytesWritten);
-  size_t consumedSize = 1000 + 7 + 20;
+  // 1 byte for length
+  // => 8 bytes of header
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 20, 20, fin);
+  ASSERT_TRUE(dataLen);
+  EXPECT_EQ(*dataLen, 20);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 20);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  EXPECT_EQ(28, outputBuf->computeChainDataLength());
+  size_t consumedSize = 1000 + 8 + 20;
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - consumedSize,
       pktBuilder.remainingSpaceInPkt());
@@ -179,6 +178,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 20);
+  outputBuf->trimStart(8);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   // Verify the on wire bytes via decoder:
@@ -205,38 +205,35 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   StreamId streamId1 = 300;
   uint64_t offset1 = 65535;
   bool fin1 = false;
-  bool hasMoreFrames1 = true;
   auto inputBuf = buildRandomInputData(30);
-  StreamFrameMetaData streamFrameMetaData(
-      streamId1, offset1, fin1, inputBuf->clone(), hasMoreFrames1);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  auto outputBuf = std::move(streamFrameWriteResult->writtenData);
-  EXPECT_EQ(30, outputBuf->computeChainDataLength());
-  EXPECT_EQ(30, streamFrameWriteResult->bytesWritten);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId1, offset1, 30, 30, fin1);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 30);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 30);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  EXPECT_EQ(38, outputBuf->computeChainDataLength());
   size_t consumedSize = 1000 + 8 + 30;
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - consumedSize,
       pktBuilder.remainingSpaceInPkt());
 
   StreamId streamId2 = 300;
-  bool hasMoreFrames2 = false;
   uint64_t offset2 = 65565;
   bool fin2 = false;
-  auto inputBuf2 = buildRandomInputData(40);
+  uint64_t remainingSpace = pktBuilder.remainingSpaceInPkt();
+  auto inputBuf2 = buildRandomInputData(remainingSpace);
   // 1 byte for type
   // 2 bytes for stream
   // 4 bytes for offset
   // => 7 bytes
-  StreamFrameMetaData streamFrameMetaData2(
-      streamId2, offset2, fin2, inputBuf2->clone(), hasMoreFrames2);
-  auto streamFrameWriteResult2 =
-      writeStreamFrame(streamFrameMetaData2, pktBuilder);
-  auto outputBuf2 = std::move(streamFrameWriteResult2->writtenData);
-  EXPECT_EQ(40, outputBuf2->computeChainDataLength());
-  // 4 bytes for stream id, 2 bytes for offset, 1 byte for initial frame type
-  EXPECT_EQ(40, streamFrameWriteResult2->bytesWritten);
-  consumedSize += 7 + 40;
+  dataLen = writeStreamFrameHeader(
+      pktBuilder, streamId2, offset2, remainingSpace, remainingSpace, fin2);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, remainingSpace - 7);
+  writeStreamFrameData(pktBuilder, inputBuf2->clone(), remainingSpace - 7);
+  auto outputBuf2 = pktBuilder.outputQueue_.front()->clone();
+  consumedSize += remainingSpace;
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - consumedSize,
       pktBuilder.remainingSpaceInPkt());
@@ -247,12 +244,15 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   EXPECT_EQ(resultFrame.streamId, streamId1);
   EXPECT_EQ(resultFrame.offset, offset1);
   EXPECT_EQ(resultFrame.len, 30);
+  outputBuf->trimStart(8);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto resultFrame2 = boost::get<WriteStreamFrame>(regularPacket.frames.back());
   EXPECT_EQ(resultFrame2.streamId, streamId2);
   EXPECT_EQ(resultFrame2.offset, offset2);
-  EXPECT_EQ(resultFrame2.len, 40);
+  EXPECT_EQ(resultFrame2.len, remainingSpace - 7);
+  outputBuf2->trimStart(38 + 7);
+  inputBuf2->trimEnd(7);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf2, outputBuf2));
 
   // Verify the on wire bytes via decoder:
@@ -273,7 +273,8 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)));
   EXPECT_EQ(decodedStreamFrame2.streamId, streamId2);
   EXPECT_EQ(decodedStreamFrame2.offset, offset2);
-  EXPECT_EQ(decodedStreamFrame2.data->computeChainDataLength(), 40);
+  EXPECT_EQ(
+      decodedStreamFrame2.data->computeChainDataLength(), remainingSpace - 7);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf2, decodedStreamFrame2.data));
 }
 
@@ -287,20 +288,18 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
   StreamId streamId = 300;
   uint64_t offset = 65535;
   bool fin = false;
-  bool hasMoreFrames = false;
 
   // 1 byte for type
   // 2 bytes for stream id
   // 4 bytes for offset
   // => 7 bytes for header
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  auto outputBuf = std::move(streamFrameWriteResult->writtenData);
-  EXPECT_EQ(outputBuf->computeChainDataLength(), 33);
-  EXPECT_EQ(streamFrameWriteResult->bytesWritten, 33);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 50, 50, fin);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 33);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 33);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  EXPECT_EQ(40, outputBuf->computeChainDataLength());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
@@ -310,6 +309,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 33);
 
+  outputBuf->trimStart(7);
   inputBuf->trimEnd(inputBuf->computeChainDataLength() - 33);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
@@ -330,34 +330,28 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameTooSmallForStreamHeader) {
   StreamId streamId = 1;
   uint64_t offset = 65535;
   bool fin = false;
-  bool hasMoreFrames = false;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto result = writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_FALSE(result.hasValue());
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 1, 1, fin);
+  EXPECT_FALSE(dataLen);
   EXPECT_EQ(1, pktBuilder.remainingSpaceInPkt());
 }
 
 TEST_F(QuicWriteCodecTest, WriteStreamNoSpaceForData) {
   MockQuicPacketBuilder pktBuilder;
-  pktBuilder.remaining_ = 4;
+  pktBuilder.remaining_ = 3;
   setupCommonExpects(pktBuilder);
-  auto inputBuf = buildRandomInputData(10);
 
   StreamId streamId = 1;
   uint64_t offset = 1;
   bool fin = false;
-  bool hasMoreFrames = true;
   // 1 byte for type
   // 1 byte for stream id
   // 1 byte for offset
-  // 1 byte for length
-  // => 4 bytes
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto result = writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_FALSE(result.hasValue());
-  EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 4);
+  // => 3 bytes
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 10, 10, fin);
+  EXPECT_FALSE(dataLen.hasValue());
+  EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
 }
 
 TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
@@ -372,18 +366,16 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   StreamId streamId = 1;
   uint64_t offset = 1;
   bool fin = false;
-  bool hasMoreFrames = false;
   // 1 byte for type
   // 1 byte for stream id
   // 1 byte for offet
   // => 3 bytes
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-
-  auto result = writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_EQ(result->bytesWritten, 1);
-  auto outputBuf = std::move(result->writtenData);
-  EXPECT_EQ(outputBuf->computeChainDataLength(), 1);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 100, 100, fin);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 1);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 1);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
@@ -394,6 +386,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 1);
   inputBuf->trimEnd(inputBuf->computeChainDataLength() - 1);
+  outputBuf->trimStart(3);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto wireBuf = std::move(builtOut.second);
@@ -415,16 +408,18 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   auto inputBuf = buildRandomInputData(10);
 
   // 1 byte for type
-  // => 1 byte
+  // 1 byte for stream id
+  // 1 byte for length
+  // => 3 byte
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  bool hasMoreFrames = false;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto result = writeStreamFrame(streamFrameMetaData, pktBuilder);
-  auto outputBuf = std::move(result->writtenData);
-  EXPECT_TRUE(result->finWritten);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 10, 10, fin);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 10);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
+  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
@@ -435,6 +430,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(inputBuf->computeChainDataLength(), resultFrame.len);
   EXPECT_TRUE(resultFrame.fin);
+  outputBuf->trimStart(3);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
   auto wireBuf = std::move(builtOut.second);
@@ -460,17 +456,16 @@ TEST_F(QuicWriteCodecTest, TestWriteIncompleteDataAndFin) {
   auto inputBuf = buildRandomInputData(inDataSize);
 
   // 1 byte for type
-  // => 1 byte
+  // 1 byte for stream id
+  // 1 byte for length
+  // => 3 byte
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  bool hasMoreFrames = false;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, inputBuf->clone(), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_FALSE(streamFrameWriteResult->finWritten);
-  EXPECT_LT(streamFrameWriteResult->bytesWritten, inDataSize);
+  auto dataLen = writeStreamFrameHeader(
+      pktBuilder, streamId, offset, inDataSize, inDataSize, fin);
+  ASSERT_TRUE(dataLen);
+  EXPECT_LT(*dataLen, inDataSize);
 }
 
 TEST_F(QuicWriteCodecTest, TestWriteNoDataAndFin) {
@@ -478,33 +473,28 @@ TEST_F(QuicWriteCodecTest, TestWriteNoDataAndFin) {
   setupCommonExpects(pktBuilder);
 
   // 1 byte for type
-  // => 1 byte
+  // 1 byte for stream id
+  // => 2 byte
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  bool hasMoreFrames = false;
   Buf empty;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, std::move(empty), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_TRUE(streamFrameWriteResult->finWritten);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin);
+  ASSERT_TRUE(dataLen);
+  EXPECT_EQ(*dataLen, 0);
 }
 
 TEST_F(QuicWriteCodecTest, TestWriteNoDataAndNoFin) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  // 1 byte for type
-  // => 1 byte
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = false;
-  bool hasMoreFrames = false;
   Buf empty;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, std::move(empty), hasMoreFrames);
   EXPECT_THROW(
-      writeStreamFrame(streamFrameMetaData, pktBuilder), QuicInternalException);
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin),
+      QuicInternalException);
 }
 
 TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeader) {
@@ -520,36 +510,45 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeader) {
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  bool hasMoreFrames = false;
-  auto buf = buildRandomInputData(1);
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, std::move(buf), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  EXPECT_FALSE(streamFrameWriteResult.hasValue());
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 20, 20, fin);
+  EXPECT_FALSE(dataLen.hasValue());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
 
 TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeaderWithFin) {
   MockQuicPacketBuilder pktBuilder;
-  pktBuilder.remaining_ = 2;
+  pktBuilder.remaining_ = 3;
   setupCommonExpects(pktBuilder);
-  auto inputBuf = buildRandomInputData(20);
   // 1 byte for type
   // 1 byte for stream id
-  // => 1 byte
+  // 1 byte for length
+  // => 3 byte
   StreamId streamId = 1;
   uint64_t offset = 0;
   bool fin = true;
-  bool hasMoreFrames = false;
-  Buf empty;
-  StreamFrameMetaData streamFrameMetaData(
-      streamId, offset, fin, std::move(empty), hasMoreFrames);
-  auto streamFrameWriteResult =
-      writeStreamFrame(streamFrameMetaData, pktBuilder);
-  ASSERT_TRUE(streamFrameWriteResult.hasValue());
-  EXPECT_TRUE(streamFrameWriteResult->finWritten);
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin);
+  ASSERT_TRUE(dataLen.hasValue());
+  EXPECT_EQ(*dataLen, 0);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
+}
+
+TEST_F(QuicWriteCodecTest, PacketNotEnoughSpaceForStreamHeaderWithFin) {
+  MockQuicPacketBuilder pktBuilder;
+  pktBuilder.remaining_ = 2;
+  setupCommonExpects(pktBuilder);
+  // 1 byte for type
+  // 1 byte for stream id
+  // 1 byte for length
+  // => 3 byte
+  StreamId streamId = 1;
+  uint64_t offset = 0;
+  bool fin = true;
+  auto dataLen =
+      writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin);
+  ASSERT_FALSE(dataLen.hasValue());
+  EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
 
 TEST_F(QuicWriteCodecTest, AckFrameGapExceedsRepresentation) {

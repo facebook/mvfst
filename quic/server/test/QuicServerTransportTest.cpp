@@ -648,27 +648,28 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
 
   auto buf1 = IOBuf::copyBuffer("Aloha");
   auto buf2 = IOBuf::copyBuffer("Hello");
-  StreamFrameMetaData streamMeta;
-  streamMeta.hasMoreFrames = true;
-  streamMeta.id = 0x08;
-  streamMeta.offset = 0;
-  streamMeta.fin = true;
-  streamMeta.data = buf1->clone();
 
-  StreamFrameMetaData streamMeta2;
-  streamMeta2.hasMoreFrames = true;
-  streamMeta2.id = 0x0C;
-  streamMeta2.offset = 0;
-  streamMeta2.fin = true;
-  streamMeta2.data = buf2->clone();
+  auto dataLen = writeStreamFrameHeader(
+      builder,
+      0x08,
+      0,
+      buf1->computeChainDataLength(),
+      buf1->computeChainDataLength(),
+      true);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
+  writeStreamFrameData(builder, buf1->clone(), buf1->computeChainDataLength());
 
-  auto res = writeStreamFrame(streamMeta, builder);
-  ASSERT_EQ(res->bytesWritten, buf1->length());
-  ASSERT_TRUE(res->finWritten);
-
-  auto res2 = writeStreamFrame(streamMeta2, builder);
-  ASSERT_EQ(res2->bytesWritten, buf2->length());
-  ASSERT_TRUE(res2->finWritten);
+  dataLen = writeStreamFrameHeader(
+      builder,
+      0x0C,
+      0,
+      buf1->computeChainDataLength(),
+      buf1->computeChainDataLength(),
+      true);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
+  writeStreamFrameData(builder, buf2->clone(), buf2->computeChainDataLength());
 
   auto packet = std::move(builder).buildPacket();
 
@@ -698,15 +699,13 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   ASSERT_EQ(server->getConn().streamManager->streamCount(), 2);
   IOBufEqualTo eq;
 
-  auto stream =
-      server->getNonConstConn().streamManager->findStream(streamMeta.id);
+  auto stream = server->getNonConstConn().streamManager->findStream(0x08);
   ASSERT_TRUE(stream);
   auto streamData = readDataFromQuicStream(*stream);
   EXPECT_TRUE(eq(buf1, streamData.first));
   EXPECT_TRUE(streamData.second);
 
-  auto stream2 =
-      server->getNonConstConn().streamManager->findStream(streamMeta2.id);
+  auto stream2 = server->getNonConstConn().streamManager->findStream(0x0C);
   ASSERT_TRUE(stream2);
   auto streamData2 = readDataFromQuicStream(*stream2);
   EXPECT_TRUE(eq(buf2, streamData2.first));
@@ -1015,13 +1014,15 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
       0 /* largestAcked */);
   ASSERT_TRUE(builder.canBuildPacket());
 
-  StreamFrameMetaData streamMeta;
-  streamMeta.id = 4;
-  streamMeta.offset = 0;
-  streamMeta.fin = true;
-  streamMeta.data = folly::IOBuf::copyBuffer("hello");
-
-  writeStreamFrame(streamMeta, builder);
+  auto buf = folly::IOBuf::copyBuffer("hello");
+  writeStreamFrameHeader(
+      builder,
+      4,
+      0,
+      buf->computeChainDataLength(),
+      buf->computeChainDataLength(),
+      true);
+  writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(TransportErrorCode::NO_ERROR, errMsg);
   writeFrame(std::move(connClose), builder);
@@ -1424,13 +1425,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  StreamFrameMetaData streamMeta;
-  streamMeta.hasMoreFrames = true;
-  streamMeta.id = 0x00;
-  streamMeta.offset = stream->currentReadOffset;
-  streamMeta.fin = true;
-  streamMeta.data = nullptr;
-  writeStreamFrame(streamMeta, builder);
+  auto dataLen = writeStreamFrameHeader(
+      builder, 0x00, stream->currentReadOffset, 0, 10, true);
+  ASSERT_TRUE(dataLen.hasValue());
+  ASSERT_EQ(*dataLen, 0);
   writeFrame(std::move(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(

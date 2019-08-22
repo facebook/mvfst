@@ -8,28 +8,6 @@
 
 #include <quic/api/QuicPacketScheduler.h>
 
-namespace {
-
-quic::StreamFrameMetaData makeStreamFrameMetaDataFromStreamBuffer(
-    quic::StreamId id,
-    const quic::StreamBuffer& buffer);
-
-quic::StreamFrameMetaData makeStreamFrameMetaDataFromStreamBuffer(
-    quic::StreamId id,
-    const quic::StreamBuffer& buffer) {
-  quic::StreamFrameMetaData streamMeta;
-  // It's very tricky to get the stream data without the length right,
-  // so don't support it for now.
-  streamMeta.hasMoreFrames = true;
-  streamMeta.id = id;
-  streamMeta.offset = buffer.offset;
-  streamMeta.fin = buffer.eof;
-  streamMeta.data = buffer.data.front() ? buffer.data.front()->clone()
-                                        : folly::IOBuf::create(0);
-  return streamMeta;
-}
-} // namespace
-
 namespace quic {
 
 bool hasAcksToSchedule(const AckState& ackState) {
@@ -226,17 +204,23 @@ void RetransmissionScheduler::writeRetransmissionStreams(
     for (auto buffer = stream->lossBuffer.cbegin();
          buffer != stream->lossBuffer.cend();
          ++buffer) {
-      auto streamMeta =
-          makeStreamFrameMetaDataFromStreamBuffer(stream->id, *buffer);
-      auto res = writeStreamFrame(streamMeta, builder);
-      if (!res) {
-        // Finish assembling a packet
-        break;
+      auto bufferLen = buffer->data.chainLength();
+      auto dataLen = writeStreamFrameHeader(
+          builder,
+          stream->id,
+          buffer->offset,
+          bufferLen, // writeBufferLen -- only the len of the single buffer.
+          bufferLen, // flowControlLen -- not relevant, already flow controlled.
+          buffer->eof);
+      if (dataLen) {
+        writeStreamFrameData(builder, buffer->data, *dataLen);
+        VLOG(4) << "Wrote retransmitted stream=" << stream->id
+                << " offset=" << buffer->offset << " bytes=" << *dataLen
+                << " fin=" << (buffer->eof && *dataLen == bufferLen) << " "
+                << conn_;
+      } else {
+        return;
       }
-      VLOG(4) << "Wrote retransmitted stream=" << streamMeta.id
-              << " offset=" << streamMeta.offset
-              << " bytes=" << res->bytesWritten << " fin=" << res->finWritten
-              << " " << conn_;
     }
   }
 }
@@ -272,6 +256,9 @@ bool StreamFrameScheduler::writeNextStreamFrame(
     PacketBuilderInterface& builder,
     StreamFrameScheduler::WritableStreamItr& writableStreamItr,
     uint64_t& connWritableBytes) {
+  if (builder.remainingSpaceInPkt() == 0) {
+    return false;
+  }
   auto stream = conn_.streamManager->findStream(*writableStreamItr);
   CHECK(stream);
 
@@ -279,46 +266,38 @@ bool StreamFrameScheduler::writeNextStreamFrame(
   // stream to be in writableList
   DCHECK(stream->hasWritableData());
 
-  auto streamMeta = makeStreamFrameMetaData(*stream, true, connWritableBytes);
-  auto res = writeStreamFrame(streamMeta, builder);
-  if (!res) {
-    // Finish assembling a packet
+  uint64_t flowControlLen =
+      std::min(getSendStreamFlowControlBytesWire(*stream), connWritableBytes);
+  uint64_t bufferLen = stream->writeBuffer.chainLength();
+  bool canWriteFin =
+      stream->finalWriteOffset.hasValue() && bufferLen <= flowControlLen;
+  auto dataLen = writeStreamFrameHeader(
+      builder,
+      stream->id,
+      stream->currentWriteOffset,
+      bufferLen,
+      flowControlLen,
+      canWriteFin);
+  if (!dataLen) {
     return false;
   }
-  VLOG(4) << "Wrote stream frame stream=" << streamMeta.id
-          << " offset=" << streamMeta.offset
-          << " bytesWritten=" << res->bytesWritten
-          << " finWritten=" << res->finWritten << " " << conn_;
-  connWritableBytes -= res->bytesWritten;
+  writeStreamFrameData(builder, stream->writeBuffer, *dataLen);
+  VLOG(4) << "Wrote stream frame stream=" << stream->id
+          << " offset=" << stream->currentWriteOffset
+          << " bytesWritten=" << *dataLen
+          << " finWritten=" << (canWriteFin && *dataLen == bufferLen) << " "
+          << conn_;
+  connWritableBytes -= dataLen.value();
   // bytesWritten < min(flowControlBytes, writeBuffer) means that we haven't
-  // written all writable bytes in this stream due to short of room in the
+  // written all writable bytes in this stream due to running out of room in the
   // packet.
-  if (res->bytesWritten ==
+  if (*dataLen ==
       std::min<uint64_t>(
           getSendStreamFlowControlBytesWire(*stream),
           stream->writeBuffer.chainLength())) {
     ++writableStreamItr;
   }
   return true;
-}
-
-StreamFrameMetaData StreamFrameScheduler::makeStreamFrameMetaData(
-    const QuicStreamState& streamData,
-    bool /*hasMoreData*/,
-    uint64_t connWritableBytes) {
-  uint64_t writableBytes = std::min(
-      getSendStreamFlowControlBytesWire(streamData), connWritableBytes);
-  StreamFrameMetaData streamMeta;
-  streamMeta.hasMoreFrames = true;
-  streamMeta.id = streamData.id;
-  streamMeta.offset = streamData.currentWriteOffset;
-  if (streamData.writeBuffer.front()) {
-    folly::io::Cursor cursor(streamData.writeBuffer.front());
-    cursor.cloneAtMost(streamMeta.data, writableBytes);
-  }
-  streamMeta.fin = streamData.finalWriteOffset.hasValue() &&
-      streamData.writeBuffer.chainLength() <= writableBytes;
-  return streamMeta;
 }
 
 AckScheduler::AckScheduler(

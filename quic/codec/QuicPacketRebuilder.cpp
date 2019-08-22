@@ -71,18 +71,23 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         [&](const WriteStreamFrame& streamFrame) {
           auto stream = conn_.streamManager->getStream(streamFrame.streamId);
           if (stream && retransmittable(*stream)) {
-            StreamFrameMetaData meta(
+            auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
+            auto bufferLen =
+                streamData ? streamData->computeChainDataLength() : 0;
+            auto dataLen = writeStreamFrameHeader(
+                builder_,
                 streamFrame.streamId,
                 streamFrame.offset,
-                streamFrame.fin,
-                cloneRetransmissionBuffer(streamFrame, stream),
-                true);
-            auto streamWriteResult = writeStreamFrame(meta, builder_);
-            bool ret = streamWriteResult.hasValue() &&
-                streamWriteResult->bytesWritten == streamFrame.len &&
-                streamWriteResult->finWritten == streamFrame.fin;
-            notPureAck |= ret;
-            return ret;
+                bufferLen,
+                bufferLen,
+                streamFrame.fin);
+            bool ret = dataLen.hasValue() && *dataLen == streamFrame.len;
+            if (ret) {
+              writeStreamFrameData(builder_, std::move(streamData), *dataLen);
+              notPureAck = true;
+              return true;
+            }
+            return false;
           }
           // If a stream is already Closed, we should not clone and resend this
           // stream data. But should we abort the cloning of this packet and

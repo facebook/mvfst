@@ -552,13 +552,16 @@ auto createInitialStream(
       pktHeaderType == LongHeader::Types::Retry ? std::move(headerRetry)
                                                 : std::move(header),
       0 /* largestAcked */);
-  StreamFrameMetaData streamFrame;
-  streamFrame.hasMoreFrames = true;
-  streamFrame.id = streamId;
-  streamFrame.offset = 0;
-  streamFrame.fin = true;
-  streamFrame.data = data.clone();
-  writeStreamFrame(streamFrame, builder);
+  auto streamData = data.clone();
+  auto dataLen = writeStreamFrameHeader(
+      builder,
+      streamId,
+      0,
+      streamData->computeChainDataLength(),
+      streamData->computeChainDataLength(),
+      true);
+  EXPECT_TRUE(dataLen);
+  writeStreamFrameData(builder, std::move(streamData), *dataLen);
   return packetToBuf(std::move(builder).buildPacket());
 }
 

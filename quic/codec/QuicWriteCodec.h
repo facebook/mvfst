@@ -32,42 +32,6 @@ struct AckFrameMetaData {
         ackDelayExponent(ackDelayExponentIn) {}
 };
 
-struct StreamFrameMetaData {
-  StreamId id{0};
-  uint64_t offset{0};
-  bool fin{false};
-  Buf data;
-  bool hasMoreFrames{true};
-
-  StreamFrameMetaData() = default;
-  StreamFrameMetaData(
-      StreamId idIn,
-      uint64_t offsetIn,
-      bool finIn,
-      Buf bufIn,
-      bool hasMoreFramesIn)
-      : id(idIn),
-        offset(offsetIn),
-        fin(finIn),
-        data(std::move(bufIn)),
-        hasMoreFrames(hasMoreFramesIn) {}
-};
-
-struct StreamFrameWriteResult {
-  // The number of bytes written to the stream data section
-  uint64_t bytesWritten;
-  bool finWritten;
-  Buf writtenData;
-
-  explicit StreamFrameWriteResult(
-      uint64_t bytesWrittenIn,
-      bool finWrittenIn,
-      Buf writtenDataIn)
-      : bytesWritten(bytesWrittenIn),
-        finWritten(finWrittenIn),
-        writtenData(std::move(writtenDataIn)) {}
-};
-
 struct AckFrameWriteResult {
   uint64_t bytesWritten;
   // This includes the first ack block
@@ -96,17 +60,41 @@ size_t writeSimpleFrame(
 size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder);
 
 /**
- * Write a StreamFrame into builder
- *
- * WriteCodec will take as much as it can to append it to the appender. Input
- * data, Stream id and offset are passed in via streamFrameMetaData.
- *
- * Return: A StreamFrameWriteResult to indicate how many bytes of data (not
- * including other stream frame fields) are written to the stream
+ * Write a complete stream frame header into builder
+ * This writes the stream frame header into the parameter builder and returns
+ * the bytes of data that can be written following the header. The number of
+ * bytes are communicated by an optional that can be >= 0. It is expected that
+ * the call is followed by writeStreamFrameData.
  */
-folly::Optional<StreamFrameWriteResult> writeStreamFrame(
-    const StreamFrameMetaData& streamFrameMetaData,
-    PacketBuilderInterface& builder);
+folly::Optional<uint64_t> writeStreamFrameHeader(
+    PacketBuilderInterface& builder,
+    StreamId id,
+    uint64_t offset,
+    uint64_t writeBufferLen,
+    uint64_t flowControlLen,
+    bool fin);
+
+/**
+ * Write stream frama data into builder
+ * This writes dataLen worth of bytes from the parameter writeBuffer into the
+ * parameter builder. This should only be called after a complete stream header
+ * has been written by writeStreamFrameHeader.
+ */
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    const folly::IOBufQueue& writeBuffer,
+    uint64_t dataLen);
+
+/**
+ * Write stream frama data into builder
+ * This writes dataLen worth of bytes from the parameter writeBuffer into the
+ * parameter builder. This should only be called after a complete stream header
+ * has been written by writeStreamFrameHeader.
+ */
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
+    Buf writeBuffer,
+    uint64_t dataLen);
 
 /**
  * Write a CryptoFrame into builder. The builder may not be able to accept all

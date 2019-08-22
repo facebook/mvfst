@@ -351,13 +351,14 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
         packetSizeLimit, std::move(header), largestAcked));
   }
   builder->setCipherOverhead(cipherOverhead);
-  StreamFrameMetaData streamFrame;
-  streamFrame.hasMoreFrames = true;
-  streamFrame.id = streamId;
-  streamFrame.offset = offset;
-  streamFrame.fin = eof;
-  streamFrame.data = data.clone();
-  writeStreamFrame(streamFrame, *builder);
+  writeStreamFrameHeader(
+      *builder,
+      streamId,
+      offset,
+      data.computeChainDataLength(),
+      data.computeChainDataLength(),
+      eof);
+  writeStreamFrameData(*builder, data.clone(), data.computeChainDataLength());
   return std::move(*builder).buildPacket();
 }
 

@@ -75,7 +75,6 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   auto streamId = stream->id;
   auto buf =
       folly::IOBuf::copyBuffer("You can't deny you are looking for the sunset");
-  StreamFrameMetaData streamMeta(streamId, 0, true, buf->clone(), true);
   MaxDataFrame maxDataFrame(1000);
   MaxStreamDataFrame maxStreamDataFrame(streamId, 2000);
   uint64_t cryptoOffset = 0;
@@ -86,7 +85,15 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   writeFrame(maxStreamsFrame, regularBuilder1);
   writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
-  writeStreamFrame(streamMeta, regularBuilder1);
+  writeStreamFrameHeader(
+      regularBuilder1,
+      streamId,
+      0,
+      buf->computeChainDataLength(),
+      buf->computeChainDataLength(),
+      true);
+  writeStreamFrameData(
+      regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeFrame(maxDataFrame, regularBuilder1);
   writeFrame(maxStreamDataFrame, regularBuilder1);
   writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
@@ -168,8 +175,15 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
   auto buf = folly::IOBuf::copyBuffer("A million miles away.");
-  StreamFrameMetaData streamMeta(streamId, 0, true, buf->clone(), false);
-  writeStreamFrame(streamMeta, regularBuilder1);
+  writeStreamFrameHeader(
+      regularBuilder1,
+      streamId,
+      0,
+      buf->computeChainDataLength(),
+      buf->computeChainDataLength(),
+      true);
+  writeStreamFrameData(
+      regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(1, packet1.packet.frames.size());
 
@@ -194,10 +208,9 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
-  StreamFrameMetaData streamMeta(streamId, 0, true, nullptr, true);
 
   // Write them with a regular builder
-  writeStreamFrame(streamMeta, regularBuilder1);
+  writeStreamFrameHeader(regularBuilder1, streamId, 0, 0, 0, true);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
       stream->retransmissionBuffer.begin(), nullptr, 0, true);
@@ -235,12 +248,19 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   StreamId streamId = stream->id;
   auto buf =
       folly::IOBuf::copyBuffer("You can't deny you are looking for the sunset");
-  StreamFrameMetaData streamMeta(streamId, 0, true, buf->clone(), true);
   uint64_t cryptoOffset = 0;
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
   // Write them with a regular builder
-  writeStreamFrame(streamMeta, regularBuilder1);
+  writeStreamFrameHeader(
+      regularBuilder1,
+      streamId,
+      0,
+      buf->computeChainDataLength(),
+      buf->computeChainDataLength(),
+      true);
+  writeStreamFrameData(
+      regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(2, packet1.packet.frames.size());
@@ -323,14 +343,21 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   auto streamId = stream->id;
   auto buf =
       folly::IOBuf::copyBuffer("You can't deny you are looking for the sunset");
-  StreamFrameMetaData streamMeta(streamId, 0, true, buf->clone(), true);
 
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(maxStreamIdFrame, regularBuilder1);
   writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
-  writeStreamFrame(streamMeta, regularBuilder1);
+  writeStreamFrameHeader(
+      regularBuilder1,
+      streamId,
+      0,
+      buf->computeChainDataLength(),
+      buf->computeChainDataLength(),
+      true);
+  writeStreamFrameData(
+      regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(5, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
