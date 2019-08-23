@@ -297,7 +297,7 @@ getRxStreamWU(StreamId streamId, PacketNum packetNum, uint64_t maximumData) {
 
 std::string getRxConnWU(PacketNum packetNum, uint64_t maximumData) {
   return "rx, packetNum: " + folly::to<std::string>(packetNum) +
-      "maximumData: " + folly::to<std::string>(maximumData);
+      ", maximumData: " + folly::to<std::string>(maximumData);
 };
 
 std::string getPeerClose(const std::string& peerCloseReason) {
@@ -307,6 +307,10 @@ std::string getPeerClose(const std::string& peerCloseReason) {
 std::string getFlowControlWindowAvailable(uint64_t windowAvailable) {
   return "on flow control, window available: " +
       folly::to<std::string>(windowAvailable);
+};
+
+std::string getClosingStream(const std::string& streamId) {
+  return "closing stream, stream id: " + streamId;
 };
 
 } // namespace quic

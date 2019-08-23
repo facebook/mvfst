@@ -56,9 +56,6 @@ constexpr auto kTransportReady = "transport ready";
 constexpr auto kDerivedZeroRttReadCipher = "derived 0-rtt read cipher";
 constexpr auto kDerivedOneRttReadCipher = "derived 1-rtt read cipher";
 constexpr auto kDerivedOneRttWriteCipher = "derived 1-rtt write cipher";
-auto kClosingStream = [](const std::string& streamId) {
-  return "closing stream, stream id: " + streamId;
-};
 constexpr auto kZeroRttRejected = "zerortt rejected";
 constexpr auto kZeroRttAccepted = "zerortt accepted";
 constexpr auto kZeroRttAttempted = "zerortt attempted";

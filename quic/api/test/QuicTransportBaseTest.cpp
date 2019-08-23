@@ -1014,7 +1014,7 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->update, kClosingStream("1"));
+  EXPECT_EQ(event->update, getClosingStream("1"));
 }
 
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {

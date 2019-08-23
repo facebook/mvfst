@@ -110,4 +110,6 @@ std::string getPeerClose(const std::string& errMsg);
 
 std::string getFlowControlWindowAvailable(uint64_t windowAvailable);
 
+std::string getClosingStream(const std::string& streamId);
+
 } // namespace quic

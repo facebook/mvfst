@@ -626,7 +626,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       kZeroRttAccepted,
       kZeroRttRejected,
       getRxStreamWU(0, 0, kDefaultStreamWindowSize),
-      kClosingStream("0")};
+      getClosingStream("0")};
   for (int i = 0; i < 6; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());

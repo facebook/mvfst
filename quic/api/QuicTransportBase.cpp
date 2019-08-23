@@ -1974,7 +1974,7 @@ void QuicTransportBase::checkForClosedStream() {
     auto stream = conn_->streamManager->findStream(*itr);
     if (conn_->qLogger && stream) {
       conn_->qLogger->addTransportStateUpdate(
-          kClosingStream(folly::to<std::string>(stream->id)));
+          getClosingStream(folly::to<std::string>(stream->id)));
     }
     QUIC_TRACE(
         holb_time,
