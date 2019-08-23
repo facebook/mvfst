@@ -163,7 +163,6 @@ class TestQuicTransport
     while (!cursor.isAtEnd()) {
       // create server chosen connId with processId = 0 and workerId = 0
       ServerConnectionIdParams params(0, 0, 0);
-      params.clientConnId = *conn_->clientConnectionId;
       conn_->serverConnectionId = connIdAlgo_->encodeConnectionId(params);
       auto type = static_cast<TestFrameType>(cursor.readBE<uint8_t>());
       if (type == TestFrameType::CRYPTO) {
@@ -312,7 +311,6 @@ class TestQuicTransport
   void setServerConnectionId() {
     // create server chosen connId with processId = 0 and workerId = 0
     ServerConnectionIdParams params(0, 0, 0);
-    params.clientConnId = *conn_->clientConnectionId;
     conn_->serverConnectionId = connIdAlgo_->encodeConnectionId(params);
   }
 

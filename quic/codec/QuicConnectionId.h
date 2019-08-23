@@ -110,7 +110,6 @@ struct ServerConnectionIdParams {
    */
   void setWorkerId(uint8_t workerIdIn);
 
-  folly::Optional<ConnectionId> clientConnId;
   // Quic connection-id short version
   uint8_t version{0};
   // Quic Host id

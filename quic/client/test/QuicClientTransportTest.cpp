@@ -1298,7 +1298,6 @@ class QuicClientTransportTest : public Test {
   void setConnectionIds() {
     originalConnId = client->getConn().clientConnectionId;
     ServerConnectionIdParams params(0, 0, 0);
-    params.clientConnId = *client->getConn().clientConnectionId;
     serverChosenConnId = connIdAlgo_->encodeConnectionId(params);
   }
 
@@ -2471,7 +2470,6 @@ class QuicClientTransportVersionAndRetryTest
     originalConnId = client->getConn().clientConnectionId;
     // create server chosen connId with processId = 0 and workerId = 0
     ServerConnectionIdParams params(0, 0, 0);
-    params.clientConnId = *client->getConn().clientConnectionId;
     serverChosenConnId = connIdAlgo_->encodeConnectionId(params);
     // The tests that we do here create streams before crypto is finished,
     // so we initialize the peer streams, to allow for this behavior. TODO: when

@@ -180,7 +180,6 @@ ServerConnectionIdParams DefaultConnectionIdAlgo::parseConnectionId(
       getHostIdBitsInConnId(id),
       getProcessIdBitsFromConnId(id),
       getWorkerIdFromConnId(id));
-  serverConnIdParams.clientConnId.assign(id);
   return serverConnIdParams;
 }
 

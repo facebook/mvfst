@@ -199,13 +199,11 @@ TEST_F(TypesTest, KeyPhase) {
 TEST_F(TypesTest, TestConnIdWorkerId) {
   std::vector<uint8_t> connIdData(kDefaultConnectionIdSize);
   folly::Random::secureRandom(connIdData.data(), connIdData.size());
-  ConnectionId randConnId(connIdData);
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
   for (uint8_t i = 0; i <= 254; i++) {
     uint8_t processId = i % 2;
     uint16_t hostId = folly::Random::rand32() % 4095;
     ServerConnectionIdParams params(hostId, processId, i);
-    params.clientConnId = randConnId;
     auto paramsAfterEncode =
         connIdAlgo->parseConnectionId(connIdAlgo->encodeConnectionId(params));
     EXPECT_TRUE(connIdAlgo->canParse(connIdAlgo->encodeConnectionId(params)));

@@ -430,7 +430,6 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   auto conn = createConn();
   // create server chosen connId with processId = 0 and workerId = 0
   ServerConnectionIdParams params(0, 0, 0);
-  params.clientConnId = *conn->clientConnectionId;
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
   folly::Optional<ConnectionId> serverChosenConnId =
       connIdAlgo->encodeConnectionId(params);
@@ -470,7 +469,6 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
   auto conn = createConn();
   // create server chosen connId with processId = 0 and workerId = 0
   ServerConnectionIdParams params(0, 0, 0);
-  params.clientConnId = *conn->clientConnectionId;
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
   folly::Optional<ConnectionId> serverChosenConnId =
       connIdAlgo->encodeConnectionId(params);

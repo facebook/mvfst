@@ -501,6 +501,7 @@ void onServerReadDataFromOpen(
         FizzCryptoFactory(&fizzFactory)
             .getClientInitialCipher(initialDestinationConnectionId, version));
     conn.readCodec->setClientConnectionId(clientConnectionId);
+    conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     if (conn.qLogger) {
       conn.qLogger->scid = conn.serverConnectionId;
       conn.qLogger->dcid = clientConnectionId;
@@ -686,31 +687,11 @@ void onServerReadDataFromOpen(
       }
     }
 
-    // TODO: remove this when we actually negotiate connid and version
-    if (!conn.clientConnectionId) {
-      conn.clientConnectionId = folly::variant_match(
-          regularPacket.header,
-          [](const LongHeader& longHeader) {
-            return longHeader.getSourceConnId();
-          },
-          [](const ShortHeader& shortHeader) {
-            return shortHeader.getConnectionId();
-          });
-      // change the connection id when we switch
-      CHECK(conn.clientConnectionId);
-      // TODO: if conn.serverConnIdParams->clientConnId != conn.clientConnId,
-      // we need to update sourceAddressMap_.
-      // TODO: need to remove ServerConnectionIdParams::clientConnId, it is no
-      // longer needed.
-      conn.serverConnIdParams->clientConnId = *conn.clientConnectionId;
-      conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
-      if (conn.qLogger) {
-        conn.qLogger->dcid = conn.clientConnectionId;
-        conn.qLogger->scid = conn.serverConnectionId;
-      }
-    }
+    CHECK(conn.clientConnectionId);
     if (conn.qLogger) {
       conn.qLogger->addPacket(regularPacket, packetSize);
+      conn.qLogger->dcid = conn.clientConnectionId;
+      conn.qLogger->scid = conn.serverConnectionId;
     }
     QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
     // We assume that the higher layer takes care of validating that the version
