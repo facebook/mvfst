@@ -295,7 +295,7 @@ class BbrCongestionController : public CongestionController {
   // Number of bytes we expect to send over on RTT when paced write.
   uint64_t pacingWindow_{0};
   uint64_t pacingBurstSize_{0};
-  std::chrono::microseconds pacingInterval_;
+  std::chrono::microseconds pacingInterval_{0us};
 
   float cwndGain_{kStartupGain};
   float pacingGain_{kStartupGain};

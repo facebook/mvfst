@@ -91,7 +91,7 @@ struct AckBlock {
  */
 struct ReadAckFrame {
   PacketNum largestAcked;
-  std::chrono::microseconds ackDelay;
+  std::chrono::microseconds ackDelay{0us};
   // Should have at least 1 block.
   // These are ordered in descending order by start packet.
   std::vector<AckBlock> ackBlocks;
@@ -105,7 +105,7 @@ struct ReadAckFrame {
 struct WriteAckFrame {
   IntervalSet<PacketNum> ackBlocks;
   // Delay in sending ack from time that packet was received.
-  std::chrono::microseconds ackDelay;
+  std::chrono::microseconds ackDelay{0us};
 
   bool operator==(const WriteAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.

@@ -87,25 +87,25 @@ class QuicSocket {
    * Information about the transport, similar to what TCP has.
    */
   struct TransportInfo {
-    std::chrono::microseconds srtt;
-    std::chrono::microseconds rttvar;
-    std::chrono::microseconds lrtt;
-    std::chrono::microseconds mrtt;
-    uint64_t writableBytes;
-    uint64_t congestionWindow;
-    uint64_t pacingBurstSize;
-    std::chrono::microseconds pacingInterval;
-    uint32_t packetsRetransmitted;
-    uint32_t timeoutBasedLoss;
-    std::chrono::microseconds pto;
-    uint64_t bytesSent;
-    uint64_t bytesAcked;
-    uint64_t bytesRecvd;
-    uint64_t totalBytesRetransmitted;
-    uint32_t ptoCount;
-    uint32_t totalPTOCount;
-    PacketNum largestPacketAckedByPeer;
-    PacketNum largestPacketSent;
+    std::chrono::microseconds srtt{0us};
+    std::chrono::microseconds rttvar{0us};
+    std::chrono::microseconds lrtt{0us};
+    std::chrono::microseconds mrtt{0us};
+    uint64_t writableBytes{0};
+    uint64_t congestionWindow{0};
+    uint64_t pacingBurstSize{0};
+    std::chrono::microseconds pacingInterval{0us};
+    uint32_t packetsRetransmitted{0};
+    uint32_t timeoutBasedLoss{0};
+    std::chrono::microseconds pto{0us};
+    uint64_t bytesSent{0};
+    uint64_t bytesAcked{0};
+    uint64_t bytesRecvd{0};
+    uint64_t totalBytesRetransmitted{0};
+    uint32_t ptoCount{0};
+    uint32_t totalPTOCount{0};
+    PacketNum largestPacketAckedByPeer{0};
+    PacketNum largestPacketSent{0};
   };
 
   /**

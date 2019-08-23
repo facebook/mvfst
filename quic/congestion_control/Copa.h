@@ -113,7 +113,7 @@ class Copa : public CongestionController {
   double latencyFactor_{0.50};
 
   uint64_t pacingBurstSize_{0};
-  std::chrono::microseconds pacingInterval_;
+  std::chrono::microseconds pacingInterval_{0us};
   std::chrono::microseconds minimalPacingInterval_{
       folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL};
 };
