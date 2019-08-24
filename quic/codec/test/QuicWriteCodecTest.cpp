@@ -21,7 +21,6 @@
 using namespace quic;
 using namespace quic::test;
 using namespace testing;
-using namespace std::chrono;
 
 ShortHeader buildTestShortHeader() {
   return ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);

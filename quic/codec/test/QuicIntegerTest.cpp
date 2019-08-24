@@ -15,7 +15,6 @@
 #include <quic/QuicException.h>
 #include <quic/codec/QuicInteger.h>
 
-using namespace quic;
 using namespace testing;
 using namespace folly;
 

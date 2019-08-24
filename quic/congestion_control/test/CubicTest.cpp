@@ -10,8 +10,6 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/test/TestingCubic.h>
 
-using namespace quic;
-using namespace quic::test;
 using namespace testing;
 
 namespace quic {

@@ -12,7 +12,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/state/StateData.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

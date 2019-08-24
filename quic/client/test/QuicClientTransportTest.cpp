@@ -33,9 +33,7 @@
 
 using namespace testing;
 using namespace folly;
-using namespace folly::io;
 using namespace quic::samples;
-using namespace quic::test;
 
 namespace quic {
 namespace test {

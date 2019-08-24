@@ -9,7 +9,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/logging/QuicLogger.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

@@ -18,9 +18,6 @@
 
 #include <cstdint>
 
-using namespace fizz;
-using namespace fizz::server;
-using namespace quic;
 
 namespace quic {
 namespace test {

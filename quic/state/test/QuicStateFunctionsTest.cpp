@@ -14,7 +14,6 @@
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/test/Mocks.h>
 
-using namespace folly;
 using namespace testing;
 
 namespace quic {

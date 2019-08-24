@@ -17,7 +17,6 @@
 
 using namespace fizz;
 using namespace fizz::test;
-using namespace quic;
 
 namespace quic {
 namespace test {

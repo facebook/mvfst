@@ -11,7 +11,6 @@
 
 using namespace std;
 using namespace quic;
-using namespace testing;
 
 TEST(IntervalSet, empty) {
   IntervalSet<int> set;

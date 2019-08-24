@@ -34,10 +34,7 @@
 #include <quic/state/StateData.h>
 
 using namespace std;
-using namespace quic;
 using namespace folly;
-using namespace folly::test;
-using namespace folly::ssl;
 using namespace testing;
 
 static constexpr StringPiece kTestHostname = "www.facebook.com";

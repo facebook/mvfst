@@ -10,9 +10,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/codec/Types.h>
 
-using namespace quic;
 using namespace testing;
-using namespace folly;
 
 namespace quic {
 namespace test {

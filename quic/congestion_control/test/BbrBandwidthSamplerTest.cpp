@@ -13,7 +13,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

@@ -9,7 +9,6 @@
 #include <quic/codec/QuicWriteCodec.h>
 
 #include <algorithm>
-#include <limits>
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>

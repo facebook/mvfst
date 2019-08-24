@@ -11,7 +11,6 @@
 
 using namespace std;
 using namespace folly;
-using namespace quic;
 using namespace testing;
 
 namespace quic {

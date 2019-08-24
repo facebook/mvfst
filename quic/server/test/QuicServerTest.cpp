@@ -23,7 +23,6 @@
 
 using namespace testing;
 using namespace folly;
-using namespace folly::io;
 
 const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
 

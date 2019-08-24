@@ -12,9 +12,7 @@
 namespace quic {
 namespace test {
 
-using namespace std;
 using namespace quic;
-using namespace testing;
 
 TEST(TimeUtil, TestMinTwo) {
   std::chrono::milliseconds ms1 = 10ms;

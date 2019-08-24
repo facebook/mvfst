@@ -23,7 +23,6 @@
 using namespace folly::test;
 using namespace testing;
 using namespace folly;
-using namespace std::chrono_literals;
 
 namespace quic {
 namespace test {

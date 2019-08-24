@@ -22,7 +22,6 @@
 #include <glog/logging.h>
 
 #include <chrono>
-#include <cstdint>
 #include <string>
 #include <vector>
 

@@ -20,7 +20,6 @@
 #include <gtest/gtest.h>
 
 using namespace folly;
-using namespace quic;
 using namespace testing;
 
 namespace quic {

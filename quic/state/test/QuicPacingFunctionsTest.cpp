@@ -10,7 +10,6 @@
 
 #include <folly/portability/GTest.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

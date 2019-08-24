@@ -13,7 +13,6 @@
 #include <iterator>
 
 using namespace testing;
-using namespace folly;
 
 namespace quic {
 namespace test {

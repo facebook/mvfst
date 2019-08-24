@@ -14,7 +14,6 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/logging/FileQLogger.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic::test {

@@ -18,11 +18,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <cstdint>
 
-using namespace fizz;
 using namespace fizz::server;
-using namespace quic;
 using namespace testing;
 
 namespace quic {

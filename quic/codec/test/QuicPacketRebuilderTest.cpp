@@ -17,7 +17,6 @@
 #include <quic/state/StateData.h>
 #include <quic/state/stream/StreamStateFunctions.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

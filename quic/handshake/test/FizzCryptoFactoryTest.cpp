@@ -15,7 +15,6 @@
 #include <quic/handshake/QuicFizzFactory.h>
 #include <quic/handshake/test/Mocks.h>
 
-using namespace folly;
 using namespace testing;
 
 namespace quic {

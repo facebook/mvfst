@@ -12,7 +12,6 @@
 #include <quic/common/test/TestUtils.h>
 
 using namespace testing;
-using namespace std::chrono_literals;
 
 namespace quic {
 namespace test {

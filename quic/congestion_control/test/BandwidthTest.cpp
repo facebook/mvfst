@@ -11,7 +11,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/congestion_control/Bbr.h>
 
-using namespace quic;
 using namespace testing;
 
 namespace quic {

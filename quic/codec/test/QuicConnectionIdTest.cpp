@@ -13,7 +13,6 @@
 #include <folly/portability/GTest.h>
 
 using namespace testing;
-using namespace folly;
 
 namespace quic {
 namespace test {
