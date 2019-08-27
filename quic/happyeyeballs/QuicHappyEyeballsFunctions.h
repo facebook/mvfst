@@ -11,15 +11,15 @@
 #include <quic/state/StateData.h>
 
 #include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/net/NetOps.h>
 
-#include <sys/socket.h>
 #include <chrono>
 #include <memory>
 
 namespace folly {
 class EventBase;
 class SocketAddress;
-}
+} // namespace folly
 
 namespace quic {
 struct TransportSettings;

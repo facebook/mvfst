@@ -9,6 +9,8 @@
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/state/QuicStateFunctions.h>
 
+#include <folly/lang/Assume.h>
+
 namespace quic {
 
 template <typename ClockType>
@@ -23,7 +25,7 @@ inline folly::Optional<PacketNum> AckScheduler::writeNextAcks(
       return writeAcksIfPending<ClockType>(builder);
     }
   }
-  __builtin_unreachable();
+  folly::assume_unreachable();
 }
 
 template <typename ClockType>

@@ -18,7 +18,6 @@
 #include <folly/net/NetOps.h>
 #include <folly/portability/Sockets.h>
 
-#include <sys/socket.h>
 #include <chrono>
 #include <memory>
 

@@ -2421,9 +2421,7 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
   }
   return StreamTransportInfo{
-      .totalHeadOfLineBlockedTime = stream->totalHolbTime,
-      .holbCount = stream->holbCount,
-      .isHolb = bool(stream->lastHolbTime)};
+      stream->totalHolbTime, stream->holbCount, bool(stream->lastHolbTime)};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {

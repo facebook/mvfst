@@ -239,6 +239,7 @@ std::string toString(PacketNumberSpace pnSpace) {
       return "AppDataSpace";
   }
   CHECK(false) << "Unknown packet number space";
+  folly::assume_unreachable();
 }
 
 std::string toString(ProtectionType protectionType) {
@@ -255,6 +256,7 @@ std::string toString(ProtectionType protectionType) {
       return "KeyPhaseOne";
   }
   CHECK(false) << "Unknown protection type";
+  folly::assume_unreachable();
 }
 
 std::string toString(FrameType frame) {
