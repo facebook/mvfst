@@ -42,8 +42,6 @@ class NewReno : public CongestionController {
 
   std::chrono::microseconds getPacingInterval() const noexcept override;
 
-  void setMinimalPacingInterval(std::chrono::microseconds) noexcept override;
-
   bool isAppLimited() const noexcept override;
 
  private:

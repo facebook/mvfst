@@ -253,7 +253,7 @@ void BbrCongestionController::updatePacing() noexcept {
     return;
   }
   auto mrtt = minRtt();
-  if (mrtt == 0us || mrtt < minimalPacingInterval_) {
+  if (mrtt == 0us || mrtt < conn_.transportSettings.pacingTimerTickInterval) {
     return;
   }
   // TODO(t40615081, yangchi) cloning Handshake packets make this better
@@ -266,7 +266,7 @@ void BbrCongestionController::updatePacing() noexcept {
       !pacingWindow_ &&
       conn_.lossState.mrtt != std::chrono::microseconds::max() &&
       conn_.lossState.mrtt != 0us &&
-      conn_.lossState.mrtt >= minimalPacingInterval_) {
+      conn_.lossState.mrtt >= conn_.transportSettings.pacingTimerTickInterval) {
     pacingWindow_ = initialCwnd_;
     mrtt = conn_.lossState.mrtt;
   } else {
@@ -274,7 +274,11 @@ void BbrCongestionController::updatePacing() noexcept {
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
   std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
-      conn_, pacingWindow_, kMinCwndInMssForBbr, minimalPacingInterval_, mrtt);
+      conn_,
+      pacingWindow_,
+      kMinCwndInMssForBbr,
+      conn_.transportSettings.pacingTimerTickInterval,
+      mrtt);
 
   if (conn_.transportSettings.pacingEnabled && conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
@@ -593,16 +597,11 @@ void BbrCongestionController::markPacerTimeoutScheduled(TimePoint) noexcept {
   /* This API is going away */
 }
 
-void BbrCongestionController::setMinimalPacingInterval(
-    std::chrono::microseconds interval) noexcept {
-  minimalPacingInterval_ = interval;
-}
-
 bool BbrCongestionController::canBePaced() const noexcept {
   if (!bandwidth() || 0us == minRtt()) {
     return false;
   }
-  if (conn_.lossState.srtt < minimalPacingInterval_) {
+  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
     return false;
   }
   return true;

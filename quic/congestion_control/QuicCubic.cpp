@@ -168,10 +168,7 @@ void Cubic::setConnectionEmulation(uint8_t num) noexcept {
 }
 
 bool Cubic::canBePaced() const noexcept {
-  if (pacingInterval_ == std::chrono::milliseconds::zero()) {
-    return false;
-  }
-  if (conn_.lossState.srtt < minimalPacingInterval_) {
+  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
     return false;
   }
   return true;
@@ -520,14 +517,6 @@ std::chrono::microseconds Cubic::getPacingInterval() const noexcept {
   return pacingInterval_;
 }
 
-void Cubic::setMinimalPacingInterval(
-    std::chrono::microseconds interval) noexcept {
-  if (interval != 0us) {
-    minimalPacingInterval_ = interval;
-    updatePacing();
-  }
-}
-
 float Cubic::pacingGain() const noexcept {
   double pacingGain = 1.0f;
   if (state_ == CubicStates::Hystart) {
@@ -543,13 +532,13 @@ void Cubic::updatePacing() noexcept {
       conn_,
       cwndBytes_ * pacingGain(),
       conn_.transportSettings.minCwndInMss,
-      minimalPacingInterval_,
+      conn_.transportSettings.pacingTimerTickInterval,
       conn_.lossState.srtt);
   if (pacingInterval_ == std::chrono::milliseconds::zero()) {
     return;
   }
   if (!spreadAcrossRtt_) {
-    pacingInterval_ = minimalPacingInterval_;
+    pacingInterval_ = conn_.transportSettings.pacingTimerTickInterval;
   }
   if (conn_.transportSettings.pacingEnabled) {
     if (conn_.qLogger) {

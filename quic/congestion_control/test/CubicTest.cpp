@@ -248,12 +248,12 @@ TEST_F(CubicTest, AppIdle) {
 
 TEST_F(CubicTest, PacingGain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto qLogger = std::make_shared<FileQLogger>();
   conn.qLogger = qLogger;
 
   conn.udpSendPacketLen = 1500;
   Cubic cubic(conn);
-  cubic.setMinimalPacingInterval(1ms);
   conn.lossState.srtt = 3000us;
   auto packet = makeTestingWritePacket(0, 1500, 1500);
   cubic.onPacketSent(packet);
@@ -295,12 +295,12 @@ TEST_F(CubicTest, PacingGain) {
 
 TEST_F(CubicTest, PacingSpread) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.pacingTimerTickInterval = 1ms;
   conn.lossState.srtt = 60ms;
   conn.udpSendPacketLen = 1500;
   Cubic::CubicBuilder builder;
   builder.setPacingSpreadAcrossRtt(true);
   auto cubic = builder.build(conn);
-  cubic->setMinimalPacingInterval(1ms);
 
   for (size_t i = 0; i < 5; i++) {
     auto packet = makeTestingWritePacket(i, 1500, 4500 + 1500 * (1 + i));
@@ -315,9 +315,9 @@ TEST_F(CubicTest, PacingSpread) {
 
 TEST_F(CubicTest, LatePacingTimer) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.pacingTimerTickInterval = 1ms;
   conn.lossState.srtt = 50ms;
   Cubic cubic(conn);
-  cubic.setMinimalPacingInterval(1ms);
   auto packet =
       makeTestingWritePacket(0, conn.udpSendPacketLen, conn.udpSendPacketLen);
   cubic.onPacketSent(packet);

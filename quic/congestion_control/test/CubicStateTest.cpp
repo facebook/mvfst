@@ -46,17 +46,9 @@ TEST_F(CubicStateTest, HystartPace) {
   conn.transportSettings.pacingEnabled = true;
   conn.lossState.srtt = 2000000us;
   TestingCubic cubic(conn);
-  cubic.setMinimalPacingInterval(10ms);
+  conn.transportSettings.pacingTimerTickInterval = 10ms;
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
   EXPECT_TRUE(cubic.canBePaced());
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::PacingMetricUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogPacingMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->pacingBurstSize, 1);
-  EXPECT_EQ(event->pacingInterval, 10ms);
 }
 
 // ======= Fast Recovery =======
@@ -135,21 +127,14 @@ TEST_F(CubicStateTest, SteadyCanPace) {
   auto qLogger = std::make_shared<FileQLogger>();
   conn.qLogger = qLogger;
   conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = 2000000us;
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::Steady);
   EXPECT_FALSE(cubic.canBePaced());
-  cubic.setMinimalPacingInterval(15ms);
+  conn.lossState.srtt = 2000000us;
+  conn.transportSettings.pacingTimerTickInterval = 15ms;
   EXPECT_TRUE(cubic.canBePaced());
   conn.lossState.srtt = 1ms;
   EXPECT_FALSE(cubic.canBePaced());
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::PacingMetricUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogPacingMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->pacingBurstSize, 1);
-  EXPECT_EQ(event->pacingInterval, 15ms);
 }
 
 } // namespace test

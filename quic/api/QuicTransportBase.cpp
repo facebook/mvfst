@@ -58,10 +58,6 @@ void QuicTransportBase::setPacingTimer(
     TimerHighRes::SharedPtr pacingTimer) noexcept {
   if (pacingTimer) {
     writeLooper_->setPacingTimer(std::move(pacingTimer));
-    if (conn_->congestionController) {
-      conn_->congestionController->setMinimalPacingInterval(
-          writeLooper_->getTimerTickInterval().value());
-    }
   }
 }
 

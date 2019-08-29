@@ -185,8 +185,6 @@ std::chrono::microseconds NewReno::getPacingInterval() const noexcept {
       folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL);
 }
 
-void NewReno::setMinimalPacingInterval(std::chrono::microseconds) noexcept {}
-
 void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
 }
 
