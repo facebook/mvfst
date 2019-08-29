@@ -273,12 +273,8 @@ void BbrCongestionController::updatePacing() noexcept {
     pacingWindow_ = std::max(pacingWindow_, targetPacingWindow);
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
-  std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
-      conn_,
-      pacingWindow_,
-      kMinCwndInMssForBbr,
-      conn_.transportSettings.pacingTimerTickInterval,
-      mrtt);
+  std::tie(pacingInterval_, pacingBurstSize_) =
+      calculatePacingRate(conn_, pacingWindow_, kMinCwndInMssForBbr, mrtt);
 
   if (conn_.transportSettings.pacingEnabled && conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);

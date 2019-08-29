@@ -532,7 +532,6 @@ void Cubic::updatePacing() noexcept {
       conn_,
       cwndBytes_ * pacingGain(),
       conn_.transportSettings.minCwndInMss,
-      conn_.transportSettings.pacingTimerTickInterval,
       conn_.lossState.srtt);
   if (pacingInterval_ == std::chrono::milliseconds::zero()) {
     return;
