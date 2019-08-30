@@ -24,6 +24,18 @@ uint64_t boundedCwnd(
       minCwndInMss * packetLength);
 }
 
+PacingRate calculatePacingRateWrapper(
+    const QuicConnectionStateBase& conn,
+    uint64_t cwnd,
+    uint64_t minCwndInMss,
+    std::chrono::microseconds rtt) {
+  auto result = calculatePacingRate(conn, cwnd, minCwndInMss, rtt);
+  return PacingRate::Builder()
+      .setInterval(result.first)
+      .setBurstSize(result.second)
+      .build();
+}
+
 std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,

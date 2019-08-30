@@ -27,6 +27,14 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
     uint64_t minCwndInMss,
     std::chrono::microseconds rtt);
 
+// TODO: Temporary wrapper to make the transition from CC doing pacing to
+// the real pacer easier. Need to remove it after real pacer is used everywhere.
+PacingRate calculatePacingRateWrapper(
+    const QuicConnectionStateBase& conn,
+    uint64_t cwnd,
+    uint64_t minCwndInMss,
+    std::chrono::microseconds rtt);
+
 template <class T1, class T2>
 void addAndCheckOverflow(T1& value, const T2& toAdd) {
   if (UNLIKELY(std::numeric_limits<T1>::max() - toAdd < value)) {

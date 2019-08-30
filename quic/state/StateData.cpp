@@ -73,4 +73,26 @@ bool AckStateVersion::operator==(const AckStateVersion& other) const {
 bool AckStateVersion::operator!=(const AckStateVersion& other) const {
   return !operator==(other);
 }
+
+PacingRate::PacingRate(
+    std::chrono::microseconds intervalIn,
+    uint64_t burstSizeIn)
+    : interval(intervalIn), burstSize(burstSizeIn) {}
+
+PacingRate::Builder&& PacingRate::Builder::setInterval(
+    std::chrono::microseconds intervalIn) && {
+  interval_ = intervalIn;
+  return std::move(*this);
+}
+
+PacingRate::Builder&& PacingRate::Builder::setBurstSize(
+    uint64_t burstSizeIn) && {
+  burstSize_ = burstSizeIn;
+  return std::move(*this);
+}
+
+PacingRate PacingRate::Builder::build() && {
+  return PacingRate(interval_, burstSize_);
+}
+
 } // namespace quic

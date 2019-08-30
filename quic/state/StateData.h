@@ -160,6 +160,24 @@ struct Pacer {
   virtual uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) = 0;
 };
 
+struct PacingRate {
+  std::chrono::microseconds interval{0us};
+  uint64_t burstSize{0};
+
+  struct Builder {
+    Builder&& setInterval(std::chrono::microseconds interval) &&;
+    Builder&& setBurstSize(uint64_t burstSize) &&;
+    PacingRate build() &&;
+
+   private:
+    std::chrono::microseconds interval_{0us};
+    uint64_t burstSize_{0};
+  };
+
+ private:
+  PacingRate(std::chrono::microseconds interval, uint64_t burstSize);
+};
+
 struct CongestionController {
   // Helper struct to group multiple lost packets into one event
   struct LossEvent {
