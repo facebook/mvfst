@@ -329,13 +329,6 @@ void Copa::updatePacing() noexcept {
   }
 }
 
-bool Copa::canBePaced() const noexcept {
-  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
-    return false;
-  }
-  return true;
-}
-
 uint64_t Copa::getBytesInFlight() const noexcept {
   return bytesInFlight_;
 }

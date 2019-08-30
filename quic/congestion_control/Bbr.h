@@ -203,7 +203,6 @@ class BbrCongestionController : public CongestionController {
   uint64_t getPacingRate(TimePoint currentTime) noexcept override;
   std::chrono::microseconds getPacingInterval() const noexcept override;
   void markPacerTimeoutScheduled(TimePoint) noexcept override;
-  bool canBePaced() const noexcept override;
 
   // TODO: some of these do not have to be in public API.
   bool inRecovery() const noexcept;

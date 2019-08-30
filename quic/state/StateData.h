@@ -268,11 +268,6 @@ struct CongestionController {
   virtual uint64_t getCongestionWindow() const = 0;
   virtual void setConnectionEmulation(uint8_t) = 0;
   /**
-   * Whether CongestionController think the connection can be paced. For
-   * example, we probably don't want to pace a connection in Recovery.
-   */
-  virtual bool canBePaced() const = 0;
-  /**
    * Notify congestion controller that the connection has become idle or active
    * in the sense that there are active non-control streams.
    * idle: true if the connection has become app-idle, false if the

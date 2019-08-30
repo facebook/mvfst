@@ -15,6 +15,11 @@ namespace quic {
 namespace test {
 
 class PacerTest : public Test {
+ public:
+  void SetUp() override {
+    conn.transportSettings.pacingTimerTickInterval = 1us;
+  }
+
  protected:
   QuicConnectionStateBase conn{QuicNodeType::Client};
   DefaultPacer pacer{conn, conn.transportSettings.minCwndInMss};
@@ -67,6 +72,24 @@ TEST_F(PacerTest, NextWriteTime) {
   });
   pacer.refreshPacingRate(20, 1000us);
   EXPECT_EQ(1000us, pacer.getTimeUntilNextWrite());
+}
+
+TEST_F(PacerTest, ImpossibleToPace) {
+  conn.transportSettings.pacingTimerTickInterval = 1ms;
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase& conn,
+                                   uint64_t cwndBytes,
+                                   uint64_t,
+                                   std::chrono::microseconds rtt) {
+    return PacingRate::Builder()
+        .setInterval(rtt)
+        .setBurstSize(cwndBytes / conn.udpSendPacketLen)
+        .build();
+  });
+  pacer.refreshPacingRate(200 * conn.udpSendPacketLen, 100us);
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      pacer.updateAndGetWriteBatchSize(Clock::now()));
 }
 
 } // namespace test

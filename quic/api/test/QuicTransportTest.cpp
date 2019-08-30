@@ -2468,8 +2468,6 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   conn.canBePaced = true;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(100));
-  EXPECT_CALL(*rawCongestionController, canBePaced())
-      .WillRepeatedly(Return(true));
 
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
@@ -2490,8 +2488,6 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   conn.canBePaced = true;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(100));
-  EXPECT_CALL(*rawCongestionController, canBePaced())
-      .WillRepeatedly(Return(true));
 
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();
@@ -2521,8 +2517,6 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   conn.canBePaced = true;
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(1000));
-  EXPECT_CALL(*rawCongestionController, canBePaced())
-      .WillRepeatedly(Return(true));
 
   auto buf = buildRandomInputData(200);
   auto streamId = transport_->createBidirectionalStream().value();

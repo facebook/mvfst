@@ -247,6 +247,9 @@ void BbrCongestionController::onPacketAcked(
       inflightBytes_);
 }
 
+// TODO: We used to check if there is available bandwidth and rtt samples in
+// canBePaced function. Now this function is gone, maybe we need to change this
+// updatePacing function.
 void BbrCongestionController::updatePacing() noexcept {
   auto bandwidthEstimate = bandwidth();
   if (!bandwidthEstimate) {
@@ -591,16 +594,6 @@ std::chrono::microseconds BbrCongestionController::getPacingInterval() const
 
 void BbrCongestionController::markPacerTimeoutScheduled(TimePoint) noexcept {
   /* This API is going away */
-}
-
-bool BbrCongestionController::canBePaced() const noexcept {
-  if (!bandwidth() || 0us == minRtt()) {
-    return false;
-  }
-  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
-    return false;
-  }
-  return true;
 }
 
 std::string bbrStateToString(BbrCongestionController::BbrState state) {

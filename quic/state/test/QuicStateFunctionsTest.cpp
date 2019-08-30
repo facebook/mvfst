@@ -448,14 +448,6 @@ TEST_F(QuicStateFunctionsTest, IsConnectionPaced) {
 
   state.transportSettings.pacingEnabled = true;
   EXPECT_FALSE(isConnectionPaced(state));
-
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  state.congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, canBePaced()).WillOnce(Return(false));
-  EXPECT_FALSE(isConnectionPaced(state));
-  EXPECT_CALL(*rawCongestionController, canBePaced()).WillOnce(Return(true));
-  EXPECT_TRUE(isConnectionPaced(state));
 }
 
 TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {

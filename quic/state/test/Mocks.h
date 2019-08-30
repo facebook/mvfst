@@ -26,7 +26,6 @@ class MockCongestionController : public CongestionController {
   MOCK_CONST_METHOD0(getCongestionWindow, uint64_t());
   MOCK_METHOD0(onSpuriousLoss, void());
   GMOCK_METHOD1_(, , , setConnectionEmulation, void(uint8_t));
-  MOCK_CONST_METHOD0(canBePaced, bool());
   MOCK_CONST_METHOD0(type, CongestionControlType());
   GMOCK_METHOD1_(, , , getPacingRate, uint64_t(TimePoint));
   GMOCK_METHOD1_(, , , markPacerTimeoutScheduled, void(TimePoint));

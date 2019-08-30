@@ -23,6 +23,11 @@ DefaultPacer::DefaultPacer(
 void DefaultPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt) {
+  if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
+    writeInterval_ = 0us;
+    batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
+    return;
+  }
   const PacingRate pacingRate =
       pacingRateCalculator_(conn_, cwndBytes, minCwndInMss_, rtt);
   writeInterval_ = pacingRate.interval;
@@ -41,6 +46,9 @@ uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
     scheduledWriteTime_.clear();
   };
+  if (writeInterval_ == 0us) {
+    return batchSize_;
+  }
   if (!scheduledWriteTime_ || *scheduledWriteTime_ >= currentTime) {
     return batchSize_;
   }

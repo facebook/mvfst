@@ -167,13 +167,6 @@ void Cubic::setConnectionEmulation(uint8_t num) noexcept {
   calculateReductionFactors();
 }
 
-bool Cubic::canBePaced() const noexcept {
-  if (conn_.lossState.srtt < conn_.transportSettings.pacingTimerTickInterval) {
-    return false;
-  }
-  return true;
-}
-
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
   QUIC_TRACE(
       cubic_appidle,

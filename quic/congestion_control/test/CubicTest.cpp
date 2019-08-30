@@ -339,21 +339,5 @@ TEST_F(CubicTest, LatePacingTimer) {
   auto pacingRateAgain = cubic.getPacingRate(currentTime + 50ms);
   EXPECT_LT(pacingRateAgain, pacingRateWithCompensation);
 }
-
-TEST_F(CubicTest, RttSmallerThanInterval) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1500;
-  conn.lossState.srtt = 1us;
-  Cubic cubic(conn);
-  auto packet = makeTestingWritePacket(0, 1500, 1500);
-  cubic.onPacketSent(packet);
-  cubic.onPacketAckOrLoss(
-      makeAck(0, 1500, Clock::now(), packet.time), folly::none);
-  EXPECT_FALSE(cubic.canBePaced());
-  EXPECT_EQ(std::chrono::milliseconds::zero(), cubic.getPacingInterval());
-  EXPECT_EQ(
-      conn.transportSettings.writeConnectionDataPacketsLimit,
-      cubic.getPacingRate(Clock::now()));
-}
 } // namespace test
 } // namespace quic

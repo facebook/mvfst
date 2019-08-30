@@ -161,11 +161,6 @@ CongestionControlType NewReno::type() const noexcept {
 
 void NewReno::setConnectionEmulation(uint8_t) noexcept {}
 
-bool NewReno::canBePaced() const noexcept {
-  // Pacing is not supported on NewReno currently
-  return false;
-}
-
 uint64_t NewReno::getBytesInFlight() const noexcept {
   return bytesInFlight_;
 }

@@ -46,9 +46,6 @@ class Copa : public CongestionController {
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
 
-  // pacing related functions, not implemented for copa
-  bool canBePaced() const noexcept override;
-
   uint64_t getPacingRate(TimePoint currentTime) noexcept override;
 
   void markPacerTimeoutScheduled(TimePoint currentTime) noexcept override;

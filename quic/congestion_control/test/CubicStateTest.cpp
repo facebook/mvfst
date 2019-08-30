@@ -39,18 +39,6 @@ TEST_F(CubicStateTest, HystartAck) {
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
 
-TEST_F(CubicStateTest, HystartPace) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>();
-  conn.qLogger = qLogger;
-  conn.transportSettings.pacingEnabled = true;
-  conn.lossState.srtt = 2000000us;
-  TestingCubic cubic(conn);
-  conn.transportSettings.pacingTimerTickInterval = 10ms;
-  EXPECT_EQ(CubicStates::Hystart, cubic.state());
-  EXPECT_TRUE(cubic.canBePaced());
-}
-
 // ======= Fast Recovery =======
 
 TEST_F(CubicStateTest, FastRecoveryAck) {
@@ -121,21 +109,5 @@ TEST_F(CubicStateTest, SteadyLoss) {
   cubic.onPacketAckOrLoss(folly::none, lossEvent);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
-
-TEST_F(CubicStateTest, SteadyCanPace) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>();
-  conn.qLogger = qLogger;
-  conn.transportSettings.pacingEnabled = true;
-  TestingCubic cubic(conn);
-  cubic.setStateForTest(CubicStates::Steady);
-  EXPECT_FALSE(cubic.canBePaced());
-  conn.lossState.srtt = 2000000us;
-  conn.transportSettings.pacingTimerTickInterval = 15ms;
-  EXPECT_TRUE(cubic.canBePaced());
-  conn.lossState.srtt = 1ms;
-  EXPECT_FALSE(cubic.canBePaced());
-}
-
 } // namespace test
 } // namespace quic
