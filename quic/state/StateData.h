@@ -125,6 +125,41 @@ struct OutstandingPacket {
         totalBytesSent(totalBytesSentIn) {}
 };
 
+struct Pacer {
+  virtual ~Pacer() = default;
+
+  /**
+   * API for CongestionController to notify Pacer the latest cwnd value in bytes
+   * and connection RTT so that Pacer can recalculate pacing rates.
+   */
+  virtual void refreshPacingRate(
+      uint64_t cwndBytes,
+      std::chrono::microseconds rtt) = 0;
+
+  /**
+   * Notify the Pacer that a paced write is scheduled.
+   *
+   * currentTime: the time that the timer is scheduled. NOT the time that a
+   *              write is scheduled to happen.
+   */
+  virtual void onPacedWriteScheduled(TimePoint currentTime) = 0;
+
+  /**
+   * API for Trnasport to query the interval before next write
+   */
+  virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;
+
+  /**
+   * API for Transport to query a recalculated batch size based on currentTime
+   * and previously scheduled write time. The batch size is how many packets the
+   * transport can write out per eventbase loop.
+   *
+   * currentTime: The caller is expected to pass in a TimePoint value so that
+   *              the Pacer can compensate the timer drift.
+   */
+  virtual uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) = 0;
+};
+
 struct CongestionController {
   // Helper struct to group multiple lost packets into one event
   struct LossEvent {
