@@ -9,6 +9,7 @@
 #include <quic/congestion_control/Pacer.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -18,11 +19,18 @@ DefaultPacer::DefaultPacer(
     : conn_(conn),
       minCwndInMss_(minCwndInMss),
       batchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
-      pacingRateCalculator_(calculatePacingRateWrapper) {}
+      pacingRateCalculator_(calculatePacingRate) {}
 
 void DefaultPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt) {
+  SCOPE_EXIT {
+    if (conn_.qLogger) {
+      conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
+    }
+    QUIC_TRACE(
+        pacing_update, conn_, writeInterval_.count(), (uint64_t)batchSize_);
+  };
   if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
     writeInterval_ = 0us;
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;

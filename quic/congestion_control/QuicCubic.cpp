@@ -109,7 +109,10 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
       state_ = CubicStates::FastRecovery;
     }
     ssthresh_ = cwndBytes_;
-    updatePacing();
+    if (conn_.pacer) {
+      conn_.pacer->refreshPacingRate(
+          cwndBytes_ * pacingGain(), conn_.lossState.srtt);
+    }
     QUIC_TRACE(
         cubic_loss,
         conn_,
@@ -412,7 +415,10 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
       onPacketAckedInRecovery(ack);
       break;
   }
-  updatePacing();
+  if (conn_.pacer) {
+    conn_.pacer->refreshPacingRate(
+        cwndBytes_ * pacingGain(), conn_.lossState.srtt);
+  }
   if (cwndBytes_ == currentCwnd) {
     QUIC_TRACE(fst_trace, conn_, "cwnd_no_change", quiescenceStart_.hasValue());
     if (conn_.qLogger) {
@@ -486,30 +492,6 @@ Cubic::CubicBuilder& Cubic::CubicBuilder::setPacingSpreadAcrossRtt(
   return *this;
 }
 
-uint64_t Cubic::getPacingRate(TimePoint currentTime) noexcept {
-  // TODO: if this is the first query since the last time inflight reaches 0, we
-  // should give a larger burst size.
-  uint64_t extraBurstToken = 0;
-  if (scheduledNextWriteTime_.hasValue() &&
-      currentTime > *scheduledNextWriteTime_) {
-    auto timerDrift = currentTime - *scheduledNextWriteTime_;
-    extraBurstToken =
-        std::ceil(timerDrift / pacingInterval_) * pacingBurstSize_;
-  }
-  scheduledNextWriteTime_.clear();
-  return std::min(
-      conn_.transportSettings.maxBurstPackets,
-      pacingBurstSize_ + extraBurstToken);
-}
-
-void Cubic::markPacerTimeoutScheduled(TimePoint currentTime) noexcept {
-  scheduledNextWriteTime_ = currentTime + pacingInterval_;
-}
-
-std::chrono::microseconds Cubic::getPacingInterval() const noexcept {
-  return pacingInterval_;
-}
-
 float Cubic::pacingGain() const noexcept {
   double pacingGain = 1.0f;
   if (state_ == CubicStates::Hystart) {
@@ -518,30 +500,6 @@ float Cubic::pacingGain() const noexcept {
     pacingGain = kCubicRecoveryPacingGain;
   }
   return pacingGain;
-}
-
-void Cubic::updatePacing() noexcept {
-  std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
-      conn_,
-      cwndBytes_ * pacingGain(),
-      conn_.transportSettings.minCwndInMss,
-      conn_.lossState.srtt);
-  if (pacingInterval_ == std::chrono::milliseconds::zero()) {
-    return;
-  }
-  if (!spreadAcrossRtt_) {
-    pacingInterval_ = conn_.transportSettings.pacingTimerTickInterval;
-  }
-  if (conn_.transportSettings.pacingEnabled) {
-    if (conn_.qLogger) {
-      conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
-    }
-    QUIC_TRACE(
-        pacing_update,
-        conn_,
-        pacingInterval_.count(),
-        (uint64_t)pacingBurstSize_);
-  }
 }
 
 void Cubic::onPacketAckedInHystart(const AckEvent& ack) {

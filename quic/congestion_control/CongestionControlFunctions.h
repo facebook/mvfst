@@ -21,15 +21,7 @@ uint64_t boundedCwnd(
     uint64_t maxCwndInMss,
     uint64_t minCwndInMss) noexcept;
 
-std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
-    const QuicConnectionStateBase& conn,
-    uint64_t cwnd,
-    uint64_t minCwndInMss,
-    std::chrono::microseconds rtt);
-
-// TODO: Temporary wrapper to make the transition from CC doing pacing to
-// the real pacer easier. Need to remove it after real pacer is used everywhere.
-PacingRate calculatePacingRateWrapper(
+PacingRate calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
     uint64_t minCwndInMss,

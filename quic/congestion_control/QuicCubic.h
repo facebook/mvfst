@@ -103,12 +103,6 @@ class Cubic : public CongestionController {
 
   CongestionControlType type() const noexcept override;
 
-  void markPacerTimeoutScheduled(TimePoint currentTime) noexcept override;
-
-  std::chrono::microseconds getPacingInterval() const noexcept override;
-
-  uint64_t getPacingRate(TimePoint currentTime) noexcept override;
-
  protected:
   CubicStates state_{CubicStates::Hystart};
 
@@ -124,7 +118,6 @@ class Cubic : public CongestionController {
   void onPersistentCongestion();
 
   float pacingGain() const noexcept;
-  void updatePacing() noexcept;
 
   void startHystartRttRound(TimePoint time) noexcept;
 
@@ -204,13 +197,6 @@ class Cubic : public CongestionController {
   // evenly across an RTT. Otherwise, we will use the first N number of pacing
   // intervals to send all N bursts.
   bool spreadAcrossRtt_{false};
-  // Pacing interval. One rtt is split into multiple inverals when pacing is on
-  // and the spreadAcrossRtt_ option it set.
-  std::chrono::microseconds pacingInterval_{0};
-  // Pacing burst size
-  uint8_t pacingBurstSize_{0};
-
-  folly::Optional<TimePoint> scheduledNextWriteTime_;
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);

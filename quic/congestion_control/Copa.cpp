@@ -262,7 +262,9 @@ void Copa::onPacketAcked(const AckEvent& ack) {
             cwndBytes_ -
                 conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen));
   }
-  updatePacing();
+  if (conn_.pacer) {
+    conn_.pacer->refreshPacingRate(cwndBytes_ * 2, conn_.lossState.srtt);
+  }
 }
 
 void Copa::onPacketLoss(const LossEvent& loss) {
@@ -285,7 +287,9 @@ void Copa::onPacketLoss(const LossEvent& loss) {
           bytesInFlight_, getCongestionWindow(), kPersistentCongestion);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
-    updatePacing();
+    if (conn_.pacer) {
+      conn_.pacer->refreshPacingRate(cwndBytes_ * 2, conn_.lossState.srtt);
+    }
   }
 }
 
@@ -311,36 +315,8 @@ CongestionControlType Copa::type() const noexcept {
 
 void Copa::setConnectionEmulation(uint8_t) noexcept {}
 
-void Copa::updatePacing() noexcept {
-  std::tie(pacingInterval_, pacingBurstSize_) = calculatePacingRate(
-      conn_,
-      cwndBytes_ * 2,
-      conn_.transportSettings.minCwndInMss,
-      conn_.lossState.srtt);
-  if (pacingInterval_ == std::chrono::milliseconds::zero()) {
-    return;
-  }
-  if (conn_.transportSettings.pacingEnabled) {
-    VLOG(10) << "updatePacing pacingInterval_ = " << pacingInterval_.count()
-             << ", pacingBurstSize_ " << pacingBurstSize_ << " " << conn_;
-    if (conn_.qLogger) {
-      conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
-    }
-  }
-}
-
 uint64_t Copa::getBytesInFlight() const noexcept {
   return bytesInFlight_;
-}
-
-uint64_t Copa::getPacingRate(TimePoint /* currentTime */) noexcept {
-  return pacingBurstSize_;
-}
-
-void Copa::markPacerTimeoutScheduled(TimePoint /* currentTime*/) noexcept {}
-
-std::chrono::microseconds Copa::getPacingInterval() const noexcept {
-  return pacingInterval_;
 }
 
 void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */

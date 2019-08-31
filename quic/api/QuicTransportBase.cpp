@@ -12,6 +12,7 @@
 #include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/Pacer.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -47,8 +48,8 @@ QuicTransportBase::QuicTransportBase(
           LooperType::WriteLooper)) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
-      conn_->congestionController->markPacerTimeoutScheduled(Clock::now());
-      return conn_->congestionController->getPacingInterval();
+      conn_->pacer->onPacedWriteScheduled(Clock::now());
+      return conn_->pacer->getTimeUntilNextWrite();
     }
     return 0us;
   });
@@ -479,13 +480,11 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   if (conn_->congestionController) {
     writableBytes = conn_->congestionController->getWritableBytes();
     congestionWindow = conn_->congestionController->getCongestionWindow();
-    // Do not collect pacing stats for Cubic, since getPacingRate() call
-    // modifies some internal state. TODO(yangchi): Remove this check after
-    // changing Cubic implementation.
     if (conn_->congestionController->type() != CongestionControlType::Cubic &&
         isConnectionPaced(*conn_)) {
-      burstSize = conn_->congestionController->getPacingRate(Clock::now());
-      pacingInterval = conn_->congestionController->getPacingInterval();
+      // TODO: This is bad, we need an API that get without update pacing rate
+      burstSize = conn_->pacer->updateAndGetWriteBatchSize(Clock::now());
+      pacingInterval = conn_->pacer->getTimeUntilNextWrite();
     }
   }
   TransportInfo transportInfo;
@@ -2290,6 +2289,14 @@ void QuicTransportBase::setTransportSettings(
     TransportSettings transportSettings) {
   conn_->transportSettings = std::move(transportSettings);
   setCongestionControl(transportSettings.defaultCongestionController);
+  if (conn_->transportSettings.pacingEnabled) {
+    conn_->pacer = std::make_unique<DefaultPacer>(
+        *conn_,
+        transportSettings.defaultCongestionController ==
+                CongestionControlType::BBR
+            ? kMinCwndInMssForBbr
+            : conn_->transportSettings.minCwndInMss);
+  }
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

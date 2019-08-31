@@ -45,19 +45,11 @@ class Copa : public CongestionController {
   void setConnectionEmulation(uint8_t) noexcept override;
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
-
-  uint64_t getPacingRate(TimePoint currentTime) noexcept override;
-
-  void markPacerTimeoutScheduled(TimePoint currentTime) noexcept override;
-
-  std::chrono::microseconds getPacingInterval() const noexcept override;
-
   bool isAppLimited() const noexcept override;
 
  private:
   void onPacketAcked(const AckEvent&);
   void onPacketLoss(const LossEvent&);
-  void updatePacing() noexcept;
 
   struct VelocityState {
     uint64_t velocity{1};
@@ -106,8 +98,5 @@ class Copa : public CongestionController {
    * it will minimize delay at expense of throughput.
    */
   double latencyFactor_{0.50};
-
-  uint64_t pacingBurstSize_{0};
-  std::chrono::microseconds pacingInterval_{0us};
 };
 } // namespace quic

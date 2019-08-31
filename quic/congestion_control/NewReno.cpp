@@ -96,6 +96,7 @@ void NewReno::onPacketAckOrLoss(
   if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
     onAckEvent(*ackEvent);
   }
+  // TODO: Pacing isn't supported with NewReno
 }
 
 void NewReno::onPacketLoss(const LossEvent& loss) {
@@ -163,21 +164,6 @@ void NewReno::setConnectionEmulation(uint8_t) noexcept {}
 
 uint64_t NewReno::getBytesInFlight() const noexcept {
   return bytesInFlight_;
-}
-
-uint64_t NewReno::getPacingRate(TimePoint /* currentTime */) noexcept {
-  // Pacing is not supported on NewReno currently
-  return conn_.transportSettings.writeConnectionDataPacketsLimit;
-}
-
-void NewReno::markPacerTimeoutScheduled(TimePoint /* currentTime */) noexcept {
-  // Pacing is not supported on NewReno currently
-}
-
-std::chrono::microseconds NewReno::getPacingInterval() const noexcept {
-  // Pacing is not supported on NewReno currently
-  return std::chrono::microseconds(
-      folly::HHWheelTimerHighRes::DEFAULT_TICK_INTERVAL);
 }
 
 void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */

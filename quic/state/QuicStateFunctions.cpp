@@ -147,8 +147,7 @@ void updateAckSendStateOnSentPacketWithAcks(
 
 bool isConnectionPaced(const QuicConnectionStateBase& conn) noexcept {
   return (
-      conn.transportSettings.pacingEnabled && conn.canBePaced &&
-      conn.congestionController);
+      conn.transportSettings.pacingEnabled && conn.canBePaced && conn.pacer);
 }
 
 AckState& getAckState(

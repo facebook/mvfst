@@ -27,12 +27,17 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD0(onSpuriousLoss, void());
   GMOCK_METHOD1_(, , , setConnectionEmulation, void(uint8_t));
   MOCK_CONST_METHOD0(type, CongestionControlType());
-  GMOCK_METHOD1_(, , , getPacingRate, uint64_t(TimePoint));
-  GMOCK_METHOD1_(, , , markPacerTimeoutScheduled, void(TimePoint));
-  MOCK_CONST_METHOD0(getPacingInterval, std::chrono::microseconds());
   GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
   MOCK_METHOD0(setAppLimited, void());
   MOCK_CONST_METHOD0(isAppLimited, bool());
+};
+
+class MockPacer : public Pacer {
+ public:
+  MOCK_METHOD2(refreshPacingRate, void(uint64_t, std::chrono::microseconds));
+  MOCK_METHOD1(onPacedWriteScheduled, void(TimePoint));
+  MOCK_CONST_METHOD0(getTimeUntilNextWrite, std::chrono::microseconds());
+  MOCK_METHOD1(updateAndGetWriteBatchSize, uint64_t(TimePoint));
 };
 } // namespace test
 } // namespace quic

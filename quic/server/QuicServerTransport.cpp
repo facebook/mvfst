@@ -187,7 +187,7 @@ void QuicServerTransport::writeData() {
 
   uint64_t packetLimit =
       (isConnectionPaced(*conn_)
-           ? conn_->congestionController->getPacingRate(Clock::now())
+           ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
   CryptoStreamScheduler initialScheduler(
       *conn_, *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));

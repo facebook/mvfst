@@ -35,12 +35,6 @@ class NewReno : public CongestionController {
 
   uint64_t getBytesInFlight() const noexcept;
 
-  uint64_t getPacingRate(TimePoint currentTime) noexcept override;
-
-  void markPacerTimeoutScheduled(TimePoint currentTime) noexcept override;
-
-  std::chrono::microseconds getPacingInterval() const noexcept override;
-
   bool isAppLimited() const noexcept override;
 
  private:

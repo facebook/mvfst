@@ -40,8 +40,6 @@ constexpr uint64_t kBandwidthWindowLength = kNumOfCycles + 2;
 constexpr std::chrono::seconds kDefaultRttSamplerExpiration{10};
 // See calculateReductionFactors in QuicCubic.cpp
 constexpr double kBbrReductionFactor = 0.9;
-// Min cwnd for BBR is 4 MSS regard less of transport settings
-constexpr uint64_t kMinCwndInMssForBbr{4};
 
 struct Bandwidth {
   uint64_t bytes;
@@ -200,10 +198,6 @@ class BbrCongestionController : public CongestionController {
 
   bool isAppLimited() const noexcept override;
 
-  uint64_t getPacingRate(TimePoint currentTime) noexcept override;
-  std::chrono::microseconds getPacingInterval() const noexcept override;
-  void markPacerTimeoutScheduled(TimePoint) noexcept override;
-
   // TODO: some of these do not have to be in public API.
   bool inRecovery() const noexcept;
   BbrState state() const noexcept;
@@ -216,6 +210,7 @@ class BbrCongestionController : public CongestionController {
   void
   onPacketAcked(const AckEvent& ack, uint64_t prevInflightBytes, bool hasLoss);
   void onPacketLoss(const LossEvent&);
+  void updatePacing() noexcept;
 
   /**
    * Update the ack aggregation states
@@ -264,7 +259,6 @@ class BbrCongestionController : public CongestionController {
 
   uint64_t calculateTargetCwnd(float gain) const noexcept;
   void updateCwnd(uint64_t ackedBytes, uint64_t excessiveBytes) noexcept;
-  void updatePacing() noexcept;
   std::chrono::microseconds minRtt() const noexcept;
   Bandwidth bandwidth() const noexcept;
 
@@ -291,8 +285,6 @@ class BbrCongestionController : public CongestionController {
   uint64_t inflightBytes_{0};
   // Number of bytes we expect to send over on RTT when paced write.
   uint64_t pacingWindow_{0};
-  uint64_t pacingBurstSize_{0};
-  std::chrono::microseconds pacingInterval_{0us};
 
   float cwndGain_{kStartupGain};
   float pacingGain_{kStartupGain};

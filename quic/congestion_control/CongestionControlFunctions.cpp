@@ -24,27 +24,17 @@ uint64_t boundedCwnd(
       minCwndInMss * packetLength);
 }
 
-PacingRate calculatePacingRateWrapper(
-    const QuicConnectionStateBase& conn,
-    uint64_t cwnd,
-    uint64_t minCwndInMss,
-    std::chrono::microseconds rtt) {
-  auto result = calculatePacingRate(conn, cwnd, minCwndInMss, rtt);
-  return PacingRate::Builder()
-      .setInterval(result.first)
-      .setBurstSize(result.second)
-      .build();
-}
-
-std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
+PacingRate calculatePacingRate(
     const QuicConnectionStateBase& conn,
     uint64_t cwnd,
     uint64_t minCwndInMss,
     std::chrono::microseconds rtt) {
   if (conn.transportSettings.pacingTimerTickInterval > rtt) {
     // We cannot really pace in this case.
-    return std::make_pair(
-        0us, conn.transportSettings.writeConnectionDataPacketsLimit);
+    return PacingRate::Builder()
+        .setInterval(0us)
+        .setBurstSize(conn.transportSettings.writeConnectionDataPacketsLimit)
+        .build();
   }
   uint64_t cwndInPackets = std::max(minCwndInMss, cwnd / conn.udpSendPacketLen);
   // Each interval we want to send cwndInpackets / (rtt / minimalInverval)
@@ -59,6 +49,9 @@ std::pair<std::chrono::microseconds, uint64_t> calculatePacingRate(
   auto interval = timeMax(
       conn.transportSettings.pacingTimerTickInterval,
       rtt * burstPerInterval / cwndInPackets);
-  return std::make_pair(interval, burstPerInterval);
+  return PacingRate::Builder()
+        .setInterval(interval)
+        .setBurstSize(burstPerInterval)
+        .build();
 }
 } // namespace quic

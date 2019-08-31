@@ -26,14 +26,14 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   std::chrono::microseconds rtt(1000 * 100);
   auto result =
       calculatePacingRate(conn, 50, conn.transportSettings.minCwndInMss, rtt);
-  EXPECT_EQ(10ms, result.first);
-  EXPECT_EQ(5, result.second);
+  EXPECT_EQ(10ms, result.interval);
+  EXPECT_EQ(5, result.burstSize);
 
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result2 =
       calculatePacingRate(conn, 300, conn.transportSettings.minCwndInMss, rtt);
-  EXPECT_EQ(1ms, result2.first);
-  EXPECT_EQ(3, result2.second);
+  EXPECT_EQ(1ms, result2.interval);
+  EXPECT_EQ(3, result2.burstSize);
 }
 
 TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
@@ -42,8 +42,8 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 100, conn.transportSettings.minCwndInMss, 100000us);
-  EXPECT_EQ(1ms, result.first);
-  EXPECT_EQ(1, result.second);
+  EXPECT_EQ(1ms, result.interval);
+  EXPECT_EQ(1, result.burstSize);
 }
 
 TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
@@ -52,8 +52,8 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 10, conn.transportSettings.minCwndInMss, 100000us);
-  EXPECT_EQ(10ms, result.first);
-  EXPECT_EQ(1, result.second);
+  EXPECT_EQ(10ms, result.interval);
+  EXPECT_EQ(1, result.burstSize);
 }
 
 TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
@@ -62,9 +62,9 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   auto result =
       calculatePacingRate(conn, 10, conn.transportSettings.minCwndInMss, 1ms);
-  EXPECT_EQ(std::chrono::milliseconds::zero(), result.first);
+  EXPECT_EQ(std::chrono::milliseconds::zero(), result.interval);
   EXPECT_EQ(
-      conn.transportSettings.writeConnectionDataPacketsLimit, result.second);
+      conn.transportSettings.writeConnectionDataPacketsLimit, result.burstSize);
 }
 
 

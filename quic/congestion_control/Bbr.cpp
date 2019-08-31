@@ -251,17 +251,15 @@ void BbrCongestionController::onPacketAcked(
 // canBePaced function. Now this function is gone, maybe we need to change this
 // updatePacing function.
 void BbrCongestionController::updatePacing() noexcept {
+  // TODO: enable Pacing and BBR together.
+  if (!conn_.pacer) {
+    return;
+  }
   auto bandwidthEstimate = bandwidth();
   if (!bandwidthEstimate) {
     return;
   }
   auto mrtt = minRtt();
-  if (mrtt == 0us || mrtt < conn_.transportSettings.pacingTimerTickInterval) {
-    return;
-  }
-  // TODO(t40615081, yangchi) cloning Handshake packets make this better
-  VLOG_IF(10, conn_.lossState.srtt != 0us)
-      << "no reliable srtt sample, " << *this;
   uint64_t targetPacingWindow = bandwidthEstimate * pacingGain_ * mrtt;
   if (btlbwFound_) {
     pacingWindow_ = targetPacingWindow;
@@ -276,12 +274,7 @@ void BbrCongestionController::updatePacing() noexcept {
     pacingWindow_ = std::max(pacingWindow_, targetPacingWindow);
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
-  std::tie(pacingInterval_, pacingBurstSize_) =
-      calculatePacingRate(conn_, pacingWindow_, kMinCwndInMssForBbr, mrtt);
-
-  if (conn_.transportSettings.pacingEnabled && conn_.qLogger) {
-    conn_.qLogger->addPacingMetricUpdate(pacingBurstSize_, pacingInterval_);
-  }
+  conn_.pacer->refreshPacingRate(pacingWindow_, mrtt);
 }
 
 void BbrCongestionController::handleAckInProbeBw(
@@ -580,20 +573,6 @@ void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {
 void BbrCongestionController::onRemoveBytesFromInflight(
     uint64_t bytesToRemove) {
   subtractAndCheckUnderflow(inflightBytes_, bytesToRemove);
-}
-
-uint64_t BbrCongestionController::getPacingRate(
-    TimePoint /* currentTime */) noexcept {
-  return pacingBurstSize_;
-}
-
-std::chrono::microseconds BbrCongestionController::getPacingInterval() const
-    noexcept {
-  return pacingInterval_;
-}
-
-void BbrCongestionController::markPacerTimeoutScheduled(TimePoint) noexcept {
-  /* This API is going away */
 }
 
 std::string bbrStateToString(BbrCongestionController::BbrState state) {

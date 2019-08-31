@@ -92,7 +92,7 @@ class TestQuicTransport
         *headerCipher,
         getVersion(),
         (isConnectionPaced(*conn_)
-             ? conn_->congestionController->getPacingRate(Clock::now())
+             ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
              : conn_->transportSettings.writeConnectionDataPacketsLimit));
   }
 
@@ -2466,6 +2466,9 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(100));
 
@@ -2473,7 +2476,7 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false, false);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
-  EXPECT_CALL(*rawCongestionController, getPacingRate(_))
+  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   transport_->pacedWrite(true);
 }
@@ -2486,6 +2489,9 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(100));
 
@@ -2493,10 +2499,10 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false, false);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
-  EXPECT_CALL(*rawCongestionController, getPacingRate(_))
+  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
-  EXPECT_CALL(*rawCongestionController, markPacerTimeoutScheduled(_));
-  EXPECT_CALL(*rawCongestionController, getPacingInterval())
+  EXPECT_CALL(*rawPacer, onPacedWriteScheduled(_));
+  EXPECT_CALL(*rawPacer, getTimeUntilNextWrite())
       .WillRepeatedly(Return(3600000ms));
   // This will write out 100 bytes, leave 100 bytes behind. FunctionLooper will
   // schedule a pacing timeout.
@@ -2515,6 +2521,9 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(1000));
 
@@ -2522,7 +2531,7 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, buf->clone(), false, false);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
-  EXPECT_CALL(*rawCongestionController, getPacingRate(_))
+  EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
   // This will write out everything. After that because there is no new data,
   // FunctionLooper won't schedule a pacing timeout.

@@ -240,6 +240,9 @@ constexpr size_t kBlockedSizeBytes = 20;
 
 constexpr uint64_t kInitCwndInMss = 10;
 constexpr uint64_t kMinCwndInMss = 2;
+// Min cwnd for BBR is 4 MSS regard less of transport settings
+constexpr uint64_t kMinCwndInMssForBbr{4};
+
 constexpr uint64_t kDefaultMaxCwndInMss = 2000;
 // When server receives early data attempt without valid source address token,
 // server will limit bytes in flight to avoid amplification attack until CFIN

@@ -285,19 +285,6 @@ struct CongestionController {
   virtual CongestionControlType type() const = 0;
 
   /**
-   * Return pacing burst size.
-   */
-  virtual uint64_t getPacingRate(TimePoint currentTime) = 0;
-
-  virtual std::chrono::microseconds getPacingInterval() const = 0;
-
-  /**
-   * Mark the time the transport schedules a pacing write. CongestionController
-   * needs to know this to compensate late time fires.
-   */
-  virtual void markPacerTimeoutScheduled(TimePoint currentTime) = 0;
-
-  /**
    * Whether the congestion controller thinks it's currently in app-limited
    * state.
    */
@@ -422,6 +409,9 @@ struct QuicConnectionStateBase {
 
   // Connection Congestion controller
   std::unique_ptr<CongestionController> congestionController;
+
+  // Pacer
+  std::unique_ptr<Pacer> pacer;
 
   // Congestion Controller factory to create specific impl of cc algorithm
   std::shared_ptr<CongestionControllerFactory> congestionControllerFactory;

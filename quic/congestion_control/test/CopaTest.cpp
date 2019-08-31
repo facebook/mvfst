@@ -363,22 +363,12 @@ TEST_F(CopaTest, TestVelocity) {
   now += 100ms;
   // velocity = 1, direction = 0
   copa.onPacketAckOrLoss(createAckEvent(30, packetSize, now), folly::none);
-  auto logNow = Clock::now();
 
   uint64_t cwndChange =
       cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 9.8 + 1 / (0.5 * 9.8) = 10 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
   lastCwnd = copa.getCongestionWindow();
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::PacingMetricUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 3);
-
-  auto tmp = std::move(qLogger->logs[indices[2]]);
-  auto event = dynamic_cast<QLogPacingMetricUpdateEvent*>(tmp.get());
-  EXPECT_EQ(event->pacingBurstSize, copa.getPacingRate(logNow));
-  EXPECT_EQ(event->pacingInterval, copa.getPacingInterval());
 
   // another ack, velocity = 1, direction 0 -> 1
   now += 100ms;
