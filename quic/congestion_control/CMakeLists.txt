@@ -13,6 +13,7 @@ add_library(
   Copa.cpp
   NewReno.cpp
   QuicCubic.cpp
+  Pacer.cpp
 )
 
 target_include_directories(
