@@ -13,6 +13,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace testing;
 
@@ -633,6 +634,37 @@ TEST_F(BbrTest, AppIdle) {
   auto event = dynamic_cast<QLogAppIdleUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->idleEvent, kAppIdle);
   EXPECT_TRUE(event->idle);
+}
+
+TEST_F(BbrTest, UpdatePacerAppLimited) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController::BbrConfig config;
+  BbrCongestionController bbr(conn, config);
+  auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
+  auto rawBandwidthSampler = mockBandwidthSampler.get();
+  bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+
+  EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
+  EXPECT_CALL(*rawPacer, setAppLimited(true)).Times(1);
+  bbr.setAppLimited();
+
+  bbr.onPacketSent(makeTestingWritePacket(0, 1000, 1000));
+  EXPECT_CALL(*rawBandwidthSampler, isAppLimited())
+      .Times(2)
+      .WillRepeatedly(Invoke([]() {
+        static int counter = 0;
+        if (!counter++) {
+          return true;
+        }
+        return false;
+      }));
+  EXPECT_CALL(*rawBandwidthSampler, onPacketAcked(_, _)).Times(1);
+  EXPECT_CALL(*rawPacer, setAppLimited(false)).Times(1);
+  bbr.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), Clock::now() - 5ms), folly::none);
 }
 
 } // namespace test

@@ -23,6 +23,9 @@ DefaultPacer::DefaultPacer(
       cachedBatchSize_(conn.transportSettings.writeConnectionDataPacketsLimit) {
 }
 
+// TODO: we choose to keep refershing pacing rate even when we are app-limited,
+// so that when we exit app-limited, we have an updated pacing rate. But I don't
+// really know if this is a good idea.
 void DefaultPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt) {
@@ -50,13 +53,17 @@ void DefaultPacer::onPacedWriteScheduled(TimePoint currentTime) {
 }
 
 std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
-  return writeInterval_;
+  return appLimited_ ? 0us : writeInterval_;
 }
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
     scheduledWriteTime_.clear();
   };
+  if (appLimited_) {
+    cachedBatchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
+    return cachedBatchSize_;
+  }
   if (writeInterval_ == 0us) {
     return batchSize_;
   }
@@ -77,6 +84,10 @@ uint64_t DefaultPacer::getCachedWriteBatchSize() const {
 void DefaultPacer::setPacingRateCalculator(
     PacingRateCalculator pacingRateCalculator) {
   pacingRateCalculator_ = std::move(pacingRateCalculator);
+}
+
+void DefaultPacer::setAppLimited(bool limited) {
+  appLimited_ = limited;
 }
 
 } // namespace quic

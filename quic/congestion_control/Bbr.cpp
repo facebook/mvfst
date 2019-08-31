@@ -180,7 +180,14 @@ void BbrCongestionController::onPacketAcked(
   bool lastAckedPacketAppLimited =
       ack.ackedPackets.empty() ? false : ack.ackedPackets.back().isAppLimited;
   if (bandwidthSampler_) {
+    // TODO: Move appLimited tracking from BandwidthSampler to BBR itself
+    bool wasAppLimited = bandwidthSampler_->isAppLimited();
     bandwidthSampler_->onPacketAcked(ack, roundTripCounter_);
+    if (wasAppLimited && !bandwidthSampler_->isAppLimited()) {
+      if (conn_.pacer) {
+        conn_.pacer->setAppLimited(false);
+      }
+    }
   }
   if (inRecovery()) {
     CHECK(endOfRecovery_.hasValue());
@@ -523,6 +530,9 @@ void BbrCongestionController::setAppLimited() {
   appLimitedSinceProbeRtt_ = true;
   if (bandwidthSampler_) {
     bandwidthSampler_->onAppLimited();
+  }
+  if (conn_.pacer) {
+    conn_.pacer->setAppLimited(true);
   }
 }
 

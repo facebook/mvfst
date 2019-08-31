@@ -41,6 +41,8 @@ class DefaultPacer : public Pacer {
 
   uint64_t getCachedWriteBatchSize() const override;
 
+  void setAppLimited(bool limited) override;
+
  private:
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
@@ -49,5 +51,6 @@ class DefaultPacer : public Pacer {
   folly::Optional<TimePoint> scheduledWriteTime_;
   PacingRateCalculator pacingRateCalculator_;
   uint64_t cachedBatchSize_;
+  bool appLimited_{false};
 };
 } // namespace quic

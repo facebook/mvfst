@@ -163,6 +163,8 @@ struct Pacer {
    * Getter API of the most recent write batch size.
    */
   virtual uint64_t getCachedWriteBatchSize() const = 0;
+
+  virtual void setAppLimited(bool limited) = 0;
 };
 
 struct PacingRate {
