@@ -158,6 +158,11 @@ struct Pacer {
    *              the Pacer can compensate the timer drift.
    */
   virtual uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) = 0;
+
+  /**
+   * Getter API of the most recent write batch size.
+   */
+  virtual uint64_t getCachedWriteBatchSize() const = 0;
 };
 
 struct PacingRate {

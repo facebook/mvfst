@@ -480,10 +480,8 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   if (conn_->congestionController) {
     writableBytes = conn_->congestionController->getWritableBytes();
     congestionWindow = conn_->congestionController->getCongestionWindow();
-    if (conn_->congestionController->type() != CongestionControlType::Cubic &&
-        isConnectionPaced(*conn_)) {
-      // TODO: This is bad, we need an API that get without update pacing rate
-      burstSize = conn_->pacer->updateAndGetWriteBatchSize(Clock::now());
+    if (isConnectionPaced(*conn_)) {
+      burstSize = conn_->pacer->getCachedWriteBatchSize();
       pacingInterval = conn_->pacer->getTimeUntilNextWrite();
     }
   }

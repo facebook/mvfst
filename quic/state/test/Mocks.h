@@ -38,6 +38,7 @@ class MockPacer : public Pacer {
   MOCK_METHOD1(onPacedWriteScheduled, void(TimePoint));
   MOCK_CONST_METHOD0(getTimeUntilNextWrite, std::chrono::microseconds());
   MOCK_METHOD1(updateAndGetWriteBatchSize, uint64_t(TimePoint));
+  MOCK_CONST_METHOD0(getCachedWriteBatchSize, uint64_t());
 };
 } // namespace test
 } // namespace quic

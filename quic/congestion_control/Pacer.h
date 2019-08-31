@@ -39,6 +39,8 @@ class DefaultPacer : public Pacer {
 
   void setPacingRateCalculator(PacingRateCalculator pacingRateCalculator);
 
+  uint64_t getCachedWriteBatchSize() const override;
+
  private:
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
@@ -46,5 +48,6 @@ class DefaultPacer : public Pacer {
   std::chrono::microseconds writeInterval_{0};
   folly::Optional<TimePoint> scheduledWriteTime_;
   PacingRateCalculator pacingRateCalculator_;
+  uint64_t cachedBatchSize_;
 };
 } // namespace quic

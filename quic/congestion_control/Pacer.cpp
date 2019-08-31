@@ -19,7 +19,9 @@ DefaultPacer::DefaultPacer(
     : conn_(conn),
       minCwndInMss_(minCwndInMss),
       batchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
-      pacingRateCalculator_(calculatePacingRate) {}
+      pacingRateCalculator_(calculatePacingRate),
+      cachedBatchSize_(conn.transportSettings.writeConnectionDataPacketsLimit) {
+}
 
 void DefaultPacer::refreshPacingRate(
     uint64_t cwndBytes,
@@ -30,6 +32,7 @@ void DefaultPacer::refreshPacingRate(
     }
     QUIC_TRACE(
         pacing_update, conn_, writeInterval_.count(), (uint64_t)batchSize_);
+    cachedBatchSize_ = batchSize_;
   };
   if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
     writeInterval_ = 0us;
@@ -62,8 +65,13 @@ uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   }
   auto adjustedInterval = std::chrono::duration_cast<std::chrono::microseconds>(
       currentTime - *scheduledWriteTime_ + writeInterval_);
-  return std::ceil(
+  cachedBatchSize_ = std::ceil(
       adjustedInterval.count() * batchSize_ * 1.0 / writeInterval_.count());
+  return cachedBatchSize_;
+}
+
+uint64_t DefaultPacer::getCachedWriteBatchSize() const {
+  return cachedBatchSize_;
 }
 
 void DefaultPacer::setPacingRateCalculator(

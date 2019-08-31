@@ -92,5 +92,31 @@ TEST_F(PacerTest, ImpossibleToPace) {
       pacer.updateAndGetWriteBatchSize(Clock::now()));
 }
 
+TEST_F(PacerTest, CachedBatchSize) {
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      pacer.getCachedWriteBatchSize());
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase& conn,
+                                   uint64_t cwndBytes,
+                                   uint64_t,
+                                   std::chrono::microseconds rtt) {
+    return PacingRate::Builder()
+        .setInterval(rtt)
+        .setBurstSize(cwndBytes / conn.udpSendPacketLen * 2)
+        .build();
+  });
+  pacer.refreshPacingRate(20 * conn.udpSendPacketLen, 100ms);
+  EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
+
+  auto currentTime = Clock::now();
+  pacer.onPacedWriteScheduled(currentTime);
+  pacer.updateAndGetWriteBatchSize(currentTime);
+  EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
+
+  pacer.onPacedWriteScheduled(currentTime + 100ms);
+  pacer.updateAndGetWriteBatchSize(currentTime + 200ms);
+  EXPECT_EQ(80, pacer.getCachedWriteBatchSize());
+}
+
 } // namespace test
 } // namespace quic
