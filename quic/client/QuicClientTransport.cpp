@@ -1055,6 +1055,9 @@ void QuicClientTransport::onDataAvailable(
 void QuicClientTransport::
     happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
   QUIC_TRACE(happy_eyeballs, *conn_, "delay timer expired");
+  // Declare 0-RTT data as lost so that they will be retransmitted over the
+  // second socket.
+  markZeroRttPacketsLost(*conn_, markPacketLoss);
   happyEyeballsStartSecondSocket(conn_->happyEyeballsState);
 }
 

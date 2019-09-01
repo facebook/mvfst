@@ -4653,6 +4653,123 @@ TEST_F(
       initialUDPSendPacketLen);
 }
 
+class QuicZeroRttHappyEyeballsClientTransportTest
+    : public QuicZeroRttClientTest {
+ public:
+  void SetUp() override {
+    client->setHostname(hostname_);
+    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    client->setPskCache(mockQuicPskCache_);
+
+    auto secondSocket =
+        std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+    secondSock = secondSocket.get();
+
+    client->setHappyEyeballsEnabled(true);
+    client->addNewPeerAddress(firstAddress);
+    client->addNewPeerAddress(secondAddress);
+    client->addNewSocket(std::move(secondSocket));
+
+    EXPECT_EQ(client->getConn().happyEyeballsState.v6PeerAddress, firstAddress);
+    EXPECT_EQ(
+        client->getConn().happyEyeballsState.v4PeerAddress, secondAddress);
+
+    setupCryptoLayer();
+  }
+
+ protected:
+  folly::test::MockAsyncUDPSocket* secondSock;
+  SocketAddress firstAddress{"::1", 443};
+  SocketAddress secondAddress{"127.0.0.1", 443};
+};
+
+TEST_F(
+    QuicZeroRttHappyEyeballsClientTransportTest,
+    ZeroRttDataIsRetransmittedOverSecondSocket) {
+  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
+      .WillOnce(InvokeWithoutArgs([]() {
+        QuicCachedPsk quicCachedPsk;
+        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataUni =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxData =
+            kDefaultConnectionWindowSize;
+        quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
+        quicCachedPsk.transportParams.maxRecvPacketSize =
+            kDefaultUDPReadBufferSize;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
+        return quicCachedPsk;
+      }));
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) { return true; },
+      []() -> Buf { return nullptr; });
+
+  EXPECT_CALL(*sock, write(firstAddress, _))
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            socketWrites.push_back(buf->clone());
+            return buf->computeChainDataLength();
+          }));
+  EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+  startClient();
+  socketWrites.clear();
+  auto& conn = client->getConn();
+  EXPECT_EQ(conn.peerAddress, firstAddress);
+  EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+  EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+  auto streamId = client->createBidirectionalStream().value();
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  loopForWrites();
+  EXPECT_TRUE(zeroRttPacketsOutstanding());
+  assertWritten(false, LongHeader::Types::ZeroRtt);
+  socketWrites.clear();
+
+  // Manually expire conn attempt timeout
+  EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+  client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+  EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+  // Declared lost
+  EXPECT_FALSE(zeroRttPacketsOutstanding());
+
+  // Manually expire loss timeout to trigger write to both first and second
+  // socket
+  EXPECT_CALL(*sock, write(firstAddress, _))
+      .Times(2)
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            socketWrites.push_back(buf->clone());
+            return buf->computeChainDataLength();
+          }));
+  EXPECT_CALL(*secondSock, write(secondAddress, _))
+      .Times(2)
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            socketWrites.push_back(buf->clone());
+            return buf->computeChainDataLength();
+          }));
+  client->lossTimeout().cancelTimeout();
+  client->lossTimeout().timeoutExpired();
+  EXPECT_EQ(socketWrites.size(), 4);
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(0), LongHeader::Types::Initial));
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(1), LongHeader::Types::Initial));
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(2), LongHeader::Types::ZeroRtt));
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(3), LongHeader::Types::ZeroRtt));
+}
+
 class QuicProcessDataTest : public QuicClientTransportAfterStartTest {
  public:
   ~QuicProcessDataTest() override = default;
