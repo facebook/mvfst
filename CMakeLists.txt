@@ -16,6 +16,16 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # $QUIC_FBCODE_ROOT/quic/path/to/file on disk
 set(QUIC_FBCODE_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 
+option(BUILD_SHARED_LIBS
+  "If enabled, build mvfst as a shared library.  \
+  This is generally discouraged, since mvfst does not commit to having \
+  a stable ABI."
+  OFF
+)
+# Mark BUILD_SHARED_LIBS as an "advanced" option, since enabling it
+# is generally discouraged.
+mark_as_advanced(BUILD_SHARED_LIBS)
+
 # Dependencies
 find_package(Boost 1.62
   REQUIRED COMPONENTS
