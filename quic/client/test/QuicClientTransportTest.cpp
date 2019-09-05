@@ -4724,6 +4724,8 @@ TEST_F(
   EXPECT_EQ(conn.peerAddress, firstAddress);
   EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
   EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+  // Cancel the delay timer because we want to manually fire it
+  client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
 
   auto streamId = client->createBidirectionalStream().value();
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
@@ -4734,7 +4736,6 @@ TEST_F(
 
   // Manually expire conn attempt timeout
   EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-  client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
   client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
   EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
