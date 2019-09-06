@@ -11,13 +11,9 @@
 #include <quic/codec/Decode.h>
 
 namespace quic {
-
-ParsedHeader::ParsedHeader(PacketHeader headerIn)
-    : header(std::move(headerIn)) {}
-
 ParsedHeaderResult::ParsedHeaderResult(
     bool isVersionNegotiationIn,
-    folly::Optional<ParsedHeader> parsedHeaderIn)
+    folly::Optional<PacketHeader> parsedHeaderIn)
     : isVersionNegotiation(isVersionNegotiationIn),
       parsedHeader(std::move(parsedHeaderIn)) {
   CHECK(isVersionNegotiation || parsedHeader);
@@ -38,14 +34,13 @@ folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
           }
           // We compensate for the type byte length by adding it back.
           DCHECK(parsedLongHeaderResult.parsedLongHeader);
-          ParsedHeader parsedHeader(PacketHeader(
-              std::move(parsedLongHeaderResult.parsedLongHeader->header)));
+          auto parsedHeader = PacketHeader(
+              std::move(parsedLongHeaderResult.parsedLongHeader->header));
           return ParsedHeaderResult(false, parsedHeader);
         });
   } else {
     return parseShortHeader(initialByte, cursor).then([](ShortHeader&& header) {
-      return ParsedHeaderResult(
-          false, ParsedHeader(PacketHeader(std::move(header))));
+      return ParsedHeaderResult(false, PacketHeader(std::move(header)));
     });
   }
 }

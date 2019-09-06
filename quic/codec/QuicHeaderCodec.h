@@ -14,18 +14,12 @@
 
 namespace quic {
 
-struct ParsedHeader {
-  PacketHeader header;
-
-  explicit ParsedHeader(PacketHeader headerIn);
-};
-
 struct ParsedHeaderResult {
   bool isVersionNegotiation;
-  folly::Optional<ParsedHeader> parsedHeader;
+  folly::Optional<PacketHeader> parsedHeader;
   ParsedHeaderResult(
       bool isVersionNegotiationIn,
-      folly::Optional<ParsedHeader> parsedHeaderIn);
+      folly::Optional<PacketHeader> parsedHeaderIn);
 };
 
 folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(

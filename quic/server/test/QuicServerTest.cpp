@@ -805,9 +805,9 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
         EXPECT_TRUE(eq(*data, *writtenData));
         // parse header and check connId to verify the integrity of the packet
         auto parsedHeader = parseHeader(*writtenData);
-        auto& header = parsedHeader->parsedHeader->header;
+        auto& header = parsedHeader->parsedHeader;
         const auto& connectionId = folly::variant_match(
-            header,
+            header.value(),
             [](const LongHeader& longHeader) {
               return longHeader.getDestinationConnId();
             },

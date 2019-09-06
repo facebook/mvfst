@@ -55,18 +55,18 @@ TEST_F(QuicHeaderCodecTest, ShortHeaderTest) {
       0 /* largestAcked */);
   auto packet = std::move(builder).buildPacket();
   auto result = parseHeader(*packet.header);
-  auto& header = result->parsedHeader->header;
+  auto& header = result->parsedHeader;
+
   EXPECT_EQ(
       getTestConnectionId(),
-      variant_match(
-          header,
+      folly::variant_match(
+          header.value(),
           [](const LongHeader& longHeader) {
             return longHeader.getDestinationConnId();
           },
           [](const ShortHeader& shortHeader) {
             return shortHeader.getConnectionId();
           }));
-  EXPECT_NO_THROW(boost::get<ShortHeader>(header));
 }
 } // namespace test
 } // namespace quic
