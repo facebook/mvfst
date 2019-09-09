@@ -203,6 +203,8 @@ void QuicTransportBase::closeImpl(
     return;
   }
 
+  drainConnection = drainConnection & conn_->transportSettings.shouldDrain;
+
   uint64_t totalCryptoDataWritten = 0;
   uint64_t totalCryptoDataRecvd = 0;
 

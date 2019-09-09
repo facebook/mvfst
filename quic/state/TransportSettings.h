@@ -105,6 +105,8 @@ struct TransportSettings {
   bool partialReliabilityEnabled{false};
   // Whether the endpoint allows peer to migrate to new address
   bool disableMigration{true};
+  // Whether or not the socket should gracefully drain on close
+  bool shouldDrain{true};
   // default stateless reset secret for stateless reset token
   folly::Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
       statelessResetTokenSecret;
