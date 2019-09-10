@@ -37,6 +37,7 @@ find_package(Boost 1.62
   context
   date_time
   program_options
+  chrono
 )
 find_package(folly REQUIRED)
 find_package(Fizz REQUIRED)
