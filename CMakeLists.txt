@@ -8,8 +8,13 @@ cmake_minimum_required(VERSION 3.10)
 project(
   mvfst
 )
-
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
+  # for in-fbsource builds
+  "${CMAKE_CURRENT_SOURCE_DIR}/opensource/fbcode_builder/CMake"
+  # For shipit-transformed builds
+  "${CMAKE_CURRENT_SOURCE_DIR}/build/fbcode_builder/CMake"
+  ${CMAKE_MODULE_PATH})
 
 # QUIC_FBCODE_ROOT is where the top level quic/ directory resides, so
 # an #include <quic/path/to/file> will resolve to
@@ -25,6 +30,9 @@ option(BUILD_SHARED_LIBS
 # Mark BUILD_SHARED_LIBS as an "advanced" option, since enabling it
 # is generally discouraged.
 mark_as_advanced(BUILD_SHARED_LIBS)
+
+include(FBBuildOptions)
+fb_activate_static_library_option()
 
 # Dependencies
 find_package(Boost 1.62
