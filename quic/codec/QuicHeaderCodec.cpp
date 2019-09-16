@@ -34,9 +34,10 @@ folly::Expected<ParsedHeaderResult, TransportErrorCode> parseHeader(
           }
           // We compensate for the type byte length by adding it back.
           DCHECK(parsedLongHeaderResult.parsedLongHeader);
-          auto parsedHeader = PacketHeader(
-              std::move(parsedLongHeaderResult.parsedLongHeader->header));
-          return ParsedHeaderResult(false, parsedHeader);
+          return ParsedHeaderResult(
+              false,
+              PacketHeader(
+                  std::move(parsedLongHeaderResult.parsedLongHeader->header)));
         });
   } else {
     return parseShortHeader(initialByte, cursor).then([](ShortHeader&& header) {
