@@ -91,6 +91,7 @@ class QuicSocket {
     std::chrono::microseconds rttvar{0us};
     std::chrono::microseconds lrtt{0us};
     std::chrono::microseconds mrtt{0us};
+    uint64_t mss{kDefaultUDPSendPacketLen};
     uint64_t writableBytes{0};
     uint64_t congestionWindow{0};
     uint64_t pacingBurstSize{0};

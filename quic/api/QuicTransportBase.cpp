@@ -492,6 +492,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.rttvar = conn_->lossState.rttvar;
   transportInfo.lrtt = conn_->lossState.lrtt;
   transportInfo.mrtt = conn_->lossState.mrtt;
+  transportInfo.mss = conn_->udpSendPacketLen;
   transportInfo.writableBytes = writableBytes;
   transportInfo.congestionWindow = congestionWindow;
   transportInfo.pacingBurstSize = burstSize;
