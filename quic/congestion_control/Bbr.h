@@ -283,7 +283,7 @@ class BbrCongestionController : public CongestionController {
   uint64_t recoveryWindow_;
   // inflight bytes
   uint64_t inflightBytes_{0};
-  // Number of bytes we expect to send over on RTT when paced write.
+  // Number of bytes we expect to send over one RTT when paced write.
   uint64_t pacingWindow_{0};
 
   float cwndGain_{kStartupGain};
