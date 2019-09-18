@@ -24,8 +24,8 @@ class QuicFlowControlTest : public Test {
  public:
   void SetUp() override {
     transportInfoCb_ = std::make_unique<MockQuicStats>();
-    conn_.streamManager =
-        std::make_unique<QuicStreamManager>(conn_, conn_.nodeType);
+    conn_.streamManager = std::make_unique<QuicStreamManager>(
+        conn_, conn_.nodeType, conn_.transportSettings);
     conn_.infoCallback = transportInfoCb_.get();
   }
   std::unique_ptr<MockQuicStats> transportInfoCb_;

@@ -494,6 +494,7 @@ void onServerReadDataFromOpen(
             conn.transportSettings.maxRecvPacketSize,
             conn.transportSettings.partialReliabilityEnabled,
             token));
+    conn.transportParametersEncoded = true;
     QuicFizzFactory fizzFactory;
     FizzCryptoFactory cryptoFactory(&fizzFactory);
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
@@ -868,18 +869,6 @@ void onServerReadDataFromOpen(
             if (stream) {
               handleStreamWindowUpdate(
                   *stream, streamWindowUpdate.maximumData, packetNum);
-            }
-          },
-          [&](MaxStreamsFrame& maxStreamsFrame) {
-            VLOG(10) << "Server received max streams frame stream="
-                     << maxStreamsFrame.maxStreams << " " << conn;
-            isNonProbingPacket = true;
-            if (maxStreamsFrame.isForBidirectionalStream()) {
-              conn.streamManager->setMaxLocalBidirectionalStreams(
-                  maxStreamsFrame.maxStreams);
-            } else {
-              conn.streamManager->setMaxLocalUnidirectionalStreams(
-                  maxStreamsFrame.maxStreams);
             }
           },
           [&](DataBlockedFrame&) {

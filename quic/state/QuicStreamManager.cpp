@@ -109,8 +109,8 @@ void QuicStreamManager::setMaxLocalBidirectionalStreams(
         "Attempt to set maxStreams beyond the max allowed.",
         TransportErrorCode::STREAM_LIMIT_ERROR);
   }
-  StreamId maxStreamId =
-      maxStreams * detail::kStreamIncrement + initialBidirectionalStreamId_;
+  StreamId maxStreamId = maxStreams * detail::kStreamIncrement +
+      initialLocalBidirectionalStreamId_;
   if (force || maxStreamId > maxLocalBidirectionalStreamId_) {
     maxLocalBidirectionalStreamId_ = maxStreamId;
   }
@@ -124,11 +124,58 @@ void QuicStreamManager::setMaxLocalUnidirectionalStreams(
         "Attempt to set maxStreams beyond the max allowed.",
         TransportErrorCode::STREAM_LIMIT_ERROR);
   }
-  StreamId maxStreamId =
-      maxStreams * detail::kStreamIncrement + initialUnidirectionalStreamId_;
+  StreamId maxStreamId = maxStreams * detail::kStreamIncrement +
+      initialLocalUnidirectionalStreamId_;
   if (force || maxStreamId > maxLocalUnidirectionalStreamId_) {
     maxLocalUnidirectionalStreamId_ = maxStreamId;
   }
+}
+
+void QuicStreamManager::setMaxRemoteBidirectionalStreams(uint64_t maxStreams) {
+  setMaxRemoteBidirectionalStreamsInternal(maxStreams, false);
+}
+
+void QuicStreamManager::setMaxRemoteUnidirectionalStreams(uint64_t maxStreams) {
+  setMaxRemoteUnidirectionalStreamsInternal(maxStreams, false);
+}
+
+void QuicStreamManager::setMaxRemoteBidirectionalStreamsInternal(
+    uint64_t maxStreams,
+    bool force) {
+  if (maxStreams > kMaxMaxStreams) {
+    throw QuicTransportException(
+        "Attempt to set maxStreams beyond the max allowed.",
+        TransportErrorCode::STREAM_LIMIT_ERROR);
+  }
+  StreamId maxStreamId = maxStreams * detail::kStreamIncrement +
+      initialRemoteBidirectionalStreamId_;
+  if (force || maxStreamId > maxRemoteBidirectionalStreamId_) {
+    maxRemoteBidirectionalStreamId_ = maxStreamId;
+  }
+}
+
+void QuicStreamManager::setMaxRemoteUnidirectionalStreamsInternal(
+    uint64_t maxStreams,
+    bool force) {
+  if (maxStreams > kMaxMaxStreams) {
+    throw QuicTransportException(
+        "Attempt to set maxStreams beyond the max allowed.",
+        TransportErrorCode::STREAM_LIMIT_ERROR);
+  }
+  StreamId maxStreamId = maxStreams * detail::kStreamIncrement +
+      initialRemoteUnidirectionalStreamId_;
+  if (force || maxStreamId > maxRemoteUnidirectionalStreamId_) {
+    maxRemoteUnidirectionalStreamId_ = maxStreamId;
+  }
+}
+
+void QuicStreamManager::refreshTransportSettings(
+    const TransportSettings& settings) {
+  transportSettings_ = &settings;
+  setMaxRemoteBidirectionalStreamsInternal(
+      transportSettings_->advertisedInitialMaxStreamsBidi, true);
+  setMaxRemoteUnidirectionalStreamsInternal(
+      transportSettings_->advertisedInitialMaxStreamsUni, true);
 }
 
 // We create local streams lazily. If a local stream was created
@@ -136,9 +183,9 @@ void QuicStreamManager::setMaxLocalUnidirectionalStreams(
 // This will return nullptr if a stream is closed or un-opened.
 QuicStreamState* FOLLY_NULLABLE
 QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
-  auto streamIdx =
-      std::find(openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
-  if (streamIdx != openLocalStreams_.end()) {
+  auto streamIdx = std::lower_bound(
+      openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
+  if (streamIdx != openLocalStreams_.end() && *streamIdx == streamId) {
     // Open a lazily created stream.
     auto it = streams_.emplace(
         std::piecewise_construct,
@@ -217,9 +264,12 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
   if (peerStream != streams_.end()) {
     return &peerStream->second;
   }
-  auto streamIdx =
-      std::find(openPeerStreams_.begin(), openPeerStreams_.end(), streamId);
-  if (streamIdx != openPeerStreams_.end()) {
+  auto& openPeerStreams = isUnidirectionalStream(streamId)
+      ? openUnidirectionalPeerStreams_
+      : openBidirectionalPeerStreams_;
+  auto streamIdx = std::lower_bound(
+      openPeerStreams.begin(), openPeerStreams.end(), streamId);
+  if (streamIdx != openPeerStreams.end() && *streamIdx == streamId) {
     // Stream was already open, create the state for it lazily.
     auto it = streams_.emplace(
         std::piecewise_construct,
@@ -229,7 +279,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
     return &it.first->second;
   }
 
-  auto previousPeerStreams = openPeerStreams_;
+  auto previousPeerStreams = folly::copy(openPeerStreams);
   auto& nextAcceptableStreamId = isUnidirectionalStream(streamId)
       ? nextAcceptablePeerUnidirectionalStreamId_
       : nextAcceptablePeerBidirectionalStreamId_;
@@ -237,7 +287,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       ? maxRemoteUnidirectionalStreamId_
       : maxRemoteBidirectionalStreamId_;
   auto openedResult = openStreamIfNotClosed(
-      streamId, openPeerStreams_, nextAcceptableStreamId, maxStreamId);
+      streamId, openPeerStreams, nextAcceptableStreamId, maxStreamId);
   if (openedResult == LocalErrorCode::CREATING_EXISTING_STREAM) {
     // Stream could be closed here.
     return nullptr;
@@ -248,8 +298,8 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
 
   // Copy over the new streams.
   std::set_difference(
-      openPeerStreams_.begin(),
-      openPeerStreams_.end(),
+      openPeerStreams.begin(),
+      openPeerStreams.end(),
       std::make_move_iterator(previousPeerStreams.begin()),
       std::make_move_iterator(previousPeerStreams.end()),
       std::back_inserter(newPeerStreams_));
@@ -331,14 +381,49 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   }
   streams_.erase(it);
   QUIC_STATS(conn_.infoCallback, onQuicStreamClosed);
-  auto streamItr =
-      std::find(openPeerStreams_.begin(), openPeerStreams_.end(), streamId);
-  if (streamItr != openPeerStreams_.end()) {
-    openPeerStreams_.erase(streamItr);
+  if (isRemoteStream(nodeType_, streamId)) {
+    auto& openPeerStreams = isUnidirectionalStream(streamId)
+        ? openUnidirectionalPeerStreams_
+        : openBidirectionalPeerStreams_;
+    auto streamItr = std::lower_bound(
+        openPeerStreams.begin(), openPeerStreams.end(), streamId);
+    if (streamItr != openPeerStreams.end() && *streamItr == streamId) {
+      openPeerStreams.erase(streamItr);
+      // Check if we should send a stream limit update. We need to send an
+      // update every time we've closed a number of streams >= the set windowing
+      // fraction.
+      uint64_t initialStreamLimit = isUnidirectionalStream(streamId)
+          ? transportSettings_->advertisedInitialMaxStreamsUni
+          : transportSettings_->advertisedInitialMaxStreamsBidi;
+      uint64_t streamWindow =
+          initialStreamLimit / streamLimitWindowingFraction_;
+      uint64_t openableRemoteStreams = isUnidirectionalStream(streamId)
+          ? openableRemoteUnidirectionalStreams()
+          : openableRemoteBidirectionalStreams();
+      // The "credit" here is how much available stream space we have based on
+      // what the initial stream limit was set to.
+      uint64_t streamCredit =
+          initialStreamLimit - openableRemoteStreams - openPeerStreams.size();
+      if (streamCredit >= streamWindow) {
+        if (isUnidirectionalStream(streamId)) {
+          uint64_t maxStreams = (maxRemoteUnidirectionalStreamId_ -
+                                 initialRemoteUnidirectionalStreamId_) /
+              detail::kStreamIncrement;
+          setMaxRemoteUnidirectionalStreams(maxStreams + streamCredit);
+          remoteUnidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
+        } else {
+          uint64_t maxStreams = (maxRemoteBidirectionalStreamId_ -
+                                 initialRemoteBidirectionalStreamId_) /
+              detail::kStreamIncrement;
+          setMaxRemoteBidirectionalStreams(maxStreams + streamCredit);
+          remoteBidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
+        }
+      }
+    }
   } else {
-    streamItr =
-        std::find(openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
-    if (streamItr != openLocalStreams_.end()) {
+    auto streamItr = std::lower_bound(
+        openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
+    if (streamItr != openLocalStreams_.end() && *streamItr == streamId) {
       openLocalStreams_.erase(streamItr);
     }
   }

@@ -130,7 +130,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
           EXPECT_EQ("The sun is in the sky.", closeFrame.reasonPhrase);
           EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
         },
-        [](const MaxStreamsFrame& maxStreamFrame) {
+        [](const QuicSimpleFrame& simpleFrame) {
+          auto maxStreamFrame = boost::get<MaxStreamsFrame>(simpleFrame);
           EXPECT_EQ(4321, maxStreamFrame.maxStreams);
         },
         [](const PingFrame& ping) { EXPECT_EQ(PingFrame(), ping); },

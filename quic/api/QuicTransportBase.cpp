@@ -1979,6 +1979,7 @@ void QuicTransportBase::checkForClosedStream() {
         stream->totalHolbTime.count(),
         stream->holbCount);
     conn_->streamManager->removeClosedStream(*itr);
+    maybeSendStreamLimitUpdates(*conn_);
     readCallbacks_.erase(*itr);
     peekCallbacks_.erase(*itr);
     itr = conn_->streamManager->closedStreams().erase(itr);
@@ -2288,7 +2289,14 @@ void QuicTransportBase::cancelDeliveryCallbacks(
 
 void QuicTransportBase::setTransportSettings(
     TransportSettings transportSettings) {
+  // If we've already encoded the transport parameters, silently return as
+  // setting the transport settings again would be buggy.
+  // TODO should we throw or return Expected here?
+  if (conn_->transportParametersEncoded) {
+    return;
+  }
   conn_->transportSettings = std::move(transportSettings);
+  conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
   setCongestionControl(transportSettings.defaultCongestionController);
   if (conn_->transportSettings.pacingEnabled) {
     conn_->pacer = std::make_unique<DefaultPacer>(

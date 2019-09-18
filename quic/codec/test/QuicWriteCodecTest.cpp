@@ -968,13 +968,14 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     auto streamCountSize = i < 64 ? 1 : 2;
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
-    auto resultMaxStreamIdFrame =
-        boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
+    auto resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
+        boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
     folly::io::Cursor cursor(wireBuf.get());
-    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
+    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(
+        boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
     EXPECT_EQ(i, wireStreamsFrame.maxStreams);
     EXPECT_TRUE(cursor.isAtEnd());
   }
@@ -994,13 +995,14 @@ TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
     auto streamCountSize = i < 64 ? 1 : 2;
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
-    auto resultMaxStreamIdFrame =
-        boost::get<MaxStreamsFrame>(regularPacket.frames[0]);
+    auto resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
+        boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
     folly::io::Cursor cursor(wireBuf.get());
-    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
+    auto wireStreamsFrame = boost::get<MaxStreamsFrame>(
+        boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
     EXPECT_EQ(i, wireStreamsFrame.maxStreams);
     EXPECT_TRUE(cursor.isAtEnd());
   }
@@ -1268,12 +1270,13 @@ TEST_F(QuicWriteCodecTest, WriteStreamIdNeeded) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 3);
-  EXPECT_NO_THROW(boost::get<MaxStreamsFrame>(regularPacket.frames[0]));
+  EXPECT_NO_THROW(boost::get<MaxStreamsFrame>(
+      boost::get<QuicSimpleFrame>(regularPacket.frames[0])));
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
-  auto writeStreamIdBlocked =
-      boost::get<MaxStreamsFrame>(parseQuicFrame(cursor));
+  auto writeStreamIdBlocked = boost::get<MaxStreamsFrame>(
+      boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
   EXPECT_EQ(writeStreamIdBlocked.maxStreams, blockedStreamId);
   EXPECT_TRUE(cursor.isAtEnd());
 }

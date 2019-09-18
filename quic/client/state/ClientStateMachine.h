@@ -74,7 +74,8 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     // We shouldn't normally need to set this until we're starting the
     // transport, however writing unit tests is much easier if we set this here.
     updateFlowControlStateWithSettings(flowControlState, transportSettings);
-    streamManager = std::make_unique<QuicStreamManager>(*this, this->nodeType);
+    streamManager = std::make_unique<QuicStreamManager>(
+        *this, this->nodeType, transportSettings);
   }
 };
 

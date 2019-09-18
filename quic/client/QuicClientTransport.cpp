@@ -430,17 +430,6 @@ void QuicClientTransport::processPacketData(
                 *stream, streamWindowUpdate.maximumData, packetNum);
           }
         },
-        [&](MaxStreamsFrame& maxStreamsFrame) {
-          VLOG(10) << "Client received max streams frame stream="
-                   << maxStreamsFrame.maxStreams << *this;
-          if (maxStreamsFrame.isForBidirectionalStream()) {
-            conn_->streamManager->setMaxLocalBidirectionalStreams(
-                maxStreamsFrame.maxStreams);
-          } else {
-            conn_->streamManager->setMaxLocalUnidirectionalStreams(
-                maxStreamsFrame.maxStreams);
-          }
-        },
         [&](DataBlockedFrame&) {
           VLOG(10) << "Client received blocked " << *this;
           pktHasRetransmittableData = true;
@@ -874,6 +863,7 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.ackDelayExponent,
       conn_->transportSettings.maxRecvPacketSize,
       customTransportParameters_);
+  conn_->transportParametersEncoded = true;
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   handshakeLayer->connect(
       ctx_,

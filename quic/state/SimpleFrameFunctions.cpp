@@ -63,6 +63,9 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       [&](const NewConnectionIdFrame& frame)
           -> folly::Optional<QuicSimpleFrame> {
         return QuicSimpleFrame(frame);
+      },
+      [&](const MaxStreamsFrame& frame) -> folly::Optional<QuicSimpleFrame> {
+        return QuicSimpleFrame(frame);
       });
 }
 
@@ -124,6 +127,9 @@ void updateSimpleFrameOnPacketLoss(
       },
       [&](const NewConnectionIdFrame& frame) {
         conn.pendingEvents.frames.push_back(frame);
+      },
+      [&](const MaxStreamsFrame& frame) {
+        conn.pendingEvents.frames.push_back(frame);
       });
 }
 
@@ -176,6 +182,16 @@ bool updateSimpleFrameOnPacketReceived(
       [&](const NewConnectionIdFrame&) {
         // TODO junqiw
         return false;
+      },
+      [&](const MaxStreamsFrame& maxStreamsFrame) {
+        if (maxStreamsFrame.isForBidirectionalStream()) {
+          conn.streamManager->setMaxLocalBidirectionalStreams(
+              maxStreamsFrame.maxStreams);
+        } else {
+          conn.streamManager->setMaxLocalUnidirectionalStreams(
+              maxStreamsFrame.maxStreams);
+        }
+        return true;
       });
 }
 

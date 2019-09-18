@@ -392,7 +392,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
     bool present = false;
     /* the next four frames should not be written */
     present |= boost::get<ConnectionCloseFrame>(&frame) ? true : false;
-    present |= boost::get<MaxStreamsFrame>(&frame) ? true : false;
+    present |= boost::get<QuicSimpleFrame>(&frame) ? true : false;
     present |= boost::get<PingFrame>(&frame) ? true : false;
     present |= boost::get<WriteAckFrame>(&frame) ? true : false;
     ASSERT_FALSE(present);

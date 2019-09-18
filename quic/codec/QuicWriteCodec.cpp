@@ -434,6 +434,23 @@ size_t writeSimpleFrame(
         }
         // no space left in packet
         return size_t(0);
+      },
+      [&](MaxStreamsFrame& maxStreamsFrame) {
+        auto frameType = maxStreamsFrame.isForBidirectionalStream()
+            ? FrameType::MAX_STREAMS_BIDI
+            : FrameType::MAX_STREAMS_UNI;
+        QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
+        QuicInteger streamCount(maxStreamsFrame.maxStreams);
+        auto maxStreamsFrameSize =
+            intFrameType.getSize() + streamCount.getSize();
+        if (packetSpaceCheck(spaceLeft, maxStreamsFrameSize)) {
+          builder.write(intFrameType);
+          builder.write(streamCount);
+          builder.appendFrame(maxStreamsFrame);
+          return maxStreamsFrameSize;
+        }
+        // no space left in packet
+        return size_t(0);
       });
 }
 
@@ -516,23 +533,6 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           builder.write(maximumData);
           builder.appendFrame(std::move(maxStreamDataFrame));
           return maxStreamDataFrameSize;
-        }
-        // no space left in packet
-        return size_t(0);
-      },
-      [&](MaxStreamsFrame& maxStreamsFrame) {
-        auto frameType = maxStreamsFrame.isForBidirectionalStream()
-            ? FrameType::MAX_STREAMS_BIDI
-            : FrameType::MAX_STREAMS_UNI;
-        QuicInteger intFrameType(static_cast<FrameTypeType>(frameType));
-        QuicInteger streamCount(maxStreamsFrame.maxStreams);
-        auto maxStreamsFrameSize =
-            intFrameType.getSize() + streamCount.getSize();
-        if (packetSpaceCheck(spaceLeft, maxStreamsFrameSize)) {
-          builder.write(intFrameType);
-          builder.write(streamCount);
-          builder.appendFrame(std::move(maxStreamsFrame));
-          return maxStreamsFrameSize;
         }
         // no space left in packet
         return size_t(0);

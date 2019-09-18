@@ -594,6 +594,9 @@ struct QuicConnectionStateBase {
   // Settings for transports.
   TransportSettings transportSettings;
 
+  // Whether we've set the transporot parameters from transportSettings yet.
+  bool transportParametersEncoded{false};
+
   // Value of the negotiated ack delay exponent.
   uint64_t peerAckDelayExponent{kDefaultAckDelayExponent};
 

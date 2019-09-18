@@ -178,5 +178,75 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppIdle());
 }
+
+TEST_F(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
+  conn.transportSettings.advertisedInitialMaxStreamsUni = 100;
+  manager.refreshTransportSettings(conn.transportSettings);
+  manager.setStreamLimitWindowingFraction(4);
+  for (int i = 0; i < 100; i++) {
+    manager.getStream(i * detail::kStreamIncrement);
+    manager.getStream(2 + i * detail::kStreamIncrement);
+  }
+  for (int i = 0; i < 25; i++) {
+    auto stream = manager.getStream(i * detail::kStreamIncrement);
+    stream->send.state = StreamSendStates::Closed();
+    stream->recv.state = StreamReceiveStates::Closed();
+    manager.removeClosedStream(stream->id);
+    stream = manager.getStream(2 + i * detail::kStreamIncrement);
+    stream->send.state = StreamSendStates::Closed();
+    stream->recv.state = StreamReceiveStates::Closed();
+    manager.removeClosedStream(stream->id);
+  }
+  auto update = manager.remoteBidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(update.value(), 125);
+  EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
+
+  update = manager.remoteUnidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(update.value(), 125);
+  EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
+}
+
+TEST_F(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
+  manager.refreshTransportSettings(conn.transportSettings);
+  manager.setStreamLimitWindowingFraction(4);
+  for (int i = 0; i < 100; i++) {
+    manager.getStream(i * detail::kStreamIncrement);
+  }
+  for (int i = 0; i < 24; i++) {
+    auto stream = manager.getStream(i * detail::kStreamIncrement);
+    stream->send.state = StreamSendStates::Closed();
+    stream->recv.state = StreamReceiveStates::Closed();
+    manager.removeClosedStream(stream->id);
+  }
+  auto update = manager.remoteBidirectionalStreamLimitUpdate();
+  EXPECT_FALSE(update);
+}
+
+TEST_F(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
+  manager.refreshTransportSettings(conn.transportSettings);
+  manager.setStreamLimitWindowingFraction(4);
+  for (int i = 0; i < 100; i++) {
+    manager.getStream(i * detail::kStreamIncrement);
+  }
+  for (int i = 0; i < 50; i++) {
+    auto stream = manager.getStream(i * detail::kStreamIncrement);
+    stream->send.state = StreamSendStates::Closed();
+    stream->recv.state = StreamReceiveStates::Closed();
+    manager.removeClosedStream(stream->id);
+  }
+  auto update = manager.remoteBidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(update.value(), 150);
+  EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
+  EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
+}
 } // namespace test
 } // namespace quic

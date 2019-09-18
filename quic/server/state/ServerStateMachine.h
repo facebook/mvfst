@@ -132,7 +132,8 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     pendingZeroRttData =
         std::make_unique<std::vector<ServerEvents::ReadData>>();
     pendingOneRttData = std::make_unique<std::vector<ServerEvents::ReadData>>();
-    streamManager = std::make_unique<QuicStreamManager>(*this, this->nodeType);
+    streamManager = std::make_unique<QuicStreamManager>(
+        *this, this->nodeType, transportSettings);
   }
 };
 

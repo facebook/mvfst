@@ -1110,4 +1110,15 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   }
   return WriteDataReason::NO_WRITE;
 }
+
+void maybeSendStreamLimitUpdates(QuicConnectionStateBase& conn) {
+  auto update = conn.streamManager->remoteBidirectionalStreamLimitUpdate();
+  if (update) {
+    sendSimpleFrame(conn, (MaxStreamsFrame(*update, true)));
+  }
+  update = conn.streamManager->remoteUnidirectionalStreamLimitUpdate();
+  if (update) {
+    sendSimpleFrame(conn, (MaxStreamsFrame(*update, false)));
+  }
+}
 } // namespace quic

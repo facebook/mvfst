@@ -502,6 +502,31 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
 }
 
+TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
+  expectTransportCallbacks();
+  auto qLogger = std::make_shared<FileQLogger>();
+  client->getNonConstConn().qLogger = qLogger;
+  TransportSettings settings;
+  settings.connectUDP = true;
+  client->setTransportSettings(settings);
+  client->start(&clientConnCallback);
+
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+  settings.connectUDP = false;
+  client->setTransportSettings(settings);
+  EXPECT_TRUE(client->getTransportSettings().connectUDP);
+}
+
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
   pskCache_->putPsk(hostname, cachedPsk);

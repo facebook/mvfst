@@ -564,7 +564,8 @@ using QuicSimpleFrame = boost::variant<
     ExpiredStreamDataFrame,
     PathChallengeFrame,
     PathResponseFrame,
-    NewConnectionIdFrame>;
+    NewConnectionIdFrame,
+    MaxStreamsFrame>;
 
 // Types of frames that can be read.
 using QuicFrame = boost::variant<
@@ -574,7 +575,6 @@ using QuicFrame = boost::variant<
     ApplicationCloseFrame,
     MaxDataFrame,
     MaxStreamDataFrame,
-    MaxStreamsFrame,
     PingFrame,
     DataBlockedFrame,
     StreamDataBlockedFrame,
@@ -594,11 +594,10 @@ using QuicWriteFrame = boost::variant<
     ApplicationCloseFrame,
     MaxDataFrame,
     MaxStreamDataFrame,
-    MaxStreamsFrame,
-    StreamsBlockedFrame,
     PingFrame,
     DataBlockedFrame,
     StreamDataBlockedFrame,
+    StreamsBlockedFrame,
     WriteAckFrame,
     WriteStreamFrame,
     WriteCryptoFrame,

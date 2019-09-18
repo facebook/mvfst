@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/state/StreamData.h>
+#include <quic/state/TransportSettings.h>
 #include <deque>
 #include <map>
 #include <numeric>
@@ -28,8 +29,11 @@ class QuicStreamManager {
  public:
   explicit QuicStreamManager(
       QuicConnectionStateBase& conn,
-      QuicNodeType nodeType)
-      : conn_(conn), nodeType_(nodeType) {
+      QuicNodeType nodeType,
+      const TransportSettings& transportSettings)
+      : conn_(conn),
+        nodeType_(nodeType),
+        transportSettings_(&transportSettings) {
     if (nodeType == QuicNodeType::Server) {
       nextAcceptablePeerBidirectionalStreamId_ = 0x00;
       nextAcceptablePeerUnidirectionalStreamId_ = 0x02;
@@ -37,8 +41,10 @@ class QuicStreamManager {
       nextAcceptableLocalUnidirectionalStreamId_ = 0x03;
       nextBidirectionalStreamId_ = 0x01;
       nextUnidirectionalStreamId_ = 0x03;
-      initialBidirectionalStreamId_ = 0x01;
-      initialUnidirectionalStreamId_ = 0x03;
+      initialLocalBidirectionalStreamId_ = 0x01;
+      initialLocalUnidirectionalStreamId_ = 0x03;
+      initialRemoteBidirectionalStreamId_ = 0x00;
+      initialRemoteUnidirectionalStreamId_ = 0x02;
     } else {
       nextAcceptablePeerBidirectionalStreamId_ = 0x01;
       nextAcceptablePeerUnidirectionalStreamId_ = 0x03;
@@ -46,9 +52,12 @@ class QuicStreamManager {
       nextAcceptableLocalUnidirectionalStreamId_ = 0x02;
       nextBidirectionalStreamId_ = 0x00;
       nextUnidirectionalStreamId_ = 0x02;
-      initialBidirectionalStreamId_ = 0x00;
-      initialUnidirectionalStreamId_ = 0x02;
+      initialLocalBidirectionalStreamId_ = 0x00;
+      initialLocalUnidirectionalStreamId_ = 0x02;
+      initialRemoteBidirectionalStreamId_ = 0x01;
+      initialRemoteUnidirectionalStreamId_ = 0x03;
     }
+    refreshTransportSettings(transportSettings);
   }
   /*
    * Create the state for a stream if it does not exist and return it. Note this
@@ -117,7 +126,13 @@ class QuicStreamManager {
    */
   bool streamExists(StreamId streamId) {
     return std::binary_search(
-               openPeerStreams_.begin(), openPeerStreams_.end(), streamId) ||
+               openBidirectionalPeerStreams_.begin(),
+               openBidirectionalPeerStreams_.end(),
+               streamId) ||
+        std::binary_search(
+               openUnidirectionalPeerStreams_.begin(),
+               openUnidirectionalPeerStreams_.end(),
+               streamId) ||
         std::binary_search(
                openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
   }
@@ -158,7 +173,8 @@ class QuicStreamManager {
    */
   void clearOpenStreams() {
     openLocalStreams_.clear();
-    openPeerStreams_.clear();
+    openBidirectionalPeerStreams_.clear();
+    openUnidirectionalPeerStreams_.clear();
     streams_.clear();
   }
 
@@ -276,6 +292,54 @@ class QuicStreamManager {
   void setMaxLocalUnidirectionalStreams(
       uint64_t maxStreams,
       bool force = false);
+
+  /*
+   * Set the max number of remote bidirectional streams. Can only be increased
+   * unless force is true.
+   */
+  void setMaxRemoteBidirectionalStreams(uint64_t maxStreams);
+
+  /*
+   * Set the max number of remote unidirectional streams. Can only be increased
+   * unless force is true.
+   */
+  void setMaxRemoteUnidirectionalStreams(uint64_t maxStreams);
+
+  void refreshTransportSettings(const TransportSettings& settings);
+
+  /*
+   * Sets the "window-by" fraction for sending stream limit updates. E.g.
+   * setting the fraction to two when the initial stream limit was 100 will
+   * cause the stream manager to update the relevant stream limit update when
+   * 50 streams have been closed.
+   */
+  void setStreamLimitWindowingFraction(uint64_t fraction) {
+    if (fraction > 0) {
+      streamLimitWindowingFraction_ = fraction;
+    }
+  }
+
+  /*
+   * The next value that should be sent in a bidirectional max streams frame,
+   * if any. This is potentially updated every time a bidirectional stream is
+   * closed. Calling this function "consumes" the update.
+   */
+  folly::Optional<uint64_t> remoteBidirectionalStreamLimitUpdate() {
+    auto ret = remoteBidirectionalStreamLimitUpdate_;
+    remoteBidirectionalStreamLimitUpdate_ = folly::none;
+    return ret;
+  }
+
+  /*
+   * The next value that should be sent in a unidirectional max streams frame,
+   * if any. This is potentially updated every time a unidirectional stream is
+   * closed. Calling this function "consumes" the update.
+   */
+  folly::Optional<uint64_t> remoteUnidirectionalStreamLimitUpdate() {
+    auto ret = remoteUnidirectionalStreamLimitUpdate_;
+    remoteUnidirectionalStreamLimitUpdate_ = folly::none;
+    return ret;
+  }
 
   /*
    * Returns a const reference to the underlying stream window updates
@@ -488,10 +552,20 @@ class QuicStreamManager {
 
   // TODO figure out a better interface here.
   /*
-   * Returns a mutable reference to the underlying open peer streams container.
+   * Returns a mutable reference to the underlying open bidirectional peer
+   * streams container.
    */
-  auto& openPeerStreams() {
-    return openPeerStreams_;
+  auto& openBidirectionalPeerStreams() {
+    return openBidirectionalPeerStreams_;
+  }
+
+  // TODO figure out a better interface here.
+  /*
+   * Returns a mutable reference to the underlying open peer unidirectional
+   * streams container.
+   */
+  auto& openUnidirectionalPeerStreams() {
+    return openUnidirectionalPeerStreams_;
   }
 
   // TODO figure out a better interface here.
@@ -579,6 +653,13 @@ class QuicStreamManager {
 
   QuicStreamState* FOLLY_NULLABLE getOrCreatePeerStream(StreamId streamId);
 
+  void setMaxRemoteBidirectionalStreamsInternal(
+      uint64_t maxStreams,
+      bool force);
+  void setMaxRemoteUnidirectionalStreamsInternal(
+      uint64_t maxStreams,
+      bool force);
+
   QuicConnectionStateBase& conn_;
   QuicNodeType nodeType_;
 
@@ -608,18 +689,39 @@ class QuicStreamManager {
 
   StreamId maxLocalUnidirectionalStreamId_{0};
 
-  StreamId maxRemoteBidirectionalStreamId_{kMaxStreamId};
+  StreamId maxRemoteBidirectionalStreamId_{0};
 
-  StreamId maxRemoteUnidirectionalStreamId_{kMaxStreamId};
+  StreamId maxRemoteUnidirectionalStreamId_{0};
 
-  StreamId initialBidirectionalStreamId_{0};
+  StreamId initialLocalBidirectionalStreamId_{0};
 
-  StreamId initialUnidirectionalStreamId_{0};
+  StreamId initialLocalUnidirectionalStreamId_{0};
+
+  StreamId initialRemoteBidirectionalStreamId_{0};
+
+  StreamId initialRemoteUnidirectionalStreamId_{0};
+
+  // The fraction to determine the window by which we will signal the need to
+  // send stream limit updates
+  uint64_t streamLimitWindowingFraction_{2};
+
+  // Contains the value of a stream window update that should be sent for
+  // remote bidirectional streams.
+  folly::Optional<uint64_t> remoteBidirectionalStreamLimitUpdate_;
+
+  // Contains the value of a stream window update that should be sent for
+  // remote bidirectional streams.
+  folly::Optional<uint64_t> remoteUnidirectionalStreamLimitUpdate_;
 
   uint64_t numControlStreams_{0};
 
-  // Streams that are opened by the peer on the connection. Ordered by id.
-  std::deque<StreamId> openPeerStreams_;
+  // Bidirectional streams that are opened by the peer on the connection.
+  // Ordered by id.
+  std::deque<StreamId> openBidirectionalPeerStreams_;
+
+  // Unidirectional streams that are opened by the peer on the connection.
+  // Ordered by id.
+  std::deque<StreamId> openUnidirectionalPeerStreams_;
 
   // Streams that are opened locally on the connection. Ordered by id.
   std::deque<StreamId> openLocalStreams_;
@@ -668,6 +770,8 @@ class QuicStreamManager {
 
   // Record whether or not we are app-idle.
   bool isAppIdle_{false};
+
+  const TransportSettings* transportSettings_;
 };
 
 } // namespace quic

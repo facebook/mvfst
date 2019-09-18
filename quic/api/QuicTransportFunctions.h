@@ -234,4 +234,6 @@ uint64_t writeProbingDataToSocket(
 HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType);
 HeaderBuilder ShortHeaderBuilder();
 
+void maybeSendStreamLimitUpdates(QuicConnectionStateBase& conn);
+
 } // namespace quic

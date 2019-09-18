@@ -876,19 +876,19 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClientOutOfOrderStream) {
   EXPECT_TRUE(conn.streamManager->streamExists(outOfOrderStream));
   // peer stream starts from 0x00
   EXPECT_EQ(
-      conn.streamManager->openPeerStreams().size(),
+      conn.streamManager->openBidirectionalPeerStreams().size(),
       ((outOfOrderStream) / kStreamIncrement) + 1);
 
   conn.streamManager->getStream(existingStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
   EXPECT_TRUE(conn.streamManager->streamExists(outOfOrderStream));
   EXPECT_EQ(
-      conn.streamManager->openPeerStreams().size(),
+      conn.streamManager->openBidirectionalPeerStreams().size(),
       ((outOfOrderStream) / kStreamIncrement) + 1);
 
-  conn.streamManager->openPeerStreams().erase(std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+  conn.streamManager->openBidirectionalPeerStreams().erase(std::find(
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       closedStream));
   EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
 }
@@ -916,9 +916,9 @@ TEST_F(QuicServerStreamFunctionsTest, GetOrCreateClosedClientStream) {
   StreamId outOfOrderStream1 = 100;
   StreamId closedStream = 48;
   conn.streamManager->getStream(outOfOrderStream1);
-  conn.streamManager->openPeerStreams().erase(std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+  conn.streamManager->openBidirectionalPeerStreams().erase(std::find(
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       closedStream));
   EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
 }
@@ -929,13 +929,13 @@ TEST_F(
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 100;
   conn.streamManager->getStream(outOfOrderStream1);
-  conn.streamManager->openPeerStreams().erase(std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+  conn.streamManager->openBidirectionalPeerStreams().erase(std::find(
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       outOfOrderStream1));
   conn.streamManager->getStream(outOfOrderStream2);
   EXPECT_EQ(
-      conn.streamManager->openPeerStreams().size(),
+      conn.streamManager->openBidirectionalPeerStreams().size(),
       (outOfOrderStream2) / kStreamIncrement);
 }
 
@@ -943,13 +943,13 @@ TEST_F(QuicStreamFunctionsTest, GetOrCreateServerStreamAfterClosingLastStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId outOfOrderStream2 = 101;
   conn.streamManager->getStream(outOfOrderStream1);
-  conn.streamManager->openPeerStreams().erase(std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+  conn.streamManager->openBidirectionalPeerStreams().erase(std::find(
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       outOfOrderStream1));
   conn.streamManager->getStream(outOfOrderStream2);
   EXPECT_EQ(
-      conn.streamManager->openPeerStreams().size(),
+      conn.streamManager->openBidirectionalPeerStreams().size(),
       (outOfOrderStream2 + 1) / kStreamIncrement);
 }
 
@@ -957,9 +957,9 @@ TEST_F(QuicStreamFunctionsTest, GetOrCreateClosedServerStream) {
   StreamId outOfOrderStream1 = 97;
   StreamId closedStream = 49;
   conn.streamManager->getStream(outOfOrderStream1);
-  conn.streamManager->openPeerStreams().erase(std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+  conn.streamManager->openBidirectionalPeerStreams().erase(std::find(
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       closedStream));
   EXPECT_EQ(conn.streamManager->getStream(closedStream), nullptr);
 }
@@ -1537,13 +1537,13 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
   std::deque<StreamId> newStreams = {0x0, 0x4, 0x8, 0xc, 0x10};
   EXPECT_EQ(conn.streamManager->getStream(clientStream)->id, clientStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openPeerStreams().size(), 5);
+  EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 5);
   EXPECT_EQ(conn.streamManager->newPeerStreams(), newStreams);
 
   StreamId clientStream2 = 0x4;
   EXPECT_EQ(conn.streamManager->getStream(clientStream2)->id, clientStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openPeerStreams().size(), 5);
+  EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 5);
   EXPECT_EQ(conn.streamManager->newPeerStreams().size(), 5);
   EXPECT_EQ(conn.streamManager->newPeerStreams(), newStreams);
 
@@ -1551,7 +1551,7 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
   newStreams = {0x0, 0x2, 0x4, 0x6, 0x8, 0xc, 0x10};
   EXPECT_EQ(conn.streamManager->getStream(clientStream3)->id, clientStream3);
   EXPECT_EQ(conn.streamManager->streamCount(), 3);
-  EXPECT_EQ(conn.streamManager->openPeerStreams().size(), 7);
+  EXPECT_EQ(conn.streamManager->openUnidirectionalPeerStreams().size(), 2);
   std::sort(
       conn.streamManager->newPeerStreams().begin(),
       conn.streamManager->newPeerStreams().end());
@@ -1636,12 +1636,12 @@ TEST_F(QuicStreamFunctionsTest, ClientGetServerQuicStream) {
   StreamId serverStream = 0x09;
   EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openPeerStreams().size(), 3);
+  EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 3);
 
   StreamId serverStream2 = 0x05;
   EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openPeerStreams().size(), 3);
+  EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 3);
 }
 
 TEST_F(QuicStreamFunctionsTest, ClientGetClientQuicStream) {
@@ -1692,16 +1692,44 @@ TEST_F(QuicStreamFunctionsTest, StreamExists) {
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));
 
   auto it = std::find(
-      conn.streamManager->openPeerStreams().begin(),
-      conn.streamManager->openPeerStreams().end(),
+      conn.streamManager->openBidirectionalPeerStreams().begin(),
+      conn.streamManager->openBidirectionalPeerStreams().end(),
       peerAutoOpened);
-  conn.streamManager->openPeerStreams().erase(it);
+  conn.streamManager->openBidirectionalPeerStreams().erase(it);
 
   conn.streamManager->removeClosedStream(peerStream);
 
   EXPECT_FALSE(conn.streamManager->streamExists(peerAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened2));
+}
+
+TEST_F(QuicStreamFunctionsTest, StreamLimitUpdates) {
+  StreamId peerStream = 13;
+  StreamId peerAutoOpened = 5;
+  StreamId peerAutoOpened2 = 9;
+  StreamId notOpenedPeer = 17;
+
+  conn.streamManager->setStreamLimitWindowingFraction(
+      conn.transportSettings.advertisedInitialMaxStreamsBidi);
+  conn.streamManager->getStream(peerStream)->send.state =
+      StreamSendStates::Closed{};
+  conn.streamManager->getStream(peerStream)->recv.state =
+      StreamReceiveStates::Closed{};
+  EXPECT_FALSE(conn.streamManager->streamExists(notOpenedPeer));
+  EXPECT_TRUE(conn.streamManager->streamExists(peerStream));
+  EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));
+
+  conn.streamManager->removeClosedStream(peerStream);
+
+  EXPECT_FALSE(conn.streamManager->streamExists(peerStream));
+  EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));
+  EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened2));
+  auto update = conn.streamManager->remoteBidirectionalStreamLimitUpdate();
+  ASSERT_TRUE(update);
+  EXPECT_EQ(
+      update.value(),
+      conn.transportSettings.advertisedInitialMaxStreamsBidi + 1);
 }
 
 TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAcked) {
