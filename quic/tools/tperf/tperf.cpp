@@ -174,6 +174,7 @@ class TPerfServer {
     settings.defaultCongestionController = congestionControlType;
     if (congestionControlType == quic::CongestionControlType::BBR) {
       settings.pacingEnabled = true;
+      settings.pacingTimerTickInterval = 200us;
     }
     if (gso) {
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
