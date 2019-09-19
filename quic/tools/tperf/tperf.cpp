@@ -170,6 +170,7 @@ class TPerfServer {
         std::make_unique<TPerfServerTransportFactory>(blockSize));
     server_->setFizzContext(quic::test::createServerCtx());
     quic::TransportSettings settings;
+    settings.maxCwndInMss = kLargeMaxCwndInMss;
     settings.writeConnectionDataPacketsLimit = writesPerLoop;
     settings.defaultCongestionController = congestionControlType;
     if (congestionControlType == quic::CongestionControlType::BBR) {

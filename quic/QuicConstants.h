@@ -244,7 +244,11 @@ constexpr uint64_t kMinCwndInMss = 2;
 // Min cwnd for BBR is 4 MSS regard less of transport settings
 constexpr uint64_t kMinCwndInMssForBbr{4};
 
+// Default max cwnd limit
 constexpr uint64_t kDefaultMaxCwndInMss = 2000;
+// Max cwnd limit for perf test purpose
+constexpr uint64_t kLargeMaxCwndInMss = 860000;
+
 // When server receives early data attempt without valid source address token,
 // server will limit bytes in flight to avoid amplification attack until CFIN
 // is received which proves sender owns the address.
