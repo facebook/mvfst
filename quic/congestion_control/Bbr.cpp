@@ -38,6 +38,8 @@ BbrCongestionController::BbrCongestionController(
           conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
       recoveryWindow_(
           conn.udpSendPacketLen * conn.transportSettings.maxCwndInMss),
+      pacingWindow_(
+          conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
       // TODO: experiment with longer window len for ack aggregation filter
       maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {}
 
@@ -270,13 +272,6 @@ void BbrCongestionController::updatePacing() noexcept {
   uint64_t targetPacingWindow = bandwidthEstimate * pacingGain_ * mrtt;
   if (btlbwFound_) {
     pacingWindow_ = targetPacingWindow;
-  } else if (
-      !pacingWindow_ &&
-      conn_.lossState.mrtt != std::chrono::microseconds::max() &&
-      conn_.lossState.mrtt != 0us &&
-      conn_.lossState.mrtt >= conn_.transportSettings.pacingTimerTickInterval) {
-    pacingWindow_ = initialCwnd_;
-    mrtt = conn_.lossState.mrtt;
   } else {
     pacingWindow_ = std::max(pacingWindow_, targetPacingWindow);
   }
