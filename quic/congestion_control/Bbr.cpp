@@ -264,6 +264,9 @@ void BbrCongestionController::updatePacing() noexcept {
   if (!conn_.pacer) {
     return;
   }
+  if (conn_.lossState.totalBytesSent < initialCwnd_) {
+    return;
+  }
   auto bandwidthEstimate = bandwidth();
   if (!bandwidthEstimate) {
     return;
