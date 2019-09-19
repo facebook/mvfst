@@ -55,7 +55,8 @@ std::unique_ptr<QuicReadCodec> makeCodec(
     ConnectionId clientConnId,
     QuicNodeType nodeType,
     std::unique_ptr<Aead> zeroRttCipher = nullptr,
-    std::unique_ptr<Aead> oneRttCipher = nullptr) {
+    std::unique_ptr<Aead> oneRttCipher = nullptr,
+    QuicVersion version = QuicVersion::MVFST) {
   QuicFizzFactory fizzFactory;
   FizzCryptoFactory cryptoFactory(&fizzFactory);
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
@@ -70,14 +71,14 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   codec->setClientConnectionId(clientConnId);
   if (nodeType == QuicNodeType::Client) {
     codec->setInitialReadCipher(
-        cryptoFactory.getServerInitialCipher(clientConnId, QuicVersion::MVFST));
-    codec->setInitialHeaderCipher(cryptoFactory.makeServerInitialHeaderCipher(
-        clientConnId, QuicVersion::MVFST));
+        cryptoFactory.getServerInitialCipher(clientConnId, version));
+    codec->setInitialHeaderCipher(
+        cryptoFactory.makeServerInitialHeaderCipher(clientConnId, version));
   } else {
     codec->setInitialReadCipher(
-        cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST));
-    codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
-        clientConnId, QuicVersion::MVFST));
+        cryptoFactory.getClientInitialCipher(clientConnId, version));
+    codec->setInitialHeaderCipher(
+        cryptoFactory.makeClientInitialHeaderCipher(clientConnId, version));
   }
   return codec;
 }
@@ -218,8 +219,9 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
 
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(resultBuf));
-  auto optionalDecodedPacket = makeCodec(serverConnId, QuicNodeType::Server)
-                                   ->parsePacket(packetQueue, ackStates);
+  auto optionalDecodedPacket =
+      makeCodec(serverConnId, QuicNodeType::Server, nullptr, nullptr, ver)
+          ->parsePacket(packetQueue, ackStates);
   auto decodedPacket = boost::get<QuicPacket>(optionalDecodedPacket);
   EXPECT_NO_THROW(boost::get<RegularQuicPacket>(decodedPacket));
   auto decodedRegularPacket = boost::get<RegularQuicPacket>(decodedPacket);
