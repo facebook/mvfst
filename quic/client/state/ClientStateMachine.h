@@ -18,26 +18,8 @@
 
 namespace quic {
 
-struct ClientStates {
-  struct Handshaking {};
-  struct Error {};
-};
-
-struct ClientEvents {
-  struct ReadData {
-    folly::SocketAddress peer;
-    Buf buf;
-    folly::Optional<folly::AsyncSocketException> error;
-  };
-};
-
-using ClientState =
-    boost::variant<ClientStates::Handshaking, ClientStates::Error>;
-
 struct QuicClientConnectionState : public QuicConnectionStateBase {
   ~QuicClientConnectionState() override = default;
-
-  ClientState state;
 
   // The stateless reset token sent by the server.
   folly::Optional<StatelessResetToken> statelessResetToken;
@@ -62,7 +44,6 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // folly::Optional<PacketNum> clientInitialPacketNum;
 
   QuicClientConnectionState() : QuicConnectionStateBase(QuicNodeType::Client) {
-    state = ClientStates::Handshaking();
     cryptoState = std::make_unique<QuicCryptoState>();
     congestionController = std::make_unique<Cubic>(*this);
     // TODO: this is wrong, it should be the handshake finish time. But i need
@@ -77,14 +58,6 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     streamManager = std::make_unique<QuicStreamManager>(
         *this, this->nodeType, transportSettings);
   }
-};
-
-void ClientInvalidStateHandler(QuicClientConnectionState& state);
-
-struct QuicClientStateMachine {
-  using StateData = QuicClientConnectionState;
-  using UserData = QuicClientConnectionState;
-  static constexpr auto InvalidEventHandler = &ClientInvalidStateHandler;
 };
 
 /**

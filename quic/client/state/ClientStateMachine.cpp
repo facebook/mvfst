@@ -174,9 +174,4 @@ void updateTransportParamsFromCachedEarlyParams(
   conn.streamManager->setMaxLocalUnidirectionalStreams(
       transportParams.initialMaxStreamsUni);
 }
-
-void ClientInvalidStateHandler(QuicClientConnectionState& state) {
-  state.state = ClientStates::Error();
-}
-
 } // namespace quic

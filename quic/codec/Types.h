@@ -846,9 +846,6 @@ struct RegularQuicWritePacket : public RegularPacket {
       : RegularPacket(std::move(headerIn)) {}
 };
 
-using QuicWritePacket =
-    boost::variant<RegularQuicWritePacket, VersionNegotiationPacket>;
-
 /**
  * Returns whether the header is long or short from the initial byte of
  * the QUIC packet.
