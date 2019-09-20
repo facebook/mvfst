@@ -300,13 +300,9 @@ void ServerHandshake::processPendingEvents() {
           break;
       }
     } else if (!pendingEvents_.empty()) {
-      auto event = std::move(pendingEvents_.front());
+      auto write = std::move(pendingEvents_.front());
       pendingEvents_.pop_front();
-      folly::variant_match(
-          event, [&actions, this](fizz::WriteNewSessionTicket& write) {
-            actions =
-                machine_.processWriteNewSessionTicket(state_, std::move(write));
-          });
+      actions = machine_.processWriteNewSessionTicket(state_, std::move(write));
     } else {
       actionGuard_.clear();
       return;

@@ -249,7 +249,7 @@ class ServerHandshake : public Handshake {
   folly::Optional<folly::DelayedDestruction::DestructorGuard> actionGuard_;
   folly::Executor* executor_;
   std::shared_ptr<const fizz::server::FizzServerContext> context_;
-  using PendingEvent = boost::variant<fizz::WriteNewSessionTicket>;
+  using PendingEvent = fizz::WriteNewSessionTicket;
   std::deque<PendingEvent> pendingEvents_;
 
   QuicCryptoState& cryptoState_;
