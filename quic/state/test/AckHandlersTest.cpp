@@ -29,8 +29,7 @@ class AckHandlersTest : public TestWithParam<PacketNumberSpace> {};
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
   return [&lostPackets](
              QuicConnectionStateBase&, auto& packet, bool, PacketNum) {
-    auto packetNum = folly::variant_match(
-        packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
+    auto packetNum = packet.header.getPacketSequenceNum();
     lostPackets.push_back(packetNum);
   };
 }
@@ -102,9 +101,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   }
   PacketNum packetNum = 16;
   for (auto& packet : conn.outstandingPackets) {
-    auto currentPacketNum = folly::variant_match(
-        packet.packet.header,
-        [](const auto& h) { return h.getPacketSequenceNum(); });
+    auto currentPacketNum = packet.packet.header.getPacketSequenceNum();
     EXPECT_EQ(currentPacketNum, packetNum);
     packetNum++;
   }
@@ -195,9 +192,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
       std::back_insert_iterator<decltype(actualPacketNumbers)>(
           actualPacketNumbers),
       [](const auto& packet) {
-        return folly::variant_match(packet.packet.header, [](const auto& h) {
-          return h.getPacketSequenceNum();
-        });
+        return packet.packet.header.getPacketSequenceNum();
       });
 
   EXPECT_TRUE(std::equal(
@@ -299,9 +294,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
       std::back_insert_iterator<decltype(actualPacketNumbers)>(
           actualPacketNumbers),
       [](const auto& packet) {
-        return folly::variant_match(packet.packet.header, [](const auto& h) {
-          return h.getPacketSequenceNum();
-        });
+        return packet.packet.header.getPacketSequenceNum();
       });
 
   EXPECT_TRUE(std::equal(
@@ -344,9 +337,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       [&](const auto& outstandingPacket,
           const auto& packetFrame,
           const ReadAckFrame&) {
-        auto ackedPacketNum = folly::variant_match(
-            outstandingPacket.packet.header,
-            [](const auto& h) { return h.getPacketSequenceNum(); });
+        auto ackedPacketNum =
+            outstandingPacket.packet.header.getPacketSequenceNum();
         EXPECT_EQ(ackedPacketNum, firstReceivedAck.largestAcked);
         folly::variant_match(
             packetFrame,

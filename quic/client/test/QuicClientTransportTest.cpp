@@ -1514,9 +1514,7 @@ class QuicClientTransportTest : public Test {
       if (!parsedPacket) {
         continue;
       }
-      PacketNum packetNumSent = folly::variant_match(
-          parsedPacket->header,
-          [](auto& h) { return h.getPacketSequenceNum(); });
+      PacketNum packetNumSent = parsedPacket->header.getPacketSequenceNum();
       sentPackets.insert(packetNumSent);
       verifyShortHeader(*write);
     }
@@ -1533,7 +1531,7 @@ class QuicClientTransportTest : public Test {
     if (!parsedPacket) {
       return false;
     }
-    auto longHeader = boost::get<LongHeader>(&parsedPacket->header);
+    auto longHeader = parsedPacket->header.asLong();
     return longHeader && longHeader->getHeaderType() == headerType;
   }
 
@@ -1546,7 +1544,7 @@ class QuicClientTransportTest : public Test {
     if (!parsedPacket) {
       return false;
     }
-    return boost::get<ShortHeader>(&parsedPacket->header) != nullptr;
+    return parsedPacket->header.asShort();
   }
 
   std::unique_ptr<QuicReadCodec> makeHandshakeCodec() {
@@ -2716,16 +2714,12 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   ASSERT_FALSE(client->getConn().outstandingPackets.empty());
 
   IntervalSet<quic::PacketNum> acks;
-  auto start = folly::variant_match(
-      getFirstOutstandingPacket(
-          client->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
-  auto end = folly::variant_match(
-      getLastOutstandingPacket(
-          client->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+  auto start = getFirstOutstandingPacket(
+                   client->getNonConstConn(), PacketNumberSpace::AppData)
+                   ->packet.header.getPacketSequenceNum();
+  auto end = getLastOutstandingPacket(
+                 client->getNonConstConn(), PacketNumberSpace::AppData)
+                 ->packet.header.getPacketSequenceNum();
   acks.insert(start, end);
 
   auto ackPacket = packetToBuf(createAckPacket(
@@ -2795,16 +2789,12 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   ASSERT_FALSE(client->getConn().outstandingPackets.empty());
 
   IntervalSet<quic::PacketNum> acks;
-  auto start = folly::variant_match(
-      getFirstOutstandingPacket(
-          client->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
-  auto end = folly::variant_match(
-      getLastOutstandingPacket(
-          client->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+  auto start = getFirstOutstandingPacket(
+                   client->getNonConstConn(), PacketNumberSpace::AppData)
+                   ->packet.header.getPacketSequenceNum();
+  auto end = getLastOutstandingPacket(
+                 client->getNonConstConn(), PacketNumberSpace::AppData)
+                 ->packet.header.getPacketSequenceNum();
   acks.insert(start, end);
 
   auto ackPacket = packetToBuf(createAckPacket(
@@ -2925,16 +2915,12 @@ TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
   // initial
   {
     IntervalSet<quic::PacketNum> acks;
-    auto start = folly::variant_match(
-        getFirstOutstandingPacket(
-            client->getNonConstConn(), PacketNumberSpace::Initial)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
-    auto end = folly::variant_match(
-        getLastOutstandingPacket(
-            client->getNonConstConn(), PacketNumberSpace::Initial)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
+    auto start = getFirstOutstandingPacket(
+                     client->getNonConstConn(), PacketNumberSpace::Initial)
+                     ->packet.header.getPacketSequenceNum();
+    auto end = getLastOutstandingPacket(
+                   client->getNonConstConn(), PacketNumberSpace::Initial)
+                   ->packet.header.getPacketSequenceNum();
     acks.insert(start, end);
     auto pn = initialPacketNum++;
     auto ackPkt = createAckPacket(
@@ -2948,16 +2934,12 @@ TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
   // handshake
   {
     IntervalSet<quic::PacketNum> acks;
-    auto start = folly::variant_match(
-        getFirstOutstandingPacket(
-            client->getNonConstConn(), PacketNumberSpace::Handshake)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
-    auto end = folly::variant_match(
-        getLastOutstandingPacket(
-            client->getNonConstConn(), PacketNumberSpace::Handshake)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
+    auto start = getFirstOutstandingPacket(
+                     client->getNonConstConn(), PacketNumberSpace::Handshake)
+                     ->packet.header.getPacketSequenceNum();
+    auto end = getLastOutstandingPacket(
+                   client->getNonConstConn(), PacketNumberSpace::Handshake)
+                   ->packet.header.getPacketSequenceNum();
     acks.insert(start, end);
     auto pn = handshakePacketNum++;
     auto ackPkt = createAckPacket(
@@ -3209,8 +3191,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   // This will clear out all the outstanding packets
   IntervalSet<PacketNum> sentPackets;
   for (auto& packet : client->getNonConstConn().outstandingPackets) {
-    auto packetNum = folly::variant_match(
-        packet.packet.header, [](auto& h) { return h.getPacketSequenceNum(); });
+    auto packetNum = packet.packet.header.getPacketSequenceNum();
     sentPackets.insert(packetNum);
   }
   auto ackPacket = packetToBuf(createAckPacket(
@@ -3659,7 +3640,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
       *originalConnId,
       321,
       QuicVersion::MVFST,
-      IOBuf::copyBuffer("this is a retry token :)"),
+      std::string("this is a retry token :)"),
       *client->getConn().initialDestinationConnectionId);
 
   RegularQuicPacketBuilder builder(
@@ -3683,7 +3664,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   auto quicPacket = boost::get<QuicPacket>(&codecResult);
   auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
-  auto header = boost::get<LongHeader>(regularQuicPacket->header);
+  auto& header = *regularQuicPacket->header.asLong();
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketReceived, qLogger);
@@ -3694,10 +3675,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   EXPECT_EQ(header.getHeaderType(), LongHeader::Types::Initial);
   EXPECT_TRUE(header.hasToken());
-  folly::IOBufEqualTo eq;
-  EXPECT_TRUE(
-      eq(header.getToken()->clone(),
-         IOBuf::copyBuffer("this is a retry token :)")));
+  EXPECT_EQ(header.getToken(), std::string("this is a retry token :)"));
   EXPECT_EQ(header.getDestinationConnId(), serverChosenConnId);
 
   eventbase_->loopOnce();
@@ -3903,9 +3881,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto packetNum = folly::variant_match(
-      forceLossPacket->header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = forceLossPacket->header.getPacketSequenceNum();
   markPacketLoss(client->getNonConstConn(), *forceLossPacket, false, packetNum);
   auto& pendingLossStreams = client->getConn().streamManager->lossStreams();
   auto it =
@@ -3932,9 +3908,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto packetNum = folly::variant_match(
-      forceLossPacket->header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = forceLossPacket->header.getPacketSequenceNum();
   markPacketLoss(client->getNonConstConn(), *forceLossPacket, false, packetNum);
   auto stream = CHECK_NOTNULL(
       client->getNonConstConn().streamManager->getStream(streamId));
@@ -4427,12 +4401,8 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTest {
 
   bool zeroRttPacketsOutstanding() {
     for (auto& packet : client->getNonConstConn().outstandingPackets) {
-      bool isZeroRtt = folly::variant_match(
-          packet.packet.header,
-          [](const LongHeader& h) {
-            return h.getProtectionType() == ProtectionType::ZeroRtt;
-          },
-          [](const ShortHeader&) { return false; });
+      bool isZeroRtt =
+          packet.packet.header.getProtectionType() == ProtectionType::ZeroRtt;
       if (isZeroRtt) {
         return true;
       }

@@ -30,8 +30,7 @@ PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
       !packet.associatedEvent ||
       conn_.outstandingPacketEvents.count(*packet.associatedEvent));
   if (!packet.associatedEvent) {
-    auto packetNum = folly::variant_match(
-        packet.packet.header, [](auto& h) { return h.getPacketSequenceNum(); });
+    auto packetNum = packet.packet.header.getPacketSequenceNum();
     DCHECK(!conn_.outstandingPacketEvents.count(packetNum));
     packet.associatedEvent = packetNum;
     conn_.outstandingPacketEvents.insert(packetNum);
@@ -57,12 +56,11 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     writeSuccess = folly::variant_match(
         frame,
         [&](const WriteAckFrame& ackFrame) {
-          uint64_t ackDelayExponent = folly::variant_match(
-              builder_.getPacketHeader(),
-              [](const LongHeader&) { return kDefaultAckDelayExponent; },
-              [&](const auto&) {
-                return conn_.transportSettings.ackDelayExponent;
-              });
+          auto& packetHeader = builder_.getPacketHeader();
+          uint64_t ackDelayExponent =
+              (packetHeader.getHeaderForm() == HeaderForm::Long)
+              ? kDefaultAckDelayExponent
+              : conn_.transportSettings.ackDelayExponent;
           AckFrameMetaData meta(
               ackFrame.ackBlocks, ackFrame.ackDelay, ackDelayExponent);
           auto ackWriteResult = writeAckFrame(meta, builder_);
@@ -99,10 +97,10 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
           // initialStream and handshakeStream can only be in handshake packet,
           // so they are not clonable
           CHECK(!packet.isHandshake);
-          folly::variant_match(packet.packet.header, [](const auto& header) {
-            // key update not supported
-            CHECK(header.getProtectionType() == ProtectionType::KeyPhaseZero);
-          });
+          // key update not supported
+          DCHECK(
+              packet.packet.header.getProtectionType() ==
+              ProtectionType::KeyPhaseZero);
           auto& stream = conn_.cryptoState->oneRttStream;
           auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, stream);
 

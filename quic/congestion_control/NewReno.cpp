@@ -40,10 +40,7 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
   addAndCheckOverflow(bytesInFlight_, packet.encodedSize);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_
-           << " packetNum="
-           << folly::variant_match(
-                  packet.packet.header,
-                  [](auto& h) { return h.getPacketSequenceNum(); })
+           << " packetNum=" << packet.packet.header.getPacketSequenceNum()
            << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(

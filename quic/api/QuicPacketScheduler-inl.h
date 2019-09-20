@@ -43,10 +43,10 @@ folly::Optional<PacketNum> AckScheduler::writeAcksImpl(
   // Use default ack delay for long headers. Usually long headers are sent
   // before crypto negotiation, so the peer might not know about the ack delay
   // exponent yet, so we use the default.
-  uint8_t ackDelayExponentToUse = folly::variant_match(
-      builder.getPacketHeader(),
-      [](const LongHeader&) { return kDefaultAckDelayExponent; },
-      [&](const auto&) { return conn_.transportSettings.ackDelayExponent; });
+  uint8_t ackDelayExponentToUse =
+      builder.getPacketHeader().getHeaderForm() == HeaderForm::Long
+      ? kDefaultAckDelayExponent
+      : conn_.transportSettings.ackDelayExponent;
   auto largestAckedPacketNum = *largestAckToSend(ackState_);
   auto ackingTime = ClockType::now();
   DCHECK(ackState_.largestRecvdPacketTime.hasValue())

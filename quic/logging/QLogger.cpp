@@ -23,17 +23,16 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
       std::chrono::steady_clock::now() - refTimePoint);
   event->packetSize = packetSize;
   event->eventType = QLogEventType::PacketReceived;
-  event->packetType = folly::variant_match(
-      regularPacket.header,
-      [](const LongHeader& header) { return toString(header.getHeaderType()); },
-      [](const ShortHeader& /* unused*/) {
-        return kShortHeaderPacketType.toString();
-      });
+  const ShortHeader* shortHeader = regularPacket.header.asShort();
+  if (shortHeader) {
+    event->packetType = kShortHeaderPacketType.toString();
+  } else {
+    event->packetType =
+        toString(regularPacket.header.asLong()->getHeaderType());
+  }
   if (event->packetType != toString(LongHeader::Types::Retry)) {
     // A Retry packet does not include a packet number.
-    event->packetNum = folly::variant_match(
-        regularPacket.header,
-        [](const auto& h) { return h.getPacketSequenceNum(); });
+    event->packetNum = regularPacket.header.getPacketSequenceNum();
   }
 
   uint64_t numPaddingFrames = 0;
@@ -149,17 +148,15 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
   auto event = std::make_unique<QLogPacketEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now() - refTimePoint);
-  event->packetNum = folly::variant_match(
-      writePacket.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  event->packetNum = writePacket.header.getPacketSequenceNum();
   event->packetSize = packetSize;
   event->eventType = QLogEventType::PacketSent;
-  event->packetType = folly::variant_match(
-      writePacket.header,
-      [](const LongHeader& header) { return toString(header.getHeaderType()); },
-      [](const ShortHeader& /* unused*/) {
-        return kShortHeaderPacketType.toString();
-      });
+  const ShortHeader* shortHeader = writePacket.header.asShort();
+  if (shortHeader) {
+    event->packetType = kShortHeaderPacketType.toString();
+  } else {
+    event->packetType = toString(writePacket.header.asLong()->getHeaderType());
+  }
 
   uint64_t numPaddingFrames = 0;
   // looping through the packet to store logs created from frames in the packet

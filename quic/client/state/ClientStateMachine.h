@@ -43,7 +43,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   folly::Optional<StatelessResetToken> statelessResetToken;
 
   // The retry token sent by the server.
-  Buf retryToken_{nullptr};
+  std::string retryToken;
 
   // Initial destination connection id.
   folly::Optional<ConnectionId> initialDestinationConnectionId;

@@ -121,7 +121,7 @@ TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
       getTestConnectionId(1),
       321,
       QuicVersion::MVFST,
-      folly::IOBuf::copyBuffer("454358"),
+      std::string("454358"),
       getTestConnectionId(2));
 
   RegularQuicPacketBuilder builder(
@@ -140,16 +140,15 @@ TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
   EXPECT_NO_THROW(boost::get<RegularQuicPacket>(decodedPacket));
   auto retryPacket = boost::get<RegularQuicPacket>(decodedPacket);
 
-  auto headerOut = boost::get<LongHeader>(retryPacket.header);
+  auto& headerOut = *retryPacket.header.asLong();
 
   EXPECT_EQ(*headerOut.getOriginalDstConnId(), getTestConnectionId(2));
   EXPECT_EQ(headerOut.getVersion(), QuicVersion::MVFST);
   EXPECT_EQ(headerOut.getSourceConnId(), getTestConnectionId(0));
   EXPECT_EQ(headerOut.getDestinationConnId(), getTestConnectionId(1));
 
-  folly::IOBufEqualTo eq;
-  auto expectedBuf = folly::IOBuf::copyBuffer("454358");
-  EXPECT_TRUE(eq(*headerOut.getToken(), *expectedBuf));
+  auto expected = std::string("454358");
+  EXPECT_EQ(headerOut.getToken(), expected);
 }
 
 TEST_F(QuicPacketBuilderTest, TooManyVersions) {
@@ -210,8 +209,8 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   auto resultBuf = packetToBufCleartext(
       resultRegularPacket, *cleartextAead, *headerCipher, pktNum);
   auto& resultHeader = resultRegularPacket.packet.header;
-  EXPECT_NO_THROW(boost::get<LongHeader>(resultHeader));
-  auto& resultLongHeader = boost::get<LongHeader>(resultHeader);
+  EXPECT_NE(resultHeader.asLong(), nullptr);
+  auto& resultLongHeader = *resultHeader.asLong();
   EXPECT_EQ(LongHeader::Types::Initial, resultLongHeader.getHeaderType());
   EXPECT_EQ(serverConnId, resultLongHeader.getSourceConnId());
   EXPECT_EQ(pktNum, resultLongHeader.getPacketSequenceNum());
@@ -225,7 +224,7 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   auto decodedPacket = boost::get<QuicPacket>(optionalDecodedPacket);
   EXPECT_NO_THROW(boost::get<RegularQuicPacket>(decodedPacket));
   auto decodedRegularPacket = boost::get<RegularQuicPacket>(decodedPacket);
-  auto& decodedHeader = boost::get<LongHeader>(decodedRegularPacket.header);
+  auto& decodedHeader = *decodedRegularPacket.header.asLong();
   EXPECT_EQ(LongHeader::Types::Initial, decodedHeader.getHeaderType());
   EXPECT_EQ(clientConnId, decodedHeader.getDestinationConnId());
   EXPECT_EQ(pktNum, decodedHeader.getPacketSequenceNum());
@@ -240,7 +239,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   auto encodedPacketNum = encodePacketNumber(pktNum, largestAckedPacketNum);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,
-      PacketHeader(ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum)),
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum);
 
   // write out at least one frame
@@ -255,7 +254,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   EXPECT_EQ(builtOut.body->computeChainDataLength(), expectedOutputSize);
   auto resultBuf = packetToBuf(builtOut);
 
-  auto resultShortHeader = boost::get<ShortHeader>(resultRegularPacket.header);
+  auto& resultShortHeader = *resultRegularPacket.header.asShort();
   EXPECT_EQ(
       ProtectionType::KeyPhaseZero, resultShortHeader.getProtectionType());
   EXPECT_EQ(connId, resultShortHeader.getConnectionId());
@@ -270,7 +269,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
           ->parsePacket(packetQueue, ackStates);
   auto decodedPacket = boost::get<QuicPacket>(parsedPacket);
   auto decodedRegularPacket = boost::get<RegularQuicPacket>(decodedPacket);
-  auto decodedHeader = boost::get<ShortHeader>(decodedRegularPacket.header);
+  auto& decodedHeader = *decodedRegularPacket.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseZero, decodedHeader.getProtectionType());
   EXPECT_EQ(connId, decodedHeader.getConnectionId());
   EXPECT_EQ(pktNum, decodedHeader.getPacketSequenceNum());
@@ -284,7 +283,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
   // frames already and will be too small to parse.
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,
-      PacketHeader(ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum)),
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       0 /* largestAcked */);
   EXPECT_TRUE(builder.canBuildPacket());
   auto builtOut = std::move(builder).buildPacket();
@@ -312,7 +311,7 @@ TEST_F(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
   size_t cipherOverhead = 2;
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,
-      PacketHeader(ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum)),
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum);
   builder.setCipherOverhead(cipherOverhead);
   EXPECT_TRUE(builder.canBuildPacket());
@@ -337,7 +336,7 @@ TEST_F(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
   size_t totalPacketSize = 20;
   RegularQuicPacketBuilder builder(
       totalPacketSize,
-      PacketHeader(ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum)),
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum);
   EXPECT_TRUE(builder.canBuildPacket());
   writeFrame(PaddingFrame(), builder);

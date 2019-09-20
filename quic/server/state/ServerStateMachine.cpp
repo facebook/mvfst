@@ -645,17 +645,11 @@ void onServerReadDataFromOpen(
           conn.infoCallback, onPacketDropped, PacketDropReason::INVALID_PACKET);
       continue;
     }
-    auto protectionLevel = folly::variant_match(
-        regularOptional->header,
-        [](auto& header) { return header.getProtectionType(); });
+    auto protectionLevel = regularOptional->header.getProtectionType();
     auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
 
-    auto packetNum = folly::variant_match(
-        regularOptional->header,
-        [](const auto& h) { return h.getPacketSequenceNum(); });
-    auto packetNumberSpace = folly::variant_match(
-        regularOptional->header,
-        [](auto& header) { return header.getPacketNumberSpace(); });
+    auto packetNum = regularOptional->header.getPacketSequenceNum();
+    auto packetNumberSpace = regularOptional->header.getPacketNumberSpace();
 
     // TODO: enforce constraints on other protection levels.
     auto& regularPacket = *regularOptional;
@@ -698,7 +692,12 @@ void onServerReadDataFromOpen(
     // We assume that the higher layer takes care of validating that the version
     // is supported.
     if (!conn.version) {
-      conn.version = boost::get<LongHeader>(regularPacket.header).getVersion();
+      LongHeader* longHeader = regularPacket.header.asLong();
+      if (!longHeader) {
+        throw QuicTransportException(
+            "Invalid packet type", TransportErrorCode::PROTOCOL_VIOLATION);
+      }
+      conn.version = longHeader->getVersion();
     }
 
     if (conn.peerAddress != readData.peer) {
@@ -1096,16 +1095,9 @@ void onServerReadDataFromClosed(
   }
   auto& regularPacket = *regularOptional;
 
-  auto protectionLevel = folly::variant_match(
-      regularPacket.header,
-      [](auto& header) { return header.getProtectionType(); });
-
-  auto packetNum = folly::variant_match(
-      regularOptional->header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
-  auto pnSpace = folly::variant_match(
-      regularOptional->header,
-      [](const auto& h) { return h.getPacketNumberSpace(); });
+  auto protectionLevel = regularPacket.header.getProtectionType();
+  auto packetNum = regularPacket.header.getPacketSequenceNum();
+  auto pnSpace = regularPacket.header.getPacketNumberSpace();
   if (conn.qLogger) {
     conn.qLogger->addPacket(regularPacket, packetSize);
   }

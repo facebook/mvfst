@@ -215,9 +215,7 @@ struct CongestionController {
             "LossEvent: lostBytes overflow",
             LocalErrorCode::LOST_BYTES_OVERFLOW);
       }
-      auto packetNum = folly::variant_match(
-          packet.packet.header,
-          [](const auto& header) { return header.getPacketSequenceNum(); });
+      PacketNum packetNum = packet.packet.header.getPacketSequenceNum();
       largestLostPacketNum =
           std::max(packetNum, largestLostPacketNum.value_or(packetNum));
       lostBytes += packet.encodedSize;

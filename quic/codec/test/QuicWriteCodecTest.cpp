@@ -124,7 +124,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - 3 - 10, pktBuilder.remainingSpaceInPkt());
   auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
+  auto regularPacket = std::move(builtOut.first);
 
   EXPECT_EQ(regularPacket.frames.size(), 1);
   auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
@@ -171,7 +171,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
       pktBuilder.remainingSpaceInPkt());
 
   auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
+  auto regularPacket = std::move(builtOut.first);
   EXPECT_EQ(regularPacket.frames.size(), 1);
   auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
   EXPECT_EQ(resultFrame.streamId, streamId);
@@ -237,7 +237,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
       kDefaultUDPSendPacketLen - consumedSize,
       pktBuilder.remainingSpaceInPkt());
   auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
+  auto regularPacket = std::move(builtOut.first);
   EXPECT_EQ(regularPacket.frames.size(), 2);
   auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.front());
   EXPECT_EQ(resultFrame.streamId, streamId1);

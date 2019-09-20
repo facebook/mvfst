@@ -444,12 +444,9 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
     }
   }
   if (cryptoDataWritten && conn_.nodeType == QuicNodeType::Client) {
-    bool initialPacket = folly::variant_match(
-        builder.getPacketHeader(),
-        [](const LongHeader& header) {
-          return header.getHeaderType() == LongHeader::Types::Initial;
-        },
-        [](const auto&) { return false; });
+    const LongHeader* longHeader = builder.getPacketHeader().asLong();
+    bool initialPacket =
+        longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
     if (initialPacket) {
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
@@ -521,9 +518,7 @@ CloningScheduler::scheduleFramesForPacket(
   for (auto iter = conn_.outstandingPackets.rbegin();
        iter != conn_.outstandingPackets.rend();
        ++iter) {
-    auto opPnSpace = folly::variant_match(
-        iter->packet.header,
-        [](const auto& h) { return h.getPacketNumberSpace(); });
+    auto opPnSpace = iter->packet.header.getPacketNumberSpace();
     if (opPnSpace != PacketNumberSpace::AppData) {
       continue;
     }
@@ -532,9 +527,7 @@ CloningScheduler::scheduleFramesForPacket(
     // clone packet. So re-create a RegularQuicPacketBuilder every time.
     // TODO: We can avoid the copy & rebuild of the header by creating an
     // independent header builder.
-    auto builderPnSpace = folly::variant_match(
-        builder.getPacketHeader(),
-        [](const auto& h) { return h.getPacketNumberSpace(); });
+    auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
     CHECK_EQ(builderPnSpace, PacketNumberSpace::AppData);
     RegularQuicPacketBuilder regularBuilder(
         conn_.udpSendPacketLen,

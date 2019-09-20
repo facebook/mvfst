@@ -376,7 +376,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   EXPECT_EQ(packetNum, *result.first);
   // written packet (result.second) should not have any frame in the builder
   auto& writtenPacket = *result.second;
-  auto shortHeader = boost::get<ShortHeader>(&writtenPacket.packet.header);
+  auto shortHeader = writtenPacket.packet.header.asShort();
   CHECK(shortHeader);
   EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader->getProtectionType());
   EXPECT_EQ(
@@ -510,10 +510,10 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
 
   EXPECT_CALL(mockScheduler, _scheduleFramesForPacket(_, _))
       .Times(1)
-      .WillOnce(
-          Invoke([&, headerCopy = header](
-                     std::unique_ptr<RegularQuicPacketBuilder>&, uint32_t) {
-            RegularQuicWritePacket packet(headerCopy);
+      .WillOnce(Invoke(
+          [&, headerCopy = header](
+              std::unique_ptr<RegularQuicPacketBuilder>&, uint32_t) mutable {
+            RegularQuicWritePacket packet(std::move(headerCopy));
             packet.frames.push_back(MaxDataFrame(2832));
             RegularQuicPacketBuilder::Packet builtPacket(
                 std::move(packet),
@@ -528,17 +528,12 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_EQ(folly::none, result.first);
-  folly::variant_match(
-      result.second->packet.header,
-      [&](const ShortHeader& shortHeader) {
-        EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader.getProtectionType());
-        EXPECT_EQ(
-            conn.ackStates.appDataAckState.nextPacketNum,
-            shortHeader.getPacketSequenceNum());
-      },
-      [&](const LongHeader&) {
-        ASSERT_FALSE(true); // should not happen
-      });
+  EXPECT_EQ(result.second->packet.header.getHeaderForm(), HeaderForm::Short);
+  ShortHeader& shortHeader = *result.second->packet.header.asShort();
+  EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader.getProtectionType());
+  EXPECT_EQ(
+      conn.ackStates.appDataAckState.nextPacketNum,
+      shortHeader.getPacketSequenceNum());
   EXPECT_EQ(1, result.second->packet.frames.size());
   folly::variant_match(
       result.second->packet.frames.front(),

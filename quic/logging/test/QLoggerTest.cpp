@@ -50,7 +50,7 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
 TEST_F(QLoggerTest, TestRegularPacket) {
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
-  RegularQuicPacket regularQuicPacket(headerIn);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
@@ -341,7 +341,7 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
 
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
-  RegularQuicPacket regularQuicPacket(headerIn);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
@@ -384,7 +384,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
 
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
-  RegularQuicPacket regularQuicPacket(headerIn);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));

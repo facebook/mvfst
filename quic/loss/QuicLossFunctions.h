@@ -105,9 +105,8 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
         std::chrono::duration_cast<std::chrono::milliseconds>(
             lastSentPacketTime + alarmDuration - now);
   } else {
-    auto lastSentPacketNum = folly::variant_match(
-        conn.outstandingPackets.back().packet.header,
-        [](const auto& h) { return h.getPacketSequenceNum(); });
+    auto lastSentPacketNum =
+        conn.outstandingPackets.back().packet.header.getPacketSequenceNum();
     VLOG(10) << __func__ << " alarm already due method=" << *alarmMethod
              << " lastSentPacketNum=" << lastSentPacketNum
              << " lastSentPacketTime="
@@ -224,15 +223,11 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   bool shouldSetTimer = false;
   while (iter != conn.outstandingPackets.end()) {
     auto& pkt = *iter;
-    auto currentPacketNum = folly::variant_match(
-        pkt.packet.header,
-        [](const auto& h) { return h.getPacketSequenceNum(); });
+    auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
     if (currentPacketNum >= largestAcked) {
       break;
     }
-    auto currentPacketNumberSpace = folly::variant_match(
-        pkt.packet.header,
-        [](const auto& h) { return h.getPacketNumberSpace(); });
+    auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
     if (currentPacketNumberSpace != pnSpace) {
       iter++;
       continue;
@@ -347,12 +342,8 @@ void onHandshakeAlarm(
     // the word "handshake" in our code base is unfortunately overloaded.
     if (iter->isHandshake) {
       auto& packet = *iter;
-      auto currentPacketNum = folly::variant_match(
-          packet.packet.header,
-          [](const auto& h) { return h.getPacketSequenceNum(); });
-      auto currentPacketNumSpace = folly::variant_match(
-          packet.packet.header,
-          [](const auto& h) { return h.getPacketNumberSpace(); });
+      auto currentPacketNum = packet.packet.header.getPacketSequenceNum();
+      auto currentPacketNumSpace = packet.packet.header.getPacketNumberSpace();
       VLOG(10) << "HandshakeAlarm, removing packetNum=" << currentPacketNum
                << " packetNumSpace=" << currentPacketNumSpace << " " << conn;
       DCHECK(!packet.pureAck);
@@ -478,22 +469,15 @@ void markZeroRttPacketsLost(
   CongestionController::LossEvent lossEvent(ClockType::now());
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   while (iter != conn.outstandingPackets.end()) {
-    DCHECK(
-        PacketNumberSpace::AppData ==
-        folly::variant_match(iter->packet.header, [](const auto& h) {
-          return h.getPacketNumberSpace();
-        }));
+    DCHECK_EQ(
+        iter->packet.header.getPacketNumberSpace(), PacketNumberSpace::AppData);
     auto isZeroRttPacket =
-        folly::variant_match(iter->packet.header, [&](const auto& h) {
-          return h.getProtectionType() == ProtectionType::ZeroRtt;
-        });
+        iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
     if (isZeroRttPacket) {
       auto& pkt = *iter;
       DCHECK(!pkt.pureAck);
       DCHECK(!pkt.isHandshake);
-      auto currentPacketNum = folly::variant_match(
-          pkt.packet.header,
-          [](const auto& h) { return h.getPacketSequenceNum(); });
+      auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
       bool processed = pkt.associatedEvent &&
           !conn.outstandingPacketEvents.count(*pkt.associatedEvent);
       lossVisitor(conn, pkt.packet, processed, currentPacketNum);

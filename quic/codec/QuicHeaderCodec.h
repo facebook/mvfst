@@ -17,6 +17,7 @@ namespace quic {
 struct ParsedHeaderResult {
   bool isVersionNegotiation;
   folly::Optional<PacketHeader> parsedHeader;
+
   ParsedHeaderResult(
       bool isVersionNegotiationIn,
       folly::Optional<PacketHeader> parsedHeaderIn);

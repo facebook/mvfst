@@ -109,7 +109,7 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
       getTestConnectionId(90),
       321,
       static_cast<QuicVersion>(0xffff),
-      folly::IOBuf::copyBuffer("fluffydog"),
+      std::string("fluffydog"),
       getTestConnectionId(110));
 
   RegularQuicPacketBuilder builder(
@@ -121,16 +121,15 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   auto retryPacket = boost::get<RegularQuicPacket>(boost::get<QuicPacket>(
       makeUnencryptedCodec()->parsePacket(packetQueue, ackStates)));
 
-  auto headerOut = boost::get<LongHeader>(retryPacket.header);
+  auto headerOut = *retryPacket.header.asLong();
 
   EXPECT_EQ(*headerOut.getOriginalDstConnId(), getTestConnectionId(110));
   EXPECT_EQ(headerOut.getVersion(), static_cast<QuicVersion>(0xffff));
   EXPECT_EQ(headerOut.getSourceConnId(), getTestConnectionId(70));
   EXPECT_EQ(headerOut.getDestinationConnId(), getTestConnectionId(90));
 
-  folly::IOBufEqualTo eq;
-  auto expectedBuf = folly::IOBuf::copyBuffer("fluffydog");
-  EXPECT_TRUE(eq(*headerOut.getToken(), *expectedBuf));
+  auto expected = std::string("fluffydog");
+  EXPECT_EQ(headerOut.getToken(), expected);
 }
 
 TEST_F(QuicReadCodecTest, EmptyVersionNegotiationPacketTest) {
@@ -486,10 +485,10 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   EXPECT_NO_THROW(boost::get<RegularQuicPacket>(quicPacket));
   auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
 
-  EXPECT_NO_THROW(boost::get<LongHeader>(regularQuicPacket.header));
-  auto longPacketHeader = boost::get<LongHeader>(regularQuicPacket.header);
+  EXPECT_NE(regularQuicPacket.header.asLong(), nullptr);
+  auto longPacketHeader = regularQuicPacket.header.asLong();
 
-  EXPECT_FALSE(longPacketHeader.hasToken());
+  EXPECT_FALSE(longPacketHeader->hasToken());
 }
 
 TEST_F(QuicReadCodecTest, TestHandshakeDone) {

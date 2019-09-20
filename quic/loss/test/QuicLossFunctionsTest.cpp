@@ -120,9 +120,7 @@ auto testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
   return [&lostPackets](
              auto& /* conn */, auto& packet, bool processed, PacketNum) {
     if (!processed) {
-      auto packetNum = folly::variant_match(packet.header, [](const auto& h) {
-        return h.getPacketSequenceNum();
-      });
+      auto packetNum = packet.header.getPacketSequenceNum();
       lostPackets.push_back(packetNum);
     }
   };
@@ -161,9 +159,13 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           conn.ackStates.appDataAckState.nextPacketNum);
       break;
   }
-  auto packetNumberSpace = folly::variant_match(
-      *header, [](const auto& h) { return h.getPacketNumberSpace(); });
-
+  PacketNumberSpace packetNumberSpace;
+  auto shortHeader = header->asShort();
+  if (shortHeader) {
+    packetNumberSpace = shortHeader->getPacketNumberSpace();
+  } else {
+    packetNumberSpace = header->asLong()->getPacketNumberSpace();
+  }
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(*header),
@@ -199,9 +201,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
         conn.outstandingPackets.begin(),
         conn.outstandingPackets.end(),
         [&associatedEvent](const auto& packet) {
-          auto packetNum = folly::variant_match(
-              packet.packet.header,
-              [](const auto& h) { return h.getPacketSequenceNum(); });
+          auto packetNum = packet.packet.header.getPacketSequenceNum();
           return packetNum == *associatedEvent;
         });
     if (it != conn.outstandingPackets.end()) {
@@ -376,8 +376,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   EXPECT_EQ(1, conn->outstandingPackets.size());
   auto& packet =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
-  auto packetNum = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.header.getPacketSequenceNum();
   markPacketLoss(*conn, packet, false, packetNum);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 0);
@@ -417,8 +416,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostAfterCancelRetransmission) {
   ASSERT_EQ(conn->outstandingPackets.size(), 1);
   EXPECT_GT(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   auto& packet = conn->outstandingPackets.front().packet;
-  auto packetNum = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.header.getPacketSequenceNum();
   cancelHandshakeCryptoStreamRetransmissions(*conn->cryptoState);
   markPacketLoss(*conn, packet, false, packetNum);
   EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
@@ -445,13 +443,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
       *stream1,
       StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
 
-  markPacketLoss(
-      *conn,
-      packet,
-      false,
-      folly::variant_match(packet.header, [](const auto& h) {
-        return h.getPacketSequenceNum();
-      }));
+  markPacketLoss(*conn, packet, false, packet.header.getPacketSequenceNum());
 
   EXPECT_TRUE(stream1->lossBuffer.empty());
   EXPECT_TRUE(stream1->retransmissionBuffer.empty());
@@ -470,9 +462,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
 
   auto testingLossMarkFunc =
       [&lostPacket](auto& /*conn*/, auto& packet, bool, PacketNum) {
-        auto packetNum = folly::variant_match(packet.header, [](const auto& h) {
-          return h.getPacketSequenceNum();
-        });
+        auto packetNum = packet.header.getPacketSequenceNum();
         lostPacket.push_back(packetNum);
       };
   for (int i = 0; i < 6; ++i) {
@@ -518,9 +508,8 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
 
   // Packet 6 should remain in packet as the delta is less than threshold
   EXPECT_EQ(conn->outstandingPackets.size(), 1);
-  auto packetNum = folly::variant_match(
-      conn->outstandingPackets.front().packet.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum =
+      conn->outstandingPackets.front().packet.header.getPacketSequenceNum();
   EXPECT_EQ(packetNum, 6);
 }
 
@@ -644,13 +633,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   auto& packet =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
-  markPacketLoss(
-      *conn,
-      packet,
-      false,
-      folly::variant_match(packet.header, [](const auto& h) {
-        return h.getPacketSequenceNum();
-      }));
+  markPacketLoss(*conn, packet, false, packet.header.getPacketSequenceNum());
 
   EXPECT_EQ(1, conn->pendingEvents.resets.size());
   EXPECT_EQ(1, conn->pendingEvents.resets.count(stream->id));
@@ -738,8 +721,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkWindowUpdateLoss) {
   auto& packet =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
 
-  auto packetNum = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.header.getPacketSequenceNum();
   markPacketLoss(*conn, packet, false, packetNum);
   EXPECT_TRUE(conn->streamManager->pendingWindowUpdate(stream->id));
 }
@@ -779,10 +761,8 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
 
   // Packet 6, 7 should remain in outstanding packet list
   EXPECT_EQ(2, conn->outstandingPackets.size());
-  auto packetNum = folly::variant_match(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                       ->packet.header.getPacketSequenceNum();
   EXPECT_EQ(packetNum, 6);
   EXPECT_TRUE(conn->lossState.appDataLossTime);
 }
@@ -1335,8 +1315,7 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejected) {
     EXPECT_FALSE(lostPacket.second);
   }
   for (size_t i = 0; i < conn->outstandingPackets.size(); ++i) {
-    auto longHeader =
-        boost::get<LongHeader>(&conn->outstandingPackets[i].packet.header);
+    auto longHeader = conn->outstandingPackets[i].packet.header.asLong();
     EXPECT_FALSE(
         longHeader &&
         longHeader->getProtectionType() == ProtectionType::ZeroRtt);
@@ -1388,8 +1367,7 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   }
   EXPECT_EQ(numProcessed, 1);
   for (size_t i = 0; i < conn->outstandingPackets.size(); ++i) {
-    auto longHeader =
-        boost::get<LongHeader>(&conn->outstandingPackets[i].packet.header);
+    auto longHeader = conn->outstandingPackets[i].packet.header.asLong();
     EXPECT_FALSE(
         longHeader &&
         longHeader->getProtectionType() == ProtectionType::ZeroRtt);

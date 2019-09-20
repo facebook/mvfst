@@ -385,28 +385,20 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
 
   EXPECT_EQ(3, conn->outstandingPackets.size());
   auto& firstHeader = conn->outstandingPackets.front().packet.header;
-  auto firstPacketNum = folly::variant_match(
-      firstHeader, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto firstPacketNum = firstHeader.getPacketSequenceNum();
   EXPECT_EQ(0, firstPacketNum);
   EXPECT_EQ(1, event1->packetNum);
 
-  EXPECT_EQ(
-      PacketNumberSpace::Initial,
-      folly::variant_match(
-          firstHeader, [](const auto& h) { return h.getPacketNumberSpace(); }));
+  EXPECT_EQ(PacketNumberSpace::Initial, firstHeader.getPacketNumberSpace());
 
   auto& lastHeader = conn->outstandingPackets.back().packet.header;
 
-  auto lastPacketNum = folly::variant_match(
-      lastHeader, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto lastPacketNum = lastHeader.getPacketSequenceNum();
 
   EXPECT_EQ(2, lastPacketNum);
   EXPECT_EQ(2, event3->packetNum);
 
-  EXPECT_EQ(
-      PacketNumberSpace::AppData,
-      folly::variant_match(
-          lastHeader, [](const auto& h) { return h.getPacketNumberSpace(); }));
+  EXPECT_EQ(PacketNumberSpace::AppData, lastHeader.getPacketNumberSpace());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
@@ -891,9 +883,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetNum = folly::variant_match(
-      packet.packet.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.packet.header.getPacketSequenceNum();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   MaxStreamDataFrame streamWindowUpdate(stream->id, 0);
   conn->streamManager->queueWindowUpdate(stream->id);
@@ -928,9 +918,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetNum = folly::variant_match(
-      packet.packet.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.packet.header.getPacketSequenceNum();
   conn->pendingEvents.connWindowUpdate = true;
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   MaxDataFrame connWindowUpdate(conn->flowControlState.advertisedMaxOffset);

@@ -39,9 +39,7 @@ void processAckFrame(
         conn.outstandingPackets.end(),
         ackBlockIt->startPacket,
         [&](const auto& packetWithTime, const auto& val) {
-          return folly::variant_match(
-              packetWithTime.packet.header,
-              [&val](const auto& h) { return h.getPacketSequenceNum() < val; });
+          return packetWithTime.packet.header.getPacketSequenceNum() < val;
         });
     if (packetIt == conn.outstandingPackets.end()) {
       // This means that all the packets are less than the start packet.
@@ -60,12 +58,9 @@ void processAckFrame(
     // or equal to crypto protection level.
     auto packetItEnd = packetIt;
     while (packetItEnd != conn.outstandingPackets.end()) {
-      auto currentPacketNum = folly::variant_match(
-          packetItEnd->packet.header,
-          [](const auto& h) { return h.getPacketSequenceNum(); });
-      auto currentPacketNumberSpace = folly::variant_match(
-          packetItEnd->packet.header,
-          [](const auto& h) { return h.getPacketNumberSpace(); });
+      auto currentPacketNum = packetItEnd->packet.header.getPacketSequenceNum();
+      auto currentPacketNumberSpace =
+          packetItEnd->packet.header.getPacketNumberSpace();
       if (pnSpace != currentPacketNumberSpace) {
         packetItEnd++;
         continue;

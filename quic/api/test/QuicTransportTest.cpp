@@ -845,8 +845,7 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, end);
 
   // Verify ack state after writing
-  auto pnSpace = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketNumberSpace(); });
+  auto pnSpace = packet.header.getPacketNumberSpace();
   auto ackState = getAckState(conn, pnSpace);
   EXPECT_EQ(ackState.largestAckScheduled, end);
   EXPECT_FALSE(ackState.needsToSendAckImmediately);

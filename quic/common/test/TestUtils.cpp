@@ -25,10 +25,7 @@ getPreviousOutstandingPacket(
     std::deque<quic::OutstandingPacket>::reverse_iterator from) {
   return std::find_if(
       from, conn.outstandingPackets.rend(), [=](const auto& op) {
-        return packetNumberSpace ==
-            folly::variant_match(op.packet.header, [](const auto& h) {
-                 return h.getPacketNumberSpace();
-               });
+        return packetNumberSpace == op.packet.header.getPacketNumberSpace();
       });
 }
 } // namespace
@@ -65,11 +62,6 @@ const RegularQuicWritePacket& writeQuicPacket(
   return getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
 }
 
-PacketNum getPacketSequenceNum(const RegularQuicWritePacket& packet) {
-  return folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
-}
-
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
     folly::AsyncUDPSocket& sock,
@@ -93,9 +85,7 @@ PacketNum rstStreamAndSendPacket(
   for (const auto& packet : conn.outstandingPackets) {
     for (const auto& frame : all_frames<RstStreamFrame>(packet.packet.frames)) {
       if (frame.streamId == stream.id) {
-        return folly::variant_match(packet.packet.header, [](const auto& h) {
-          return h.getPacketSequenceNum();
-        });
+        return packet.packet.header.getPacketSequenceNum();
       }
     }
   }
@@ -394,32 +384,24 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   folly::Optional<PacketHeader> header;
   switch (protectionType) {
     case ProtectionType::Initial:
-      header = PacketHeader(LongHeader(
-          LongHeader::Types::Initial,
-          srcConnId,
-          dstConnId,
-          packetNum,
-          version));
+      header = LongHeader(
+          LongHeader::Types::Initial, srcConnId, dstConnId, packetNum, version);
       break;
     case ProtectionType::Handshake:
-      header = PacketHeader(LongHeader(
+      header = LongHeader(
           LongHeader::Types::Handshake,
           srcConnId,
           dstConnId,
           packetNum,
-          version));
+          version);
       break;
     case ProtectionType::ZeroRtt:
-      header = PacketHeader(LongHeader(
-          LongHeader::Types::ZeroRtt,
-          srcConnId,
-          dstConnId,
-          packetNum,
-          version));
+      header = LongHeader(
+          LongHeader::Types::ZeroRtt, srcConnId, dstConnId, packetNum, version);
       break;
     case ProtectionType::KeyPhaseOne:
     case ProtectionType::KeyPhaseZero:
-      header = PacketHeader(ShortHeader(protectionType, dstConnId, packetNum));
+      header = ShortHeader(protectionType, dstConnId, packetNum);
       break;
   }
   RegularQuicPacketBuilder builder(
@@ -449,10 +431,7 @@ Buf packetToBufCleartext(
   if (packet.body) {
     body = packet.body->clone();
   }
-  auto headerForm = folly::variant_match(
-      packet.packet.header,
-      [](const LongHeader&) { return HeaderForm::Long; },
-      [](const ShortHeader&) { return HeaderForm::Short; });
+  auto headerForm = packet.packet.header.getHeaderForm();
   auto encryptedBody =
       cleartextCipher.encrypt(std::move(body), packet.header.get(), packetNum);
   encryptPacketHeader(headerForm, *packet.header, *encryptedBody, headerCipher);

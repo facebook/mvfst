@@ -24,15 +24,158 @@ HeaderForm getHeaderForm(uint8_t headerValue) {
   return HeaderForm::Short;
 }
 
+PacketHeader::PacketHeader(ShortHeader&& shortHeaderIn)
+    : headerForm_(HeaderForm::Short) {
+  new (&shortHeader) ShortHeader(std::move(shortHeaderIn));
+}
+
+PacketHeader::PacketHeader(LongHeader&& longHeaderIn)
+    : headerForm_(HeaderForm::Long) {
+  new (&longHeader) LongHeader(std::move(longHeaderIn));
+}
+
+PacketHeader::PacketHeader(const PacketHeader& other)
+    : headerForm_(other.headerForm_) {
+  switch (other.headerForm_) {
+    case HeaderForm::Long:
+      new (&longHeader) LongHeader(other.longHeader);
+      break;
+    case HeaderForm::Short:
+      new (&shortHeader) ShortHeader(other.shortHeader);
+      break;
+  }
+}
+
+PacketHeader::PacketHeader(PacketHeader&& other) noexcept
+    : headerForm_(other.headerForm_) {
+  switch (other.headerForm_) {
+    case HeaderForm::Long:
+      new (&longHeader) LongHeader(std::move(other.longHeader));
+      break;
+    case HeaderForm::Short:
+      new (&shortHeader) ShortHeader(std::move(other.shortHeader));
+      break;
+  }
+}
+
+PacketHeader& PacketHeader::operator=(PacketHeader&& other) noexcept {
+  destroyHeader();
+  switch (other.headerForm_) {
+    case HeaderForm::Long:
+      new (&longHeader) LongHeader(std::move(other.longHeader));
+      break;
+    case HeaderForm::Short:
+      new (&shortHeader) ShortHeader(std::move(other.shortHeader));
+      break;
+  }
+  headerForm_ = other.headerForm_;
+  return *this;
+}
+
+PacketHeader& PacketHeader::operator=(const PacketHeader& other) {
+  destroyHeader();
+  switch (other.headerForm_) {
+    case HeaderForm::Long:
+      new (&longHeader) LongHeader(other.longHeader);
+      break;
+    case HeaderForm::Short:
+      new (&shortHeader) ShortHeader(other.shortHeader);
+      break;
+  }
+  headerForm_ = other.headerForm_;
+  return *this;
+}
+
+PacketHeader::~PacketHeader() {
+  destroyHeader();
+}
+
+void PacketHeader::destroyHeader() {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      longHeader.~LongHeader();
+      break;
+    case HeaderForm::Short:
+      shortHeader.~ShortHeader();
+      break;
+  }
+}
+
+LongHeader* PacketHeader::asLong() {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return &longHeader;
+    case HeaderForm::Short:
+      return nullptr;
+  }
+}
+
+ShortHeader* PacketHeader::asShort() {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return nullptr;
+    case HeaderForm::Short:
+      return &shortHeader;
+  }
+}
+
+const LongHeader* PacketHeader::asLong() const {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return &longHeader;
+    case HeaderForm::Short:
+      return nullptr;
+  }
+}
+
+const ShortHeader* PacketHeader::asShort() const {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return nullptr;
+    case HeaderForm::Short:
+      return &shortHeader;
+  }
+}
+
+PacketNum PacketHeader::getPacketSequenceNum() const {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return longHeader.getPacketSequenceNum();
+    case HeaderForm::Short:
+      return shortHeader.getPacketSequenceNum();
+  }
+}
+
+HeaderForm PacketHeader::getHeaderForm() const {
+  return headerForm_;
+}
+
+ProtectionType PacketHeader::getProtectionType() const {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return longHeader.getProtectionType();
+    case HeaderForm::Short:
+      return shortHeader.getProtectionType();
+  }
+}
+
+PacketNumberSpace PacketHeader::getPacketNumberSpace() const {
+  switch (headerForm_) {
+    case HeaderForm::Long:
+      return longHeader.getPacketNumberSpace();
+    case HeaderForm::Short:
+      return shortHeader.getPacketNumberSpace();
+  }
+}
+
 LongHeader::LongHeader(
     Types type,
     LongHeaderInvariant invariant,
-    Buf token,
+    const std::string& token,
     folly::Optional<ConnectionId> originalDstConnId)
-    : headerForm_(HeaderForm::Long),
-      longHeaderType_(type),
+    : longHeaderType_(type),
       invariant_(std::move(invariant)),
-      token_(std::move(token)),
+      token_(token),
       originalDstConnId_(originalDstConnId) {}
 
 LongHeader::LongHeader(
@@ -41,40 +184,13 @@ LongHeader::LongHeader(
     const ConnectionId& dstConnId,
     PacketNum packetNum,
     QuicVersion version,
-    Buf token,
+    const std::string& token,
     folly::Optional<ConnectionId> originalDstConnId)
-    : headerForm_(HeaderForm::Long),
-      longHeaderType_(type),
+    : longHeaderType_(type),
       invariant_(LongHeaderInvariant(version, srcConnId, dstConnId)),
-      packetSequenceNum_(packetNum),
-      token_(token ? std::move(token) : nullptr),
-      originalDstConnId_(originalDstConnId) {}
-
-LongHeader::LongHeader(const LongHeader& other)
-    : headerForm_(other.headerForm_),
-      longHeaderType_(other.longHeaderType_),
-      invariant_(other.invariant_),
-      packetSequenceNum_(other.packetSequenceNum_),
-      originalDstConnId_(other.originalDstConnId_) {
-  if (other.token_) {
-    token_ = other.token_->clone();
-  }
-}
-
-void LongHeader::setPacketNumber(PacketNum packetNum) {
-  packetSequenceNum_ = packetNum;
-}
-
-LongHeader& LongHeader::operator=(const LongHeader& other) {
-  headerForm_ = other.headerForm_;
-  longHeaderType_ = other.longHeaderType_;
-  invariant_ = other.invariant_;
-  packetSequenceNum_ = other.packetSequenceNum_;
-  originalDstConnId_ = other.originalDstConnId_;
-  if (other.token_) {
-    token_ = other.token_->clone();
-  }
-  return *this;
+      token_(token),
+      originalDstConnId_(originalDstConnId) {
+  setPacketNumber(packetNum);
 }
 
 LongHeader::Types LongHeader::getHeaderType() const noexcept {
@@ -93,27 +209,31 @@ const folly::Optional<ConnectionId>& LongHeader::getOriginalDstConnId() const {
   return originalDstConnId_;
 }
 
-PacketNum LongHeader::getPacketSequenceNum() const {
-  return *packetSequenceNum_;
-}
-
 QuicVersion LongHeader::getVersion() const {
   return invariant_.version;
 }
 
 bool LongHeader::hasToken() const {
-  return token_ ? true : false;
+  return !token_.empty();
 }
 
-folly::IOBuf* LongHeader::getToken() const {
-  return token_.get();
+const std::string& LongHeader::getToken() const {
+  return token_;
+}
+
+PacketNum LongHeader::getPacketSequenceNum() const {
+  return packetSequenceNum_;
+}
+
+void LongHeader::setPacketNumber(PacketNum packetNum) {
+  packetSequenceNum_ = packetNum;
 }
 
 ProtectionType LongHeader::getProtectionType() const {
   return longHeaderTypeToProtectionType(getHeaderType());
 }
 
-PacketNumberSpace LongHeader::getPacketNumberSpace() const noexcept {
+PacketNumberSpace LongHeader::getPacketNumberSpace() const {
   return longHeaderTypeToPacketNumberSpace(getHeaderType());
 }
 
@@ -152,21 +272,17 @@ ShortHeader::ShortHeader(
     ProtectionType protectionType,
     ConnectionId connId,
     PacketNum packetNum)
-    : headerForm_(HeaderForm::Short),
-      protectionType_(protectionType),
-      connectionId_(std::move(connId)),
-      packetSequenceNum_(packetNum) {
+    : protectionType_(protectionType), connectionId_(std::move(connId)) {
   if (protectionType_ != ProtectionType::KeyPhaseZero &&
       protectionType_ != ProtectionType::KeyPhaseOne) {
     throw QuicInternalException(
         "bad short header protection type", LocalErrorCode::CODEC_ERROR);
   }
+  setPacketNumber(packetNum);
 }
 
 ShortHeader::ShortHeader(ProtectionType protectionType, ConnectionId connId)
-    : headerForm_(HeaderForm::Short),
-      protectionType_(protectionType),
-      connectionId_(std::move(connId)) {
+    : protectionType_(protectionType), connectionId_(std::move(connId)) {
   if (protectionType_ != ProtectionType::KeyPhaseZero &&
       protectionType_ != ProtectionType::KeyPhaseOne) {
     throw QuicInternalException(
@@ -174,11 +290,11 @@ ShortHeader::ShortHeader(ProtectionType protectionType, ConnectionId connId)
   }
 }
 
-ProtectionType ShortHeader::getProtectionType() const noexcept {
+ProtectionType ShortHeader::getProtectionType() const {
   return protectionType_;
 }
 
-PacketNumberSpace ShortHeader::getPacketNumberSpace() const noexcept {
+PacketNumberSpace ShortHeader::getPacketNumberSpace() const {
   return PacketNumberSpace::AppData;
 }
 
@@ -187,7 +303,7 @@ const ConnectionId& ShortHeader::getConnectionId() const {
 }
 
 PacketNum ShortHeader::getPacketSequenceNum() const {
-  return *packetSequenceNum_;
+  return packetSequenceNum_;
 }
 
 void ShortHeader::setPacketNumber(PacketNum packetNum) {

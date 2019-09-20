@@ -61,7 +61,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       getTestConnectionId(),
       321,
       QuicVersion::QUIC_DRAFT,
-      IOBuf::copyBuffer("this is a retry token :)"),
+      std::string("this is a retry token :)"),
       getTestConnectionId());
 
   RegularQuicPacketBuilder builder(
@@ -261,5 +261,39 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       PacketNumberSpace::AppData, zeroRttLongHeader.getPacketNumberSpace());
 }
 
+class PacketHeaderTest : public Test {};
+
+TEST_F(PacketHeaderTest, LongHeader) {
+  PacketNum packetNumber = 202;
+  LongHeader handshakeLongHeader(
+      LongHeader::Types::Handshake,
+      getTestConnectionId(4),
+      getTestConnectionId(5),
+      packetNumber,
+      QuicVersion::QUIC_DRAFT);
+  PacketHeader readHeader(std::move(handshakeLongHeader));
+  EXPECT_NE(readHeader.asLong(), nullptr);
+  EXPECT_EQ(readHeader.asShort(), nullptr);
+  EXPECT_EQ(readHeader.getPacketSequenceNum(), packetNumber);
+  EXPECT_EQ(readHeader.getHeaderForm(), HeaderForm::Long);
+  EXPECT_EQ(readHeader.getProtectionType(), ProtectionType::Handshake);
+  EXPECT_EQ(readHeader.getPacketNumberSpace(), PacketNumberSpace::Handshake);
+  EXPECT_EQ(readHeader.asLong()->getHeaderType(), LongHeader::Types::Handshake);
+}
+
+TEST_F(PacketHeaderTest, ShortHeader) {
+  PacketNum packetNumber = 202;
+  ConnectionId connid = getTestConnectionId(4);
+  ShortHeader shortHeader(ProtectionType::KeyPhaseZero, connid, packetNumber);
+  PacketHeader readHeader(std::move(shortHeader));
+  EXPECT_EQ(readHeader.asLong(), nullptr);
+  EXPECT_NE(readHeader.asShort(), nullptr);
+  EXPECT_EQ(readHeader.getPacketSequenceNum(), packetNumber);
+  EXPECT_EQ(readHeader.getHeaderForm(), HeaderForm::Short);
+  EXPECT_EQ(readHeader.getProtectionType(), ProtectionType::KeyPhaseZero);
+  EXPECT_EQ(readHeader.getPacketNumberSpace(), PacketNumberSpace::AppData);
+
+  EXPECT_EQ(readHeader.asShort()->getConnectionId(), connid);
+}
 } // namespace test
 } // namespace quic

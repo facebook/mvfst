@@ -210,10 +210,7 @@ std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
     PacketNumberSpace packetNumberSpace,
     std::deque<OutstandingPacket>::iterator from) {
   return std::find_if(from, conn.outstandingPackets.end(), [=](const auto& op) {
-    return packetNumberSpace ==
-        folly::variant_match(op.packet.header, [](const auto& h) {
-             return h.getPacketNumberSpace();
-           });
+    return packetNumberSpace == op.packet.header.getPacketNumberSpace();
   });
 }
 

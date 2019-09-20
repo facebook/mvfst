@@ -448,7 +448,7 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(0);
 
   RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, header, 0 /* largestAcked */);
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -463,7 +463,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
 
   RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, header, 0 /* largestAcked */);
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -501,7 +501,7 @@ TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {
   EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
 
   RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, header, 0 /* largestAcked */);
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.terminateLoopSoon();
@@ -544,7 +544,7 @@ auto createInitialStream(
       destConnId,
       packetNum,
       version,
-      IOBuf::copyBuffer("this is a retry token :)"),
+      std::string("this is a retry token :)"),
       getTestConnectionId());
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,
@@ -806,15 +806,12 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
         // parse header and check connId to verify the integrity of the packet
         auto parsedHeader = parseHeader(*writtenData);
         auto& header = parsedHeader->parsedHeader;
-        const auto& connectionId = folly::variant_match(
-            header.value(),
-            [](const LongHeader& longHeader) {
-              return longHeader.getDestinationConnId();
-            },
-            [](const ShortHeader& shortHeader) {
-              return shortHeader.getConnectionId();
-            });
-        EXPECT_EQ(connId, connectionId);
+        LongHeader* longHeader = header->asLong();
+        if (longHeader) {
+          EXPECT_EQ(connId, longHeader->getDestinationConnId());
+        } else {
+          EXPECT_EQ(connId, header->asShort()->getConnectionId());
+        }
         return data->computeChainDataLength();
       }));
   takeoverWorker_->startPacketForwarding(folly::SocketAddress("0", 0));

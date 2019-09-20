@@ -627,6 +627,8 @@ struct LongHeaderInvariant {
 // TODO: split this into read and write types.
 struct LongHeader {
  public:
+  virtual ~LongHeader() = default;
+
   static constexpr uint8_t kFixedBitMask = 0x40;
   static constexpr uint8_t kPacketTypeMask = 0x30;
   static constexpr uint8_t kReservedBitsMask = 0x0c;
@@ -647,40 +649,33 @@ struct LongHeader {
       const ConnectionId& dstConnId,
       PacketNum packetNum,
       QuicVersion version,
-      Buf token = nullptr,
+      const std::string& token = std::string(),
       folly::Optional<ConnectionId> originalDstConnId = folly::none);
 
   LongHeader(
       Types type,
       LongHeaderInvariant invariant,
-      Buf token = nullptr,
+      const std::string& token = std::string(),
       folly::Optional<ConnectionId> originalDstConnId = folly::none);
-
-  void setPacketNumber(PacketNum packetNum);
-
-  // Stuff stored in a variant type needs to be copyable.
-  // TODO: can we make this copyable only by the variant, but not
-  // by anyone else.
-  LongHeader(const LongHeader& other);
-  LongHeader& operator=(const LongHeader& other);
 
   Types getHeaderType() const noexcept;
   const ConnectionId& getSourceConnId() const;
   const ConnectionId& getDestinationConnId() const;
   const folly::Optional<ConnectionId>& getOriginalDstConnId() const;
-  PacketNum getPacketSequenceNum() const;
   QuicVersion getVersion() const;
+  PacketNumberSpace getPacketNumberSpace() const;
   ProtectionType getProtectionType() const;
-  PacketNumberSpace getPacketNumberSpace() const noexcept;
   bool hasToken() const;
-  folly::IOBuf* getToken() const;
+  const std::string& getToken() const;
+  PacketNum getPacketSequenceNum() const;
+
+  void setPacketNumber(PacketNum packetNum);
 
  private:
-  HeaderForm headerForm_;
+  PacketNum packetSequenceNum_{0};
   Types longHeaderType_;
   LongHeaderInvariant invariant_;
-  folly::Optional<PacketNum> packetSequenceNum_; // at most 32 bits on wire
-  Buf token_;
+  std::string token_;
   folly::Optional<ConnectionId> originalDstConnId_;
 };
 
@@ -692,6 +687,8 @@ struct ShortHeaderInvariant {
 
 struct ShortHeader {
  public:
+  virtual ~ShortHeader() = default;
+
   // There is also a spin bit which is 0x20 that we don't currently implement.
   static constexpr uint8_t kFixedBitMask = 0x40;
   static constexpr uint8_t kReservedBitsMask = 0x18;
@@ -712,11 +709,10 @@ struct ShortHeader {
       ConnectionId connId,
       PacketNum packetNum);
 
-  ProtectionType getProtectionType() const noexcept;
-  PacketNumberSpace getPacketNumberSpace() const noexcept;
-
-  const ConnectionId& getConnectionId() const;
+  ProtectionType getProtectionType() const;
+  PacketNumberSpace getPacketNumberSpace() const;
   PacketNum getPacketSequenceNum() const;
+  const ConnectionId& getConnectionId() const;
 
   void setPacketNumber(PacketNum packetNum);
 
@@ -729,16 +725,48 @@ struct ShortHeader {
       folly::io::Cursor& cursor);
 
  private:
-  HeaderForm headerForm_;
+  PacketNum packetSequenceNum_{0};
   ProtectionType protectionType_;
   ConnectionId connectionId_;
-  folly::Optional<PacketNum> packetSequenceNum_; // var-size 8/16/24/32 bits
+};
+
+struct PacketHeader {
+  ~PacketHeader();
+
+  /* implicit */ PacketHeader(LongHeader&& longHeader);
+  /* implicit */ PacketHeader(ShortHeader&& shortHeader);
+
+  PacketHeader(PacketHeader&& other) noexcept;
+  PacketHeader(const PacketHeader& other);
+
+  PacketHeader& operator=(PacketHeader&& other) noexcept;
+  PacketHeader& operator=(const PacketHeader& other);
+
+  LongHeader* asLong();
+  ShortHeader* asShort();
+
+  const LongHeader* asLong() const;
+  const ShortHeader* asShort() const;
+
+  PacketNum getPacketSequenceNum() const;
+  HeaderForm getHeaderForm() const;
+  ProtectionType getProtectionType() const;
+  PacketNumberSpace getPacketNumberSpace() const;
+
+ private:
+  void destroyHeader();
+
+  union {
+    LongHeader longHeader;
+    ShortHeader shortHeader;
+  };
+
+  HeaderForm headerForm_;
 };
 
 ProtectionType longHeaderTypeToProtectionType(LongHeader::Types type);
-PacketNumberSpace longHeaderTypeToPacketNumberSpace(LongHeader::Types type);
 
-using PacketHeader = boost::variant<LongHeader, ShortHeader>;
+PacketNumberSpace longHeaderTypeToPacketNumberSpace(LongHeader::Types type);
 
 struct StreamTypeField {
  public:
@@ -791,8 +819,7 @@ struct VersionNegotiationPacket {
 struct RegularPacket {
   PacketHeader header;
 
-  explicit RegularPacket(PacketHeader&& headerIn)
-      : header(std::move(headerIn)) {}
+  explicit RegularPacket(PacketHeader&& headerIn) : header(std::move(headerIn)) {}
 };
 
 /**
@@ -842,17 +869,16 @@ inline std::ostream& operator<<(
 }
 
 inline std::ostream& operator<<(std::ostream& os, const PacketHeader& header) {
-  folly::variant_match(
-      header,
-      [&os](const LongHeader& h) {
-        os << "header=long"
-           << " protectionType=" << (int)h.getProtectionType()
-           << " type=" << std::hex << (int)h.getHeaderType();
-      },
-      [&os](const ShortHeader& h) {
-        os << "header=short"
-           << " protectionType=" << (int)h.getProtectionType();
-      });
+  auto shortHeader = header.asShort();
+  if (shortHeader) {
+    os << "header=short"
+       << " protectionType=" << (int)shortHeader->getProtectionType();
+  } else {
+    auto longHeader = header.asLong();
+    os << "header=long"
+       << " protectionType=" << (int)longHeader->getProtectionType()
+       << " type=" << std::hex << (int)longHeader->getHeaderType();
+  }
   return os;
 }
 

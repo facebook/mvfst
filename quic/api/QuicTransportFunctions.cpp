@@ -195,14 +195,12 @@ void updateConnection(
     RegularQuicWritePacket packet,
     TimePoint sentTime,
     uint32_t encodedSize) {
-  auto packetNum = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketSequenceNum(); });
+  auto packetNum = packet.header.getPacketSequenceNum();
   bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
   bool isHandshake = false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
-  auto packetNumberSpace = folly::variant_match(
-      packet.header, [](const auto& h) { return h.getPacketNumberSpace(); });
+  auto packetNumberSpace = packet.header.getPacketNumberSpace();
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize
            << " " << conn;
@@ -233,9 +231,7 @@ void updateConnection(
         },
         [&](const WriteCryptoFrame& writeCryptoFrame) {
           retransmittable = true;
-          auto protectionType = folly::variant_match(
-              packet.header,
-              [](const auto& h) { return h.getProtectionType(); });
+          auto protectionType = packet.header.getProtectionType();
           // NewSessionTicket is sent in crypto frame encrypted with 1-rtt key,
           // however, it is not part of handshake
           isHandshake =
@@ -406,9 +402,7 @@ void updateConnection(
       conn.outstandingPackets.end(),
       packetNum,
       [&](const auto& packetWithTime, const auto& val) {
-        return folly::variant_match(
-            packetWithTime.packet.header,
-            [&val](const auto& h) { return h.getPacketSequenceNum() < val; });
+        return packetWithTime.packet.header.getPacketSequenceNum() < val;
       });
   conn.outstandingPackets.insert(packetIt, std::move(pkt));
 
@@ -453,14 +447,9 @@ HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType) {
              const ConnectionId& dstConnId,
              PacketNum packetNum,
              QuicVersion version,
-             Buf token) {
+             const std::string& token) {
     return LongHeader(
-        packetType,
-        srcConnId,
-        dstConnId,
-        packetNum,
-        version,
-        token ? std::move(token) : nullptr);
+        packetType, srcConnId, dstConnId, packetNum, version, token);
   };
 }
 
@@ -469,7 +458,7 @@ HeaderBuilder ShortHeaderBuilder() {
             const ConnectionId& dstConnId,
             PacketNum packetNum,
             QuicVersion,
-            Buf) {
+            const std::string&) {
     return ShortHeader(ProtectionType::KeyPhaseZero, dstConnId, packetNum);
   };
 }
@@ -557,7 +546,7 @@ uint64_t writeCryptoAndAckDataToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit,
-    Buf token) {
+    const std::string& token) {
   auto encryptionLevel = protectionTypeToEncryptionLevel(
       longHeaderTypeToProtectionType(packetType));
   FrameScheduler scheduler =
@@ -584,7 +573,7 @@ uint64_t writeCryptoAndAckDataToSocket(
       cleartextCipher,
       headerCipher,
       version,
-      token ? std::move(token) : nullptr);
+      token);
   VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
                            << " written crypto and acks data type="
                            << packetType << " packets=" << written << " "
@@ -718,10 +707,9 @@ void writeCloseCommon(
     const PacketNumberCipher& headerCipher) {
   // close is special, we're going to bypass all the packet sent logic for all
   // packets we send with a connection close frame.
-  auto pnSpace = folly::variant_match(
-      header, [](const auto& h) { return h.getPacketNumberSpace(); });
-  PacketNum packetNum = folly::variant_match(
-      header, [](const auto& h) { return h.getPacketSequenceNum(); });
+  PacketNumberSpace pnSpace = header.getPacketNumberSpace();
+  HeaderForm headerForm = header.getHeaderForm();
+  PacketNum packetNum = header.getPacketSequenceNum();
   RegularQuicPacketBuilder packetBuilder(
       connection.udpSendPacketLen,
       std::move(header),
@@ -760,10 +748,6 @@ void writeCloseCommon(
   auto packet = std::move(packetBuilder).buildPacket();
   auto body =
       aead.encrypt(std::move(packet.body), packet.header.get(), packetNum);
-  HeaderForm headerForm = folly::variant_match(
-      header,
-      [](const ShortHeader&) { return HeaderForm::Short; },
-      [](const LongHeader&) { return HeaderForm::Long; });
   encryptPacketHeader(headerForm, *packet.header, *body, headerCipher);
   auto packetBuf = std::move(packet.header);
   packetBuf->prependChain(std::move(body));
@@ -891,7 +875,7 @@ uint64_t writeConnectionDataToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
-    Buf token) {
+    const std::string& token) {
   VLOG(10) << nodeToString(connection.nodeType)
            << " writing data using scheduler=" << scheduler.name() << " "
            << connection;
@@ -917,12 +901,7 @@ uint64_t writeConnectionDataToSocket(
   }
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
-    auto header = builder(
-        srcConnId,
-        dstConnId,
-        packetNum,
-        version,
-        token ? token->clone() : nullptr);
+    auto header = builder(srcConnId, dstConnId, packetNum, version, token);
     uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
         connection.udpSendPacketLen, writableBytesFunc(connection)));
     uint64_t cipherOverhead = aead.getCipherOverhead();
@@ -954,10 +933,7 @@ uint64_t writeConnectionDataToSocket(
     auto body =
         aead.encrypt(std::move(packet->body), packet->header.get(), packetNum);
 
-    HeaderForm headerForm = folly::variant_match(
-        packet->packet.header,
-        [](const LongHeader&) { return HeaderForm::Long; },
-        [](const ShortHeader&) { return HeaderForm::Short; });
+    HeaderForm headerForm = packet->packet.header.getHeaderForm();
     encryptPacketHeader(headerForm, *packet->header, *body, headerCipher);
 
     auto packetBuf = std::move(packet->header);

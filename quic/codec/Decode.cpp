@@ -104,10 +104,9 @@ ReadAckFrame decodeAckFrame(
   // and ack delay, the sender has to use something, so they use the default
   // ack delay. To keep it consistent the protocol specifies using the same
   // ack delay for all the long header packets.
-  uint8_t ackDelayExponentToUse = folly::variant_match(
-      header,
-      [](const LongHeader&) { return kDefaultAckDelayExponent; },
-      [&params](auto&) { return params.peerAckDelayExponent; });
+  uint8_t ackDelayExponentToUse = (header.getHeaderForm() == HeaderForm::Long)
+      ? kDefaultAckDelayExponent
+      : params.peerAckDelayExponent;
   DCHECK_LT(ackDelayExponentToUse, sizeof(ackDelay->first) * 8);
   // ackDelayExponentToUse is guaranteed to be less than the size of uint64_t
   uint64_t delayOverflowMask = 0xFFFFFFFFFFFFFFFF;
@@ -986,7 +985,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
         LongHeader(
             type,
             std::move(parsedLongHeaderInvariant.invariant),
-            std::move(token),
+            token ? token->moveToFbString().toStdString() : std::string(),
             std::move(originalDstConnId)),
         PacketLength(0, 0));
   }
@@ -1037,7 +1036,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       LongHeader(
           type,
           std::move(parsedLongHeaderInvariant.invariant),
-          std::move(token)),
+          token ? token->moveToFbString().toStdString() : std::string()),
       PacketLength(pktLen->first, pktLen->second));
 }
 

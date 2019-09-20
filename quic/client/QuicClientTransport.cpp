@@ -152,15 +152,11 @@ void QuicClientTransport::processPacketData(
     return;
   }
 
-  bool longHeader = folly::variant_match(
-      regularOptional->header,
-      [](const LongHeader&) { return true; },
-      [](const ShortHeader&) { return false; });
+  LongHeader* longHeader = regularOptional->header.asLong();
+  ShortHeader* shortHeader = regularOptional->header.asShort();
 
-  if (longHeader &&
-      boost::get<LongHeader>(regularOptional->header).getHeaderType() ==
-          LongHeader::Types::Retry) {
-    if (clientConn_->retryToken_) {
+  if (longHeader && longHeader->getHeaderType() == LongHeader::Types::Retry) {
+    if (!clientConn_->retryToken.empty()) {
       VLOG(4) << "Server sent more than one retry packet";
       return;
     }
@@ -175,14 +171,12 @@ void QuicClientTransport::processPacketData(
     //   better approach, but I don't know if it is a good indicator that we've
     //   received an initial packet from the server.
 
-    auto header = boost::get<LongHeader>(regularOptional->header);
-
     const ConnectionId* dstConnId =
         &(*clientConn_->initialDestinationConnectionId);
     if (conn_->serverConnectionId) {
       dstConnId = &(*conn_->serverConnectionId);
     }
-    if (*header.getOriginalDstConnId() != *dstConnId) {
+    if (*longHeader->getOriginalDstConnId() != *dstConnId) {
       VLOG(4) << "Original destination connection id field in the retry "
               << "packet doesn't match the destination connection id from the "
               << "client's initial packet";
@@ -191,7 +185,7 @@ void QuicClientTransport::processPacketData(
 
     // Set the destination connection ID to be the value from the source
     // connection id of the retry packet
-    clientConn_->initialDestinationConnectionId = header.getSourceConnId();
+    clientConn_->initialDestinationConnectionId = longHeader->getSourceConnId();
 
     auto released = static_cast<QuicClientConnectionState*>(conn_.release());
     std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
@@ -200,7 +194,7 @@ void QuicClientTransport::processPacketData(
     clientConn_ = tempConn.get();
     conn_ = std::move(tempConn);
 
-    clientConn_->retryToken_ = header.getToken()->clone();
+    clientConn_->retryToken = longHeader->getToken();
 
     if (conn_->qLogger) {
       conn_->qLogger->addPacket(*regularOptional, packetSize);
@@ -210,18 +204,11 @@ void QuicClientTransport::processPacketData(
     return;
   }
 
-  auto protectionLevel = folly::variant_match(
-      regularOptional->header,
-      [](auto& header) { return header.getProtectionType(); });
-
+  auto protectionLevel = regularOptional->header.getProtectionType();
   auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
 
-  auto packetNum = folly::variant_match(
-      regularOptional->header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
-  auto pnSpace = folly::variant_match(
-      regularOptional->header,
-      [](auto& header) { return header.getPacketNumberSpace(); });
+  auto packetNum = regularOptional->header.getPacketSequenceNum();
+  auto pnSpace = regularOptional->header.getPacketNumberSpace();
 
   bool isProtectedPacket = protectionLevel == ProtectionType::KeyPhaseZero ||
       protectionLevel == ProtectionType::KeyPhaseOne;
@@ -255,31 +242,21 @@ void QuicClientTransport::processPacketData(
   }
 
   if (!conn_->serverConnectionId && longHeader) {
-    folly::Optional<ConnectionId> receivedSrcConnId(folly::variant_match(
-        regularOptional->header,
-        [&](const LongHeader& h) -> folly::Optional<ConnectionId> {
-          return h.getSourceConnId();
-        },
-        [](const ShortHeader&) -> folly::Optional<ConnectionId> {
-          return folly::none;
-        }));
-    // Assign the conn id to the server chosen connid.
-    if (!receivedSrcConnId) {
-      throw QuicTransportException(
-          "Expected long header with connection-id",
-          TransportErrorCode::PROTOCOL_VIOLATION);
-    }
-    conn_->serverConnectionId = std::move(receivedSrcConnId);
+    conn_->serverConnectionId = longHeader->getSourceConnId();
     conn_->readCodec->setServerConnectionId(*conn_->serverConnectionId);
   }
 
   // Error out if the connection id on the packet is not the one that is
   // expected.
-  if (folly::variant_match(
-          regularOptional->header,
-          [](const LongHeader& h) { return h.getDestinationConnId(); },
-          [](const ShortHeader& h) { return h.getConnectionId(); }) !=
-      *conn_->clientConnectionId) {
+  bool connidMatched = true;
+  if (longHeader && longHeader->getDestinationConnId() != *conn_->clientConnectionId) {
+    connidMatched = false;
+  } else if (
+      shortHeader &&
+      shortHeader->getConnectionId() != *conn_->clientConnectionId) {
+    connidMatched = false;
+  }
+  if (!connidMatched) {
     throw QuicTransportException(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
@@ -303,9 +280,8 @@ void QuicClientTransport::processPacketData(
               [&](const OutstandingPacket& outstandingPacket,
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
-                auto outstandingProtectionType = folly::variant_match(
-                    outstandingPacket.packet.header,
-                    [](const auto& h) { return h.getProtectionType(); });
+                auto outstandingProtectionType =
+                    outstandingPacket.packet.header.getProtectionType();
                 if (outstandingProtectionType == ProtectionType::KeyPhaseZero) {
                   // If we received an ack for data that we sent in 1-rtt from
                   // the server, we can assume that the server had successfully
@@ -734,7 +710,7 @@ void QuicClientTransport::writeData() {
         *conn_->initialHeaderCipher,
         version,
         packetLimit,
-        clientConn_->retryToken_ ? clientConn_->retryToken_->clone() : nullptr);
+        clientConn_->retryToken);
   }
   if (!packetLimit) {
     return;

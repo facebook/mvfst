@@ -47,9 +47,9 @@ PacketNumEncodingResult encodeLongHeaderHelper(
   appender.writeBE<uint8_t>(initialByte);
   bool isInitial = longHeader.getHeaderType() == LongHeader::Types::Initial;
   uint64_t tokenHeaderLength = 0;
-  auto token = longHeader.getToken();
+  const std::string& token = longHeader.getToken();
   if (isInitial) {
-    uint64_t tokenLength = token ? token->coalesce().size() : 0;
+    uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
     tokenHeaderLength = tokenLengthInt.getSize() + tokenLength;
   }
@@ -99,11 +99,11 @@ PacketNumEncodingResult encodeLongHeaderHelper(
   }
 
   if (isInitial) {
-    uint64_t tokenLength = token ? token->coalesce().size() : 0;
+    uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
     tokenLengthInt.encode(appender);
     if (tokenLength > 0) {
-      appender.push(token->coalesce());
+      appender.push(folly::StringPiece(token.data(), token.size()));
     }
   }
 
@@ -113,8 +113,8 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     appender.push(originalDstConnId->data(), originalDstConnId->size());
 
     // Write the retry token
-    CHECK(token) << "Retry packet must contain a token";
-    appender.insert(*token);
+    CHECK(!token.empty()) << "Retry packet must contain a token";
+    appender.push(folly::StringPiece(token.data(), token.size()));
   }
   // defer write of the packet num and length till payload has been computed
   return encodedPacketNum;
@@ -188,10 +188,7 @@ void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   // at this point everything should been set in the packet_
-  bool isLongHeader = folly::variant_match(
-      packet_.header,
-      [](const LongHeader&) { return true; },
-      [](const ShortHeader&) { return false; });
+  LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
   while (outputQueue_.chainLength() + cipherOverhead_ < minBodySize &&
@@ -201,9 +198,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
     write(paddingType);
   }
   packet_.frames = std::move(quicFrames_);
-  if (isLongHeader &&
-      boost::get<LongHeader>(packet_.header).getHeaderType() !=
-          LongHeader::Types::Retry) {
+  if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
         packetNumberEncoding_->length + outputQueue_.chainLength() +
         cipherOverhead_);
@@ -218,11 +213,11 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
 
 void RegularQuicPacketBuilder::writeHeaderBytes(
     PacketNum largestAckedPacketNum) {
-  if (packet_.header.type() == typeid(LongHeader)) {
-    LongHeader& longHeader = boost::get<LongHeader>(packet_.header);
+  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
+    LongHeader& longHeader = *packet_.header.asLong();
     encodeLongHeader(longHeader, largestAckedPacketNum);
   } else {
-    ShortHeader& shortHeader = boost::get<ShortHeader>(packet_.header);
+    ShortHeader& shortHeader = *packet_.header.asShort();
     encodeShortHeader(shortHeader, largestAckedPacketNum);
   }
 }

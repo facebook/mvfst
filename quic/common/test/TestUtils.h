@@ -52,8 +52,6 @@ const RegularQuicWritePacket& writeQuicPacket(
     const folly::IOBuf& data,
     bool eof = false);
 
-PacketNum getPacketSequenceNum(const RegularQuicWritePacket& packet);
-
 RegularQuicPacketBuilder::Packet createAckPacket(
     QuicConnectionStateBase& dstConn,
     PacketNum pn,

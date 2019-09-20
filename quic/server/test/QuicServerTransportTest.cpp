@@ -494,16 +494,12 @@ class QuicServerTransportTest : public Test {
     auto aead = getInitialCipher();
     auto headerCipher = getInitialHeaderCipher();
     IntervalSet<quic::PacketNum> acks;
-    auto start = folly::variant_match(
-        getFirstOutstandingPacket(
-            server->getNonConstConn(), PacketNumberSpace::Initial)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
-    auto end = folly::variant_match(
-        getLastOutstandingPacket(
-            server->getNonConstConn(), PacketNumberSpace::Initial)
-            ->packet.header,
-        [](auto& h) { return h.getPacketSequenceNum(); });
+    auto start = getFirstOutstandingPacket(
+                     server->getNonConstConn(), PacketNumberSpace::Initial)
+                     ->packet.header.getPacketSequenceNum();
+    auto end = getLastOutstandingPacket(
+                   server->getNonConstConn(), PacketNumberSpace::Initial)
+                   ->packet.header.getPacketSequenceNum();
     acks.insert(start, end);
     auto pn = clientNextInitialPacketNum++;
     auto ackPkt = createAckPacket(
@@ -879,16 +875,12 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   loopForWrites();
 
   IntervalSet<quic::PacketNum> acks;
-  auto start = folly::variant_match(
-      getFirstOutstandingPacket(
-          server->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
-  auto end = folly::variant_match(
-      getLastOutstandingPacket(
-          server->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+  auto start = getFirstOutstandingPacket(
+                   server->getNonConstConn(), PacketNumberSpace::AppData)
+                   ->packet.header.getPacketSequenceNum();
+  auto end = getLastOutstandingPacket(
+                 server->getNonConstConn(), PacketNumberSpace::AppData)
+                 ->packet.header.getPacketSequenceNum();
   acks.insert(start, end);
   deliverData(packetToBuf(createAckPacket(
       server->getNonConstConn(),
@@ -953,7 +945,9 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       *server->getConn().serverConnectionId,
       clientNextAppDataPacketNum++);
   RegularQuicPacketBuilder builder(
-      server->getConn().udpSendPacketLen, header, 0 /* largestAcked */);
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
   ASSERT_TRUE(builder.canBuildPacket());
 
   // Deliver a reset to non existent stream to trigger a local conn error
@@ -1071,30 +1065,25 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   // We need more than one packet for this test.
   ASSERT_FALSE(server->getConn().outstandingPackets.empty());
 
-  PacketNum packetNum1 = folly::variant_match(
+  PacketNum packetNum1 =
       getFirstOutstandingPacket(
           server->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+          ->packet.header.getPacketSequenceNum();
 
-  PacketNum lastPacketNum = folly::variant_match(
+  PacketNum lastPacketNum =
       getLastOutstandingPacket(
           server->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+          ->packet.header.getPacketSequenceNum();
 
   uint32_t buffersInPacket1 = 0;
   for (size_t i = 0; i < server->getNonConstConn().outstandingPackets.size();
        ++i) {
     auto& packet = server->getNonConstConn().outstandingPackets[i];
-    if (PacketNumberSpace::AppData !=
-        folly::variant_match(packet.packet.header, [](auto& h) {
-          return h.getPacketNumberSpace();
-        })) {
+    if (packet.packet.header.getPacketNumberSpace() !=
+        PacketNumberSpace::AppData) {
       continue;
     }
-    PacketNum currentPacket = folly::variant_match(
-        packet.packet.header, [](auto& h) { return h.getPacketSequenceNum(); });
+    PacketNum currentPacket = packet.packet.header.getPacketSequenceNum();
     ASSERT_FALSE(packet.packet.frames.empty());
     for (auto& quicFrame : packet.packet.frames) {
       auto frame = boost::get<WriteStreamFrame>(&quicFrame);
@@ -1159,11 +1148,10 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   loopForWrites();
   ASSERT_FALSE(server->getConn().outstandingPackets.empty());
 
-  PacketNum finPacketNum = folly::variant_match(
+  PacketNum finPacketNum =
       getFirstOutstandingPacket(
           server->getNonConstConn(), PacketNumberSpace::AppData)
-          ->packet.header,
-      [](auto& h) { return h.getPacketSequenceNum(); });
+          ->packet.header.getPacketSequenceNum();
 
   IntervalSet<PacketNum> acks3 = {{lastPacketNum, finPacketNum}};
   auto packet4 = createAckPacket(
@@ -1670,9 +1658,7 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   };
   auto op = findOutstandingPacket(server->getNonConstConn(), match);
   ASSERT_TRUE(op != nullptr);
-  PacketNum packetNum = folly::variant_match(
-      op->packet.header,
-      [](const auto& h) { return h.getPacketSequenceNum(); });
+  PacketNum packetNum = op->packet.header.getPacketSequenceNum();
   IntervalSet<PacketNum> acks = {{packetNum, packetNum}};
   auto packet1 = createAckPacket(
       server->getNonConstConn(),
@@ -2986,13 +2972,9 @@ TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
     auto parsedPacket = boost::get<QuicPacket>(&result);
     CHECK(parsedPacket);
     auto& regularPacket = boost::get<RegularQuicPacket>(*parsedPacket);
-    bool handshakePacket = folly::variant_match(
-        regularPacket.header,
-        [](const LongHeader& h) {
-          return h.getProtectionType() == ProtectionType::Initial ||
-              h.getProtectionType() == ProtectionType::Handshake;
-        },
-        [](const auto&) { return false; });
+    ProtectionType protectionType = regularPacket.header.getProtectionType();
+    bool handshakePacket = protectionType == ProtectionType::Initial ||
+        protectionType == ProtectionType::Handshake;
     EXPECT_GE(regularPacket.frames.size(), 1);
     bool hasCryptoFrame = false;
     bool hasNonCryptoStream = false;

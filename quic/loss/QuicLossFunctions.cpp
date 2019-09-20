@@ -126,9 +126,7 @@ void markPacketLoss(
           if (processed) {
             return;
           }
-          auto protectionType = folly::variant_match(
-              packet.header,
-              [](auto& header) { return header.getProtectionType(); });
+          auto protectionType = packet.header.getProtectionType();
           auto encryptionLevel =
               protectionTypeToEncryptionLevel(protectionType);
           auto cryptoStream =

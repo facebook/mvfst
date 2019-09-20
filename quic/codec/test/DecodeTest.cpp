@@ -361,7 +361,6 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
   ackBlocks.emplace_back(QuicInteger(10), QuicInteger(10));
 
-  auto header = makeHeader();
   auto result1 = createAckFrame(
       largestAcked,
       folly::none,
@@ -373,7 +372,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   EXPECT_THROW(
       decodeAckFrame(
           cursor1,
-          header,
+          makeHeader(),
           CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
@@ -383,7 +382,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   EXPECT_THROW(
       decodeAckFrame(
           cursor2,
-          header,
+          makeHeader(),
           CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
@@ -393,7 +392,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   EXPECT_THROW(
       decodeAckFrame(
           cursor3,
-          header,
+          makeHeader(),
           CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
@@ -403,7 +402,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   EXPECT_THROW(
       decodeAckFrame(
           cursor4,
-          header,
+          makeHeader(),
           CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 
@@ -413,7 +412,7 @@ TEST_F(DecodeTest, AckFrameMissingFields) {
   EXPECT_THROW(
       decodeAckFrame(
           cursor5,
-          header,
+          makeHeader(),
           CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST)),
       QuicTransportException);
 }
