@@ -270,7 +270,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void handleNetworkData(
       const folly::SocketAddress& client,
       Buf data,
-      const TimePoint& receiveTime) noexcept;
+      const TimePoint& receiveTime,
+      bool isForwardedData = false) noexcept;
 
   /**
    * Try handling the data as a health check.
@@ -285,7 +286,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void forwardNetworkData(
       const folly::SocketAddress& client,
       RoutingData&& routingData,
-      NetworkData&& networkData);
+      NetworkData&& networkData,
+      bool isForwardedData = false);
 
   /**
    * Return Infocallback ptr for various transport stats (such as packet

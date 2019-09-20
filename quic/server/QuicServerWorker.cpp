@@ -125,7 +125,8 @@ void QuicServerWorker::onDataAvailable(
 void QuicServerWorker::handleNetworkData(
     const folly::SocketAddress& client,
     Buf data,
-    const TimePoint& packetReceiveTime) noexcept {
+    const TimePoint& packetReceiveTime,
+    bool isForwardedData) noexcept {
   try {
     if (shutdown_) {
       VLOG(4) << "Packet received after shutdown, dropping";
@@ -167,7 +168,8 @@ void QuicServerWorker::handleNetworkData(
       return forwardNetworkData(
           client,
           std::move(routingData),
-          NetworkData(std::move(data), packetReceiveTime));
+          NetworkData(std::move(data), packetReceiveTime),
+          isForwardedData);
     }
 
     folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
@@ -239,7 +241,8 @@ void QuicServerWorker::handleNetworkData(
     return forwardNetworkData(
         client,
         std::move(routingData),
-        NetworkData(std::move(data), packetReceiveTime));
+        NetworkData(std::move(data), packetReceiveTime),
+        isForwardedData);
   } catch (const std::exception& ex) {
     // Drop the packet.
     QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
@@ -275,12 +278,13 @@ void QuicServerWorker::tryHandlingAsHealthCheck(
 void QuicServerWorker::forwardNetworkData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
-    NetworkData&& networkData) {
+    NetworkData&& networkData,
+    bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
   // mismatches: foward if pktForwarding is enabled else dropPacket
   if (!routingData.isUsingClientConnId &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
-    if (packetForwardingEnabled_) {
+    if (packetForwardingEnabled_ && !isForwardedData) {
       VLOG(3) << "Forwarding packet with unknown connId version from client="
               << client << " to another process";
       takeoverPktHandler_.forwardPacketToAnotherServer(
@@ -291,7 +295,9 @@ void QuicServerWorker::forwardNetworkData(
       VLOG(3) << "Dropping packet due to unknown connectionId version connId="
               << routingData.destinationConnId.hex();
       QUIC_STATS(
-          infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          infoCallback_,
+          onPacketDropped,
+          PacketDropReason::CONNECTION_NOT_FOUND);
     }
     return;
   }

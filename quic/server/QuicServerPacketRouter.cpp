@@ -219,7 +219,10 @@ void TakeoverPacketHandler::processForwardedPacket(
   data->trimStart(cursor - data.get());
   QUIC_STATS(worker_->getInfoCallback(), onForwardedPacketProcessed);
   worker_->handleNetworkData(
-      peerAddress, std::move(data), clientPacketReceiveTime);
+      peerAddress,
+      std::move(data),
+      clientPacketReceiveTime,
+      /* isForwardedData */ true);
 }
 
 void TakeoverPacketHandler::stop() {
