@@ -21,7 +21,8 @@ class QuicReusePortUDPSocketFactory : public QuicUDPSocketFactory {
       override {
     auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
     sock->setReusePort(true);
+    sock->setReuseAddr(false);
     return sock;
   }
 };
-}
+} // namespace quic
