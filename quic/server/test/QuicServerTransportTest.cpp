@@ -188,13 +188,12 @@ bool verifyFramePresent(
   for (auto& write : socketWrites) {
     auto packetQueue = bufToQueue(write->clone());
     auto result = readCodec.parsePacket(packetQueue, ackStates);
-    auto parsedPacket = boost::get<QuicPacket>(&result);
-    if (!parsedPacket) {
+    auto regularPacket = boost::get<RegularQuicPacket>(&result);
+    if (!regularPacket) {
       continue;
     }
-    auto& regularPacket = boost::get<RegularQuicPacket>(*parsedPacket);
     for (FOLLY_MAYBE_UNUSED auto& frame :
-         all_frames<FrameType>(regularPacket.frames)) {
+         all_frames<FrameType>(regularPacket->frames)) {
       return true;
     }
   }
@@ -561,8 +560,8 @@ class QuicServerTransportTest : public Test {
     AckStates ackStates;
     for (auto& serverWrite : serverWrites) {
       auto packetQueue = bufToQueue(serverWrite->clone());
-      auto parsedPacket = boost::get<RegularQuicPacket>(boost::get<QuicPacket>(
-          clientReadCodec->parsePacket(packetQueue, ackStates)));
+      auto parsedPacket = boost::get<RegularQuicPacket>(
+          clientReadCodec->parsePacket(packetQueue, ackStates));
       for (auto& frame : all_frames<ReadCryptoFrame>(parsedPacket.frames)) {
         cryptoBuf->prependChain(frame.data->clone());
       }
@@ -2969,9 +2968,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
   for (auto& write : serverWrites) {
     auto packetQueue = bufToQueue(write->clone());
     auto result = clientCodec->parsePacket(packetQueue, ackStates);
-    auto parsedPacket = boost::get<QuicPacket>(&result);
-    CHECK(parsedPacket);
-    auto& regularPacket = boost::get<RegularQuicPacket>(*parsedPacket);
+    auto& regularPacket = boost::get<RegularQuicPacket>(result);
     ProtectionType protectionType = regularPacket.header.getProtectionType();
     bool handshakePacket = protectionType == ProtectionType::Initial ||
         protectionType == ProtectionType::Handshake;

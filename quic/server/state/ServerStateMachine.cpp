@@ -529,7 +529,7 @@ void onServerReadDataFromOpen(
     size_t packetSize = dataSize - udpData.chainLength();
     bool parseSuccess = folly::variant_match(
         parsedPacket,
-        [&](QuicPacket&) { return true; },
+        [&](RegularQuicPacket&) { return true; },
         [&](folly::Optional<CipherUnavailable>& originalData) {
           if (!originalData.hasValue()) {
             VLOG(10) << "drop cipher unavailable, no data " << conn;
@@ -628,23 +628,9 @@ void onServerReadDataFromOpen(
           conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;
     }
-    auto& packet = boost::get<QuicPacket>(parsedPacket);
-    // Before we know what the protection level of the packet is, we should
-    // not throw an error.
-    auto regularOptional = boost::get<RegularQuicPacket>(&packet);
-    if (!regularOptional) {
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            packetSize,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::INVALID_PACKET));
-      }
-      QUIC_TRACE(packet_drop, conn, "not_regular");
-      VLOG(10) << "drop, not regular packet " << conn;
-      QUIC_STATS(
-          conn.infoCallback, onPacketDropped, PacketDropReason::INVALID_PACKET);
-      continue;
-    }
+    auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
+    DCHECK(regularOptional);
+
     auto protectionLevel = regularOptional->header.getProtectionType();
     auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
 
@@ -1047,7 +1033,7 @@ void onServerReadDataFromClosed(
   auto parsedPacket = conn.readCodec->parsePacket(udpData, conn.ackStates);
   bool parseSuccess = folly::variant_match(
       parsedPacket,
-      [&](QuicPacket&) { return true; },
+      [&](RegularQuicPacket&) { return true; },
       [&](folly::Optional<CipherUnavailable>&) {
         VLOG(10) << "drop cipher unavailable " << conn;
         if (conn.qLogger) {
@@ -1076,23 +1062,10 @@ void onServerReadDataFromClosed(
         conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
     return;
   }
-  auto& packet = boost::get<QuicPacket>(parsedPacket);
   // Before we know what the protection level of the packet is, we should
   // not throw an error.
-  auto regularOptional = boost::get<RegularQuicPacket>(&packet);
-  if (!regularOptional) {
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          packetSize,
-          QuicTransportStatsCallback::toString(
-              PacketDropReason::INVALID_PACKET));
-    }
-    QUIC_TRACE(packet_drop, conn, "not_regular");
-    VLOG(10) << "drop, not regular packet " << conn;
-    QUIC_STATS(
-        conn.infoCallback, onPacketDropped, PacketDropReason::INVALID_PACKET);
-    return;
-  }
+  auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
+  DCHECK(regularOptional);
   auto& regularPacket = *regularOptional;
 
   auto protectionLevel = regularPacket.header.getProtectionType();

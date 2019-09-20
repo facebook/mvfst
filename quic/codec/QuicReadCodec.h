@@ -37,8 +37,10 @@ struct CipherUnavailable {
         protectionType(protectionTypeIn) {}
 };
 
-using CodecResult = boost::
-    variant<QuicPacket, folly::Optional<CipherUnavailable>, StatelessReset>;
+using CodecResult = boost::variant<
+    RegularQuicPacket,
+    folly::Optional<CipherUnavailable>,
+    StatelessReset>;
 
 class QuicReadCodec {
  public:
@@ -51,11 +53,21 @@ class QuicReadCodec {
    * If it is able to parse the packet, then it returns
    * a valid QUIC packet. If it is not able to parse a packet it might return a
    * cipher unavailable structure. The caller can then retry when the cipher is
-   * available.
+   * available. A client should call tryParsingVersionNegotiation
+   * before the version is negotiated to detect VN.
    */
   virtual CodecResult parsePacket(
       folly::IOBufQueue& queue,
       const AckStates& ackStates);
+
+  /**
+   * Tries to parse the packet and returns whether or not
+   * it is a version negotiation packet.
+   * This returns folly::none if the packet is either not
+   * a VN packet or is invalid.
+   */
+  folly::Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(
+      folly::IOBufQueue& queue);
 
   const Aead* getOneRttReadCipher() const;
   const Aead* getZeroRttReadCipher() const;

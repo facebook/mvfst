@@ -20,7 +20,7 @@ using namespace testing;
 bool parseSuccess(const CodecResult& result) {
   return folly::variant_match(
       result,
-      [&](const QuicPacket&) { return true; },
+      [&](const RegularQuicPacket&) { return true; },
       [&](auto&) { return false; });
 }
 
@@ -92,14 +92,13 @@ TEST_F(QuicReadCodecTest, VersionNegotiationPacketTest) {
                                      static_cast<QuicVersion>(0xffff)});
   VersionNegotiationPacketBuilder builder(srcConnId, destConnId, versions);
   auto packet = std::move(builder).buildPacket();
-  AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(packet.second));
   auto versionNegotiationPacket =
-      boost::get<VersionNegotiationPacket>(boost::get<QuicPacket>(
-          makeUnencryptedCodec()->parsePacket(packetQueue, ackStates)));
-  EXPECT_EQ(versionNegotiationPacket.destinationConnectionId, destConnId);
-  EXPECT_EQ(versionNegotiationPacket.sourceConnectionId, srcConnId);
-  EXPECT_EQ(versionNegotiationPacket.versions, versions);
+      makeUnencryptedCodec()->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionNegotiationPacket.hasValue());
+  EXPECT_EQ(versionNegotiationPacket->destinationConnectionId, destConnId);
+  EXPECT_EQ(versionNegotiationPacket->sourceConnectionId, srcConnId);
+  EXPECT_EQ(versionNegotiationPacket->versions, versions);
 }
 
 TEST_F(QuicReadCodecTest, RetryPacketTest) {
@@ -118,8 +117,8 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   auto packetQueue = bufToQueue(std::move(packet));
 
   AckStates ackStates;
-  auto retryPacket = boost::get<RegularQuicPacket>(boost::get<QuicPacket>(
-      makeUnencryptedCodec()->parsePacket(packetQueue, ackStates)));
+  auto retryPacket = boost::get<RegularQuicPacket>(
+      makeUnencryptedCodec()->parsePacket(packetQueue, ackStates));
 
   auto headerOut = *retryPacket.header.asLong();
 
@@ -479,11 +478,8 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
   auto res = codec->parsePacket(packetQueue, ackStates);
 
-  EXPECT_NO_THROW(boost::get<QuicPacket>(res));
-  auto quicPacket = boost::get<QuicPacket>(res);
-
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(quicPacket));
-  auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
+  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(res));
+  auto regularQuicPacket = boost::get<RegularQuicPacket>(res);
 
   EXPECT_NE(regularQuicPacket.header.asLong(), nullptr);
   auto longPacketHeader = regularQuicPacket.header.asLong();

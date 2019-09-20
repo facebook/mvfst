@@ -22,6 +22,30 @@ namespace quic {
 
 QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
+folly::Optional<VersionNegotiationPacket>
+QuicReadCodec::tryParsingVersionNegotiation(folly::IOBufQueue& queue) {
+  folly::io::Cursor cursor(queue.front());
+  if (!cursor.canAdvance(sizeof(uint8_t))) {
+    return folly::none;
+  }
+  uint8_t initialByte = cursor.readBE<uint8_t>();
+  auto headerForm = getHeaderForm(initialByte);
+  if (headerForm != HeaderForm::Long) {
+    return folly::none;
+  }
+  auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
+  if (!longHeaderInvariant) {
+    // if it is an invalid packet, it's definitely not a VN packet, so ignore
+    // it.
+    return folly::none;
+  }
+  if (longHeaderInvariant->invariant.version !=
+      QuicVersion::VERSION_NEGOTIATION) {
+    return folly::none;
+  }
+  return decodeVersionNegotiation(*longHeaderInvariant, cursor);
+}
+
 CodecResult QuicReadCodec::parseLongHeaderPacket(
     folly::IOBufQueue& queue,
     const AckStates& ackStates) {
@@ -38,18 +62,11 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   }
   if (longHeaderInvariant->invariant.version ==
       QuicVersion::VERSION_NEGOTIATION) {
-    // Couldn't parse the packet as a regular packet, try parsing it as a
-    // version negotiation.
-
-    auto versionNegotiation =
-        decodeVersionNegotiation(*longHeaderInvariant, cursor);
-
-    if (versionNegotiation) {
-      return std::move(*versionNegotiation);
-    } else {
-      VLOG(4) << "Dropping version negotiation packet " << connIdToHex();
-    }
-    // Version negotiation is not allowed to be coalesced with any other packet.
+    // We shouldn't handle VN packets while parsing the long header.
+    // We assume here that they have been handled before calling this
+    // function.
+    // Since VN is not allowed to be coalesced with another packet
+    // type, we clear out the buffer to avoid anyone else parsing it.
     queue.clear();
     return CodecResult(folly::none);
   }

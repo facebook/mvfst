@@ -136,13 +136,12 @@ TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(packet.second));
-  auto quicPacket = boost::get<QuicPacket>(
-      codec->parsePacket(packetQueue, ackStates));
-  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
-  EXPECT_EQ(versionPacket.destinationConnectionId, destCid);
-  EXPECT_EQ(versionPacket.sourceConnectionId, srcCid);
-  EXPECT_EQ(versionPacket.versions.size(), versions.size());
-  EXPECT_EQ(versionPacket.versions, versions);
+  auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionPacket.hasValue());
+  EXPECT_EQ(versionPacket->destinationConnectionId, destCid);
+  EXPECT_EQ(versionPacket->sourceConnectionId, srcCid);
+  EXPECT_EQ(versionPacket->versions.size(), versions.size());
+  EXPECT_EQ(versionPacket->versions, versions);
 }
 
 TEST_F(DecodeTest, DifferentCIDLength) {
@@ -159,13 +158,12 @@ TEST_F(DecodeTest, DifferentCIDLength) {
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(packet.second));
-  auto quicPacket = boost::get<QuicPacket>(
-      codec->parsePacket(packetQueue, ackStates));
-  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
-  EXPECT_EQ(versionPacket.sourceConnectionId, sourceConnectionId);
-  EXPECT_EQ(versionPacket.destinationConnectionId, destinationConnectionId);
-  EXPECT_EQ(versionPacket.versions.size(), versions.size());
-  EXPECT_EQ(versionPacket.versions, versions);
+  auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionPacket.hasValue());
+  EXPECT_EQ(versionPacket->sourceConnectionId, sourceConnectionId);
+  EXPECT_EQ(versionPacket->destinationConnectionId, destinationConnectionId);
+  EXPECT_EQ(versionPacket->versions.size(), versions.size());
+  EXPECT_EQ(versionPacket->versions, versions);
 }
 
 TEST_F(DecodeTest, VersionNegotiationPacketBadPacketTest) {
@@ -184,13 +182,13 @@ TEST_F(DecodeTest, VersionNegotiationPacketBadPacketTest) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(buf));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_THROW(boost::get<QuicPacket>(packet), boost::bad_get);
+  EXPECT_THROW(boost::get<RegularQuicPacket>(packet), boost::bad_get);
 
   buf = folly::IOBuf::create(0);
   packetQueue = bufToQueue(std::move(buf));
   packet = codec->parsePacket(packetQueue, ackStates);
   // Packet with empty versions
-  EXPECT_THROW(boost::get<QuicPacket>(packet), boost::bad_get);
+  EXPECT_THROW(boost::get<RegularQuicPacket>(packet), boost::bad_get);
 }
 
 TEST_F(DecodeTest, ValidAckFrame) {

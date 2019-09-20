@@ -1497,11 +1497,7 @@ class QuicClientTransportTest : public Test {
   }
 
   RegularQuicPacket* parseRegularQuicPacket(CodecResult& codecResult) {
-    auto parsedPacket = boost::get<QuicPacket>(&codecResult);
-    if (!parsedPacket) {
-      return nullptr;
-    }
-    return boost::get<RegularQuicPacket>(parsedPacket);
+    return boost::get<RegularQuicPacket>(&codecResult);
   }
 
   void verifyShortPackets(IntervalSet<PacketNum>& sentPackets) {
@@ -2689,13 +2685,12 @@ bool verifyFramePresent(
   for (auto& write : socketWrites) {
     auto packetQueue = bufToQueue(write->clone());
     auto result = readCodec.parsePacket(packetQueue, ackStates);
-    auto parsedPacket = boost::get<QuicPacket>(&result);
-    if (!parsedPacket) {
+    auto regularPacket = boost::get<RegularQuicPacket>(&result);
+    if (!regularPacket) {
       continue;
     }
-    auto& regularPacket = boost::get<RegularQuicPacket>(*parsedPacket);
     for (FOLLY_MAYBE_UNUSED auto& frame :
-         all_frames<FrameType>(regularPacket.frames)) {
+         all_frames<FrameType>(regularPacket->frames)) {
       return true;
     }
   }
@@ -3662,9 +3657,8 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   auto codecResult =
       makeEncryptedCodec(true)->parsePacket(packetQueue, ackStates);
 
-  auto quicPacket = boost::get<QuicPacket>(&codecResult);
-  auto regularQuicPacket = boost::get<RegularQuicPacket>(quicPacket);
-  auto& header = *regularQuicPacket->header.asLong();
+  auto regularQuicPacket = boost::get<RegularQuicPacket>(codecResult);
+  auto& header = *regularQuicPacket.header.asLong();
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketReceived, qLogger);

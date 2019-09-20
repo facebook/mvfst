@@ -76,6 +76,23 @@ void QuicClientTransport::processUDPData(
     NetworkData&& networkData) {
   folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};
   udpData.append(std::move(networkData.data));
+
+  if (!conn_->version) {
+    // We only check for version negotiation packets before the version
+    // is negotiated.
+    auto versionNegotiation =
+        conn_->readCodec->tryParsingVersionNegotiation(udpData);
+    if (versionNegotiation) {
+      VLOG(4) << "Got version negotiation packet from peer=" << peer
+              << " versions=" << std::hex << versionNegotiation->versions << " "
+              << *this;
+
+      throw QuicInternalException(
+          "Received version negotiation packet",
+          LocalErrorCode::CONNECTION_ABANDONED);
+    }
+  }
+
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
        processedPackets++) {
@@ -99,7 +116,7 @@ void QuicClientTransport::processPacketData(
       conn_->readCodec->parsePacket(packetQueue, conn_->ackStates);
   bool parseSuccess = folly::variant_match(
       parsedPacket,
-      [&](QuicPacket&) { return true; },
+      [&](RegularQuicPacket&) { return true; },
       [&](StatelessReset& reset) {
         auto& token = clientConn_->statelessResetToken;
         if (reset.token != token) {
@@ -127,30 +144,8 @@ void QuicClientTransport::processPacketData(
         *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
   }
 
-  auto& packet = boost::get<QuicPacket>(parsedPacket);
-  auto versionNegotiation = boost::get<VersionNegotiationPacket>(&packet);
-  if (versionNegotiation) {
-    VLOG(4) << "Got version negotiation packet from peer=" << peer
-            << " versions=" << std::hex << versionNegotiation->versions << " "
-            << *this;
-
-    throw QuicInternalException(
-        "Received version negotiation packet",
-        LocalErrorCode::CONNECTION_ABANDONED);
-  }
-
-  // TODO: handle other packet types.
-  // Before we know what the protection level of the packet is, we should
-  // not throw an error.
-  auto regularOptional = boost::get<RegularQuicPacket>(&packet);
-  if (!regularOptional) {
-    VLOG(4) << "Dropping non-regular packet " << *conn_;
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(packetSize, kNonRegular);
-    }
-    QUIC_TRACE(packet_drop, *conn_, "non_regular");
-    return;
-  }
+  auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
+  DCHECK(regularOptional);
 
   LongHeader* longHeader = regularOptional->header.asLong();
   ShortHeader* shortHeader = regularOptional->header.asShort();

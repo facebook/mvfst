@@ -1515,14 +1515,11 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   auto serverData = reader->readOne().get();
 
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-  AckStates ackStates;
-
   auto packetQueue = bufToQueue(std::move(serverData));
-  auto rawPacket = codec->parsePacket(packetQueue, ackStates);
-  auto quicPacket = boost::get<QuicPacket>(rawPacket);
-  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
+  auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionPacket.hasValue());
 
-  EXPECT_EQ(versionPacket.destinationConnectionId, clientConnId);
+  EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
   EXPECT_TRUE(testingObserver->observerCalled());
 }
 
@@ -1560,18 +1557,16 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   auto serverData = reader->readOne().get();
 
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-  AckStates ackStates;
 
   auto packetQueue = bufToQueue(std::move(serverData));
-  auto rawPacket = codec->parsePacket(packetQueue, ackStates);
-  auto quicPacket = boost::get<QuicPacket>(rawPacket);
-  auto versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
+  auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionPacket.hasValue());
 
-  EXPECT_EQ(versionPacket.destinationConnectionId, clientConnId);
-  EXPECT_EQ(versionPacket.sourceConnectionId, serverConnId);
+  EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
+  EXPECT_EQ(versionPacket->sourceConnectionId, serverConnId);
   EXPECT_TRUE(testingObserver->observerCalled());
-  EXPECT_EQ(versionPacket.versions.size(), 1);
-  EXPECT_EQ(versionPacket.versions.at(0), QuicVersion::MVFST_INVALID);
+  EXPECT_EQ(versionPacket->versions.size(), 1);
+  EXPECT_EQ(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
 
   // Then reset the reject flag and check that we get a valid version instead
   server_->rejectNewConnections(false);
@@ -1584,15 +1579,14 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   serverData = reader->readOne().get();
 
   packetQueue = bufToQueue(std::move(serverData));
-  rawPacket = codec->parsePacket(packetQueue, ackStates);
-  quicPacket = boost::get<QuicPacket>(rawPacket);
-  versionPacket = boost::get<VersionNegotiationPacket>(quicPacket);
+  versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(versionPacket.hasValue());
 
-  EXPECT_EQ(versionPacket.destinationConnectionId, clientConnId);
-  EXPECT_EQ(versionPacket.sourceConnectionId, serverConnId);
+  EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
+  EXPECT_EQ(versionPacket->sourceConnectionId, serverConnId);
   EXPECT_TRUE(testingObserver->observerCalled());
-  EXPECT_GE(versionPacket.versions.size(), 1);
-  EXPECT_NE(versionPacket.versions.at(0), QuicVersion::MVFST_INVALID);
+  EXPECT_GE(versionPacket->versions.size(), 1);
+  EXPECT_NE(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
 }
 
 TEST_F(QuicServerTest, NetworkTestHealthCheck) {

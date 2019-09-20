@@ -846,8 +846,6 @@ struct RegularQuicWritePacket : public RegularPacket {
       : RegularPacket(std::move(headerIn)) {}
 };
 
-using QuicPacket = boost::variant<RegularQuicPacket, VersionNegotiationPacket>;
-
 using QuicWritePacket =
     boost::variant<RegularQuicWritePacket, VersionNegotiationPacket>;
 

@@ -100,18 +100,15 @@ TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   EXPECT_EQ(resultVersionNegotiationPacket.destinationConnectionId, destConnId);
 
   // Verify the returned buf from packet builder can be decoded by read codec:
-  AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(builtOut.second));
-  auto optionalDecodedPacket = makeCodec(destConnId, QuicNodeType::Client)
-                                   ->parsePacket(packetQueue, ackStates);
-  auto decodedPacket = boost::get<QuicPacket>(optionalDecodedPacket);
-  EXPECT_NO_THROW(boost::get<VersionNegotiationPacket>(decodedPacket));
   auto decodedVersionNegotiationPacket =
-      boost::get<VersionNegotiationPacket>(decodedPacket);
-  EXPECT_EQ(decodedVersionNegotiationPacket.sourceConnectionId, srcConnId);
+      makeCodec(destConnId, QuicNodeType::Client)
+          ->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(decodedVersionNegotiationPacket.hasValue());
+  EXPECT_EQ(decodedVersionNegotiationPacket->sourceConnectionId, srcConnId);
   EXPECT_EQ(
-      decodedVersionNegotiationPacket.destinationConnectionId, destConnId);
-  EXPECT_EQ(decodedVersionNegotiationPacket.versions, versions);
+      decodedVersionNegotiationPacket->destinationConnectionId, destConnId);
+  EXPECT_EQ(decodedVersionNegotiationPacket->versions, versions);
 }
 
 TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
@@ -135,10 +132,8 @@ TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
   auto optionalDecodedPacket =
       makeCodec(getTestConnectionId(1), QuicNodeType::Client)
           ->parsePacket(packetQueue, ackStates);
-  EXPECT_NO_THROW(boost::get<QuicPacket>(optionalDecodedPacket));
-  auto decodedPacket = boost::get<QuicPacket>(optionalDecodedPacket);
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(decodedPacket));
-  auto retryPacket = boost::get<RegularQuicPacket>(decodedPacket);
+  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(optionalDecodedPacket));
+  auto retryPacket = boost::get<RegularQuicPacket>(optionalDecodedPacket);
 
   auto& headerOut = *retryPacket.header.asLong();
 
@@ -178,19 +173,19 @@ TEST_F(QuicPacketBuilderTest, TooManyVersions) {
 
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(resultBuf));
-  auto decodedPacket = boost::get<VersionNegotiationPacket>(
-      boost::get<QuicPacket>(makeCodec(destConnId, QuicNodeType::Client)
-                                 ->parsePacket(packetQueue, ackStates)));
-  EXPECT_EQ(decodedPacket.destinationConnectionId, destConnId);
-  EXPECT_EQ(decodedPacket.sourceConnectionId, srcConnId);
-  EXPECT_EQ(decodedPacket.versions, expectedWrittenVersions);
+  auto decodedPacket = makeCodec(destConnId, QuicNodeType::Client)
+                           ->tryParsingVersionNegotiation(packetQueue);
+  ASSERT_TRUE(decodedPacket.hasValue());
+  EXPECT_EQ(decodedPacket->destinationConnectionId, destConnId);
+  EXPECT_EQ(decodedPacket->sourceConnectionId, srcConnId);
+  EXPECT_EQ(decodedPacket->versions, expectedWrittenVersions);
 }
 
 TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   ConnectionId clientConnId = getTestConnectionId(),
                serverConnId = ConnectionId({1, 3, 5, 7});
   PacketNum pktNum = 444;
-  QuicVersion ver = QuicVersion::QUIC_DRAFT;
+  QuicVersion ver = QuicVersion::MVFST;
   // create a server cleartext write codec.
   QuicFizzFactory fizzFactory;
   FizzCryptoFactory cryptoFactory(&fizzFactory);
@@ -218,12 +213,11 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
 
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(resultBuf));
-  auto optionalDecodedPacket =
-      makeCodec(serverConnId, QuicNodeType::Server, nullptr, nullptr, ver)
-          ->parsePacket(packetQueue, ackStates);
-  auto decodedPacket = boost::get<QuicPacket>(optionalDecodedPacket);
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(decodedPacket));
-  auto decodedRegularPacket = boost::get<RegularQuicPacket>(decodedPacket);
+  auto optionalDecodedPacket = makeCodec(serverConnId, QuicNodeType::Server)
+                                   ->parsePacket(packetQueue, ackStates);
+  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(optionalDecodedPacket));
+  auto decodedRegularPacket =
+      boost::get<RegularQuicPacket>(optionalDecodedPacket);
   auto& decodedHeader = *decodedRegularPacket.header.asLong();
   EXPECT_EQ(LongHeader::Types::Initial, decodedHeader.getHeaderType());
   EXPECT_EQ(clientConnId, decodedHeader.getDestinationConnId());
@@ -267,8 +261,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
       makeCodec(
           connId, QuicNodeType::Client, nullptr, quic::test::createNoOpAead())
           ->parsePacket(packetQueue, ackStates);
-  auto decodedPacket = boost::get<QuicPacket>(parsedPacket);
-  auto decodedRegularPacket = boost::get<RegularQuicPacket>(decodedPacket);
+  auto decodedRegularPacket = boost::get<RegularQuicPacket>(parsedPacket);
   auto& decodedHeader = *decodedRegularPacket.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseZero, decodedHeader.getProtectionType());
   EXPECT_EQ(connId, decodedHeader.getConnectionId());
@@ -297,7 +290,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
       makeCodec(
           connId, QuicNodeType::Client, nullptr, quic::test::createNoOpAead())
           ->parsePacket(packetQueue, ackStates);
-  auto decodedPacket = boost::get<QuicPacket>(&parsedPacket);
+  auto decodedPacket = boost::get<RegularQuicPacket>(&parsedPacket);
   EXPECT_EQ(decodedPacket, nullptr);
 }
 
