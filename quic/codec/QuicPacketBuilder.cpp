@@ -239,22 +239,23 @@ void RegularQuicPacketBuilder::encodeShortHeader(
     remainingBytes_ = 0;
     return;
   }
-  folly::io::QueueAppender appender(&header_, kAppenderGrowthSize);
   uint8_t initialByte =
       ShortHeader::kFixedBitMask | (packetNumberEncoding_->length - 1);
   initialByte &= ~ShortHeader::kReservedBitsMask;
   if (shortHeader.getProtectionType() == ProtectionType::KeyPhaseOne) {
     initialByte |= ShortHeader::kKeyPhaseMask;
   }
-  appender.writeBE<uint8_t>(initialByte);
+  headerAppender_.writeBE<uint8_t>(initialByte);
   --remainingBytes_;
 
-  appender.push(
+  headerAppender_.push(
       shortHeader.getConnectionId().data(),
       shortHeader.getConnectionId().size());
   remainingBytes_ -= shortHeader.getConnectionId().size();
   appendBytes(
-      appender, packetNumberEncoding_->result, packetNumberEncoding_->length);
+      headerAppender_,
+      packetNumberEncoding_->result,
+      packetNumberEncoding_->length);
 }
 
 void RegularQuicPacketBuilder::push(const uint8_t* data, size_t len) {
