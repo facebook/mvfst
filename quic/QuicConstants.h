@@ -314,8 +314,6 @@ constexpr uint8_t kRxPacketsPendingBeforeAckThresh = 10;
 constexpr double kAckTimerFactor = 0.25;
 // max ack timeout: 25ms
 constexpr std::chrono::microseconds kMaxAckTimeout = 25000us;
-// min ack timeout: 10ms
-constexpr std::chrono::microseconds kMinAckTimeout = 10000us;
 
 constexpr uint64_t kAckPurgingThresh = 10;
 

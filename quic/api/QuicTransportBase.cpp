@@ -2076,14 +2076,17 @@ void QuicTransportBase::scheduleAckTimeout() {
     if (!ackTimeout_.isScheduled()) {
       auto factoredRtt = std::chrono::duration_cast<std::chrono::microseconds>(
           kAckTimerFactor * conn_->lossState.srtt);
-      auto timeout =
-          timeMax(kMinAckTimeout, timeMin(kMaxAckTimeout, factoredRtt));
+      auto& wheelTimer = getEventBase()->timer();
+      auto timeout = timeMax(
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              wheelTimer.getTickInterval()),
+          timeMin(kMaxAckTimeout, factoredRtt));
       auto timeoutMs =
           std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                << " factoredRtt=" << factoredRtt.count() << "us"
                << " " << *this;
-      getEventBase()->timer().scheduleTimeout(&ackTimeout_, timeoutMs);
+      wheelTimer.scheduleTimeout(&ackTimeout_, timeoutMs);
     }
   } else {
     if (ackTimeout_.isScheduled()) {
