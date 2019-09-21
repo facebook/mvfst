@@ -208,9 +208,14 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   TPerfClient(
       const std::string& host,
       uint16_t port,
+      std::chrono::milliseconds transportTimerResolution,
       int32_t duration,
       uint64_t window)
-      : host_(host), port_(port), duration_(duration), window_(window) {}
+      : host_(host),
+        port_(port),
+        eventBase_(transportTimerResolution),
+        duration_(duration),
+        window_(window) {}
 
   void timeoutExpired() noexcept override {
     quicClient_->closeNow(folly::none);
@@ -338,6 +343,10 @@ DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 64 * 1024, "Flow control window size");
 DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/none");
 DEFINE_bool(gso, false, "Enable GSO writes to the socket");
+DEFINE_uint32(
+    client_transport_timer_resolution_ms,
+    1,
+    "Timer resolution for Ack and Loss tiemout in client transport");
 
 using namespace quic::tperf;
 
@@ -378,7 +387,12 @@ int main(int argc, char* argv[]) {
         FLAGS_gso);
     server.start();
   } else if (FLAGS_mode == "client") {
-    TPerfClient client(FLAGS_host, FLAGS_port, FLAGS_duration, FLAGS_window);
+    TPerfClient client(
+        FLAGS_host,
+        FLAGS_port,
+        std::chrono::milliseconds(FLAGS_client_transport_timer_resolution_ms),
+        FLAGS_duration,
+        FLAGS_window);
     client.start();
   }
   return 0;
