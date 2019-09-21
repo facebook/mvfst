@@ -658,6 +658,11 @@ struct LongHeader {
       const std::string& token = std::string(),
       folly::Optional<ConnectionId> originalDstConnId = folly::none);
 
+  LongHeader(const LongHeader& other) = default;
+  LongHeader(LongHeader&& other) = default;
+  LongHeader& operator=(const LongHeader& other) = default;
+  LongHeader& operator=(LongHeader&& other) = default;
+
   Types getHeaderType() const noexcept;
   const ConnectionId& getSourceConnId() const;
   const ConnectionId& getDestinationConnId() const;
