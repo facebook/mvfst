@@ -27,7 +27,8 @@ class QuicClientTransport
  public:
   QuicClientTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket);
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      size_t connectionIdSize = kDefaultConnectionIdSize);
 
   ~QuicClientTransport() override;
 
@@ -44,8 +45,10 @@ class QuicClientTransport
   template <class TransportType = QuicClientTransport>
   static std::shared_ptr<TransportType> newClient(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> sock) {
-    auto client = std::make_shared<TransportType>(evb, std::move(sock));
+      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      size_t connectionIdSize = kDefaultConnectionIdSize) {
+    auto client =
+        std::make_shared<TransportType>(evb, std::move(sock), connectionIdSize);
     client->setSelfOwning();
     return client;
   }

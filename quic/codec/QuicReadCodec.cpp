@@ -72,8 +72,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   }
   auto type = parseLongHeaderType(initialByte);
 
-  auto parsedLongHeader =
-      parseLongHeaderVariants(type, std::move(*longHeaderInvariant), cursor);
+  auto parsedLongHeader = parseLongHeaderVariants(
+      type, std::move(*longHeaderInvariant), cursor, nodeType_);
   if (!parsedLongHeader) {
     VLOG(4) << "Dropping due to failed to parse header " << connIdToHex();
     // We've failed to parse the long header, so we have no idea where this
@@ -234,7 +234,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
 
 CodecResult QuicReadCodec::parsePacket(
     folly::IOBufQueue& queue,
-    const AckStates& ackStates) {
+    const AckStates& ackStates,
+    size_t dstConnIdSize) {
   if (queue.empty()) {
     return CodecResult(folly::none);
   }
@@ -260,7 +261,7 @@ CodecResult QuicReadCodec::parsePacket(
   }
 
   // TODO: allow other connid lengths from the state.
-  size_t packetNumberOffset = 1 + kDefaultConnectionIdSize;
+  size_t packetNumberOffset = 1 + dstConnIdSize;
   PacketNum expectedNextPacketNum =
       ackStates.appDataAckState.largestReceivedPacketNum
       ? (1 + *ackStates.appDataAckState.largestReceivedPacketNum)
@@ -286,7 +287,8 @@ CodecResult QuicReadCodec::parsePacket(
       sampleByteRange, initialByteRange, packetNumberByteRange);
   std::pair<PacketNum, size_t> packetNum = parsePacketNumber(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
-  auto shortHeader = parseShortHeader(initialByteRange.data()[0], cursor);
+  auto shortHeader =
+      parseShortHeader(initialByteRange.data()[0], cursor, dstConnIdSize);
   if (!shortHeader) {
     VLOG(10) << "Dropping packet, cannot parse " << connIdToHex();
     return folly::none;

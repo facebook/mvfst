@@ -58,7 +58,8 @@ class QuicReadCodec {
    */
   virtual CodecResult parsePacket(
       folly::IOBufQueue& queue,
-      const AckStates& ackStates);
+      const AckStates& ackStates,
+      size_t dstConnIdSize = kDefaultConnectionIdSize);
 
   /**
    * Tries to parse the packet and returns whether or not

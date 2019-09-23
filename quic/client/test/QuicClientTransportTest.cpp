@@ -58,12 +58,21 @@ class DestructionCallback
   bool destroyed_{false};
 };
 
+struct TestingParams {
+  QuicVersion version;
+  uint8_t dstConnIdSize;
+
+  explicit TestingParams(QuicVersion versionIn, uint8_t dstConnIdSizeIn = 8)
+      : version(versionIn), dstConnIdSize(dstConnIdSizeIn) {}
+};
+
 class TestingQuicClientTransport : public QuicClientTransport {
  public:
   TestingQuicClientTransport(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket)
-      : QuicClientTransport(evb, std::move(socket)) {}
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      size_t connIdSize = kDefaultConnectionIdSize)
+      : QuicClientTransport(evb, std::move(socket), connIdSize) {}
 
   ~TestingQuicClientTransport() override {
     if (destructionCallback_) {
@@ -158,7 +167,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
 
 using StreamPair = std::pair<std::unique_ptr<folly::IOBuf>, StreamId>;
 
-class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
+class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
  public:
   void SetUp() override {
     folly::ssl::init();
@@ -177,7 +186,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
   }
 
   QuicVersion getVersion() {
-    return GetParam();
+    return GetParam().version;
   }
 
   std::shared_ptr<TestingQuicClientTransport> createClient() {
@@ -188,7 +197,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<QuicVersion> {
 
     auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
     client = std::make_shared<TestingQuicClientTransport>(
-        &eventbase_, std::move(sock));
+        &eventbase_, std::move(sock), GetParam().dstConnIdSize);
     client->setSupportedVersions({getVersion()});
     client->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
@@ -1083,9 +1092,10 @@ INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,
     ::testing::Values(
-        QuicVersion::MVFST,
-        QuicVersion::MVFST_OLD,
-        QuicVersion::QUIC_DRAFT));
+        TestingParams(QuicVersion::MVFST),
+        TestingParams(QuicVersion::MVFST_OLD),
+        TestingParams(QuicVersion::QUIC_DRAFT),
+        TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
 // Simulates a simple 1rtt handshake without needing to get any handshake bytes
 // from the server.
@@ -2450,7 +2460,7 @@ TEST_F(
   fatalWriteErrorOnBothAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-class QuicClientTransportAfterStartTest : public QuicClientTransportTest {
+class QuicClientTransportAfterStartTestBase : public QuicClientTransportTest {
  public:
   void SetUp() override {
     client->addNewPeerAddress(serverAddr);
@@ -2477,8 +2487,17 @@ class QuicClientTransportAfterStartTest : public QuicClientTransportTest {
   std::string hostname_{"TestHost"};
 };
 
+class QuicClientTransportAfterStartTest
+    : public QuicClientTransportAfterStartTestBase,
+      public testing::WithParamInterface<uint8_t> {};
+
+INSTANTIATE_TEST_CASE_P(
+    QuicClientZeroLenConnIds,
+    QuicClientTransportAfterStartTest,
+    ::Values(0, 8));
+
 class QuicClientTransportVersionAndRetryTest
-    : public QuicClientTransportAfterStartTest {
+    : public QuicClientTransportAfterStartTestBase {
  public:
   ~QuicClientTransportVersionAndRetryTest() override = default;
 
@@ -2506,7 +2525,7 @@ class QuicClientTransportVersionAndRetryTest
 };
 
 class QuicClientVersionParamInvalidTest
-    : public QuicClientTransportAfterStartTest {
+    : public QuicClientTransportAfterStartTestBase {
  public:
   ~QuicClientVersionParamInvalidTest() override = default;
 
@@ -2550,7 +2569,13 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   client->close(folly::none);
 }
 
-TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
+TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
+  uint8_t connIdSize = GetParam();
+
+  client->getNonConstConn().clientConnectionId =
+      ConnectionId(std::vector<uint8_t>(connIdSize, 1));
+  setConnectionIds();
+
   StreamId streamId = client->createBidirectionalStream().value();
   auto qLogger = std::make_shared<FileQLogger>();
   client->getNonConstConn().qLogger = qLogger;
@@ -2608,7 +2633,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
-  EXPECT_EQ(event->packetSize, 81);
+  EXPECT_EQ(event->packetSize, 65 + (2 * connIdSize));
   EXPECT_EQ(event->dropReason, kParse);
 }
 
@@ -2820,11 +2845,11 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
 }
 
 class QuicClientTransportAfterStartTestClose
-    : public QuicClientTransportAfterStartTest,
+    : public QuicClientTransportAfterStartTestBase,
       public testing::WithParamInterface<bool> {};
 
 INSTANTIATE_TEST_CASE_P(
-    QuicClientTransportAfterStartTest,
+    QuicClientTransportAfterStartTestCloseWithError,
     QuicClientTransportAfterStartTestClose,
     Values(true, false));
 
@@ -4278,12 +4303,12 @@ TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
 }
 
 class QuicClientTransportPskCacheTest
-    : public QuicClientTransportAfterStartTest {
+    : public QuicClientTransportAfterStartTestBase {
  public:
   void SetUp() override {
     mockPskCache_ = std::make_shared<MockQuicPskCache>();
     client->setPskCache(mockPskCache_);
-    QuicClientTransportAfterStartTest::SetUp();
+    QuicClientTransportAfterStartTestBase::SetUp();
   }
 
  protected:
@@ -4346,7 +4371,7 @@ TEST_F(QuicClientTransportPskCacheTest, TestTwoOnNewCachedPsk) {
   mockClientHandshake->triggerOnNewCachedPsk();
 }
 
-class QuicZeroRttClientTest : public QuicClientTransportAfterStartTest {
+class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
  public:
   ~QuicZeroRttClientTest() override = default;
 
@@ -4760,7 +4785,8 @@ TEST_F(
       verifyLongHeader(*socketWrites.at(3), LongHeader::Types::ZeroRtt));
 }
 
-class QuicProcessDataTest : public QuicClientTransportAfterStartTest {
+class QuicProcessDataTest : public QuicClientTransportAfterStartTestBase,
+                            public testing::WithParamInterface<uint8_t> {
  public:
   ~QuicProcessDataTest() override = default;
 
@@ -4772,6 +4798,11 @@ class QuicProcessDataTest : public QuicClientTransportAfterStartTest {
     setConnectionIds();
   }
 };
+
+INSTANTIATE_TEST_CASE_P(
+    QuicClientZeroLenConnIds,
+    QuicProcessDataTest,
+    ::Values(0, 8));
 
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   auto qLogger = std::make_shared<FileQLogger>();
@@ -4807,7 +4838,12 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   EXPECT_EQ(event->dropReason, kParse);
 }
 
-TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
+TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
+  uint8_t connIdSize = GetParam();
+  client->getNonConstConn().clientConnectionId =
+      ConnectionId(std::vector<uint8_t>(connIdSize, 1));
+  setConnectionIds();
+
   auto qLogger = std::make_shared<FileQLogger>();
   client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
@@ -4825,6 +4861,7 @@ TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
       *serverHello,
       aead,
       0 /* largestAcked */);
+
   deliverData(serverAddr, packet.header->coalesce());
   EXPECT_EQ(
       getAckState(client->getConn(), PacketNumberSpace::Handshake)
@@ -4836,7 +4873,7 @@ TEST_F(QuicProcessDataTest, ProcessDataHeaderOnly) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogDatagramReceivedEvent*>(tmp.get());
-  EXPECT_EQ(event->dataLen, 26);
+  EXPECT_EQ(event->dataLen, 18 + connIdSize);
 }
 
 TEST(AsyncUDPSocketTest, CloseMultipleTimes) {

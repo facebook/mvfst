@@ -20,6 +20,11 @@ namespace quic {
 
 constexpr size_t kMinConnectionIdSize = 4;
 constexpr size_t kMaxConnectionIdSize = 20;
+
+// Minimum required length (in bytes) for the destination connection-id
+// on inbound initial packets.
+constexpr size_t kMinInitialDestinationConnIdLength = 8;
+
 // set conn id version at the first 4 bits
 constexpr uint8_t kShortVersionId = 0x1;
 

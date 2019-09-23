@@ -27,16 +27,28 @@ namespace quic {
 
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket)
+    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    size_t connectionIdSize)
     : QuicTransportBase(evb, std::move(socket)),
       happyEyeballsConnAttemptDelayTimeout_(this) {
+  // TODO(T53612743) Only enforce that the initial destination connection id
+  // is at least kMinInitialDestinationConnIdLength.
+  // All subsequent connection ids should be in between
+  // [kMinConnectionIdSize, kMaxConnectionIdSize]
+  DCHECK(
+      connectionIdSize == 0 ||
+      (connectionIdSize >= kMinInitialDestinationConnIdLength &&
+       connectionIdSize <= kMaxConnectionIdSize));
   auto tempConn = std::make_unique<QuicClientConnectionState>();
   clientConn_ = tempConn.get();
   conn_ = std::move(tempConn);
-  std::vector<uint8_t> connIdData(kDefaultConnectionIdSize);
+  std::vector<uint8_t> connIdData(
+      std::max(kMinInitialDestinationConnIdLength, connectionIdSize));
   folly::Random::secureRandom(connIdData.data(), connIdData.size());
-  // Set them to be the same, this shouldn't really matter.
-  conn_->clientConnectionId = ConnectionId(connIdData);
+
+  conn_->clientConnectionId = ConnectionId(
+      connectionIdSize == 0 ? std::vector<uint8_t>(0) : connIdData);
+
   // Change destination connection to not be same as src connid to suss
   // out bugs.
   connIdData[0] ^= 0x1;
@@ -112,8 +124,8 @@ void QuicClientTransport::processPacketData(
   if (packetSize == 0) {
     return;
   }
-  auto parsedPacket =
-      conn_->readCodec->parsePacket(packetQueue, conn_->ackStates);
+  auto parsedPacket = conn_->readCodec->parsePacket(
+      packetQueue, conn_->ackStates, conn_->clientConnectionId->size());
   bool parseSuccess = folly::variant_match(
       parsedPacket,
       [&](RegularQuicPacket&) { return true; },
@@ -244,7 +256,8 @@ void QuicClientTransport::processPacketData(
   // Error out if the connection id on the packet is not the one that is
   // expected.
   bool connidMatched = true;
-  if (longHeader && longHeader->getDestinationConnId() != *conn_->clientConnectionId) {
+  if (longHeader &&
+      longHeader->getDestinationConnId() != *conn_->clientConnectionId) {
     connidMatched = false;
   } else if (
       shortHeader &&

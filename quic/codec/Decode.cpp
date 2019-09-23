@@ -13,8 +13,6 @@
 #include <quic/codec/QuicInteger.h>
 
 namespace {
-// Minimum required length (in bytes) for the destination connection-id
-constexpr size_t kMinInitialDestinationConnIdLength = 8;
 
 template <class T>
 inline std::string toHex(
@@ -960,7 +958,8 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> parseLongHeader(
 folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     LongHeader::Types type,
     ParsedLongHeaderInvariant parsedLongHeaderInvariant,
-    folly::io::Cursor& cursor) {
+    folly::io::Cursor& cursor,
+    QuicNodeType nodeType) {
   if (type == LongHeader::Types::Retry) {
     if (!cursor.canAdvance(sizeof(uint8_t))) {
       VLOG(5) << "Not enough bytes for ODCID length";
@@ -990,12 +989,16 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
         PacketLength(0, 0));
   }
 
-  if (type == LongHeader::Types::Initial &&
+  // TODO Checking kMinInitialDestinationConnIdLength isn't necessary
+  // if this packet is in response to a retry.
+  if (type == LongHeader::Types::Initial && nodeType == QuicNodeType::Server &&
       parsedLongHeaderInvariant.invariant.dstConnId.size() <
           kMinInitialDestinationConnIdLength) {
-    VLOG(5) << "Dest Conn-Id length in initial packet must be >= 8 bytes";
+    VLOG(5)
+        << "Dest Conn-Id length in client initial packet must be >= 8 bytes.";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
+
   Buf token;
   if (type == LongHeader::Types::Initial) {
     auto tokenLen = decodeQuicInteger(cursor);
@@ -1041,24 +1044,28 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
 }
 
 folly::Expected<ShortHeaderInvariant, TransportErrorCode>
-parseShortHeaderInvariants(uint8_t initialByte, folly::io::Cursor& cursor) {
+parseShortHeaderInvariants(
+    uint8_t initialByte,
+    folly::io::Cursor& cursor,
+    size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   // TODO(t39154014, yangchi): read the length from the connection state in
   // draft-17
-  if (!cursor.canAdvance(kDefaultConnectionIdSize)) {
+  if (!cursor.canAdvance(dstConnIdSize)) {
     VLOG(5) << "Not enough input bytes for ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
-  ConnectionId connId(cursor, kDefaultConnectionIdSize);
+  ConnectionId connId(cursor, dstConnIdSize);
   return ShortHeaderInvariant(std::move(connId));
 }
 
 folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     uint8_t initialByte,
-    folly::io::Cursor& cursor) {
+    folly::io::Cursor& cursor,
+    size_t dstConnIdSize) {
   if (getHeaderForm(initialByte) != HeaderForm::Short) {
     VLOG(5) << "Bad header form bit";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1073,7 +1080,8 @@ folly::Expected<ShortHeader, TransportErrorCode> parseShortHeader(
     // Specs asks this to be PROTOCOL_VIOLATION
     return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
   }
-  auto invariant = parseShortHeaderInvariants(initialByte, cursor);
+  auto invariant =
+      parseShortHeaderInvariants(initialByte, cursor, dstConnIdSize);
   if (!invariant) {
     VLOG(5) << "Error parsing short header invariant";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
