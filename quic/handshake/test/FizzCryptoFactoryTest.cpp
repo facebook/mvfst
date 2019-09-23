@@ -12,7 +12,6 @@
 #include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzCryptoFactory.h>
-#include <quic/handshake/QuicFizzFactory.h>
 #include <quic/handshake/test/Mocks.h>
 
 using namespace testing;
@@ -20,9 +19,9 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-class QuicTestFizzFactory : public QuicFizzFactory {
+class FizzCryptoTestFactory : public FizzCryptoFactory {
  public:
-  ~QuicTestFizzFactory() override = default;
+  ~FizzCryptoTestFactory() override = default;
 
   std::unique_ptr<fizz::Aead> makeAead(fizz::CipherSuite) const override {
     return std::move(aead_);
@@ -32,6 +31,7 @@ class QuicTestFizzFactory : public QuicFizzFactory {
     aead_ = std::move(aead);
   }
 
+  using FizzCryptoFactory::makePacketNumberCipher;
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       fizz::CipherSuite) const override {
     return std::move(packetNumberCipher_);
@@ -84,9 +84,8 @@ TEST_F(FizzCryptoFactoryTest, TestDraft17ClearTextCipher) {
     destinationConnidVector.push_back(connid.data()[i]);
   }
   ConnectionId destinationConnid(destinationConnidVector);
-  QuicTestFizzFactory fizzFactory;
-  fizzFactory.setMockAead(createMockAead());
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoTestFactory cryptoFactory;
+  cryptoFactory.setMockAead(createMockAead());
   auto aead = cryptoFactory.getClientInitialCipher(
       destinationConnid, QuicVersion::MVFST_OLD);
 
@@ -107,9 +106,8 @@ TEST_F(FizzCryptoFactoryTest, TestDraft23ClearTextCipher) {
     destinationConnidVector.push_back(connid.data()[i]);
   }
   ConnectionId destinationConnid(destinationConnidVector);
-  QuicTestFizzFactory fizzFactory;
-  fizzFactory.setMockAead(createMockAead());
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoTestFactory cryptoFactory;
+  cryptoFactory.setMockAead(createMockAead());
   auto aead = cryptoFactory.getClientInitialCipher(
       destinationConnid, QuicVersion::QUIC_DRAFT);
 
@@ -122,9 +120,8 @@ TEST_F(FizzCryptoFactoryTest, TestDraft23ClearTextCipher) {
 }
 
 TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
-  QuicTestFizzFactory fizzFactory;
-  fizzFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoTestFactory cryptoFactory;
+  cryptoFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
   auto clientKey = std::vector<uint8_t>(
       {0x0c, 0x74, 0xbb, 0x95, 0xa1, 0x04, 0x8e, 0x52, 0xef, 0x3b, 0x72,
        0xe1, 0x28, 0x89, 0x35, 0x1c, 0xd7, 0x3a, 0x55, 0x0f, 0xb6, 0x2c,
@@ -136,7 +133,7 @@ TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
   EXPECT_EQ(secretHex, expectedHex);
 
   // reset the cipher
-  fizzFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
+  cryptoFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
   auto serverKey = std::vector<uint8_t>(
       {0x4c, 0x9e, 0xdf, 0x24, 0xb0, 0xe5, 0xe5, 0x06, 0xdd, 0x3b, 0xfa,
        0x4e, 0x0a, 0x03, 0x11, 0xe8, 0xc4, 0x1f, 0x35, 0x42, 0x73, 0xd8,

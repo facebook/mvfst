@@ -18,6 +18,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
@@ -282,6 +283,7 @@ class ServerHandshake : public Handshake {
 
   Phase phase_{Phase::Handshake};
 
+  std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ServerTransportParametersExtension> transportParams_;
 }; // namespace quic
 } // namespace quic

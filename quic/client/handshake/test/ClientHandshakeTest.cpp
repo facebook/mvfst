@@ -27,7 +27,7 @@
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/QuicFizzFactory.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
 
@@ -387,7 +387,7 @@ class ClientHandshakeHRRTest : public ClientHandshakeTest {
     clientCtx->setDefaultShares({fizz::NamedGroup::secp256r1});
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = std::make_shared<fizz::server::FizzServerContext>();
-    serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
+    serverCtx->setFactory(std::make_shared<FizzCryptoFactory>());
     serverCtx->setSupportedGroups({fizz::NamedGroup::x25519});
     serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupCtxWithTestCert(*serverCtx);

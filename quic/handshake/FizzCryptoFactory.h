@@ -10,13 +10,13 @@
 
 #include <quic/handshake/CryptoFactory.h>
 
-#include <quic/handshake/QuicFizzFactory.h>
+#include <fizz/protocol/OpenSSLFactory.h>
 
 namespace quic {
 
-class FizzCryptoFactory : public CryptoFactory {
+class FizzCryptoFactory : public CryptoFactory, public fizz::OpenSSLFactory {
  public:
-  explicit FizzCryptoFactory(QuicFizzFactory* factory) : factory_(factory) {}
+  FizzCryptoFactory() {}
 
   Buf makeInitialTrafficSecret(
       folly::StringPiece label,
@@ -31,8 +31,21 @@ class FizzCryptoFactory : public CryptoFactory {
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       folly::ByteRange baseSecret) const override;
 
- private:
-  QuicFizzFactory* factory_{nullptr};
+  std::unique_ptr<fizz::PlaintextReadRecordLayer> makePlaintextReadRecordLayer()
+      const override;
+
+  std::unique_ptr<fizz::PlaintextWriteRecordLayer>
+  makePlaintextWriteRecordLayer() const override;
+
+  std::unique_ptr<fizz::EncryptedReadRecordLayer> makeEncryptedReadRecordLayer(
+      fizz::EncryptionLevel encryptionLevel) const override;
+
+  std::unique_ptr<fizz::EncryptedWriteRecordLayer>
+  makeEncryptedWriteRecordLayer(
+      fizz::EncryptionLevel encryptionLevel) const override;
+
+  virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      fizz::CipherSuite cipher) const;
 };
 
 } // namespace quic

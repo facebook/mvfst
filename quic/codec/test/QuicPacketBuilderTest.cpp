@@ -57,8 +57,7 @@ std::unique_ptr<QuicReadCodec> makeCodec(
     std::unique_ptr<Aead> zeroRttCipher = nullptr,
     std::unique_ptr<Aead> oneRttCipher = nullptr,
     QuicVersion version = QuicVersion::MVFST) {
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   auto codec = std::make_unique<QuicReadCodec>(nodeType);
   if (nodeType != QuicNodeType::Client) {
     codec->setZeroRttReadCipher(std::move(zeroRttCipher));
@@ -187,8 +186,7 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   PacketNum pktNum = 444;
   QuicVersion ver = QuicVersion::MVFST;
   // create a server cleartext write codec.
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   auto cleartextAead = cryptoFactory.getClientInitialCipher(serverConnId, ver);
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(serverConnId, ver);

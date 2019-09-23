@@ -569,12 +569,10 @@ void onServerReadDataFromOpen(
             conn.transportSettings.partialReliabilityEnabled,
             token));
     conn.transportParametersEncoded = true;
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    CryptoFactory& cryptoFactory = *conn.serverHandshakeLayer->cryptoFactory_;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
-    conn.readCodec->setInitialReadCipher(
-        FizzCryptoFactory(&fizzFactory)
-            .getClientInitialCipher(initialDestinationConnectionId, version));
+    conn.readCodec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
+        initialDestinationConnectionId, version));
     conn.readCodec->setClientConnectionId(clientConnectionId);
     conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     if (conn.qLogger) {

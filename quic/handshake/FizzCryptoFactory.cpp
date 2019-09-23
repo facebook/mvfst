@@ -11,15 +11,85 @@
 #include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/HandshakeLayer.h>
 
+namespace {
+
+class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
+ public:
+  ~QuicPlaintextReadRecordLayer() override = default;
+
+  folly::Optional<fizz::TLSMessage> read(folly::IOBufQueue& buf) override {
+    if (buf.empty()) {
+      return folly::none;
+    }
+    fizz::TLSMessage msg;
+    msg.type = fizz::ContentType::handshake;
+    msg.fragment = buf.move();
+    return msg;
+  }
+};
+
+class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
+ public:
+  ~QuicEncryptedReadRecordLayer() override = default;
+
+  explicit QuicEncryptedReadRecordLayer(fizz::EncryptionLevel encryptionLevel)
+      : fizz::EncryptedReadRecordLayer(encryptionLevel) {}
+
+  folly::Optional<fizz::TLSMessage> read(folly::IOBufQueue& buf) override {
+    if (buf.empty()) {
+      return folly::none;
+    }
+    fizz::TLSMessage msg;
+    msg.type = fizz::ContentType::handshake;
+    msg.fragment = buf.move();
+    return msg;
+  }
+};
+
+class QuicPlaintextWriteRecordLayer : public fizz::PlaintextWriteRecordLayer {
+ public:
+  ~QuicPlaintextWriteRecordLayer() override = default;
+
+  fizz::TLSContent write(fizz::TLSMessage&& msg) const override {
+    fizz::TLSContent content;
+    content.data = std::move(msg.fragment);
+    content.contentType = msg.type;
+    content.encryptionLevel = getEncryptionLevel();
+    return content;
+  }
+
+  fizz::TLSContent writeInitialClientHello(
+      std::unique_ptr<folly::IOBuf> encodedClientHello) const override {
+    return write(fizz::TLSMessage{fizz::ContentType::handshake,
+                                  std::move(encodedClientHello)});
+  }
+};
+
+class QuicEncryptedWriteRecordLayer : public fizz::EncryptedWriteRecordLayer {
+ public:
+  ~QuicEncryptedWriteRecordLayer() override = default;
+
+  explicit QuicEncryptedWriteRecordLayer(fizz::EncryptionLevel encryptionLevel)
+      : EncryptedWriteRecordLayer(encryptionLevel) {}
+
+  fizz::TLSContent write(fizz::TLSMessage&& msg) const override {
+    fizz::TLSContent content;
+    content.data = std::move(msg.fragment);
+    content.contentType = msg.type;
+    content.encryptionLevel = getEncryptionLevel();
+    return content;
+  }
+};
+
+} // namespace
+
 namespace quic {
 
 Buf FizzCryptoFactory::makeInitialTrafficSecret(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
-  DCHECK(factory_);
-  auto deriver =
-      factory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto deriver = makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto connIdRange = folly::range(clientDestinationConnId);
   folly::StringPiece salt;
   switch (version) {
@@ -50,12 +120,10 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
     folly::StringPiece label,
     const ConnectionId& clientDestinationConnId,
     QuicVersion version) const {
-  DCHECK(factory_);
   auto trafficSecret =
       makeInitialTrafficSecret(label, clientDestinationConnId, version);
-  auto deriver =
-      factory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto aead = factory_->makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto deriver = makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto aead = makeAead(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto key = deriver->expandLabel(
       trafficSecret->coalesce(),
       kQuicKeyLabel,
@@ -74,14 +142,47 @@ std::unique_ptr<Aead> FizzCryptoFactory::makeInitialAead(
 
 std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
     folly::ByteRange baseSecret) const {
-  auto pnCipher = factory_->makePacketNumberCipher(
-      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto deriver =
-      factory_->makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto pnCipher =
+      makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto deriver = makeKeyDeriver(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto pnKey = deriver->expandLabel(
       baseSecret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
   pnCipher->setKey(pnKey->coalesce());
   return pnCipher;
+}
+
+std::unique_ptr<fizz::PlaintextReadRecordLayer>
+FizzCryptoFactory::makePlaintextReadRecordLayer() const {
+  return std::make_unique<QuicPlaintextReadRecordLayer>();
+}
+
+std::unique_ptr<fizz::PlaintextWriteRecordLayer>
+FizzCryptoFactory::makePlaintextWriteRecordLayer() const {
+  return std::make_unique<QuicPlaintextWriteRecordLayer>();
+}
+
+std::unique_ptr<fizz::EncryptedReadRecordLayer>
+FizzCryptoFactory::makeEncryptedReadRecordLayer(
+    fizz::EncryptionLevel encryptionLevel) const {
+  return std::make_unique<QuicEncryptedReadRecordLayer>(encryptionLevel);
+}
+
+std::unique_ptr<fizz::EncryptedWriteRecordLayer>
+FizzCryptoFactory::makeEncryptedWriteRecordLayer(
+    fizz::EncryptionLevel encryptionLevel) const {
+  return std::make_unique<QuicEncryptedWriteRecordLayer>(encryptionLevel);
+}
+
+std::unique_ptr<PacketNumberCipher> FizzCryptoFactory::makePacketNumberCipher(
+    fizz::CipherSuite cipher) const {
+  switch (cipher) {
+    case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
+      return std::make_unique<Aes128PacketNumberCipher>();
+    case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
+      return std::make_unique<Aes256PacketNumberCipher>();
+    default:
+      throw std::runtime_error("Packet number cipher not implemented");
+  }
 }
 
 } // namespace quic
