@@ -7,7 +7,7 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-add_executable(tperf tperf.cpp)
+add_executable(tperf tperf.cpp TperfQLogger.cpp)
 
 target_compile_options(
   tperf

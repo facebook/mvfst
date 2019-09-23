@@ -18,6 +18,29 @@
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
+#include <quic/tools/tperf/TperfQLogger.h>
+
+DEFINE_string(host, "::1", "TPerf server hostname/IP");
+DEFINE_int32(port, 6666, "TPerf server port");
+DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
+DEFINE_int32(duration, 10, "Duration of test in seconds");
+DEFINE_uint64(
+    block_size,
+    4096,
+    "Amount of data written to stream each iteration");
+DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
+DEFINE_uint64(window, 64 * 1024, "Flow control window size");
+DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/none");
+DEFINE_bool(gso, false, "Enable GSO writes to the socket");
+DEFINE_uint32(
+    client_transport_timer_resolution_ms,
+    1,
+    "Timer resolution for Ack and Loss tiemout in client transport");
+DEFINE_string(
+    server_qlogger_path,
+    "",
+    "Path to the directory where qlog files will be written. File will be named"
+    " as <CID>.qlog where CID is the DCID from client's perspective.");
 
 namespace quic {
 namespace tperf {
@@ -55,6 +78,7 @@ class ServerSingleStreamHandler : public quic::QuicSocket::ConnectionCallback,
 
   void onConnectionEnd() noexcept override {
     LOG(INFO) << "Socket closed";
+    sock_.reset();
   }
 
   void onConnectionError(
@@ -145,6 +169,10 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         std::make_unique<ServerSingleStreamHandler>(evb, blockSize_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), *serverHandler, ctx);
+    if (!FLAGS_server_qlogger_path.empty()) {
+      transport->setQLogger(std::make_shared<TperfQLogger>(
+          kQLogServerVantagePoint, FLAGS_server_qlogger_path));
+    }
     auto settings = transport->getTransportSettings();
     serverHandler->setQuicSocket(transport);
     LOG(ERROR) << "pushing a handler!";
@@ -330,23 +358,6 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
 
 } // namespace tperf
 } // namespace quic
-
-DEFINE_string(host, "::1", "TPerf server hostname/IP");
-DEFINE_int32(port, 6666, "TPerf server port");
-DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
-DEFINE_int32(duration, 10, "Duration of test in seconds");
-DEFINE_uint64(
-    block_size,
-    4096,
-    "Amount of data written to stream each iteration");
-DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
-DEFINE_uint64(window, 64 * 1024, "Flow control window size");
-DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/none");
-DEFINE_bool(gso, false, "Enable GSO writes to the socket");
-DEFINE_uint32(
-    client_transport_timer_resolution_ms,
-    1,
-    "Timer resolution for Ack and Loss tiemout in client transport");
 
 using namespace quic::tperf;
 
