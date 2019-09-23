@@ -101,4 +101,18 @@ class Aes128PacketNumberCipher : public PacketNumberCipher {
  private:
   folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
 };
+
+class Aes256PacketNumberCipher : public PacketNumberCipher {
+ public:
+  ~Aes256PacketNumberCipher() override = default;
+
+  void setKey(folly::ByteRange key) override;
+
+  HeaderProtectionMask mask(folly::ByteRange sample) const override;
+
+  size_t keyLength() const override;
+
+ private:
+  folly::ssl::EvpCipherCtxUniquePtr encryptCtx_;
+};
 } // namespace quic

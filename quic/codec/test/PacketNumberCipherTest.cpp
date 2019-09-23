@@ -8,6 +8,7 @@
 
 #include <folly/portability/GTest.h>
 
+#include <fizz/record/Types.h>
 #include <quic/codec/PacketNumberCipher.h>
 
 #include <folly/String.h>
@@ -17,7 +18,22 @@ using namespace testing;
 namespace quic {
 namespace test {
 
+// This is identical to code which will eventually live in
+// QuizFizzFactory
+std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+    fizz::CipherSuite cipher) {
+  switch (cipher) {
+    case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
+      return std::make_unique<Aes128PacketNumberCipher>();
+    case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
+      return std::make_unique<Aes256PacketNumberCipher>();
+    default:
+      throw std::runtime_error("Packet number cipher not implemented");
+  }
+}
+
 struct HeaderParams {
+  fizz::CipherSuite cipher;
   folly::StringPiece key;
   folly::StringPiece sample;
   folly::StringPiece packetNumberBytes;
@@ -30,103 +46,97 @@ struct HeaderParams {
 class LongPacketNumberCipherTest : public TestWithParam<HeaderParams> {
  public:
   void SetUp() override {}
-
- protected:
-  Aes128PacketNumberCipher cipher_;
 };
 
-TEST_P(LongPacketNumberCipherTest, TestDecrypt) {
-  auto key = folly::unhexlify(GetParam().key);
-  cipher_.setKey(folly::range(key));
-  std::array<uint8_t, 1> initialByte;
-  std::array<uint8_t, 16> sample;
-  std::array<uint8_t, 4> packetNumberBytes;
-
-  auto initialByteString = folly::unhexlify(GetParam().initialByte);
-  auto sampleString = folly::unhexlify(GetParam().sample);
-  auto packetNumberBytesString = folly::unhexlify(GetParam().packetNumberBytes);
-
-  memcpy(initialByte.data(), initialByteString.data(), initialByte.size());
-  memcpy(sample.data(), sampleString.data(), sample.size());
-  memcpy(
-      packetNumberBytes.data(),
-      packetNumberBytesString.data(),
-      packetNumberBytes.size());
-
-  cipher_.decryptLongHeader(
-      sample, folly::range(initialByte), folly::range(packetNumberBytes));
-
-  EXPECT_EQ(
-      folly::hexlify(packetNumberBytes), GetParam().decryptedPacketNumberBytes);
-  EXPECT_EQ(folly::hexlify(initialByte), GetParam().decryptedInitialByte);
-
-  memcpy(initialByte.data(), initialByteString.data(), initialByte.size());
-  memcpy(sample.data(), sampleString.data(), sample.size());
-  memcpy(
-      packetNumberBytes.data(),
-      packetNumberBytesString.data(),
-      packetNumberBytes.size());
-  cipher_.decryptLongHeader(
-      sample, folly::range(initialByte), folly::range(packetNumberBytes));
-
-  EXPECT_EQ(
-      folly::hexlify(packetNumberBytes), GetParam().decryptedPacketNumberBytes);
-  EXPECT_EQ(folly::hexlify(initialByte), GetParam().decryptedInitialByte);
+template <typename Array>
+Array hexToBytes(const folly::StringPiece hex) {
+  auto bytesString = folly::unhexlify(hex);
+  Array bytes;
+  memcpy(bytes.data(), bytesString.data(), bytes.size());
+  return bytes;
 }
 
-TEST_P(LongPacketNumberCipherTest, TestEncrypt) {
+using SampleBytes = std::array<uint8_t, 16>;
+using InitialByte = std::array<uint8_t, 1>;
+using PacketNumberBytes = std::array<uint8_t, 4>;
+
+struct CipherBytes {
+  SampleBytes sample;
+  InitialByte initial;
+  PacketNumberBytes packetNumber;
+
+  explicit CipherBytes(
+      const folly::StringPiece sampleHex,
+      const folly::StringPiece initialHex,
+      const folly::StringPiece packetNumberHex)
+      : sample(hexToBytes<SampleBytes>(sampleHex)),
+        initial(hexToBytes<InitialByte>(initialHex)),
+        packetNumber(hexToBytes<PacketNumberBytes>(packetNumberHex)) {}
+};
+
+TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
+  auto cipher = makePacketNumberCipher(GetParam().cipher);
   auto key = folly::unhexlify(GetParam().key);
-  cipher_.setKey(folly::range(key));
-  std::array<uint8_t, 1> initialByte;
-  std::array<uint8_t, 16> sample;
-  std::array<uint8_t, 4> packetNumberBytes;
-
-  auto initialByteString = folly::unhexlify(GetParam().decryptedInitialByte);
-  auto sampleString = folly::unhexlify(GetParam().sample);
-  auto packetNumberBytesString =
-      folly::unhexlify(GetParam().decryptedPacketNumberBytes);
-
-  memcpy(initialByte.data(), initialByteString.data(), initialByte.size());
-  memcpy(sample.data(), sampleString.data(), sample.size());
-  memcpy(
-      packetNumberBytes.data(),
-      packetNumberBytesString.data(),
-      packetNumberBytes.size());
-
-  cipher_.encryptLongHeader(
-      sample, folly::range(initialByte), folly::range(packetNumberBytes));
-
-  EXPECT_EQ(folly::hexlify(packetNumberBytes), GetParam().packetNumberBytes);
-  EXPECT_EQ(folly::hexlify(initialByte), GetParam().initialByte);
-
-  memcpy(initialByte.data(), initialByteString.data(), initialByte.size());
-  memcpy(sample.data(), sampleString.data(), sample.size());
-  memcpy(
-      packetNumberBytes.data(),
-      packetNumberBytesString.data(),
-      packetNumberBytes.size());
-  cipher_.encryptLongHeader(
-      sample, folly::range(initialByte), folly::range(packetNumberBytes));
-
-  EXPECT_EQ(folly::hexlify(packetNumberBytes), GetParam().packetNumberBytes);
-  EXPECT_EQ(folly::hexlify(initialByte), GetParam().initialByte);
+  EXPECT_EQ(cipher->keyLength(), key.size());
+  cipher->setKey(folly::range(key));
+  CipherBytes cipherBytes(
+      GetParam().sample,
+      GetParam().decryptedInitialByte,
+      GetParam().decryptedPacketNumberBytes);
+  cipher->encryptLongHeader(
+      cipherBytes.sample,
+      folly::range(cipherBytes.initial),
+      folly::range(cipherBytes.packetNumber));
+  EXPECT_EQ(folly::hexlify(cipherBytes.initial), GetParam().initialByte);
+  EXPECT_EQ(
+      folly::hexlify(cipherBytes.packetNumber), GetParam().packetNumberBytes);
+  cipher->decryptLongHeader(
+      cipherBytes.sample,
+      folly::range(cipherBytes.initial),
+      folly::range(cipherBytes.packetNumber));
+  EXPECT_EQ(
+      folly::hexlify(cipherBytes.initial), GetParam().decryptedInitialByte);
+  EXPECT_EQ(
+      folly::hexlify(cipherBytes.packetNumber),
+      GetParam().decryptedPacketNumberBytes);
 }
 
 INSTANTIATE_TEST_CASE_P(
     LongPacketNumberCipherTests,
     LongPacketNumberCipherTest,
     ::testing::Values(
-        HeaderParams{folly::StringPiece{"0edd982a6ac527f2eddcbb7348dea5d7"},
+        HeaderParams{fizz::CipherSuite::TLS_AES_128_GCM_SHA256,
+                     folly::StringPiece{"0edd982a6ac527f2eddcbb7348dea5d7"},
                      folly::StringPiece{"0000f3a694c75775b4e546172ce9e047"},
                      folly::StringPiece{"0dbc195a"},
                      folly::StringPiece{"c1"},
                      folly::StringPiece{"00000002"},
                      folly::StringPiece{"c3"}},
-        HeaderParams{folly::StringPiece{"94b9452d2b3c7c7f6da7fdd8593537fd"},
+        HeaderParams{fizz::CipherSuite::TLS_AES_128_GCM_SHA256,
+                     folly::StringPiece{"94b9452d2b3c7c7f6da7fdd8593537fd"},
                      folly::StringPiece{"c4c2a2303d297e3c519bf6b22386e3d0"},
                      folly::StringPiece{"f7ed5f01"},
                      folly::StringPiece{"c4"},
                      folly::StringPiece{"00015f01"},
-                     folly::StringPiece{"c1"}}));
+                     folly::StringPiece{"c1"}},
+        HeaderParams{
+            fizz::CipherSuite::TLS_AES_256_GCM_SHA384,
+            folly::StringPiece{
+                "0edd982a6ac527f2eddcbb7348dea5d70edd982a6ac527f2eddcbb7348dea5d7"},
+            folly::StringPiece{"0000f3a694c75775b4e546172ce9e047"},
+            folly::StringPiece{"664d195a"},
+            folly::StringPiece{"c7"},
+            folly::StringPiece{"7d51195a"},
+            folly::StringPiece{"c9"}},
+        HeaderParams{
+            fizz::CipherSuite::TLS_AES_256_GCM_SHA384,
+            folly::StringPiece{
+                "94b9452d2b3c7c7f6da7fdd8593537fd0edd982a6ac527f2eddcbb7348dea5d7"},
+            folly::StringPiece{"c4c2a2303d297e3c519bf6b22386e3d0"},
+            folly::StringPiece{"2e2fad01"},
+            folly::StringPiece{"c8"},
+            folly::StringPiece{"772aa701"},
+            folly::StringPiece{"ce"}}));
+
 } // namespace test
 } // namespace quic
