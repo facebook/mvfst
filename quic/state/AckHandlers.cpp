@@ -27,6 +27,11 @@ void processAckFrame(
   // TODO: send error if we get an ack for a packet we've not sent t18721184
   CongestionController::AckEvent ack;
   ack.ackTime = ackReceiveTime;
+  // Using kRxPacketsPendingBeforeAckThresh to reseve for ackedPackets container
+  // is a hueristic. Other quic implementations may have very different acking
+  // policy. It's also possibly that all acked packets are pure acks which leads
+  // to different number of packets being acked usually.
+  ack.ackedPackets.reserve(kRxPacketsPendingBeforeAckThresh);
   auto currentPacketItStart = getFirstOutstandingPacket(conn, pnSpace);
   uint64_t handshakePacketAcked = 0;
   uint64_t pureAckPacketsAcked = 0;
