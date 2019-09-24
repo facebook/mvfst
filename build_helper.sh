@@ -21,11 +21,12 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -p BUILD_DIR                           (optional): Path of the base dir for mvfst
   -i INSTALL_PREFIX                      (optional): install prefix path
   -m                                     (optional): Build folly without jemalloc
+  -s                                     (optional): Skip installing system package dependencies
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:m" arg; do
+while getopts ":hp:i:ms" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
@@ -35,6 +36,9 @@ while getopts ":hp:i:m" arg; do
       ;;
     m)
       MVFST_FOLLY_USE_JEMALLOC="n"
+      ;;
+    s)
+      MVFST_SKIP_SYSTEM_DEPENDENCIES=true
       ;;
     h | *) # Display help.
       usage
@@ -144,14 +148,16 @@ function setup_folly() {
   if [ ! -d "$FOLLY_DIR" ] ; then
     echo -e "${COLOR_GREEN}[ INFO ] Cloning folly repo ${COLOR_OFF}"
     git clone https://github.com/facebook/folly.git "$FOLLY_DIR"
-    echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
-    if [ "$Platform" = "Linux" ]; then
-      install_dependencies_linux
-    elif [ "$Platform" = "Mac" ]; then
-        install_dependencies_mac
-    else
-      echo -e "${COLOR_RED}[ ERROR ] Unknown platform: $Platform ${COLOR_OFF}"
-      exit 1
+    if [[ -z "${MVFST_SKIP_SYSTEM_DEPENDENCIES-}" ]]; then
+      echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
+      if [ "$Platform" = "Linux" ]; then
+        install_dependencies_linux
+      elif [ "$Platform" = "Mac" ]; then
+          install_dependencies_mac
+      else
+        echo -e "${COLOR_RED}[ ERROR ] Unknown platform: $Platform ${COLOR_OFF}"
+        exit 1
+      fi
     fi
   fi
 
