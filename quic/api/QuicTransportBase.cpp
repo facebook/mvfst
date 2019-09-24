@@ -1119,16 +1119,22 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
              << " running write looper thisIteration=" << thisIteration << " "
              << *this;
     writeLooper_->run(thisIteration);
-    conn_->debugState.needsWriteLoopDetect =
-        (conn_->loopDetectorCallback != nullptr);
+    if (conn_->loopDetectorCallback) {
+      conn_->debugState.needsWriteLoopDetect =
+          (conn_->loopDetectorCallback != nullptr);
+    }
   } else {
     VLOG(10) << nodeToString(conn_->nodeType) << " stopping write looper "
              << *this;
     writeLooper_->stop();
-    conn_->debugState.needsWriteLoopDetect = false;
-    conn_->debugState.currentEmptyLoopCount = 0;
+    if (conn_->loopDetectorCallback) {
+      conn_->debugState.needsWriteLoopDetect = false;
+      conn_->debugState.currentEmptyLoopCount = 0;
+    }
   }
-  conn_->debugState.writeDataReason = writeDataReason;
+  if (conn_->loopDetectorCallback) {
+    conn_->debugState.writeDataReason = writeDataReason;
+  }
 }
 
 void QuicTransportBase::cancelDeliveryCallbacksForStream(StreamId streamId) {
@@ -2203,7 +2209,7 @@ void QuicTransportBase::writeSocketData() {
       setLossDetectionAlarm(*conn_, *this);
       auto packetsAfter = conn_->outstandingPackets.size();
       bool packetWritten = (packetsAfter > packetsBefore);
-      if (packetWritten) {
+      if (conn_->loopDetectorCallback && packetWritten) {
         conn_->debugState.currentEmptyLoopCount = 0;
       } else if (
           conn_->debugState.needsWriteLoopDetect &&

@@ -894,10 +894,12 @@ uint64_t writeConnectionDataToSocket(
   ioBufBatch.setContinueOnNetworkUnreachable(
       connection.transportSettings.continueOnNetworkUnreachable);
 
-  connection.debugState.schedulerName = scheduler.name();
-  connection.debugState.noWriteReason = NoWriteReason::WRITE_OK;
-  if (!scheduler.hasData()) {
-    connection.debugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
+  if (connection.loopDetectorCallback) {
+    connection.debugState.schedulerName = scheduler.name();
+    connection.debugState.noWriteReason = NoWriteReason::WRITE_OK;
+    if (!scheduler.hasData()) {
+      connection.debugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
+    }
   }
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
@@ -921,13 +923,17 @@ uint64_t writeConnectionDataToSocket(
     auto& packet = result.second;
     if (!packet || packet->packet.frames.empty()) {
       ioBufBatch.flush();
-      connection.debugState.noWriteReason = NoWriteReason::NO_FRAME;
+      if (connection.loopDetectorCallback) {
+        connection.debugState.noWriteReason = NoWriteReason::NO_FRAME;
+      }
       return ioBufBatch.getPktSent();
     }
     if (!packet->body) {
       // No more space remaining.
       ioBufBatch.flush();
-      connection.debugState.noWriteReason = NoWriteReason::NO_BODY;
+      if (connection.loopDetectorCallback) {
+        connection.debugState.noWriteReason = NoWriteReason::NO_BODY;
+      }
       return ioBufBatch.getPktSent();
     }
     auto body =
@@ -958,7 +964,9 @@ uint64_t writeConnectionDataToSocket(
     // if ioBufBatch.write returns false
     // it is because a flush() call failed
     if (!ret) {
-      connection.debugState.noWriteReason = NoWriteReason::SOCKET_FAILURE;
+      if (connection.loopDetectorCallback) {
+        connection.debugState.noWriteReason = NoWriteReason::SOCKET_FAILURE;
+      }
       return ioBufBatch.getPktSent();
     }
   }
