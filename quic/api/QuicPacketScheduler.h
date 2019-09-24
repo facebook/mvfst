@@ -309,7 +309,7 @@ class FrameScheduler : public QuicPacketScheduler {
         const QuicConnectionStateBase& conn,
         EncryptionLevel encryptionLevel,
         PacketNumberSpace packetNumberSpace,
-        const std::string& name);
+        std::string name);
 
     Builder& streamRetransmissions();
     Builder& streamFrames();
@@ -339,7 +339,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool simpleFrameScheduler_{false};
   };
 
-  explicit FrameScheduler(const std::string& name);
+  explicit FrameScheduler(std::string name);
 
   virtual std::pair<
       folly::Optional<PacketEvent>,

@@ -35,11 +35,11 @@ FrameScheduler::Builder::Builder(
     const QuicConnectionStateBase& conn,
     EncryptionLevel encryptionLevel,
     PacketNumberSpace packetNumberSpace,
-    const std::string& name)
+    std::string name)
     : conn_(conn),
       encryptionLevel_(encryptionLevel),
       packetNumberSpace_(packetNumberSpace),
-      name_(name) {}
+      name_(std::move(name)) {}
 
 FrameScheduler::Builder& FrameScheduler::Builder::streamRetransmissions() {
   retransmissionScheduler_ = true;
@@ -82,7 +82,7 @@ FrameScheduler::Builder& FrameScheduler::Builder::simpleFrames() {
 }
 
 FrameScheduler FrameScheduler::Builder::build() && {
-  auto scheduler = FrameScheduler(name_);
+  FrameScheduler scheduler(std::move(name_));
   if (retransmissionScheduler_) {
     scheduler.retransmissionScheduler_.emplace(RetransmissionScheduler(conn_));
   }
@@ -112,7 +112,7 @@ FrameScheduler FrameScheduler::Builder::build() && {
   return scheduler;
 }
 
-FrameScheduler::FrameScheduler(const std::string& name) : name_(name) {}
+FrameScheduler::FrameScheduler(std::string name) : name_(std::move(name)) {}
 
 std::pair<
     folly::Optional<PacketEvent>,
