@@ -109,6 +109,8 @@ std::unique_ptr<PacketNumberCipher> QuicFizzFactory::makePacketNumberCipher(
   switch (cipher) {
     case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
       return std::make_unique<Aes128PacketNumberCipher>();
+    case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
+      return std::make_unique<Aes256PacketNumberCipher>();
     default:
       throw std::runtime_error("Packet number cipher not implemented");
   }
