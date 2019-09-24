@@ -397,13 +397,15 @@ void updateConnection(
     ++conn.lossState.timeoutBasedRtxCount;
   }
 
-  auto packetIt = std::lower_bound(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
-      packetNum,
-      [&](const auto& packetWithTime, const auto& val) {
-        return packetWithTime.packet.header.getPacketSequenceNum() < val;
-      });
+  auto packetIt =
+      std::find_if(
+          conn.outstandingPackets.rbegin(),
+          conn.outstandingPackets.rend(),
+          [packetNum](const auto& packetWithTime) {
+            return packetWithTime.packet.header.getPacketSequenceNum() <
+                packetNum;
+          })
+          .base();
   conn.outstandingPackets.insert(packetIt, std::move(pkt));
 
   auto opCount = conn.outstandingPackets.size();
