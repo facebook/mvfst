@@ -9,7 +9,8 @@
 #include <folly/portability/GTest.h>
 
 #include <fizz/record/Types.h>
-#include <quic/codec/PacketNumberCipher.h>
+#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/handshake/FizzPacketNumberCipher.h>
 
 #include <folly/String.h>
 
@@ -17,20 +18,6 @@ using namespace testing;
 
 namespace quic {
 namespace test {
-
-// This is identical to code which will eventually live in
-// QuizFizzFactory
-std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-    fizz::CipherSuite cipher) {
-  switch (cipher) {
-    case fizz::CipherSuite::TLS_AES_128_GCM_SHA256:
-      return std::make_unique<Aes128PacketNumberCipher>();
-    case fizz::CipherSuite::TLS_AES_256_GCM_SHA384:
-      return std::make_unique<Aes256PacketNumberCipher>();
-    default:
-      throw std::runtime_error("Packet number cipher not implemented");
-  }
-}
 
 struct HeaderParams {
   fizz::CipherSuite cipher;
@@ -75,7 +62,8 @@ struct CipherBytes {
 };
 
 TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
-  auto cipher = makePacketNumberCipher(GetParam().cipher);
+  FizzCryptoFactory cryptoFactory;
+  auto cipher = cryptoFactory.makePacketNumberCipher(GetParam().cipher);
   auto key = folly::unhexlify(GetParam().key);
   EXPECT_EQ(cipher->keyLength(), key.size());
   cipher->setKey(folly::range(key));

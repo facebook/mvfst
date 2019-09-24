@@ -9,6 +9,7 @@
 #include <quic/handshake/FizzCryptoFactory.h>
 
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzPacketNumberCipher.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace {

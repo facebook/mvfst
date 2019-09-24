@@ -25,3 +25,12 @@ quic_add_test(TARGET FizzCryptoFactoryTest
   mvfst_handshake
   mvfst_test_utils
 )
+
+quic_add_test(TARGET FizzPacketNumberCipherTest
+  SOURCES
+  FizzPacketNumberCipherTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_handshake
+  mvfst_codec_packet_number_cipher
+)

@@ -58,14 +58,6 @@ quic_add_test(TARGET PacketNumberTest
   mvfst_codec_types
 )
 
-quic_add_test(TARGET PacketNumberCipherTest
-  SOURCES
-  PacketNumberCipherTest.cpp
-  DEPENDS
-  Folly::folly
-  mvfst_codec_packet_number_cipher
-)
-
 quic_add_test(TARGET DecodeTest
   SOURCES
   DecodeTest.cpp
@@ -103,7 +95,6 @@ quic_add_test(TARGET QuicPacketBuilderTest
   mvfst_state_stream_functions
   mvfst_test_utils
 )
-
 
 quic_add_test(TARGET QuicIntegerTest
   SOURCES
