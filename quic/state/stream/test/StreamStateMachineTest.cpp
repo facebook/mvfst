@@ -217,6 +217,55 @@ TEST_F(QuicOpenStateTest, AckStream) {
   ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
 }
 
+TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  EventBase evb;
+  folly::test::MockAsyncUDPSocket socket(&evb);
+  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  serverChosenConnId.value().data()[0] ^= 0x01;
+
+  auto buf1 = IOBuf::copyBuffer("Alice");
+  auto buf2 = IOBuf::copyBuffer("Bob");
+  auto buf3 = IOBuf::copyBuffer("NSA");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      socket,
+      *stream,
+      *buf1,
+      false);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      socket,
+      *stream,
+      *buf2,
+      false);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      socket,
+      *stream,
+      *buf3,
+      false);
+
+  EXPECT_EQ(3, stream->retransmissionBuffer.size());
+  EXPECT_EQ(3, conn->outstandingPackets.size());
+  auto packet = conn->outstandingPackets[folly::Random::rand32() % 3];
+  auto streamFrame = boost::get<WriteStreamFrame>(
+      conn->outstandingPackets[std::rand() % 3].packet.frames.front());
+  StreamEvents::AckStreamFrame ack(streamFrame);
+  invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
+  EXPECT_EQ(2, stream->retransmissionBuffer.size());
+  EXPECT_GT(
+      stream->retransmissionBuffer.back().offset,
+      stream->retransmissionBuffer.front().offset);
+}
+
 TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
   auto conn = createConn();
   conn->partialReliabilityEnabled = true;

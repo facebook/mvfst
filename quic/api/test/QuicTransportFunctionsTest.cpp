@@ -1155,6 +1155,41 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
   EXPECT_TRUE(conn->outstandingPackets.empty());
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketRetxBufferSorted) {
+  EventBase evb;
+  folly::test::MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf1 = IOBuf::copyBuffer("Whatsapp");
+  writeDataToQuicStream(*stream, std::move(buf1), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(1, stream->retransmissionBuffer.size());
+
+  auto buf2 = IOBuf::copyBuffer("Google Buzz");
+  writeDataToQuicStream(*stream, std::move(buf2), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(2, stream->retransmissionBuffer.size());
+  EXPECT_GT(
+      stream->retransmissionBuffer.back().offset,
+      stream->retransmissionBuffer.front().offset);
+}
+
 TEST_F(QuicTransportFunctionsTest, NothingWritten) {
   auto conn = createConn();
   auto mockCongestionController = std::make_unique<MockCongestionController>();

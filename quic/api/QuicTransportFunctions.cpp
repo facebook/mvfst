@@ -98,16 +98,11 @@ void handleNewStreamDataWritten(
   stream.currentWriteOffset += frameLen;
   auto bufWritten = stream.writeBuffer.split(folly::to<size_t>(frameLen));
   stream.currentWriteOffset += frameFin ? 1 : 0;
-  auto insertIt = std::upper_bound(
-      stream.retransmissionBuffer.begin(),
-      stream.retransmissionBuffer.end(),
-      originalOffset,
-      [](const auto& offset, const auto& compare) {
-        // TODO: huh? why isn't this a >= ?
-        return compare.offset > offset;
-      });
-  stream.retransmissionBuffer.emplace(
-      insertIt, std::move(bufWritten), originalOffset, frameFin);
+  CHECK(
+      stream.retransmissionBuffer.empty() ||
+      stream.retransmissionBuffer.back().offset < originalOffset);
+  stream.retransmissionBuffer.emplace_back(
+      std::move(bufWritten), originalOffset, frameFin);
 }
 
 void handleRetransmissionWritten(

@@ -389,6 +389,46 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   EXPECT_TRUE(eq(buf, buffer.data.move()));
 }
 
+TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf1 = IOBuf::copyBuffer("Worse case scenario");
+  auto buf2 = IOBuf::copyBuffer("The hard problem");
+  auto buf3 = IOBuf::copyBuffer("And then we had a flash of insight...");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      socket,
+      *stream,
+      *buf1);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      socket,
+      *stream,
+      *buf2);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      socket,
+      *stream,
+      *buf3);
+  EXPECT_EQ(3, stream->retransmissionBuffer.size());
+  EXPECT_EQ(3, conn->outstandingPackets.size());
+  auto packet = conn->outstandingPackets[folly::Random::rand32() % 3];
+  markPacketLoss(
+      *conn, packet.packet, false, packet.packet.header.getPacketSequenceNum());
+  EXPECT_EQ(2, stream->retransmissionBuffer.size());
+  EXPECT_GT(
+      stream->retransmissionBuffer.back().offset,
+      stream->retransmissionBuffer.front().offset);
+}
+
 TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostAfterCancelRetransmission) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
