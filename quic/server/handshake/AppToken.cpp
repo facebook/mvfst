@@ -57,7 +57,7 @@ TicketTransportParameters createTicketTransportParameters(
   return params;
 }
 
-fizz::Buf encodeAppToken(const AppToken& appToken) {
+std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
   auto buf = folly::IOBuf::create(20);
   folly::io::Appender appender(buf.get(), 20);
   auto ext = encodeExtension(appToken.transportParams);
