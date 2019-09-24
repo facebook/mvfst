@@ -92,6 +92,9 @@ void quicTraceLogger(std::string name, const T& conn, Args&&... args) {
 #define QUIC_LOGGER(name, conn, ...) quicTraceLogger(#name, conn, __VA_ARGS__);
 #endif
 
+#if QUIC_TPERF
+#define QUIC_TRACE(name, conn, ...) ;
+#else
 #define QUIC_TRACE(name, conn, ...)                                           \
   do {                                                                        \
     QUIC_LOGGER(name, conn, __VA_ARGS__)                                      \
@@ -101,6 +104,7 @@ void quicTraceLogger(std::string name, const T& conn, Args&&... args) {
         (conn).clientConnectionId.value_or(quic::ConnectionId{{0, 0, 0, 0}}), \
         TAKE_ATMOST_8(__VA_ARGS__));                                          \
   } while (false);
+#endif
 
 #define QUIC_TRACE_SOCK(name, sock, ...)                \
   if (sock && sock->getState()) {                       \
