@@ -208,7 +208,7 @@ uint64_t writeConnectionDataToSocket(
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
-    const HeaderBuilder& builder,
+    HeaderBuilder builder,
     PacketNumberSpace pnSpace,
     QuicPacketScheduler& scheduler,
     const WritableBytesFunc& writableBytesFunc,
