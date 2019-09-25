@@ -98,6 +98,53 @@ void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
   *len = transportSettings_.maxRecvPacketSize;
 }
 
+// Returns true if we either drop the packet or send a version
+// negotiation packet to the client. Returns false if there's
+// no need for version negotiation.
+bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
+    const folly::SocketAddress& client,
+    bool isInitial,
+    LongHeaderInvariant& invariant) {
+  folly::Optional<std::pair<VersionNegotiationPacket, Buf>>
+      versionNegotiationPacket;
+  if (rejectNewConnections_ && isInitial) {
+    VersionNegotiationPacketBuilder builder(
+        invariant.dstConnId,
+        invariant.srcConnId,
+        std::vector<QuicVersion>{QuicVersion::MVFST_INVALID});
+    versionNegotiationPacket =
+        folly::make_optional(std::move(builder).buildPacket());
+  }
+  if (!versionNegotiationPacket) {
+    bool negotiationNeeded = std::find(
+                                 supportedVersions_.begin(),
+                                 supportedVersions_.end(),
+                                 invariant.version) == supportedVersions_.end();
+    if (negotiationNeeded && !isInitial) {
+      VLOG(3) << "Dropping non-initial packet due to invalid version";
+      QUIC_STATS(
+          infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+      return true;
+    }
+    if (negotiationNeeded) {
+      VersionNegotiationPacketBuilder builder(
+          invariant.dstConnId, invariant.srcConnId, supportedVersions_);
+      versionNegotiationPacket =
+          folly::make_optional(std::move(builder).buildPacket());
+    }
+  }
+  if (versionNegotiationPacket) {
+    VLOG(4) << "Version negotiation sent to client=" << client;
+    auto len = versionNegotiationPacket->second->computeChainDataLength();
+    QUIC_STATS(infoCallback_, onWrite, len);
+    QUIC_STATS(infoCallback_, onPacketProcessed);
+    QUIC_STATS(infoCallback_, onPacketSent);
+    socket_->write(client, versionNegotiationPacket->second);
+    return true;
+  }
+  return false;
+}
+
 void QuicServerWorker::onDataAvailable(
     const folly::SocketAddress& client,
     size_t len,
@@ -184,44 +231,8 @@ void QuicServerWorker::handleNetworkData(
     bool isUsingClientConnId =
         isInitial || longHeaderType == LongHeader::Types::ZeroRtt;
 
-    folly::Optional<std::pair<VersionNegotiationPacket, Buf>>
-        versionNegotiationPacket;
-    if (rejectNewConnections_ && isInitial) {
-      VersionNegotiationPacketBuilder builder(
-          parsedLongHeader->invariant.dstConnId,
-          parsedLongHeader->invariant.srcConnId,
-          std::vector<QuicVersion>{QuicVersion::MVFST_INVALID});
-      versionNegotiationPacket =
-          folly::make_optional(std::move(builder).buildPacket());
-    }
-    if (!versionNegotiationPacket) {
-      bool negotiationNeeded =
-          std::find(
-              supportedVersions_.begin(),
-              supportedVersions_.end(),
-              parsedLongHeader->invariant.version) == supportedVersions_.end();
-      if (negotiationNeeded && !isInitial) {
-        VLOG(3) << "Dropping non-initial packet due to invalid version";
-        QUIC_STATS(
-            infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
-        return;
-      }
-      if (negotiationNeeded) {
-        VersionNegotiationPacketBuilder builder(
-            parsedLongHeader->invariant.dstConnId,
-            parsedLongHeader->invariant.srcConnId,
-            supportedVersions_);
-        versionNegotiationPacket =
-            folly::make_optional(std::move(builder).buildPacket());
-      }
-    }
-    if (versionNegotiationPacket) {
-      VLOG(4) << "Version negotiation sent to client=" << client;
-      auto len = versionNegotiationPacket->second->computeChainDataLength();
-      QUIC_STATS(infoCallback_, onWrite, len);
-      QUIC_STATS(infoCallback_, onPacketProcessed);
-      QUIC_STATS(infoCallback_, onPacketSent);
-      socket_->write(client, std::move(versionNegotiationPacket->second));
+    if (maybeSendVersionNegotiationPacketOrDrop(
+            client, isInitial, parsedLongHeader->invariant)) {
       return;
     }
 

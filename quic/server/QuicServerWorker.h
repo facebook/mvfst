@@ -323,6 +323,11 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       const NetworkData& networkData,
       const ConnectionId& connId);
 
+  bool maybeSendVersionNegotiationPacketOrDrop(
+      const folly::SocketAddress& client,
+      bool isInitial,
+      LongHeaderInvariant& invariant);
+
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   std::shared_ptr<WorkerCallback> callback_;
   folly::EventBase* evb_{nullptr};
