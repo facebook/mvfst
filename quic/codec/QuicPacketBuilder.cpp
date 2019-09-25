@@ -15,6 +15,10 @@ namespace {
 
 // maximum length of packet length.
 constexpr auto kMaxPacketLenSize = sizeof(uint16_t);
+// Amount of space to reserve in the quicFrames_ of the builder. 2 seems to be
+// good for most cases, as the heaviest path is usually 1 stream frame per
+// packet.
+constexpr auto kPreAllocatedFramesSize = 2;
 } // namespace
 
 namespace quic {
@@ -130,6 +134,7 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
       headerAppender_(&header_, kLongHeaderHeaderSize),
       bodyAppender_(&outputQueue_, kAppenderGrowthSize),
       version_(version) {
+  quicFrames_.reserve(kPreAllocatedFramesSize);
   writeHeaderBytes(largestAckedPacketNum);
 }
 
