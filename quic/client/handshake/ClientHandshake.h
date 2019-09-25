@@ -152,26 +152,6 @@ class ClientHandshake : public Handshake {
    */
   virtual folly::Optional<ServerTransportParameters> getServerTransportParams();
 
-  class ActionMoveVisitor : public boost::static_visitor<> {
-   public:
-    explicit ActionMoveVisitor(ClientHandshake& client);
-
-    void operator()(fizz::DeliverAppData&);
-    void operator()(fizz::WriteToSocket& write);
-    void operator()(fizz::client::ReportEarlyHandshakeSuccess&);
-    void operator()(fizz::client::ReportHandshakeSuccess& handshakeSuccess);
-    void operator()(fizz::client::ReportEarlyWriteFailed&);
-    void operator()(fizz::ReportError& err);
-    void operator()(fizz::WaitForData&);
-    void operator()(fizz::client::MutateState& mutator);
-    void operator()(fizz::client::NewCachedPsk& newCachedPsk);
-    void operator()(fizz::SecretAvailable& secret);
-    void operator()(fizz::EndOfData&);
-
-   private:
-    ClientHandshake& client_;
-  };
-
   virtual ~ClientHandshake() = default;
 
  protected:
@@ -202,6 +182,7 @@ class ClientHandshake : public Handshake {
 
   void computeZeroRttCipher();
 
+  class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);
 
   fizz::client::State state_;
@@ -216,7 +197,6 @@ class ClientHandshake : public Handshake {
 
   folly::exception_wrapper error_;
 
-  ActionMoveVisitor visitor_;
   folly::Optional<std::string> pskIdentity_;
 
   std::shared_ptr<CryptoFactory> cryptoFactory_;

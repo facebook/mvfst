@@ -16,7 +16,7 @@
 namespace quic {
 
 ClientHandshake::ClientHandshake(QuicCryptoState& cryptoState)
-    : cryptoState_(cryptoState), visitor_(*this) {}
+    : cryptoState_(cryptoState) {}
 
 void ClientHandshake::connect(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
@@ -237,164 +237,166 @@ void ClientHandshake::computeZeroRttCipher() {
   earlyDataAttempted_ = true;
 }
 
-void ClientHandshake::processActions(fizz::client::Actions actions) {
-  for (auto& action : actions) {
-    boost::apply_visitor(visitor_, action);
+class ClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
+ public:
+  explicit ActionMoveVisitor(ClientHandshake& client) : client_(client) {}
+
+  void operator()(fizz::DeliverAppData&) {
+    client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
+        "Invalid app data on crypto stream",
+        TransportErrorCode::PROTOCOL_VIOLATION);
   }
-}
 
-ClientHandshake::ActionMoveVisitor::ActionMoveVisitor(ClientHandshake& client)
-    : client_(client) {}
-
-void ClientHandshake::ActionMoveVisitor::operator()(fizz::DeliverAppData&) {
-  client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
-      "Invalid app data on crypto stream",
-      TransportErrorCode::PROTOCOL_VIOLATION);
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::WriteToSocket& write) {
-  for (auto& content : write.contents) {
-    auto& cryptoState = client_.cryptoState_;
-    auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
-    if (encryptionLevel == EncryptionLevel::AppData) {
-      // Don't write 1-rtt handshake data on the client.
-      continue;
+  void operator()(fizz::WriteToSocket& write) {
+    for (auto& content : write.contents) {
+      auto& cryptoState = client_.cryptoState_;
+      auto encryptionLevel =
+          getEncryptionLevelFromFizz(content.encryptionLevel);
+      if (encryptionLevel == EncryptionLevel::AppData) {
+        // Don't write 1-rtt handshake data on the client.
+        continue;
+      }
+      auto cryptoStream = getCryptoStream(cryptoState, encryptionLevel);
+      writeDataToQuicStream(*cryptoStream, std::move(content.data));
     }
-    auto cryptoStream = getCryptoStream(cryptoState, encryptionLevel);
-    writeDataToQuicStream(*cryptoStream, std::move(content.data));
-  }
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::client::ReportEarlyHandshakeSuccess&) {
-  client_.computeZeroRttCipher();
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::client::ReportHandshakeSuccess& handshakeSuccess) {
-  client_.computeOneRttCipher(handshakeSuccess);
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::client::ReportEarlyWriteFailed&) {
-  LOG(DFATAL) << "QUIC TLS app data write";
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(fizz::ReportError& err) {
-  auto errMsg = err.error.what();
-  if (errMsg.empty()) {
-    errMsg = "Error during handshake";
   }
 
-  auto fe = err.error.get_exception<fizz::FizzException>();
+  void operator()(fizz::client::ReportEarlyHandshakeSuccess&) {
+    client_.computeZeroRttCipher();
+  }
 
-  if (fe && fe->getAlert()) {
-    auto alertNum = static_cast<std::underlying_type<TransportErrorCode>::type>(
-        fe->getAlert().value());
-    alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
-        TransportErrorCode::CRYPTO_ERROR);
+  void operator()(fizz::client::ReportHandshakeSuccess& handshakeSuccess) {
+    client_.computeOneRttCipher(handshakeSuccess);
+  }
+
+  void operator()(fizz::client::ReportEarlyWriteFailed&) {
+    LOG(DFATAL) << "QUIC TLS app data write";
+  }
+
+  void operator()(fizz::ReportError& err) {
+    auto errMsg = err.error.what();
+    if (errMsg.empty()) {
+      errMsg = "Error during handshake";
+    }
+
+    auto fe = err.error.get_exception<fizz::FizzException>();
+
+    if (fe && fe->getAlert()) {
+      auto alertNum =
+          static_cast<std::underlying_type<TransportErrorCode>::type>(
+              fe->getAlert().value());
+      alertNum += static_cast<std::underlying_type<TransportErrorCode>::type>(
+          TransportErrorCode::CRYPTO_ERROR);
+      client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
+          errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum));
+    } else {
+      client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
+          errMsg.toStdString(),
+          static_cast<TransportErrorCode>(
+              fizz::AlertDescription::internal_error));
+    }
+  }
+
+  void operator()(fizz::WaitForData&) {
+    client_.waitForData_ = true;
+  }
+
+  void operator()(fizz::client::MutateState& mutator) {
+    mutator(client_.state_);
+  }
+
+  void operator()(fizz::client::NewCachedPsk& newCachedPsk) {
+    if (client_.callback_) {
+      client_.callback_->onNewCachedPsk(newCachedPsk);
+    }
+  }
+
+  void operator()(fizz::EndOfData&) {
     client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
-        errMsg.toStdString(), static_cast<TransportErrorCode>(alertNum));
-  } else {
-    client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
-        errMsg.toStdString(),
-        static_cast<TransportErrorCode>(
-            fizz::AlertDescription::internal_error));
+        "unexpected close notify", TransportErrorCode::INTERNAL_ERROR);
   }
-}
 
-void ClientHandshake::ActionMoveVisitor::operator()(fizz::WaitForData&) {
-  client_.waitForData_ = true;
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::client::MutateState& mutator) {
-  mutator(client_.state_);
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::client::NewCachedPsk& newCachedPsk) {
-  if (client_.callback_) {
-    client_.callback_->onNewCachedPsk(newCachedPsk);
-  }
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(fizz::EndOfData&) {
-  client_.error_ = folly::make_exception_wrapper<QuicTransportException>(
-      "unexpected close notify", TransportErrorCode::INTERNAL_ERROR);
-}
-
-void ClientHandshake::ActionMoveVisitor::operator()(
-    fizz::SecretAvailable& secretAvailable) {
-  folly::variant_match(
-      secretAvailable.secret.type,
-      [&](fizz::EarlySecrets earlySecrets) {
-        switch (earlySecrets) {
-          case fizz::EarlySecrets::ClientEarlyTraffic: {
-            auto cipher = client_.state_.earlyDataParams()->cipher;
-            auto keyScheduler =
-                client_.state_.context()->getFactory()->makeKeyScheduler(
-                    cipher);
-            client_.zeroRttWriteCipher_ =
-                FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-                    *client_.state_.context()->getFactory(),
-                    *keyScheduler,
-                    cipher,
-                    folly::range(secretAvailable.secret.secret),
-                    kQuicKeyLabel,
-                    kQuicIVLabel));
-            client_.zeroRttWriteHeaderCipher_ =
-                client_.cryptoFactory_->makePacketNumberCipher(
-                    folly::range(secretAvailable.secret.secret));
-            break;
+  void operator()(fizz::SecretAvailable& secretAvailable) {
+    folly::variant_match(
+        secretAvailable.secret.type,
+        [&](fizz::EarlySecrets earlySecrets) {
+          switch (earlySecrets) {
+            case fizz::EarlySecrets::ClientEarlyTraffic: {
+              auto cipher = client_.state_.earlyDataParams()->cipher;
+              auto keyScheduler =
+                  client_.state_.context()->getFactory()->makeKeyScheduler(
+                      cipher);
+              client_.zeroRttWriteCipher_ =
+                  FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
+                      *client_.state_.context()->getFactory(),
+                      *keyScheduler,
+                      cipher,
+                      folly::range(secretAvailable.secret.secret),
+                      kQuicKeyLabel,
+                      kQuicIVLabel));
+              client_.zeroRttWriteHeaderCipher_ =
+                  client_.cryptoFactory_->makePacketNumberCipher(
+                      folly::range(secretAvailable.secret.secret));
+              break;
+            }
+            default:
+              break;
           }
-          default:
-            break;
-        }
-      },
-      [&](fizz::HandshakeSecrets handshakeSecrets) {
-        auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
-            *client_.state_.context()->getFactory(),
-            *client_.state_.keyScheduler(),
-            *client_.state_.cipher(),
-            folly::range(secretAvailable.secret.secret),
-            kQuicKeyLabel,
-            kQuicIVLabel);
-        auto headerCipher = client_.cryptoFactory_->makePacketNumberCipher(
-            folly::range(secretAvailable.secret.secret));
-        switch (handshakeSecrets) {
-          case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-            client_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
-            client_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
-            break;
-          case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-            client_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
-            client_.handshakeReadHeaderCipher_ = std::move(headerCipher);
-            break;
-        }
-      },
-      [&](fizz::AppTrafficSecrets appSecrets) {
-        auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
-            *client_.state_.context()->getFactory(),
-            *client_.state_.keyScheduler(),
-            *client_.state_.cipher(),
-            folly::range(secretAvailable.secret.secret),
-            kQuicKeyLabel,
-            kQuicIVLabel);
-        auto appHeaderCipher = client_.cryptoFactory_->makePacketNumberCipher(
-            folly::range(secretAvailable.secret.secret));
-        switch (appSecrets) {
-          case fizz::AppTrafficSecrets::ClientAppTraffic:
-            client_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
-            client_.oneRttWriteHeaderCipher_ = std::move(appHeaderCipher);
-            break;
-          case fizz::AppTrafficSecrets::ServerAppTraffic:
-            client_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
-            client_.oneRttReadHeaderCipher_ = std::move(appHeaderCipher);
-            break;
-        }
-      },
-      [&](auto) {});
+        },
+        [&](fizz::HandshakeSecrets handshakeSecrets) {
+          auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
+              *client_.state_.context()->getFactory(),
+              *client_.state_.keyScheduler(),
+              *client_.state_.cipher(),
+              folly::range(secretAvailable.secret.secret),
+              kQuicKeyLabel,
+              kQuicIVLabel);
+          auto headerCipher = client_.cryptoFactory_->makePacketNumberCipher(
+              folly::range(secretAvailable.secret.secret));
+          switch (handshakeSecrets) {
+            case fizz::HandshakeSecrets::ClientHandshakeTraffic:
+              client_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
+              client_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
+              break;
+            case fizz::HandshakeSecrets::ServerHandshakeTraffic:
+              client_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
+              client_.handshakeReadHeaderCipher_ = std::move(headerCipher);
+              break;
+          }
+        },
+        [&](fizz::AppTrafficSecrets appSecrets) {
+          auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
+              *client_.state_.context()->getFactory(),
+              *client_.state_.keyScheduler(),
+              *client_.state_.cipher(),
+              folly::range(secretAvailable.secret.secret),
+              kQuicKeyLabel,
+              kQuicIVLabel);
+          auto appHeaderCipher = client_.cryptoFactory_->makePacketNumberCipher(
+              folly::range(secretAvailable.secret.secret));
+          switch (appSecrets) {
+            case fizz::AppTrafficSecrets::ClientAppTraffic:
+              client_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
+              client_.oneRttWriteHeaderCipher_ = std::move(appHeaderCipher);
+              break;
+            case fizz::AppTrafficSecrets::ServerAppTraffic:
+              client_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
+              client_.oneRttReadHeaderCipher_ = std::move(appHeaderCipher);
+              break;
+          }
+        },
+        [&](auto) {});
+  }
+
+ private:
+  ClientHandshake& client_;
+};
+
+void ClientHandshake::processActions(fizz::client::Actions actions) {
+  ActionMoveVisitor visitor(*this);
+  for (auto& action : actions) {
+    boost::apply_visitor(visitor, action);
+  }
 }
+
 } // namespace quic
