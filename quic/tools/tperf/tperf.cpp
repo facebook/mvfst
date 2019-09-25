@@ -41,6 +41,10 @@ DEFINE_string(
     "",
     "Path to the directory where qlog files will be written. File will be named"
     " as <CID>.qlog where CID is the DCID from client's perspective.");
+DEFINE_uint32(
+    max_cwnd_mss,
+    quic::kLargeMaxCwndInMss,
+    "Max cwnd in the unit of mss");
 
 namespace quic {
 namespace tperf {
@@ -192,13 +196,14 @@ class TPerfServer {
       uint64_t blockSize,
       uint64_t writesPerLoop,
       quic::CongestionControlType congestionControlType,
-      bool gso)
+      bool gso,
+      uint32_t maxCwndInMss)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<TPerfServerTransportFactory>(blockSize));
     server_->setFizzContext(quic::test::createServerCtx());
     quic::TransportSettings settings;
-    settings.maxCwndInMss = kLargeMaxCwndInMss;
+    settings.maxCwndInMss = maxCwndInMss;
     settings.writeConnectionDataPacketsLimit = writesPerLoop;
     settings.defaultCongestionController = congestionControlType;
     if (congestionControlType == quic::CongestionControlType::BBR) {
@@ -395,7 +400,8 @@ int main(int argc, char* argv[]) {
         FLAGS_block_size,
         FLAGS_writes_per_loop,
         flagsToCongestionControlType(FLAGS_congestion),
-        FLAGS_gso);
+        FLAGS_gso,
+        FLAGS_max_cwnd_mss);
     server.start();
   } else if (FLAGS_mode == "client") {
     TPerfClient client(
