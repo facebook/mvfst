@@ -110,6 +110,10 @@ void processClientInitialParams(
   auto partialReliability = getIntegerParameter(
       static_cast<TransportParameterId>(kPartialReliabilityParameterId),
       clientParams.parameters);
+  auto activeConnectionIdLimit = getIntegerParameter(
+      TransportParameterId::active_connection_id_limit,
+      clientParams.parameters);
+
   if (!packetSize || *packetSize == 0) {
     packetSize = kDefaultMaxUDPPayload;
   }
@@ -153,6 +157,9 @@ void processClientInitialParams(
   if (conn.transportSettings.canIgnorePathMTU) {
     conn.udpSendPacketLen = *packetSize;
   }
+
+  conn.peerActiveConnectionIdLimit =
+      activeConnectionIdLimit.value_or(kDefaultConnectionIdLimit);
 
   if (partialReliability && *partialReliability != 0 &&
       conn.transportSettings.partialReliabilityEnabled) {

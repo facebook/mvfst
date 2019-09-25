@@ -30,6 +30,7 @@ enum class TransportParameterId : uint16_t {
   max_ack_delay = 0x000b,
   disable_migration = 0x000c,
   preferred_address = 0x000d,
+  active_connection_id_limit = 0x000e
 };
 
 struct TransportParameter {

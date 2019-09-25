@@ -28,6 +28,8 @@ constexpr size_t kMinInitialDestinationConnIdLength = 8;
 // set conn id version at the first 4 bits
 constexpr uint8_t kShortVersionId = 0x1;
 
+constexpr uint64_t kDefaultConnectionIdLimit = 0;
+
 struct ConnectionId {
   uint8_t* data();
 

@@ -479,6 +479,8 @@ struct QuicConnectionStateBase {
   // Time at which the connection started.
   TimePoint connectionTime;
 
+  uint64_t peerActiveConnectionIdLimit{kDefaultConnectionIdLimit};
+
   // The current connection id. This will eventually be negotiated
   // with the peer.
   folly::Optional<ConnectionId> clientConnectionId;
