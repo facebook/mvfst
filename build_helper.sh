@@ -158,6 +158,8 @@ function setup_folly() {
         echo -e "${COLOR_RED}[ ERROR ] Unknown platform: $Platform ${COLOR_OFF}"
         exit 1
       fi
+    else
+      echo -e "${COLOR_GREEN}[ INFO ] Skipping installing dependencies ${COLOR_OFF}"
     fi
   fi
 
