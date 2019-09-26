@@ -488,6 +488,12 @@ struct QuicConnectionStateBase {
   // The current server chosen connection id.
   folly::Optional<ConnectionId> serverConnectionId;
 
+  // Connection ids issued by self.
+  std::vector<ConnectionIdData> selfConnectionIds;
+
+  // Connection ids issued by peer - to be used as destination ids.
+  std::vector<ConnectionIdData> peerConnectionIds;
+
   // ConnectionIdAlgo implementation to encode and decode ConnectionId with
   // various info, such as routing related info.
   ConnectionIdAlgo* connIdAlgo{nullptr};

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/Optional.h>
+
 #include <folly/String.h>
 #include <folly/hash/Hash.h>
 #include <folly/io/Cursor.h>
@@ -29,6 +30,7 @@ constexpr size_t kMinInitialDestinationConnIdLength = 8;
 constexpr uint8_t kShortVersionId = 0x1;
 
 constexpr uint64_t kDefaultConnectionIdLimit = 0;
+constexpr uint64_t kInitialSequenceNumber = 0x0;
 
 struct ConnectionId {
   uint8_t* data();
@@ -71,6 +73,14 @@ inline std::ostream& operator<<(std::ostream& os, const ConnectionId& connId) {
 inline folly::IOBuf toData(const ConnectionId& connId) {
   return folly::IOBuf::wrapBufferAsValue(connId.data(), connId.size());
 }
+
+struct ConnectionIdData {
+  ConnectionIdData(const ConnectionId& connIdIn, uint64_t sequenceNumberIn)
+      : connId(connIdIn), sequenceNumber(sequenceNumberIn) {}
+
+  const ConnectionId connId;
+  const uint64_t sequenceNumber;
+};
 
 /**
  * Encapsulate parameters to generate server chosen connection id

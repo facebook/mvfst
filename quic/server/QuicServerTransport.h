@@ -110,6 +110,8 @@ class QuicServerTransport
     return shedConnection_;
   }
 
+  void addConnectionId(const ConnectionId& connectionIdToAdd);
+
  protected:
   // From ServerHandshake::HandshakeCallback
   virtual void onCryptoEventAvailable() noexcept override;

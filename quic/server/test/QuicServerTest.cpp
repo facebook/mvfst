@@ -298,6 +298,47 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       QuicTransportStatsCallback::PacketDropReason::CONNECTION_NOT_FOUND);
 }
 
+// TODO (T54143063) Must change use of connectionIdMap_ before
+// can test multiple conn ids routing to the same connection.
+TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto connId = getTestConnectionId(hostId_);
+  createQuicConnection(kClientAddr, connId);
+
+  auto data = folly::IOBuf::copyBuffer("data");
+  PacketNum num = 2;
+  ShortHeader shortHeaderConnId(ProtectionType::KeyPhaseZero, connId, num);
+
+  EXPECT_CALL(*transportInfoCb_, onNewConnection());
+  transport_->QuicServerTransport::setRoutingCallback(worker_.get());
+  transport_->addConnectionId(connId);
+  const auto& connIdMap = worker_->getConnectionIdMap();
+  EXPECT_EQ(connIdMap.count(connId), 1);
+
+  EXPECT_CALL(*transport_, getClientConnectionId())
+      .WillRepeatedly(Return(connId));
+  worker_->onConnectionIdBound(transport_);
+
+  const auto& addrMap = worker_->getSrcToTransportMap();
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+
+  // routing by connid after connid available.
+  EXPECT_CALL(*transport_, onNetworkData(kClientAddr, BufMatches(*data)))
+      .Times(1);
+  RoutingData routingData2(
+      HeaderForm::Short, false, false, connId, folly::none);
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData2),
+      NetworkData(data->clone(), Clock::now()));
+  eventbase_.loop();
+
+  EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(1);
+  worker_->onConnectionUnbound(std::make_pair(kClientAddr, connId), connId);
+  EXPECT_EQ(connIdMap.count(connId), 0);
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+}
+
 TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
@@ -324,7 +365,10 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onNewConnection());
-  worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
+  ConnectionId newConnId = getTestConnectionId(hostId_);
+
+  transport_->QuicServerTransport::setRoutingCallback(worker_.get());
+  transport_->addConnectionId(newConnId);
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
