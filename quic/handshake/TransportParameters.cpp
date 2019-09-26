@@ -77,7 +77,7 @@ TransportParameter CustomStringTransportParameter::encode() const {
 
 CustomBlobTransportParameter::CustomBlobTransportParameter(
     uint16_t id,
-    fizz::Buf value)
+    std::unique_ptr<folly::IOBuf> value)
     : CustomTransportParameter(id), value_(std::move(value)) {}
 
 TransportParameter CustomBlobTransportParameter::encode() const {

@@ -35,11 +35,11 @@ enum class TransportParameterId : uint16_t {
 
 struct TransportParameter {
   TransportParameterId parameter;
-  fizz::Buf value;
+  std::unique_ptr<folly::IOBuf> value;
 
   TransportParameter() {}
 
-  TransportParameter(TransportParameterId p, fizz::Buf v)
+  TransportParameter(TransportParameterId p, std::unique_ptr<folly::IOBuf> v)
       : parameter(p), value(v ? std::move(v) : nullptr) {}
 
   TransportParameter(const TransportParameter& other)
@@ -73,12 +73,14 @@ class CustomStringTransportParameter : public CustomTransportParameter {
 
 class CustomBlobTransportParameter : public CustomTransportParameter {
  public:
-  CustomBlobTransportParameter(uint16_t id, fizz::Buf value);
+  CustomBlobTransportParameter(
+      uint16_t id,
+      std::unique_ptr<folly::IOBuf> value);
 
   TransportParameter encode() const override;
 
  private:
-  fizz::Buf value_;
+  std::unique_ptr<folly::IOBuf> value_;
 };
 
 class CustomIntegralTransportParameter : public CustomTransportParameter {

@@ -34,7 +34,7 @@ struct AppToken {
   TicketTransportParameters transportParams;
   std::vector<folly::IPAddress> sourceAddresses;
   folly::Optional<QuicVersion> version;
-  Buf appParams;
+  std::unique_ptr<folly::IOBuf> appParams;
 };
 
 TicketTransportParameters createTicketTransportParameters(
@@ -47,7 +47,7 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni);
 
-fizz::Buf encodeAppToken(const AppToken& appToken);
+std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken);
 
 folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
 
