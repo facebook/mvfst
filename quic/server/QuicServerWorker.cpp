@@ -641,11 +641,13 @@ void QuicServerWorker::onConnectionIdAvailable(
     QuicServerTransport::Ptr transport,
     ConnectionId id) noexcept {
   VLOG(4) << "Adding into connectionIdMap_ for CID=" << id << " " << *transport;
+  QuicServerTransport* transportPtr = transport.get();
   auto result =
       connectionIdMap_.emplace(std::make_pair(id, std::move(transport)));
   if (!result.second) {
     LOG(ERROR) << "connectionIdMap_ already has CID=" << id;
   } else {
+    boundServerTransports_.insert(transportPtr);
     QUIC_STATS(infoCallback_, onNewConnection);
   }
 }
@@ -671,14 +673,21 @@ void QuicServerWorker::onConnectionIdBound(
 }
 
 void QuicServerWorker::onConnectionUnbound(
+    QuicServerTransport* transport,
     const QuicServerTransport::SourceIdentity& source,
     folly::Optional<ConnectionId> connectionId) noexcept {
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
   // TODO: verify we are removing the right transport
   sourceAddressMap_.erase(source);
+
+  // Ensures we only process `onConnectionUnbound()` once.
+  transport->setRoutingCallback(nullptr);
+  boundServerTransports_.erase(transport);
+
   if (connectionId) {
     VLOG(4) << "Removing from connectionIdMap_ for CID=" << *connectionId
             << ", workerId=" << (uint32_t)workerId_;
+
     connectionIdMap_.erase(*connectionId);
     QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
   }
@@ -699,6 +708,8 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     takeoverCB_->pause();
   }
   callback_ = nullptr;
+
+  // Shut down all transports without bound connection ids.
   for (auto& it : sourceAddressMap_) {
     auto transport = it.second;
     transport->setRoutingCallback(nullptr);
@@ -706,8 +717,9 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     transport->closeNow(
         std::make_pair(QuicErrorCode(error), std::string("shutting down")));
   }
-  for (auto& it : connectionIdMap_) {
-    auto transport = it.second;
+
+  // Shut down all transports with bound connection ids.
+  for (auto transport : boundServerTransports_) {
     transport->setRoutingCallback(nullptr);
     transport->setTransportInfoCallback(nullptr);
     transport->closeNow(

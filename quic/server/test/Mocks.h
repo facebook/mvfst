@@ -100,12 +100,13 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
       ,
       onConnectionIdBound,
       void(QuicServerTransport::Ptr));
-  GMOCK_METHOD2_(
+  GMOCK_METHOD3_(
       ,
       noexcept,
       ,
       onConnectionUnbound,
       void(
+          QuicServerTransport*,
           const QuicServerTransport::SourceIdentity&,
           folly::Optional<ConnectionId>));
 };

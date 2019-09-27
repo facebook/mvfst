@@ -41,6 +41,7 @@ class QuicServerTransport
 
     // Called when the connection is finished and needs to be Unbound.
     virtual void onConnectionUnbound(
+        QuicServerTransport* transport,
         const SourceIdentity& address,
         folly::Optional<ConnectionId> connectionId) noexcept = 0;
   };

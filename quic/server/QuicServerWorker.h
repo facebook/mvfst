@@ -228,6 +228,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * connectionId: destination CID (i.e. server chosen connection-id)
    */
   void onConnectionUnbound(
+      QuicServerTransport* transport,
       const QuicServerTransport::SourceIdentity& source,
       folly::Optional<ConnectionId> connectionId) noexcept override;
 
@@ -337,8 +338,12 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   QuicServerTransportFactory* transportFactory_;
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
 
+  // A server transport's membership is exclusive to only one of these maps.
   ConnIdToTransportMap connectionIdMap_;
   SrcToTransportMap sourceAddressMap_;
+
+  // Contains every unique transport that is mapped in connectionIdMap_.
+  std::unordered_set<QuicServerTransport*> boundServerTransports_;
 
   Buf readBuffer_;
   bool shutdown_{false};

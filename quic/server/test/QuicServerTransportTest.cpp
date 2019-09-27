@@ -1831,7 +1831,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
 }
 
 TEST_F(QuicServerTransportTest, CloseTransportWontUnbound) {
-  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _)).Times(0);
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _)).Times(0);
   server->closeTransport();
   // Need to do this otherwise server transport destructor will still call
   // onConnectionUnbound
@@ -1839,7 +1839,7 @@ TEST_F(QuicServerTransportTest, CloseTransportWontUnbound) {
 }
 
 TEST_F(QuicServerTransportTest, UnboundConnection) {
-  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _)).Times(1);
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _)).Times(1);
   server->unbindConnection();
   // Need to do this otherwise server transport destructor will still call
   // onConnectionUnbound

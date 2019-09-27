@@ -334,9 +334,16 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(1);
-  worker_->onConnectionUnbound(std::make_pair(kClientAddr, connId), connId);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  worker_->onConnectionUnbound(
+      transport_.get(), std::make_pair(kClientAddr, connId), connId);
   EXPECT_EQ(connIdMap.count(connId), 0);
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+
+  // transport_ dtor is run at the end of the test, which causes
+  // onConnectionUnbound to be called if the routingCallback_ is
+  // still set.
+  transport_->QuicServerTransport::setRoutingCallback(nullptr);
 }
 
 TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
@@ -428,14 +435,22 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(2);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   worker_->onConnectionUnbound(
+      transport_.get(),
       std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
       getTestConnectionId(hostId_));
-  worker_->onConnectionUnbound(std::make_pair(clientAddr2, connId2), connId2);
+  worker_->onConnectionUnbound(
+      transport_.get(), std::make_pair(clientAddr2, connId2), connId2);
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 0);
   EXPECT_EQ(
       addrMap.count(std::make_pair(kClientAddr, getTestConnectionId(hostId_))),
       0);
+
+  // transport_ dtor is run at the end of the test, which causes
+  // onConnectionUnbound to be called if the routingCallback_ is
+  // still set.
+  transport_->QuicServerTransport::setRoutingCallback(nullptr);
 }
 
 TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
@@ -478,7 +493,9 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
           QuicErrorCode(TransportErrorCode::SERVER_BUSY),
           std::string("shedding under load")))));
   worker_->onConnectionIdBound(transport_);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
+      transport_.get(),
       std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
       getTestConnectionId(hostId_));
 }
