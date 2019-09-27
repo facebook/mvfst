@@ -24,7 +24,7 @@ class QuicSharedUDPSocketFactory : public QuicUDPSocketFactory {
       sock->setFD(
           folly::NetworkSocket::fromFd(fd),
           folly::AsyncUDPSocket::FDOwnership::SHARED);
-      sock->dontFragment(true);
+      sock->setDFAndTurnOffPMTU();
     }
     return sock;
   }

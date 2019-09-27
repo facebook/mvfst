@@ -67,7 +67,7 @@ class SimpleQuicServerWorkerTest : public Test {
   folly::test::MockAsyncUDPSocket* rawSocket_{nullptr};
 };
 
-TEST_F(SimpleQuicServerWorkerTest, DontFragment) {
+TEST_F(SimpleQuicServerWorkerTest, TurnOffPMTU) {
   auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
   rawSocket_ = sock.get();
   DCHECK(sock->getEventBase());
@@ -79,7 +79,7 @@ TEST_F(SimpleQuicServerWorkerTest, DontFragment) {
   folly::SocketAddress addr("::1", 0);
   // We check versions in bind()
   worker_->setSupportedVersions({QuicVersion::MVFST});
-  EXPECT_CALL(*rawSocket_, dontFragment(true)).Times(1);
+  EXPECT_CALL(*rawSocket_, setDFAndTurnOffPMTU()).Times(1);
   worker_->bind(addr);
 }
 

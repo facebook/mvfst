@@ -34,7 +34,7 @@ void QuicServerWorker::bind(const folly::SocketAddress& address) {
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
   socket_->bind(address);
-  socket_->dontFragment(true);
+  socket_->setDFAndTurnOffPMTU();
 }
 
 void QuicServerWorker::setTransportSettingsOverrideFn(

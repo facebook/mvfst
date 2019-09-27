@@ -129,30 +129,7 @@ void happyEyeballsSetUpSocket(
     socket.bind(folly::SocketAddress("::", 0));
   }
   if (transportSettings.turnoffPMTUD) {
-    // TODO: Clean this up or move this into AsyncUDPSocket once we have a
-    // better idea of how to handle PMTU
-#if defined(IP_MTU_DISCOVER) && defined(IP_PMTUDISC_PROBE)
-    if (socket.address().getFamily() == AF_INET) {
-      int v4 = IP_PMTUDISC_PROBE;
-      folly::netops::setsockopt(
-          socket.getNetworkSocket(),
-          IPPROTO_IP,
-          IP_MTU_DISCOVER,
-          &v4,
-          sizeof(v4));
-    }
-#endif
-#if defined(IPV6_MTU_DISCOVER) && defined(IPV6_PMTUDISC_PROBE)
-    if (socket.address().getFamily() == AF_INET6) {
-      int v6 = IPV6_PMTUDISC_PROBE;
-      folly::netops::setsockopt(
-          socket.getNetworkSocket(),
-          IPPROTO_IPV6,
-          IPV6_MTU_DISCOVER,
-          &v6,
-          sizeof(v6));
-    }
-#endif
+    socket.setDFAndTurnOffPMTU();
   } else {
     socket.dontFragment(true);
   }
