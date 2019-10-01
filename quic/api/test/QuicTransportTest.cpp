@@ -1483,6 +1483,33 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
       [&](auto&) { return false; }));
 }
 
+TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
+  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  auto& conn = transport_->getConnectionState();
+  RetireConnectionIdFrame retireConnId(1);
+  sendSimpleFrame(conn, retireConnId);
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  EXPECT_TRUE(conn.pendingEvents.frames.empty());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  auto packet =
+      getLastOutstandingPacket(
+          transport_->getConnectionState(), PacketNumberSpace::AppData)
+          ->packet;
+  bool foundRetireConnectionId = false;
+  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+    folly::variant_match(
+        simpleFrame,
+        [&](const RetireConnectionIdFrame& frame) {
+          EXPECT_EQ(frame, retireConnId);
+          foundRetireConnectionId = true;
+        },
+        [&](auto&) {});
+  }
+  EXPECT_TRUE(foundRetireConnectionId);
+}
+
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
