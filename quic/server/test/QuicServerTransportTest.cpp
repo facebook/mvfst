@@ -1585,8 +1585,22 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto packetItr = std::find_if(
       server->getNonConstConn().outstandingPackets.begin(),
       server->getNonConstConn().outstandingPackets.end(),
-      findFrameInPacketFunc<StopSendingFrame>());
-
+      [&](auto& p) {
+        return std::find_if(
+                   p.packet.frames.begin(),
+                   p.packet.frames.end(),
+                   [&](auto& f) {
+                     return folly::variant_match(
+                         f,
+                         [&](QuicSimpleFrame& s) {
+                           return folly::variant_match(
+                               s,
+                               [&](StopSendingFrame&) { return true; },
+                               [&](auto&) { return false; });
+                         },
+                         [&](auto&) { return false; });
+                   }) != p.packet.frames.end();
+      });
   ASSERT_TRUE(packetItr != server->getNonConstConn().outstandingPackets.end());
   // Force a timeout with no data so that it clones the packet
   server->lossTimeout().timeoutExpired();
@@ -1594,8 +1608,22 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto numStopSendingPackets = std::count_if(
       server->getNonConstConn().outstandingPackets.begin(),
       server->getNonConstConn().outstandingPackets.end(),
-      findFrameInPacketFunc<StopSendingFrame>());
-
+      [&](auto& p) {
+        return std::find_if(
+                   p.packet.frames.begin(),
+                   p.packet.frames.end(),
+                   [&](auto& f) {
+                     return folly::variant_match(
+                         f,
+                         [&](QuicSimpleFrame& s) {
+                           return folly::variant_match(
+                               s,
+                               [&](StopSendingFrame&) { return true; },
+                               [&](auto&) { return false; });
+                         },
+                         [&](auto&) { return false; });
+                   }) != p.packet.frames.end();
+      });
   EXPECT_GT(numStopSendingPackets, 1);
 
   std::vector<int> indices =
@@ -1611,8 +1639,22 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   server->getNonConstConn().streamManager->getStream(streamId);
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  auto match = findFrameInPacketFunc<StopSendingFrame>();
-
+  auto match = [](OutstandingPacket& packet) {
+    return std::find_if(
+               packet.packet.frames.begin(),
+               packet.packet.frames.end(),
+               [&](auto& f) {
+                 return folly::variant_match(
+                     f,
+                     [&](QuicSimpleFrame& s) {
+                       return folly::variant_match(
+                           s,
+                           [&](StopSendingFrame&) { return true; },
+                           [&](auto&) { return false; });
+                     },
+                     [&](auto&) { return false; });
+               }) != packet.packet.frames.end();
+  };
   auto op = findOutstandingPacket(server->getNonConstConn(), match);
   ASSERT_TRUE(op != nullptr);
   PacketNum packetNum = op->packet.header.getPacketSequenceNum();
