@@ -69,7 +69,7 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       },
       [&](const RetireConnectionIdFrame&) -> folly::Optional<QuicSimpleFrame> {
         // TODO junqiw
-        return QuicSimpleFrame(frame);
+        return folly::none;
       });
 }
 

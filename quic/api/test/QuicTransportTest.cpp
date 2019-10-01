@@ -1510,69 +1510,6 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
   EXPECT_TRUE(foundRetireConnectionId);
 }
 
-TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
-  auto& conn = transport_->getConnectionState();
-  // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
-  conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
-
-  RetireConnectionIdFrame retireConnId(1);
-  sendSimpleFrame(conn, retireConnId);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
-  auto numRetireConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](RetireConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
-  EXPECT_EQ(numRetireConnIdPackets, 1);
-
-  // Force a timeout with no data so that it clones the packet
-  transport_->lossTimeout().timeoutExpired();
-  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandingPackets.size(), 3);
-  numRetireConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](RetireConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
-  EXPECT_EQ(numRetireConnIdPackets, 3);
-}
-
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
