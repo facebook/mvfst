@@ -275,5 +275,23 @@ std::vector<int> getQLogEventIndices(
     QLogEventType type,
     const std::shared_ptr<FileQLogger>& q);
 
+template <typename FrameType>
+auto findFrameInPacketFunc() {
+  return [&](auto& p) {
+    return std::find_if(
+               p.packet.frames.begin(), p.packet.frames.end(), [&](auto& f) {
+                 return folly::variant_match(
+                     f,
+                     [&](QuicSimpleFrame& s) {
+                       return folly::variant_match(
+                           s,
+                           [&](FrameType&) { return true; },
+                           [&](auto&) { return false; });
+                     },
+                     [&](auto&) { return false; });
+               }) != p.packet.frames.end();
+  };
+}
+
 } // namespace test
 } // namespace quic
