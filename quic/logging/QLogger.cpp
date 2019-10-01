@@ -61,10 +61,6 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
               frame.streamId, frame.maximumData));
         },
-        [&](const MaxStreamsFrame& frame) {
-          event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
-              frame.maxStreams, frame.isForBidirectional));
-        },
         [&](const StreamsBlockedFrame& frame) {
           event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
               frame.streamLimit, frame.isForBidirectional));
@@ -88,14 +84,6 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           event->frames.push_back(std::make_unique<ReadAckFrameLog>(
               frame.ackBlocks, frame.ackDelay));
         },
-        [&](const WriteStreamFrame& frame) {
-          event->frames.push_back(std::make_unique<StreamFrameLog>(
-              frame.streamId, frame.offset, frame.len, frame.fin));
-        },
-        [&](const WriteCryptoFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<CryptoFrameLog>(frame.offset, frame.len));
-        },
         [&](const ReadStreamFrame& frame) {
           event->frames.push_back(std::make_unique<StreamFrameLog>(
               frame.streamId, frame.offset, frame.data->length(), frame.fin));
@@ -107,29 +95,41 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
         [&](const ReadNewTokenFrame& /* unused */) {
           event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
         },
-        [&](const StopSendingFrame& frame) {
-          event->frames.push_back(std::make_unique<StopSendingFrameLog>(
-              frame.streamId, frame.errorCode));
-        },
-        [&](const MinStreamDataFrame& frame) {
-          event->frames.push_back(std::make_unique<MinStreamDataFrameLog>(
-              frame.streamId, frame.maximumData, frame.minimumStreamOffset));
-        },
-        [&](const ExpiredStreamDataFrame& frame) {
-          event->frames.push_back(std::make_unique<ExpiredStreamDataFrameLog>(
-              frame.streamId, frame.minimumStreamOffset));
-        },
-        [&](const PathChallengeFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<PathChallengeFrameLog>(frame.pathData));
-        },
-        [&](const PathResponseFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<PathResponseFrameLog>(frame.pathData));
-        },
-        [&](const NewConnectionIdFrame& frame) {
-          event->frames.push_back(std::make_unique<NewConnectionIdFrameLog>(
-              frame.sequenceNumber, frame.token));
+        [&](const QuicSimpleFrame& simpleFrame) {
+          folly::variant_match(
+              simpleFrame,
+              [&](const StopSendingFrame& frame) {
+                event->frames.push_back(std::make_unique<StopSendingFrameLog>(
+                    frame.streamId, frame.errorCode));
+              },
+              [&](const MinStreamDataFrame& frame) {
+                event->frames.push_back(std::make_unique<MinStreamDataFrameLog>(
+                    frame.streamId,
+                    frame.maximumData,
+                    frame.minimumStreamOffset));
+              },
+              [&](const ExpiredStreamDataFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<ExpiredStreamDataFrameLog>(
+                        frame.streamId, frame.minimumStreamOffset));
+              },
+              [&](const PathChallengeFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<PathChallengeFrameLog>(frame.pathData));
+              },
+              [&](const PathResponseFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<PathResponseFrameLog>(frame.pathData));
+              },
+              [&](const NewConnectionIdFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<NewConnectionIdFrameLog>(
+                        frame.sequenceNumber, frame.token));
+              },
+              [&](const MaxStreamsFrame& frame) {
+                event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
+                    frame.maxStreams, frame.isForBidirectional));
+              });
         },
         [&](const auto& /* unused */) {
           // Ignore other frames.
@@ -184,10 +184,6 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
               frame.streamId, frame.maximumData));
         },
-        [&](const MaxStreamsFrame& frame) {
-          event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
-              frame.maxStreams, frame.isForBidirectional));
-        },
         [&](const StreamsBlockedFrame& frame) {
           event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
               frame.streamLimit, frame.isForBidirectional));
@@ -207,10 +203,6 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           event->frames.push_back(std::make_unique<WriteAckFrameLog>(
               frame.ackBlocks, frame.ackDelay));
         },
-        [&](const ReadAckFrame& frame) {
-          event->frames.push_back(std::make_unique<ReadAckFrameLog>(
-              frame.ackBlocks, frame.ackDelay));
-        },
         [&](const WriteStreamFrame& frame) {
           event->frames.push_back(std::make_unique<StreamFrameLog>(
               frame.streamId, frame.offset, frame.len, frame.fin));
@@ -219,40 +211,41 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
           event->frames.push_back(
               std::make_unique<CryptoFrameLog>(frame.offset, frame.len));
         },
-        [&](const ReadStreamFrame& frame) {
-          event->frames.push_back(std::make_unique<StreamFrameLog>(
-              frame.streamId, frame.offset, frame.data->length(), frame.fin));
-        },
-        [&](const ReadCryptoFrame& frame) {
-          event->frames.push_back(std::make_unique<CryptoFrameLog>(
-              frame.offset, frame.data->length()));
-        },
-        [&](const ReadNewTokenFrame& /* unused */) {
-          event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
-        },
-        [&](const StopSendingFrame& frame) {
-          event->frames.push_back(std::make_unique<StopSendingFrameLog>(
-              frame.streamId, frame.errorCode));
-        },
-        [&](const MinStreamDataFrame& frame) {
-          event->frames.push_back(std::make_unique<MinStreamDataFrameLog>(
-              frame.streamId, frame.maximumData, frame.minimumStreamOffset));
-        },
-        [&](const ExpiredStreamDataFrame& frame) {
-          event->frames.push_back(std::make_unique<ExpiredStreamDataFrameLog>(
-              frame.streamId, frame.minimumStreamOffset));
-        },
-        [&](const PathChallengeFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<PathChallengeFrameLog>(frame.pathData));
-        },
-        [&](const PathResponseFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<PathResponseFrameLog>(frame.pathData));
-        },
-        [&](const NewConnectionIdFrame& frame) {
-          event->frames.push_back(std::make_unique<NewConnectionIdFrameLog>(
-              frame.sequenceNumber, frame.token));
+        [&](const QuicSimpleFrame& simpleFrame) {
+          folly::variant_match(
+              simpleFrame,
+              [&](const StopSendingFrame& frame) {
+                event->frames.push_back(std::make_unique<StopSendingFrameLog>(
+                    frame.streamId, frame.errorCode));
+              },
+              [&](const MinStreamDataFrame& frame) {
+                event->frames.push_back(std::make_unique<MinStreamDataFrameLog>(
+                    frame.streamId,
+                    frame.maximumData,
+                    frame.minimumStreamOffset));
+              },
+              [&](const ExpiredStreamDataFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<ExpiredStreamDataFrameLog>(
+                        frame.streamId, frame.minimumStreamOffset));
+              },
+              [&](const PathChallengeFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<PathChallengeFrameLog>(frame.pathData));
+              },
+              [&](const PathResponseFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<PathResponseFrameLog>(frame.pathData));
+              },
+              [&](const NewConnectionIdFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<NewConnectionIdFrameLog>(
+                        frame.sequenceNumber, frame.token));
+              },
+              [&](const MaxStreamsFrame& frame) {
+                event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
+                    frame.maxStreams, frame.isForBidirectional));
+              });
         },
         [&](const auto& /* unused */) {
           // Ignore other frames.
