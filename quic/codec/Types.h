@@ -476,9 +476,12 @@ struct NewConnectionIdFrame {
 
 struct RetireConnectionIdFrame {
   uint64_t sequenceNumber;
-
   explicit RetireConnectionIdFrame(uint64_t sequenceNumberIn)
       : sequenceNumber(sequenceNumberIn) {}
+
+  bool operator==(const RetireConnectionIdFrame& rhs) const {
+    return sequenceNumber == rhs.sequenceNumber;
+  }
 };
 
 struct PathChallengeFrame {
@@ -565,7 +568,8 @@ using QuicSimpleFrame = boost::variant<
     PathChallengeFrame,
     PathResponseFrame,
     NewConnectionIdFrame,
-    MaxStreamsFrame>;
+    MaxStreamsFrame,
+    RetireConnectionIdFrame>;
 
 // Types of frames that can be read.
 using QuicFrame = boost::variant<

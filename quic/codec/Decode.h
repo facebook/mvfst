@@ -110,7 +110,8 @@ StreamsBlockedFrame decodeUniStreamsBlockedFrame(folly::io::Cursor& cursor);
 
 NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor);
 
-NoopFrame decodeRetireConnectionIdFrame(folly::io::Cursor& cursor);
+RetireConnectionIdFrame decodeRetireConnectionIdFrame(
+    folly::io::Cursor& cursor);
 
 StopSendingFrame decodeStopSendingFrame(
     folly::io::Cursor& cursor,
