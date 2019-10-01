@@ -236,6 +236,8 @@ constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
 // Congestion control:
 constexpr std::chrono::microseconds::rep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t { Cubic, NewReno, Copa, BBR, None };
+folly::StringPiece congestionControlTypeToString(CongestionControlType type);
+
 // This is an approximation of a small enough number for cwnd to be blocked.
 constexpr size_t kBlockedSizeBytes = 20;
 

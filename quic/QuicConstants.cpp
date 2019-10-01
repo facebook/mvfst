@@ -10,6 +10,23 @@
 
 namespace quic {
 
+folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
+  switch (type) {
+    case CongestionControlType::Cubic:
+      return "cubic";
+    case CongestionControlType::BBR:
+      return "bbr";
+    case CongestionControlType::Copa:
+      return "copa";
+    case CongestionControlType::NewReno:
+      return "new reno";
+    case CongestionControlType::None:
+      return "none";
+    default:
+      return "unknown";
+  }
+}
+
 QuicBatchingMode getQuicBatchingMode(uint32_t val) {
   switch (val) {
     case static_cast<uint32_t>(QuicBatchingMode::BATCHING_MODE_NONE):

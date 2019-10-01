@@ -475,11 +475,13 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
  */
 
 QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
+  CongestionControlType congestionControlType = CongestionControlType::None;
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
   uint64_t congestionWindow = std::numeric_limits<uint64_t>::max();
   uint64_t burstSize = 0;
   std::chrono::microseconds pacingInterval = 0ms;
   if (conn_->congestionController) {
+    congestionControlType = conn_->congestionController->type();
     writableBytes = conn_->congestionController->getWritableBytes();
     congestionWindow = conn_->congestionController->getCongestionWindow();
     if (isConnectionPaced(*conn_)) {
@@ -493,6 +495,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.lrtt = conn_->lossState.lrtt;
   transportInfo.mrtt = conn_->lossState.mrtt;
   transportInfo.mss = conn_->udpSendPacketLen;
+  transportInfo.congestionControlType = congestionControlType;
   transportInfo.writableBytes = writableBytes;
   transportInfo.congestionWindow = congestionWindow;
   transportInfo.pacingBurstSize = burstSize;
