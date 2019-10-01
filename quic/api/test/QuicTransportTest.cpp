@@ -1573,29 +1573,6 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   EXPECT_EQ(numRetireConnIdPackets, 3);
 }
 
-TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
-  auto& conn = transport_->getConnectionState();
-
-  RetireConnectionIdFrame retireConnId(1);
-  sendSimpleFrame(conn, retireConnId);
-  transport_->updateWriteLooper(true);
-  loopForWrites();
-
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
-  auto packet =
-      getLastOutstandingPacket(
-          transport_->getConnectionState(), PacketNumberSpace::AppData)
-          ->packet;
-
-  EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  markPacketLoss(conn, packet, false, 2);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  EXPECT_TRUE(folly::variant_match(
-      conn.pendingEvents.frames.front(),
-      [&](RetireConnectionIdFrame& f) { return f == retireConnId; },
-      [&](auto&) { return false; }));
-}
-
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
