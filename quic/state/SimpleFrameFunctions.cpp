@@ -135,8 +135,8 @@ void updateSimpleFrameOnPacketLoss(
       [&](const MaxStreamsFrame& frame) {
         conn.pendingEvents.frames.push_back(frame);
       },
-      [&](const RetireConnectionIdFrame&) {
-        // TODO junqiw
+      [&](const RetireConnectionIdFrame& frame) {
+        conn.pendingEvents.frames.push_back(frame);
       });
 }
 
