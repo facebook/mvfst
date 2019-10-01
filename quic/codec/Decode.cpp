@@ -503,8 +503,7 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
       std::move(statelessResetToken));
 }
 
-RetireConnectionIdFrame decodeRetireConnectionIdFrame(
-    folly::io::Cursor& cursor) {
+NoopFrame decodeRetireConnectionIdFrame(folly::io::Cursor& cursor) {
   // TODO we parse this frame, but return NoopFrame. Add proper support for it!
   auto sequenceNum = decodeQuicInteger(cursor);
   if (UNLIKELY(!sequenceNum)) {
@@ -514,7 +513,7 @@ RetireConnectionIdFrame decodeRetireConnectionIdFrame(
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::RETIRE_CONNECTION_ID);
   }
-  return RetireConnectionIdFrame(sequenceNum->first);
+  return NoopFrame();
 }
 
 PathChallengeFrame decodePathChallengeFrame(folly::io::Cursor& cursor) {

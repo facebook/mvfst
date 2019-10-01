@@ -1318,27 +1318,6 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   EXPECT_TRUE(cursor.isAtEnd());
 }
 
-TEST_F(QuicWriteCodecTest, WriteRetireConnId) {
-  MockQuicPacketBuilder pktBuilder;
-  setupCommonExpects(pktBuilder);
-  RetireConnectionIdFrame retireConnId(3);
-  auto bytesWritten = writeFrame(retireConnId, pktBuilder);
-
-  auto builtOut = std::move(pktBuilder).buildPacket();
-  auto regularPacket = builtOut.first;
-  EXPECT_EQ(bytesWritten, 2);
-  auto resultRetireConnIdFrame = boost::get<RetireConnectionIdFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
-  EXPECT_EQ(resultRetireConnIdFrame.sequenceNumber, 3);
-
-  auto wireBuf = std::move(builtOut.second);
-  folly::io::Cursor cursor(wireBuf.get());
-  auto wireRetireConnIdFrame = boost::get<RetireConnectionIdFrame>(
-      boost::get<QuicSimpleFrame>(parseQuicFrame(cursor)));
-  EXPECT_EQ(3, wireRetireConnIdFrame.sequenceNumber);
-  EXPECT_TRUE(cursor.isAtEnd());
-}
-
 TEST_F(QuicWriteCodecTest, WriteStopSending) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
