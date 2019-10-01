@@ -1026,22 +1026,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathChallengeFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1051,22 +1036,8 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathChallengeFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathChallengeFrame>());
+
   EXPECT_EQ(numPathChallengePackets, 3);
 }
 
@@ -1088,22 +1059,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathChallengeFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Reset outstandingPathValidation
@@ -1116,22 +1072,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathChallengeFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 }
 
@@ -1256,22 +1197,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   auto numPathResponsePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathResponseFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathResponseFrame>());
   EXPECT_EQ(numPathResponsePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1279,22 +1205,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   numPathResponsePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](PathResponseFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<PathResponseFrame>());
   EXPECT_EQ(numPathResponsePackets, 1);
 }
 
@@ -1365,22 +1276,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto numNewConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](NewConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<NewConnectionIdFrame>());
   EXPECT_EQ(numNewConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1390,22 +1286,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   numNewConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](NewConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<NewConnectionIdFrame>());
   EXPECT_EQ(numNewConnIdPackets, 3);
 }
 
@@ -1529,22 +1410,7 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto numRetireConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](RetireConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<RetireConnectionIdFrame>());
   EXPECT_EQ(numRetireConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1554,22 +1420,7 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   numRetireConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      [&](auto& p) {
-        return std::find_if(
-                   p.packet.frames.begin(),
-                   p.packet.frames.end(),
-                   [&](auto& f) {
-                     return folly::variant_match(
-                         f,
-                         [&](QuicSimpleFrame& s) {
-                           return folly::variant_match(
-                               s,
-                               [&](RetireConnectionIdFrame&) { return true; },
-                               [&](auto&) { return false; });
-                         },
-                         [&](auto&) { return false; });
-                   }) != p.packet.frames.end();
-      });
+      findFrameInPacketFunc<RetireConnectionIdFrame>());
   EXPECT_EQ(numRetireConnIdPackets, 3);
 }
 
