@@ -182,13 +182,13 @@ TEST_F(DecodeTest, VersionNegotiationPacketBadPacketTest) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(std::move(buf));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_THROW(boost::get<RegularQuicPacket>(packet), boost::bad_get);
+  EXPECT_EQ(packet.regularPacket(), nullptr);
 
   buf = folly::IOBuf::create(0);
   packetQueue = bufToQueue(std::move(buf));
   packet = codec->parsePacket(packetQueue, ackStates);
   // Packet with empty versions
-  EXPECT_THROW(boost::get<RegularQuicPacket>(packet), boost::bad_get);
+  EXPECT_EQ(packet.regularPacket(), nullptr);
 }
 
 TEST_F(DecodeTest, ValidAckFrame) {

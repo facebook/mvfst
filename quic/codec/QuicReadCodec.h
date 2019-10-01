@@ -37,10 +37,47 @@ struct CipherUnavailable {
         protectionType(protectionTypeIn) {}
 };
 
-using CodecResult = boost::variant<
-    RegularQuicPacket,
-    folly::Optional<CipherUnavailable>,
-    StatelessReset>;
+/**
+ * A type which represents no data.
+ */
+struct Nothing {};
+
+struct CodecResult {
+  enum class Type {
+    REGULAR_PACKET,
+    CIPHER_UNAVAILABLE,
+    STATELESS_RESET,
+    NOTHING
+  };
+
+  ~CodecResult();
+
+  CodecResult(CodecResult&& other) noexcept;
+  CodecResult& operator=(CodecResult&& other) noexcept;
+
+  /* implicit */ CodecResult(RegularQuicPacket&& regularPacketIn);
+  /* implicit */ CodecResult(CipherUnavailable&& cipherUnavailableIn);
+  /* implicit */ CodecResult(StatelessReset&& statelessReset);
+  /* implicit */ CodecResult(Nothing&& nothing);
+
+  Type type();
+  RegularQuicPacket* regularPacket();
+  CipherUnavailable* cipherUnavailable();
+  StatelessReset* statelessReset();
+  Nothing* nothing();
+
+ private:
+  void destroyCodecResult();
+
+  union {
+    RegularQuicPacket packet;
+    CipherUnavailable cipher;
+    StatelessReset reset;
+    Nothing none;
+  };
+
+  Type type_;
+};
 
 class QuicReadCodec {
  public:

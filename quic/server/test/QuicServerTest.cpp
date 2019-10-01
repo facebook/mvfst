@@ -248,11 +248,7 @@ void QuicServerWorkerTest::testSendReset(
         AckStates ackStates;
         auto packetQueue = bufToQueue(buf->clone());
         auto res = codec.parsePacket(packetQueue, ackStates);
-        bool isReset = folly::variant_match(
-            res,
-            [](StatelessReset&) { return true; },
-            [](auto&) { return false; });
-        EXPECT_TRUE(isReset);
+        EXPECT_NE(res.statelessReset(), nullptr);
         return buf->computeChainDataLength();
       }));
 
@@ -1715,9 +1711,7 @@ void QuicServerTest::testReset(Buf packet) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(serverData->clone());
   auto res = codec.parsePacket(packetQueue, ackStates);
-  bool isReset = folly::variant_match(
-      res, [](StatelessReset&) { return true; }, [](auto&) { return false; });
-  EXPECT_TRUE(isReset);
+  EXPECT_NE(res.statelessReset(), nullptr);
 }
 
 TEST_F(QuicServerTest, NetworkTestReset) {

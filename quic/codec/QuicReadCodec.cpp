@@ -58,7 +58,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   if (longHeaderInvariant->invariant.version ==
       QuicVersion::VERSION_NEGOTIATION) {
@@ -68,7 +68,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // Since VN is not allowed to be coalesced with another packet
     // type, we clear out the buffer to avoid anyone else parsing it.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   auto type = parseLongHeaderType(initialByte);
 
@@ -80,7 +80,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   // As soon as we have parsed out the long header we can split off any
   // coalesced packets. We do this early since the spec mandates that decryption
@@ -97,7 +97,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   if (queue.chainLength() < currentPacketLen) {
     // Packet appears truncated, there's no parse-able data left.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   auto currentPacketData = queue.split(currentPacketLen);
   cursor.reset(currentPacketData.get());
@@ -109,7 +109,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
             << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   cursor.skip(kMaxPacketNumEncodingSize);
   Sample sample;
@@ -117,7 +117,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     VLOG(4) << "Dropping packet, sample too small " << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   cursor.pull(sample.data(), sample.size());
   const PacketNumberCipher* headerCipher{nullptr};
@@ -131,7 +131,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
           VLOG(4) << nodeToString(nodeType_)
                   << " dropping initial packet for exceeding key timeout"
                   << connIdToHex();
-          return CodecResult(folly::none);
+          return CodecResult(Nothing());
         }
       }
       headerCipher = initialHeaderCipher_.get();
@@ -148,7 +148,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
           VLOG(4) << nodeToString(nodeType_)
                   << " dropping zero rtt packet for exceeding key timeout"
                   << connIdToHex();
-          return CodecResult(folly::none);
+          return CodecResult(Nothing());
         }
       }
       headerCipher = zeroRttHeaderCipher_.get();
@@ -219,7 +219,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
             << " packetNumLen=" << parsePacketNumberLength(initialByte)
             << " protectionType=" << toString(protectionType) << " "
             << connIdToHex();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   decrypted = std::move(*decryptAttempt);
 
@@ -237,12 +237,12 @@ CodecResult QuicReadCodec::parsePacket(
     const AckStates& ackStates,
     size_t dstConnIdSize) {
   if (queue.empty()) {
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   DCHECK(!queue.front()->isChained());
   folly::io::Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
-    return folly::none;
+    return CodecResult(Nothing());
   }
   uint8_t initialByte = cursor.readBE<uint8_t>();
   auto headerForm = getHeaderForm(initialByte);
@@ -273,7 +273,7 @@ CodecResult QuicReadCodec::parsePacket(
     // There's not enough space for the short header packet, clear the queue
     // to indicate there's no more parse-able data.
     queue.clear();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   // Take it out of the queue so we can do some writing.
   auto data = queue.move();
@@ -291,13 +291,13 @@ CodecResult QuicReadCodec::parsePacket(
       parseShortHeader(initialByteRange.data()[0], cursor, dstConnIdSize);
   if (!shortHeader) {
     VLOG(10) << "Dropping packet, cannot parse " << connIdToHex();
-    return folly::none;
+    return CodecResult(Nothing());
   }
   shortHeader->setPacketNumber(packetNum.first);
   if (shortHeader->getProtectionType() == ProtectionType::KeyPhaseOne) {
     VLOG(4) << nodeToString(nodeType_) << " cannot read key phase one packet "
             << connIdToHex();
-    return folly::none;
+    return CodecResult(Nothing());
   }
 
   // Back in the queue so we can split.
@@ -341,7 +341,7 @@ CodecResult QuicReadCodec::parsePacket(
     VLOG(10) << "Unable to decrypt packet=" << packetNum.first
              << " protectionType=" << (int)protectionType << " "
              << connIdToHex();
-    return CodecResult(folly::none);
+    return CodecResult(Nothing());
   }
   decrypted = std::move(*decryptAttempt);
   if (!decrypted) {
@@ -471,5 +471,115 @@ std::string QuicReadCodec::connIdToHex() {
   const auto& clientId = clientConnectionId_.value_or(zeroConn);
   return folly::to<std::string>(
       "server=", serverId.hex(), " ", "client=", clientId.hex());
+}
+
+CodecResult::CodecResult(RegularQuicPacket&& regularPacketIn)
+    : type_(CodecResult::Type::REGULAR_PACKET) {
+  new (&packet) RegularQuicPacket(std::move(regularPacketIn));
+}
+
+CodecResult::CodecResult(CipherUnavailable&& cipherUnavailableIn)
+    : type_(CodecResult::Type::CIPHER_UNAVAILABLE) {
+  new (&cipher) CipherUnavailable(std::move(cipherUnavailableIn));
+}
+
+CodecResult::CodecResult(StatelessReset&& statelessResetIn)
+    : type_(CodecResult::Type::STATELESS_RESET) {
+  new (&reset) StatelessReset(std::move(statelessResetIn));
+}
+
+CodecResult::CodecResult(Nothing&&) : type_(CodecResult::Type::NOTHING) {
+  new (&none) Nothing();
+}
+
+void CodecResult::destroyCodecResult() {
+  switch (type_) {
+    case CodecResult::Type::REGULAR_PACKET:
+      packet.~RegularQuicPacket();
+      break;
+    case CodecResult::Type::CIPHER_UNAVAILABLE:
+      cipher.~CipherUnavailable();
+      break;
+    case CodecResult::Type::STATELESS_RESET:
+      reset.~StatelessReset();
+      break;
+    case CodecResult::Type::NOTHING:
+      none.~Nothing();
+      break;
+  }
+}
+
+CodecResult::~CodecResult() {
+  destroyCodecResult();
+}
+
+CodecResult::CodecResult(CodecResult&& other) noexcept {
+  switch (other.type_) {
+    case CodecResult::Type::REGULAR_PACKET:
+      new (&packet) RegularQuicPacket(std::move(other.packet));
+      break;
+    case CodecResult::Type::CIPHER_UNAVAILABLE:
+      new (&cipher) CipherUnavailable(std::move(other.cipher));
+      break;
+    case CodecResult::Type::STATELESS_RESET:
+      new (&reset) StatelessReset(std::move(other.reset));
+      break;
+    case CodecResult::Type::NOTHING:
+      new (&none) Nothing(std::move(other.none));
+      break;
+  }
+  type_ = other.type_;
+}
+
+CodecResult& CodecResult::operator=(CodecResult&& other) noexcept {
+  destroyCodecResult();
+  switch (other.type_) {
+    case CodecResult::Type::REGULAR_PACKET:
+      new (&packet) RegularQuicPacket(std::move(other.packet));
+      break;
+    case CodecResult::Type::CIPHER_UNAVAILABLE:
+      new (&cipher) CipherUnavailable(std::move(other.cipher));
+      break;
+    case CodecResult::Type::STATELESS_RESET:
+      new (&reset) StatelessReset(std::move(other.reset));
+      break;
+    case CodecResult::Type::NOTHING:
+      new (&none) Nothing(std::move(other.none));
+      break;
+  }
+  type_ = other.type_;
+  return *this;
+}
+
+CodecResult::Type CodecResult::type() {
+  return type_;
+}
+
+RegularQuicPacket* CodecResult::regularPacket() {
+  if (type_ == CodecResult::Type::REGULAR_PACKET) {
+    return &packet;
+  }
+  return nullptr;
+}
+
+CipherUnavailable* CodecResult::cipherUnavailable() {
+  if (type_ == CodecResult::Type::CIPHER_UNAVAILABLE) {
+    return &cipher;
+  }
+  return nullptr;
+}
+
+StatelessReset* CodecResult::statelessReset() {
+  if (type_ == CodecResult::Type::STATELESS_RESET) {
+    return &reset;
+  }
+  return nullptr;
+}
+
+Nothing* CodecResult::nothing() {
+  if (type_ == CodecResult::Type::NOTHING) {
+    return &none;
+  }
+  return nullptr;
 }
 } // namespace quic

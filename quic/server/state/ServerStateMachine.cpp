@@ -414,6 +414,73 @@ void onServerReadData(
   }
 }
 
+void handleCipherUnavailable(
+    CipherUnavailable* originalData,
+    QuicServerConnectionState& conn,
+    size_t packetSize,
+    ServerEvents::ReadData& readData) {
+  if (!originalData->packet || originalData->packet->empty()) {
+    VLOG(10) << "drop because no data " << conn;
+    if (conn.qLogger) {
+      conn.qLogger->addPacketDrop(packetSize, kNoData);
+    }
+    QUIC_TRACE(packet_drop, conn, "no_data");
+    return;
+  }
+  if (originalData->protectionType != ProtectionType::ZeroRtt &&
+      originalData->protectionType != ProtectionType::KeyPhaseZero) {
+    VLOG(10) << "drop because unexpected protection level " << conn;
+    if (conn.qLogger) {
+      conn.qLogger->addPacketDrop(packetSize, kUnexpectedProtectionLevel);
+    }
+    QUIC_TRACE(packet_drop, conn, "unexpected_protection_level");
+    return;
+  }
+
+  size_t combinedSize =
+      (conn.pendingZeroRttData ? conn.pendingZeroRttData->size() : 0) +
+      (conn.pendingOneRttData ? conn.pendingOneRttData->size() : 0);
+  if (combinedSize >= conn.transportSettings.maxPacketsToBuffer) {
+    VLOG(10) << "drop because max buffered " << conn;
+    if (conn.qLogger) {
+      conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
+    }
+    QUIC_TRACE(packet_drop, conn, "max_buffered");
+    return;
+  }
+
+  auto& pendingData = originalData->protectionType == ProtectionType::ZeroRtt
+      ? conn.pendingZeroRttData
+      : conn.pendingOneRttData;
+  if (pendingData) {
+    QUIC_TRACE(
+        packet_buffered,
+        conn,
+        originalData->packetNum,
+        originalData->protectionType,
+        packetSize);
+    if (conn.qLogger) {
+      conn.qLogger->addPacketBuffered(
+          originalData->packetNum, originalData->protectionType, packetSize);
+    }
+    ServerEvents::ReadData pendingReadData;
+    pendingReadData.peer = readData.peer;
+    pendingReadData.networkData = NetworkData(
+        std::move(originalData->packet), readData.networkData.receiveTimePoint);
+    pendingData->emplace_back(std::move(pendingReadData));
+    VLOG(10) << "Adding pending data to "
+             << toString(originalData->protectionType)
+             << " buffer size=" << pendingData->size() << " " << conn;
+  } else {
+    VLOG(10) << "drop because " << toString(originalData->protectionType)
+             << " buffer no longer available " << conn;
+    if (conn.qLogger) {
+      conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
+    }
+    QUIC_TRACE(packet_drop, conn, "buffer_unavailable");
+  }
+}
+
 void onServerReadDataFromOpen(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
@@ -534,95 +601,35 @@ void onServerReadDataFromOpen(
     size_t dataSize = udpData.chainLength();
     auto parsedPacket = conn.readCodec->parsePacket(udpData, conn.ackStates);
     size_t packetSize = dataSize - udpData.chainLength();
-    bool parseSuccess = folly::variant_match(
-        parsedPacket,
-        [&](RegularQuicPacket&) { return true; },
-        [&](folly::Optional<CipherUnavailable>& originalData) {
-          if (!originalData.hasValue()) {
-            VLOG(10) << "drop cipher unavailable, no data " << conn;
-            if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
-            }
-            QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
-            return false;
-          }
-          if (!originalData->packet || originalData->packet->empty()) {
-            VLOG(10) << "drop because no data " << conn;
-            if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kNoData);
-            }
-            QUIC_TRACE(packet_drop, conn, "no_data");
-            return false;
-          }
-          if (originalData->protectionType != ProtectionType::ZeroRtt &&
-              originalData->protectionType != ProtectionType::KeyPhaseZero) {
-            VLOG(10) << "drop because unexpected protection level " << conn;
-            if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(
-                  packetSize, kUnexpectedProtectionLevel);
-            }
-            QUIC_TRACE(packet_drop, conn, "unexpected_protection_level");
-            return false;
-          }
 
-          size_t combinedSize =
-              (conn.pendingZeroRttData ? conn.pendingZeroRttData->size() : 0) +
-              (conn.pendingOneRttData ? conn.pendingOneRttData->size() : 0);
-          if (combinedSize >= conn.transportSettings.maxPacketsToBuffer) {
-            VLOG(10) << "drop because max buffered " << conn;
-            if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
-            }
-            QUIC_TRACE(packet_drop, conn, "max_buffered");
-            return false;
-          }
+    switch (parsedPacket.type()) {
+      case CodecResult::Type::CIPHER_UNAVAILABLE: {
+        handleCipherUnavailable(
+            parsedPacket.cipherUnavailable(), conn, packetSize, readData);
+        break;
+      }
+      case CodecResult::Type::STATELESS_RESET: {
+        VLOG(10) << "drop because reset " << conn;
+        if (conn.qLogger) {
+          conn.qLogger->addPacketDrop(packetSize, kReset);
+        }
+        QUIC_TRACE(packet_drop, conn, "reset");
+        break;
+      }
+      case CodecResult::Type::NOTHING: {
+        VLOG(10) << "drop cipher unavailable, no data " << conn;
+        if (conn.qLogger) {
+          conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+        }
+        QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
+        break;
+      }
+      case CodecResult::Type::REGULAR_PACKET:
+        break;
+    }
 
-          auto& pendingData =
-              originalData->protectionType == ProtectionType::ZeroRtt
-              ? conn.pendingZeroRttData
-              : conn.pendingOneRttData;
-          if (pendingData) {
-            QUIC_TRACE(
-                packet_buffered,
-                conn,
-                originalData->packetNum,
-                originalData->protectionType,
-                packetSize);
-            if (conn.qLogger) {
-              conn.qLogger->addPacketBuffered(
-                  originalData->packetNum,
-                  originalData->protectionType,
-                  packetSize);
-            }
-            ServerEvents::ReadData pendingReadData;
-            pendingReadData.peer = readData.peer;
-            pendingReadData.networkData = NetworkData(
-                std::move(originalData->packet),
-                readData.networkData.receiveTimePoint);
-            pendingData->emplace_back(std::move(pendingReadData));
-            VLOG(10) << "Adding pending data to "
-                     << toString(originalData->protectionType)
-                     << " buffer size=" << pendingData->size() << " " << conn;
-          } else {
-            VLOG(10) << "drop because "
-                     << toString(originalData->protectionType)
-                     << " buffer no longer available " << conn;
-            if (conn.qLogger) {
-              conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
-            }
-            QUIC_TRACE(packet_drop, conn, "buffer_unavailable");
-          }
-          return false;
-        },
-        [&](const auto&) {
-          VLOG(10) << "drop because reset " << conn;
-          if (conn.qLogger) {
-            conn.qLogger->addPacketDrop(packetSize, kReset);
-          }
-          QUIC_TRACE(packet_drop, conn, "reset");
-          return false;
-        });
-    if (!parseSuccess) {
+    RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
+    if (!regularOptional) {
       // We were unable to parse the packet, drop for now.
       VLOG(10) << "Not able to parse QUIC packet " << conn;
       if (conn.qLogger) {
@@ -635,8 +642,6 @@ void onServerReadDataFromOpen(
           conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;
     }
-    auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
-    DCHECK(regularOptional);
 
     auto protectionLevel = regularOptional->header.getProtectionType();
     auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
@@ -1038,26 +1043,36 @@ void onServerReadDataFromClosed(
     return;
   }
   auto parsedPacket = conn.readCodec->parsePacket(udpData, conn.ackStates);
-  bool parseSuccess = folly::variant_match(
-      parsedPacket,
-      [&](RegularQuicPacket&) { return true; },
-      [&](folly::Optional<CipherUnavailable>&) {
-        VLOG(10) << "drop cipher unavailable " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
-        }
-        QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
-        return false;
-      },
-      [&](const auto&) {
-        VLOG(10) << "drop because reset " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(packetSize, kReset);
-        }
-        QUIC_TRACE(packet_drop, conn, "reset");
-        return false;
-      });
-  if (!parseSuccess) {
+  switch (parsedPacket.type()) {
+    case CodecResult::Type::CIPHER_UNAVAILABLE: {
+      VLOG(10) << "drop cipher unavailable " << conn;
+      if (conn.qLogger) {
+        conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+      }
+      QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
+      break;
+    }
+    case CodecResult::Type::STATELESS_RESET: {
+      VLOG(10) << "drop because reset " << conn;
+      if (conn.qLogger) {
+        conn.qLogger->addPacketDrop(packetSize, kReset);
+      }
+      QUIC_TRACE(packet_drop, conn, "reset");
+      break;
+    }
+    case CodecResult::Type::NOTHING: {
+      VLOG(10) << "drop cipher unavailable, no data " << conn;
+      if (conn.qLogger) {
+        conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+      }
+      QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
+      break;
+    }
+    case CodecResult::Type::REGULAR_PACKET:
+      break;
+  }
+  auto regularOptional = parsedPacket.regularPacket();
+  if (!regularOptional) {
     // We were unable to parse the packet, drop for now.
     VLOG(10) << "Not able to parse QUIC packet " << conn;
     if (conn.qLogger) {
@@ -1069,12 +1084,8 @@ void onServerReadDataFromClosed(
         conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
     return;
   }
-  // Before we know what the protection level of the packet is, we should
-  // not throw an error.
-  auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
-  DCHECK(regularOptional);
-  auto& regularPacket = *regularOptional;
 
+  auto& regularPacket = *regularOptional;
   auto protectionLevel = regularPacket.header.getProtectionType();
   auto packetNum = regularPacket.header.getPacketSequenceNum();
   auto pnSpace = regularPacket.header.getPacketNumberSpace();

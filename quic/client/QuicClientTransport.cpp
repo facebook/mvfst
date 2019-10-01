@@ -126,38 +126,31 @@ void QuicClientTransport::processPacketData(
   }
   auto parsedPacket = conn_->readCodec->parsePacket(
       packetQueue, conn_->ackStates, conn_->clientConnectionId->size());
-  bool parseSuccess = folly::variant_match(
-      parsedPacket,
-      [&](RegularQuicPacket&) { return true; },
-      [&](StatelessReset& reset) {
-        auto& token = clientConn_->statelessResetToken;
-        if (reset.token != token) {
-          VLOG(4) << "Drop StatelessReset for bad connId or token " << *this;
-          return false;
-        }
-        VLOG(4) << "Received Stateless Reset " << *this;
-        conn_->peerConnectionError = std::make_pair(
-            QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
-            toString(LocalErrorCode::CONNECTION_RESET));
-        throw QuicInternalException("Peer reset", LocalErrorCode::NO_ERROR);
-        folly::assume_unreachable();
-      },
-      [&](auto&) { return false; });
-  if (!parseSuccess) {
+  StatelessReset* statelessReset = parsedPacket.statelessReset();
+  if (statelessReset) {
+    auto& token = clientConn_->statelessResetToken;
+    if (statelessReset->token == token) {
+      VLOG(4) << "Received Stateless Reset " << *this;
+      conn_->peerConnectionError = std::make_pair(
+          QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
+          toString(LocalErrorCode::CONNECTION_RESET));
+      throw QuicInternalException("Peer reset", LocalErrorCode::NO_ERROR);
+    }
+    VLOG(4) << "Drop StatelessReset for bad connId or token " << *this;
+  }
+
+  RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
+  if (!regularOptional) {
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(packetSize, kParse);
     }
     QUIC_TRACE(packet_drop, *conn_, "parse");
     return;
   }
-
   if (happyEyeballsEnabled_) {
     happyEyeballsOnDataReceived(
         *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
   }
-
-  auto regularOptional = boost::get<RegularQuicPacket>(&parsedPacket);
-  DCHECK(regularOptional);
 
   LongHeader* longHeader = regularOptional->header.asLong();
   ShortHeader* shortHeader = regularOptional->header.asShort();

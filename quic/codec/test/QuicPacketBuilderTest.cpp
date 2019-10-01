@@ -132,8 +132,8 @@ TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
   auto optionalDecodedPacket =
       makeCodec(getTestConnectionId(1), QuicNodeType::Client)
           ->parsePacket(packetQueue, ackStates);
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(optionalDecodedPacket));
-  auto retryPacket = boost::get<RegularQuicPacket>(optionalDecodedPacket);
+  ASSERT_NE(optionalDecodedPacket.regularPacket(), nullptr);
+  auto& retryPacket = *optionalDecodedPacket.regularPacket();
 
   auto& headerOut = *retryPacket.header.asLong();
 
@@ -215,9 +215,8 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   auto packetQueue = bufToQueue(std::move(resultBuf));
   auto optionalDecodedPacket = makeCodec(serverConnId, QuicNodeType::Server)
                                    ->parsePacket(packetQueue, ackStates);
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(optionalDecodedPacket));
-  auto decodedRegularPacket =
-      boost::get<RegularQuicPacket>(optionalDecodedPacket);
+  ASSERT_NE(optionalDecodedPacket.regularPacket(), nullptr);
+  auto& decodedRegularPacket = *optionalDecodedPacket.regularPacket();
   auto& decodedHeader = *decodedRegularPacket.header.asLong();
   EXPECT_EQ(LongHeader::Types::Initial, decodedHeader.getHeaderType());
   EXPECT_EQ(clientConnId, decodedHeader.getDestinationConnId());
@@ -261,7 +260,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
       makeCodec(
           connId, QuicNodeType::Client, nullptr, quic::test::createNoOpAead())
           ->parsePacket(packetQueue, ackStates);
-  auto decodedRegularPacket = boost::get<RegularQuicPacket>(parsedPacket);
+  auto& decodedRegularPacket = *parsedPacket.regularPacket();
   auto& decodedHeader = *decodedRegularPacket.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseZero, decodedHeader.getProtectionType());
   EXPECT_EQ(connId, decodedHeader.getConnectionId());
@@ -290,7 +289,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
       makeCodec(
           connId, QuicNodeType::Client, nullptr, quic::test::createNoOpAead())
           ->parsePacket(packetQueue, ackStates);
-  auto decodedPacket = boost::get<RegularQuicPacket>(&parsedPacket);
+  auto decodedPacket = parsedPacket.regularPacket();
   EXPECT_EQ(decodedPacket, nullptr);
 }
 

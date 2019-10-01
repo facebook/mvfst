@@ -17,18 +17,12 @@ using namespace quic;
 using namespace quic::test;
 using namespace testing;
 
-bool parseSuccess(const CodecResult& result) {
-  return folly::variant_match(
-      result,
-      [&](const RegularQuicPacket&) { return true; },
-      [&](auto&) { return false; });
+bool parseSuccess(CodecResult&& result) {
+  return result.regularPacket() != nullptr;
 }
 
-bool isReset(const CodecResult& result) {
-  return folly::variant_match(
-      result,
-      [](const StatelessReset&) { return true; },
-      [](const auto&) { return false; });
+bool isReset(CodecResult&& result) {
+  return result.statelessReset() != nullptr;
 }
 
 class QuicReadCodecTest : public Test {};
@@ -117,8 +111,9 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   auto packetQueue = bufToQueue(std::move(packet));
 
   AckStates ackStates;
-  auto retryPacket = boost::get<RegularQuicPacket>(
-      makeUnencryptedCodec()->parsePacket(packetQueue, ackStates));
+  auto retryPacket = *makeUnencryptedCodec()
+                          ->parsePacket(packetQueue, ackStates)
+                          .regularPacket();
 
   auto headerOut = *retryPacket.header.asLong();
 
@@ -181,7 +176,7 @@ TEST_F(QuicReadCodecTest, StreamWithShortHeader) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, createNoOpAead())
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_TRUE(parseSuccess(packet));
+  EXPECT_TRUE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, StreamWithShortHeaderOnlyHeader) {
@@ -200,7 +195,7 @@ TEST_F(QuicReadCodecTest, StreamWithShortHeaderOnlyHeader) {
   auto packetQueue = bufToQueue(std::move(packetBuf));
   auto packet = makeEncryptedCodec(connId, std::move(aead))
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(parseSuccess(packet));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, PacketDecryptFail) {
@@ -225,7 +220,7 @@ TEST_F(QuicReadCodecTest, PacketDecryptFail) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, std::move(aead))
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(parseSuccess(packet));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, ShortOneRttPacketWithZeroRttCipher) {
@@ -247,7 +242,7 @@ TEST_F(QuicReadCodecTest, ShortOneRttPacketWithZeroRttCipher) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, nullptr, createNoOpAead())
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(parseSuccess(packet));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, ZeroRttPacketWithOneRttCipher) {
@@ -270,7 +265,7 @@ TEST_F(QuicReadCodecTest, ZeroRttPacketWithOneRttCipher) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, createNoOpAead())
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(parseSuccess(packet));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, ZeroRttPacketWithZeroRttCipher) {
@@ -293,7 +288,7 @@ TEST_F(QuicReadCodecTest, ZeroRttPacketWithZeroRttCipher) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, nullptr, createNoOpAead())
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_TRUE(parseSuccess(packet));
+  EXPECT_TRUE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, KeyPhaseOnePacket) {
@@ -317,7 +312,7 @@ TEST_F(QuicReadCodecTest, KeyPhaseOnePacket) {
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = makeEncryptedCodec(connId, createNoOpAead(), createNoOpAead())
                     ->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(parseSuccess(packet));
+  EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
@@ -351,7 +346,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_TRUE(isReset(packet));
+  EXPECT_TRUE(isReset(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
@@ -385,7 +380,7 @@ TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_TRUE(isReset(packet));
+  EXPECT_TRUE(isReset(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
@@ -418,7 +413,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(isReset(packet));
+  EXPECT_FALSE(isReset(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
@@ -449,7 +444,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
-  EXPECT_FALSE(isReset(packet));
+  EXPECT_FALSE(isReset(std::move(packet)));
 }
 
 TEST_F(QuicReadCodecTest, TestInitialPacket) {
@@ -478,11 +473,11 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
   auto res = codec->parsePacket(packetQueue, ackStates);
 
-  EXPECT_NO_THROW(boost::get<RegularQuicPacket>(res));
-  auto regularQuicPacket = boost::get<RegularQuicPacket>(res);
+  auto regularQuicPacket = res.regularPacket();
+  ASSERT_NE(regularQuicPacket, nullptr);
 
-  EXPECT_NE(regularQuicPacket.header.asLong(), nullptr);
-  auto longPacketHeader = regularQuicPacket.header.asLong();
+  EXPECT_NE(regularQuicPacket->header.asLong(), nullptr);
+  auto longPacketHeader = regularQuicPacket->header.asLong();
 
   EXPECT_FALSE(longPacketHeader->hasToken());
 }

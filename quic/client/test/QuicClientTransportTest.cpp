@@ -1507,7 +1507,7 @@ class QuicClientTransportTest : public Test {
   }
 
   RegularQuicPacket* parseRegularQuicPacket(CodecResult& codecResult) {
-    return boost::get<RegularQuicPacket>(&codecResult);
+    return codecResult.regularPacket();
   }
 
   void verifyShortPackets(IntervalSet<PacketNum>& sentPackets) {
@@ -2710,7 +2710,7 @@ bool verifyFramePresent(
   for (auto& write : socketWrites) {
     auto packetQueue = bufToQueue(write->clone());
     auto result = readCodec.parsePacket(packetQueue, ackStates);
-    auto regularPacket = boost::get<RegularQuicPacket>(&result);
+    auto regularPacket = result.regularPacket();
     if (!regularPacket) {
       continue;
     }
@@ -3682,7 +3682,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   auto codecResult =
       makeEncryptedCodec(true)->parsePacket(packetQueue, ackStates);
 
-  auto regularQuicPacket = boost::get<RegularQuicPacket>(codecResult);
+  auto& regularQuicPacket = *codecResult.regularPacket();
   auto& header = *regularQuicPacket.header.asLong();
 
   std::vector<int> indices =
