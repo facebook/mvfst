@@ -449,6 +449,20 @@ size_t writeSimpleFrame(
           builder.appendFrame(maxStreamsFrame);
           return maxStreamsFrameSize;
         }
+        return size_t(0);
+      },
+      [&](RetireConnectionIdFrame& retireConnectionIdFrame) {
+        QuicInteger frameType(
+            static_cast<uint8_t>(FrameType::RETIRE_CONNECTION_ID));
+        QuicInteger sequence(retireConnectionIdFrame.sequenceNumber);
+        auto retireConnectionIdFrameSize =
+            frameType.getSize() + sequence.getSize();
+        if (packetSpaceCheck(spaceLeft, retireConnectionIdFrameSize)) {
+          builder.write(frameType);
+          builder.write(sequence);
+          builder.appendFrame(retireConnectionIdFrame);
+          return retireConnectionIdFrameSize;
+        }
         // no space left in packet
         return size_t(0);
       });

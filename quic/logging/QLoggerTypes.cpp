@@ -175,6 +175,12 @@ folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["sequenceNumber"] = sequenceNumber;
+  return d;
+}
+
 folly::dynamic ReadAckFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   folly::dynamic ackRangeDynamic = folly::dynamic::array();

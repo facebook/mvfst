@@ -129,6 +129,11 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
               [&](const MaxStreamsFrame& frame) {
                 event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
                     frame.maxStreams, frame.isForBidirectional));
+              },
+              [&](const RetireConnectionIdFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<RetireConnectionIdFrameLog>(
+                        frame.sequenceNumber));
               });
         },
         [&](const auto& /* unused */) {
@@ -245,6 +250,11 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
               [&](const MaxStreamsFrame& frame) {
                 event->frames.push_back(std::make_unique<MaxStreamsFrameLog>(
                     frame.maxStreams, frame.isForBidirectional));
+              },
+              [&](const RetireConnectionIdFrame& frame) {
+                event->frames.push_back(
+                    std::make_unique<RetireConnectionIdFrameLog>(
+                        frame.sequenceNumber));
               });
         },
         [&](const auto& /* unused */) {
