@@ -196,10 +196,6 @@ folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
   return std::move(zeroRttRejected_);
 }
 
-const fizz::client::State& ClientHandshake::getState() const {
-  return state_;
-}
-
 const folly::Optional<std::string>& ClientHandshake::getApplicationProtocol()
     const {
   auto& earlyDataParams = state_.earlyDataParams();

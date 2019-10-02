@@ -142,11 +142,6 @@ class ClientHandshake : public Handshake {
   folly::Optional<bool> getZeroRttRejected();
 
   /**
-   * Returns the state of the TLS connection.
-   */
-  const fizz::client::State& getState() const;
-
-  /**
    * Returns the application protocol that was negotiated by the handshake.
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
