@@ -1,7 +1,8 @@
 
 ![alt text](logo.png "MVFST")
 
-[![Build Status](https://api.travis-ci.com/facebookincubator/mvfst.svg?branch=master)](https://travis-ci.com/facebookincubator/mvfst)
+[![Travis Build Status](https://api.travis-ci.org/facebookincubator/mvfst.svg?branch=master)](https://travis-ci.org/facebookincubator/mvfst)
+[![CI Status](https://github.com/facebookincubator/mvfst/workflows/CI/badge.svg?branch=master)](https://github.com/facebookincubator/mvfst/actions?workflow=CI)
 
 ## Introduction
 `mvfst` (Pronounced *move fast*) is a client and server implementation of [IETF QUIC](https://tools.ietf.org/html/draft-ietf-quic-transport-20) protocol in C++ by Facebook. QUIC is a UDP based reliable, multiplexed transport protocol that will become an internet standard. The goal of `mvfst` is to build a performant implementation of the QUIC transport protocol that applications could adapt for use cases on both the internet and the data-center. `mvfst` has been tested at scale on android, iOS apps, as well as servers and has several features to support large scale deployments.
