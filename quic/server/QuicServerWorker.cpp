@@ -677,12 +677,12 @@ void QuicServerWorker::onConnectionUnbound(
     const QuicServerTransport::SourceIdentity& source,
     folly::Optional<ConnectionId> connectionId) noexcept {
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
-  // TODO: verify we are removing the right transport
-  sourceAddressMap_.erase(source);
-
   // Ensures we only process `onConnectionUnbound()` once.
   transport->setRoutingCallback(nullptr);
   boundServerTransports_.erase(transport);
+
+  // TODO: verify we are removing the right transport
+  sourceAddressMap_.erase(source);
 
   if (connectionId) {
     VLOG(4) << "Removing from connectionIdMap_ for CID=" << *connectionId

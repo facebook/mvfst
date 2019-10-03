@@ -294,6 +294,41 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       QuicTransportStatsCallback::PacketDropReason::CONNECTION_NOT_FOUND);
 }
 
+TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
+  MockConnectionCallback connCb;
+  auto mockSock =
+      std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
+  EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  MockQuicTransport::Ptr testTransport = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock), connCb, nullptr);
+  EXPECT_CALL(*testTransport, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+
+  EXPECT_CALL(*testTransport, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(kClientAddr));
+  auto connId = getTestConnectionId(hostId_);
+  createQuicConnection(kClientAddr, connId, testTransport);
+
+  // Otherwise the mock of _make will hold on to a shared_ptr to the transport
+  Mock::VerifyAndClearExpectations(factory_.get());
+
+  auto& srcAddrMap = worker_->getSrcToTransportMap();
+  EXPECT_EQ(1, srcAddrMap.size());
+  EXPECT_EQ(srcAddrMap.begin()->second.get(), testTransport.get());
+  auto& srcIdentity = srcAddrMap.begin()->first;
+  auto& connIdMap = worker_->getConnectionIdMap();
+  EXPECT_EQ(0, connIdMap.size());
+
+  auto* rawTransport = testTransport.get();
+  // This is fine, server worker still has at one shared_ptr in its map.
+  testTransport.reset();
+
+  EXPECT_CALL(*rawTransport, setRoutingCallback(nullptr)).Times(1);
+  // Now remove it from the maps. Nothing should crash.
+  worker_->onConnectionUnbound(rawTransport, srcIdentity, folly::none);
+  EXPECT_EQ(0, srcAddrMap.size());
+}
+
 // TODO (T54143063) Must change use of connectionIdMap_ before
 // can test multiple conn ids routing to the same connection.
 TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
