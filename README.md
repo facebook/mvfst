@@ -1,7 +1,7 @@
 
 ![alt text](logo.png "MVFST")
 
-[![Travis Build Status](https://api.travis-ci.org/facebookincubator/mvfst.svg?branch=master)](https://travis-ci.org/facebookincubator/mvfst)
+[![Travis Build Status](https://api.travis-ci.com/facebookincubator/mvfst.svg?branch=master)](https://travis-ci.com/facebookincubator/mvfst)
 [![CI Status](https://github.com/facebookincubator/mvfst/workflows/CI/badge.svg?branch=master)](https://github.com/facebookincubator/mvfst/actions?workflow=CI)
 
 ## Introduction
