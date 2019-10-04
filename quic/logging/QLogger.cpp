@@ -81,90 +81,90 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
   // looping through the packet to store logs created from frames in the packet
   for (const auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
-      case QuicFrame::Type::PaddingFrame: {
+      case QuicFrame::Type::PaddingFrame_E: {
         ++numPaddingFrames;
         break;
       }
-      case QuicFrame::Type::RstStreamFrame: {
+      case QuicFrame::Type::RstStreamFrame_E: {
         const auto& frame = *quicFrame.asRstStreamFrame();
         event->frames.push_back(std::make_unique<RstStreamFrameLog>(
             frame.streamId, frame.errorCode, frame.offset));
         break;
       }
-      case QuicFrame::Type::ConnectionCloseFrame: {
+      case QuicFrame::Type::ConnectionCloseFrame_E: {
         const auto& frame = *quicFrame.asConnectionCloseFrame();
         event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
             frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
         break;
       }
-      case QuicFrame::Type::ApplicationCloseFrame: {
+      case QuicFrame::Type::ApplicationCloseFrame_E: {
         const auto& frame = *quicFrame.asApplicationCloseFrame();
         event->frames.push_back(std::make_unique<ApplicationCloseFrameLog>(
             frame.errorCode, frame.reasonPhrase));
         break;
       }
-      case QuicFrame::Type::MaxDataFrame: {
+      case QuicFrame::Type::MaxDataFrame_E: {
         const auto& frame = *quicFrame.asMaxDataFrame();
         event->frames.push_back(
             std::make_unique<MaxDataFrameLog>(frame.maximumData));
         break;
       }
-      case QuicFrame::Type::MaxStreamDataFrame: {
+      case QuicFrame::Type::MaxStreamDataFrame_E: {
         const auto& frame = *quicFrame.asMaxStreamDataFrame();
         event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
             frame.streamId, frame.maximumData));
         break;
       }
-      case QuicFrame::Type::PingFrame: {
+      case QuicFrame::Type::PingFrame_E: {
         event->frames.push_back(std::make_unique<PingFrameLog>());
         break;
       }
-      case QuicFrame::Type::DataBlockedFrame: {
+      case QuicFrame::Type::DataBlockedFrame_E: {
         const auto& frame = *quicFrame.asDataBlockedFrame();
         event->frames.push_back(
             std::make_unique<DataBlockedFrameLog>(frame.dataLimit));
         break;
       }
-      case QuicFrame::Type::StreamDataBlockedFrame: {
+      case QuicFrame::Type::StreamDataBlockedFrame_E: {
         const auto& frame = *quicFrame.asStreamDataBlockedFrame();
         event->frames.push_back(std::make_unique<StreamDataBlockedFrameLog>(
             frame.streamId, frame.dataLimit));
         break;
       }
-      case QuicFrame::Type::StreamsBlockedFrame: {
+      case QuicFrame::Type::StreamsBlockedFrame_E: {
         const auto& frame = *quicFrame.asStreamsBlockedFrame();
         event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
             frame.streamLimit, frame.isForBidirectional));
         break;
       }
-      case QuicFrame::Type::ReadAckFrame: {
+      case QuicFrame::Type::ReadAckFrame_E: {
         const auto& frame = *quicFrame.asReadAckFrame();
         event->frames.push_back(
             std::make_unique<ReadAckFrameLog>(frame.ackBlocks, frame.ackDelay));
         break;
       }
-      case QuicFrame::Type::ReadStreamFrame: {
+      case QuicFrame::Type::ReadStreamFrame_E: {
         const auto& frame = *quicFrame.asReadStreamFrame();
         event->frames.push_back(std::make_unique<StreamFrameLog>(
             frame.streamId, frame.offset, frame.data->length(), frame.fin));
         break;
       }
-      case QuicFrame::Type::ReadCryptoFrame: {
+      case QuicFrame::Type::ReadCryptoFrame_E: {
         const auto& frame = *quicFrame.asReadCryptoFrame();
         event->frames.push_back(std::make_unique<CryptoFrameLog>(
             frame.offset, frame.data->length()));
         break;
       }
-      case QuicFrame::Type::ReadNewTokenFrame: {
+      case QuicFrame::Type::ReadNewTokenFrame_E: {
         event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
         break;
       }
-      case QuicFrame::Type::QuicSimpleFrame: {
+      case QuicFrame::Type::QuicSimpleFrame_E: {
         const auto& simpleFrame = *quicFrame.asQuicSimpleFrame();
         addQuicSimpleFrameToEvent(event.get(), simpleFrame);
         break;
       }
-      case QuicFrame::Type::NoopFrame: {
+      case QuicFrame::Type::NoopFrame_E: {
         break;
       }
     }

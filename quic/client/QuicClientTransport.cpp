@@ -270,7 +270,7 @@ void QuicClientTransport::processPacketData(
 
   for (auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
-      case QuicFrame::Type::ReadAckFrame: {
+      case QuicFrame::Type::ReadAckFrame_E: {
         VLOG(10) << "Client received ack frame in packet=" << packetNum << " "
                  << *this;
         ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
@@ -345,7 +345,7 @@ void QuicClientTransport::processPacketData(
             receiveTimePoint);
         break;
       }
-      case QuicFrame::Type::RstStreamFrame: {
+      case QuicFrame::Type::RstStreamFrame_E: {
         RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
         VLOG(10) << "Client received reset stream=" << frame.streamId << " "
                  << *this;
@@ -358,7 +358,7 @@ void QuicClientTransport::processPacketData(
         invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
         break;
       }
-      case QuicFrame::Type::ReadCryptoFrame: {
+      case QuicFrame::Type::ReadCryptoFrame_E: {
         pktHasRetransmittableData = true;
         pktHasCryptoData = true;
         ReadCryptoFrame& cryptoFrame = *quicFrame.asReadCryptoFrame();
@@ -371,7 +371,7 @@ void QuicClientTransport::processPacketData(
                 std::move(cryptoFrame.data), cryptoFrame.offset, false));
         break;
       }
-      case QuicFrame::Type::ReadStreamFrame: {
+      case QuicFrame::Type::ReadStreamFrame_E: {
         ReadStreamFrame& frame = *quicFrame.asReadStreamFrame();
         VLOG(10) << "Client received stream data for stream=" << frame.streamId
                  << " offset=" << frame.offset
@@ -388,7 +388,7 @@ void QuicClientTransport::processPacketData(
         invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
         break;
       }
-      case QuicFrame::Type::MaxDataFrame: {
+      case QuicFrame::Type::MaxDataFrame_E: {
         MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
         VLOG(10) << "Client received max data offset="
                  << connWindowUpdate.maximumData << " " << *this;
@@ -396,7 +396,7 @@ void QuicClientTransport::processPacketData(
         handleConnWindowUpdate(*conn_, connWindowUpdate, packetNum);
         break;
       }
-      case QuicFrame::Type::MaxStreamDataFrame: {
+      case QuicFrame::Type::MaxStreamDataFrame_E: {
         MaxStreamDataFrame& streamWindowUpdate =
             *quicFrame.asMaxStreamDataFrame();
         VLOG(10) << "Client received max stream data stream="
@@ -417,13 +417,13 @@ void QuicClientTransport::processPacketData(
         }
         break;
       }
-      case QuicFrame::Type::DataBlockedFrame: {
+      case QuicFrame::Type::DataBlockedFrame_E: {
         VLOG(10) << "Client received blocked " << *this;
         pktHasRetransmittableData = true;
         handleConnBlocked(*conn_);
         break;
       }
-      case QuicFrame::Type::StreamDataBlockedFrame: {
+      case QuicFrame::Type::StreamDataBlockedFrame_E: {
         // peer wishes to send data, but is unable to due to stream-level flow
         // control
         StreamDataBlockedFrame& blocked = *quicFrame.asStreamDataBlockedFrame();
@@ -436,7 +436,7 @@ void QuicClientTransport::processPacketData(
         }
         break;
       }
-      case QuicFrame::Type::StreamsBlockedFrame: {
+      case QuicFrame::Type::StreamsBlockedFrame_E: {
         // peer wishes to open a stream, but is unable to due to the maximum
         // stream limit set by us
         StreamsBlockedFrame& blocked = *quicFrame.asStreamsBlockedFrame();
@@ -445,7 +445,7 @@ void QuicClientTransport::processPacketData(
         // TODO implement handler for it
         break;
       }
-      case QuicFrame::Type::ConnectionCloseFrame: {
+      case QuicFrame::Type::ConnectionCloseFrame_E: {
         ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
         auto errMsg = folly::to<std::string>(
             "Client closed by peer reason=", connFrame.reasonPhrase);
@@ -462,7 +462,7 @@ void QuicClientTransport::processPacketData(
             "Peer closed", TransportErrorCode::NO_ERROR);
         break;
       }
-      case QuicFrame::Type::ApplicationCloseFrame: {
+      case QuicFrame::Type::ApplicationCloseFrame_E: {
         ApplicationCloseFrame& appClose = *quicFrame.asApplicationCloseFrame();
         auto errMsg = folly::to<std::string>(
             "Client closed by peer reason=", appClose.reasonPhrase);
@@ -477,10 +477,10 @@ void QuicClientTransport::processPacketData(
             "Peer closed", TransportErrorCode::NO_ERROR);
         break;
       }
-      case QuicFrame::Type::PaddingFrame: {
+      case QuicFrame::Type::PaddingFrame_E: {
         break;
       }
-      case QuicFrame::Type::QuicSimpleFrame: {
+      case QuicFrame::Type::QuicSimpleFrame_E: {
         QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
         pktHasRetransmittableData = true;
         updateSimpleFrameOnPacketReceived(

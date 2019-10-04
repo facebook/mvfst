@@ -2756,7 +2756,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   EXPECT_CALL(readCb, readError(streamId, _));
   client->closeGracefully();
   EXPECT_FALSE(verifyFramePresent(
-      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
+      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
 
   // close the stream
   auto packet = packetToBuf(createStreamPacket(
@@ -2772,7 +2772,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   socketWrites.clear();
   deliverData(packet->coalesce());
   EXPECT_TRUE(verifyFramePresent(
-      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
+      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
@@ -2845,7 +2845,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 }
 
 class QuicClientTransportAfterStartTestClose
@@ -2877,7 +2877,7 @@ TEST_P(
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
-        QuicFrame::Type::ApplicationCloseFrame));
+        QuicFrame::Type::ApplicationCloseFrame_E));
 
     std::vector<int> indices =
         getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
@@ -2895,7 +2895,7 @@ TEST_P(
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
-        QuicFrame::Type::ConnectionCloseFrame));
+        QuicFrame::Type::ConnectionCloseFrame_E));
     std::vector<int> indices =
         getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
     // expecting that connection close called once
@@ -3046,13 +3046,13 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeEncryptedCodec(),
-        QuicFrame::Type::ApplicationCloseFrame));
+        QuicFrame::Type::ApplicationCloseFrame_E));
   } else {
     client->close(folly::none);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeEncryptedCodec(),
-        QuicFrame::Type::ConnectionCloseFrame));
+        QuicFrame::Type::ConnectionCloseFrame_E));
   }
 }
 
@@ -3259,9 +3259,9 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
   auto serverCodec = makeEncryptedCodec();
   // We expect a conn close in a cleartext packet.
   EXPECT_FALSE(verifyFramePresent(
-      socketWrites, *serverCodec, QuicFrame::Type::ApplicationCloseFrame));
+      socketWrites, *serverCodec, QuicFrame::Type::ApplicationCloseFrame_E));
   EXPECT_FALSE(verifyFramePresent(
-      socketWrites, *serverCodec, QuicFrame::Type::ConnectionCloseFrame));
+      socketWrites, *serverCodec, QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_TRUE(socketWrites.empty());
 }
 
@@ -3286,7 +3286,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeEncryptedCodec(true),
-      QuicFrame::Type::ConnectionCloseFrame));
+      QuicFrame::Type::ConnectionCloseFrame_E));
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);
@@ -4205,7 +4205,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeHandshakeCodec(),
-      QuicFrame::Type::ConnectionCloseFrame));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
@@ -4239,7 +4239,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
       *makeHandshakeCodec(),
-      QuicFrame::Type::ConnectionCloseFrame));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
