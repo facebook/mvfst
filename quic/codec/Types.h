@@ -19,6 +19,7 @@
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/IntervalSet.h>
+#include <quic/common/Variant.h>
 
 /**
  * This details the types of objects that can be serialized or deserialized
@@ -571,24 +572,25 @@ using QuicSimpleFrame = boost::variant<
     MaxStreamsFrame,
     RetireConnectionIdFrame>;
 
-// Types of frames that can be read.
-using QuicFrame = boost::variant<
-    PaddingFrame,
-    RstStreamFrame,
-    ConnectionCloseFrame,
-    ApplicationCloseFrame,
-    MaxDataFrame,
-    MaxStreamDataFrame,
-    PingFrame,
-    DataBlockedFrame,
-    StreamDataBlockedFrame,
-    StreamsBlockedFrame,
-    ReadAckFrame,
-    ReadStreamFrame,
-    ReadCryptoFrame,
-    ReadNewTokenFrame,
-    QuicSimpleFrame,
-    NoopFrame>;
+#define QUIC_FRAME(F, ...)               \
+  F(PaddingFrame, __VA_ARGS__)           \
+  F(RstStreamFrame, __VA_ARGS__)         \
+  F(ConnectionCloseFrame, __VA_ARGS__)   \
+  F(ApplicationCloseFrame, __VA_ARGS__)  \
+  F(MaxDataFrame, __VA_ARGS__)           \
+  F(MaxStreamDataFrame, __VA_ARGS__)     \
+  F(PingFrame, __VA_ARGS__)              \
+  F(DataBlockedFrame, __VA_ARGS__)       \
+  F(StreamDataBlockedFrame, __VA_ARGS__) \
+  F(StreamsBlockedFrame, __VA_ARGS__)    \
+  F(ReadAckFrame, __VA_ARGS__)           \
+  F(ReadStreamFrame, __VA_ARGS__)        \
+  F(ReadCryptoFrame, __VA_ARGS__)        \
+  F(ReadNewTokenFrame, __VA_ARGS__)      \
+  F(QuicSimpleFrame, __VA_ARGS__)        \
+  F(NoopFrame, __VA_ARGS__)
+
+DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
 
 // Types of frames which are written.
 using QuicWriteFrame = boost::variant<

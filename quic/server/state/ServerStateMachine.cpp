@@ -658,10 +658,10 @@ void onServerReadDataFromOpen(
 
     if (!isProtectedPacket) {
       for (auto& quicFrame : regularPacket.frames) {
-        auto isPadding = boost::get<PaddingFrame>(&quicFrame);
-        auto isAck = boost::get<ReadAckFrame>(&quicFrame);
-        auto isClose = boost::get<ConnectionCloseFrame>(&quicFrame);
-        auto isCrypto = boost::get<ReadCryptoFrame>(&quicFrame);
+        auto isPadding = quicFrame.asPaddingFrame();
+        auto isAck = quicFrame.asReadAckFrame();
+        auto isClose = quicFrame.asConnectionCloseFrame();
+        auto isCrypto = quicFrame.asReadCryptoFrame();
         // TODO: add path challenge and response
         if (!isPadding && !isAck && !isClose && !isCrypto) {
           QUIC_STATS(
@@ -743,199 +743,224 @@ void onServerReadDataFromOpen(
     // TODO: possibly drop the packet here, but rolling back state of
     // what we've already processed is difficult.
     for (auto& quicFrame : regularPacket.frames) {
-      folly::variant_match(
-          quicFrame,
-          [&](ReadAckFrame& ackFrame) {
-            VLOG(10) << "Server received ack frame packet=" << packetNum << " "
-                     << conn;
-            isNonProbingPacket = true;
-            processAckFrame(
-                conn,
-                packetNumberSpace,
-                ackFrame,
-                [&](const OutstandingPacket&,
-                    const QuicWriteFrame& packetFrame,
-                    const ReadAckFrame&) {
-                  folly::variant_match(
-                      packetFrame,
-                      [&](const WriteStreamFrame& frame) {
-                        VLOG(4) << "Server received ack for stream="
-                                << frame.streamId << " offset=" << frame.offset
-                                << " fin=" << frame.fin << " len=" << frame.len
-                                << " " << conn;
-                        auto ackedStream =
-                            conn.streamManager->getStream(frame.streamId);
-                        if (ackedStream) {
-                          invokeStreamSendStateMachine(
-                              conn,
-                              *ackedStream,
-                              StreamEvents::AckStreamFrame(frame));
-                        }
-                      },
-                      [&](const WriteCryptoFrame& frame) {
-                        auto cryptoStream =
-                            getCryptoStream(*conn.cryptoState, encryptionLevel);
-                        processCryptoStreamAck(
-                            *cryptoStream, frame.offset, frame.len);
-                      },
-                      [&](const RstStreamFrame& frame) {
-                        VLOG(4) << "Server received ack for reset stream="
-                                << frame.streamId << " " << conn;
-                        auto stream =
-                            conn.streamManager->getStream(frame.streamId);
-                        if (stream) {
-                          invokeStreamSendStateMachine(
-                              conn, *stream, StreamEvents::RstAck(frame));
-                        }
-                      },
-                      [&](const WriteAckFrame& frame) {
-                        DCHECK(!frame.ackBlocks.empty());
-                        VLOG(4) << "Server received ack for largestAcked="
-                                << frame.ackBlocks.back().end << " " << conn;
-                        commonAckVisitorForAckFrame(ackState, frame);
-                      },
-                      [&](const auto& /*frame*/) {
-                        // Ignore other frames.
-                      });
-                },
-                markPacketLoss,
-                readData.networkData.receiveTimePoint);
-          },
-          [&](RstStreamFrame& frame) {
-            VLOG(10) << "Server received reset stream=" << frame.streamId << " "
-                     << conn;
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            auto stream = conn.streamManager->getStream(frame.streamId);
-            if (!stream) {
-              return;
-            }
+      switch (quicFrame.type()) {
+        case QuicFrame::Type::ReadAckFrame: {
+          VLOG(10) << "Server received ack frame packet=" << packetNum << " "
+                   << conn;
+          isNonProbingPacket = true;
+          ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
+          processAckFrame(
+              conn,
+              packetNumberSpace,
+              ackFrame,
+              [&](const OutstandingPacket&,
+                  const QuicWriteFrame& packetFrame,
+                  const ReadAckFrame&) {
+                folly::variant_match(
+                    packetFrame,
+                    [&](const WriteStreamFrame& frame) {
+                      VLOG(4)
+                          << "Server received ack for stream=" << frame.streamId
+                          << " offset=" << frame.offset << " fin=" << frame.fin
+                          << " len=" << frame.len << " " << conn;
+                      auto ackedStream =
+                          conn.streamManager->getStream(frame.streamId);
+                      if (ackedStream) {
+                        invokeStreamSendStateMachine(
+                            conn,
+                            *ackedStream,
+                            StreamEvents::AckStreamFrame(frame));
+                      }
+                    },
+                    [&](const WriteCryptoFrame& frame) {
+                      auto cryptoStream =
+                          getCryptoStream(*conn.cryptoState, encryptionLevel);
+                      processCryptoStreamAck(
+                          *cryptoStream, frame.offset, frame.len);
+                    },
+                    [&](const RstStreamFrame& frame) {
+                      VLOG(4) << "Server received ack for reset stream="
+                              << frame.streamId << " " << conn;
+                      auto stream =
+                          conn.streamManager->getStream(frame.streamId);
+                      if (stream) {
+                        invokeStreamSendStateMachine(
+                            conn, *stream, StreamEvents::RstAck(frame));
+                      }
+                    },
+                    [&](const WriteAckFrame& frame) {
+                      DCHECK(!frame.ackBlocks.empty());
+                      VLOG(4) << "Server received ack for largestAcked="
+                              << frame.ackBlocks.back().end << " " << conn;
+                      commonAckVisitorForAckFrame(ackState, frame);
+                    },
+                    [&](const auto& /*frame*/) {
+                      // Ignore other frames.
+                    });
+              },
+              markPacketLoss,
+              readData.networkData.receiveTimePoint);
+          break;
+        }
+        case QuicFrame::Type::RstStreamFrame: {
+          RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
+          VLOG(10) << "Server received reset stream=" << frame.streamId << " "
+                   << conn;
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          auto stream = conn.streamManager->getStream(frame.streamId);
+          if (!stream) {
+            break;
+          }
+          invokeStreamReceiveStateMachine(conn, *stream, std::move(frame));
+          break;
+        }
+        case QuicFrame::Type::ReadCryptoFrame: {
+          pktHasRetransmittableData = true;
+          pktHasCryptoData = true;
+          isNonProbingPacket = true;
+          ReadCryptoFrame& cryptoFrame = *quicFrame.asReadCryptoFrame();
+          VLOG(10) << "Server received crypto data offset="
+                   << cryptoFrame.offset
+                   << " len=" << cryptoFrame.data->computeChainDataLength()
+                   << " currentReadOffset="
+                   << getCryptoStream(*conn.cryptoState, encryptionLevel)
+                          ->currentReadOffset
+                   << " " << conn;
+          appendDataToReadBuffer(
+              *getCryptoStream(*conn.cryptoState, encryptionLevel),
+              StreamBuffer(
+                  std::move(cryptoFrame.data), cryptoFrame.offset, false));
+          break;
+        }
+        case QuicFrame::Type::ReadStreamFrame: {
+          ReadStreamFrame& frame = *quicFrame.asReadStreamFrame();
+          VLOG(10) << "Server received stream data for stream="
+                   << frame.streamId << ", offset=" << frame.offset
+                   << " len=" << frame.data->computeChainDataLength()
+                   << " fin=" << frame.fin << " " << conn;
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          auto stream = conn.streamManager->getStream(frame.streamId);
+          // Ignore data from closed streams that we don't have the
+          // state for any more.
+          if (stream) {
             invokeStreamReceiveStateMachine(conn, *stream, frame);
-          },
-          [&](ReadCryptoFrame& cryptoFrame) {
-            pktHasRetransmittableData = true;
-            pktHasCryptoData = true;
-            isNonProbingPacket = true;
-            VLOG(10) << "Server received crypto data offset="
-                     << cryptoFrame.offset
-                     << " len=" << cryptoFrame.data->computeChainDataLength()
-                     << " currentReadOffset="
-                     << getCryptoStream(*conn.cryptoState, encryptionLevel)
-                            ->currentReadOffset
-                     << " " << conn;
-            appendDataToReadBuffer(
-                *getCryptoStream(*conn.cryptoState, encryptionLevel),
-                StreamBuffer(
-                    std::move(cryptoFrame.data), cryptoFrame.offset, false));
-          },
-          [&](ReadStreamFrame& frame) {
-            VLOG(10) << "Server received stream data for stream="
-                     << frame.streamId << ", offset=" << frame.offset
-                     << " len=" << frame.data->computeChainDataLength()
-                     << " fin=" << frame.fin << " " << conn;
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            auto stream = conn.streamManager->getStream(frame.streamId);
-            // Ignore data from closed streams that we don't have the
-            // state for any more.
-            if (stream) {
-              invokeStreamReceiveStateMachine(conn, *stream, frame);
-            }
-          },
-          [&](MaxDataFrame& connWindowUpdate) {
-            VLOG(10) << "Server received max data offset="
-                     << connWindowUpdate.maximumData << " " << conn;
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            handleConnWindowUpdate(conn, connWindowUpdate, packetNum);
-          },
-          [&](MaxStreamDataFrame& streamWindowUpdate) {
-            VLOG(10) << "Server received max stream data stream="
-                     << streamWindowUpdate.streamId
-                     << " offset=" << streamWindowUpdate.maximumData << " "
-                     << conn;
-            if (isReceivingStream(conn.nodeType, streamWindowUpdate.streamId)) {
-              throw QuicTransportException(
-                  "Received MaxStreamDataFrame for receiving stream.",
-                  TransportErrorCode::STREAM_STATE_ERROR);
-            }
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            auto stream =
-                conn.streamManager->getStream(streamWindowUpdate.streamId);
-            if (stream) {
-              handleStreamWindowUpdate(
-                  *stream, streamWindowUpdate.maximumData, packetNum);
-            }
-          },
-          [&](DataBlockedFrame&) {
-            VLOG(10) << "Server received blocked " << conn;
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            handleConnBlocked(conn);
-          },
-          [&](StreamDataBlockedFrame& blocked) {
-            VLOG(10) << "Server received blocked stream=" << blocked.streamId
-                     << " " << conn;
-            pktHasRetransmittableData = true;
-            isNonProbingPacket = true;
-            auto stream = conn.streamManager->getStream(blocked.streamId);
-            if (stream) {
-              handleStreamBlocked(*stream);
-            }
-          },
-          [&](StreamsBlockedFrame& blocked) {
-            // peer wishes to open a stream, but is unable to due to the maximum
-            // stream limit set by us
-            // TODO implement the handler
-            isNonProbingPacket = true;
-            VLOG(10) << "Server received streams blocked limit="
-                     << blocked.streamLimit << ", " << conn;
-          },
-          [&](ConnectionCloseFrame& connFrame) {
-            isNonProbingPacket = true;
-            auto errMsg = folly::to<std::string>(
-                "Server closed by peer reason=", connFrame.reasonPhrase);
-            VLOG(4) << errMsg << " " << conn;
-            // we want to deliver app callbacks with the peer supplied error,
-            // but send a NO_ERROR to the peer.
-            QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-            if (conn.qLogger) {
-              conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-            }
-            conn.peerConnectionError = std::make_pair(
-                QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+          }
+          break;
+        }
+        case QuicFrame::Type::MaxDataFrame: {
+          MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
+          VLOG(10) << "Server received max data offset="
+                   << connWindowUpdate.maximumData << " " << conn;
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          handleConnWindowUpdate(conn, connWindowUpdate, packetNum);
+          break;
+        }
+        case QuicFrame::Type::MaxStreamDataFrame: {
+          MaxStreamDataFrame& streamWindowUpdate =
+              *quicFrame.asMaxStreamDataFrame();
+          VLOG(10) << "Server received max stream data stream="
+                   << streamWindowUpdate.streamId
+                   << " offset=" << streamWindowUpdate.maximumData << " "
+                   << conn;
+          if (isReceivingStream(conn.nodeType, streamWindowUpdate.streamId)) {
             throw QuicTransportException(
-                "Peer closed", TransportErrorCode::NO_ERROR);
-          },
-          [&](ApplicationCloseFrame& appClose) {
-            isNonProbingPacket = true;
-            auto errMsg = folly::to<std::string>(
-                "Server closed by peer reason=", appClose.reasonPhrase);
-            VLOG(10) << errMsg << " " << conn;
-            // we want to deliver app callbacks with the peer supplied error,
-            // but send a NO_ERROR to the peer.
-            QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-            if (conn.qLogger) {
-              conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-            }
-            conn.peerConnectionError = std::make_pair(
-                QuicErrorCode(appClose.errorCode), std::move(errMsg));
-            throw QuicTransportException(
-                "Peer closed", TransportErrorCode::NO_ERROR);
-          },
-          [&](PaddingFrame&) {},
-          [&](QuicSimpleFrame& simpleFrame) {
-            pktHasRetransmittableData = true;
-            isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
-                conn,
-                simpleFrame,
-                packetNum,
-                readData.peer != conn.peerAddress);
-          },
-          [&](auto&) {
-            // TODO update isNonProbingPacket
-          });
+                "Received MaxStreamDataFrame for receiving stream.",
+                TransportErrorCode::STREAM_STATE_ERROR);
+          }
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          auto stream =
+              conn.streamManager->getStream(streamWindowUpdate.streamId);
+          if (stream) {
+            handleStreamWindowUpdate(
+                *stream, streamWindowUpdate.maximumData, packetNum);
+          }
+          break;
+        }
+        case QuicFrame::Type::DataBlockedFrame: {
+          VLOG(10) << "Server received blocked " << conn;
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          handleConnBlocked(conn);
+          break;
+        }
+        case QuicFrame::Type::StreamDataBlockedFrame: {
+          StreamDataBlockedFrame& blocked =
+              *quicFrame.asStreamDataBlockedFrame();
+          VLOG(10) << "Server received blocked stream=" << blocked.streamId
+                   << " " << conn;
+          pktHasRetransmittableData = true;
+          isNonProbingPacket = true;
+          auto stream = conn.streamManager->getStream(blocked.streamId);
+          if (stream) {
+            handleStreamBlocked(*stream);
+          }
+          break;
+        }
+        case QuicFrame::Type::StreamsBlockedFrame: {
+          StreamsBlockedFrame& blocked = *quicFrame.asStreamsBlockedFrame();
+          // peer wishes to open a stream, but is unable to due to the maximum
+          // stream limit set by us
+          // TODO implement the handler
+          isNonProbingPacket = true;
+          VLOG(10) << "Server received streams blocked limit="
+                   << blocked.streamLimit << ", " << conn;
+          break;
+        }
+        case QuicFrame::Type::ConnectionCloseFrame: {
+          isNonProbingPacket = true;
+          ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
+          auto errMsg = folly::to<std::string>(
+              "Server closed by peer reason=", connFrame.reasonPhrase);
+          VLOG(4) << errMsg << " " << conn;
+          // we want to deliver app callbacks with the peer supplied error,
+          // but send a NO_ERROR to the peer.
+          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+          if (conn.qLogger) {
+            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
+          conn.peerConnectionError = std::make_pair(
+              QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+          throw QuicTransportException(
+              "Peer closed", TransportErrorCode::NO_ERROR);
+          break;
+        }
+        case QuicFrame::Type::ApplicationCloseFrame: {
+          isNonProbingPacket = true;
+          ApplicationCloseFrame& appClose =
+              *quicFrame.asApplicationCloseFrame();
+          auto errMsg = folly::to<std::string>(
+              "Server closed by peer reason=", appClose.reasonPhrase);
+          VLOG(10) << errMsg << " " << conn;
+          // we want to deliver app callbacks with the peer supplied error,
+          // but send a NO_ERROR to the peer.
+          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+          if (conn.qLogger) {
+            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+          }
+          conn.peerConnectionError = std::make_pair(
+              QuicErrorCode(appClose.errorCode), std::move(errMsg));
+          throw QuicTransportException(
+              "Peer closed", TransportErrorCode::NO_ERROR);
+          break;
+        }
+        case QuicFrame::Type::PaddingFrame: {
+          break;
+        }
+        case QuicFrame::Type::QuicSimpleFrame: {
+          pktHasRetransmittableData = true;
+          QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
+          isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
+              conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
+          break;
+        }
+        default: {
+          break;
+        }
+      }
     }
 
     // Update writable limit before processing the handshake data. This is so
@@ -1100,38 +1125,44 @@ void onServerReadDataFromClosed(
 
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {
-    folly::variant_match(
-        quicFrame,
-        [&](ConnectionCloseFrame& connFrame) {
-          auto errMsg = folly::to<std::string>(
-              "Server closed by peer reason=", connFrame.reasonPhrase);
-          VLOG(4) << errMsg << " " << conn;
-          if (conn.qLogger) {
-            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
-          // we want to deliver app callbacks with the peer supplied error,
-          // but send a NO_ERROR to the peer.
-          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-          conn.peerConnectionError = std::make_pair(
-              QuicErrorCode(connFrame.errorCode), std::move(errMsg));
-        },
-        [&](ApplicationCloseFrame& appClose) {
-          if (!isProtectedPacket) {
-            return;
-          }
-          auto errMsg = folly::to<std::string>(
-              "Server closed by peer reason=", appClose.reasonPhrase);
-          VLOG(10) << errMsg << " " << conn;
-          if (conn.qLogger) {
-            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
-          // we want to deliver app callbacks with the peer supplied error,
-          // but send a NO_ERROR to the peer.
-          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-          conn.peerConnectionError = std::make_pair(
-              QuicErrorCode(appClose.errorCode), std::move(errMsg));
-        },
-        [&](auto&) { return; });
+    switch (quicFrame.type()) {
+      case QuicFrame::Type::ConnectionCloseFrame: {
+        ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
+        auto errMsg = folly::to<std::string>(
+            "Server closed by peer reason=", connFrame.reasonPhrase);
+        VLOG(4) << errMsg << " " << conn;
+        if (conn.qLogger) {
+          conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+        }
+        // we want to deliver app callbacks with the peer supplied error,
+        // but send a NO_ERROR to the peer.
+        QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+        conn.peerConnectionError = std::make_pair(
+            QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+        break;
+      }
+      case QuicFrame::Type::ApplicationCloseFrame: {
+        if (!isProtectedPacket) {
+          return;
+        }
+        ApplicationCloseFrame& appClose = *quicFrame.asApplicationCloseFrame();
+        auto errMsg = folly::to<std::string>(
+            "Server closed by peer reason=", appClose.reasonPhrase);
+        VLOG(10) << errMsg << " " << conn;
+        if (conn.qLogger) {
+          conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+        }
+        // we want to deliver app callbacks with the peer supplied error,
+        // but send a NO_ERROR to the peer.
+        QUIC_TRACE(recvd_close, conn, errMsg.c_str());
+        conn.peerConnectionError = std::make_pair(
+            QuicErrorCode(appClose.errorCode), std::move(errMsg));
+
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   // We only need to set the largest received packet number in order to

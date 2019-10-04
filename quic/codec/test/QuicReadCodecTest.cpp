@@ -111,9 +111,8 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   auto packetQueue = bufToQueue(std::move(packet));
 
   AckStates ackStates;
-  auto retryPacket = *makeUnencryptedCodec()
-                          ->parsePacket(packetQueue, ackStates)
-                          .regularPacket();
+  auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
+  auto& retryPacket = *result.regularPacket();
 
   auto headerOut = *retryPacket.header.asLong();
 

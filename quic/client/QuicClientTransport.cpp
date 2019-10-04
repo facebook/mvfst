@@ -219,10 +219,10 @@ void QuicClientTransport::processPacketData(
   }
   if (!isProtectedPacket) {
     for (auto& quicFrame : regularPacket.frames) {
-      auto isPadding = boost::get<PaddingFrame>(&quicFrame);
-      auto isAck = boost::get<ReadAckFrame>(&quicFrame);
-      auto isClose = boost::get<ConnectionCloseFrame>(&quicFrame);
-      auto isCrypto = boost::get<ReadCryptoFrame>(&quicFrame);
+      auto isPadding = quicFrame.asPaddingFrame();
+      auto isAck = quicFrame.asReadAckFrame();
+      auto isClose = quicFrame.asConnectionCloseFrame();
+      auto isCrypto = quicFrame.asReadCryptoFrame();
       // TODO: add path challenge and response
       if (!isPadding && !isAck && !isClose && !isCrypto) {
         throw QuicTransportException(
@@ -269,202 +269,227 @@ void QuicClientTransport::processPacketData(
   bool pktHasCryptoData = false;
 
   for (auto& quicFrame : regularPacket.frames) {
-    folly::variant_match(
-        quicFrame,
-        [&](ReadAckFrame& ackFrame) {
-          VLOG(10) << "Client received ack frame in packet=" << packetNum << " "
-                   << *this;
-          processAckFrame(
-              *conn_,
-              pnSpace,
-              ackFrame,
-              [&](const OutstandingPacket& outstandingPacket,
-                  const QuicWriteFrame& packetFrame,
-                  const ReadAckFrame&) {
-                auto outstandingProtectionType =
-                    outstandingPacket.packet.header.getProtectionType();
-                if (outstandingProtectionType == ProtectionType::KeyPhaseZero) {
-                  // If we received an ack for data that we sent in 1-rtt from
-                  // the server, we can assume that the server had successfully
-                  // derived the 1-rtt keys and hence received the client
-                  // finished message. Thus we don't need to retransmit any of
-                  // the crypto data any longer.
-                  //
-                  // This will not cancel oneRttStream.
-                  //
-                  // TODO: replace this with a better solution later.
-                  cancelHandshakeCryptoStreamRetransmissions(
-                      *conn_->cryptoState);
-                }
-                folly::variant_match(
-                    packetFrame,
-                    [&](const WriteAckFrame& frame) {
-                      DCHECK(!frame.ackBlocks.empty());
-                      VLOG(4) << "Client received ack for largestAcked="
-                              << frame.ackBlocks.back().end << " " << *this;
-                      commonAckVisitorForAckFrame(ackState, frame);
-                    },
-                    [&](const RstStreamFrame& frame) {
-                      VLOG(4) << "Client received ack for reset frame stream="
-                              << frame.streamId << " " << *this;
+    switch (quicFrame.type()) {
+      case QuicFrame::Type::ReadAckFrame: {
+        VLOG(10) << "Client received ack frame in packet=" << packetNum << " "
+                 << *this;
+        ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
+        processAckFrame(
+            *conn_,
+            pnSpace,
+            ackFrame,
+            [&](const OutstandingPacket& outstandingPacket,
+                const QuicWriteFrame& packetFrame,
+                const ReadAckFrame&) {
+              auto outstandingProtectionType =
+                  outstandingPacket.packet.header.getProtectionType();
+              if (outstandingProtectionType == ProtectionType::KeyPhaseZero) {
+                // If we received an ack for data that we sent in 1-rtt from
+                // the server, we can assume that the server had successfully
+                // derived the 1-rtt keys and hence received the client
+                // finished message. Thus we don't need to retransmit any of
+                // the crypto data any longer.
+                //
+                // This will not cancel oneRttStream.
+                //
+                // TODO: replace this with a better solution later.
+                cancelHandshakeCryptoStreamRetransmissions(*conn_->cryptoState);
+              }
+              folly::variant_match(
+                  packetFrame,
+                  [&](const WriteAckFrame& frame) {
+                    DCHECK(!frame.ackBlocks.empty());
+                    VLOG(4) << "Client received ack for largestAcked="
+                            << frame.ackBlocks.back().end << " " << *this;
+                    commonAckVisitorForAckFrame(ackState, frame);
+                  },
+                  [&](const RstStreamFrame& frame) {
+                    VLOG(4) << "Client received ack for reset frame stream="
+                            << frame.streamId << " " << *this;
 
-                      auto stream =
-                          conn_->streamManager->getStream(frame.streamId);
-                      if (stream) {
-                        invokeStreamSendStateMachine(
-                            *conn_, *stream, StreamEvents::RstAck(frame));
-                      }
-                    },
-                    [&](const WriteStreamFrame& frame) {
-                      auto ackedStream =
-                          conn_->streamManager->getStream(frame.streamId);
-                      VLOG(4) << "Client got ack for stream=" << frame.streamId
-                              << " offset=" << frame.offset
-                              << " fin=" << frame.fin << " data=" << frame.len
-                              << " closed=" << (ackedStream == nullptr) << " "
-                              << *this;
-                      if (ackedStream) {
-                        invokeStreamSendStateMachine(
-                            *conn_,
-                            *ackedStream,
-                            StreamEvents::AckStreamFrame(frame));
-                      }
-                    },
-                    [&](const WriteCryptoFrame& frame) {
-                      auto cryptoStream = getCryptoStream(
-                          *conn_->cryptoState,
-                          protectionTypeToEncryptionLevel(
-                              outstandingProtectionType));
-                      processCryptoStreamAck(
-                          *cryptoStream, frame.offset, frame.len);
-                    },
-                    [&](const auto& /* frame */) {
-                      // Ignore other frames.
-                    });
-              },
-              markPacketLoss,
-              receiveTimePoint);
-        },
-        [&](RstStreamFrame& frame) {
-          VLOG(10) << "Client received reset stream=" << frame.streamId << " "
-                   << *this;
-          pktHasRetransmittableData = true;
-          auto streamId = frame.streamId;
-          auto stream = conn_->streamManager->getStream(streamId);
-          if (!stream) {
-            return;
-          }
-          invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
-        },
-        [&](ReadCryptoFrame& cryptoFrame) {
-          pktHasRetransmittableData = true;
-          pktHasCryptoData = true;
-          VLOG(10) << "Client received crypto data offset="
-                   << cryptoFrame.offset
-                   << " len=" << cryptoFrame.data->computeChainDataLength()
-                   << " packetNum=" << packetNum << " " << *this;
-          appendDataToReadBuffer(
-              *getCryptoStream(*conn_->cryptoState, encryptionLevel),
-              StreamBuffer(
-                  std::move(cryptoFrame.data), cryptoFrame.offset, false));
-        },
-        [&](ReadStreamFrame& frame) {
-          VLOG(10) << "Client received stream data for stream="
-                   << frame.streamId << " offset=" << frame.offset
-                   << " len=" << frame.data->computeChainDataLength()
-                   << " fin=" << frame.fin << " packetNum=" << packetNum << " "
-                   << *this;
-          auto stream = conn_->streamManager->getStream(frame.streamId);
-          pktHasRetransmittableData = true;
-          if (!stream) {
-            VLOG(10) << "Could not find stream=" << frame.streamId << " "
-                     << *conn_;
-            return;
-          }
-          invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
-        },
-        [&](MaxDataFrame& connWindowUpdate) {
-          VLOG(10) << "Client received max data offset="
-                   << connWindowUpdate.maximumData << " " << *this;
-          pktHasRetransmittableData = true;
-          handleConnWindowUpdate(*conn_, connWindowUpdate, packetNum);
-        },
-        [&](MaxStreamDataFrame& streamWindowUpdate) {
-          VLOG(10) << "Client received max stream data stream="
-                   << streamWindowUpdate.streamId
-                   << " offset=" << streamWindowUpdate.maximumData << " "
-                   << *this;
-          if (isReceivingStream(conn_->nodeType, streamWindowUpdate.streamId)) {
-            throw QuicTransportException(
-                "Received MaxStreamDataFrame for receiving stream.",
-                TransportErrorCode::STREAM_STATE_ERROR);
-          }
-          pktHasRetransmittableData = true;
-          auto stream =
-              conn_->streamManager->getStream(streamWindowUpdate.streamId);
-          if (stream) {
-            handleStreamWindowUpdate(
-                *stream, streamWindowUpdate.maximumData, packetNum);
-          }
-        },
-        [&](DataBlockedFrame&) {
-          VLOG(10) << "Client received blocked " << *this;
-          pktHasRetransmittableData = true;
-          handleConnBlocked(*conn_);
-        },
-        [&](StreamDataBlockedFrame& blocked) {
-          // peer wishes to send data, but is unable to due to stream-level flow
-          // control
-          VLOG(10) << "Client received blocked stream=" << blocked.streamId
-                   << " " << *this;
-          pktHasRetransmittableData = true;
-          auto stream = conn_->streamManager->getStream(blocked.streamId);
-          if (stream) {
-            handleStreamBlocked(*stream);
-          }
-        },
-        [&](StreamsBlockedFrame& blocked) {
-          // peer wishes to open a stream, but is unable to due to the maximum
-          // stream limit set by us
-          VLOG(10) << "Client received stream blocked limit="
-                   << blocked.streamLimit << " " << *this;
-          // TODO implement handler for it
-        },
-        [&](ConnectionCloseFrame& connFrame) {
-          auto errMsg = folly::to<std::string>(
-              "Client closed by peer reason=", connFrame.reasonPhrase);
-          VLOG(4) << errMsg << " " << *this;
-          // we want to deliver app callbacks with the peer supplied error,
-          // but send a NO_ERROR to the peer.
-          if (conn_->qLogger) {
-            conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
-          QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
-          conn_->peerConnectionError = std::make_pair(
-              QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+                    auto stream =
+                        conn_->streamManager->getStream(frame.streamId);
+                    if (stream) {
+                      invokeStreamSendStateMachine(
+                          *conn_, *stream, StreamEvents::RstAck(frame));
+                    }
+                  },
+                  [&](const WriteStreamFrame& frame) {
+                    auto ackedStream =
+                        conn_->streamManager->getStream(frame.streamId);
+                    VLOG(4) << "Client got ack for stream=" << frame.streamId
+                            << " offset=" << frame.offset
+                            << " fin=" << frame.fin << " data=" << frame.len
+                            << " closed=" << (ackedStream == nullptr) << " "
+                            << *this;
+                    if (ackedStream) {
+                      invokeStreamSendStateMachine(
+                          *conn_,
+                          *ackedStream,
+                          StreamEvents::AckStreamFrame(frame));
+                    }
+                  },
+                  [&](const WriteCryptoFrame& frame) {
+                    auto cryptoStream = getCryptoStream(
+                        *conn_->cryptoState,
+                        protectionTypeToEncryptionLevel(
+                            outstandingProtectionType));
+                    processCryptoStreamAck(
+                        *cryptoStream, frame.offset, frame.len);
+                  },
+                  [&](const auto& /* frame */) {
+                    // Ignore other frames.
+                  });
+            },
+            markPacketLoss,
+            receiveTimePoint);
+        break;
+      }
+      case QuicFrame::Type::RstStreamFrame: {
+        RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
+        VLOG(10) << "Client received reset stream=" << frame.streamId << " "
+                 << *this;
+        pktHasRetransmittableData = true;
+        auto streamId = frame.streamId;
+        auto stream = conn_->streamManager->getStream(streamId);
+        if (!stream) {
+          break;
+        }
+        invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
+        break;
+      }
+      case QuicFrame::Type::ReadCryptoFrame: {
+        pktHasRetransmittableData = true;
+        pktHasCryptoData = true;
+        ReadCryptoFrame& cryptoFrame = *quicFrame.asReadCryptoFrame();
+        VLOG(10) << "Client received crypto data offset=" << cryptoFrame.offset
+                 << " len=" << cryptoFrame.data->computeChainDataLength()
+                 << " packetNum=" << packetNum << " " << *this;
+        appendDataToReadBuffer(
+            *getCryptoStream(*conn_->cryptoState, encryptionLevel),
+            StreamBuffer(
+                std::move(cryptoFrame.data), cryptoFrame.offset, false));
+        break;
+      }
+      case QuicFrame::Type::ReadStreamFrame: {
+        ReadStreamFrame& frame = *quicFrame.asReadStreamFrame();
+        VLOG(10) << "Client received stream data for stream=" << frame.streamId
+                 << " offset=" << frame.offset
+                 << " len=" << frame.data->computeChainDataLength()
+                 << " fin=" << frame.fin << " packetNum=" << packetNum << " "
+                 << *this;
+        auto stream = conn_->streamManager->getStream(frame.streamId);
+        pktHasRetransmittableData = true;
+        if (!stream) {
+          VLOG(10) << "Could not find stream=" << frame.streamId << " "
+                   << *conn_;
+          break;
+        }
+        invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
+        break;
+      }
+      case QuicFrame::Type::MaxDataFrame: {
+        MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
+        VLOG(10) << "Client received max data offset="
+                 << connWindowUpdate.maximumData << " " << *this;
+        pktHasRetransmittableData = true;
+        handleConnWindowUpdate(*conn_, connWindowUpdate, packetNum);
+        break;
+      }
+      case QuicFrame::Type::MaxStreamDataFrame: {
+        MaxStreamDataFrame& streamWindowUpdate =
+            *quicFrame.asMaxStreamDataFrame();
+        VLOG(10) << "Client received max stream data stream="
+                 << streamWindowUpdate.streamId
+                 << " offset=" << streamWindowUpdate.maximumData << " "
+                 << *this;
+        if (isReceivingStream(conn_->nodeType, streamWindowUpdate.streamId)) {
           throw QuicTransportException(
-              "Peer closed", TransportErrorCode::NO_ERROR);
-        },
-        [&](ApplicationCloseFrame& appClose) {
-          auto errMsg = folly::to<std::string>(
-              "Client closed by peer reason=", appClose.reasonPhrase);
-          VLOG(4) << errMsg << " " << *this;
-          if (conn_->qLogger) {
-            conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
-          QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
-          conn_->peerConnectionError = std::make_pair(
-              QuicErrorCode(appClose.errorCode), std::move(errMsg));
-          throw QuicTransportException(
-              "Peer closed", TransportErrorCode::NO_ERROR);
-        },
-        [&](PaddingFrame&) {},
-        [&](QuicSimpleFrame& simpleFrame) {
-          pktHasRetransmittableData = true;
-          updateSimpleFrameOnPacketReceived(
-              *conn_, simpleFrame, packetNum, false);
-        },
-        [&](auto&) {});
+              "Received MaxStreamDataFrame for receiving stream.",
+              TransportErrorCode::STREAM_STATE_ERROR);
+        }
+        pktHasRetransmittableData = true;
+        auto stream =
+            conn_->streamManager->getStream(streamWindowUpdate.streamId);
+        if (stream) {
+          handleStreamWindowUpdate(
+              *stream, streamWindowUpdate.maximumData, packetNum);
+        }
+        break;
+      }
+      case QuicFrame::Type::DataBlockedFrame: {
+        VLOG(10) << "Client received blocked " << *this;
+        pktHasRetransmittableData = true;
+        handleConnBlocked(*conn_);
+        break;
+      }
+      case QuicFrame::Type::StreamDataBlockedFrame: {
+        // peer wishes to send data, but is unable to due to stream-level flow
+        // control
+        StreamDataBlockedFrame& blocked = *quicFrame.asStreamDataBlockedFrame();
+        VLOG(10) << "Client received blocked stream=" << blocked.streamId << " "
+                 << *this;
+        pktHasRetransmittableData = true;
+        auto stream = conn_->streamManager->getStream(blocked.streamId);
+        if (stream) {
+          handleStreamBlocked(*stream);
+        }
+        break;
+      }
+      case QuicFrame::Type::StreamsBlockedFrame: {
+        // peer wishes to open a stream, but is unable to due to the maximum
+        // stream limit set by us
+        StreamsBlockedFrame& blocked = *quicFrame.asStreamsBlockedFrame();
+        VLOG(10) << "Client received stream blocked limit="
+                 << blocked.streamLimit << " " << *this;
+        // TODO implement handler for it
+        break;
+      }
+      case QuicFrame::Type::ConnectionCloseFrame: {
+        ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
+        auto errMsg = folly::to<std::string>(
+            "Client closed by peer reason=", connFrame.reasonPhrase);
+        VLOG(4) << errMsg << " " << *this;
+        // we want to deliver app callbacks with the peer supplied error,
+        // but send a NO_ERROR to the peer.
+        if (conn_->qLogger) {
+          conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+        }
+        QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
+        conn_->peerConnectionError = std::make_pair(
+            QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+        throw QuicTransportException(
+            "Peer closed", TransportErrorCode::NO_ERROR);
+        break;
+      }
+      case QuicFrame::Type::ApplicationCloseFrame: {
+        ApplicationCloseFrame& appClose = *quicFrame.asApplicationCloseFrame();
+        auto errMsg = folly::to<std::string>(
+            "Client closed by peer reason=", appClose.reasonPhrase);
+        VLOG(4) << errMsg << " " << *this;
+        if (conn_->qLogger) {
+          conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
+        }
+        QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
+        conn_->peerConnectionError = std::make_pair(
+            QuicErrorCode(appClose.errorCode), std::move(errMsg));
+        throw QuicTransportException(
+            "Peer closed", TransportErrorCode::NO_ERROR);
+        break;
+      }
+      case QuicFrame::Type::PaddingFrame: {
+        break;
+      }
+      case QuicFrame::Type::QuicSimpleFrame: {
+        QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
+        pktHasRetransmittableData = true;
+        updateSimpleFrameOnPacketReceived(
+            *conn_, simpleFrame, packetNum, false);
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   // Try reading bytes off of crypto, and performing a handshake.

@@ -80,69 +80,94 @@ std::unique_ptr<QLogPacketEvent> QLogger::createPacketEvent(
   uint64_t numPaddingFrames = 0;
   // looping through the packet to store logs created from frames in the packet
   for (const auto& quicFrame : regularPacket.frames) {
-    folly::variant_match(
-        quicFrame,
-        [&](const PaddingFrame& /* unused */) { ++numPaddingFrames; },
-        [&](const RstStreamFrame& frame) {
-          event->frames.push_back(std::make_unique<RstStreamFrameLog>(
-              frame.streamId, frame.errorCode, frame.offset));
-        },
-        [&](const ConnectionCloseFrame& frame) {
-          event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
-              frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
-        },
-        [&](const ApplicationCloseFrame& frame) {
-          event->frames.push_back(std::make_unique<ApplicationCloseFrameLog>(
-              frame.errorCode, frame.reasonPhrase));
-        },
-        [&](const MaxDataFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<MaxDataFrameLog>(frame.maximumData));
-        },
-        [&](const MaxStreamDataFrame& frame) {
-          event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
-              frame.streamId, frame.maximumData));
-        },
-        [&](const StreamsBlockedFrame& frame) {
-          event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
-              frame.streamLimit, frame.isForBidirectional));
-        },
-        [&](const PingFrame& /* unused */) {
-          event->frames.push_back(std::make_unique<PingFrameLog>());
-        },
-        [&](const DataBlockedFrame& frame) {
-          event->frames.push_back(
-              std::make_unique<DataBlockedFrameLog>(frame.dataLimit));
-        },
-        [&](const StreamDataBlockedFrame& frame) {
-          event->frames.push_back(std::make_unique<StreamDataBlockedFrameLog>(
-              frame.streamId, frame.dataLimit));
-        },
-        [&](const WriteAckFrame& frame) {
-          event->frames.push_back(std::make_unique<WriteAckFrameLog>(
-              frame.ackBlocks, frame.ackDelay));
-        },
-        [&](const ReadAckFrame& frame) {
-          event->frames.push_back(std::make_unique<ReadAckFrameLog>(
-              frame.ackBlocks, frame.ackDelay));
-        },
-        [&](const ReadStreamFrame& frame) {
-          event->frames.push_back(std::make_unique<StreamFrameLog>(
-              frame.streamId, frame.offset, frame.data->length(), frame.fin));
-        },
-        [&](const ReadCryptoFrame& frame) {
-          event->frames.push_back(std::make_unique<CryptoFrameLog>(
-              frame.offset, frame.data->length()));
-        },
-        [&](const ReadNewTokenFrame& /* unused */) {
-          event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
-        },
-        [&](const QuicSimpleFrame& simpleFrame) {
-          addQuicSimpleFrameToEvent(event.get(), simpleFrame);
-        },
-        [&](const auto& /* unused */) {
-          // Ignore other frames.
-        });
+    switch (quicFrame.type()) {
+      case QuicFrame::Type::PaddingFrame: {
+        ++numPaddingFrames;
+        break;
+      }
+      case QuicFrame::Type::RstStreamFrame: {
+        const auto& frame = *quicFrame.asRstStreamFrame();
+        event->frames.push_back(std::make_unique<RstStreamFrameLog>(
+            frame.streamId, frame.errorCode, frame.offset));
+        break;
+      }
+      case QuicFrame::Type::ConnectionCloseFrame: {
+        const auto& frame = *quicFrame.asConnectionCloseFrame();
+        event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
+            frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
+        break;
+      }
+      case QuicFrame::Type::ApplicationCloseFrame: {
+        const auto& frame = *quicFrame.asApplicationCloseFrame();
+        event->frames.push_back(std::make_unique<ApplicationCloseFrameLog>(
+            frame.errorCode, frame.reasonPhrase));
+        break;
+      }
+      case QuicFrame::Type::MaxDataFrame: {
+        const auto& frame = *quicFrame.asMaxDataFrame();
+        event->frames.push_back(
+            std::make_unique<MaxDataFrameLog>(frame.maximumData));
+        break;
+      }
+      case QuicFrame::Type::MaxStreamDataFrame: {
+        const auto& frame = *quicFrame.asMaxStreamDataFrame();
+        event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
+            frame.streamId, frame.maximumData));
+        break;
+      }
+      case QuicFrame::Type::PingFrame: {
+        event->frames.push_back(std::make_unique<PingFrameLog>());
+        break;
+      }
+      case QuicFrame::Type::DataBlockedFrame: {
+        const auto& frame = *quicFrame.asDataBlockedFrame();
+        event->frames.push_back(
+            std::make_unique<DataBlockedFrameLog>(frame.dataLimit));
+        break;
+      }
+      case QuicFrame::Type::StreamDataBlockedFrame: {
+        const auto& frame = *quicFrame.asStreamDataBlockedFrame();
+        event->frames.push_back(std::make_unique<StreamDataBlockedFrameLog>(
+            frame.streamId, frame.dataLimit));
+        break;
+      }
+      case QuicFrame::Type::StreamsBlockedFrame: {
+        const auto& frame = *quicFrame.asStreamsBlockedFrame();
+        event->frames.push_back(std::make_unique<StreamsBlockedFrameLog>(
+            frame.streamLimit, frame.isForBidirectional));
+        break;
+      }
+      case QuicFrame::Type::ReadAckFrame: {
+        const auto& frame = *quicFrame.asReadAckFrame();
+        event->frames.push_back(
+            std::make_unique<ReadAckFrameLog>(frame.ackBlocks, frame.ackDelay));
+        break;
+      }
+      case QuicFrame::Type::ReadStreamFrame: {
+        const auto& frame = *quicFrame.asReadStreamFrame();
+        event->frames.push_back(std::make_unique<StreamFrameLog>(
+            frame.streamId, frame.offset, frame.data->length(), frame.fin));
+        break;
+      }
+      case QuicFrame::Type::ReadCryptoFrame: {
+        const auto& frame = *quicFrame.asReadCryptoFrame();
+        event->frames.push_back(std::make_unique<CryptoFrameLog>(
+            frame.offset, frame.data->length()));
+        break;
+      }
+      case QuicFrame::Type::ReadNewTokenFrame: {
+        event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
+        break;
+      }
+      case QuicFrame::Type::QuicSimpleFrame: {
+        const auto& simpleFrame = *quicFrame.asQuicSimpleFrame();
+        addQuicSimpleFrameToEvent(event.get(), simpleFrame);
+        break;
+      }
+      case QuicFrame::Type::NoopFrame: {
+        break;
+      }
+    }
   }
   if (numPaddingFrames > 0) {
     event->frames.push_back(

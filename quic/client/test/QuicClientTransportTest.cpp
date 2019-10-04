@@ -2702,10 +2702,10 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallenge) {
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 
-template <class FrameType>
 bool verifyFramePresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
-    QuicReadCodec& readCodec) {
+    QuicReadCodec& readCodec,
+    QuicFrame::Type frameType) {
   AckStates ackStates;
   for (auto& write : socketWrites) {
     auto packetQueue = bufToQueue(write->clone());
@@ -2714,8 +2714,10 @@ bool verifyFramePresent(
     if (!regularPacket) {
       continue;
     }
-    for (FOLLY_MAYBE_UNUSED auto& frame :
-         all_frames<FrameType>(regularPacket->frames)) {
+    for (FOLLY_MAYBE_UNUSED auto& frame : regularPacket->frames) {
+      if (frame.type() != frameType) {
+        continue;
+      }
       return true;
     }
   }
@@ -2753,8 +2755,8 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   auto serverReadCodec = makeEncryptedCodec();
   EXPECT_CALL(readCb, readError(streamId, _));
   client->closeGracefully();
-  EXPECT_FALSE(
-      verifyFramePresent<ConnectionCloseFrame>(socketWrites, *serverReadCodec));
+  EXPECT_FALSE(verifyFramePresent(
+      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
 
   // close the stream
   auto packet = packetToBuf(createStreamPacket(
@@ -2769,8 +2771,8 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
       true));
   socketWrites.clear();
   deliverData(packet->coalesce());
-  EXPECT_TRUE(
-      verifyFramePresent<ConnectionCloseFrame>(socketWrites, *serverReadCodec));
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
@@ -2840,8 +2842,10 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   deliverData(packet->coalesce());
   EXPECT_CALL(readCb, readError(streamId, _));
   client->close(folly::none);
-  EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-      socketWrites, *makeEncryptedCodec()));
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites,
+      *makeEncryptedCodec(),
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 class QuicClientTransportAfterStartTestClose
@@ -2870,8 +2874,10 @@ TEST_P(
     client->close(std::make_pair(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
-    EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
-        socketWrites, *makeHandshakeCodec()));
+    EXPECT_TRUE(verifyFramePresent(
+        socketWrites,
+        *makeHandshakeCodec(),
+        QuicFrame::Type::ApplicationCloseFrame));
 
     std::vector<int> indices =
         getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
@@ -2886,8 +2892,10 @@ TEST_P(
 
   } else {
     client->close(folly::none);
-    EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-        socketWrites, *makeHandshakeCodec()));
+    EXPECT_TRUE(verifyFramePresent(
+        socketWrites,
+        *makeHandshakeCodec(),
+        QuicFrame::Type::ConnectionCloseFrame));
     std::vector<int> indices =
         getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
     // expecting that connection close called once
@@ -3035,12 +3043,16 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
     client->close(std::make_pair(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
-    EXPECT_TRUE(verifyFramePresent<ApplicationCloseFrame>(
-        socketWrites, *makeEncryptedCodec()));
+    EXPECT_TRUE(verifyFramePresent(
+        socketWrites,
+        *makeEncryptedCodec(),
+        QuicFrame::Type::ApplicationCloseFrame));
   } else {
     client->close(folly::none);
-    EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-        socketWrites, *makeEncryptedCodec()));
+    EXPECT_TRUE(verifyFramePresent(
+        socketWrites,
+        *makeEncryptedCodec(),
+        QuicFrame::Type::ConnectionCloseFrame));
   }
 }
 
@@ -3246,10 +3258,10 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
 
   auto serverCodec = makeEncryptedCodec();
   // We expect a conn close in a cleartext packet.
-  EXPECT_FALSE(
-      verifyFramePresent<ApplicationCloseFrame>(socketWrites, *serverCodec));
-  EXPECT_FALSE(
-      verifyFramePresent<ConnectionCloseFrame>(socketWrites, *serverCodec));
+  EXPECT_FALSE(verifyFramePresent(
+      socketWrites, *serverCodec, QuicFrame::Type::ApplicationCloseFrame));
+  EXPECT_FALSE(verifyFramePresent(
+      socketWrites, *serverCodec, QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_TRUE(socketWrites.empty());
 }
 
@@ -3271,8 +3283,10 @@ TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
       0 /* cipherOverhead */,
       0 /* largestAcked */));
   deliverData(packet->coalesce());
-  EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-      socketWrites, *makeEncryptedCodec(true)));
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites,
+      *makeEncryptedCodec(true),
+      QuicFrame::Type::ConnectionCloseFrame));
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);
@@ -3339,6 +3353,56 @@ TEST_F(
   writeFrame(rstFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   EXPECT_THROW(deliverData(packet->coalesce()), std::runtime_error);
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReceiveRstStreamNonExistentAndOtherFrame) {
+  StreamId serverUnidirectional = 0x03;
+
+  // Deliver reset on peer unidirectional stream to close the stream.
+  RstStreamFrame rstFrame(
+      serverUnidirectional, GenericApplicationErrorCode::UNKNOWN, 0);
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */,
+      *client->getConn().version);
+  writeFrame(rstFrame, builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  deliverData(packet->coalesce());
+
+  auto streamId =
+      client->createBidirectionalStream(false /* replaySafe */).value();
+
+  ShortHeader header2(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder2(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */,
+      *client->getConn().version);
+  writeFrame(rstFrame, builder2);
+
+  auto data = folly::IOBuf::copyBuffer("hello");
+  writeStreamFrameHeader(
+      builder2,
+      streamId,
+      0,
+      data->computeChainDataLength(),
+      data->computeChainDataLength(),
+      false);
+  writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
+  auto packetObject = std::move(builder2).buildPacket();
+  auto packet2 = packetToBuf(std::move(packetObject));
+  deliverData(packet2->coalesce());
+
+  auto readData = client->read(streamId, 0);
+  ASSERT_TRUE(readData.hasValue());
+  ASSERT_NE(readData.value().first, nullptr);
+  EXPECT_TRUE(folly::IOBufEqualTo()(*readData.value().first, *data));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
@@ -4138,8 +4202,10 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
       QuicErrorCode(TransportErrorCode::NO_ERROR),
       client->getConn().localConnectionError->first);
   EXPECT_TRUE(client->isClosed());
-  EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-      socketWrites, *makeHandshakeCodec()));
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites,
+      *makeHandshakeCodec(),
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
@@ -4170,8 +4236,10 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
       QuicErrorCode(TransportErrorCode::NO_ERROR),
       client->getConn().localConnectionError->first);
   EXPECT_TRUE(client->isClosed());
-  EXPECT_TRUE(verifyFramePresent<ConnectionCloseFrame>(
-      socketWrites, *makeHandshakeCodec()));
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites,
+      *makeHandshakeCodec(),
+      QuicFrame::Type::ConnectionCloseFrame));
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);

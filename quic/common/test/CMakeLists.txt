@@ -61,6 +61,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   QuicCodecUtilsTest.cpp
   TimeUtilTest.cpp
   IntervalSetTest.cpp
+  VariantTest.cpp
   DEPENDS
   Folly::folly
   ${LIBFIZZ_LIBRARY}
