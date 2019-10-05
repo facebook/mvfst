@@ -300,38 +300,30 @@ CodecResult QuicReadCodec::parsePacket(
     return CodecResult(Nothing());
   }
 
-  // Back in the queue so we can split.
-  // TODO: this will share the buffer. We should be able to supply an unshared
-  // buffer.
-  queue.append(std::move(data));
+  // We know that the iobuf is not chained. This means that we can safely have a
+  // non-owning reference to the header without cloning the buffer. If we don't
+  // clone the buffer, the buffer will not show up as shared and we can decrypt
+  // in-place.
   size_t aadLen = packetNumberOffset + packetNum.second;
-  auto headerData = queue.split(aadLen);
-  auto encryptedData = queue.move();
-  if (!encryptedData) {
-    // There should normally be some integrity tag at least in the data,
-    // however allowing the aead to process the data even if the tag is not
-    // present helps with writing tests.
-    encryptedData = folly::IOBuf::create(0);
-  }
+  folly::IOBuf headerData =
+      folly::IOBuf::wrapBufferAsValue(data->data(), aadLen);
+  data->trimStart(aadLen);
+
   Buf decrypted;
   // TODO: small optimization we can do here: only read the token if
   // decryption fails
   folly::Optional<StatelessResetToken> token;
-  auto encryptedDataLength = encryptedData->computeChainDataLength();
+  auto encryptedDataLength = data->length();
   if (statelessResetToken_ &&
       encryptedDataLength > sizeof(StatelessResetToken)) {
     token = StatelessResetToken();
-    // We want to avoid cloning the IOBuf which would prevent in-place
-    // decryption
-    folly::io::Cursor statelessTokenCursor(encryptedData.get());
-    // TODO: we could possibly use headroom or tailroom of the iobuf to avoid
-    // extra allocations
-    statelessTokenCursor.skip(
-        encryptedDataLength - sizeof(StatelessResetToken));
-    statelessTokenCursor.pull(token->data(), token->size());
+    memcpy(
+        token->data(),
+        data->data() + (encryptedDataLength - sizeof(StatelessResetToken)),
+        token->size());
   }
   auto decryptAttempt = oneRttReadCipher_->tryDecrypt(
-      std::move(encryptedData), headerData.get(), packetNum.first);
+      std::move(data), &headerData, packetNum.first);
   if (!decryptAttempt) {
     // Can't return the data now, already consumed it to try decrypting it.
     if (token) {
