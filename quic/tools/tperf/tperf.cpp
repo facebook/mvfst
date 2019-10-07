@@ -15,6 +15,7 @@
 
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -243,12 +244,16 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
       uint16_t port,
       std::chrono::milliseconds transportTimerResolution,
       int32_t duration,
-      uint64_t window)
+      uint64_t window,
+      bool gso,
+      quic::CongestionControlType congestionControlType)
       : host_(host),
         port_(port),
         eventBase_(transportTimerResolution),
         duration_(duration),
-        window_(window) {}
+        window_(window),
+        gso_(gso),
+        congestionControlType_(congestionControlType) {}
 
   void timeoutExpired() noexcept override {
     quicClient_->closeNow(folly::none);
@@ -339,10 +344,21 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     quicClient_->setHostname("tperf");
     quicClient_->setCertificateVerifier(test::createTestCertificateVerifier());
     quicClient_->addNewPeerAddress(addr);
+    quicClient_->setCongestionControllerFactory(
+        std::make_shared<DefaultCongestionControllerFactory>());
     auto settings = quicClient_->getTransportSettings();
     settings.advertisedInitialUniStreamWindowSize = window_;
     settings.advertisedInitialConnectionWindowSize = 10 * window_;
     settings.connectUDP = true;
+    settings.defaultCongestionController = congestionControlType_;
+    if (congestionControlType_ == quic::CongestionControlType::BBR) {
+      settings.pacingEnabled = true;
+      settings.pacingTimerTickInterval = 200us;
+    }
+    if (gso_) {
+      settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
+      settings.maxBatchSize = 16;
+    }
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
@@ -360,6 +376,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   size_t receivedBytes_{0};
   std::chrono::seconds duration_;
   uint64_t window_;
+  bool gso_;
+  quic::CongestionControlType congestionControlType_;
 };
 
 } // namespace tperf
@@ -410,7 +428,9 @@ int main(int argc, char* argv[]) {
         FLAGS_port,
         std::chrono::milliseconds(FLAGS_client_transport_timer_resolution_ms),
         FLAGS_duration,
-        FLAGS_window);
+        FLAGS_window,
+        FLAGS_gso,
+        flagsToCongestionControlType(FLAGS_congestion));
     client.start();
   }
   return 0;
