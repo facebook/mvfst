@@ -12,6 +12,17 @@
 #include <quic/logging/QuicLogger.h>
 
 namespace {
+std::deque<quic::OutstandingPacket>::reverse_iterator
+getPreviousOutstandingPacket(
+    quic::QuicConnectionStateBase& conn,
+    quic::PacketNumberSpace packetNumberSpace,
+    std::deque<quic::OutstandingPacket>::reverse_iterator from) {
+  return std::find_if(
+      from, conn.outstandingPackets.rend(), [=](const auto& op) {
+        return packetNumberSpace == op.packet.header.getPacketNumberSpace();
+      });
+}
+
 template <typename V, typename A>
 std::pair<folly::Optional<V>, A> minOptional(
     std::pair<folly::Optional<V>, A> p1,
@@ -203,6 +214,13 @@ std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(
     PacketNumberSpace packetNumberSpace) {
   return getNextOutstandingPacket(
       conn, packetNumberSpace, conn.outstandingPackets.begin());
+}
+
+std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace packetNumberSpace) {
+  return getPreviousOutstandingPacket(
+      conn, packetNumberSpace, conn.outstandingPackets.rbegin());
 }
 
 std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(

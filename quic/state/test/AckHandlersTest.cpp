@@ -43,12 +43,12 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
-  StreamId current = 10;
+  StreamId currentStreamId = 10;
   auto sentTime = Clock::now();
   for (PacketNum packetNum = 10; packetNum <= 101; packetNum++) {
     RegularQuicWritePacket regularPacket =
         createNewPacket(packetNum, GetParam());
-    WriteStreamFrame frame(current++, 0, 0, true);
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
         std::move(regularPacket), sentTime, 1, false, false, packetNum));
@@ -88,10 +88,10 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
       Clock::now());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
-  StreamId start = 21;
+  StreamId start = currentStreamId - 1;
   for (auto& stream : streams) {
     EXPECT_EQ(stream.streamId, start);
-    start++;
+    start--;
   }
   // only unacked packets should be remaining
   EXPECT_EQ(conn.outstandingPackets.size(), 5);
@@ -116,10 +116,10 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
-  StreamId current = 10;
+  StreamId currentStreamId = 10;
   for (PacketNum packetNum = 10; packetNum < 51; packetNum++) {
     auto regularPacket = createNewPacket(packetNum, GetParam());
-    WriteStreamFrame frame(current++, 0, 0, true);
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
         std::move(regularPacket), Clock::now(), 1, false, false, packetNum));
@@ -159,27 +159,25 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
       Clock::now());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
-  StreamId start = 12;
-  std::vector<StreamId> ids(10);
-  std::iota(ids.begin(), ids.end(), start);
+  StreamId start = 45;
+  std::vector<StreamId> ids(45 - 33 + 1);
+  std::generate(ids.begin(), ids.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
       streams.begin(),
-      streams.begin() + 10,
+      streams.begin() + (45 - 33 + 1),
       ids.begin(),
       ids.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
 
-  std::vector<StreamId> ids2(12);
-  std::iota(ids2.begin(), ids2.end(), 33);
+  start = 21;
+  std::vector<StreamId> ids2(10);
+  std::generate(ids2.begin(), ids2.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
-      streams.begin() + 10,
-      streams.begin() + 10 + 12,
+      streams.begin() + (45 - 33 + 1),
+      streams.end(),
       ids2.begin(),
       ids2.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
-
-  StreamId stream45 = 45;
-  EXPECT_EQ((streams.begin() + 10 + 12)->streamId, stream45);
 
   std::vector<PacketNum> remainingPackets(11 + 5);
   std::iota(remainingPackets.begin(), remainingPackets.begin() + 11, 22);
@@ -267,18 +265,17 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
       testLossHandler(lostPackets),
       Clock::now());
 
-  StreamId start = 10;
-  std::vector<StreamId> ids(11);
-  std::iota(ids.begin(), ids.end(), start);
+  EXPECT_EQ(26, streams.begin()->streamId);
+
+  StreamId start = 20;
+  std::vector<StreamId> ids(20 - 10 + 1);
+  std::generate(ids.begin(), ids.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
-      streams.begin(),
-      streams.begin() + 11,
+      streams.begin() + 1,
+      streams.end(),
       ids.begin(),
       ids.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
-
-  EXPECT_EQ(streams.begin() + 11 + 1, streams.end());
-  EXPECT_EQ((streams.begin() + 11)->streamId, 26);
 
   std::vector<PacketNum> remainingPackets(5);
   remainingPackets[0] = 23;

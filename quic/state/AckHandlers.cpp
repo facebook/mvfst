@@ -12,8 +12,25 @@
 #include <quic/logging/QuicLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
+#include <iterator>
 
 namespace quic {
+
+/**
+ * Process ack frame and acked outstanding packets.
+ *
+ * This function process incoming ack blocks which is sorted in the descending
+ * order of packet number. For each ack block, we try to find a continuous range
+ * of outstanding packets in the connection's outstanding packets list that is
+ * acked by the current ack block. The search is in the reverse order of the
+ * outstandingPackets given that the list is sorted in the ascending order of
+ * packet number. For each outstanding packet that is acked by current ack
+ * frame, ack and loss visitors are invoked on the sent frames. The outstanding
+ * packets may contain packets from all three packet number spaces. But ack is
+ * always restrained to a single space. So we also need to skip packets that are
+ * not in the current packet number space.
+ *
+ */
 
 void processAckFrame(
     QuicConnectionStateBase& conn,
@@ -32,68 +49,85 @@ void processAckFrame(
   // policy. It's also possibly that all acked packets are pure acks which leads
   // to different number of packets being acked usually.
   ack.ackedPackets.reserve(kRxPacketsPendingBeforeAckThresh);
-  auto currentPacketItStart = getFirstOutstandingPacket(conn, pnSpace);
+  auto currentPacketIt = getLastOutstandingPacket(conn, pnSpace);
   uint64_t handshakePacketAcked = 0;
   uint64_t pureAckPacketsAcked = 0;
   uint64_t clonedPacketsAcked = 0;
-  for (auto ackBlockIt = frame.ackBlocks.crbegin();
-       ackBlockIt != frame.ackBlocks.crend();
-       ackBlockIt++) {
-    auto packetIt = std::lower_bound(
-        currentPacketItStart,
-        conn.outstandingPackets.end(),
-        ackBlockIt->startPacket,
+  folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
+      lastAckedPacketSentTime;
+  auto ackBlockIt = frame.ackBlocks.cbegin();
+  while (ackBlockIt != frame.ackBlocks.cend() &&
+         currentPacketIt != conn.outstandingPackets.rend()) {
+    // In reverse order, find the first outstanding packet that has a packet
+    // number LE the endPacket of the current ack range.
+    auto rPacketIt = std::lower_bound(
+        currentPacketIt,
+        conn.outstandingPackets.rend(),
+        ackBlockIt->endPacket,
         [&](const auto& packetWithTime, const auto& val) {
-          return packetWithTime.packet.header.getPacketSequenceNum() < val;
+          return packetWithTime.packet.header.getPacketSequenceNum() > val;
         });
-    if (packetIt == conn.outstandingPackets.end()) {
-      // This means that all the packets are less than the start packet.
-      // Since we iterate the ACK blocks in order of start packets, our work
-      // here is done.
-      VLOG(10) << __func__
-               << " larger than all outstanding packets outstanding="
+    if (rPacketIt == conn.outstandingPackets.rend()) {
+      // This means that all the packets are greater than the end packet.
+      // Since we iterate the ACK blocks in reverse order of end packets, our
+      // work here is done.
+      VLOG(10) << __func__ << " less than all outstanding packets outstanding="
                << conn.outstandingPackets.size() << " range=["
                << ackBlockIt->startPacket << ", " << ackBlockIt->endPacket
                << "]"
                << " " << conn;
+      ackBlockIt++;
       break;
     }
 
     // TODO: only process ACKs from packets which are sent from a greater than
     // or equal to crypto protection level.
-    auto packetItEnd = packetIt;
-    while (packetItEnd != conn.outstandingPackets.end()) {
-      auto currentPacketNum = packetItEnd->packet.header.getPacketSequenceNum();
+    auto eraseEnd = rPacketIt;
+    while (rPacketIt != conn.outstandingPackets.rend()) {
+      auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
       auto currentPacketNumberSpace =
-          packetItEnd->packet.header.getPacketNumberSpace();
+          rPacketIt->packet.header.getPacketNumberSpace();
       if (pnSpace != currentPacketNumberSpace) {
-        packetItEnd++;
+        // When the next packet is not in the same packet number space, we need
+        // to skip it in current ack processing. If the iterator has moved, that
+        // means we have found packets in the current space that are acked by
+        // this ack block. So the code erases the current iterator range and
+        // move the iterator to be the next search point.
+        if (rPacketIt != eraseEnd) {
+          auto nextElem =
+              conn.outstandingPackets.erase(rPacketIt.base(), eraseEnd.base());
+          rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
+          eraseEnd = rPacketIt;
+        } else {
+          rPacketIt++;
+          eraseEnd = rPacketIt;
+        }
         continue;
       }
-      if (currentPacketNum > ackBlockIt->endPacket) {
+      if (currentPacketNum < ackBlockIt->startPacket) {
         break;
       }
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
-               << " handshake=" << (int)packetItEnd->isHandshake
-               << " pureAck=" << (int)packetItEnd->pureAck << " " << conn;
-      if (packetItEnd->isHandshake) {
+               << " handshake=" << (int)rPacketIt->isHandshake
+               << " pureAck=" << (int)rPacketIt->pureAck << " " << conn;
+      if (rPacketIt->isHandshake) {
         ++handshakePacketAcked;
       }
-      if (!packetItEnd->pureAck) {
-        ack.ackedBytes += packetItEnd->encodedSize;
+      if (!rPacketIt->pureAck) {
+        ack.ackedBytes += rPacketIt->encodedSize;
       } else {
         ++pureAckPacketsAcked;
       }
-      if (packetItEnd->associatedEvent) {
+      if (rPacketIt->associatedEvent) {
         ++clonedPacketsAcked;
       }
       // Update RTT if current packet is the largestAcked in the frame:
       auto ackReceiveTimeOrNow =
-          ackReceiveTime > packetItEnd->time ? ackReceiveTime : Clock::now();
+          ackReceiveTime > rPacketIt->time ? ackReceiveTime : Clock::now();
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
-          ackReceiveTimeOrNow - packetItEnd->time);
-      if (currentPacketNum == frame.largestAcked && !packetItEnd->pureAck) {
+          ackReceiveTimeOrNow - rPacketIt->time);
+      if (currentPacketNum == frame.largestAcked && !rPacketIt->pureAck) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
       if (conn.qLogger) {
@@ -106,31 +140,47 @@ void processAckFrame(
           currentPacketNum);
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandingPacketEvents
-      if (!packetItEnd->associatedEvent ||
-          conn.outstandingPacketEvents.count(*packetItEnd->associatedEvent)) {
-        for (auto& packetFrame : packetItEnd->packet.frames) {
-          ackVisitor(*packetItEnd, packetFrame, frame);
+      if (!rPacketIt->associatedEvent ||
+          conn.outstandingPacketEvents.count(*rPacketIt->associatedEvent)) {
+        for (auto& packetFrame : rPacketIt->packet.frames) {
+          ackVisitor(*rPacketIt, packetFrame, frame);
         }
         // Remove this PacketEvent from the outstandingPacketEvents set
-        if (packetItEnd->associatedEvent) {
-          conn.outstandingPacketEvents.erase(*packetItEnd->associatedEvent);
+        if (rPacketIt->associatedEvent) {
+          conn.outstandingPacketEvents.erase(*rPacketIt->associatedEvent);
         }
       }
       ack.largestAckedPacket = std::max(
           ack.largestAckedPacket.value_or(currentPacketNum), currentPacketNum);
-      if (ackReceiveTime > packetItEnd->time) {
+      if (ackReceiveTime > rPacketIt->time) {
         ack.mrttSample =
             std::min(ack.mrttSample.value_or(rttSample), rttSample);
       }
-      conn.lossState.totalBytesAcked += packetItEnd->encodedSize;
+      conn.lossState.totalBytesAcked += rPacketIt->encodedSize;
       conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
       conn.lossState.totalBytesAckedAtLastAck = conn.lossState.totalBytesAcked;
-      conn.lossState.lastAckedPacketSentTime = packetItEnd->time;
+      if (!lastAckedPacketSentTime) {
+        lastAckedPacketSentTime = rPacketIt->time;
+      }
       conn.lossState.lastAckedTime = ackReceiveTime;
-      ack.ackedPackets.push_back(std::move(*packetItEnd));
-      packetItEnd = conn.outstandingPackets.erase(packetItEnd);
+      ack.ackedPackets.push_back(std::move(*rPacketIt));
+      rPacketIt++;
     }
-    currentPacketItStart = packetItEnd;
+    // Done searching for acked outstanding packets in current ack block. Erase
+    // the current iterator range which is the last batch of continuous
+    // outstanding packets that are in this ack block. Move the iterator to be
+    // the next search point.
+    if (rPacketIt != eraseEnd) {
+      auto nextElem =
+          conn.outstandingPackets.erase(rPacketIt.base(), eraseEnd.base());
+      currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
+    } else {
+      currentPacketIt = rPacketIt;
+    }
+    ackBlockIt++;
+  }
+  if (lastAckedPacketSentTime) {
+    conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
   DCHECK_GE(conn.outstandingHandshakePacketsCount, handshakePacketAcked);
   conn.outstandingHandshakePacketsCount -= handshakePacketAcked;

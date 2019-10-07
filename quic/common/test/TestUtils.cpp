@@ -17,19 +17,6 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
-namespace {
-std::deque<quic::OutstandingPacket>::reverse_iterator
-getPreviousOutstandingPacket(
-    quic::QuicConnectionStateBase& conn,
-    quic::PacketNumberSpace packetNumberSpace,
-    std::deque<quic::OutstandingPacket>::reverse_iterator from) {
-  return std::find_if(
-      from, conn.outstandingPackets.rend(), [=](const auto& op) {
-        return packetNumberSpace == op.packet.header.getPacketNumberSpace();
-      });
-}
-} // namespace
-
 namespace quic {
 namespace test {
 
@@ -510,13 +497,6 @@ void updateAckState(
       outOfOrder,
       pkHasRetransmittableData,
       pkHasCryptoData);
-}
-
-std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
-    QuicConnectionStateBase& conn,
-    PacketNumberSpace packetNumberSpace) {
-  return getPreviousOutstandingPacket(
-      conn, packetNumberSpace, conn.outstandingPackets.rbegin());
 }
 
 std::unique_ptr<folly::IOBuf> buildRandomInputData(size_t length) {

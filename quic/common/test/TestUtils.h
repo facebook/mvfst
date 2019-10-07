@@ -217,10 +217,6 @@ OutstandingPacket* findOutstandingPacket(
   return helper(conn.outstandingPackets);
 }
 
-std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
-    QuicConnectionStateBase& conn,
-    PacketNumberSpace packetNumberSpace);
-
 // Helper function to generate a buffer containing random data of given length
 std::unique_ptr<folly::IOBuf> buildRandomInputData(size_t length);
 
