@@ -342,6 +342,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     auto settings = quicClient_->getTransportSettings();
     settings.advertisedInitialUniStreamWindowSize = window_;
     settings.advertisedInitialConnectionWindowSize = 10 * window_;
+    settings.connectUDP = true;
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
