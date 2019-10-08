@@ -10,13 +10,13 @@
 
 #include <folly/dynamic.h>
 #include <quic/codec/Types.h>
-#include <quic/logging/QLogger.h>
+#include <quic/logging/BaseQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QLoggerTypes.h>
 
 namespace quic {
 
-class FileQLogger : public QLogger {
+class FileQLogger : public BaseQLogger {
  public:
   std::vector<std::unique_ptr<QLogEvent>> logs;
   FileQLogger(

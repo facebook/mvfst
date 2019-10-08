@@ -6,6 +6,7 @@
 add_library(
   mvfst_qlogger STATIC
   QLogger.cpp
+  BaseQLogger.cpp
   QLoggerTypes.cpp
   FileQLogger.cpp
 )

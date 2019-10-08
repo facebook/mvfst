@@ -10,7 +10,6 @@
 #include <fstream>
 
 #include <folly/json.h>
-#include <quic/logging/QLogger.h>
 
 namespace quic {
 

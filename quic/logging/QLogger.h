@@ -8,7 +8,8 @@
 
 #pragma once
 
-#include <quic/logging/QLoggerTypes.h>
+#include <quic/codec/QuicConnectionId.h>
+#include <quic/codec/Types.h>
 
 namespace quic {
 
@@ -85,18 +86,6 @@ class QLogger {
   virtual void addStreamStateUpdate(
       quic::StreamId streamId,
       std::string update) = 0;
-  std::unique_ptr<QLogPacketEvent> createPacketEvent(
-      const RegularQuicPacket& regularPacket,
-      uint64_t packetSize);
-
-  std::unique_ptr<QLogPacketEvent> createPacketEvent(
-      const RegularQuicWritePacket& writePacket,
-      uint64_t packetSize);
-
-  std::unique_ptr<QLogVersionNegotiationEvent> createPacketEvent(
-      const VersionNegotiationPacket& versionPacket,
-      uint64_t packetSize,
-      bool isPacketRecvd);
 };
 
 std::string getFlowControlEvent(int offset);
