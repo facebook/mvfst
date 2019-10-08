@@ -56,7 +56,8 @@ struct ConnectionId {
  private:
   ConnectionId() = default;
 
-  std::vector<uint8_t> connid;
+  std::array<uint8_t, kMaxConnectionIdSize> connid;
+  uint8_t connidLen;
 };
 
 struct ConnectionIdHash {

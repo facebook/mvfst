@@ -21,30 +21,34 @@ const uint8_t* ConnectionId::data() const {
 }
 
 uint8_t ConnectionId::size() const {
-  return static_cast<uint8_t>(connid.size());
+  return connidLen;
 }
 
 std::string ConnectionId::hex() const {
-  return folly::hexlify(connid);
+  return folly::hexlify(folly::ByteRange(connid.data(), connidLen));
 }
 
-ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn)
-    : connid(connidIn) {
+ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   static_assert(
       std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
       "Max connection size is too big");
-  if (connid.size() != 0 &&
-      (connid.size() < kMinConnectionIdSize ||
-       connid.size() > kMaxConnectionIdSize)) {
+  if (connidIn.size() != 0 &&
+      (connidIn.size() < kMinConnectionIdSize ||
+       connidIn.size() > kMaxConnectionIdSize)) {
     // We can't throw a transport error here because of the dependency. This is
     // sad because this will cause an internal error downstream.
     throw std::runtime_error("ConnectionId invalid size");
+  }
+  connidLen = connidIn.size();
+  if (connidLen != 0) {
+    memcpy(connid.data(), connidIn.data(), connidLen);
   }
 }
 
 ConnectionId::ConnectionId(folly::io::Cursor& cursor, size_t len) {
   // Zero is special case for connids.
   if (len == 0) {
+    connidLen = 0;
     return;
   }
   if (len < kMinConnectionIdSize || len > kMaxConnectionIdSize) {
@@ -52,19 +56,23 @@ ConnectionId::ConnectionId(folly::io::Cursor& cursor, size_t len) {
     // sad because this will cause an internal error downstream.
     throw std::runtime_error("ConnectionId invalid size");
   }
-  connid.resize(len);
+  connidLen = len;
   cursor.pull(connid.data(), len);
 }
 
 ConnectionId ConnectionId::createWithoutChecks(
     const std::vector<uint8_t>& connidIn) {
   ConnectionId connid;
-  connid.connid = connidIn;
+  connid.connidLen = connidIn.size();
+  if (connid.connidLen != 0) {
+    memcpy(connid.connid.data(), connidIn.data(), connid.connidLen);
+  }
   return connid;
 }
 
 bool ConnectionId::operator==(const ConnectionId& other) const {
-  return connid == other.connid;
+  return connidLen == other.connidLen &&
+      memcmp(connid.data(), other.connid.data(), connidLen) == 0;
 }
 
 bool ConnectionId::operator!=(const ConnectionId& other) const {
