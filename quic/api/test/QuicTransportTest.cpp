@@ -235,8 +235,7 @@ size_t bufLength(
 void dropPackets(QuicServerConnectionState& conn) {
   for (const auto& packet : conn.outstandingPackets) {
     for (const auto& frame : packet.packet.frames) {
-      const WriteStreamFrame* streamFrame =
-          boost::get<WriteStreamFrame>(&frame);
+      const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
       if (!streamFrame) {
         continue;
       }
@@ -285,15 +284,18 @@ void verifyCorrectness(
   bool finSet = false;
   std::vector<uint64_t> offsets;
   for (const auto& packet : conn.outstandingPackets) {
-    for (const auto& streamFrame :
-         all_frames<WriteStreamFrame>(packet.packet.frames)) {
-      if (streamFrame.streamId != id) {
+    for (const auto& frame : packet.packet.frames) {
+      auto streamFrame = frame.asWriteStreamFrame();
+      if (!streamFrame) {
         continue;
       }
-      offsets.push_back(streamFrame.offset);
-      endOffset = std::max(endOffset, streamFrame.offset + streamFrame.len);
-      totalLen += streamFrame.len;
-      finSet |= streamFrame.fin;
+      if (streamFrame->streamId != id) {
+        continue;
+      }
+      offsets.push_back(streamFrame->offset);
+      endOffset = std::max(endOffset, streamFrame->offset + streamFrame->len);
+      totalLen += streamFrame->len;
+      finSet |= streamFrame->fin;
     }
   }
   auto stream = conn.streamManager->findStream(id);
@@ -592,8 +594,12 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto& packet =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool blockedFound = false;
-  for (auto& blocked : all_frames<StreamDataBlockedFrame>(packet.frames)) {
-    EXPECT_EQ(blocked.streamId, streamId);
+  for (auto& frame : packet.frames) {
+    auto blocked = frame.asStreamDataBlockedFrame();
+    if (!blocked) {
+      continue;
+    }
+    EXPECT_EQ(blocked->streamId, streamId);
     blockedFound = true;
   }
   EXPECT_TRUE(blockedFound);
@@ -782,10 +788,14 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
   EXPECT_GE(packet.frames.size(), 1);
 
   bool ackFound = false;
-  for (auto& ackFrame : all_frames<WriteAckFrame>(packet.frames)) {
-    EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
-    EXPECT_EQ(start, ackFrame.ackBlocks.front().start);
-    EXPECT_EQ(end, ackFrame.ackBlocks.front().end);
+  for (auto& frame : packet.frames) {
+    auto ackFrame = frame.asWriteAckFrame();
+    if (!ackFrame) {
+      continue;
+    }
+    EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+    EXPECT_EQ(start, ackFrame->ackBlocks.front().start);
+    EXPECT_EQ(end, ackFrame->ackBlocks.front().end);
     ackFound = true;
   }
   EXPECT_TRUE(ackFound);
@@ -835,10 +845,14 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   EXPECT_GE(packet.frames.size(), 2);
 
   bool ackFound = false;
-  for (auto& ackFrame : all_frames<WriteAckFrame>(packet.frames)) {
-    EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
-    EXPECT_EQ(ackFrame.ackBlocks.front().start, start);
-    EXPECT_EQ(ackFrame.ackBlocks.front().end, end);
+  for (auto& frame : packet.frames) {
+    auto ackFrame = frame.asWriteAckFrame();
+    if (!ackFrame) {
+      continue;
+    }
+    EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
+    EXPECT_EQ(ackFrame->ackBlocks.front().start, start);
+    EXPECT_EQ(ackFrame->ackBlocks.front().end, end);
     ackFound = true;
   }
   EXPECT_TRUE(ackFound);
@@ -864,10 +878,14 @@ TEST_F(QuicTransportTest, RstStream) {
           ->packet;
   EXPECT_GE(packet.frames.size(), 1);
   bool rstFound = false;
-  for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
-    EXPECT_EQ(streamId, frame.streamId);
-    EXPECT_EQ(0, frame.offset);
-    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
+  for (auto& frame : packet.frames) {
+    auto rstFrame = frame.asRstStreamFrame();
+    if (!rstFrame) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstFrame->streamId);
+    EXPECT_EQ(0, rstFrame->offset);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstFrame->errorCode);
     rstFound = true;
   }
   EXPECT_TRUE(rstFound);
@@ -896,15 +914,20 @@ TEST_F(QuicTransportTest, StopSending) {
           ->packet;
   EXPECT_EQ(14, packet.frames.size());
   bool foundStopSending = false;
-  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
     folly::variant_match(
-        simpleFrame,
+        *simpleFrame,
         [&](const StopSendingFrame& frame) {
           EXPECT_EQ(streamId, frame.streamId);
           EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
           foundStopSending = true;
         },
-        [&](auto&) {});
+        [&](auto&) {
+        });
   }
   EXPECT_TRUE(foundStopSending);
 }
@@ -932,9 +955,13 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
   bool foundPathChallenge = false;
-  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
     folly::variant_match(
-        simpleFrame,
+        *simpleFrame,
         [&](const PathChallengeFrame& frame) {
           EXPECT_EQ(frame, pathChallenge);
           foundPathChallenge = true;
@@ -1133,9 +1160,13 @@ TEST_F(QuicTransportTest, SendPathResponse) {
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool foundPathResponse = false;
-  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
     folly::variant_match(
-        simpleFrame,
+        *simpleFrame,
         [&](const PathResponseFrame& frame) {
           EXPECT_EQ(frame, pathResponse);
           foundPathResponse = true;
@@ -1244,9 +1275,13 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
   bool foundNewConnectionId = false;
-  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
     folly::variant_match(
-        simpleFrame,
+        *simpleFrame,
         [&](const NewConnectionIdFrame& frame) {
           EXPECT_EQ(frame, newConnId);
           foundNewConnectionId = true;
@@ -1379,9 +1414,13 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
   bool foundRetireConnectionId = false;
-  for (auto& simpleFrame : all_frames<QuicSimpleFrame>(packet.frames)) {
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
     folly::variant_match(
-        simpleFrame,
+        *simpleFrame,
         [&](const RetireConnectionIdFrame& frame) {
           EXPECT_EQ(frame, retireConnId);
           foundRetireConnectionId = true;
@@ -1500,10 +1539,14 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   EXPECT_GE(packet.frames.size(), 1);
 
   bool foundReset = false;
-  for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
-    EXPECT_EQ(streamId, frame.streamId);
-    EXPECT_EQ(currentWriteOffset, frame.offset);
-    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
+  for (auto& frame : packet.frames) {
+    auto rstStream = frame.asRstStreamFrame();
+    if (!rstStream) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstStream->streamId);
+    EXPECT_EQ(currentWriteOffset, rstStream->offset);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1530,9 +1573,13 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   EXPECT_GE(packet.frames.size(), 1);
 
   bool foundReset = false;
-  for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
-    EXPECT_EQ(streamId, frame.streamId);
-    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
+  for (auto& frame : packet.frames) {
+    auto rstStream = frame.asRstStreamFrame();
+    if (!rstStream) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstStream->streamId);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1596,10 +1643,14 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   EXPECT_GE(packet.frames.size(), 1);
 
   bool foundReset = false;
-  for (auto& frame : all_frames<RstStreamFrame>(packet.frames)) {
-    EXPECT_EQ(streamId, frame.streamId);
-    EXPECT_EQ(currentWriteOffset, frame.offset);
-    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
+  for (auto& frame : packet.frames) {
+    auto rstFrame = frame.asRstStreamFrame();
+    if (!rstFrame) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstFrame->streamId);
+    EXPECT_EQ(currentWriteOffset, rstFrame->offset);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstFrame->errorCode);
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
@@ -1671,8 +1722,12 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   EXPECT_GE(packet.frames.size(), 1);
   bool connWindowFound = false;
-  for (auto& connWindowUpdate : all_frames<MaxDataFrame>(packet.frames)) {
-    EXPECT_EQ(100, connWindowUpdate.maximumData);
+  for (auto& frame : packet.frames) {
+    auto connWindowUpdate = frame.asMaxDataFrame();
+    if (!connWindowUpdate) {
+      continue;
+    }
+    EXPECT_EQ(100, connWindowUpdate->maximumData);
     connWindowFound = true;
   }
 
@@ -1702,7 +1757,7 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   auto packet1 =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   const MaxStreamDataFrame* streamWindowUpdate =
-      boost::get<MaxStreamDataFrame>(&packet1.frames.front());
+      packet1.frames.front().asMaxStreamDataFrame();
   EXPECT_TRUE(streamWindowUpdate);
 }
 
@@ -2278,7 +2333,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   auto& packet = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(1, packet.packet.frames.size());
   auto& frame = packet.packet.frames.front();
-  const WriteStreamFrame* streamFrame = boost::get<WriteStreamFrame>(&frame);
+  const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame);
   EXPECT_EQ(streamFrame->streamId, s1);
   conn.outstandingPackets.clear();
@@ -2301,7 +2356,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   auto& packet2 = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(1, packet2.packet.frames.size());
   auto& frame2 = packet2.packet.frames.front();
-  const WriteStreamFrame* streamFrame2 = boost::get<WriteStreamFrame>(&frame2);
+  const WriteStreamFrame* streamFrame2 = frame2.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame2);
   EXPECT_EQ(streamFrame2->streamId, s2);
   conn.outstandingPackets.clear();
@@ -2324,10 +2379,10 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   EXPECT_EQ(2, packet3.packet.frames.size());
   auto& frame3 = packet3.packet.frames.front();
   auto& frame4 = packet3.packet.frames.back();
-  const WriteStreamFrame* streamFrame3 = boost::get<WriteStreamFrame>(&frame3);
+  const WriteStreamFrame* streamFrame3 = frame3.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame3);
   EXPECT_EQ(streamFrame3->streamId, s2);
-  const WriteStreamFrame* streamFrame4 = boost::get<WriteStreamFrame>(&frame4);
+  const WriteStreamFrame* streamFrame4 = frame4.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame4);
   EXPECT_EQ(streamFrame4->streamId, s1);
   transport_->close(folly::none);

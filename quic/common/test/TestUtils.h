@@ -276,14 +276,13 @@ auto findFrameInPacketFunc() {
   return [&](auto& p) {
     return std::find_if(
                p.packet.frames.begin(), p.packet.frames.end(), [&](auto& f) {
+                 QuicSimpleFrame* simpleFrame = f.asQuicSimpleFrame();
+                 if (!simpleFrame) {
+                   return false;
+                 }
                  return folly::variant_match(
-                     f,
-                     [&](QuicSimpleFrame& s) {
-                       return folly::variant_match(
-                           s,
-                           [&](FrameType&) { return true; },
-                           [&](auto&) { return false; });
-                     },
+                     *simpleFrame,
+                     [&](FrameType&) { return true; },
                      [&](auto&) { return false; });
                }) != p.packet.frames.end();
   };

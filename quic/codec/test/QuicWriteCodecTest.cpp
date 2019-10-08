@@ -127,7 +127,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   auto regularPacket = std::move(builtOut.first);
 
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 10);
@@ -174,7 +174,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = std::move(builtOut.first);
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 20);
@@ -241,14 +241,14 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = std::move(builtOut.first);
   EXPECT_EQ(regularPacket.frames.size(), 2);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.front());
+  auto& resultFrame = *regularPacket.frames.front().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId1);
   EXPECT_EQ(resultFrame.offset, offset1);
   EXPECT_EQ(resultFrame.len, 30);
   outputBuf->trimStart(8);
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, outputBuf));
 
-  auto resultFrame2 = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame2 = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame2.streamId, streamId2);
   EXPECT_EQ(resultFrame2.offset, offset2);
   EXPECT_EQ(resultFrame2.len, remainingSpace - 7);
@@ -307,7 +307,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 33);
@@ -385,7 +385,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   auto regularPacket = builtOut.first;
 
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(resultFrame.len, 1);
@@ -430,7 +430,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   auto regularPacket = builtOut.first;
 
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  auto resultFrame = boost::get<WriteStreamFrame>(regularPacket.frames.back());
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
   EXPECT_EQ(resultFrame.streamId, streamId);
   EXPECT_EQ(resultFrame.offset, offset);
   EXPECT_EQ(inputBuf->computeChainDataLength(), resultFrame.len);
@@ -592,8 +592,7 @@ TEST_F(QuicWriteCodecTest, AckFrameVeryLargeAckRange) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
 
   EXPECT_EQ(ackFrame.ackBlocks.front().start, 1);
@@ -640,8 +639,7 @@ TEST_F(QuicWriteCodecTest, WriteSimpleAckFrame) {
   EXPECT_EQ(kDefaultUDPSendPacketLen - 11, pktBuilder.remainingSpaceInPkt());
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 2);
   auto iter = ackFrame.ackBlocks.cbegin();
   EXPECT_EQ(iter->start, 101);
@@ -675,8 +673,7 @@ TEST_F(QuicWriteCodecTest, WriteAckFrameWillSaveAckDelay) {
   writeAckFrame(meta, pktBuilder);
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackDelay, ackFrame.ackDelay);
 }
 
@@ -714,8 +711,7 @@ TEST_F(QuicWriteCodecTest, VerifyNumAckBlocksSizeAccounted) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 64);
 
   EXPECT_EQ(ackFrame.ackBlocks.front().start, 746);
@@ -787,8 +783,7 @@ TEST_F(QuicWriteCodecTest, OnlyAckLargestPacket) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
   EXPECT_EQ(ackFrame.ackBlocks.front().start, 1000);
   EXPECT_EQ(ackFrame.ackBlocks.front().end, 1000);
@@ -838,8 +833,7 @@ TEST_F(QuicWriteCodecTest, WriteSomeAckBlocks) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(regularPacket.frames.size(), 1);
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(regularPacket.frames.back());
+  WriteAckFrame& ackFrame = *regularPacket.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 14);
 
   // Verify the on wire bytes via decoder:
@@ -886,8 +880,7 @@ TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {
   EXPECT_EQ(ackFrameWriteResult.bytesWritten, 7);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
   auto builtOut = std::move(pktBuilder).buildPacket();
-  WriteAckFrame ackFrame =
-      boost::get<WriteAckFrame>(builtOut.first.frames.back());
+  WriteAckFrame& ackFrame = *builtOut.first.frames.back().asWriteAckFrame();
   EXPECT_EQ(ackFrame.ackBlocks.size(), 1);
   EXPECT_EQ(ackFrame.ackBlocks.front().start, 1000);
   EXPECT_EQ(ackFrame.ackBlocks.front().end, 1000);
@@ -917,7 +910,7 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamData) {
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 3);
   auto& resultMaxStreamDataFrame =
-      boost::get<MaxStreamDataFrame>(regularPacket.frames[0]);
+      *regularPacket.frames[0].asMaxStreamDataFrame();
   EXPECT_EQ(id, resultMaxStreamDataFrame.streamId);
   EXPECT_EQ(offset, resultMaxStreamDataFrame.maximumData);
 
@@ -949,7 +942,7 @@ TEST_F(QuicWriteCodecTest, WriteMaxData) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 3);
-  auto& resultMaxDataFrame = boost::get<MaxDataFrame>(regularPacket.frames[0]);
+  auto& resultMaxDataFrame = *regularPacket.frames[0].asMaxDataFrame();
   EXPECT_EQ(1000, resultMaxDataFrame.maximumData);
 
   auto wireBuf = std::move(builtOut.second);
@@ -975,7 +968,8 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     uint64_t maxStream = i;
     bool isBidirectional = true;
     MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
-    auto bytesWritten = writeFrame(maxStreamsFrame, pktBuilder);
+    auto bytesWritten =
+        writeFrame(QuicSimpleFrame(maxStreamsFrame), pktBuilder);
 
     auto builtOut = std::move(pktBuilder).buildPacket();
     auto regularPacket = builtOut.first;
@@ -983,7 +977,7 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
     auto& resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
-        boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+        *regularPacket.frames[0].asQuicSimpleFrame());
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
@@ -1003,7 +997,8 @@ TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
     uint64_t maxStream = i;
     bool isBidirectional = false;
     MaxStreamsFrame maxStreamsFrame(maxStream, isBidirectional);
-    auto bytesWritten = writeFrame(maxStreamsFrame, pktBuilder);
+    auto bytesWritten =
+        writeFrame(QuicSimpleFrame(maxStreamsFrame), pktBuilder);
 
     auto builtOut = std::move(pktBuilder).buildPacket();
     auto regularPacket = builtOut.first;
@@ -1011,7 +1006,7 @@ TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
     auto& resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
-        boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+        *regularPacket.frames[0].asQuicSimpleFrame());
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
@@ -1030,7 +1025,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForMaxStreamId) {
   setupCommonExpects(pktBuilder);
   StreamId maxStream = 0x1234;
   MaxStreamsFrame maxStreamIdFrame(maxStream, true);
-  EXPECT_EQ(0, writeFrame(maxStreamIdFrame, pktBuilder));
+  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(maxStreamIdFrame), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, WriteConnClose) {
@@ -1039,14 +1034,15 @@ TEST_F(QuicWriteCodecTest, WriteConnClose) {
   std::string reasonPhrase("You are fired");
   ConnectionCloseFrame connectionCloseFrame(
       TransportErrorCode::PROTOCOL_VIOLATION, reasonPhrase);
-  auto connCloseBytesWritten = writeFrame(connectionCloseFrame, pktBuilder);
+  auto connCloseBytesWritten =
+      writeFrame(std::move(connectionCloseFrame), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   // 6 == ErrorCode(2) + FrameType(1) + reasonPhrase-len(2)
   EXPECT_EQ(4 + reasonPhrase.size(), connCloseBytesWritten);
   auto& resultConnCloseFrame =
-      boost::get<ConnectionCloseFrame>(regularPacket.frames[0]);
+      *regularPacket.frames[0].asConnectionCloseFrame();
   EXPECT_EQ(
       TransportErrorCode::PROTOCOL_VIOLATION, resultConnCloseFrame.errorCode);
   EXPECT_EQ("You are fired", resultConnCloseFrame.reasonPhrase);
@@ -1074,7 +1070,7 @@ TEST_F(QuicWriteCodecTest, DecodeConnCloseLarge) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   auto& resultConnCloseFrame =
-      boost::get<ConnectionCloseFrame>(regularPacket.frames[0]);
+      *regularPacket.frames[0].asConnectionCloseFrame();
   EXPECT_EQ(
       TransportErrorCode::PROTOCOL_VIOLATION, resultConnCloseFrame.errorCode);
   EXPECT_EQ(resultConnCloseFrame.reasonPhrase, reasonPhrase);
@@ -1091,7 +1087,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceConnClose) {
   std::string reasonPhrase("You are all fired");
   ConnectionCloseFrame connCloseFrame(
       TransportErrorCode::PROTOCOL_VIOLATION, reasonPhrase);
-  EXPECT_EQ(0, writeFrame(connCloseFrame, pktBuilder));
+  EXPECT_EQ(0, writeFrame(std::move(connCloseFrame), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
@@ -1101,12 +1097,12 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
   reasonPhrase.resize(kMaxReasonPhraseLength + 10);
   ApplicationCloseFrame applicationCloseFrame(
       GenericApplicationErrorCode::UNKNOWN, reasonPhrase);
-  writeFrame(applicationCloseFrame, pktBuilder);
+  writeFrame(std::move(applicationCloseFrame), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   auto& resultAppCloseFrame =
-      boost::get<ApplicationCloseFrame>(regularPacket.frames[0]);
+      *regularPacket.frames[0].asApplicationCloseFrame();
   EXPECT_EQ(
       GenericApplicationErrorCode::UNKNOWN, resultAppCloseFrame.errorCode);
   EXPECT_EQ(resultAppCloseFrame.reasonPhrase, reasonPhrase);
@@ -1119,13 +1115,12 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
 TEST_F(QuicWriteCodecTest, WritePing) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  PingFrame pingFrame;
-  auto pingBytesWritten = writeFrame(pingFrame, pktBuilder);
+  auto pingBytesWritten = writeFrame(PingFrame(), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(1, pingBytesWritten);
-  EXPECT_NO_THROW(boost::get<PingFrame>(regularPacket.frames[0]));
+  EXPECT_NE(regularPacket.frames[0].asPingFrame(), nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -1140,20 +1135,18 @@ TEST_F(QuicWriteCodecTest, NoSpaceForPing) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
-  PingFrame pingFrame;
-  EXPECT_EQ(0, writeFrame(pingFrame, pktBuilder));
+  EXPECT_EQ(0, writeFrame(PingFrame(), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, WritePadding) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  PaddingFrame paddingFrame;
-  auto paddingBytesWritten = writeFrame(paddingFrame, pktBuilder);
+  auto paddingBytesWritten = writeFrame(PaddingFrame(), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(1, paddingBytesWritten);
-  EXPECT_NO_THROW(boost::get<PaddingFrame>(regularPacket.frames[0]));
+  EXPECT_NE(regularPacket.frames[0].asPaddingFrame(), nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -1183,7 +1176,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamBlocked) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(blockedBytesWritten, 7);
-  EXPECT_NO_THROW(boost::get<StreamDataBlockedFrame>(regularPacket.frames[0]));
+  EXPECT_NE(regularPacket.frames[0].asStreamDataBlockedFrame(), nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -1217,8 +1210,7 @@ TEST_F(QuicWriteCodecTest, WriteRstStream) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(13, rstStreamBytesWritten);
-  auto& resultRstStreamFrame =
-      boost::get<RstStreamFrame>(regularPacket.frames[0]);
+  auto& resultRstStreamFrame = *regularPacket.frames[0].asRstStreamFrame();
   EXPECT_EQ(errorCode, resultRstStreamFrame.errorCode);
   EXPECT_EQ(id, resultRstStreamFrame.streamId);
   EXPECT_EQ(offset, resultRstStreamFrame.offset);
@@ -1255,7 +1247,7 @@ TEST_F(QuicWriteCodecTest, WriteBlockedFrame) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 5);
-  EXPECT_NO_THROW(boost::get<DataBlockedFrame>(regularPacket.frames[0]));
+  EXPECT_NE(regularPacket.frames[0].asDataBlockedFrame(), nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -1279,13 +1271,13 @@ TEST_F(QuicWriteCodecTest, WriteStreamIdNeeded) {
   setupCommonExpects(pktBuilder);
   StreamId blockedStreamId = 0x211;
   MaxStreamsFrame streamIdNeeded(blockedStreamId, true);
-  auto bytesWritten = writeFrame(streamIdNeeded, pktBuilder);
+  auto bytesWritten = writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 3);
   EXPECT_NO_THROW(boost::get<MaxStreamsFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0])));
+      *regularPacket.frames[0].asQuicSimpleFrame()));
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
@@ -1302,7 +1294,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForStreamIdNeeded) {
   setupCommonExpects(pktBuilder);
   StreamId blockedStreamId = 0x211;
   MaxStreamsFrame streamIdNeeded(blockedStreamId, true);
-  EXPECT_EQ(0, writeFrame(streamIdNeeded, pktBuilder));
+  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(streamIdNeeded), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, WriteNewConnId) {
@@ -1311,13 +1303,13 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   StatelessResetToken token;
   memset(token.data(), 'a', token.size());
   NewConnectionIdFrame newConnId(1, 0, getTestConnectionId(), token);
-  auto bytesWritten = writeFrame(newConnId, pktBuilder);
+  auto bytesWritten = writeFrame(QuicSimpleFrame(newConnId), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 28);
   auto& resultNewConnIdFrame = boost::get<NewConnectionIdFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(resultNewConnIdFrame.sequenceNumber, 1);
   EXPECT_EQ(resultNewConnIdFrame.retirePriorTo, 0);
   EXPECT_EQ(resultNewConnIdFrame.connectionId, getTestConnectionId());
@@ -1338,13 +1330,13 @@ TEST_F(QuicWriteCodecTest, WriteRetireConnId) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
   RetireConnectionIdFrame retireConnId(3);
-  auto bytesWritten = writeFrame(retireConnId, pktBuilder);
+  auto bytesWritten = writeFrame(QuicSimpleFrame(retireConnId), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 2);
   auto resultRetireConnIdFrame = boost::get<RetireConnectionIdFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(resultRetireConnIdFrame.sequenceNumber, 3);
 
   auto wireBuf = std::move(builtOut.second);
@@ -1385,7 +1377,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForNewConnId) {
   setupCommonExpects(pktBuilder);
   NewConnectionIdFrame newConnId(
       1, 0, getTestConnectionId(), StatelessResetToken());
-  EXPECT_EQ(0, writeFrame(newConnId, pktBuilder));
+  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(newConnId), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, WriteExpiredStreamDataFrame) {
@@ -1394,13 +1386,14 @@ TEST_F(QuicWriteCodecTest, WriteExpiredStreamDataFrame) {
   StreamId id = 10;
   uint64_t offset = 0x08;
   ExpiredStreamDataFrame expiredStreamDataFrame(id, offset);
-  auto bytesWritten = writeFrame(expiredStreamDataFrame, pktBuilder);
+  auto bytesWritten =
+      writeFrame(QuicSimpleFrame(expiredStreamDataFrame), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 4);
   auto result = boost::get<ExpiredStreamDataFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(id, result.streamId);
   EXPECT_EQ(offset, result.minimumStreamOffset);
 
@@ -1424,13 +1417,14 @@ TEST_F(QuicWriteCodecTest, WriteMinStreamDataFrame) {
   uint64_t maximumData = 0x64;
   uint64_t offset = 0x08;
   MinStreamDataFrame minStreamDataFrame(id, maximumData, offset);
-  auto bytesWritten = writeFrame(minStreamDataFrame, pktBuilder);
+  auto bytesWritten =
+      writeFrame(QuicSimpleFrame(minStreamDataFrame), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 6);
   auto result = boost::get<MinStreamDataFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(id, result.streamId);
   EXPECT_EQ(maximumData, result.maximumData);
   EXPECT_EQ(offset, result.minimumStreamOffset);
@@ -1461,7 +1455,7 @@ TEST_F(QuicWriteCodecTest, WritePathChallenge) {
 
   auto regularPacket = builtOut.first;
   auto result = boost::get<PathChallengeFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(result.pathData, pathData);
 
   auto wireBuf = std::move(builtOut.second);
@@ -1486,7 +1480,7 @@ TEST_F(QuicWriteCodecTest, WritePathResponse) {
 
   auto regularPacket = builtOut.first;
   auto result = boost::get<PathResponseFrame>(
-      boost::get<QuicSimpleFrame>(regularPacket.frames[0]));
+      *regularPacket.frames[0].asQuicSimpleFrame());
   EXPECT_EQ(result.pathData, pathData);
 
   auto wireBuf = std::move(builtOut.second);

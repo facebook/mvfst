@@ -70,8 +70,12 @@ PacketNum rstStreamAndSendPacket(
       conn.transportSettings.writeConnectionDataPacketsLimit);
 
   for (const auto& packet : conn.outstandingPackets) {
-    for (const auto& frame : all_frames<RstStreamFrame>(packet.packet.frames)) {
-      if (frame.streamId == stream.id) {
+    for (const auto& frame : packet.packet.frames) {
+      auto rstFrame = frame.asRstStreamFrame();
+      if (!rstFrame) {
+        continue;
+      }
+      if (rstFrame->streamId == stream.id) {
         return packet.packet.header.getPacketSequenceNum();
       }
     }

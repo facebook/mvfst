@@ -203,122 +203,141 @@ void updateConnection(
     conn.qLogger->addPacket(packet, encodedSize);
   }
   for (const auto& frame : packet.frames) {
-    folly::variant_match(
-        frame,
-        [&](const WriteStreamFrame& writeStreamFrame) {
-          retransmittable = true;
-          auto stream = CHECK_NOTNULL(
-              conn.streamManager->getStream(writeStreamFrame.streamId));
-          auto newStreamDataWritten = handleStreamWritten(
-              conn,
-              *stream,
-              writeStreamFrame.offset,
-              writeStreamFrame.len,
-              writeStreamFrame.fin,
-              packetNum,
-              packetNumberSpace);
-          if (newStreamDataWritten) {
-            updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
-            maybeWriteBlockAfterSocketWrite(*stream);
-            conn.streamManager->updateWritableStreams(*stream);
-          }
-          conn.streamManager->updateLossStreams(*stream);
-        },
-        [&](const WriteCryptoFrame& writeCryptoFrame) {
-          retransmittable = true;
-          auto protectionType = packet.header.getProtectionType();
-          // NewSessionTicket is sent in crypto frame encrypted with 1-rtt key,
-          // however, it is not part of handshake
-          isHandshake =
-              (protectionType == ProtectionType::Initial ||
-               protectionType == ProtectionType::Handshake);
-          auto encryptionLevel =
-              protectionTypeToEncryptionLevel(protectionType);
-          handleStreamWritten(
-              conn,
-              *getCryptoStream(*conn.cryptoState, encryptionLevel),
-              writeCryptoFrame.offset,
-              writeCryptoFrame.len,
-              false,
-              packetNum,
-              packetNumberSpace);
-        },
-        [&](const WriteAckFrame& writeAckFrame) {
-          DCHECK(!ackFrameCounter++)
-              << "Send more than one WriteAckFrame " << conn;
-          auto largestAckedPacketWritten = writeAckFrame.ackBlocks.back().end;
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent packet with largestAcked="
-                   << largestAckedPacketWritten << " packetNum=" << packetNum
-                   << " " << conn;
-          updateAckSendStateOnSentPacketWithAcks(
-              conn,
-              getAckState(conn, packetNumberSpace),
-              largestAckedPacketWritten);
-        },
-        [&](const RstStreamFrame& rstStreamFrame) {
-          retransmittable = true;
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent reset streams in packetNum=" << packetNum << " "
-                   << conn;
-          auto resetIter =
-              conn.pendingEvents.resets.find(rstStreamFrame.streamId);
-          // TODO: this can happen because we clone RST_STREAM frames. Should we
-          // start to treat RST_STREAM in the same way we treat window update?
-          if (resetIter != conn.pendingEvents.resets.end()) {
-            conn.pendingEvents.resets.erase(resetIter);
-          } else {
-            DCHECK(packetEvent.hasValue())
-                << " reset missing from pendingEvents for non-clone packet";
-          }
-        },
-        [&](const MaxDataFrame& maxDataFrame) {
-          CHECK(!connWindowUpdateSent++)
-              << "Send more than one connection window update " << conn;
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent conn window update packetNum=" << packetNum << " "
-                   << conn;
-          retransmittable = true;
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent conn window update in packetNum=" << packetNum
-                   << " " << conn;
-          onConnWindowUpdateSent(
-              conn, packetNum, maxDataFrame.maximumData, sentTime);
-        },
-        [&](const MaxStreamDataFrame& maxStreamDataFrame) {
-          auto stream = CHECK_NOTNULL(
-              conn.streamManager->getStream(maxStreamDataFrame.streamId));
-          retransmittable = true;
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent packet with window update packetNum=" << packetNum
-                   << " stream=" << maxStreamDataFrame.streamId << " " << conn;
-          onStreamWindowUpdateSent(
-              *stream, packetNum, maxStreamDataFrame.maximumData, sentTime);
-        },
-        [&](const StreamDataBlockedFrame& streamBlockedFrame) {
-          VLOG(10) << nodeToString(conn.nodeType)
-                   << " sent blocked stream frame packetNum=" << packetNum
-                   << " " << conn;
-          retransmittable = true;
-          conn.streamManager->removeBlocked(streamBlockedFrame.streamId);
-        },
-        [&](const PaddingFrame&) {
-          // do not mark padding as retransmittable. There are several reasons
-          // for this:
-          // 1. We might need to pad ACK packets to make it so that we can
-          //    sample them correctly for header encryption. ACK packets may not
-          //    count towards congestion window, so the padding frames in those
-          //    ack packets should not count towards the window either
-          // 2. Of course we do not want to retransmit the ACK frames.
-        },
-        [&](const QuicSimpleFrame& simpleFrame) {
-          retransmittable = true;
-          // We don't want this triggered for cloned frames.
-          if (!packetEvent.hasValue()) {
-            updateSimpleFrameOnPacketSent(conn, simpleFrame);
-          }
-        },
-        [&](const auto&) { retransmittable = true; });
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+        const WriteStreamFrame& writeStreamFrame = *frame.asWriteStreamFrame();
+        retransmittable = true;
+        auto stream = CHECK_NOTNULL(
+            conn.streamManager->getStream(writeStreamFrame.streamId));
+        auto newStreamDataWritten = handleStreamWritten(
+            conn,
+            *stream,
+            writeStreamFrame.offset,
+            writeStreamFrame.len,
+            writeStreamFrame.fin,
+            packetNum,
+            packetNumberSpace);
+        if (newStreamDataWritten) {
+          updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
+          maybeWriteBlockAfterSocketWrite(*stream);
+          conn.streamManager->updateWritableStreams(*stream);
+        }
+        conn.streamManager->updateLossStreams(*stream);
+        break;
+      }
+      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+        const WriteCryptoFrame& writeCryptoFrame = *frame.asWriteCryptoFrame();
+        retransmittable = true;
+        auto protectionType = packet.header.getProtectionType();
+        // NewSessionTicket is sent in crypto frame encrypted with 1-rtt key,
+        // however, it is not part of handshake
+        isHandshake =
+            (protectionType == ProtectionType::Initial ||
+             protectionType == ProtectionType::Handshake);
+        auto encryptionLevel = protectionTypeToEncryptionLevel(protectionType);
+        handleStreamWritten(
+            conn,
+            *getCryptoStream(*conn.cryptoState, encryptionLevel),
+            writeCryptoFrame.offset,
+            writeCryptoFrame.len,
+            false,
+            packetNum,
+            packetNumberSpace);
+        break;
+      }
+      case QuicWriteFrame::Type::WriteAckFrame_E: {
+        const WriteAckFrame& writeAckFrame = *frame.asWriteAckFrame();
+        DCHECK(!ackFrameCounter++)
+            << "Send more than one WriteAckFrame " << conn;
+        auto largestAckedPacketWritten = writeAckFrame.ackBlocks.back().end;
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent packet with largestAcked="
+                 << largestAckedPacketWritten << " packetNum=" << packetNum
+                 << " " << conn;
+        updateAckSendStateOnSentPacketWithAcks(
+            conn,
+            getAckState(conn, packetNumberSpace),
+            largestAckedPacketWritten);
+        break;
+      }
+      case QuicWriteFrame::Type::RstStreamFrame_E: {
+        const RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
+        retransmittable = true;
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent reset streams in packetNum=" << packetNum << " "
+                 << conn;
+        auto resetIter =
+            conn.pendingEvents.resets.find(rstStreamFrame.streamId);
+        // TODO: this can happen because we clone RST_STREAM frames. Should we
+        // start to treat RST_STREAM in the same way we treat window update?
+        if (resetIter != conn.pendingEvents.resets.end()) {
+          conn.pendingEvents.resets.erase(resetIter);
+        } else {
+          DCHECK(packetEvent.hasValue())
+              << " reset missing from pendingEvents for non-clone packet";
+        }
+        break;
+      }
+      case QuicWriteFrame::Type::MaxDataFrame_E: {
+        const MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
+        CHECK(!connWindowUpdateSent++)
+            << "Send more than one connection window update " << conn;
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent conn window update packetNum=" << packetNum << " "
+                 << conn;
+        retransmittable = true;
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent conn window update in packetNum=" << packetNum << " "
+                 << conn;
+        onConnWindowUpdateSent(
+            conn, packetNum, maxDataFrame.maximumData, sentTime);
+        break;
+      }
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+        const MaxStreamDataFrame& maxStreamDataFrame =
+            *frame.asMaxStreamDataFrame();
+        auto stream = CHECK_NOTNULL(
+            conn.streamManager->getStream(maxStreamDataFrame.streamId));
+        retransmittable = true;
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent packet with window update packetNum=" << packetNum
+                 << " stream=" << maxStreamDataFrame.streamId << " " << conn;
+        onStreamWindowUpdateSent(
+            *stream, packetNum, maxStreamDataFrame.maximumData, sentTime);
+        break;
+      }
+      case QuicWriteFrame::Type::StreamDataBlockedFrame_E: {
+        const StreamDataBlockedFrame& streamBlockedFrame =
+            *frame.asStreamDataBlockedFrame();
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent blocked stream frame packetNum=" << packetNum << " "
+                 << conn;
+        retransmittable = true;
+        conn.streamManager->removeBlocked(streamBlockedFrame.streamId);
+        break;
+      }
+      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+        const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
+        retransmittable = true;
+        // We don't want this triggered for cloned frames.
+        if (!packetEvent.hasValue()) {
+          updateSimpleFrameOnPacketSent(conn, simpleFrame);
+        }
+        break;
+      }
+      case QuicWriteFrame::Type::PaddingFrame_E: {
+        // do not mark padding as retransmittable. There are several reasons
+        // for this:
+        // 1. We might need to pad ACK packets to make it so that we can
+        //    sample them correctly for header encryption. ACK packets may not
+        //    count towards congestion window, so the padding frames in those
+        //    ack packets should not count towards the window either
+        // 2. Of course we do not want to retransmit the ACK frames.
+        break;
+      }
+      default:
+        retransmittable = true;
+    }
   }
 
   // TODO: Now pureAck is equivalent to non retransmittable packet. This might

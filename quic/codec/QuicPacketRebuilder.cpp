@@ -53,108 +53,128 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
        iter != packet.packet.frames.cend();
        iter++) {
     const QuicWriteFrame& frame = *iter;
-    writeSuccess = folly::variant_match(
-        frame,
-        [&](const WriteAckFrame& ackFrame) {
-          auto& packetHeader = builder_.getPacketHeader();
-          uint64_t ackDelayExponent =
-              (packetHeader.getHeaderForm() == HeaderForm::Long)
-              ? kDefaultAckDelayExponent
-              : conn_.transportSettings.ackDelayExponent;
-          AckFrameMetaData meta(
-              ackFrame.ackBlocks, ackFrame.ackDelay, ackDelayExponent);
-          auto ackWriteResult = writeAckFrame(meta, builder_);
-          return ackWriteResult.hasValue();
-        },
-        [&](const WriteStreamFrame& streamFrame) {
-          auto stream = conn_.streamManager->getStream(streamFrame.streamId);
-          if (stream && retransmittable(*stream)) {
-            auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
-            auto bufferLen =
-                streamData ? streamData->computeChainDataLength() : 0;
-            auto dataLen = writeStreamFrameHeader(
-                builder_,
-                streamFrame.streamId,
-                streamFrame.offset,
-                bufferLen,
-                bufferLen,
-                streamFrame.fin);
-            bool ret = dataLen.hasValue() && *dataLen == streamFrame.len;
-            if (ret) {
-              writeStreamFrameData(builder_, std::move(streamData), *dataLen);
-              notPureAck = true;
-              return true;
-            }
-            return false;
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::WriteAckFrame_E: {
+        const WriteAckFrame& ackFrame = *frame.asWriteAckFrame();
+        auto& packetHeader = builder_.getPacketHeader();
+        uint64_t ackDelayExponent =
+            (packetHeader.getHeaderForm() == HeaderForm::Long)
+            ? kDefaultAckDelayExponent
+            : conn_.transportSettings.ackDelayExponent;
+        AckFrameMetaData meta(
+            ackFrame.ackBlocks, ackFrame.ackDelay, ackDelayExponent);
+        auto ackWriteResult = writeAckFrame(meta, builder_);
+        writeSuccess = ackWriteResult.hasValue();
+        break;
+      }
+      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+        const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();
+        auto stream = conn_.streamManager->getStream(streamFrame.streamId);
+        if (stream && retransmittable(*stream)) {
+          auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
+          auto bufferLen =
+              streamData ? streamData->computeChainDataLength() : 0;
+          auto dataLen = writeStreamFrameHeader(
+              builder_,
+              streamFrame.streamId,
+              streamFrame.offset,
+              bufferLen,
+              bufferLen,
+              streamFrame.fin);
+          bool ret = dataLen.hasValue() && *dataLen == streamFrame.len;
+          if (ret) {
+            writeStreamFrameData(builder_, std::move(streamData), *dataLen);
+            notPureAck = true;
+            writeSuccess = true;
+            break;
           }
-          // If a stream is already Closed, we should not clone and resend this
-          // stream data. But should we abort the cloning of this packet and
-          // move on to the next packet? I'm gonna err on the aggressive side
-          // for now and call it success.
-          return true;
-        },
-        [&](const WriteCryptoFrame& cryptoFrame) {
-          // initialStream and handshakeStream can only be in handshake packet,
-          // so they are not clonable
-          CHECK(!packet.isHandshake);
-          // key update not supported
-          DCHECK(
-              packet.packet.header.getProtectionType() ==
-              ProtectionType::KeyPhaseZero);
-          auto& stream = conn_.cryptoState->oneRttStream;
-          auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, stream);
+          writeSuccess = false;
+          break;
+        }
+        // If a stream is already Closed, we should not clone and resend this
+        // stream data. But should we abort the cloning of this packet and
+        // move on to the next packet? I'm gonna err on the aggressive side
+        // for now and call it success.
+        writeSuccess = true;
+        break;
+      }
+      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+        const WriteCryptoFrame& cryptoFrame = *frame.asWriteCryptoFrame();
+        // initialStream and handshakeStream can only be in handshake packet,
+        // so they are not clonable
+        CHECK(!packet.isHandshake);
+        // key update not supported
+        DCHECK(
+            packet.packet.header.getProtectionType() ==
+            ProtectionType::KeyPhaseZero);
+        auto& stream = conn_.cryptoState->oneRttStream;
+        auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, stream);
 
-          // No crypto data found to be cloned, just skip
-          if (!buf) {
-            return true;
-          }
-          auto cryptoWriteResult =
-              writeCryptoFrame(cryptoFrame.offset, std::move(buf), builder_);
-          bool ret = cryptoWriteResult.hasValue() &&
-              cryptoWriteResult->offset == cryptoFrame.offset &&
-              cryptoWriteResult->len == cryptoFrame.len;
-          notPureAck |= ret;
-          return ret;
-        },
-        [&](const MaxDataFrame&) {
-          shouldWriteWindowUpdate = true;
-          auto ret = 0 != writeFrame(generateMaxDataFrame(conn_), builder_);
-          windowUpdateWritten |= ret;
-          notPureAck |= ret;
-          return true;
-        },
-        [&](const MaxStreamDataFrame& maxStreamDataFrame) {
-          auto stream =
-              conn_.streamManager->getStream(maxStreamDataFrame.streamId);
-          if (!stream || !stream->shouldSendFlowControl()) {
-            return true;
-          }
-          shouldWriteWindowUpdate = true;
-          auto ret =
-              0 != writeFrame(generateMaxStreamDataFrame(*stream), builder_);
-          windowUpdateWritten |= ret;
-          notPureAck |= ret;
-          return true;
-        },
-        [&](const PaddingFrame& paddingFrame) {
-          return writeFrame(paddingFrame, builder_) != 0;
-        },
-        [&](const QuicSimpleFrame& simpleFrame) {
-          auto updatedSimpleFrame =
-              updateSimpleFrameOnPacketClone(conn_, simpleFrame);
-          if (!updatedSimpleFrame) {
-            return true;
-          }
-          bool ret =
-              writeSimpleFrame(std::move(*updatedSimpleFrame), builder_) != 0;
-          notPureAck |= ret;
-          return ret;
-        },
-        [&](const auto& otherFrame) {
-          bool ret = writeFrame(otherFrame, builder_) != 0;
-          notPureAck |= ret;
-          return ret;
-        });
+        // No crypto data found to be cloned, just skip
+        if (!buf) {
+          writeSuccess = true;
+          break;
+        }
+        auto cryptoWriteResult =
+            writeCryptoFrame(cryptoFrame.offset, std::move(buf), builder_);
+        bool ret = cryptoWriteResult.hasValue() &&
+            cryptoWriteResult->offset == cryptoFrame.offset &&
+            cryptoWriteResult->len == cryptoFrame.len;
+        notPureAck |= ret;
+        writeSuccess = ret;
+        break;
+      }
+      case QuicWriteFrame::Type::MaxDataFrame_E: {
+        shouldWriteWindowUpdate = true;
+        auto ret = 0 != writeFrame(generateMaxDataFrame(conn_), builder_);
+        windowUpdateWritten |= ret;
+        notPureAck |= ret;
+        writeSuccess = true;
+        break;
+      }
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+        const MaxStreamDataFrame& maxStreamDataFrame =
+            *frame.asMaxStreamDataFrame();
+        auto stream =
+            conn_.streamManager->getStream(maxStreamDataFrame.streamId);
+        if (!stream || !stream->shouldSendFlowControl()) {
+          writeSuccess = true;
+          break;
+        }
+        shouldWriteWindowUpdate = true;
+        auto ret =
+            0 != writeFrame(generateMaxStreamDataFrame(*stream), builder_);
+        windowUpdateWritten |= ret;
+        notPureAck |= ret;
+        writeSuccess = true;
+        break;
+      }
+      case QuicWriteFrame::Type::PaddingFrame_E: {
+        const PaddingFrame& paddingFrame = *frame.asPaddingFrame();
+        writeSuccess = writeFrame(paddingFrame, builder_) != 0;
+        break;
+      }
+      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+        const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
+        auto updatedSimpleFrame =
+            updateSimpleFrameOnPacketClone(conn_, simpleFrame);
+        if (!updatedSimpleFrame) {
+          writeSuccess = true;
+          break;
+        }
+        bool ret =
+            writeSimpleFrame(std::move(*updatedSimpleFrame), builder_) != 0;
+        notPureAck |= ret;
+        writeSuccess = ret;
+        break;
+      }
+      default: {
+        bool ret = writeFrame(QuicWriteFrame(frame), builder_) != 0;
+        notPureAck |= ret;
+        writeSuccess = ret;
+        break;
+      }
+    }
     if (!writeSuccess) {
       return folly::none;
     }

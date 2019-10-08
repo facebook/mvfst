@@ -167,6 +167,11 @@ class QuicClientTransport
 
   void happyEyeballsConnAttemptDelayTimeoutExpired() noexcept;
 
+  void handleAckFrame(
+      const OutstandingPacket& outstandingPacket,
+      const QuicWriteFrame& packetFrame,
+      const ReadAckFrame&);
+
   // From ClientHandshake::HandshakeCallback
   void onNewCachedPsk(
       fizz::client::NewCachedPsk& newCachedPsk) noexcept override;

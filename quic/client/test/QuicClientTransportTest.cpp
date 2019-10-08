@@ -3934,12 +3934,11 @@ RegularQuicWritePacket* findPacketWithStream(
     StreamId streamId) {
   auto op = findOutstandingPacket(conn, [=](OutstandingPacket& packet) {
     for (auto& frame : packet.packet.frames) {
-      bool tryPacket = folly::variant_match(
-          frame,
-          [streamId](WriteStreamFrame& streamFrame) {
-            return streamFrame.streamId == streamId;
-          },
-          [](auto&) { return false; });
+      bool tryPacket = false;
+      WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
+      if (streamFrame) {
+        tryPacket = streamFrame->streamId == streamId;
+      }
       if (tryPacket) {
         return true;
       }

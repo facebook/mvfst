@@ -295,51 +295,61 @@ void QuicClientTransport::processPacketData(
                 // TODO: replace this with a better solution later.
                 cancelHandshakeCryptoStreamRetransmissions(*conn_->cryptoState);
               }
-              folly::variant_match(
-                  packetFrame,
-                  [&](const WriteAckFrame& frame) {
-                    DCHECK(!frame.ackBlocks.empty());
-                    VLOG(4) << "Client received ack for largestAcked="
-                            << frame.ackBlocks.back().end << " " << *this;
-                    commonAckVisitorForAckFrame(ackState, frame);
-                  },
-                  [&](const RstStreamFrame& frame) {
-                    VLOG(4) << "Client received ack for reset frame stream="
-                            << frame.streamId << " " << *this;
+              switch (packetFrame.type()) {
+                case QuicWriteFrame::Type::WriteAckFrame_E: {
+                  const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+                  DCHECK(!frame.ackBlocks.empty());
+                  VLOG(4) << "Client received ack for largestAcked="
+                          << frame.ackBlocks.back().end << " " << *this;
+                  commonAckVisitorForAckFrame(ackState, frame);
+                  break;
+                }
+                case QuicWriteFrame::Type::RstStreamFrame_E: {
+                  const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+                  VLOG(4) << "Client received ack for reset frame stream="
+                          << frame.streamId << " " << *this;
 
-                    auto stream =
-                        conn_->streamManager->getStream(frame.streamId);
-                    if (stream) {
-                      invokeStreamSendStateMachine(
-                          *conn_, *stream, StreamEvents::RstAck(frame));
-                    }
-                  },
-                  [&](const WriteStreamFrame& frame) {
-                    auto ackedStream =
-                        conn_->streamManager->getStream(frame.streamId);
-                    VLOG(4) << "Client got ack for stream=" << frame.streamId
-                            << " offset=" << frame.offset
-                            << " fin=" << frame.fin << " data=" << frame.len
-                            << " closed=" << (ackedStream == nullptr) << " "
-                            << *this;
-                    if (ackedStream) {
-                      invokeStreamSendStateMachine(
-                          *conn_,
-                          *ackedStream,
-                          StreamEvents::AckStreamFrame(frame));
-                    }
-                  },
-                  [&](const WriteCryptoFrame& frame) {
-                    auto cryptoStream = getCryptoStream(
-                        *conn_->cryptoState,
-                        protectionTypeToEncryptionLevel(
-                            outstandingProtectionType));
-                    processCryptoStreamAck(
-                        *cryptoStream, frame.offset, frame.len);
-                  },
-                  [&](const auto& /* frame */) {
-                    // Ignore other frames.
-                  });
+                  auto stream = conn_->streamManager->getStream(frame.streamId);
+                  if (stream) {
+                    invokeStreamSendStateMachine(
+                        *conn_, *stream, StreamEvents::RstAck(frame));
+                  }
+                  break;
+                }
+                case QuicWriteFrame::Type::WriteStreamFrame_E: {
+                  const WriteStreamFrame& frame =
+                      *packetFrame.asWriteStreamFrame();
+
+                  auto ackedStream =
+                      conn_->streamManager->getStream(frame.streamId);
+                  VLOG(4) << "Client got ack for stream=" << frame.streamId
+                          << " offset=" << frame.offset << " fin=" << frame.fin
+                          << " data=" << frame.len
+                          << " closed=" << (ackedStream == nullptr) << " "
+                          << *this;
+                  if (ackedStream) {
+                    invokeStreamSendStateMachine(
+                        *conn_,
+                        *ackedStream,
+                        StreamEvents::AckStreamFrame(frame));
+                  }
+                  break;
+                }
+                case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+                  const WriteCryptoFrame& frame =
+                      *packetFrame.asWriteCryptoFrame();
+                  auto cryptoStream = getCryptoStream(
+                      *conn_->cryptoState,
+                      protectionTypeToEncryptionLevel(
+                          outstandingProtectionType));
+                  processCryptoStreamAck(
+                      *cryptoStream, frame.offset, frame.len);
+                  break;
+                }
+                default:
+                  // ignore other frames.
+                  break;
+              }
             },
             markPacketLoss,
             receiveTimePoint);

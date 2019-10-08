@@ -1116,7 +1116,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
     PacketNum currentPacket = packet.packet.header.getPacketSequenceNum();
     ASSERT_FALSE(packet.packet.frames.empty());
     for (auto& quicFrame : packet.packet.frames) {
-      auto frame = boost::get<WriteStreamFrame>(&quicFrame);
+      auto frame = quicFrame.asWriteStreamFrame();
       if (!frame) {
         continue;
       }
@@ -1374,7 +1374,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(stopSendingFrame), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback,
@@ -1416,7 +1416,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(stopSendingFrame), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   server->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   EXPECT_CALL(connCallback, onStopSending(_, _)).Times(0);
@@ -1499,7 +1499,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       builder, 0x00, stream->currentReadOffset, 0, 10, true);
   ASSERT_TRUE(dataLen.hasValue());
   ASSERT_EQ(*dataLen, 0);
-  writeFrame(std::move(stopSendingFrame), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback,
@@ -1523,7 +1523,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingBeforeStream) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(stopSendingFrame), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onNewBidirectionalStream(streamId));
   EXPECT_CALL(
@@ -1578,8 +1578,8 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   StopSendingFrame stopSendingFrame2(
       streamId2, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(std::move(stopSendingFrame1), builder);
-  writeFrame(std::move(stopSendingFrame2), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame1), builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame2), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(
       connCallback, onStopSending(_, GenericApplicationErrorCode::UNKNOWN))
@@ -1605,7 +1605,7 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(stopSendingFrame, builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
   markPacketLoss(
       server->getNonConstConn(),
@@ -1635,7 +1635,7 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
-  writeFrame(stopSendingFrame, builder);
+  writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
 
   // clear out all the streams, this is not a great way to simulate closed

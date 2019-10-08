@@ -366,7 +366,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   // Write those framses with a regular builder
   writeFrame(connCloseFrame, regularBuilder);
-  writeFrame(maxStreamFrame, regularBuilder);
+  writeFrame(QuicSimpleFrame(maxStreamFrame), regularBuilder);
   writeFrame(pingFrame, regularBuilder);
   writeAckFrame(ackMeta, regularBuilder);
 
@@ -386,15 +386,15 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   // Test that the only frame that's written is maxdataframe
   EXPECT_GE(writtenPacket.packet.frames.size(), 1);
   auto& writtenFrame = writtenPacket.packet.frames.at(0);
-  auto maxDataFrame = boost::get<MaxDataFrame>(&writtenFrame);
+  auto maxDataFrame = writtenFrame.asMaxDataFrame();
   CHECK(maxDataFrame);
   for (auto& frame : writtenPacket.packet.frames) {
     bool present = false;
     /* the next four frames should not be written */
-    present |= boost::get<ConnectionCloseFrame>(&frame) ? true : false;
-    present |= boost::get<QuicSimpleFrame>(&frame) ? true : false;
-    present |= boost::get<PingFrame>(&frame) ? true : false;
-    present |= boost::get<WriteAckFrame>(&frame) ? true : false;
+    present |= frame.asConnectionCloseFrame() ? true : false;
+    present |= frame.asQuicSimpleFrame() ? true : false;
+    present |= frame.asPingFrame() ? true : false;
+    present |= frame.asWriteAckFrame() ? true : false;
     ASSERT_FALSE(present);
   }
 }
@@ -535,12 +535,10 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
       conn.ackStates.appDataAckState.nextPacketNum,
       shortHeader.getPacketSequenceNum());
   EXPECT_EQ(1, result.second->packet.frames.size());
-  folly::variant_match(
-      result.second->packet.frames.front(),
-      [&](const MaxDataFrame& frame) { EXPECT_EQ(2832, frame.maximumData); },
-      [&](const auto&) {
-        ASSERT_FALSE(true); // should not happen
-      });
+  MaxDataFrame* maxDataFrame =
+      result.second->packet.frames.front().asMaxDataFrame();
+  ASSERT_NE(maxDataFrame, nullptr);
+  EXPECT_EQ(2832, maxDataFrame->maximumData);
   EXPECT_TRUE(folly::IOBufEqualTo{}(
       *folly::IOBuf::copyBuffer("if you are the dealer"),
       *result.second->header));
@@ -580,18 +578,25 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   EXPECT_EQ(expectedPacketEvent, *packetResult.first);
   int32_t verifyConnWindowUpdate = 1, verifyStreamWindowUpdate = 1;
   for (const auto& frame : packetResult.second->packet.frames) {
-    folly::variant_match(
-        frame,
-        [&](const MaxStreamDataFrame& maxStreamDataFrame) {
-          EXPECT_EQ(stream->id, maxStreamDataFrame.streamId);
-          verifyStreamWindowUpdate--;
-        },
-        [&](const MaxDataFrame&) { verifyConnWindowUpdate--; },
-        [&](const PaddingFrame&) {},
-        [&](const auto&) {
-          // should never happen
-          EXPECT_TRUE(false);
-        });
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+        const MaxStreamDataFrame& maxStreamDataFrame =
+            *frame.asMaxStreamDataFrame();
+        EXPECT_EQ(stream->id, maxStreamDataFrame.streamId);
+        verifyStreamWindowUpdate--;
+        break;
+      }
+      case QuicWriteFrame::Type::MaxDataFrame_E: {
+        verifyConnWindowUpdate--;
+        break;
+      }
+      case QuicWriteFrame::Type::PaddingFrame_E: {
+        break;
+      }
+      default:
+        // should never happen
+        EXPECT_TRUE(false);
+    }
   }
   EXPECT_EQ(0, verifyStreamWindowUpdate);
   EXPECT_EQ(0, verifyConnWindowUpdate);
@@ -600,15 +605,21 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   EXPECT_GE(packetResult.second->packet.frames.size(), 2);
   uint32_t streamWindowUpdateCounter = 0;
   uint32_t connWindowUpdateCounter = 0;
-  for (auto& streamFlowControl :
-       all_frames<MaxStreamDataFrame>(packetResult.second->packet.frames)) {
+  for (auto& frame : packetResult.second->packet.frames) {
+    auto streamFlowControl = frame.asMaxStreamDataFrame();
+    if (!streamFlowControl) {
+      continue;
+    }
     streamWindowUpdateCounter++;
-    EXPECT_EQ(1700, streamFlowControl.maximumData);
+    EXPECT_EQ(1700, streamFlowControl->maximumData);
   }
-  for (auto& connFlowControl :
-       all_frames<MaxDataFrame>(packetResult.second->packet.frames)) {
+  for (auto& frame : packetResult.second->packet.frames) {
+    auto connFlowControl = frame.asMaxDataFrame();
+    if (!connFlowControl) {
+      continue;
+    }
     connWindowUpdateCounter++;
-    EXPECT_EQ(3300, connFlowControl.maximumData);
+    EXPECT_EQ(3300, connFlowControl->maximumData);
   }
   EXPECT_EQ(1, connWindowUpdateCounter);
   EXPECT_EQ(1, streamWindowUpdateCounter);

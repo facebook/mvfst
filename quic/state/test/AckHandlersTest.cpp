@@ -81,7 +81,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
       GetParam(),
       ackFrame,
       [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
-        auto& stream = boost::get<WriteStreamFrame>(packetFrame);
+        auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
       testLossHandler(lostPackets),
@@ -152,7 +152,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
       GetParam(),
       ackFrame,
       [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
-        auto& stream = boost::get<WriteStreamFrame>(packetFrame);
+        auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
       testLossHandler(lostPackets),
@@ -259,7 +259,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
       GetParam(),
       ackFrame,
       [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
-        auto& stream = boost::get<WriteStreamFrame>(packetFrame);
+        auto& stream = *packetFrame.asWriteStreamFrame();
         streams.emplace_back(stream);
       },
       testLossHandler(lostPackets),
@@ -337,15 +337,10 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
         auto ackedPacketNum =
             outstandingPacket.packet.header.getPacketSequenceNum();
         EXPECT_EQ(ackedPacketNum, firstReceivedAck.largestAcked);
-        folly::variant_match(
-            packetFrame,
-            [&](const WriteAckFrame& frame) {
-              commonAckVisitorForAckFrame(
-                  conn.ackStates.appDataAckState, frame);
-            },
-            [&](const auto& /* frame */) {
-              // Ignore other frames.
-            });
+        const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
+        if (frame) {
+          commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
+        }
       },
       [](auto& /* conn */,
          auto& /* packet */,
@@ -368,15 +363,10 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
       GetParam(),
       secondReceivedAck,
       [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
-        folly::variant_match(
-            packetFrame,
-            [&](const WriteAckFrame& frame) {
-              commonAckVisitorForAckFrame(
-                  conn.ackStates.appDataAckState, frame);
-            },
-            [&](const auto& /* frame */) {
-              // Ignore other frames.
-            });
+        const WriteAckFrame* frame = packetFrame.asWriteAckFrame();
+        if (frame) {
+          commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
+        }
       },
       [](auto& /* conn */,
          auto& /* packet */,

@@ -205,9 +205,10 @@ TEST_F(QuicOpenStateTest, AckStream) {
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
   EXPECT_EQ(1, conn->outstandingPackets.size());
 
-  auto& streamFrame = boost::get<WriteStreamFrame>(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.frames.front());
+  auto& streamFrame =
+      *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+           ->packet.frames.front()
+           .asWriteStreamFrame();
 
   StreamEvents::AckStreamFrame ack(streamFrame);
   invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
@@ -256,8 +257,9 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   EXPECT_EQ(3, stream->retransmissionBuffer.size());
   EXPECT_EQ(3, conn->outstandingPackets.size());
   auto packet = conn->outstandingPackets[folly::Random::rand32() % 3];
-  auto streamFrame = boost::get<WriteStreamFrame>(
-      conn->outstandingPackets[std::rand() % 3].packet.frames.front());
+  auto streamFrame = *conn->outstandingPackets[std::rand() % 3]
+                          .packet.frames.front()
+                          .asWriteStreamFrame();
   StreamEvents::AckStreamFrame ack(streamFrame);
   invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
   EXPECT_EQ(2, stream->retransmissionBuffer.size());
@@ -289,9 +291,10 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
   EXPECT_EQ(1, conn->outstandingPackets.size());
 
-  auto& streamFrame = boost::get<WriteStreamFrame>(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.frames.front());
+  auto& streamFrame =
+      *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+           ->packet.frames.front()
+           .asWriteStreamFrame();
 
   PacketNum packetNum(1);
   MinStreamDataFrame minDataFrame(stream->id, 1000, 100);
@@ -333,9 +336,10 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkipHalfBuf) {
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
   EXPECT_EQ(1, conn->outstandingPackets.size());
 
-  auto& streamFrame = boost::get<WriteStreamFrame>(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.frames.front());
+  auto& streamFrame =
+      *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+           ->packet.frames.front()
+           .asWriteStreamFrame();
 
   PacketNum packetNum(1);
   // Skip ~0.5 buffers.
@@ -387,11 +391,11 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkipOneAndAHalfBuf) {
   auto streamFrameIt =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
   auto& streamFrame1 =
-      boost::get<WriteStreamFrame>(streamFrameIt->packet.frames.front());
-  auto& streamFrame2 = boost::get<WriteStreamFrame>(
-      getNextOutstandingPacket(
-          *conn, PacketNumberSpace::AppData, ++streamFrameIt)
-          ->packet.frames.front());
+      *streamFrameIt->packet.frames.front().asWriteStreamFrame();
+  auto& streamFrame2 = *getNextOutstandingPacket(
+                            *conn, PacketNumberSpace::AppData, ++streamFrameIt)
+                            ->packet.frames.front()
+                            .asWriteStreamFrame();
 
   PacketNum packetNum(1);
   // Skip ~1.5 buffers.
@@ -502,9 +506,10 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
   EXPECT_EQ(1, conn->outstandingPackets.size());
 
-  auto& streamFrame = boost::get<WriteStreamFrame>(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.frames.front());
+  auto& streamFrame =
+      *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+           ->packet.frames.front()
+           .asWriteStreamFrame();
 
   StreamEvents::AckStreamFrame ack(streamFrame);
   invokeHandler<StreamSendStateMachine>(stream->send, ack, *stream);
@@ -541,9 +546,10 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
   EXPECT_EQ(1, conn->outstandingPackets.size());
 
-  auto& streamFrame = boost::get<WriteStreamFrame>(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->packet.frames.front());
+  auto& streamFrame =
+      *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+           ->packet.frames.front()
+           .asWriteStreamFrame();
 
   PacketNum packetNum(1);
   MinStreamDataFrame minDataFrame(stream->id, 1000, 100);

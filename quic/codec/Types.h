@@ -592,22 +592,25 @@ using QuicSimpleFrame = boost::variant<
 
 DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
 
+#define QUIC_WRITE_FRAME(F, ...)         \
+  F(PaddingFrame, __VA_ARGS__)           \
+  F(RstStreamFrame, __VA_ARGS__)         \
+  F(ConnectionCloseFrame, __VA_ARGS__)   \
+  F(ApplicationCloseFrame, __VA_ARGS__)  \
+  F(MaxDataFrame, __VA_ARGS__)           \
+  F(MaxStreamDataFrame, __VA_ARGS__)     \
+  F(PingFrame, __VA_ARGS__)              \
+  F(DataBlockedFrame, __VA_ARGS__)       \
+  F(StreamDataBlockedFrame, __VA_ARGS__) \
+  F(StreamsBlockedFrame, __VA_ARGS__)    \
+  F(WriteAckFrame, __VA_ARGS__)          \
+  F(WriteStreamFrame, __VA_ARGS__)       \
+  F(WriteCryptoFrame, __VA_ARGS__)       \
+  F(QuicSimpleFrame, __VA_ARGS__)        \
+  F(NoopFrame, __VA_ARGS__)
+
 // Types of frames which are written.
-using QuicWriteFrame = boost::variant<
-    PaddingFrame,
-    RstStreamFrame,
-    ConnectionCloseFrame,
-    ApplicationCloseFrame,
-    MaxDataFrame,
-    MaxStreamDataFrame,
-    PingFrame,
-    DataBlockedFrame,
-    StreamDataBlockedFrame,
-    StreamsBlockedFrame,
-    WriteAckFrame,
-    WriteStreamFrame,
-    WriteCryptoFrame,
-    QuicSimpleFrame>;
+DECLARE_VARIANT_TYPE(QuicWriteFrame, QUIC_WRITE_FRAME)
 
 enum class HeaderForm : bool {
   Long = 1,

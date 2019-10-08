@@ -30,9 +30,14 @@ namespace quic {
     return nullptr;                  \
   }
 
-#define UNION_CTORS(X, NAME)          \
-  NAME(X&& x) : type_(Type::X##_E) {  \
-    new (&X##_) X(std::move(x));      \
+#define UNION_CTORS(X, NAME)         \
+  NAME(X&& x) : type_(Type::X##_E) { \
+    new (&X##_) X(std::move(x));     \
+  }
+
+#define UNION_COPY_CTORS(X, NAME)         \
+  NAME(const X& x) : type_(Type::X##_E) { \
+    new (&X##_) X(x);                     \
   }
 
 #define UNION_MOVE_CASES(X, other)        \
@@ -55,6 +60,8 @@ namespace quic {
     enum class Type { X(ENUM_TYPES) };                    \
                                                           \
     X(UNION_CTORS, NAME)                                  \
+                                                          \
+    X(UNION_COPY_CTORS, NAME)                             \
                                                           \
     NAME(NAME&& other) {                                  \
       switch (other.type_) { X(UNION_MOVE_CASES, other) } \

@@ -1223,14 +1223,13 @@ TEST_F(QuicTransportFunctionsTest, NothingWritten) {
       0);
 }
 
-template <class FrameType>
-const FrameType& getFirstFrameInOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPackets) {
+const QuicWriteFrame& getFirstFrameInOutstandingPackets(
+    const std::deque<OutstandingPacket>& outstandingPackets,
+    QuicWriteFrame::Type frameType) {
   for (const auto& packet : outstandingPackets) {
     for (const auto& frame : packet.packet.frames) {
-      auto decodedFrame = boost::get<FrameType>(&frame);
-      if (decodedFrame) {
-        return *decodedFrame;
+      if (frame.type() == frameType) {
+        return frame;
       }
     }
   }
@@ -1272,8 +1271,10 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   EXPECT_LT(sentBytes, 200);
 
   EXPECT_GT(conn->ackStates.appDataAckState.nextPacketNum, originalNextSeq);
-  auto blocked = getFirstFrameInOutstandingPackets<StreamDataBlockedFrame>(
-      conn->outstandingPackets);
+  auto blocked = *getFirstFrameInOutstandingPackets(
+                      conn->outstandingPackets,
+                      QuicWriteFrame::Type::StreamDataBlockedFrame_E)
+                      .asStreamDataBlockedFrame();
   EXPECT_EQ(blocked.streamId, stream1->id);
 
   // Since everything is blocked, we shouldn't write a blocked again, so we
@@ -1758,7 +1759,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounter) {
   auto connWindowUpdate =
       MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
   conn->pendingEvents.connWindowUpdate = true;
-  packet.packet.frames.push_back(connWindowUpdate);
+  packet.packet.frames.emplace_back(connWindowUpdate);
   PacketEvent packetEvent = 100;
   conn->outstandingPacketEvents.insert(packetEvent);
   updateConnection(*conn, packetEvent, packet.packet, TimePoint(), 123);
@@ -1788,7 +1789,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   StreamDataBlockedFrame blockedFrame(stream->id, 1000);
-  packet.packet.frames.push_back(blockedFrame);
+  packet.packet.frames.emplace_back(blockedFrame);
   conn->outstandingPacketEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(
@@ -1805,8 +1806,8 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   MaxDataFrame connWindowUpdate(
       1000 + conn->flowControlState.advertisedMaxOffset);
-  packet.packet.frames.push_back(connWindowUpdate);
-  packet.packet.frames.push_back(connWindowUpdate);
+  packet.packet.frames.emplace_back(connWindowUpdate);
+  packet.packet.frames.emplace_back(connWindowUpdate);
   conn->pendingEvents.connWindowUpdate = true;
   EXPECT_DEATH(
       updateConnection(
@@ -1859,7 +1860,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   RstStreamFrame rstStreamFrame(
       stream->id, GenericApplicationErrorCode::UNKNOWN, 0);
-  packet.packet.frames.push_back(rstStreamFrame);
+  packet.packet.frames.emplace_back(std::move(rstStreamFrame));
   conn->outstandingPacketEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(

@@ -57,138 +57,149 @@ void markPacketLoss(
     bool processed,
     PacketNum currentPacketNum) {
   for (auto& packetFrame : packet.frames) {
-    folly::variant_match(
-        packetFrame,
-        [&](MaxStreamDataFrame& frame) {
-          // For all other frames, we process it if it's not from a clone
-          // packet, or if the clone and its siblings have never been processed.
-          // But for both MaxData and MaxStreamData, clone and its siblings may
-          // have different values. So we process it if it matches the
-          // latestMaxDataPacket or latestMaxStreamDataPacket. If an older
-          // packet also has such frames, it's ok to skip process of such loss
-          // since newer value is already sent in later packets.
-          auto stream = conn.streamManager->getStream(frame.streamId);
-          if (!stream) {
-            return;
-          }
-          // TODO: check for the stream is in Open or HalfClosedLocal state, the
-          // peer doesn't need a flow control update in these cases.
-          if (stream->latestMaxStreamDataPacket == currentPacketNum) {
-            onStreamWindowUpdateLost(*stream);
-          }
-        },
-        [&](MaxDataFrame&) {
-          if (conn.latestMaxDataPacket == currentPacketNum) {
-            onConnWindowUpdateLost(conn);
-          }
-        },
-        // For other frame types, we only process them if the packet is not a
-        // processed clone.
-        [&](WriteStreamFrame& frame) {
-          if (processed) {
-            return;
-          }
-          auto stream = conn.streamManager->getStream(frame.streamId);
-          if (!stream) {
-            return;
-          }
-          auto bufferItr = std::lower_bound(
-              stream->retransmissionBuffer.begin(),
-              stream->retransmissionBuffer.end(),
-              frame.offset,
-              [](const auto& buffer, const auto& offset) {
-                return buffer.offset < offset;
-              });
-          if (bufferItr == stream->retransmissionBuffer.end()) {
-            // It's possible that the stream was reset or data on the stream was
-            // skipped while we discovered that its packet was lost so we might
-            // not have the offset.
-            return;
-          }
-          // The original rxmt offset might have been bumped up after it was
-          // shrunk due to egress partially reliable skip.
-          if (!ackFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
-            return;
-          }
-          stream->lossBuffer.insert(
-              std::upper_bound(
-                  stream->lossBuffer.begin(),
-                  stream->lossBuffer.end(),
-                  bufferItr->offset,
-                  [](const auto& offset, const auto& buffer) {
-                    return offset < buffer.offset;
-                  }),
-              std::move(*bufferItr));
-          stream->retransmissionBuffer.erase(bufferItr);
-          conn.streamManager->updateLossStreams(*stream);
-        },
-        [&](WriteCryptoFrame& frame) {
-          if (processed) {
-            return;
-          }
-          auto protectionType = packet.header.getProtectionType();
-          auto encryptionLevel =
-              protectionTypeToEncryptionLevel(protectionType);
-          auto cryptoStream =
-              getCryptoStream(*conn.cryptoState, encryptionLevel);
+    switch (packetFrame.type()) {
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+        MaxStreamDataFrame& frame = *packetFrame.asMaxStreamDataFrame();
+        // For all other frames, we process it if it's not from a clone
+        // packet, or if the clone and its siblings have never been processed.
+        // But for both MaxData and MaxStreamData, clone and its siblings may
+        // have different values. So we process it if it matches the
+        // latestMaxDataPacket or latestMaxStreamDataPacket. If an older
+        // packet also has such frames, it's ok to skip process of such loss
+        // since newer value is already sent in later packets.
+        auto stream = conn.streamManager->getStream(frame.streamId);
+        if (!stream) {
+          break;
+        }
+        // TODO: check for the stream is in Open or HalfClosedLocal state, the
+        // peer doesn't need a flow control update in these cases.
+        if (stream->latestMaxStreamDataPacket == currentPacketNum) {
+          onStreamWindowUpdateLost(*stream);
+        }
+        break;
+      }
+      case QuicWriteFrame::Type::MaxDataFrame_E: {
+        if (conn.latestMaxDataPacket == currentPacketNum) {
+          onConnWindowUpdateLost(conn);
+        }
+        break;
+      }
+      // For other frame types, we only process them if the packet is not a
+      // processed clone.
+      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+        WriteStreamFrame frame = *packetFrame.asWriteStreamFrame();
+        if (processed) {
+          break;
+        }
+        auto stream = conn.streamManager->getStream(frame.streamId);
+        if (!stream) {
+          break;
+        }
+        auto bufferItr = std::lower_bound(
+            stream->retransmissionBuffer.begin(),
+            stream->retransmissionBuffer.end(),
+            frame.offset,
+            [](const auto& buffer, const auto& offset) {
+              return buffer.offset < offset;
+            });
+        if (bufferItr == stream->retransmissionBuffer.end()) {
+          // It's possible that the stream was reset or data on the stream was
+          // skipped while we discovered that its packet was lost so we might
+          // not have the offset.
+          break;
+        }
+        // The original rxmt offset might have been bumped up after it was
+        // shrunk due to egress partially reliable skip.
+        if (!ackFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
+          break;
+        }
+        stream->lossBuffer.insert(
+            std::upper_bound(
+                stream->lossBuffer.begin(),
+                stream->lossBuffer.end(),
+                bufferItr->offset,
+                [](const auto& offset, const auto& buffer) {
+                  return offset < buffer.offset;
+                }),
+            std::move(*bufferItr));
+        stream->retransmissionBuffer.erase(bufferItr);
+        conn.streamManager->updateLossStreams(*stream);
+        break;
+      }
+      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+        WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+        if (processed) {
+          break;
+        }
+        auto protectionType = packet.header.getProtectionType();
+        auto encryptionLevel = protectionTypeToEncryptionLevel(protectionType);
+        auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
 
-          auto bufferItr = std::lower_bound(
-              cryptoStream->retransmissionBuffer.begin(),
-              cryptoStream->retransmissionBuffer.end(),
-              frame.offset,
-              [](const auto& buffer, const auto& offset) {
-                return buffer.offset < offset;
-              });
-          if (bufferItr == cryptoStream->retransmissionBuffer.end()) {
-            // It's possible that the stream was reset while we discovered that
-            // it's packet was lost so we might not have the offset.
-            return;
-          }
-          DCHECK_EQ(bufferItr->offset, frame.offset);
-          cryptoStream->lossBuffer.insert(
-              std::upper_bound(
-                  cryptoStream->lossBuffer.begin(),
-                  cryptoStream->lossBuffer.end(),
-                  bufferItr->offset,
-                  [](const auto& offset, const auto& buffer) {
-                    return offset < buffer.offset;
-                  }),
-              std::move(*bufferItr));
-          cryptoStream->retransmissionBuffer.erase(bufferItr);
-        },
-        [&](RstStreamFrame& frame) {
-          if (processed) {
-            return;
-          }
-          auto stream = conn.streamManager->getStream(frame.streamId);
-          if (!stream) {
-            // If the stream is dead, ignore the retransmissions of the rst
-            // stream.
-            return;
-          }
-          // Add the lost RstStreamFrame back to pendingEvents:
-          conn.pendingEvents.resets.insert({frame.streamId, frame});
-        },
-        [&](StreamDataBlockedFrame& frame) {
-          if (processed) {
-            return;
-          }
-          auto stream = conn.streamManager->getStream(frame.streamId);
-          // TODO: check for retransmittable
-          if (!stream) {
-            return;
-          }
-          onBlockedLost(*stream);
-        },
-        [&](QuicSimpleFrame& frame) {
-          if (processed) {
-            return;
-          }
-          updateSimpleFrameOnPacketLoss(conn, frame);
-        },
-        [&](auto&) {
-          // ignore the rest of the frames.
-        });
+        auto bufferItr = std::lower_bound(
+            cryptoStream->retransmissionBuffer.begin(),
+            cryptoStream->retransmissionBuffer.end(),
+            frame.offset,
+            [](const auto& buffer, const auto& offset) {
+              return buffer.offset < offset;
+            });
+        if (bufferItr == cryptoStream->retransmissionBuffer.end()) {
+          // It's possible that the stream was reset while we discovered that
+          // it's packet was lost so we might not have the offset.
+          break;
+        }
+        DCHECK_EQ(bufferItr->offset, frame.offset);
+        cryptoStream->lossBuffer.insert(
+            std::upper_bound(
+                cryptoStream->lossBuffer.begin(),
+                cryptoStream->lossBuffer.end(),
+                bufferItr->offset,
+                [](const auto& offset, const auto& buffer) {
+                  return offset < buffer.offset;
+                }),
+            std::move(*bufferItr));
+        cryptoStream->retransmissionBuffer.erase(bufferItr);
+        break;
+      }
+      case QuicWriteFrame::Type::RstStreamFrame_E: {
+        RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+        if (processed) {
+          break;
+        }
+        auto stream = conn.streamManager->getStream(frame.streamId);
+        if (!stream) {
+          // If the stream is dead, ignore the retransmissions of the rst
+          // stream.
+          break;
+        }
+        // Add the lost RstStreamFrame back to pendingEvents:
+        conn.pendingEvents.resets.insert({frame.streamId, frame});
+        break;
+      }
+      case QuicWriteFrame::Type::StreamDataBlockedFrame_E: {
+        StreamDataBlockedFrame& frame = *packetFrame.asStreamDataBlockedFrame();
+        if (processed) {
+          break;
+        }
+        auto stream = conn.streamManager->getStream(frame.streamId);
+        // TODO: check for retransmittable
+        if (!stream) {
+          break;
+        }
+        onBlockedLost(*stream);
+        break;
+      }
+      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+        QuicSimpleFrame& frame = *packetFrame.asQuicSimpleFrame();
+        if (processed) {
+          break;
+        }
+        updateSimpleFrameOnPacketLoss(conn, frame);
+        break;
+      }
+      default:
+        // ignore the rest of the frames.
+        break;
+    }
   }
 }
 } // namespace quic

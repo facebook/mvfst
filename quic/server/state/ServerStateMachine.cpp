@@ -756,47 +756,56 @@ void onServerReadDataFromOpen(
               [&](const OutstandingPacket&,
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
-                folly::variant_match(
-                    packetFrame,
-                    [&](const WriteStreamFrame& frame) {
-                      VLOG(4)
-                          << "Server received ack for stream=" << frame.streamId
-                          << " offset=" << frame.offset << " fin=" << frame.fin
-                          << " len=" << frame.len << " " << conn;
-                      auto ackedStream =
-                          conn.streamManager->getStream(frame.streamId);
-                      if (ackedStream) {
-                        invokeStreamSendStateMachine(
-                            conn,
-                            *ackedStream,
-                            StreamEvents::AckStreamFrame(frame));
-                      }
-                    },
-                    [&](const WriteCryptoFrame& frame) {
-                      auto cryptoStream =
-                          getCryptoStream(*conn.cryptoState, encryptionLevel);
-                      processCryptoStreamAck(
-                          *cryptoStream, frame.offset, frame.len);
-                    },
-                    [&](const RstStreamFrame& frame) {
-                      VLOG(4) << "Server received ack for reset stream="
-                              << frame.streamId << " " << conn;
-                      auto stream =
-                          conn.streamManager->getStream(frame.streamId);
-                      if (stream) {
-                        invokeStreamSendStateMachine(
-                            conn, *stream, StreamEvents::RstAck(frame));
-                      }
-                    },
-                    [&](const WriteAckFrame& frame) {
-                      DCHECK(!frame.ackBlocks.empty());
-                      VLOG(4) << "Server received ack for largestAcked="
-                              << frame.ackBlocks.back().end << " " << conn;
-                      commonAckVisitorForAckFrame(ackState, frame);
-                    },
-                    [&](const auto& /*frame*/) {
-                      // Ignore other frames.
-                    });
+                switch (packetFrame.type()) {
+                  case QuicWriteFrame::Type::WriteStreamFrame_E: {
+                    const WriteStreamFrame& frame =
+                        *packetFrame.asWriteStreamFrame();
+                    VLOG(4)
+                        << "Server received ack for stream=" << frame.streamId
+                        << " offset=" << frame.offset << " fin=" << frame.fin
+                        << " len=" << frame.len << " " << conn;
+                    auto ackedStream =
+                        conn.streamManager->getStream(frame.streamId);
+                    if (ackedStream) {
+                      invokeStreamSendStateMachine(
+                          conn,
+                          *ackedStream,
+                          StreamEvents::AckStreamFrame(frame));
+                    }
+                    break;
+                  }
+                  case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+                    const WriteCryptoFrame& frame =
+                        *packetFrame.asWriteCryptoFrame();
+                    auto cryptoStream =
+                        getCryptoStream(*conn.cryptoState, encryptionLevel);
+                    processCryptoStreamAck(
+                        *cryptoStream, frame.offset, frame.len);
+                    break;
+                  }
+                  case QuicWriteFrame::Type::RstStreamFrame_E: {
+                    const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+                    VLOG(4) << "Server received ack for reset stream="
+                            << frame.streamId << " " << conn;
+                    auto stream = conn.streamManager->getStream(frame.streamId);
+                    if (stream) {
+                      invokeStreamSendStateMachine(
+                          conn, *stream, StreamEvents::RstAck(frame));
+                    }
+                    break;
+                  }
+                  case QuicWriteFrame::Type::WriteAckFrame_E: {
+                    const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+                    DCHECK(!frame.ackBlocks.empty());
+                    VLOG(4) << "Server received ack for largestAcked="
+                            << frame.ackBlocks.back().end << " " << conn;
+                    commonAckVisitorForAckFrame(ackState, frame);
+                    break;
+                  }
+                  default: {
+                    break;
+                  }
+                }
               },
               markPacketLoss,
               readData.networkData.receiveTimePoint);

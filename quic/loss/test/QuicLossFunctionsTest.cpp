@@ -696,10 +696,14 @@ TEST_F(QuicLossFunctionsTest, TestMarkRstLoss) {
   auto& packet2 =
       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
   bool rstFound = false;
-  for (auto& frame : all_frames<RstStreamFrame>(packet2.frames)) {
-    EXPECT_EQ(stream->id, frame.streamId);
-    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
-    EXPECT_EQ(currentOffset, frame.offset);
+  for (auto& frame : packet2.frames) {
+    auto resetFrame = frame.asRstStreamFrame();
+    if (!resetFrame) {
+      continue;
+    }
+    EXPECT_EQ(stream->id, resetFrame->streamId);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, resetFrame->errorCode);
+    EXPECT_EQ(currentOffset, resetFrame->offset);
     rstFound = true;
   }
   EXPECT_TRUE(rstFound);
@@ -1235,12 +1239,19 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
   for (const auto& frame :
        getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
            ->packet.frames) {
-    folly::variant_match(
-        frame,
-        [&](const WriteStreamFrame&) { streamDataCounter++; },
-        [&](const MaxStreamDataFrame&) { streamWindowUpdateCounter++; },
-        [&](const MaxDataFrame&) { connWindowUpdateCounter++; },
-        [](const auto&) { ASSERT_TRUE(false); });
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::WriteStreamFrame_E:
+        streamDataCounter++;
+        break;
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E:
+        streamWindowUpdateCounter++;
+        break;
+      case QuicWriteFrame::Type::MaxDataFrame_E:
+        connWindowUpdateCounter++;
+        break;
+      default:
+        CHECK(false) << "unexpected frame=" << (int)frame.type();
+    }
   }
   EXPECT_EQ(1, streamDataCounter);
   EXPECT_EQ(1, streamWindowUpdateCounter);

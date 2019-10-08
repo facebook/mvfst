@@ -80,7 +80,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
 
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
-  writeFrame(maxStreamsFrame, regularBuilder1);
+  writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
   writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
@@ -123,44 +123,61 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       stream->currentReadOffset + stream->flowControlState.windowSize,
       stream->flowControlState.advertisedMaxOffset);
   for (const auto& frame : packet2.packet.frames) {
-    folly::variant_match(
-        frame,
-        [](const ConnectionCloseFrame& closeFrame) {
-          EXPECT_EQ(
-              TransportErrorCode::FRAME_ENCODING_ERROR, closeFrame.errorCode);
-          EXPECT_EQ("The sun is in the sky.", closeFrame.reasonPhrase);
-          EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
-        },
-        [](const QuicSimpleFrame& simpleFrame) {
-          auto maxStreamFrame = boost::get<MaxStreamsFrame>(simpleFrame);
-          EXPECT_EQ(4321, maxStreamFrame.maxStreams);
-        },
-        [](const PingFrame& ping) { EXPECT_EQ(PingFrame(), ping); },
-        [](const WriteAckFrame& ack) {
-          EXPECT_EQ(Interval<PacketNum>(10, 100), ack.ackBlocks.front());
-          EXPECT_EQ(Interval<PacketNum>(200, 1000), ack.ackBlocks.back());
-        },
-        [&buf, &streamId](const WriteStreamFrame& streamFrame) {
-          EXPECT_EQ(streamId, streamFrame.streamId);
-          EXPECT_EQ(0, streamFrame.offset);
-          EXPECT_EQ(buf->computeChainDataLength(), streamFrame.len);
-          EXPECT_EQ(true, streamFrame.fin);
-        },
-        [&cryptoOffset, &cryptoBuf](const WriteCryptoFrame& frame) {
-          EXPECT_EQ(frame.offset, cryptoOffset);
-          EXPECT_EQ(frame.len, cryptoBuf->computeChainDataLength());
-        },
-        [&expectedConnFlowControlValue](const MaxDataFrame& maxData) {
-          EXPECT_EQ(expectedConnFlowControlValue, maxData.maximumData);
-        },
-        [&streamId, &expectedStreamFlowControlValue](
-            const MaxStreamDataFrame& maxStreamData) {
-          EXPECT_EQ(streamId, maxStreamData.streamId);
-          EXPECT_EQ(expectedStreamFlowControlValue, maxStreamData.maximumData);
-        },
-        [](const auto&) {
-          EXPECT_TRUE(false); /* should never happen*/
-        });
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::ConnectionCloseFrame_E: {
+        const ConnectionCloseFrame& closeFrame =
+            *frame.asConnectionCloseFrame();
+        EXPECT_EQ(
+            TransportErrorCode::FRAME_ENCODING_ERROR, closeFrame.errorCode);
+        EXPECT_EQ("The sun is in the sky.", closeFrame.reasonPhrase);
+        EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
+        break;
+      }
+      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+        const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
+        auto maxStreamFrame = boost::get<MaxStreamsFrame>(simpleFrame);
+        EXPECT_EQ(4321, maxStreamFrame.maxStreams);
+        break;
+      }
+      case QuicWriteFrame::Type::PingFrame_E: {
+        const PingFrame& ping = *frame.asPingFrame();
+        EXPECT_EQ(PingFrame(), ping);
+        break;
+      }
+      case QuicWriteFrame::Type::WriteAckFrame_E: {
+        const WriteAckFrame& ack = *frame.asWriteAckFrame();
+        EXPECT_EQ(Interval<PacketNum>(10, 100), ack.ackBlocks.front());
+        EXPECT_EQ(Interval<PacketNum>(200, 1000), ack.ackBlocks.back());
+        break;
+      }
+      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+        const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();
+        EXPECT_EQ(streamId, streamFrame.streamId);
+        EXPECT_EQ(0, streamFrame.offset);
+        EXPECT_EQ(buf->computeChainDataLength(), streamFrame.len);
+        EXPECT_EQ(true, streamFrame.fin);
+        break;
+      }
+      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+        const WriteCryptoFrame& cryptoFrame = *frame.asWriteCryptoFrame();
+        EXPECT_EQ(cryptoFrame.offset, cryptoOffset);
+        EXPECT_EQ(cryptoFrame.len, cryptoBuf->computeChainDataLength());
+        break;
+      }
+      case QuicWriteFrame::Type::MaxDataFrame_E: {
+        const MaxDataFrame& maxData = *frame.asMaxDataFrame();
+        EXPECT_EQ(expectedConnFlowControlValue, maxData.maximumData);
+        break;
+      }
+      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+        const MaxStreamDataFrame& maxStreamData = *frame.asMaxStreamDataFrame();
+        EXPECT_EQ(streamId, maxStreamData.streamId);
+        EXPECT_EQ(expectedStreamFlowControlValue, maxStreamData.maximumData);
+        break;
+      }
+      default:
+        EXPECT_TRUE(false); /* should never happen*/
+    }
   }
   EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.header, *packet2.header));
   // TODO: I don't have a good way to verify body without decode them
@@ -286,17 +303,14 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size() + 1);
   for (const auto& frame : packet2.packet.frames) {
-    folly::variant_match(
-        frame,
-        [&buf, &streamId](const WriteStreamFrame& streamFrame) {
-          EXPECT_EQ(streamId, streamFrame.streamId);
-          EXPECT_EQ(0, streamFrame.offset);
-          EXPECT_EQ(buf->computeChainDataLength(), streamFrame.len);
-          EXPECT_EQ(true, streamFrame.fin);
-        },
-        [](const auto&) {
-          EXPECT_TRUE(false); /* should never happen*/
-        });
+    const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
+    if (!streamFrame) {
+      EXPECT_TRUE(false); /* should never happen*/
+    }
+    EXPECT_EQ(streamId, streamFrame->streamId);
+    EXPECT_EQ(0, streamFrame->offset);
+    EXPECT_EQ(buf->computeChainDataLength(), streamFrame->len);
+    EXPECT_EQ(true, streamFrame->fin);
   }
   EXPECT_TRUE(folly::IOBufEqualTo()(*packet1.header, *packet2.header));
 }
