@@ -106,12 +106,13 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   EXPECT_TRUE(result.hasValue());
   EXPECT_EQ(*result, 150);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
-  folly::variant_match(
-      stream->conn.pendingEvents.frames[0],
-      [&](ExpiredStreamDataFrame& frame) {
-        EXPECT_EQ(frame.minimumStreamOffset, 150);
-      },
-      [&](auto&) {});
+  {
+    ExpiredStreamDataFrame* expiredFrame =
+        stream->conn.pendingEvents.frames[0].asExpiredStreamDataFrame();
+    if (expiredFrame) {
+      EXPECT_EQ(expiredFrame->minimumStreamOffset, 150);
+    }
+  }
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
 
   // case4. update existing pending event.
@@ -124,12 +125,13 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   EXPECT_TRUE(result.hasValue());
   EXPECT_EQ(*result, 200);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
-  folly::variant_match(
-      stream->conn.pendingEvents.frames[0],
-      [&](ExpiredStreamDataFrame& frame) {
-        EXPECT_EQ(frame.minimumStreamOffset, 200);
-      },
-      [&](auto&) {});
+  {
+    ExpiredStreamDataFrame* expiredFrame =
+        stream->conn.pendingEvents.frames[0].asExpiredStreamDataFrame();
+    if (expiredFrame) {
+      EXPECT_EQ(expiredFrame->minimumStreamOffset, 200);
+    }
+  }
 }
 
 TEST_F(QPRFunctionsTest, RecvMinStreamDataFrame) {
@@ -219,12 +221,13 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
   stream->currentReceiveOffset = 10;
   result = advanceCurrentReceiveOffset(stream, 100);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
-  folly::variant_match(
-      stream->conn.pendingEvents.frames[0],
-      [&](MinStreamDataFrame& frame) {
-        EXPECT_EQ(frame.minimumStreamOffset, 100);
-      },
-      [&](auto&) {});
+  {
+    MinStreamDataFrame* minStreamDataFrame =
+        stream->conn.pendingEvents.frames[0].asMinStreamDataFrame();
+    if (minStreamDataFrame) {
+      EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 100);
+    }
+  }
   EXPECT_TRUE(result.hasValue());
   EXPECT_EQ(*result, 100);
 
@@ -236,12 +239,13 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
       MinStreamDataFrame(stream->id, 100, 120));
   result = advanceCurrentReceiveOffset(stream, 150);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
-  folly::variant_match(
-      stream->conn.pendingEvents.frames[0],
-      [&](MinStreamDataFrame& frame) {
-        EXPECT_EQ(frame.minimumStreamOffset, 150);
-      },
-      [&](auto&) {});
+  {
+    MinStreamDataFrame* minStreamDataFrame =
+        stream->conn.pendingEvents.frames[0].asMinStreamDataFrame();
+    if (minStreamDataFrame) {
+      EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 150);
+    }
+  }
   EXPECT_TRUE(result.hasValue());
   EXPECT_EQ(*result, 150);
 
@@ -251,12 +255,13 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
   stream->finalReadOffset = folly::make_optional((uint64_t)120);
   result = advanceCurrentReceiveOffset(stream, 150);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
-  folly::variant_match(
-      stream->conn.pendingEvents.frames[0],
-      [&](MinStreamDataFrame& frame) {
-        EXPECT_EQ(frame.minimumStreamOffset, 120);
-      },
-      [&](auto&) {});
+  {
+    MinStreamDataFrame* minStreamDataFrame =
+        stream->conn.pendingEvents.frames[0].asMinStreamDataFrame();
+    if (minStreamDataFrame) {
+      EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 120);
+    }
+  }
   EXPECT_TRUE(result.hasValue());
   EXPECT_EQ(*result, 120);
 }

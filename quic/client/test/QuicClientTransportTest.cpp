@@ -2697,8 +2697,8 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallenge) {
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
   deliverData(data->coalesce(), false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto& pathResponse =
-      boost::get<PathResponseFrame>(conn.pendingEvents.frames[0]);
+  PathResponseFrame& pathResponse =
+      *conn.pendingEvents.frames[0].asPathResponseFrame();
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 

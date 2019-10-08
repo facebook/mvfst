@@ -976,15 +976,15 @@ TEST_F(QuicWriteCodecTest, WriteMaxStreamId) {
     auto streamCountSize = i < 64 ? 1 : 2;
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
-    auto& resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
-        *regularPacket.frames[0].asQuicSimpleFrame());
+    MaxStreamsFrame& resultMaxStreamIdFrame =
+        *regularPacket.frames[0].asQuicSimpleFrame()->asMaxStreamsFrame();
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
     folly::io::Cursor cursor(wireBuf.get());
     QuicFrame decodedFrame = parseQuicFrame(cursor);
     QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-    auto& wireStreamsFrame = boost::get<MaxStreamsFrame>(simpleFrame);
+    MaxStreamsFrame& wireStreamsFrame = *simpleFrame.asMaxStreamsFrame();
     EXPECT_EQ(i, wireStreamsFrame.maxStreams);
     EXPECT_TRUE(cursor.isAtEnd());
   }
@@ -1005,15 +1005,15 @@ TEST_F(QuicWriteCodecTest, WriteUniMaxStreamId) {
     auto streamCountSize = i < 64 ? 1 : 2;
     // 1 byte for the type and up to 2 bytes for the stream count.
     EXPECT_EQ(1 + streamCountSize, bytesWritten);
-    auto& resultMaxStreamIdFrame = boost::get<MaxStreamsFrame>(
-        *regularPacket.frames[0].asQuicSimpleFrame());
+    MaxStreamsFrame& resultMaxStreamIdFrame =
+        *regularPacket.frames[0].asQuicSimpleFrame()->asMaxStreamsFrame();
     EXPECT_EQ(i, resultMaxStreamIdFrame.maxStreams);
 
     auto wireBuf = std::move(builtOut.second);
     folly::io::Cursor cursor(wireBuf.get());
     QuicFrame decodedFrame = parseQuicFrame(cursor);
     QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-    auto& wireStreamsFrame = boost::get<MaxStreamsFrame>(simpleFrame);
+    MaxStreamsFrame& wireStreamsFrame = *simpleFrame.asMaxStreamsFrame();
     EXPECT_EQ(i, wireStreamsFrame.maxStreams);
     EXPECT_TRUE(cursor.isAtEnd());
   }
@@ -1276,14 +1276,15 @@ TEST_F(QuicWriteCodecTest, WriteStreamIdNeeded) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 3);
-  EXPECT_NO_THROW(boost::get<MaxStreamsFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame()));
+  EXPECT_NE(
+      regularPacket.frames[0].asQuicSimpleFrame()->asMaxStreamsFrame(),
+      nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto& writeStreamIdBlocked = boost::get<MaxStreamsFrame>(simpleFrame);
+  auto& writeStreamIdBlocked = *simpleFrame.asMaxStreamsFrame();
   EXPECT_EQ(writeStreamIdBlocked.maxStreams, blockedStreamId);
   EXPECT_TRUE(cursor.isAtEnd());
 }
@@ -1308,8 +1309,8 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 28);
-  auto& resultNewConnIdFrame = boost::get<NewConnectionIdFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  NewConnectionIdFrame& resultNewConnIdFrame =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asNewConnectionIdFrame();
   EXPECT_EQ(resultNewConnIdFrame.sequenceNumber, 1);
   EXPECT_EQ(resultNewConnIdFrame.retirePriorTo, 0);
   EXPECT_EQ(resultNewConnIdFrame.connectionId, getTestConnectionId());
@@ -1319,7 +1320,8 @@ TEST_F(QuicWriteCodecTest, WriteNewConnId) {
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wireNewConnIdFrame = boost::get<NewConnectionIdFrame>(simpleFrame);
+  NewConnectionIdFrame wireNewConnIdFrame =
+      *simpleFrame.asNewConnectionIdFrame();
   EXPECT_EQ(1, wireNewConnIdFrame.sequenceNumber);
   EXPECT_EQ(0, wireNewConnIdFrame.retirePriorTo);
   EXPECT_EQ(getTestConnectionId(), wireNewConnIdFrame.connectionId);
@@ -1335,15 +1337,16 @@ TEST_F(QuicWriteCodecTest, WriteRetireConnId) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 2);
-  auto resultRetireConnIdFrame = boost::get<RetireConnectionIdFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  RetireConnectionIdFrame resultRetireConnIdFrame =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asRetireConnectionIdFrame();
   EXPECT_EQ(resultRetireConnIdFrame.sequenceNumber, 3);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wireRetireConnIdFrame = boost::get<RetireConnectionIdFrame>(simpleFrame);
+  RetireConnectionIdFrame wireRetireConnIdFrame =
+      *simpleFrame.asRetireConnectionIdFrame();
   EXPECT_EQ(3, wireRetireConnIdFrame.sequenceNumber);
   EXPECT_TRUE(cursor.isAtEnd());
 }
@@ -1365,7 +1368,7 @@ TEST_F(QuicWriteCodecTest, WriteStopSending) {
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wireStopSendingFrame = boost::get<StopSendingFrame>(simpleFrame);
+  StopSendingFrame wireStopSendingFrame = *simpleFrame.asStopSendingFrame();
   EXPECT_EQ(wireStopSendingFrame.streamId, streamId);
   EXPECT_EQ(wireStopSendingFrame.errorCode, errorCode);
   EXPECT_TRUE(cursor.isAtEnd());
@@ -1392,8 +1395,8 @@ TEST_F(QuicWriteCodecTest, WriteExpiredStreamDataFrame) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 4);
-  auto result = boost::get<ExpiredStreamDataFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  ExpiredStreamDataFrame result =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asExpiredStreamDataFrame();
   EXPECT_EQ(id, result.streamId);
   EXPECT_EQ(offset, result.minimumStreamOffset);
 
@@ -1401,8 +1404,8 @@ TEST_F(QuicWriteCodecTest, WriteExpiredStreamDataFrame) {
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wireExpiredStreamDataFrame =
-      boost::get<ExpiredStreamDataFrame>(simpleFrame);
+  ExpiredStreamDataFrame wireExpiredStreamDataFrame =
+      *simpleFrame.asExpiredStreamDataFrame();
   EXPECT_EQ(id, wireExpiredStreamDataFrame.streamId);
   EXPECT_EQ(offset, wireExpiredStreamDataFrame.minimumStreamOffset);
 
@@ -1423,8 +1426,8 @@ TEST_F(QuicWriteCodecTest, WriteMinStreamDataFrame) {
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(bytesWritten, 6);
-  auto result = boost::get<MinStreamDataFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  MinStreamDataFrame result =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asMinStreamDataFrame();
   EXPECT_EQ(id, result.streamId);
   EXPECT_EQ(maximumData, result.maximumData);
   EXPECT_EQ(offset, result.minimumStreamOffset);
@@ -1433,7 +1436,8 @@ TEST_F(QuicWriteCodecTest, WriteMinStreamDataFrame) {
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wireMinStreamDataFrame = boost::get<MinStreamDataFrame>(simpleFrame);
+  MinStreamDataFrame wireMinStreamDataFrame =
+      *simpleFrame.asMinStreamDataFrame();
   EXPECT_EQ(id, wireMinStreamDataFrame.streamId);
   EXPECT_EQ(maximumData, wireMinStreamDataFrame.maximumData);
   EXPECT_EQ(offset, wireMinStreamDataFrame.minimumStreamOffset);
@@ -1454,15 +1458,16 @@ TEST_F(QuicWriteCodecTest, WritePathChallenge) {
   auto builtOut = std::move(pktBuilder).buildPacket();
 
   auto regularPacket = builtOut.first;
-  auto result = boost::get<PathChallengeFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  PathChallengeFrame result =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asPathChallengeFrame();
   EXPECT_EQ(result.pathData, pathData);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wirePathChallengeFrame = boost::get<PathChallengeFrame>(simpleFrame);
+  PathChallengeFrame wirePathChallengeFrame =
+      *simpleFrame.asPathChallengeFrame();
   EXPECT_EQ(wirePathChallengeFrame.pathData, pathData);
   EXPECT_TRUE(cursor.isAtEnd());
 }
@@ -1479,15 +1484,15 @@ TEST_F(QuicWriteCodecTest, WritePathResponse) {
   auto builtOut = std::move(pktBuilder).buildPacket();
 
   auto regularPacket = builtOut.first;
-  auto result = boost::get<PathResponseFrame>(
-      *regularPacket.frames[0].asQuicSimpleFrame());
+  PathResponseFrame result =
+      *regularPacket.frames[0].asQuicSimpleFrame()->asPathResponseFrame();
   EXPECT_EQ(result.pathData, pathData);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedFrame = parseQuicFrame(cursor);
   QuicSimpleFrame& simpleFrame = *decodedFrame.asQuicSimpleFrame();
-  auto wirePathResponseFrame = boost::get<PathResponseFrame>(simpleFrame);
+  PathResponseFrame wirePathResponseFrame = *simpleFrame.asPathResponseFrame();
   EXPECT_EQ(wirePathResponseFrame.pathData, pathData);
   EXPECT_TRUE(cursor.isAtEnd());
 }

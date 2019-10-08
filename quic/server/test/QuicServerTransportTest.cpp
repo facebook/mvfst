@@ -1613,10 +1613,11 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
       false,
       clientNextAppDataPacketNum);
   EXPECT_EQ(server->getNonConstConn().pendingEvents.frames.size(), 1);
-  EXPECT_TRUE(folly::variant_match(
-      server->getNonConstConn().pendingEvents.frames.front(),
-      [&](StopSendingFrame& s) { return s == stopSendingFrame; },
-      [&](auto&) { return false; }));
+  StopSendingFrame* stopFrame = server->getNonConstConn()
+                                    .pendingEvents.frames.front()
+                                    .asStopSendingFrame();
+  ASSERT_NE(stopFrame, nullptr);
+  EXPECT_EQ(*stopFrame, stopSendingFrame);
 }
 
 TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
@@ -1668,7 +1669,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto packetItr = std::find_if(
       server->getNonConstConn().outstandingPackets.begin(),
       server->getNonConstConn().outstandingPackets.end(),
-      findFrameInPacketFunc<StopSendingFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
 
   ASSERT_TRUE(packetItr != server->getNonConstConn().outstandingPackets.end());
   // Force a timeout with no data so that it clones the packet
@@ -1677,7 +1678,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto numStopSendingPackets = std::count_if(
       server->getNonConstConn().outstandingPackets.begin(),
       server->getNonConstConn().outstandingPackets.end(),
-      findFrameInPacketFunc<StopSendingFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
 
   EXPECT_GT(numStopSendingPackets, 1);
 
@@ -1694,7 +1695,8 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   server->getNonConstConn().streamManager->getStream(streamId);
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  auto match = findFrameInPacketFunc<StopSendingFrame>();
+  auto match =
+      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>();
 
   auto op = findOutstandingPacket(server->getNonConstConn(), match);
   ASSERT_TRUE(op != nullptr);
@@ -1726,8 +1728,8 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
   deliverData(packetToBuf(packet), false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  auto& pathResponse =
-      boost::get<PathResponseFrame>(conn.pendingEvents.frames[0]);
+  PathResponseFrame& pathResponse =
+      *conn.pendingEvents.frames[0].asPathResponseFrame();
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 

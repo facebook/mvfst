@@ -11,7 +11,6 @@
 #include <quic/client/handshake/QuicPskCache.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
-#include <quic/common/test/QuicCodecUtils.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -271,7 +270,7 @@ std::vector<int> getQLogEventIndices(
     QLogEventType type,
     const std::shared_ptr<FileQLogger>& q);
 
-template <typename FrameType>
+template <QuicSimpleFrame::Type Type>
 auto findFrameInPacketFunc() {
   return [&](auto& p) {
     return std::find_if(
@@ -280,10 +279,7 @@ auto findFrameInPacketFunc() {
                  if (!simpleFrame) {
                    return false;
                  }
-                 return folly::variant_match(
-                     *simpleFrame,
-                     [&](FrameType&) { return true; },
-                     [&](auto&) { return false; });
+                 return simpleFrame->type() == Type;
                }) != p.packet.frames.end();
   };
 }

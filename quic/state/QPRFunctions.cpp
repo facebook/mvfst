@@ -91,18 +91,19 @@ folly::Optional<uint64_t> advanceCurrentReceiveOffset(
   // Check if we have a pending MinStreamDataFrame for this stream
   auto& frames = stream->conn.pendingEvents.frames;
   auto it = find_if(frames.begin(), frames.end(), [&](QuicSimpleFrame& frame) {
-    return folly::variant_match(
-        frame,
-        [&](MinStreamDataFrame& frame) { return frame.streamId == stream->id; },
-        [&](auto&) { return false; });
+    MinStreamDataFrame* minStreamData = frame.asMinStreamDataFrame();
+    if (!minStreamData) {
+      return false;
+    }
+    return minStreamData->streamId == stream->id;
   });
 
-  auto minStreamDataFrame = generateMinStreamDataFrame(*stream);
+  MinStreamDataFrame minStreamDataFrame = generateMinStreamDataFrame(*stream);
   if (it == frames.end()) {
     frames.emplace_back(minStreamDataFrame);
   } else {
     // update existing pending MinStreamDataFrame
-    auto& frame = boost::get<MinStreamDataFrame>(*it);
+    MinStreamDataFrame& frame = *it->asMinStreamDataFrame();
     frame = minStreamDataFrame;
   }
   return offset;
@@ -148,13 +149,12 @@ void onRecvMinStreamDataFrame(
   // remove the stale pending ExpiredStreamDataFrame if exists
   auto& frames = stream->conn.pendingEvents.frames;
   auto it = find_if(frames.begin(), frames.end(), [&](QuicSimpleFrame& frame) {
-    return folly::variant_match(
-        frame,
-        [&](ExpiredStreamDataFrame& frame) {
-          return frame.minimumStreamOffset <=
-              stream->minimumRetransmittableOffset;
-        },
-        [&](auto&) { return false; });
+    ExpiredStreamDataFrame* expiredFrame = frame.asExpiredStreamDataFrame();
+    if (!expiredFrame) {
+      return false;
+    }
+    return expiredFrame->minimumStreamOffset <=
+        stream->minimumRetransmittableOffset;
   });
   if (it != frames.end()) {
     frames.erase(it);
@@ -182,12 +182,11 @@ folly::Optional<uint64_t> advanceMinimumRetransmittableOffset(
   shrinkRetransmittableBuffers(stream, stream->minimumRetransmittableOffset);
   auto& frames = stream->conn.pendingEvents.frames;
   auto it = find_if(frames.begin(), frames.end(), [&](QuicSimpleFrame& frame) {
-    return folly::variant_match(
-        frame,
-        [&](ExpiredStreamDataFrame& frame) {
-          return frame.streamId == stream->id;
-        },
-        [&](auto&) { return false; });
+    ExpiredStreamDataFrame* expiredFrame = frame.asExpiredStreamDataFrame();
+    if (!expiredFrame) {
+      return false;
+    }
+    return expiredFrame->streamId == stream->id;
   });
 
   if (it == frames.end()) {
@@ -195,7 +194,7 @@ folly::Optional<uint64_t> advanceMinimumRetransmittableOffset(
         ExpiredStreamDataFrame(stream->id, minimumStreamOffset));
   } else {
     // update the existing pending ExpiredStreamDataFrame
-    auto& frame = boost::get<ExpiredStreamDataFrame>(*it);
+    ExpiredStreamDataFrame& frame = *it->asExpiredStreamDataFrame();
     frame.minimumStreamOffset = minimumStreamOffset;
   }
   return minimumStreamOffset;
@@ -229,12 +228,11 @@ void onRecvExpiredStreamDataFrame(
   // remove the stale pending MinStreamDataFrame if exists
   auto& frames = stream->conn.pendingEvents.frames;
   auto it = find_if(frames.begin(), frames.end(), [&](QuicSimpleFrame& frame) {
-    return folly::variant_match(
-        frame,
-        [&](MinStreamDataFrame& frame) {
-          return frame.minimumStreamOffset <= stream->currentReceiveOffset;
-        },
-        [&](auto&) { return false; });
+    MinStreamDataFrame* minStreamData = frame.asMinStreamDataFrame();
+    if (!minStreamData) {
+      return false;
+    }
+    return minStreamData->minimumStreamOffset <= stream->currentReceiveOffset;
   });
   if (it != frames.end()) {
     frames.erase(it);

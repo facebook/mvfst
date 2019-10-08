@@ -42,6 +42,10 @@ struct A {
     return *this;
   }
 
+  bool operator==(const A&) const {
+    return true;
+  }
+
   bool moved{false};
   bool copied{false};
   bool moveAssign{false};
@@ -59,11 +63,19 @@ struct B {
     copied = true;
   }
 
+  bool operator==(const B&) const {
+    return true;
+  }
+
   bool moved{false};
   bool copied{false};
 };
 
-struct C {};
+struct C {
+  bool operator==(const C&) const {
+    return true;
+  }
+};
 
 #define TEST_VARIANT(F, ...) \
   F(A, __VA_ARGS__)          \

@@ -919,15 +919,13 @@ TEST_F(QuicTransportTest, StopSending) {
     if (!simpleFrame) {
       continue;
     }
-    folly::variant_match(
-        *simpleFrame,
-        [&](const StopSendingFrame& frame) {
-          EXPECT_EQ(streamId, frame.streamId);
-          EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, frame.errorCode);
-          foundStopSending = true;
-        },
-        [&](auto&) {
-        });
+    const StopSendingFrame* stopSending = simpleFrame->asStopSendingFrame();
+    if (!stopSending) {
+      continue;
+    }
+    EXPECT_EQ(streamId, stopSending->streamId);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, stopSending->errorCode);
+    foundStopSending = true;
   }
   EXPECT_TRUE(foundStopSending);
 }
@@ -960,13 +958,13 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
     if (!simpleFrame) {
       continue;
     }
-    folly::variant_match(
-        *simpleFrame,
-        [&](const PathChallengeFrame& frame) {
-          EXPECT_EQ(frame, pathChallenge);
-          foundPathChallenge = true;
-        },
-        [&](auto&) {});
+    const PathChallengeFrame* pathChallengeFrame =
+        simpleFrame->asPathChallengeFrame();
+    if (!pathChallengeFrame) {
+      continue;
+    }
+    EXPECT_EQ(*pathChallengeFrame, pathChallenge);
+    foundPathChallenge = true;
   }
   EXPECT_TRUE(foundPathChallenge);
 }
@@ -1053,7 +1051,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathChallengeFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1063,7 +1061,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathChallengeFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
 
   EXPECT_EQ(numPathChallengePackets, 3);
 }
@@ -1086,7 +1084,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathChallengeFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Reset outstandingPathValidation
@@ -1099,7 +1097,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   numPathChallengePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathChallengeFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 }
 
@@ -1165,13 +1163,12 @@ TEST_F(QuicTransportTest, SendPathResponse) {
     if (!simpleFrame) {
       continue;
     }
-    folly::variant_match(
-        *simpleFrame,
-        [&](const PathResponseFrame& frame) {
-          EXPECT_EQ(frame, pathResponse);
-          foundPathResponse = true;
-        },
-        [&](auto&) {});
+    const PathResponseFrame* response = simpleFrame->asPathResponseFrame();
+    if (!response) {
+      continue;
+    }
+    EXPECT_EQ(*response, pathResponse);
+    foundPathResponse = true;
   }
   EXPECT_TRUE(foundPathResponse);
 }
@@ -1228,7 +1225,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   auto numPathResponsePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathResponseFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
   EXPECT_EQ(numPathResponsePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1236,7 +1233,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   numPathResponsePackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<PathResponseFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
   EXPECT_EQ(numPathResponsePackets, 1);
 }
 
@@ -1280,13 +1277,13 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
     if (!simpleFrame) {
       continue;
     }
-    folly::variant_match(
-        *simpleFrame,
-        [&](const NewConnectionIdFrame& frame) {
-          EXPECT_EQ(frame, newConnId);
-          foundNewConnectionId = true;
-        },
-        [&](auto&) {});
+    const NewConnectionIdFrame* connIdFrame =
+        simpleFrame->asNewConnectionIdFrame();
+    if (!connIdFrame) {
+      continue;
+    }
+    EXPECT_EQ(*connIdFrame, newConnId);
+    foundNewConnectionId = true;
   }
   EXPECT_TRUE(foundNewConnectionId);
 }
@@ -1311,7 +1308,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto numNewConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<NewConnectionIdFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
   EXPECT_EQ(numNewConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1321,7 +1318,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   numNewConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<NewConnectionIdFrame>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
   EXPECT_EQ(numNewConnIdPackets, 3);
 }
 
@@ -1393,10 +1390,10 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
   markPacketLoss(conn, packet, false, 2);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  EXPECT_TRUE(folly::variant_match(
-      conn.pendingEvents.frames.front(),
-      [&](NewConnectionIdFrame& f) { return f == newConnId; },
-      [&](auto&) { return false; }));
+  NewConnectionIdFrame* connIdFrame =
+      conn.pendingEvents.frames.front().asNewConnectionIdFrame();
+  ASSERT_NE(connIdFrame, nullptr);
+  EXPECT_EQ(*connIdFrame, newConnId);
 }
 
 TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
@@ -1419,13 +1416,13 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
     if (!simpleFrame) {
       continue;
     }
-    folly::variant_match(
-        *simpleFrame,
-        [&](const RetireConnectionIdFrame& frame) {
-          EXPECT_EQ(frame, retireConnId);
-          foundRetireConnectionId = true;
-        },
-        [&](auto&) {});
+    const RetireConnectionIdFrame* retireFrame =
+        simpleFrame->asRetireConnectionIdFrame();
+    if (!retireFrame) {
+      continue;
+    }
+    EXPECT_EQ(*retireFrame, retireConnId);
+    foundRetireConnectionId = true;
   }
   EXPECT_TRUE(foundRetireConnectionId);
 }
@@ -1449,7 +1446,8 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto numRetireConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<RetireConnectionIdFrame>());
+      findFrameInPacketFunc<
+          QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
   EXPECT_EQ(numRetireConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1459,7 +1457,8 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   numRetireConnIdPackets = std::count_if(
       conn.outstandingPackets.begin(),
       conn.outstandingPackets.end(),
-      findFrameInPacketFunc<RetireConnectionIdFrame>());
+      findFrameInPacketFunc<
+          QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
   EXPECT_EQ(numRetireConnIdPackets, 3);
 }
 
@@ -1480,10 +1479,10 @@ TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
   markPacketLoss(conn, packet, false, 2);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
-  EXPECT_TRUE(folly::variant_match(
-      conn.pendingEvents.frames.front(),
-      [&](RetireConnectionIdFrame& f) { return f == retireConnId; },
-      [&](auto&) { return false; }));
+  RetireConnectionIdFrame* retireFrame =
+      conn.pendingEvents.frames.front().asRetireConnectionIdFrame();
+  ASSERT_NE(retireFrame, nullptr);
+  EXPECT_EQ(*retireFrame, retireConnId);
 }
 
 TEST_F(QuicTransportTest, NonWritableStreamAPI) {

@@ -8,10 +8,8 @@
 
 #pragma once
 
-#include <boost/variant.hpp>
 #include <folly/Conv.h>
 #include <folly/Optional.h>
-#include <folly/Overload.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
@@ -550,7 +548,11 @@ struct ApplicationCloseFrame {
 };
 
 // Frame to represent ones we skip
-struct NoopFrame {};
+struct NoopFrame {
+  bool operator==(const NoopFrame&) const {
+    return true;
+  }
+};
 
 constexpr uint8_t kStatelessResetTokenLength = 16;
 using StatelessResetToken = std::array<uint8_t, kStatelessResetTokenLength>;
@@ -562,15 +564,17 @@ struct StatelessReset {
       : token(std::move(tokenIn)) {}
 };
 
-using QuicSimpleFrame = boost::variant<
-    StopSendingFrame,
-    MinStreamDataFrame,
-    ExpiredStreamDataFrame,
-    PathChallengeFrame,
-    PathResponseFrame,
-    NewConnectionIdFrame,
-    MaxStreamsFrame,
-    RetireConnectionIdFrame>;
+#define QUIC_SIMPLE_FRAME(F, ...)        \
+  F(StopSendingFrame, __VA_ARGS__)       \
+  F(MinStreamDataFrame, __VA_ARGS__)     \
+  F(ExpiredStreamDataFrame, __VA_ARGS__) \
+  F(PathChallengeFrame, __VA_ARGS__)     \
+  F(PathResponseFrame, __VA_ARGS__)      \
+  F(NewConnectionIdFrame, __VA_ARGS__)   \
+  F(MaxStreamsFrame, __VA_ARGS__)        \
+  F(RetireConnectionIdFrame, __VA_ARGS__)
+
+DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 
 #define QUIC_FRAME(F, ...)               \
   F(PaddingFrame, __VA_ARGS__)           \

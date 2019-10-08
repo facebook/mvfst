@@ -135,8 +135,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       }
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
-        auto maxStreamFrame = boost::get<MaxStreamsFrame>(simpleFrame);
-        EXPECT_EQ(4321, maxStreamFrame.maxStreams);
+        const MaxStreamsFrame* maxStreamFrame = simpleFrame.asMaxStreamsFrame();
+        EXPECT_NE(maxStreamFrame, nullptr);
+        EXPECT_EQ(4321, maxStreamFrame->maxStreams);
         break;
       }
       case QuicWriteFrame::Type::PingFrame_E: {

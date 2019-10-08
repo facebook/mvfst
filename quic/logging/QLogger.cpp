@@ -17,42 +17,62 @@ namespace {
 void addQuicSimpleFrameToEvent(
     quic::QLogPacketEvent* event,
     const quic::QuicSimpleFrame& simpleFrame) {
-  folly::variant_match(
-      simpleFrame,
-      [&](const quic::StopSendingFrame& frame) {
-        event->frames.push_back(std::make_unique<quic::StopSendingFrameLog>(
-            frame.streamId, frame.errorCode));
-      },
-      [&](const quic::MinStreamDataFrame& frame) {
-        event->frames.push_back(std::make_unique<quic::MinStreamDataFrameLog>(
-            frame.streamId, frame.maximumData, frame.minimumStreamOffset));
-      },
-      [&](const quic::ExpiredStreamDataFrame& frame) {
-        event->frames.push_back(
-            std::make_unique<quic::ExpiredStreamDataFrameLog>(
-                frame.streamId, frame.minimumStreamOffset));
-      },
-      [&](const quic::PathChallengeFrame& frame) {
-        event->frames.push_back(
-            std::make_unique<quic::PathChallengeFrameLog>(frame.pathData));
-      },
-      [&](const quic::PathResponseFrame& frame) {
-        event->frames.push_back(
-            std::make_unique<quic::PathResponseFrameLog>(frame.pathData));
-      },
-      [&](const quic::NewConnectionIdFrame& frame) {
-        event->frames.push_back(std::make_unique<quic::NewConnectionIdFrameLog>(
-            frame.sequenceNumber, frame.token));
-      },
-      [&](const quic::MaxStreamsFrame& frame) {
-        event->frames.push_back(std::make_unique<quic::MaxStreamsFrameLog>(
-            frame.maxStreams, frame.isForBidirectional));
-      },
-      [&](const quic::RetireConnectionIdFrame& frame) {
-        event->frames.push_back(
-            std::make_unique<quic::RetireConnectionIdFrameLog>(
-                frame.sequenceNumber));
-      });
+  switch (simpleFrame.type()) {
+    case quic::QuicSimpleFrame::Type::StopSendingFrame_E: {
+      const quic::StopSendingFrame& frame = *simpleFrame.asStopSendingFrame();
+      event->frames.push_back(std::make_unique<quic::StopSendingFrameLog>(
+          frame.streamId, frame.errorCode));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::MinStreamDataFrame_E: {
+      const quic::MinStreamDataFrame& frame =
+          *simpleFrame.asMinStreamDataFrame();
+      event->frames.push_back(std::make_unique<quic::MinStreamDataFrameLog>(
+          frame.streamId, frame.maximumData, frame.minimumStreamOffset));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::ExpiredStreamDataFrame_E: {
+      const quic::ExpiredStreamDataFrame& frame =
+          *simpleFrame.asExpiredStreamDataFrame();
+      event->frames.push_back(std::make_unique<quic::ExpiredStreamDataFrameLog>(
+          frame.streamId, frame.minimumStreamOffset));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::PathChallengeFrame_E: {
+      const quic::PathChallengeFrame& frame =
+          *simpleFrame.asPathChallengeFrame();
+      event->frames.push_back(
+          std::make_unique<quic::PathChallengeFrameLog>(frame.pathData));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::PathResponseFrame_E: {
+      const quic::PathResponseFrame& frame = *simpleFrame.asPathResponseFrame();
+      event->frames.push_back(
+          std::make_unique<quic::PathResponseFrameLog>(frame.pathData));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::NewConnectionIdFrame_E: {
+      const quic::NewConnectionIdFrame& frame =
+          *simpleFrame.asNewConnectionIdFrame();
+      event->frames.push_back(std::make_unique<quic::NewConnectionIdFrameLog>(
+          frame.sequenceNumber, frame.token));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::MaxStreamsFrame_E: {
+      const quic::MaxStreamsFrame& frame = *simpleFrame.asMaxStreamsFrame();
+      event->frames.push_back(std::make_unique<quic::MaxStreamsFrameLog>(
+          frame.maxStreams, frame.isForBidirectional));
+      break;
+    }
+    case quic::QuicSimpleFrame::Type::RetireConnectionIdFrame_E: {
+      const quic::RetireConnectionIdFrame& frame =
+          *simpleFrame.asRetireConnectionIdFrame();
+      event->frames.push_back(
+          std::make_unique<quic::RetireConnectionIdFrameLog>(
+              frame.sequenceNumber));
+      break;
+    }
+  }
 }
 } // namespace
 
