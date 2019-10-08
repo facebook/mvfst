@@ -13,8 +13,10 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
+#include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/QuicStreamFunctions.h>
 
 using namespace quic;
 using namespace testing;
@@ -680,6 +682,83 @@ TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
   EXPECT_EQ(50, *largestAckToSend(conn.ackStates.initialAckState));
   EXPECT_EQ(150, *largestAckToSend(conn.ackStates.handshakeAckState));
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.appDataAckState));
+}
+
+TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
+  QuicClientConnectionState conn;
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connId = getTestConnectionId();
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
+  auto stream2 = conn.streamManager->createNextBidirectionalStream().value();
+  auto stream3 = conn.streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
+  writeDataToQuicStream(*stream2, folly::IOBuf::copyBuffer("some data"), false);
+  writeDataToQuicStream(*stream3, folly::IOBuf::copyBuffer("some data"), false);
+  scheduler.writeStreams(builder);
+  EXPECT_EQ(conn.schedulingState.nextScheduledStream, 0);
+}
+
+TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
+  QuicClientConnectionState conn;
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto connId = getTestConnectionId();
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
+  auto stream2 = conn.streamManager->createNextBidirectionalStream().value();
+  auto stream3 = conn.streamManager->createNextBidirectionalStream().value();
+  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 2, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  auto chainLen = largeBuf->computeChainDataLength();
+  writeDataToQuicStream(*stream1, std::move(largeBuf), false);
+  writeDataToQuicStream(*stream2, folly::IOBuf::copyBuffer("some data"), false);
+  writeDataToQuicStream(*stream3, folly::IOBuf::copyBuffer("some data"), false);
+  scheduler.writeStreams(builder1);
+  EXPECT_EQ(conn.schedulingState.nextScheduledStream, 4);
+
+  // Should write frames for stream2, stream3, followed by stream1 again.
+  MockQuicPacketBuilder builder2;
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+  }));
+  scheduler.writeStreams(builder2);
+  auto& frames = builder2.frames_;
+  ASSERT_EQ(frames.size(), 3);
+  auto packet = builder2.frames_;
+  WriteStreamFrame f1(stream2->id, 0, 9, false);
+  WriteStreamFrame f2(stream3->id, 0, 9, false);
+  WriteStreamFrame f3(stream1->id, 0, chainLen, false);
+  ASSERT_TRUE(frames[0].asWriteStreamFrame());
+  EXPECT_EQ(*frames[0].asWriteStreamFrame(), f1);
+  ASSERT_TRUE(frames[1].asWriteStreamFrame());
+  EXPECT_EQ(*frames[1].asWriteStreamFrame(), f2);
+  ASSERT_TRUE(frames[2].asWriteStreamFrame());
+  EXPECT_EQ(*frames[2].asWriteStreamFrame(), f3);
 }
 
 } // namespace test

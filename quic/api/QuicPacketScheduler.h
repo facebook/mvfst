@@ -70,7 +70,7 @@ class RetransmissionScheduler {
 
 class StreamFrameScheduler {
  public:
-  explicit StreamFrameScheduler(const QuicConnectionStateBase& conn);
+  explicit StreamFrameScheduler(QuicConnectionStateBase& conn);
 
   /**
    * Return: the first boolean indicates if at least one Blocked frame
@@ -169,10 +169,10 @@ class StreamFrameScheduler {
    */
   bool writeNextStreamFrame(
       PacketBuilderInterface& builder,
-      WritableStreamItr& writableStreamItr,
+      StreamId streamId,
       uint64_t& connWritableBytes);
 
-  const QuicConnectionStateBase& conn_;
+  QuicConnectionStateBase& conn_;
 };
 
 class AckScheduler {
@@ -306,7 +306,7 @@ class FrameScheduler : public QuicPacketScheduler {
 
   struct Builder {
     Builder(
-        const QuicConnectionStateBase& conn,
+        QuicConnectionStateBase& conn,
         EncryptionLevel encryptionLevel,
         PacketNumberSpace packetNumberSpace,
         std::string name);
@@ -323,7 +323,7 @@ class FrameScheduler : public QuicPacketScheduler {
     FrameScheduler build() &&;
 
    private:
-    const QuicConnectionStateBase& conn_;
+    QuicConnectionStateBase& conn_;
     EncryptionLevel encryptionLevel_;
     PacketNumberSpace packetNumberSpace_;
     std::string name_;

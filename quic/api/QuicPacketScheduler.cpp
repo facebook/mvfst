@@ -32,7 +32,7 @@ folly::Optional<PacketNum> largestAckToSend(const AckState& ackState) {
 // Schedulers
 
 FrameScheduler::Builder::Builder(
-    const QuicConnectionStateBase& conn,
+    QuicConnectionStateBase& conn,
     EncryptionLevel encryptionLevel,
     PacketNumberSpace packetNumberSpace,
     std::string name)
@@ -229,23 +229,29 @@ bool RetransmissionScheduler::hasPendingData() const {
   return !conn_.streamManager->lossStreams().empty();
 }
 
-StreamFrameScheduler::StreamFrameScheduler(const QuicConnectionStateBase& conn)
+StreamFrameScheduler::StreamFrameScheduler(QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
 void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
   MiddleStartingIterationWrapper wrapper(
       conn_.streamManager->writableStreams(),
-      conn_.schedulingState.lastScheduledStream);
+      conn_.schedulingState.nextScheduledStream);
   auto writableStreamItr = wrapper.cbegin();
+  // This will write the stream frames in a round robin fashion ordered by
+  // stream id. The iterator will wrap around the collection at the end, and we
+  // keep track of the value at the next iteration. This allows us to start
+  // writing at the next stream when building the next packet.
+  // TODO experiment with writing streams with an actual prioritization scheme.
   while (writableStreamItr != wrapper.cend() && connWritableBytes > 0) {
-    auto res =
-        writeNextStreamFrame(builder, writableStreamItr, connWritableBytes);
-    if (!res) {
+    if (writeNextStreamFrame(builder, *writableStreamItr, connWritableBytes)) {
+      writableStreamItr++;
+    } else {
       break;
     }
   }
-}
+  conn_.schedulingState.nextScheduledStream = *writableStreamItr;
+} // namespace quic
 
 bool StreamFrameScheduler::hasPendingData() const {
   return conn_.streamManager->hasWritable() &&
@@ -254,12 +260,12 @@ bool StreamFrameScheduler::hasPendingData() const {
 
 bool StreamFrameScheduler::writeNextStreamFrame(
     PacketBuilderInterface& builder,
-    StreamFrameScheduler::WritableStreamItr& writableStreamItr,
+    StreamId streamId,
     uint64_t& connWritableBytes) {
   if (builder.remainingSpaceInPkt() == 0) {
     return false;
   }
-  auto stream = conn_.streamManager->findStream(*writableStreamItr);
+  auto stream = conn_.streamManager->findStream(streamId);
   CHECK(stream);
 
   // hasWritableData is the condition which has to be satisfied for the
@@ -288,15 +294,6 @@ bool StreamFrameScheduler::writeNextStreamFrame(
           << " finWritten=" << (canWriteFin && *dataLen == bufferLen) << " "
           << conn_;
   connWritableBytes -= dataLen.value();
-  // bytesWritten < min(flowControlBytes, writeBuffer) means that we haven't
-  // written all writable bytes in this stream due to running out of room in the
-  // packet.
-  if (*dataLen ==
-      std::min<uint64_t>(
-          getSendStreamFlowControlBytesWire(*stream),
-          stream->writeBuffer.chainLength())) {
-    ++writableStreamItr;
-  }
   return true;
 }
 

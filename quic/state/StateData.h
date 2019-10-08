@@ -615,7 +615,7 @@ struct QuicConnectionStateBase {
   uint64_t udpSendPacketLen{kDefaultUDPSendPacketLen};
 
   struct PacketSchedulingState {
-    StreamId lastScheduledStream{0};
+    StreamId nextScheduledStream{0};
   };
 
   PacketSchedulingState schedulingState;

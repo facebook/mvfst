@@ -2338,7 +2338,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandingPackets.clear();
 
   // Start from stream2 instead of stream1
-  conn.schedulingState.lastScheduledStream = s2;
+  conn.schedulingState.nextScheduledStream = s2;
   writableBytes = kDefaultUDPSendPacketLen - 100;
 
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
@@ -2361,7 +2361,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandingPackets.clear();
 
   // Test wrap around
-  conn.schedulingState.lastScheduledStream = s2;
+  conn.schedulingState.nextScheduledStream = s2;
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   writeQuicDataToSocket(
