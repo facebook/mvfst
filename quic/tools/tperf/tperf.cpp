@@ -32,6 +32,7 @@ DEFINE_uint64(
 DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 64 * 1024, "Flow control window size");
 DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/none");
+DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_bool(gso, false, "Enable GSO writes to the socket");
 DEFINE_uint32(
     client_transport_timer_resolution_ms,
@@ -198,7 +199,8 @@ class TPerfServer {
       uint64_t writesPerLoop,
       quic::CongestionControlType congestionControlType,
       bool gso,
-      uint32_t maxCwndInMss)
+      uint32_t maxCwndInMss,
+      bool pacing)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<TPerfServerTransportFactory>(blockSize));
@@ -207,8 +209,8 @@ class TPerfServer {
     settings.maxCwndInMss = maxCwndInMss;
     settings.writeConnectionDataPacketsLimit = writesPerLoop;
     settings.defaultCongestionController = congestionControlType;
-    if (congestionControlType == quic::CongestionControlType::BBR) {
-      settings.pacingEnabled = true;
+    settings.pacingEnabled = pacing;
+    if (pacing) {
       settings.pacingTimerTickInterval = 200us;
     }
     if (gso) {
@@ -420,7 +422,8 @@ int main(int argc, char* argv[]) {
         FLAGS_writes_per_loop,
         flagsToCongestionControlType(FLAGS_congestion),
         FLAGS_gso,
-        FLAGS_max_cwnd_mss);
+        FLAGS_max_cwnd_mss,
+        FLAGS_pacing);
     server.start();
   } else if (FLAGS_mode == "client") {
     TPerfClient client(
