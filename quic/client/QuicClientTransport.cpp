@@ -497,6 +497,10 @@ void QuicClientTransport::processPacketData(
             *conn_, simpleFrame, packetNum, false);
         break;
       }
+      case QuicFrame::Type::PingFrame_E: {
+        pktHasRetransmittableData = true;
+        break;
+      }
       default:
         break;
     }

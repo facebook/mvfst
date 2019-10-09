@@ -4360,6 +4360,22 @@ TEST_F(
   EXPECT_GE(timeRemaining1.count() - timeRemaining2.count(), sleepAmountMillis);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
+  PingFrame pingFrame;
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  writeFrame(pingFrame, builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  deliverData(packet->coalesce());
+  EXPECT_TRUE(client->getConn().pendingEvents.scheduleAckTimeout);
+  EXPECT_FALSE(getAckState(client->getConn(), PacketNumberSpace::AppData)
+                   .needsToSendAckImmediately);
+}
+
 TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
   EXPECT_THROW(performFakeHandshake(), std::runtime_error);
 }
