@@ -163,7 +163,7 @@ class MockQuicTransport : public QuicServerTransport {
     virtual void onConnectionUnbound(
         QuicServerTransport*,
         const QuicServerTransport::SourceIdentity& address,
-        folly::Optional<ConnectionId> connectionId) noexcept = 0;
+        const std::vector<ConnectionIdData>& connectionIdData) noexcept = 0;
   };
 
   MockQuicTransport(

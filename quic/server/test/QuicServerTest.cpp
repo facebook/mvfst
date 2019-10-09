@@ -325,7 +325,7 @@ TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
 
   EXPECT_CALL(*rawTransport, setRoutingCallback(nullptr)).Times(1);
   // Now remove it from the maps. Nothing should crash.
-  worker_->onConnectionUnbound(rawTransport, srcIdentity, folly::none);
+  worker_->onConnectionUnbound(rawTransport, srcIdentity, std::vector<ConnectionIdData>{});
   EXPECT_EQ(0, srcAddrMap.size());
 }
 
@@ -364,10 +364,29 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       NetworkData(data->clone(), Clock::now()));
   eventbase_.loop();
 
+  auto connId2 = connId;
+  connId2.data()[7] ^= 0x1;
+  transport_->addConnectionId(connId2);
+
+  EXPECT_EQ(connIdMap.size(), 2);
+
+  EXPECT_CALL(*transport_, onNetworkData(kClientAddr, BufMatches(*data)))
+      .Times(1);
+  RoutingData routingData3(
+      HeaderForm::Short, false, false, connId2, folly::none);
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData3),
+      NetworkData(data->clone(), Clock::now()));
+  eventbase_.loop();
+
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(1);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
-      transport_.get(), std::make_pair(kClientAddr, connId), connId);
+      transport_.get(),
+      std::make_pair(kClientAddr, connId),
+      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0},
+                                    ConnectionIdData{connId2, 1}});
   EXPECT_EQ(connIdMap.count(connId), 0);
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
 
@@ -470,9 +489,11 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->onConnectionUnbound(
       transport_.get(),
       std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
-      getTestConnectionId(hostId_));
+      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
   worker_->onConnectionUnbound(
-      transport_.get(), std::make_pair(clientAddr2, connId2), connId2);
+      transport_.get(),
+      std::make_pair(clientAddr2, connId2),
+      std::vector<ConnectionIdData>{ConnectionIdData{connId2, 0}});
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 0);
   EXPECT_EQ(
       addrMap.count(std::make_pair(kClientAddr, getTestConnectionId(hostId_))),
@@ -528,7 +549,7 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
   worker_->onConnectionUnbound(
       transport_.get(),
       std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
-      getTestConnectionId(hostId_));
+      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
 }
 
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {

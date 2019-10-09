@@ -261,7 +261,7 @@ void QuicServerTransport::unbindConnection() {
     routingCb->onConnectionUnbound(
         this,
         std::make_pair(getOriginalPeerAddress(), *conn_->clientConnectionId),
-        conn_->serverConnectionId);
+        conn_->selfConnectionIds);
   }
 }
 

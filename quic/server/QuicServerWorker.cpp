@@ -646,8 +646,7 @@ void QuicServerWorker::onConnectionIdAvailable(
       connectionIdMap_.emplace(std::make_pair(id, std::move(transport)));
   if (!result.second) {
     LOG(ERROR) << "connectionIdMap_ already has CID=" << id;
-  } else {
-    boundServerTransports_.insert(transportPtr);
+  } else if (boundServerTransports_.insert(transportPtr).second) {
     QUIC_STATS(infoCallback_, onNewConnection);
   }
 }
@@ -675,7 +674,7 @@ void QuicServerWorker::onConnectionIdBound(
 void QuicServerWorker::onConnectionUnbound(
     QuicServerTransport* transport,
     const QuicServerTransport::SourceIdentity& source,
-    folly::Optional<ConnectionId> connectionId) noexcept {
+    const std::vector<ConnectionIdData>& connectionIdData) noexcept {
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
   // Ensures we only process `onConnectionUnbound()` once.
   transport->setRoutingCallback(nullptr);
@@ -684,12 +683,14 @@ void QuicServerWorker::onConnectionUnbound(
   // TODO: verify we are removing the right transport
   sourceAddressMap_.erase(source);
 
-  if (connectionId) {
-    VLOG(4) << "Removing from connectionIdMap_ for CID=" << *connectionId
-            << ", workerId=" << (uint32_t)workerId_;
-
-    connectionIdMap_.erase(*connectionId);
+  if (connectionIdData.size()) {
     QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
+  }
+
+  for (auto& connId : connectionIdData) {
+    VLOG(4) << "Removing from connectionIdMap_ for CID=" << connId.connId
+            << ", workerId=" << (uint32_t)workerId_;
+    connectionIdMap_.erase(connId.connId);
   }
 }
 

@@ -108,6 +108,6 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
       void(
           QuicServerTransport*,
           const QuicServerTransport::SourceIdentity&,
-          folly::Optional<ConnectionId>));
+          const std::vector<ConnectionIdData>& connIdData));
 };
 } // namespace quic

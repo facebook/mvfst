@@ -230,7 +230,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void onConnectionUnbound(
       QuicServerTransport* transport,
       const QuicServerTransport::SourceIdentity& source,
-      folly::Optional<ConnectionId> connectionId) noexcept override;
+      const std::vector<ConnectionIdData>& connectionIdData) noexcept override;
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override;
 

@@ -43,7 +43,7 @@ class QuicServerTransport
     virtual void onConnectionUnbound(
         QuicServerTransport* transport,
         const SourceIdentity& address,
-        folly::Optional<ConnectionId> connectionId) noexcept = 0;
+        const std::vector<ConnectionIdData>& connectionIdData) noexcept = 0;
   };
 
   static QuicServerTransport::Ptr make(
