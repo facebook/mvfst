@@ -197,8 +197,6 @@ class ClientHandshake : public Handshake {
 
   folly::exception_wrapper error_;
 
-  folly::Optional<std::string> pskIdentity_;
-
   std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
   bool earlyDataAttempted_{false};
