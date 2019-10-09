@@ -2763,24 +2763,6 @@ TEST_F(
   EXPECT_TRUE(server->getConn().migrationState.lastCongestionAndRtt);
 }
 
-TEST_F(QuicServerTransportTest, PingIsRetransmittable) {
-  PingFrame pingFrame;
-  ShortHeader header(
-      ProtectionType::KeyPhaseZero,
-      *server->getConn().serverConnectionId,
-      clientNextAppDataPacketNum++);
-  RegularQuicPacketBuilder builder(
-      server->getConn().udpSendPacketLen,
-      std::move(header),
-      0 /* largestAcked */);
-  writeFrame(pingFrame, builder);
-  auto packet = std::move(builder).buildPacket();
-  deliverData(packetToBuf(packet));
-  EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
-  EXPECT_FALSE(getAckState(server->getConn(), PacketNumberSpace::AppData)
-                   .needsToSendAckImmediately);
-}
-
 class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {
  public:
   void setupConnection() override {}

@@ -964,11 +964,6 @@ void onServerReadDataFromOpen(
               conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
           break;
         }
-        case QuicFrame::Type::PingFrame_E: {
-          pktHasRetransmittableData = true;
-          isNonProbingPacket = true;
-          break;
-        }
         default: {
           break;
         }
