@@ -9,7 +9,6 @@ add_library(
   FizzBridge.cpp
   FizzCryptoFactory.cpp
   HandshakeLayer.cpp
-  QuicFizzFactory.cpp
   TransportParameters.cpp
 )
 

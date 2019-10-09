@@ -1554,8 +1554,7 @@ class QuicClientTransportTest : public Test {
   }
 
   std::unique_ptr<QuicReadCodec> makeHandshakeCodec() {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     codec->setClientConnectionId(*originalConnId);
     codec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
@@ -1569,8 +1568,7 @@ class QuicClientTransportTest : public Test {
 
   std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
       bool handshakeCipher = false) {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     std::unique_ptr<Aead> handshakeReadCipher;
     codec->setClientConnectionId(*originalConnId);
@@ -2593,8 +2591,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
     eventbase_->terminateLoopSoon();
   }));
 
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   auto garbage = IOBuf::copyBuffer("garbage");
   auto initialCipher = cryptoFactory.getServerInitialCipher(
       *serverChosenConnId, QuicVersion::MVFST);
@@ -2643,8 +2640,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   client->setReadCallback(streamId, &readCb);
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   IOBufQueue packets{IOBufQueue::cacheChainLength()};
   for (int i = 0; i < kMaxNumCoalescedPackets; i++) {
     auto garbage = IOBuf::copyBuffer("garbage");
@@ -3311,8 +3307,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvalidStream) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   StreamId streamId = client->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");

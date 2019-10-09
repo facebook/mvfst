@@ -28,7 +28,9 @@ void ClientHandshake::connect(
   transportParams_ = transportParams;
   callback_ = callback;
   auto ctx = std::make_shared<fizz::client::FizzClientContext>(*context);
-  ctx->setFactory(std::make_shared<QuicFizzFactory>());
+  auto cryptoFactory = std::make_shared<FizzCryptoFactory>();
+  ctx->setFactory(cryptoFactory);
+  cryptoFactory_ = std::move(cryptoFactory);
   ctx->setSupportedCiphers({fizz::CipherSuite::TLS_AES_128_GCM_SHA256});
   ctx->setCompatibilityMode(false);
   // Since Draft-17, EOED should not be sent
@@ -325,8 +327,6 @@ void ClientHandshake::ActionMoveVisitor::operator()(fizz::EndOfData&) {
 
 void ClientHandshake::ActionMoveVisitor::operator()(
     fizz::SecretAvailable& secretAvailable) {
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
   folly::variant_match(
       secretAvailable.secret.type,
       [&](fizz::EarlySecrets earlySecrets) {
@@ -345,7 +345,7 @@ void ClientHandshake::ActionMoveVisitor::operator()(
                     kQuicKeyLabel,
                     kQuicIVLabel));
             client_.zeroRttWriteHeaderCipher_ =
-                cryptoFactory.makePacketNumberCipher(
+                client_.cryptoFactory_->makePacketNumberCipher(
                     folly::range(secretAvailable.secret.secret));
             break;
           }
@@ -361,7 +361,7 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             folly::range(secretAvailable.secret.secret),
             kQuicKeyLabel,
             kQuicIVLabel);
-        auto headerCipher = cryptoFactory.makePacketNumberCipher(
+        auto headerCipher = client_.cryptoFactory_->makePacketNumberCipher(
             folly::range(secretAvailable.secret.secret));
         switch (handshakeSecrets) {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
@@ -382,7 +382,7 @@ void ClientHandshake::ActionMoveVisitor::operator()(
             folly::range(secretAvailable.secret.secret),
             kQuicKeyLabel,
             kQuicIVLabel);
-        auto appHeaderCipher = cryptoFactory.makePacketNumberCipher(
+        auto appHeaderCipher = client_.cryptoFactory_->makePacketNumberCipher(
             folly::range(secretAvailable.secret.secret));
         switch (appSecrets) {
           case fizz::AppTrafficSecrets::ClientAppTraffic:

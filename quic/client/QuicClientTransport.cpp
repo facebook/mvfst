@@ -849,8 +849,7 @@ void QuicClientTransport::startCryptoHandshake() {
     cachedPsk = std::move(quicCachedPsk->cachedPsk);
   }
 
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   auto version = conn_->originalVersion.value();
   conn_->initialWriteCipher = cryptoFactory.getClientInitialCipher(
       *clientConn_->initialDestinationConnectionId, version);

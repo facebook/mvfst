@@ -22,6 +22,7 @@
 #include <quic/QuicException.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/handshake/QuicPskCache.h>
+#include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/state/StateData.h>
 
@@ -218,6 +219,7 @@ class ClientHandshake : public Handshake {
   ActionMoveVisitor visitor_;
   folly::Optional<std::string> pskIdentity_;
 
+  std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
   bool earlyDataAttempted_{false};
 };

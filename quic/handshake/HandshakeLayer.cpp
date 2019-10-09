@@ -11,9 +11,6 @@
 #include <fizz/crypto/KeyDerivation.h>
 #include <fizz/crypto/Sha256.h>
 #include <fizz/protocol/Factory.h>
-#include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/FizzCryptoFactory.h>
-#include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
 

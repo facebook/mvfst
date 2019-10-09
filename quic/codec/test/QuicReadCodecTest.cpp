@@ -39,8 +39,7 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
     std::unique_ptr<Aead> oneRttAead,
     std::unique_ptr<Aead> zeroRttAead = nullptr,
     std::unique_ptr<StatelessResetToken> sourceToken = nullptr) {
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   codec->setClientConnectionId(clientConnId);
   codec->setInitialReadCipher(
@@ -449,8 +448,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
 TEST_F(QuicReadCodecTest, TestInitialPacket) {
   auto connId = getTestConnectionId();
 
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   PacketNum packetNum = 1;
   uint64_t offset = 0;
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
@@ -484,8 +482,7 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
 TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   auto connId = getTestConnectionId();
 
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   PacketNum packetNum = 1;
   uint64_t offset = 0;
   auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);

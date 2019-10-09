@@ -267,7 +267,6 @@ class TestingQuicServerTransport : public QuicServerTransport {
 class QuicServerTransportTest : public Test {
  public:
   void SetUp() override {
-    QuicFizzFactory fizzFactory;
     clientAddr = folly::SocketAddress("127.0.0.1", 1000);
     auto fakeServerAddr = folly::SocketAddress("1.2.3.4", 8080);
     clientConnectionId = getTestConnectionId();
@@ -323,15 +322,13 @@ class QuicServerTransportTest : public Test {
   }
 
   std::unique_ptr<Aead> getInitialCipher() {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     return cryptoFactory.getClientInitialCipher(
         *initialDestinationConnectionId, QuicVersion::MVFST);
   }
 
   std::unique_ptr<PacketNumberCipher> getInitialHeaderCipher() {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     return cryptoFactory.makeClientInitialHeaderCipher(
         *initialDestinationConnectionId, QuicVersion::MVFST);
   }
@@ -381,7 +378,6 @@ class QuicServerTransportTest : public Test {
   void recvClientFinished(
       bool writes = true,
       folly::SocketAddress* peerAddress = nullptr) {
-    QuicFizzFactory fizzFactory;
     auto finished = IOBuf::copyBuffer("FINISHED");
     auto nextPacketNum = clientNextHandshakePacketNum++;
     auto headerCipher = test::createNoOpHeaderCipher();
@@ -408,8 +404,7 @@ class QuicServerTransportTest : public Test {
   }
 
   virtual void setupClientReadCodec() {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     clientReadCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
     clientReadCodec->setClientConnectionId(*clientConnectionId);
     clientReadCodec->setInitialReadCipher(cryptoFactory.getServerInitialCipher(
@@ -576,8 +571,7 @@ class QuicServerTransportTest : public Test {
 
   std::unique_ptr<QuicReadCodec> makeClientEncryptedCodec(
       bool handshakeCipher = false) {
-    QuicFizzFactory fizzFactory;
-    FizzCryptoFactory cryptoFactory(&fizzFactory);
+    FizzCryptoFactory cryptoFactory;
     auto readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
     readCodec->setOneRttReadCipher(test::createNoOpAead());
     readCodec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
@@ -2775,7 +2769,6 @@ class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {
 };
 
 TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedStream) {
-  QuicFizzFactory fizzFactory;
   auto data = IOBuf::copyBuffer("bad data");
   PacketNum nextPacket = clientNextInitialPacketNum++;
   StreamId streamId = 3;
@@ -2801,7 +2794,6 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedStream) {
 TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   auto qLogger = std::make_shared<FileQLogger>();
   server->getNonConstConn().qLogger = qLogger;
-  QuicFizzFactory fizzFactory;
   IntervalSet<PacketNum> acks = {{1, 2}};
   auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = clientNextInitialPacketNum++;
@@ -2858,8 +2850,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
-  QuicFizzFactory fizzFactory;
-  FizzCryptoFactory cryptoFactory(&fizzFactory);
+  FizzCryptoFactory cryptoFactory;
   PacketNum nextPacket = clientNextInitialPacketNum++;
   auto aead = cryptoFactory.getServerInitialCipher(
       *clientConnectionId, QuicVersion::MVFST);
@@ -3128,7 +3119,6 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   auto qLogger = std::make_shared<FileQLogger>();
   server->getNonConstConn().qLogger = qLogger;
 
-  QuicFizzFactory fizzFactory;
   auto data = IOBuf::copyBuffer("bad data");
   PacketNum nextPacket = clientNextInitialPacketNum++;
   auto aead = getInitialCipher();

@@ -27,8 +27,8 @@
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzBridge.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
-#include <quic/handshake/QuicFizzFactory.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/StateData.h>
@@ -77,7 +77,7 @@ class ServerHandshakeTest : public Test {
     cryptoState = std::make_unique<QuicCryptoState>();
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setOmitEarlyRecordLayer(true);
-    clientCtx->setFactory(std::make_shared<QuicFizzFactory>());
+    clientCtx->setFactory(std::make_shared<FizzCryptoFactory>());
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = quic::test::createServerCtx();
     setupClientAndServerContext();
