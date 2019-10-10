@@ -107,6 +107,9 @@ class StreamFrameScheduler {
           : streams_(streams) {
         itr_ = streams_->lower_bound(start);
         checkForWrapAround();
+        // We don't want to mark it as wrapped around initially, instead just
+        // act as if start was the first element.
+        wrappedAround_ = false;
       }
 
       const MapType::value_type& dereference() const {
