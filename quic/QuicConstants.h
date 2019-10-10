@@ -170,9 +170,6 @@ enum class LocalErrorCode : uint32_t {
   CALLBACK_ALREADY_INSTALLED = 0x4000001A,
 };
 
-using QuicErrorCode =
-    boost::variant<ApplicationErrorCode, LocalErrorCode, TransportErrorCode>;
-
 enum class QuicNodeType : bool {
   Client,
   Server,

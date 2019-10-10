@@ -9,7 +9,6 @@
 #include <quic/QuicException.h>
 
 #include <fizz/record/Types.h>
-#include <folly/Overload.h>
 #include <glog/logging.h>
 
 namespace quic {
@@ -161,34 +160,6 @@ std::string toString(TransportErrorCode code) {
   return "Unknown error";
 }
 
-std::string toString(QuicErrorCode code) {
-  return folly::variant_match(
-      code,
-      [](ApplicationErrorCode errorCode) {
-        return folly::to<std::string>(errorCode);
-      },
-      [](LocalErrorCode errorCode) { return toString(errorCode); },
-      [](TransportErrorCode errorCode) { return toString(errorCode); });
-}
-
-std::string toString(
-    const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>&
-        error) {
-  return folly::to<std::string>(
-      folly::variant_match(
-          error.first,
-          [](ApplicationErrorCode errorCode) {
-            return "ApplicationError: " + toString(errorCode) + ", ";
-          },
-          [](LocalErrorCode errorCode) {
-            return "LocalError: " + toString(errorCode) + ", ";
-          },
-          [](TransportErrorCode errorCode) {
-            return "TransportError: " + toString(errorCode) + ", ";
-          }),
-      error.second.value_or(folly::StringPiece()).toString());
-}
-
 std::string cryptoErrorToString(TransportErrorCode code) {
   auto codeVal =
       static_cast<std::underlying_type<TransportErrorCode>::type>(code);
@@ -199,4 +170,37 @@ std::string cryptoErrorToString(TransportErrorCode code) {
       toString(static_cast<fizz::AlertDescription>(alertDescNum));
 }
 
+std::string toString(QuicErrorCode code) {
+  switch (code.type()) {
+    case QuicErrorCode::Type::ApplicationErrorCode_E:
+      return folly::to<std::string>(*code.asApplicationErrorCode());
+    case QuicErrorCode::Type::LocalErrorCode_E:
+      return toString(*code.asLocalErrorCode());
+    case QuicErrorCode::Type::TransportErrorCode_E:
+      return toString(*code.asTransportErrorCode());
+  }
+  folly::assume_unreachable();
+}
+
+std::string toString(
+    const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>&
+        error) {
+  std::string err;
+  switch (error.first.type()) {
+    case QuicErrorCode::Type::ApplicationErrorCode_E:
+      err = "ApplicationError: " +
+          toString(*error.first.asApplicationErrorCode()) + ", ";
+      break;
+    case QuicErrorCode::Type::LocalErrorCode_E:
+      err = "LocalError: " + toString(*error.first.asLocalErrorCode()) + ", ";
+      break;
+    case QuicErrorCode::Type::TransportErrorCode_E:
+      err = "TransportError: " + toString(*error.first.asTransportErrorCode()) +
+          ", ";
+  }
+  if (error.second) {
+    err = folly::to<std::string>(err, error.second.value());
+  }
+  return err;
+}
 } // namespace quic

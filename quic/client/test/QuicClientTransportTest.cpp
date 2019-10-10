@@ -449,13 +449,9 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
-        EXPECT_TRUE(folly::variant_match(
-            errorCode.first,
-            [](const TransportErrorCode& err) {
-              return static_cast<fizz::AlertDescription>(err) ==
-                  fizz::AlertDescription::bad_certificate;
-            },
-            [](const auto&) { return false; }));
+        const TransportErrorCode* transportError =
+            errorCode.first.asTransportErrorCode();
+        EXPECT_NE(transportError, nullptr);
         client->close(folly::none);
         this->checkTransportSummaryEvent(qLogger);
 
@@ -477,12 +473,8 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
-        EXPECT_TRUE(folly::variant_match(
-            errorCode.first,
-            [](const LocalErrorCode& err) {
-              return err == LocalErrorCode::CONNECT_FAILED;
-            },
-            [](const auto&) { return false; }));
+        const LocalErrorCode* localError = errorCode.first.asLocalErrorCode();
+        EXPECT_NE(localError, nullptr);
         this->checkTransportSummaryEvent(qLogger);
       }));
   client->start(&clientConnCallback);
@@ -1459,12 +1451,11 @@ class QuicClientTransportTest : public Test {
     deliverDataWithoutErrorCheck(addr, std::move(data), writes);
     if (client->getConn().localConnectionError) {
       bool idleTimeout = false;
-      folly::variant_match(
-          client->getConn().localConnectionError->first,
-          [&](const LocalErrorCode& err) {
-            idleTimeout = (err == LocalErrorCode::IDLE_TIMEOUT);
-          },
-          [&](const auto&) {});
+      const LocalErrorCode* localError =
+          client->getConn().localConnectionError->first.asLocalErrorCode();
+      if (localError) {
+        idleTimeout = (*localError == LocalErrorCode::IDLE_TIMEOUT);
+      }
       if (!idleTimeout) {
         throw std::runtime_error(
             toString(client->getConn().localConnectionError->first));

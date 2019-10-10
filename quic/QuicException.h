@@ -12,8 +12,17 @@
 #include <string>
 
 #include <quic/QuicConstants.h>
+#include <quic/common/Variant.h>
 
 namespace quic {
+
+#define QUIC_ERROR_CODE(F, ...)        \
+  F(ApplicationErrorCode, __VA_ARGS__) \
+  F(LocalErrorCode, __VA_ARGS__)       \
+  F(TransportErrorCode, __VA_ARGS__)
+
+DECLARE_VARIANT_TYPE(QuicErrorCode, QUIC_ERROR_CODE)
+
 class QuicTransportException : public std::runtime_error {
  public:
   explicit QuicTransportException(

@@ -263,13 +263,11 @@ void QuicTransportBase::closeImpl(
   }
   bool isReset = false;
   bool isAbandon = false;
-  folly::variant_match(
-      cancelCode.first,
-      [&](const LocalErrorCode& err) {
-        isReset = err == LocalErrorCode::CONNECTION_RESET;
-        isAbandon = err == LocalErrorCode::CONNECTION_ABANDONED;
-      },
-      [](const auto&) {});
+  LocalErrorCode* localError = cancelCode.first.asLocalErrorCode();
+  if (localError) {
+    isReset = *localError == LocalErrorCode::CONNECTION_RESET;
+    isAbandon = *localError == LocalErrorCode::CONNECTION_ABANDONED;
+  }
   VLOG_IF(4, isReset) << "Closing transport due to stateless reset " << *this;
   VLOG_IF(4, isAbandon) << "Closing transport due to abandoned connection "
                         << *this;
@@ -349,16 +347,23 @@ void QuicTransportBase::closeImpl(
   // connCallback_ could be null if start() was never invoked and the
   // transport was destroyed or if the app initiated close.
   if (connCallback_) {
-    bool noError = folly::variant_match(
-        cancelCode.first,
-        [](const LocalErrorCode& err) {
-          return err == LocalErrorCode::NO_ERROR ||
-              err == LocalErrorCode::IDLE_TIMEOUT;
-        },
-        [](const TransportErrorCode& err) {
-          return err == TransportErrorCode::NO_ERROR;
-        },
-        [](const auto&) { return false; });
+    bool noError = false;
+    switch (cancelCode.first.type()) {
+      case QuicErrorCode::Type::LocalErrorCode_E: {
+        LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
+        noError = localErrorCode == LocalErrorCode::NO_ERROR ||
+            localErrorCode == LocalErrorCode::IDLE_TIMEOUT;
+        break;
+      }
+      case QuicErrorCode::Type::TransportErrorCode_E: {
+        TransportErrorCode transportErrorCode =
+            *cancelCode.first.asTransportErrorCode();
+        noError = transportErrorCode == TransportErrorCode::NO_ERROR;
+        break;
+      }
+      case QuicErrorCode::Type::ApplicationErrorCode_E:
+        noError = false;
+    }
     if (noError) {
       connCallback_->onConnectionEnd();
     } else {
@@ -1289,12 +1294,13 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
   }
 
   if (stream->streamReadError) {
-    return folly::variant_match(
-        *stream->streamReadError,
-        [](LocalErrorCode err) { return folly::makeUnexpected(err); },
-        [](const auto&) {
-          return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
-        });
+    switch (stream->streamReadError->type()) {
+      case QuicErrorCode::Type::LocalErrorCode_E:
+        return folly::makeUnexpected(
+            *stream->streamReadError->asLocalErrorCode());
+      default:
+        return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+    }
   }
 
   peekDataFromQuicStream(*stream, std::move(peekCallback));
@@ -1358,15 +1364,14 @@ folly::
     }
 
     if (stream->streamReadError) {
-      return folly::variant_match(
-          *stream->streamReadError,
-          [](LocalErrorCode err) {
-            return folly::makeUnexpected(ConsumeError{err, folly::none});
-          },
-          [](const auto&) {
-            return folly::makeUnexpected(
-                ConsumeError{LocalErrorCode::INTERNAL_ERROR, folly::none});
-          });
+      switch (stream->streamReadError->type()) {
+        case QuicErrorCode::Type::LocalErrorCode_E:
+          return folly::makeUnexpected(ConsumeError{
+              *stream->streamReadError->asLocalErrorCode(), folly::none});
+        default:
+          return folly::makeUnexpected(
+              ConsumeError{LocalErrorCode::INTERNAL_ERROR, folly::none});
+      }
     }
 
     consumeDataFromQuicStream(*stream, amount);
@@ -2479,15 +2484,11 @@ folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::maybeResetStreamFromReadError(
     StreamId id,
     QuicErrorCode error) {
-  return folly::variant_match(
-      error,
-      [this, id](quic::ApplicationErrorCode ec) { return resetStream(id, ec); },
-      [](quic::LocalErrorCode) {
-        return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
-      },
-      [](quic::TransportErrorCode) {
-        return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
-      });
+  quic::ApplicationErrorCode* code = error.asApplicationErrorCode();
+  if (code) {
+    return resetStream(id, *code);
+  }
+  return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
 }
 
 } // namespace quic

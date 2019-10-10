@@ -739,23 +739,29 @@ void writeCloseCommon(
             TransportErrorCode::NO_ERROR, std::string("No error")),
         packetBuilder);
   } else {
-    written = folly::variant_match(
-        closeDetails->first,
-        [&](ApplicationErrorCode code) {
-          return writeFrame(
-              ApplicationCloseFrame(code, closeDetails->second), packetBuilder);
-        },
-        [&](TransportErrorCode code) {
-          return writeFrame(
-              ConnectionCloseFrame(code, closeDetails->second), packetBuilder);
-        },
-        [&](LocalErrorCode /*code*/) {
-          return writeFrame(
-              ConnectionCloseFrame(
-                  TransportErrorCode::INTERNAL_ERROR,
-                  std::string("Internal error")),
-              packetBuilder);
-        });
+    switch (closeDetails->first.type()) {
+      case QuicErrorCode::Type::ApplicationErrorCode_E:
+        written = writeFrame(
+            ApplicationCloseFrame(
+                *closeDetails->first.asApplicationErrorCode(),
+                closeDetails->second),
+            packetBuilder);
+        break;
+      case QuicErrorCode::Type::TransportErrorCode_E:
+        written = writeFrame(
+            ConnectionCloseFrame(
+                *closeDetails->first.asTransportErrorCode(),
+                closeDetails->second),
+            packetBuilder);
+        break;
+      case QuicErrorCode::Type::LocalErrorCode_E:
+        written = writeFrame(
+            ConnectionCloseFrame(
+                TransportErrorCode::INTERNAL_ERROR,
+                std::string("Internal error")),
+            packetBuilder);
+        break;
+    }
   }
   if (written == 0) {
     LOG(ERROR) << "Close frame too large " << connection;

@@ -874,6 +874,8 @@ HeaderForm getHeaderForm(uint8_t headerValue);
 
 std::string toString(LongHeader::Types type);
 
+std::string toString(QuicErrorCode code);
+
 inline std::ostream& operator<<(
     std::ostream& os,
     const LongHeader::Types& type) {

@@ -143,23 +143,26 @@ uint64_t computeExpectedDelay(
 
 std::unique_ptr<fizz::CertificateVerifier> createTestCertificateVerifier();
 
-template <class T>
-bool matchError(std::pair<QuicErrorCode, std::string> errorCode, T error) {
-  return folly::variant_match(
-      errorCode.first,
-      [&](T err) { return err == error; },
-      [](auto) { return false; });
-}
-
-template <class T>
+// match error functions
 bool matchError(
     std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    T error) {
-  return folly::variant_match(
-      errorCode.first,
-      [&](T err) { return err == error; },
-      [](auto) { return false; });
-}
+    LocalErrorCode error);
+
+bool matchError(
+    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
+    TransportErrorCode error);
+
+bool matchError(
+    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
+    ApplicationErrorCode error);
+
+bool matchError(
+    std::pair<QuicErrorCode, std::string> errorCode,
+    ApplicationErrorCode error);
+
+bool matchError(
+    std::pair<QuicErrorCode, std::string> errorCode,
+    TransportErrorCode error);
 
 ConnectionId getTestConnectionId(uint16_t hostId = 0);
 
@@ -170,26 +173,8 @@ MATCHER_P(IsError, error, "") {
   return matchError(arg, error);
 }
 
-inline bool matchAppError(
-    std::pair<QuicErrorCode, std::string> errorCode,
-    ApplicationErrorCode error) {
-  return folly::variant_match(
-      errorCode.first,
-      [&](ApplicationErrorCode err) { return err == error; },
-      [](auto) { return false; });
-}
-
-inline bool matchAppError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    ApplicationErrorCode error) {
-  return folly::variant_match(
-      errorCode.first,
-      [&](ApplicationErrorCode err) { return err == error; },
-      [](auto) { return false; });
-}
-
 MATCHER_P(IsAppError, error, "") {
-  return matchAppError(arg, error);
+  return matchError(arg, error);
 }
 
 void updateAckState(

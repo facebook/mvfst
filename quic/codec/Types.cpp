@@ -472,5 +472,4 @@ std::string toString(LongHeader::Types type) {
   LOG(WARNING) << "toString has unhandled long header type";
   return "UNKNOWN";
 }
-
 } // namespace quic
