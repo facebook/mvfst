@@ -415,6 +415,37 @@ folly::dynamic QLogPacingMetricUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogPacingObservationEvent::QLogPacingObservationEvent(
+    std::string actualIn,
+    std::string expectIn,
+    std::string conclusionIn,
+    std::chrono::microseconds refTimeIn)
+    : actual(std::move(actualIn)),
+      expect(std::move(expectIn)),
+      conclusion(std::move(conclusionIn)) {
+  eventType = QLogEventType::PacingObservation;
+  refTime = refTimeIn;
+}
+
+// TODO: Sad. I wanted moved all the string into the dynamic but this function
+// is const. I think we should make all the toDynamic rvalue qualified since
+// users are not supposed to use them after toDynamic() is called.
+folly::dynamic QLogPacingObservationEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "METRIC_UPDATE",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["actual_pacing_rate"] = actual;
+  data["expect_pacing_rate"] = expect;
+  data["conclustion"] = conclusion;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 QLogAppIdleUpdateEvent::QLogAppIdleUpdateEvent(
     std::string idleEventIn,
     bool idleIn,
@@ -724,6 +755,8 @@ std::string toString(QLogEventType type) {
       return "METRIC_UPDATE";
     case QLogEventType::StreamStateUpdate:
       return "STREAM_STATE_UPDATE";
+    case QLogEventType::PacingObservation:
+      return "PACING_OBSERVATION";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

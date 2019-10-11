@@ -59,6 +59,10 @@ class FileQLogger : public BaseQLogger {
   void addPacingMetricUpdate(
       uint64_t pacingBurstSizeIn,
       std::chrono::microseconds pacingIntervalIn) override;
+  void addPacingObservation(
+      std::string actual,
+      std::string expected,
+      std::string conclusion) override;
   void addAppIdleUpdate(std::string idleEvent, bool idle) override;
   void addPacketDrop(size_t packetSize, std::string dropReasonIn) override;
   void addDatagramReceived(uint64_t dataLen) override;

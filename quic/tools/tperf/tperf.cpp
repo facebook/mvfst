@@ -19,6 +19,7 @@
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
+#include <quic/tools/tperf/PacingObserver.h>
 #include <quic/tools/tperf/TperfQLogger.h>
 
 DEFINE_string(host, "::1", "TPerf server hostname/IP");
@@ -176,8 +177,10 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), *serverHandler, ctx);
     if (!FLAGS_server_qlogger_path.empty()) {
-      transport->setQLogger(std::make_shared<TperfQLogger>(
-          kQLogServerVantagePoint, FLAGS_server_qlogger_path));
+      auto qlogger = std::make_shared<TperfQLogger>(
+          kQLogServerVantagePoint, FLAGS_server_qlogger_path);
+      qlogger->setPacingObserver(std::make_unique<QLogPacingObserver>(qlogger));
+      transport->setQLogger(std::move(qlogger));
     }
     auto settings = transport->getTransportSettings();
     serverHandler->setQuicSocket(transport);

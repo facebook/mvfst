@@ -13,6 +13,15 @@
 
 namespace quic {
 
+struct PacingObserver {
+  PacingObserver() = default;
+  virtual ~PacingObserver() = default;
+  virtual void onNewPacingRate(
+      uint64_t packetsPerInterval,
+      std::chrono::microseconds interval) = 0;
+  virtual void onPacketSent() = 0;
+};
+
 class QLogger {
  public:
   folly::Optional<ConnectionId> dcid;
@@ -58,6 +67,10 @@ class QLogger {
   virtual void addPacingMetricUpdate(
       uint64_t pacingBurstSizeIn,
       std::chrono::microseconds pacingIntervalIn) = 0;
+  virtual void addPacingObservation(
+      std::string actual,
+      std::string expected,
+      std::string conclusion) = 0;
   virtual void addAppIdleUpdate(std::string idleEvent, bool idle) = 0;
   virtual void addPacketDrop(size_t packetSize, std::string dropReasonIn) = 0;
   virtual void addDatagramReceived(uint64_t dataLen) = 0;

@@ -103,6 +103,16 @@ void FileQLogger::addPacingMetricUpdate(
       pacingBurstSizeIn, pacingIntervalIn, refTime));
 }
 
+void FileQLogger::addPacingObservation(
+    std::string actual,
+    std::string expect,
+    std::string conclusion) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+  logs.push_back(std::make_unique<quic::QLogPacingObservationEvent>(
+      std::move(actual), std::move(expect), std::move(conclusion), refTime));
+}
+
 void FileQLogger::addAppIdleUpdate(std::string idleEvent, bool idle) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now() - refTimePoint);
