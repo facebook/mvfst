@@ -384,6 +384,9 @@ void Cubic::onPacketAckOrLoss(
   // furture.
   if (lossEvent) {
     onPacketLoss(*lossEvent);
+    if (conn_.pacer) {
+      conn_.pacer->onPacketsLoss();
+    }
   }
   if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
     CHECK(!ackEvent->ackedPackets.empty());

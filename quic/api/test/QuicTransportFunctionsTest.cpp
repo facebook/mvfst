@@ -743,6 +743,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn->pacer = std::move(mockPacer);
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
@@ -751,6 +754,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   ackFrame.ackBlocks.insert(10);
   packet.packet.frames.push_back(std::move(ackFrame));
   EXPECT_CALL(*rawController, onPacketSent(_)).Times(0);
+  EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(1, conn->outstandingPackets.size());
@@ -974,6 +978,34 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onWrite(_));
+  writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+}
+
+TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
+  auto conn = createConn();
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn->pacer = std::move(mockPacer);
+
+  EventBase evb;
+  auto socket = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+  auto rawSocket = socket.get();
+
+  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf =
+      IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+
+  EXPECT_CALL(*rawPacer, onPacketSent()).Times(1);
   EXPECT_CALL(*transportInfoCb_, onWrite(_));
   writeQuicDataToSocket(
       *rawSocket,

@@ -396,6 +396,9 @@ void updateConnection(
           conn.congestionController->getCongestionWindow());
     }
   }
+  if (conn.pacer && !pureAck) {
+    conn.pacer->onPacketSent();
+  }
   if (pkt.isHandshake) {
     ++conn.outstandingHandshakePacketsCount;
     conn.lossState.lastHandshakePacketSentTime = pkt.time;

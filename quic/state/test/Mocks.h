@@ -40,6 +40,8 @@ class MockPacer : public Pacer {
   MOCK_METHOD1(updateAndGetWriteBatchSize, uint64_t(TimePoint));
   MOCK_CONST_METHOD0(getCachedWriteBatchSize, uint64_t());
   MOCK_METHOD1(setAppLimited, void(bool));
+  MOCK_METHOD0(onPacketSent, void());
+  MOCK_METHOD0(onPacketsLoss, void());
 };
 } // namespace test
 } // namespace quic

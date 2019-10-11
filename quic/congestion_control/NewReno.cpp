@@ -89,6 +89,8 @@ void NewReno::onPacketAckOrLoss(
     folly::Optional<LossEvent> lossEvent) {
   if (lossEvent) {
     onPacketLoss(*lossEvent);
+    // When we start to support pacing in NewReno, we need to call onPacketsLoss
+    // on the pacer when there is loss.
   }
   if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
     onAckEvent(*ackEvent);

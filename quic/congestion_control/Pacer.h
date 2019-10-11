@@ -43,6 +43,9 @@ class DefaultPacer : public Pacer {
 
   void setAppLimited(bool limited) override;
 
+  void onPacketSent() override;
+  void onPacketsLoss() override;
+
  private:
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
@@ -52,5 +55,6 @@ class DefaultPacer : public Pacer {
   PacingRateCalculator pacingRateCalculator_;
   uint64_t cachedBatchSize_;
   bool appLimited_{false};
+  uint64_t tokens_;
 };
 } // namespace quic

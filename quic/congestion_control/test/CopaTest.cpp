@@ -10,6 +10,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace testing;
 
@@ -453,6 +454,20 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   EXPECT_EQ(event->bytesInFlight, copa.getBytesInFlight());
   EXPECT_EQ(event->currentCwnd, kDefaultCwnd);
   EXPECT_EQ(event->congestionEvent, kCongestionPacketLoss);
+}
+
+TEST_F(CopaTest, PacketLossInvokesPacer) {
+  QuicServerConnectionState conn;
+  Copa copa(conn);
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+  auto packet = createPacket(0 /* pacetNum */, 1000, 1000);
+  copa.onPacketSent(packet);
+  EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
+  CongestionController::LossEvent lossEvent;
+  lossEvent.addLostPacket(packet);
+  copa.onPacketAckOrLoss(folly::none, lossEvent);
 }
 
 } // namespace test

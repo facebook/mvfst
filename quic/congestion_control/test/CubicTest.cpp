@@ -303,5 +303,20 @@ TEST_F(CubicTest, PacingGain) {
   auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->update, kRecalculateTimeToOrigin);
 }
+
+TEST_F(CubicTest, PacetLossInvokesPacer) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+  Cubic cubic(conn);
+
+  auto packet = makeTestingWritePacket(0, 1000, 1000);
+  cubic.onPacketSent(packet);
+  EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
+  CongestionController::LossEvent lossEvent;
+  lossEvent.addLostPacket(packet);
+  cubic.onPacketAckOrLoss(folly::none, lossEvent);
+}
 } // namespace test
 } // namespace quic

@@ -667,5 +667,21 @@ TEST_F(BbrTest, UpdatePacerAppLimited) {
       makeAck(0, 1000, Clock::now(), Clock::now() - 5ms), folly::none);
 }
 
+TEST_F(BbrTest, PacketLossInvokesPacer) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController::BbrConfig config;
+  BbrCongestionController bbr(conn, config);
+  auto mockPacer = std::make_unique<MockPacer>();
+  auto rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+
+  auto packet = makeTestingWritePacket(0, 1000, 1000);
+  bbr.onPacketSent(packet);
+  EXPECT_CALL(*rawPacer, onPacketsLoss()).Times(1);
+  CongestionController::LossEvent lossEvent;
+  lossEvent.addLostPacket(packet);
+  bbr.onPacketAckOrLoss(folly::none, lossEvent);
+}
+
 } // namespace test
 } // namespace quic

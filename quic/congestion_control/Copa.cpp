@@ -127,6 +127,9 @@ void Copa::onPacketAckOrLoss(
     folly::Optional<LossEvent> loss) {
   if (loss) {
     onPacketLoss(*loss);
+    if (conn_.pacer) {
+      conn_.pacer->onPacketsLoss();
+    }
     QUIC_TRACE(copa_loss, conn_, cwndBytes_, bytesInFlight_);
   }
   if (ack && ack->largestAckedPacket.hasValue()) {

@@ -20,8 +20,8 @@ DefaultPacer::DefaultPacer(
       minCwndInMss_(minCwndInMss),
       batchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
       pacingRateCalculator_(calculatePacingRate),
-      cachedBatchSize_(conn.transportSettings.writeConnectionDataPacketsLimit) {
-}
+      cachedBatchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
+      tokens_(conn.transportSettings.writeConnectionDataPacketsLimit) {}
 
 // TODO: we choose to keep refershing pacing rate even when we are app-limited,
 // so that when we exit app-limited, we have an updated pacing rate. But I don't
@@ -46,14 +46,25 @@ void DefaultPacer::refreshPacingRate(
       pacingRateCalculator_(conn_, cwndBytes, minCwndInMss_, rtt);
   writeInterval_ = pacingRate.interval;
   batchSize_ = pacingRate.burstSize;
+  tokens_ += batchSize_;
 }
 
 void DefaultPacer::onPacedWriteScheduled(TimePoint currentTime) {
   scheduledWriteTime_ = currentTime;
 }
 
+void DefaultPacer::onPacketSent() {
+  if (tokens_) {
+    --tokens_;
+  }
+}
+
+void DefaultPacer::onPacketsLoss() {
+  tokens_ = 0UL;
+}
+
 std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
-  return appLimited_ ? 0us : writeInterval_;
+  return (appLimited_ || tokens_) ? 0us : writeInterval_;
 }
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
@@ -68,13 +79,19 @@ uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
     return batchSize_;
   }
   if (!scheduledWriteTime_ || *scheduledWriteTime_ >= currentTime) {
-    return batchSize_;
+    return tokens_;
   }
   auto adjustedInterval = std::chrono::duration_cast<std::chrono::microseconds>(
       currentTime - *scheduledWriteTime_ + writeInterval_);
   cachedBatchSize_ = std::ceil(
       adjustedInterval.count() * batchSize_ * 1.0 / writeInterval_.count());
-  return cachedBatchSize_;
+  if (cachedBatchSize_ < batchSize_) {
+    LOG(ERROR)
+        << "Quic pacer batch size calculation: cachedBatchSize < batchSize";
+  }
+  tokens_ +=
+      (cachedBatchSize_ > batchSize_ ? cachedBatchSize_ - batchSize_ : 0);
+  return tokens_;
 }
 
 uint64_t DefaultPacer::getCachedWriteBatchSize() const {
