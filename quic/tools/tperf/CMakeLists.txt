@@ -7,12 +7,7 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-add_executable(tperf tperf.cpp TperfQLogger.cpp PacingObserver.cpp)
-
-add_library(
-  tperf_pacing_observer STATIC
-  PacingObserver.cpp
-)
+add_executable(tperf tperf.cpp TperfQLogger.cpp)
 
 target_compile_options(
   tperf

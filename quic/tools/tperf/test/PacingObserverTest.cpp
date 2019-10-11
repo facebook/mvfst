@@ -7,6 +7,7 @@
  */
 
 #include <quic/tools/tperf/PacingObserver.h>
+#include <quic/common/test/TestUtils.h>
 #include <quic/logging/test/Mocks.h>
 
 using namespace testing;
@@ -35,8 +36,9 @@ TEST_F(QLogPacingObserverTest, Basic) {
       .WillOnce(Invoke(
           [](std::string actual, std::string expect, std::string conclustion) {
             EXPECT_TRUE(actual.find("20packets / ") != std::string::npos);
-            EXPECT_EQ(Bandwidth(0, 0us, "packets").conciseDescribe(), expect);
-            EXPECT_EQ("Pacing above expect", conclustion);
+            EXPECT_EQ(Bandwidth(0, 0s, "packets").describe(), expect);
+            EXPECT_NE(
+                std::string::npos, conclustion.find("Pacing above expect"));
           }));
   pacingObserver.onNewPacingRate(10, 10s);
 
@@ -45,10 +47,57 @@ TEST_F(QLogPacingObserverTest, Basic) {
       .WillOnce(Invoke(
           [](std::string actual, std::string expect, std::string conclustion) {
             EXPECT_TRUE(actual.find("0packets / ") != std::string::npos);
-            EXPECT_EQ(Bandwidth(10, 10s, "packets").conciseDescribe(), expect);
-            EXPECT_EQ("Pacing below expect", conclustion);
+            EXPECT_EQ(Bandwidth(1, 1s, "packets").describe(), expect);
+            EXPECT_NE(
+                std::string::npos, conclustion.find("Pacing below expect"));
           }));
   pacingObserver.onNewPacingRate(20, 10s);
+}
+
+class RttBucketTest : public Test {
+ protected:
+  QuicConnectionStateBase conn_{QuicNodeType::Client};
+};
+
+TEST_F(RttBucketTest, Basic) {
+  auto fakeNow = Clock::now();
+  MockClock::mockNow = [=]() { return fakeNow; };
+  // This initialize bucketBegin_ to fakeNow:
+  RttBucket<MockClock> rttBucket(conn_);
+  conn_.lossState.srtt = 1s;
+
+  MockClock::mockNow = [=]() { return fakeNow + 10ms; };
+  EXPECT_FALSE(rttBucket());
+
+  // This resets the bucketBegin_ to fakeNow + 2s
+  MockClock::mockNow = [=]() { return fakeNow + 2s; };
+  EXPECT_TRUE(rttBucket());
+
+  MockClock::mockNow = [=]() { return fakeNow + 2010ms; };
+  EXPECT_FALSE(rttBucket());
+
+  MockClock::mockNow = [=]() { return fakeNow + 3010ms; };
+  EXPECT_TRUE(rttBucket());
+}
+
+class FixedTimeBucketTest : public Test {};
+
+TEST_F(FixedTimeBucketTest, Basic) {
+  auto fakeNow = Clock::now();
+  MockClock::mockNow = [=]() { return fakeNow; };
+  FixedTimeBucket<MockClock> fixedTimeBucket(2s);
+
+  MockClock::mockNow = [=]() { return fakeNow + 1s; };
+  EXPECT_FALSE(fixedTimeBucket());
+
+  MockClock::mockNow = [=]() { return fakeNow + 2s; };
+  EXPECT_TRUE(fixedTimeBucket());
+
+  MockClock::mockNow = [=]() { return fakeNow + 2050ms; };
+  EXPECT_FALSE(fixedTimeBucket());
+
+  MockClock::mockNow = [=]() { return fakeNow + 4s; };
+  EXPECT_TRUE(fixedTimeBucket());
 }
 
 } // namespace quic::test

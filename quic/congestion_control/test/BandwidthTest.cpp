@@ -58,5 +58,17 @@ TEST_F(BandwidthTest, Arithmetics) {
   EXPECT_EQ(750, testBandwidth * 1.5 * shortRtt);
   EXPECT_EQ(666, testBandwidth / 3 * longRtt);
 }
+
+TEST_F(BandwidthTest, Normalize) {
+  Bandwidth testBandwidth(300, 20us);
+  EXPECT_EQ(15000000, testBandwidth.normalize());
+}
+
+TEST_F(BandwidthTest, Addition) {
+  Bandwidth first(600, 20us), second(300, 20us);
+  EXPECT_EQ(Bandwidth(45000000, 1s), first + second);
+  first += second;
+  EXPECT_EQ(Bandwidth(45000000, 1s), first);
+}
 } // namespace test
 } // namespace quic

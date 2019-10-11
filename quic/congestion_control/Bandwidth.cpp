@@ -14,9 +14,13 @@ const std::string& Bandwidth::unitName() const noexcept {
   return unitName_;
 }
 
-std::string Bandwidth::conciseDescribe() const noexcept {
+std::string Bandwidth::describe() const noexcept {
   return folly::to<std::string>(
       units, unitName_, " / ", interval.count(), "us");
+}
+
+std::string Bandwidth::normalizedDescribe() const noexcept {
+  return folly::to<std::string>(normalize(), unitName_, " / s");
 }
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs) {
@@ -52,8 +56,7 @@ bool operator==(const Bandwidth& lhs, const Bandwidth& rhs) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Bandwidth& bandwidth) {
-  os << "bandwidth " << bandwidth.unitName() << "=" << bandwidth.units
-     << " interval=" << bandwidth.interval.count() << "us";
+  os << bandwidth.describe();
   return os;
 }
 

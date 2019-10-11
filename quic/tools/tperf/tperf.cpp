@@ -179,7 +179,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     if (!FLAGS_server_qlogger_path.empty()) {
       auto qlogger = std::make_shared<TperfQLogger>(
           kQLogServerVantagePoint, FLAGS_server_qlogger_path);
-      qlogger->setPacingObserver(std::make_unique<QLogPacingObserver>(qlogger));
+      qlogger->setPacingObserver(
+          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 1s));
       transport->setQLogger(std::move(qlogger));
     }
     auto settings = transport->getTransportSettings();
