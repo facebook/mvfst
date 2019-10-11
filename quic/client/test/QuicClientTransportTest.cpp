@@ -399,6 +399,10 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
 
   EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
+    EXPECT_EQ(client->getConn().peerConnectionIds.size(), 1);
+    EXPECT_EQ(
+        *client->getConn().serverConnectionId,
+        client->getConn().peerConnectionIds[0].connId);
     eventbase_.terminateLoopSoon();
   }));
   eventbase_.loopForever();
@@ -1257,6 +1261,11 @@ class QuicClientTransportTest : public Test {
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));
     ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
+    EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
+    EXPECT_EQ(
+        client->getConn().selfConnectionIds[0].connId,
+        *client->getConn().clientConnectionId);
+    EXPECT_EQ(client->getConn().peerConnectionIds.size(), 0);
   }
 
   virtual void setupCryptoLayer() {

@@ -46,8 +46,11 @@ QuicClientTransport::QuicClientTransport(
       std::max(kMinInitialDestinationConnIdLength, connectionIdSize));
   folly::Random::secureRandom(connIdData.data(), connIdData.size());
 
-  conn_->clientConnectionId = ConnectionId(
+  auto connId = ConnectionId(
       connectionIdSize == 0 ? std::vector<uint8_t>(0) : connIdData);
+  conn_->clientConnectionId = connId;
+  conn_->selfConnectionIds.emplace_back(
+      std::move(connId), kInitialSequenceNumber);
 
   // Change destination connection to not be same as src connid to suss
   // out bugs.
@@ -243,6 +246,8 @@ void QuicClientTransport::processPacketData(
 
   if (!conn_->serverConnectionId && longHeader) {
     conn_->serverConnectionId = longHeader->getSourceConnId();
+    conn_->peerConnectionIds.emplace_back(
+        longHeader->getSourceConnId(), kInitialSequenceNumber);
     conn_->readCodec->setServerConnectionId(*conn_->serverConnectionId);
   }
 

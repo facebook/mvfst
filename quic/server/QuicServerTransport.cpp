@@ -276,6 +276,8 @@ std::shared_ptr<QuicTransportBase> QuicServerTransport::sharedGuard() {
 void QuicServerTransport::setClientConnectionId(
     const ConnectionId& clientConnectionId) {
   conn_->clientConnectionId.assign(clientConnectionId);
+  conn_->peerConnectionIds.emplace_back(
+      clientConnectionId, kInitialSequenceNumber);
 }
 
 void QuicServerTransport::onCryptoEventAvailable() noexcept {

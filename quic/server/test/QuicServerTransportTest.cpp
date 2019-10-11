@@ -315,6 +315,10 @@ class QuicServerTransportTest : public Test {
     server->accept();
     setupConnection();
     EXPECT_TRUE(server->idleTimeout().isScheduled());
+    EXPECT_EQ(server->getConn().peerConnectionIds.size(), 1);
+    EXPECT_EQ(
+        *server->getConn().clientConnectionId,
+        server->getConn().peerConnectionIds[0].connId);
   }
 
   virtual void initializeServerHandshake() {
@@ -449,7 +453,10 @@ class QuicServerTransportTest : public Test {
     EXPECT_EQ(server->getConn().serverConnIdParams->processId, 0);
     EXPECT_EQ(server->getConn().serverConnIdParams->workerId, 1);
     EXPECT_TRUE(server->getConn().serverConnectionId.hasValue());
+    EXPECT_EQ(server->getConn().selfConnectionIds.size(), 1);
     serverConnectionId = *server->getConn().serverConnectionId;
+    EXPECT_EQ(
+        server->getConn().selfConnectionIds[0].connId, serverConnectionId);
     // the crypto data should have been written in the previous loop, verify
     // that the write loop callback is not scheduled any more since we don't
     // have keys to write acks. This assumes that we will schedule crypto data
