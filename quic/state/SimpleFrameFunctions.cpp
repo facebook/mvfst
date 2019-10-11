@@ -184,7 +184,44 @@ bool updateSimpleFrameOnPacketReceived(
       return false;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E: {
-      // TODO junqiw
+      const NewConnectionIdFrame& newConnectionId =
+          *frame.asNewConnectionIdFrame();
+      // TODO vchynaro Ensure we ignore smaller subsequent retirePriorTos
+      // than the largest seen so far.
+      if (newConnectionId.retirePriorTo > newConnectionId.sequenceNumber) {
+        throw QuicTransportException(
+            "Retire prior to greater than sequence number",
+            TransportErrorCode::PROTOCOL_VIOLATION);
+      }
+
+      for (const auto& existingPeerConnIdData : conn.peerConnectionIds) {
+        if (existingPeerConnIdData.connId == newConnectionId.connectionId) {
+          if (existingPeerConnIdData.sequenceNumber !=
+              newConnectionId.sequenceNumber) {
+            throw QuicTransportException(
+                "Repeated connection id with different sequence number.",
+                TransportErrorCode::PROTOCOL_VIOLATION);
+          } else {
+            // No-op on repeated conn id.
+            return false;
+          }
+        }
+      }
+
+      // TODO if peer is requesting 0-len dst conn ids, then this
+      // is also protocol violation as per d-23 #19.15
+
+      // TODO vchynaro Implement retire_prior_to logic
+
+      // TODO Store StatelessResetToken in ConnIdData
+
+      if (conn.peerConnectionIds.size() == conn.peerReceivedConnectionIdLimit) {
+        // Unspec'd as of d-23 if a server doesn't respect the
+        // active_connection_id_limit. Ignore frame.
+        return false;
+      }
+      conn.peerConnectionIds.emplace_back(
+          newConnectionId.connectionId, newConnectionId.sequenceNumber);
       return false;
     }
     case QuicSimpleFrame::Type::MaxStreamsFrame_E: {

@@ -685,6 +685,10 @@ struct QuicConnectionStateBase {
   DebugState debugState;
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
+
+  // The parameter used to send the peer's active_connection_id_limit
+  // does not include the connection id used in the initial handshake.
+  uint64_t peerReceivedConnectionIdLimit{kDefaultConnectionIdLimit + 1};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

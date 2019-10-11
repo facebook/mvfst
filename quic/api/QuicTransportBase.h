@@ -598,5 +598,4 @@ class QuicTransportBase : public QuicSocket {
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
-
 } // namespace quic

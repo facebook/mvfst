@@ -2787,6 +2787,104 @@ TEST_F(QuicServerTransportTest, PingIsRetransmittable) {
                    .needsToSendAckImmediately);
 }
 
+TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
+  auto& conn = server->getNonConstConn();
+  conn.peerReceivedConnectionIdLimit = 2;
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  deliverData(packetToBuf(packet), false);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
+  EXPECT_EQ(conn.peerConnectionIds[1].connId, newConnId.connectionId);
+  EXPECT_EQ(conn.peerConnectionIds[1].sequenceNumber, newConnId.sequenceNumber);
+}
+
+TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
+  auto& conn = server->getNonConstConn();
+  conn.peerReceivedConnectionIdLimit = 1;
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  deliverData(packetToBuf(packet), false);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+}
+
+TEST_F(QuicServerTransportTest, RecvNewConnectionIdInvalidRetire) {
+  auto& conn = server->getNonConstConn();
+  conn.peerReceivedConnectionIdLimit = 1;
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(
+      1, 3, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  EXPECT_THROW(deliverData(packetToBuf(packet), false), std::runtime_error);
+}
+
+TEST_F(QuicServerTransportTest, RecvNewConnectionIdNoopValidDuplicate) {
+  auto& conn = server->getNonConstConn();
+  conn.peerReceivedConnectionIdLimit = 1;
+
+  ConnectionId connId2({5, 5, 5, 5});
+  conn.peerConnectionIds.emplace_back(connId2, 1);
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(1, 0, connId2, StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
+  deliverData(packetToBuf(packet), false);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
+}
+
+TEST_F(QuicServerTransportTest, RecvNewConnectionIdExceptionInvalidDuplicate) {
+  auto& conn = server->getNonConstConn();
+
+  ConnectionId connId2({5, 5, 5, 5});
+  conn.peerConnectionIds.emplace_back(connId2, 1);
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(2, 0, connId2, StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
+  EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
+}
+
 class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {
  public:
   void setupConnection() override {}
