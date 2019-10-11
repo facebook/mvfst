@@ -39,8 +39,8 @@ PacingRate calculatePacingRate(
   uint64_t cwndInPackets = std::max(minCwndInMss, cwnd / conn.udpSendPacketLen);
   // Each interval we want to send cwndInpackets / (rtt / minimalInverval)
   // number of packets.
-  uint64_t burstPerInterval = std::min(
-      conn.transportSettings.maxBurstPackets,
+  uint64_t burstPerInterval = std::max(
+      conn.transportSettings.minBurstPackets,
       static_cast<uint64_t>(std::ceil(
           static_cast<double>(cwndInPackets) *
           static_cast<double>(

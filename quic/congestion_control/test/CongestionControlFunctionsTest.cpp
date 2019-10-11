@@ -22,6 +22,7 @@ class CongestionControlFunctionsTest : public Test {};
 TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
+  conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   std::chrono::microseconds rtt(1000 * 100);
   auto result =
@@ -41,14 +42,17 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   conn.udpSendPacketLen = 1;
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
-      conn, 100, conn.transportSettings.minCwndInMss, 100000us);
-  EXPECT_EQ(1ms, result.interval);
-  EXPECT_EQ(1, result.burstSize);
+      conn, 100, conn.transportSettings.minCwndInMss, 100ms);
+  // 100 ms rtt, 1ms tick interval, 100 mss cwnd, 5 mss min burst -> 5 mss every
+  // 5ms
+  EXPECT_EQ(5ms, result.interval);
+  EXPECT_EQ(conn.transportSettings.minBurstPackets, result.burstSize);
 }
 
 TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
+  conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 10, conn.transportSettings.minCwndInMss, 100000us);
@@ -59,6 +63,7 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
 TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1;
+  conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   auto result =
       calculatePacingRate(conn, 10, conn.transportSettings.minCwndInMss, 1ms);

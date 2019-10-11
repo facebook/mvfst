@@ -53,8 +53,8 @@ struct TransportSettings {
   bool enableSocketErrMsgCallback{true};
   // Whether pacing is enabled.
   bool pacingEnabled{false};
-  // The maximum number of packets to burst out during pacing
-  uint64_t maxBurstPackets{kDefaultMaxBurstPackets};
+  // The minimum number of packets to burst out during pacing
+  uint64_t minBurstPackets{kDefaultMinBurstPackets};
   // Pacing timer tick interval
   std::chrono::microseconds pacingTimerTickInterval{
       kDefaultPacingTimerTickInterval};

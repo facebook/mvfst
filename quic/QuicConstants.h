@@ -222,8 +222,8 @@ constexpr auto kPacketToSendForPTO = 2;
 
 // Maximum number of packets to write per writeConnectionDataToSocket call.
 constexpr uint64_t kDefaultWriteConnectionDataPacketLimit = 5;
-// Maximum number of packets to write per burst in pacing
-constexpr uint64_t kDefaultMaxBurstPackets = 10;
+// Minimum number of packets to write per burst in pacing
+constexpr uint64_t kDefaultMinBurstPackets = 5;
 // Default timer tick interval for pacing timer
 // the microsecond timers are accurate to  about 5 usec
 // but the notifications can get delayed if the event loop is busy
