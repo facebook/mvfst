@@ -741,7 +741,7 @@ QuicFrame parseFrame(
       case FrameType::EXPIRED_STREAM_DATA:
         return QuicFrame(decodeExpiredStreamDataFrame(cursor));
     }
-  } catch (const std::exception& e) {
+  } catch (const std::exception&) {
     throw QuicTransportException(
         folly::to<std::string>(
             "Frame format invalid, type=", toHex<uint8_t>(initialByte->first)),

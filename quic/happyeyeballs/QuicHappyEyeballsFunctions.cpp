@@ -98,7 +98,7 @@ void startHappyEyeballs(
           connection.transportSettings,
           errMsgCallback,
           readCallback);
-    } catch (const std::exception& ex) {
+    } catch (const std::exception&) {
       // If second socket bind throws exception, give it up
       connAttemptDelayTimeout.cancelTimeout();
       connection.happyEyeballsState.finished = true;
