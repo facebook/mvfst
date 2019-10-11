@@ -5,6 +5,7 @@
 
 add_library(
   mvfst_cc_algo STATIC
+  Bandwidth.cpp
   Bbr.cpp
   BbrBandwidthSampler.cpp
   BbrRttSampler.cpp
