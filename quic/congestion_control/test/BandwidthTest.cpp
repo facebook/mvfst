@@ -21,7 +21,7 @@ class BandwidthTest : public Test {};
 TEST_F(BandwidthTest, DefaultZero) {
   Bandwidth defaultBandwidth;
   EXPECT_FALSE(defaultBandwidth);
-  EXPECT_EQ(0, defaultBandwidth.bytes);
+  EXPECT_EQ(0, defaultBandwidth.units);
   EXPECT_TRUE(defaultBandwidth == Bandwidth(0, 100us));
   EXPECT_TRUE(Bandwidth(0, 100us) == Bandwidth(0, 200us));
   EXPECT_TRUE(Bandwidth(0, 1us) < Bandwidth(1, 1000us));

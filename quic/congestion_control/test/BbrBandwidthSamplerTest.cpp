@@ -25,7 +25,7 @@ class BbrBandwidthSamplerTest : public Test {
 
 TEST_F(BbrBandwidthSamplerTest, InitBandwidth) {
   BbrBandwidthSampler sampler(conn_);
-  EXPECT_EQ(0, sampler.getBandwidth().bytes);
+  EXPECT_EQ(0, sampler.getBandwidth().units);
 }
 
 TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacket) {
@@ -36,7 +36,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacket) {
   ackEvent.ackedPackets.emplace_back(
       makeTestingWritePacket(0, 1000, 1000, false));
   sampler.onPacketAcked(ackEvent, 0);
-  EXPECT_EQ(0, sampler.getBandwidth().bytes);
+  EXPECT_EQ(0, sampler.getBandwidth().units);
 }
 
 TEST_F(BbrBandwidthSamplerTest, RateCalculation) {
@@ -170,7 +170,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   ackEvent.ackedPackets.push_back(packet);
   // AppLimited packet, but sample is larger than current best
   sampler.onPacketAcked(ackEvent, 0);
-  EXPECT_LT(0, sampler.getBandwidth().bytes);
+  EXPECT_LT(0, sampler.getBandwidth().units);
   auto bandwidth = sampler.getBandwidth();
 
   pn++;

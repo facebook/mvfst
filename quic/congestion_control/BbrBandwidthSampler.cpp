@@ -34,8 +34,8 @@ void BbrBandwidthSampler::onPacketAcked(
           appLimitedExitTarget_.time_since_epoch().count());
       if (conn_.qLogger) {
         conn_.qLogger->addCongestionMetricUpdate(
-            getBandwidth().bytes,
-            getBandwidth().bytes,
+            getBandwidth().units,
+            getBandwidth().units,
             kCongestionAppUnlimited);
       }
     }
@@ -74,7 +74,7 @@ void BbrBandwidthSampler::onPacketAcked(
                 outstandingPacket.lastAckedPacketInfo->ackTime));
       }
     } else if (ackEvent.ackTime > outstandingPacket.time) {
-      // No previous ack info from outstanding packet, fallback to bytes/lrtt.
+      // No previous ack info from outstanding packet, fallback to units/lrtt.
       // This is a per packet delivery rate. Given there can be multiple packets
       // inflight during the time, this is clearly under estimating bandwidth.
       // But it's better than nothing.
@@ -113,7 +113,7 @@ void BbrBandwidthSampler::onAppLimited() {
       bbr_applimited, conn_, appLimitedExitTarget_.time_since_epoch().count());
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        getBandwidth().bytes, getBandwidth().bytes, kCongestionAppLimited);
+        getBandwidth().units, getBandwidth().units, kCongestionAppLimited);
   }
 }
 

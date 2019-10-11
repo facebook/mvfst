@@ -7,8 +7,18 @@
  */
 
 #include <quic/congestion_control/Bandwidth.h>
+#include <folly/Conv.h>
 
 namespace quic {
+const std::string& Bandwidth::unitName() const noexcept {
+  return unitName_;
+}
+
+std::string Bandwidth::conciseDescribe() const noexcept {
+  return folly::to<std::string>(
+      units, unitName_, " / ", interval.count(), "us");
+}
+
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs) {
   return !(lhs >= rhs);
 }
@@ -18,13 +28,13 @@ bool operator<=(const Bandwidth& lhs, const Bandwidth& rhs) {
 }
 
 bool operator>(const Bandwidth& lhs, const Bandwidth& rhs) {
-  if (lhs.bytes == 0 && rhs.bytes > 0) {
+  if (lhs.units == 0 && rhs.units > 0) {
     return false;
   }
-  if (lhs.bytes > 0 && rhs.bytes == 0) {
+  if (lhs.units > 0 && rhs.units == 0) {
     return true;
   }
-  return lhs.bytes * rhs.interval > rhs.bytes * lhs.interval;
+  return lhs.units * rhs.interval > rhs.units * lhs.interval;
 }
 
 bool operator>=(const Bandwidth& lhs, const Bandwidth& rhs) {
@@ -32,17 +42,17 @@ bool operator>=(const Bandwidth& lhs, const Bandwidth& rhs) {
 }
 
 bool operator==(const Bandwidth& lhs, const Bandwidth& rhs) {
-  if (lhs.bytes == 0 && rhs.bytes > 0) {
+  if (lhs.units == 0 && rhs.units > 0) {
     return false;
   }
-  if (rhs.bytes == 0 && lhs.bytes > 0) {
+  if (rhs.units == 0 && lhs.units > 0) {
     return false;
   }
-  return lhs.bytes * rhs.interval == rhs.bytes * lhs.interval;
+  return lhs.units * rhs.interval == rhs.units * lhs.interval;
 }
 
 std::ostream& operator<<(std::ostream& os, const Bandwidth& bandwidth) {
-  os << "bandwidth bytes=" << bandwidth.bytes
+  os << "bandwidth " << bandwidth.unitName() << "=" << bandwidth.units
      << " interval=" << bandwidth.interval.count() << "us";
   return os;
 }

@@ -17,38 +17,57 @@ namespace quic {
 using namespace std::chrono_literals;
 
 struct Bandwidth {
-  uint64_t bytes;
-  std::chrono::microseconds interval;
+  uint64_t units{0};
+  std::chrono::microseconds interval{0us};
 
   explicit Bandwidth()
-      : bytes(0), interval(std::chrono::microseconds::zero()) {}
+      : units(0),
+        interval(std::chrono::microseconds::zero()),
+        unitName_("bytes") {}
 
   explicit Bandwidth(
-      uint64_t bytesDelievered,
+      uint64_t unitsDelievered,
       std::chrono::microseconds deliveryInterval)
-      : bytes(bytesDelievered), interval(deliveryInterval) {}
+      : units(unitsDelievered),
+        interval(deliveryInterval),
+        unitName_("bytes") {}
+
+  explicit Bandwidth(
+      uint64_t unitsDelievered,
+      std::chrono::microseconds deliveryInterval,
+      std::string unitName)
+      : units(unitsDelievered),
+        interval(deliveryInterval),
+        unitName_(std::move(unitName)) {}
 
   explicit operator bool() const noexcept {
-    return bytes != 0;
+    return units != 0;
   }
 
   template <
       typename T,
       typename = std::enable_if_t<std::is_arithmetic<T>::value>>
   const Bandwidth operator*(T t) const noexcept {
-    return Bandwidth(std::ceil(bytes * t), interval);
+    return Bandwidth(std::ceil(units * t), interval);
   }
 
   template <typename T, typename = std::enable_if_t<std::is_integral<T>::value>>
   const Bandwidth operator/(T t) const noexcept {
-    return Bandwidth(bytes / t, interval);
+    return Bandwidth(units / t, interval);
   }
 
   uint64_t operator*(std::chrono::microseconds delay) const noexcept {
     return interval == std::chrono::microseconds::zero()
         ? 0
-        : bytes * delay / interval;
+        : units * delay / interval;
   }
+
+  const std::string& unitName() const noexcept;
+
+  std::string conciseDescribe() const noexcept;
+
+ private:
+  std::string unitName_;
 };
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs);
