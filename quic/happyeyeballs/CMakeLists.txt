@@ -11,7 +11,6 @@ add_library(
 target_include_directories(
   mvfst_happyeyeballs PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include/>
 )
 
@@ -29,7 +28,6 @@ add_dependencies(
 target_link_libraries(
   mvfst_happyeyeballs PUBLIC
   Folly::folly
-  ${LIBFIZZ_LIBRARY}
   mvfst_state_machine
 )
 

@@ -20,7 +20,6 @@ add_library(
 target_include_directories(
   mvfst_cc_algo PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include/>
 )
 
@@ -41,7 +40,6 @@ add_dependencies(
 target_link_libraries(
   mvfst_cc_algo PUBLIC
   Folly::folly
-  ${LIBFIZZ_LIBRARY}
   mvfst_constants
   mvfst_exception
   mvfst_state_machine

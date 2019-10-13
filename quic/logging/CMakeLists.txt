@@ -32,7 +32,6 @@ add_dependencies(
 target_link_libraries(
   mvfst_qlogger PUBLIC
   Folly::folly
-  ${LIBFIZZ_LIBRARY}
   mvfst_codec_types
 )
 
