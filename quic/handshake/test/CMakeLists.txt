@@ -7,9 +7,9 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-quic_add_test(TARGET TransportParametersTest
+quic_add_test(TARGET FizzTransportParametersTest
   SOURCES
-  TransportParametersTest.cpp
+  FizzTransportParametersTest.cpp
   DEPENDS
   Folly::folly
   mvfst_handshake

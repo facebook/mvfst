@@ -9,7 +9,7 @@
 #pragma once
 
 #include <fizz/server/ServerExtensions.h>
-#include <quic/handshake/TransportParameters.h>
+#include <quic/handshake/FizzTransportParameters.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
 namespace quic {
