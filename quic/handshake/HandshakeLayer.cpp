@@ -8,10 +8,6 @@
 
 #include <quic/handshake/HandshakeLayer.h>
 
-#include <fizz/crypto/KeyDerivation.h>
-#include <fizz/crypto/Sha256.h>
-#include <fizz/protocol/Factory.h>
-
 namespace quic {
 
 EncryptionLevel protectionTypeToEncryptionLevel(ProtectionType type) {
