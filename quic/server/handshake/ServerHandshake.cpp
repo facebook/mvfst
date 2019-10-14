@@ -36,7 +36,7 @@ void ServerHandshake::initialize(
   executor_ = executor;
   auto ctx = std::make_shared<fizz::server::FizzServerContext>(*context);
   auto cryptoFactory = std::make_shared<FizzCryptoFactory>();
-  ctx->setFactory(cryptoFactory);
+  ctx->setFactory(cryptoFactory->getFizzFactory());
   cryptoFactory_ = std::move(cryptoFactory);
   ctx->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
   ctx->setVersionFallbackEnabled(false);

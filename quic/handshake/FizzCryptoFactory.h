@@ -9,14 +9,13 @@
 #pragma once
 
 #include <quic/handshake/CryptoFactory.h>
-
-#include <fizz/protocol/OpenSSLFactory.h>
+#include <quic/handshake/QuicFizzFactory.h>
 
 namespace quic {
 
-class FizzCryptoFactory : public CryptoFactory, public fizz::OpenSSLFactory {
+class FizzCryptoFactory : public CryptoFactory {
  public:
-  FizzCryptoFactory() {}
+  FizzCryptoFactory() : fizzFactory_{std::make_shared<QuicFizzFactory>()} {}
 
   Buf makeInitialTrafficSecret(
       folly::StringPiece label,
@@ -31,21 +30,15 @@ class FizzCryptoFactory : public CryptoFactory, public fizz::OpenSSLFactory {
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       folly::ByteRange baseSecret) const override;
 
-  std::unique_ptr<fizz::PlaintextReadRecordLayer> makePlaintextReadRecordLayer()
-      const override;
-
-  std::unique_ptr<fizz::PlaintextWriteRecordLayer>
-  makePlaintextWriteRecordLayer() const override;
-
-  std::unique_ptr<fizz::EncryptedReadRecordLayer> makeEncryptedReadRecordLayer(
-      fizz::EncryptionLevel encryptionLevel) const override;
-
-  std::unique_ptr<fizz::EncryptedWriteRecordLayer>
-  makeEncryptedWriteRecordLayer(
-      fizz::EncryptionLevel encryptionLevel) const override;
-
   virtual std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       fizz::CipherSuite cipher) const;
+
+  std::shared_ptr<fizz::Factory> getFizzFactory() {
+    return fizzFactory_;
+  }
+
+ protected:
+  std::shared_ptr<QuicFizzFactory> fizzFactory_;
 };
 
 } // namespace quic

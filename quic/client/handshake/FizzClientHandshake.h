@@ -9,11 +9,11 @@
 #pragma once
 
 #include <quic/client/handshake/ClientHandshake.h>
+#include <quic/handshake/FizzCryptoFactory.h>
 
 namespace quic {
 
 class FizzClientQuicHandshakeContext;
-class FizzCryptoFactory;
 
 class FizzClientHandshake : public ClientHandshake {
  public:
@@ -38,8 +38,9 @@ class FizzClientHandshake : public ClientHandshake {
 
   fizz::client::ClientStateMachine machine_;
 
+  FizzCryptoFactory cryptoFactory_;
+
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
-  std::shared_ptr<FizzCryptoFactory> cryptoFactory_;
 };
 
 } // namespace quic

@@ -10,7 +10,6 @@
 
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/FizzCryptoFactory.h>
 #include <folly/Overload.h>
 
 #include <fizz/protocol/Protocol.h>
@@ -30,12 +29,10 @@ void FizzClientHandshake::connect(
   transportParams_ = transportParams;
   callback_ = callback;
 
-  cryptoFactory_ = std::make_shared<FizzCryptoFactory>();
-
   // Setup context for this handshake.
   auto context = std::make_shared<fizz::client::FizzClientContext>(
       *fizzContext_->getContext());
-  context->setFactory(cryptoFactory_);
+  context->setFactory(cryptoFactory_.getFizzFactory());
   context->setSupportedCiphers({fizz::CipherSuite::TLS_AES_128_GCM_SHA256});
   context->setCompatibilityMode(false);
   // Since Draft-17, EOED should not be sent
@@ -72,7 +69,7 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
       kQuicKeyLabel,
       kQuicIVLabel));
 
-  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
+  auto packetNumberCipher = cryptoFactory_.makePacketNumberCipher(secret);
 
   return {std::move(aead), std::move(packetNumberCipher)};
 }
