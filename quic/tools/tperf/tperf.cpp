@@ -213,7 +213,9 @@ class TPerfServer {
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<TPerfServerTransportFactory>(blockSize, numStreams));
-    server_->setFizzContext(quic::test::createServerCtx());
+    auto serverCtx = quic::test::createServerCtx();
+    serverCtx->setClock(std::make_shared<fizz::SystemClock>());
+    server_->setFizzContext(serverCtx);
     quic::TransportSettings settings;
     settings.maxCwndInMss = maxCwndInMss;
     settings.writeConnectionDataPacketsLimit = writesPerLoop;
