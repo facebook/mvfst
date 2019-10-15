@@ -48,20 +48,20 @@ DEFINE_uint32(
     max_cwnd_mss,
     quic::kLargeMaxCwndInMss,
     "Max cwnd in the unit of mss");
+DEFINE_uint32(num_streams, 1, "Number of streams to send on simultaneously");
 
 namespace quic {
 namespace tperf {
 
-class ServerSingleStreamHandler : public quic::QuicSocket::ConnectionCallback,
-                                  public quic::QuicSocket::ReadCallback,
-                                  public quic::QuicSocket::WriteCallback {
+class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
+                            public quic::QuicSocket::ReadCallback,
+                            public quic::QuicSocket::WriteCallback {
  public:
-  using StreamData = std::pair<folly::IOBufQueue, bool>;
-
-  explicit ServerSingleStreamHandler(
+  explicit ServerStreamHandler(
       folly::EventBase* evbIn,
-      uint64_t blockSize)
-      : evb_(evbIn), blockSize_(blockSize) {}
+      uint64_t blockSize,
+      uint32_t numStreams)
+      : evb_(evbIn), blockSize_(blockSize), numStreams_(numStreams) {}
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock_ = socket;
@@ -95,9 +95,11 @@ class ServerSingleStreamHandler : public quic::QuicSocket::ConnectionCallback,
 
   void onTransportReady() noexcept override {
     LOG(INFO) << "Starting sends to client.";
-    auto stream = sock_->createUnidirectionalStream();
-    CHECK(stream.hasValue());
-    sock_->notifyPendingWriteOnStream(stream.value(), this);
+    for (uint32_t i = 0; i < numStreams_; i++) {
+      auto stream = sock_->createUnidirectionalStream();
+      CHECK(stream.hasValue());
+      sock_->notifyPendingWriteOnStream(stream.value(), this);
+    }
   }
 
   void notifyDataForStream(quic::StreamId id) {
@@ -127,7 +129,8 @@ class ServerSingleStreamHandler : public quic::QuicSocket::ConnectionCallback,
   void onStreamWriteReady(
       quic::StreamId id,
       uint64_t maxToSend) noexcept override {
-    auto buf = folly::IOBuf::createChain(maxToSend * 2, blockSize_);
+    auto buf = folly::IOBuf::createChain(
+        std::max<uint64_t>(maxToSend / numStreams_, 64), blockSize_);
     auto curBuf = buf.get();
     do {
       curBuf->append(curBuf->capacity());
@@ -156,14 +159,15 @@ class ServerSingleStreamHandler : public quic::QuicSocket::ConnectionCallback,
   std::shared_ptr<quic::QuicSocket> sock_;
   folly::EventBase* evb_;
   uint64_t blockSize_;
+  uint32_t numStreams_;
 };
 
 class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
   ~TPerfServerTransportFactory() override = default;
 
-  explicit TPerfServerTransportFactory(uint64_t blockSize)
-      : blockSize_(blockSize) {}
+  explicit TPerfServerTransportFactory(uint64_t blockSize, uint32_t numStreams)
+      : blockSize_(blockSize), numStreams_(numStreams) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -173,7 +177,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
           ctx) noexcept override {
     CHECK_EQ(evb, sock->getEventBase());
     auto serverHandler =
-        std::make_unique<ServerSingleStreamHandler>(evb, blockSize_);
+        std::make_unique<ServerStreamHandler>(evb, blockSize_, numStreams_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), *serverHandler, ctx);
     if (!FLAGS_server_qlogger_path.empty()) {
@@ -185,13 +189,13 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     }
     auto settings = transport->getTransportSettings();
     serverHandler->setQuicSocket(transport);
-    LOG(ERROR) << "pushing a handler!";
     handlers_.push_back(std::move(serverHandler));
     return transport;
   }
 
-  std::vector<std::unique_ptr<ServerSingleStreamHandler>> handlers_;
+  std::vector<std::unique_ptr<ServerStreamHandler>> handlers_;
   uint64_t blockSize_;
+  uint32_t numStreams_;
 };
 
 class TPerfServer {
@@ -204,10 +208,11 @@ class TPerfServer {
       quic::CongestionControlType congestionControlType,
       bool gso,
       uint32_t maxCwndInMss,
-      bool pacing)
+      bool pacing,
+      uint32_t numStreams)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
-        std::make_unique<TPerfServerTransportFactory>(blockSize));
+        std::make_unique<TPerfServerTransportFactory>(blockSize, numStreams));
     server_->setFizzContext(quic::test::createServerCtx());
     quic::TransportSettings settings;
     settings.maxCwndInMss = maxCwndInMss;
@@ -266,8 +271,12 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     constexpr double bytesPerMegabit = 131072;
     LOG(INFO) << "Received " << receivedBytes_ << " bytes in "
               << duration_.count() << " seconds.";
-    LOG(INFO) << (receivedBytes_ / bytesPerMegabit) / duration_.count()
+    LOG(INFO) << "Overall throughput: "
+              << (receivedBytes_ / bytesPerMegabit) / duration_.count()
               << "Mb/s";
+    for (auto& p : bytesPerStream_) {
+      LOG(INFO) << "Received " << p.second << " bytes on stream " << p.first;
+    }
   }
 
   virtual void callbackCanceled() noexcept override {}
@@ -279,7 +288,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
                  << ", error=" << (uint32_t)readData.error();
     }
 
-    receivedBytes_ += readData->first->computeChainDataLength();
+    auto readBytes = readData->first->computeChainDataLength();
+    receivedBytes_ += readBytes;
+    bytesPerStream_[streamId] += readBytes;
   }
 
   void readError(
@@ -354,7 +365,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
         std::make_shared<DefaultCongestionControllerFactory>());
     auto settings = quicClient_->getTransportSettings();
     settings.advertisedInitialUniStreamWindowSize = window_;
-    settings.advertisedInitialConnectionWindowSize = 10 * window_;
+    // TODO figure out what actually to do with conn flow control and not sent
+    // limit.
+    settings.advertisedInitialConnectionWindowSize =
+        std::numeric_limits<uint32_t>::max();
     settings.connectUDP = true;
     settings.defaultCongestionController = congestionControlType_;
     if (congestionControlType_ == quic::CongestionControlType::BBR) {
@@ -380,6 +394,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   folly::EventBase eventBase_;
   size_t receivedBytes_{0};
+  std::map<quic::StreamId, size_t> bytesPerStream_;
   std::chrono::seconds duration_;
   uint64_t window_;
   bool gso_;
@@ -427,7 +442,8 @@ int main(int argc, char* argv[]) {
         flagsToCongestionControlType(FLAGS_congestion),
         FLAGS_gso,
         FLAGS_max_cwnd_mss,
-        FLAGS_pacing);
+        FLAGS_pacing,
+        FLAGS_num_streams);
     server.start();
   } else if (FLAGS_mode == "client") {
     TPerfClient client(
