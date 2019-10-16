@@ -10,17 +10,24 @@
 #include <folly/Conv.h>
 
 namespace quic {
-const std::string& Bandwidth::unitName() const noexcept {
-  return unitName_;
+
+std::string Bandwidth::unitName() const noexcept {
+  switch (unitType) {
+    case UnitType::BYTES:
+      return "bytes";
+    case UnitType::PACKETS:
+      return "packets";
+  }
+  folly::assume_unreachable();
 }
 
 std::string Bandwidth::describe() const noexcept {
   return folly::to<std::string>(
-      units, unitName_, " / ", interval.count(), "us");
+      units, unitName(), " / ", interval.count(), "us");
 }
 
 std::string Bandwidth::normalizedDescribe() const noexcept {
-  return folly::to<std::string>(normalize(), unitName_, " / s");
+  return folly::to<std::string>(normalize(), unitName(), " / s");
 }
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs) {

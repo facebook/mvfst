@@ -36,7 +36,9 @@ TEST_F(QLogPacingObserverTest, Basic) {
       .WillOnce(Invoke(
           [](std::string actual, std::string expect, std::string conclustion) {
             EXPECT_TRUE(actual.find("20packets / ") != std::string::npos);
-            EXPECT_EQ(Bandwidth(0, 0s, "packets").describe(), expect);
+            EXPECT_EQ(
+                Bandwidth(0, 0s, Bandwidth::UnitType::PACKETS).describe(),
+                expect);
             EXPECT_NE(
                 std::string::npos, conclustion.find("Pacing above expect"));
           }));
@@ -47,7 +49,9 @@ TEST_F(QLogPacingObserverTest, Basic) {
       .WillOnce(Invoke(
           [](std::string actual, std::string expect, std::string conclustion) {
             EXPECT_TRUE(actual.find("0packets / ") != std::string::npos);
-            EXPECT_EQ(Bandwidth(1, 1s, "packets").describe(), expect);
+            EXPECT_EQ(
+                Bandwidth(1, 1s, Bandwidth::UnitType::PACKETS).describe(),
+                expect);
             EXPECT_NE(
                 std::string::npos, conclustion.find("Pacing below expect"));
           }));

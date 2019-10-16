@@ -17,28 +17,32 @@ namespace quic {
 using namespace std::chrono_literals;
 
 struct Bandwidth {
+  enum class UnitType : uint8_t {
+    BYTES,
+    PACKETS,
+  };
+
   uint64_t units{0};
   std::chrono::microseconds interval{0us};
+  UnitType unitType{UnitType::BYTES};
 
   explicit Bandwidth()
       : units(0),
-        interval(std::chrono::microseconds::zero()),
-        unitName_("bytes") {}
+        interval(std::chrono::microseconds::zero()) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,
       std::chrono::microseconds deliveryInterval)
       : units(unitsDelievered),
-        interval(deliveryInterval),
-        unitName_("bytes") {}
+        interval(deliveryInterval) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,
       std::chrono::microseconds deliveryInterval,
-      std::string unitName)
+      UnitType unitTypeIn)
       : units(unitsDelievered),
         interval(deliveryInterval),
-        unitName_(std::move(unitName)) {}
+        unitType(unitTypeIn) {}
 
   explicit operator bool() const noexcept {
     return units != 0 && interval != 0us;
@@ -48,12 +52,12 @@ struct Bandwidth {
       typename T,
       typename = std::enable_if_t<std::is_arithmetic<T>::value>>
   const Bandwidth operator*(T t) const noexcept {
-    return Bandwidth(std::ceil(units * t), interval, unitName());
+    return Bandwidth(std::ceil(units * t), interval, unitType);
   }
 
   template <typename T, typename = std::enable_if_t<std::is_integral<T>::value>>
   const Bandwidth operator/(T t) const noexcept {
-    return Bandwidth(units / t, interval, unitName());
+    return Bandwidth(units / t, interval, unitType);
   }
 
   uint64_t operator*(std::chrono::microseconds delay) const noexcept {
@@ -76,18 +80,16 @@ struct Bandwidth {
   }
 
   Bandwidth operator+(const Bandwidth& other) {
-    Bandwidth result(normalize(), 1s, unitName());
+    Bandwidth result(normalize(), 1s, unitType);
     result.units += other.normalize();
     return result;
   }
-
-  const std::string& unitName() const noexcept;
 
   std::string describe() const noexcept;
   std::string normalizedDescribe() const noexcept;
 
  private:
-  std::string unitName_;
+  std::string unitName() const noexcept;
 };
 
 bool operator<(const Bandwidth& lhs, const Bandwidth& rhs);

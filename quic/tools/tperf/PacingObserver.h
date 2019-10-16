@@ -43,7 +43,7 @@ class BucketedQLogPacingObserver : public PacingObserver {
           packetsSentSinceLastUpdate_,
           std::chrono::duration_cast<std::chrono::microseconds>(
               Clock::now() - lastSampledTime_),
-          "packets");
+          Bandwidth::UnitType::PACKETS);
       auto logger = logger_.lock();
       if (logger) {
         double ratio = avgPacingRate
@@ -61,9 +61,11 @@ class BucketedQLogPacingObserver : public PacingObserver {
       packetsSentSinceLastUpdate_ = 0;
       lastSampledTime_ = Clock::now();
       runningExpectedPacingRateCount_ = 0;
-      runningExpectedPacingRateSum_ = Bandwidth(0, 0us, "packets");
+      runningExpectedPacingRateSum_ =
+          Bandwidth(0, 0us, Bandwidth::UnitType::PACKETS);
     }
-    Bandwidth expectedPacingRate(packetsPerInterval, interval, "packets");
+    Bandwidth expectedPacingRate(
+        packetsPerInterval, interval, Bandwidth::UnitType::PACKETS);
     runningExpectedPacingRateSum_ += expectedPacingRate;
     ++runningExpectedPacingRateCount_;
   }
@@ -77,7 +79,7 @@ class BucketedQLogPacingObserver : public PacingObserver {
   uint64_t packetsSentSinceLastUpdate_{0};
   TimePoint lastSampledTime_;
   BucketEndPredicate bucketEndPredicate_;
-  Bandwidth runningExpectedPacingRateSum_{0, 0us, "packets"};
+  Bandwidth runningExpectedPacingRateSum_{0, 0us, Bandwidth::UnitType::PACKETS};
   size_t runningExpectedPacingRateCount_{0};
 };
 
