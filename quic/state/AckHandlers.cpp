@@ -150,8 +150,12 @@ void processAckFrame(
           conn.outstandingPacketEvents.erase(*rPacketIt->associatedEvent);
         }
       }
-      ack.largestAckedPacket = std::max(
-          ack.largestAckedPacket.value_or(currentPacketNum), currentPacketNum);
+      if (!ack.largestAckedPacket ||
+          *ack.largestAckedPacket < currentPacketNum) {
+        ack.largestAckedPacket = currentPacketNum;
+        ack.largestAckedPacketSentTime = rPacketIt->time;
+        ack.largestAckedPacketAppLimited = rPacketIt->isAppLimited;
+      }
       if (ackReceiveTime > rPacketIt->time) {
         ack.mrttSample =
             std::min(ack.mrttSample.value_or(rttSample), rttSample);

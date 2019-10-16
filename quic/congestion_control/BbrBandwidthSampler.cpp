@@ -25,7 +25,7 @@ void BbrBandwidthSampler::onPacketAcked(
     const CongestionController::AckEvent& ackEvent,
     uint64_t rttCounter) {
   if (appLimited_) {
-    if (appLimitedExitTarget_ < ackEvent.ackedPackets.back().time) {
+    if (appLimitedExitTarget_ < ackEvent.largestAckedPacketSentTime) {
       appLimited_ = false;
       QUIC_TRACE(
           bbr_appunlimited,

@@ -983,6 +983,61 @@ TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
   EXPECT_TRUE(conn.outstandingPackets.empty());
 }
 
+TEST_P(AckHandlersTest, AckEventCreation) {
+  QuicServerConnectionState conn;
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+
+  PacketNum packetNum = 0;
+  StreamId streamid = 0;
+  TimePoint largestSentTime;
+  while (packetNum < 10) {
+    auto regularPacket = createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    largestSentTime =
+        Clock::now() - 100ms + std::chrono::milliseconds(packetNum);
+    OutstandingPacket sentPacket(
+        std::move(regularPacket),
+        largestSentTime,
+        1,
+        false /* handshake */,
+        (packetNum % 2) /* pureAck */,
+        packetNum);
+    sentPacket.isAppLimited = (packetNum % 2);
+    conn.outstandingPackets.emplace_back(sentPacket);
+    packetNum++;
+  }
+  conn.outstandingPureAckPacketsCount = 5;
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 9;
+  ackFrame.ackBlocks.emplace_back(0, 9);
+  auto ackTime = Clock::now() + 10ms;
+  EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](auto ack, auto /* loss */) {
+        EXPECT_EQ(ackTime, ack->ackTime);
+        EXPECT_EQ(9, ack->largestAckedPacket.value());
+        EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
+        EXPECT_EQ(5, ack->ackedBytes);
+        EXPECT_TRUE(ack->largestAckedPacketAppLimited);
+        EXPECT_EQ(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                ackTime - largestSentTime),
+            ack->mrttSample.value());
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool, PacketNum) {},
+      ackTime);
+}
+
 INSTANTIATE_TEST_CASE_P(
     AckHandlersTests,
     AckHandlersTest,

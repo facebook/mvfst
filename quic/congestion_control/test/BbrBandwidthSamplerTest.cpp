@@ -132,6 +132,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   ackEvent.largestAckedPacket = ++conn.lossState.largestSent;
   auto packet =
       makeTestingWritePacket(*ackEvent.largestAckedPacket, 1000, 1000, false);
+  ackEvent.largestAckedPacketSentTime = packet.time;
   ackEvent.ackedPackets.push_back(std::move(packet));
   sampler.onPacketAcked(ackEvent, 0);
   EXPECT_FALSE(sampler.isAppLimited());

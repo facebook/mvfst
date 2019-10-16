@@ -236,6 +236,8 @@ struct CongestionController {
      * outstanding, and figure out the largest acked packet along the way.
      */
     folly::Optional<PacketNum> largestAckedPacket;
+    TimePoint largestAckedPacketSentTime;
+    bool largestAckedPacketAppLimited{false};
     uint64_t ackedBytes{0};
     TimePoint ackTime;
     // The minimal RTT sample among packets acked by this AckEvent. This RTT

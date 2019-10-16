@@ -180,10 +180,10 @@ void BbrCongestionController::onPacketAcked(
     }
   }
 
-  bool newRoundTrip = updateRoundTripCounter(ack.ackedPackets.back().time);
+  bool newRoundTrip = updateRoundTripCounter(ack.largestAckedPacketSentTime);
   // TODO: I actually don't know why the last one is so special
   bool lastAckedPacketAppLimited =
-      ack.ackedPackets.empty() ? false : ack.ackedPackets.back().isAppLimited;
+      ack.ackedPackets.empty() ? false : ack.largestAckedPacketAppLimited;
   if (bandwidthSampler_) {
     // TODO: Move appLimited tracking from BandwidthSampler to BBR itself
     bool wasAppLimited = bandwidthSampler_->isAppLimited();
@@ -200,7 +200,7 @@ void BbrCongestionController::onPacketAcked(
         recoveryState_ != BbrCongestionController::RecoveryState::GROWTH) {
       recoveryState_ = BbrCongestionController::RecoveryState::GROWTH;
     }
-    if (ack.ackedPackets.back().time > *endOfRecovery_) {
+    if (ack.largestAckedPacketSentTime > *endOfRecovery_) {
       recoveryState_ = BbrCongestionController::RecoveryState::NOT_RECOVERY;
     } else {
       updateRecoveryWindowWithAck(ack.ackedBytes);

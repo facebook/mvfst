@@ -399,7 +399,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
   DCHECK_LE(ack.ackedBytes, inflightBytes_);
   inflightBytes_ -= ack.ackedBytes;
   if (recoveryState_.endOfRecovery.hasValue() &&
-      *recoveryState_.endOfRecovery >= ack.ackedPackets.back().time) {
+      *recoveryState_.endOfRecovery >= ack.largestAckedPacketSentTime) {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_ack");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
@@ -557,7 +557,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       VLOG(20) << "Cubic Hystart, mayEndHystartRttRound, largestAckedPacketNum="
                << *ack.largestAckedPacket << ", rttRoundEndTarget="
                << hystartState_.rttRoundEndTarget.time_since_epoch().count();
-      if (ack.ackedPackets.back().time > hystartState_.rttRoundEndTarget) {
+      if (ack.largestAckedPacketSentTime > hystartState_.rttRoundEndTarget) {
         hystartState_.inRttRound = false;
       }
     }
@@ -737,7 +737,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
 
 void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
   CHECK_EQ(cwndBytes_, ssthresh_);
-  if (isRecovered(ack.ackedPackets.back().time)) {
+  if (isRecovered(ack.largestAckedPacketSentTime)) {
     state_ = CubicStates::Steady;
 
     // We do a Cubic cwnd pre-calculation here so that all Ack events from

@@ -549,6 +549,7 @@ CongestionController::AckEvent makeAck(
   ack.largestAckedPacket = seq;
   ack.ackedPackets.emplace_back(
       std::move(packet), sentTime, ackedSize, false, false, ackedSize);
+  ack.largestAckedPacketSentTime = sentTime;
   return ack;
 }
 
