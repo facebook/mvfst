@@ -10,6 +10,7 @@
 
 #include <folly/io/async/AsyncSocketException.h>
 #include <quic/client/handshake/ClientHandshake.h>
+#include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -30,6 +31,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // Initial destination connection id.
   folly::Optional<ConnectionId> initialDestinationConnectionId;
 
+  std::shared_ptr<ClientHandshakeFactory> handshakeFactory;
   ClientHandshake* clientHandshakeLayer;
 
   // Save the server transport params here so that client can access the value
@@ -43,15 +45,21 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // TODO: use this to get rid of the data in the crypto stream.
   // folly::Optional<PacketNum> clientInitialPacketNum;
 
-  QuicClientConnectionState() : QuicConnectionStateBase(QuicNodeType::Client) {
+  explicit QuicClientConnectionState(
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactoryIn)
+      : QuicConnectionStateBase(QuicNodeType::Client),
+        handshakeFactory(std::move(handshakeFactoryIn)) {
     cryptoState = std::make_unique<QuicCryptoState>();
     congestionController = std::make_unique<Cubic>(*this);
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
     originalVersion = QuicVersion::MVFST;
-    clientHandshakeLayer = new ClientHandshake(*cryptoState);
-    handshakeLayer.reset(clientHandshakeLayer);
+    DCHECK(handshakeFactory);
+    auto tmpClientHandshake =
+        handshakeFactory->makeClientHandshake(*cryptoState);
+    clientHandshakeLayer = tmpClientHandshake.get();
+    handshakeLayer.reset(tmpClientHandshake.release());
     // We shouldn't normally need to set this until we're starting the
     // transport, however writing unit tests is much easier if we set this here.
     updateFlowControlStateWithSettings(flowControlState, transportSettings);

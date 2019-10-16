@@ -11,6 +11,7 @@
 #include <folly/portability/GTest.h>
 
 #include <quic/api/test/Mocks.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/test/Mocks.h>
@@ -115,7 +116,8 @@ TEST_F(QuicPacketSchedulerTest, NoopScheduler) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   auto connId = getTestConnectionId();
   LongHeader longHeader1(
       LongHeader::Types::Initial,
@@ -174,7 +176,8 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialNotPadded) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   auto connId = getTestConnectionId();
   LongHeader longHeader(
       LongHeader::Types::Initial,
@@ -221,7 +224,8 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   auto connId = getTestConnectionId();
   LongHeader longHeader(
       LongHeader::Types::Initial,
@@ -308,7 +312,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
@@ -335,7 +340,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
@@ -402,7 +408,8 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 }
 
 TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, but then mark the second one processed by
@@ -432,7 +439,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
 }
 
 TEST_F(QuicPacketSchedulerTest, DoNotClonePureAck) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, with second one being pureAck
@@ -458,7 +466,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotClonePureAck) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasDataIgnoresNonAppData) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
@@ -474,7 +483,8 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasDataIgnoresNonAppData) {
 }
 
 TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, with second one being handshake
@@ -501,7 +511,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   MockFrameScheduler mockScheduler;
   CloningScheduler cloningScheduler(mockScheduler, conn, "Mocker", 0);
   ShortHeader header(
@@ -549,7 +560,8 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   FrameScheduler noopScheduler("frame");
@@ -630,7 +642,8 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
 
 TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.initialAckState));
   EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.handshakeAckState));
   EXPECT_FALSE(hasAcksToSchedule(conn.ackStates.appDataAckState));
@@ -647,7 +660,8 @@ TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {
 }
 
 TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   AckScheduler initialAckScheduler(
       conn, getAckState(conn, PacketNumberSpace::Initial));
   AckScheduler handshakeAckScheduler(
@@ -670,7 +684,8 @@ TEST_F(QuicPacketSchedulerTest, AckSchedulerHasAcksToSchedule) {
 }
 
 TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.initialAckState));
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.handshakeAckState));
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.appDataAckState));
@@ -685,7 +700,8 @@ TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
@@ -710,7 +726,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
@@ -763,7 +780,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
@@ -784,7 +802,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;

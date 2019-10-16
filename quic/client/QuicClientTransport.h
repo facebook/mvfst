@@ -62,7 +62,7 @@ class QuicClientTransport
   /**
    * Set the client context for fizz. Must be set before start()
    */
-  void setFizzClientContext(
+  void setFizzClientQuicHandshakeContext(
       std::shared_ptr<const fizz::client::FizzClientContext> ctx);
 
   /**

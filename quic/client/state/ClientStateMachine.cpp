@@ -22,7 +22,8 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
     std::unique_ptr<QuicClientConnectionState> conn) {
   // Create a new connection state and copy over properties that don't change
   // across stateless retry.
-  auto newConn = std::make_unique<QuicClientConnectionState>();
+  auto newConn = std::make_unique<QuicClientConnectionState>(
+      std::move(conn->handshakeFactory));
   newConn->qLogger = conn->qLogger;
   newConn->clientConnectionId = conn->clientConnectionId;
   newConn->initialDestinationConnectionId =
