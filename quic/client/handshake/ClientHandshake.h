@@ -177,10 +177,12 @@ class ClientHandshake : public Handshake {
   QuicCryptoState& cryptoState_;
 
  private:
-  void computeOneRttCipher(
-      const fizz::client::ReportHandshakeSuccess& handshakeSuccess);
+  EncryptionLevel getReadRecordLayerEncryptionLevel();
+  void processSocketData(folly::IOBufQueue& queue);
 
+  void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
   void computeZeroRttCipher();
+  void computeOneRttCipher(bool earlyDataAccepted);
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);

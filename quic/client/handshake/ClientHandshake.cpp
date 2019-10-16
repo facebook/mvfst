@@ -77,16 +77,16 @@ void ClientHandshake::doHandshake(
   // Get the current buffer type the transport is accepting.
   waitForData_ = false;
   while (!waitForData_) {
-    switch (state_.readRecordLayer()->getEncryptionLevel()) {
-      case fizz::EncryptionLevel::Plaintext:
-        processActions(machine_.processSocketData(state_, initialReadBuf_));
+    switch (getReadRecordLayerEncryptionLevel()) {
+      case EncryptionLevel::Initial:
+        processSocketData(initialReadBuf_);
         break;
-      case fizz::EncryptionLevel::Handshake:
-        processActions(machine_.processSocketData(state_, handshakeReadBuf_));
+      case EncryptionLevel::Handshake:
+        processSocketData(handshakeReadBuf_);
         break;
-      case fizz::EncryptionLevel::EarlyData:
-      case fizz::EncryptionLevel::AppTraffic:
-        processActions(machine_.processSocketData(state_, appDataReadBuf_));
+      case EncryptionLevel::EarlyData:
+      case EncryptionLevel::AppData:
+        processSocketData(appDataReadBuf_);
         break;
     }
     if (error_) {
@@ -208,13 +208,38 @@ const folly::Optional<std::string>& ClientHandshake::getApplicationProtocol()
   }
 }
 
-void ClientHandshake::computeOneRttCipher(
-    const fizz::client::ReportHandshakeSuccess& handshakeSuccess) {
+EncryptionLevel ClientHandshake::getReadRecordLayerEncryptionLevel() {
+  return getEncryptionLevelFromFizz(
+      state_.readRecordLayer()->getEncryptionLevel());
+}
+
+void ClientHandshake::processSocketData(folly::IOBufQueue& queue) {
+  processActions(machine_.processSocketData(state_, queue));
+}
+
+void ClientHandshake::writeDataToStream(
+    EncryptionLevel encryptionLevel,
+    Buf data) {
+  if (encryptionLevel == EncryptionLevel::AppData) {
+    // Don't write 1-rtt handshake data on the client.
+    return;
+  }
+  auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
+  writeDataToQuicStream(*cryptoStream, std::move(data));
+}
+
+void ClientHandshake::computeZeroRttCipher() {
+  VLOG(10) << "Computing Client zero rtt keys";
+  CHECK(state_.earlyDataParams().hasValue());
+  earlyDataAttempted_ = true;
+}
+
+void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // The 1-rtt handshake should have succeeded if we know that the early
   // write failed. We currently treat the data as lost.
   // TODO: we need to deal with HRR based rejection as well, however we don't
   // have an API right now.
-  if (earlyDataAttempted_ && !handshakeSuccess.earlyDataAccepted) {
+  if (earlyDataAttempted_ && !earlyDataAccepted) {
     if (fizz::client::earlyParametersMatch(state_)) {
       zeroRttRejected_ = true;
     } else {
@@ -231,12 +256,6 @@ void ClientHandshake::computeOneRttCipher(
   phase_ = Phase::OneRttKeysDerived;
 }
 
-void ClientHandshake::computeZeroRttCipher() {
-  VLOG(10) << "Computing Client zero rtt keys";
-  CHECK(state_.earlyDataParams().hasValue());
-  earlyDataAttempted_ = true;
-}
-
 class ClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
  public:
   explicit ActionMoveVisitor(ClientHandshake& client) : client_(client) {}
@@ -249,15 +268,9 @@ class ClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
 
   void operator()(fizz::WriteToSocket& write) {
     for (auto& content : write.contents) {
-      auto& cryptoState = client_.cryptoState_;
       auto encryptionLevel =
           getEncryptionLevelFromFizz(content.encryptionLevel);
-      if (encryptionLevel == EncryptionLevel::AppData) {
-        // Don't write 1-rtt handshake data on the client.
-        continue;
-      }
-      auto cryptoStream = getCryptoStream(cryptoState, encryptionLevel);
-      writeDataToQuicStream(*cryptoStream, std::move(content.data));
+      client_.writeDataToStream(encryptionLevel, std::move(content.data));
     }
   }
 
@@ -266,7 +279,7 @@ class ClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::client::ReportHandshakeSuccess& handshakeSuccess) {
-    client_.computeOneRttCipher(handshakeSuccess);
+    client_.computeOneRttCipher(handshakeSuccess.earlyDataAccepted);
   }
 
   void operator()(fizz::client::ReportEarlyWriteFailed&) {
