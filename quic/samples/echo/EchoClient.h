@@ -18,6 +18,7 @@
 
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/common/test/TestUtils.h>
 
 namespace quic {
@@ -111,11 +112,13 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
 
     evb->runInEventBaseThreadAndWait([&] {
       auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
-      quicClient_ =
-          std::make_shared<quic::QuicClientTransport>(evb, std::move(sock));
+      auto fizzClientContext =
+          FizzClientQuicHandshakeContext::Builder()
+              .setCertificateVerifier(test::createTestCertificateVerifier())
+              .build();
+      quicClient_ = std::make_shared<quic::QuicClientTransport>(
+          evb, std::move(sock), std::move(fizzClientContext));
       quicClient_->setHostname("echo.com");
-      quicClient_->setCertificateVerifier(
-          test::createTestCertificateVerifier());
       quicClient_->addNewPeerAddress(addr);
 
       TransportSettings settings;

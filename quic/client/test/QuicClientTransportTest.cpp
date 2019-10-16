@@ -19,6 +19,7 @@
 #include <folly/io/Cursor.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
@@ -72,8 +73,13 @@ class TestingQuicClientTransport : public QuicClientTransport {
   TestingQuicClientTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connIdSize = kDefaultConnectionIdSize)
-      : QuicClientTransport(evb, std::move(socket), connIdSize) {}
+      : QuicClientTransport(
+            evb,
+            std::move(socket),
+            std::move(handshakeFactory),
+            connIdSize) {}
 
   ~TestingQuicClientTransport() override {
     if (destructionCallback_) {
@@ -183,6 +189,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
       connected_ = true;
     }));
 
+    clientCtx = createClientContext();
+    verifier = createTestCertificateVerifier();
     client = createClient();
   }
 
@@ -190,21 +198,30 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     return GetParam().version;
   }
 
-  std::shared_ptr<TestingQuicClientTransport> createClient() {
+  std::shared_ptr<fizz::client::FizzClientContext> createClientContext() {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setSupportedAlpns({"h1q-fb"});
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
+    return clientCtx;
+  }
+
+  std::shared_ptr<TestingQuicClientTransport> createClient() {
     pskCache_ = std::make_shared<BasicQuicPskCache>();
 
     auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventbase_);
+    auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
+                                 .setFizzClientContext(clientCtx)
+                                 .setCertificateVerifier(verifier)
+                                 .build();
     client = std::make_shared<TestingQuicClientTransport>(
-        &eventbase_, std::move(sock), GetParam().dstConnIdSize);
+        &eventbase_,
+        std::move(sock),
+        std::move(fizzClientContext),
+        GetParam().dstConnIdSize);
     client->setSupportedVersions({getVersion()});
     client->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
     client->setHostname(hostname);
-    client->setFizzClientQuicHandshakeContext(clientCtx);
-    client->setCertificateVerifier(createTestCertificateVerifier());
     client->addNewPeerAddress(serverAddr);
     client->setPskCache(pskCache_);
     return client;
@@ -317,6 +334,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<TestingQuicClientTransport> client;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
   std::shared_ptr<fizz::client::FizzClientContext> clientCtx;
+  std::shared_ptr<fizz::CertificateVerifier> verifier;
   std::shared_ptr<QuicPskCache> pskCache_;
   std::shared_ptr<QuicServer> server_;
   bool connected_{false};
@@ -449,6 +467,9 @@ TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
+  verifier = nullptr;
+  client = createClient();
+
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
@@ -465,7 +486,6 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
 
   ASSERT_EQ(client->getAppProtocol(), folly::none);
 
-  client->setCertificateVerifier(nullptr);
   client->start(&clientConnCallback);
   eventbase_.loopForever();
 }
@@ -1102,8 +1122,6 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
       : ClientHandshake(cryptoState) {}
 
   void connect(
-      std::shared_ptr<const fizz::client::FizzClientContext>,
-      std::shared_ptr<const fizz::CertificateVerifier>,
       folly::Optional<std::string>,
       folly::Optional<fizz::client::CachedPsk>,
       const std::shared_ptr<ClientTransportParametersExtension>&,
@@ -1251,13 +1269,17 @@ class QuicClientTransportTest : public Test {
     auto socket =
         std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
     sock = socket.get();
+
+    auto fizzClientContext =
+        FizzClientQuicHandshakeContext::Builder()
+            .setCertificateVerifier(createTestCertificateVerifier())
+            .build();
     client = TestingQuicClientTransport::newClient<TestingQuicClientTransport>(
-        eventbase_.get(), std::move(socket));
+        eventbase_.get(), std::move(socket), std::move(fizzClientContext));
     destructionCallback = std::make_shared<DestructionCallback>();
     client->setDestructionCallback(destructionCallback);
     client->setSupportedVersions(
         {QuicVersion::MVFST, MVFST1, QuicVersion::QUIC_DRAFT});
-    client->setCertificateVerifier(createTestCertificateVerifier());
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));

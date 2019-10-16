@@ -11,8 +11,8 @@
 #include <folly/portability/Sockets.h>
 
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/FizzCryptoFactory.h>
@@ -30,9 +30,11 @@ namespace quic {
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
+    std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize)
     : QuicTransportBase(evb, std::move(socket)),
       happyEyeballsConnAttemptDelayTimeout_(this) {
+  DCHECK(handshakeFactory);
   // TODO(T53612743) Only enforce that the initial destination connection id
   // is at least kMinInitialDestinationConnIdLength.
   // All subsequent connection ids should be in between
@@ -41,8 +43,8 @@ QuicClientTransport::QuicClientTransport(
       connectionIdSize == 0 ||
       (connectionIdSize >= kMinInitialDestinationConnIdLength &&
        connectionIdSize <= kMaxConnectionIdSize));
-  auto tempConn = std::make_unique<QuicClientConnectionState>(
-      std::make_shared<FizzClientQuicHandshakeContext>());
+  auto tempConn =
+      std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
   conn_ = std::move(tempConn);
   std::vector<uint8_t> connIdData(
@@ -891,8 +893,6 @@ void QuicClientTransport::startCryptoHandshake() {
   conn_->transportParametersEncoded = true;
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   handshakeLayer->connect(
-      ctx_,
-      verifier_,
       hostname_,
       std::move(cachedPsk),
       std::move(paramsExtension),
@@ -1093,14 +1093,6 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
 
   CHECK(conn_->peerAddress.isInitialized());
 
-  if (!ctx_) {
-    ctx_ = std::make_shared<const fizz::client::FizzClientContext>();
-  }
-  if (!verifier_) {
-    verifier_ = std::make_shared<const fizz::DefaultCertificateVerifier>(
-        fizz::VerificationContext::Client);
-  }
-
   if (conn_->qLogger) {
     conn_->qLogger->addTransportStateUpdate(kStart);
   }
@@ -1168,16 +1160,6 @@ void QuicClientTransport::addNewSocket(
 
 void QuicClientTransport::setHostname(const std::string& hostname) {
   hostname_ = hostname;
-}
-
-void QuicClientTransport::setFizzClientQuicHandshakeContext(
-    std::shared_ptr<const fizz::client::FizzClientContext> ctx) {
-  ctx_ = std::move(ctx);
-}
-
-void QuicClientTransport::setCertificateVerifier(
-    std::shared_ptr<const fizz::CertificateVerifier> verifier) {
-  verifier_ = std::move(verifier);
 }
 
 void QuicClientTransport::setPskCache(std::shared_ptr<QuicPskCache> pskCache) {

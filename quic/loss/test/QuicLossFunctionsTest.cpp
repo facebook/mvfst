@@ -87,7 +87,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
 
   std::unique_ptr<QuicClientConnectionState> createClientConn() {
     auto conn = std::make_unique<QuicClientConnectionState>(
-        std::make_shared<FizzClientQuicHandshakeContext>());
+        FizzClientQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState.nextPacketNum = 1;

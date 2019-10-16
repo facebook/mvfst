@@ -56,7 +56,7 @@ void RunTest(int numBatch) {
   auto batchWriter = std::make_unique<TestPacketBatchWriter>(numBatch);
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   QuicClientConnectionState conn(
-      std::make_shared<FizzClientQuicHandshakeContext>());
+      FizzClientQuicHandshakeContext::Builder().build());
   QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
 
   IOBufQuicBatch ioBufBatch(

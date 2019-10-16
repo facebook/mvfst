@@ -10,9 +10,7 @@
 
 #include <fizz/client/ClientProtocol.h>
 #include <fizz/client/EarlyDataRejectionPolicy.h>
-#include <fizz/client/FizzClientContext.h>
 #include <fizz/client/PskCache.h>
-#include <fizz/protocol/DefaultCertificateVerifier.h>
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
@@ -45,8 +43,6 @@ class ClientHandshake : public Handshake {
    * Initiate the handshake with the supplied parameters.
    */
   virtual void connect(
-      std::shared_ptr<const fizz::client::FizzClientContext> context,
-      std::shared_ptr<const fizz::CertificateVerifier> verifier,
       folly::Optional<std::string> hostname,
       folly::Optional<fizz::client::CachedPsk> cachedPsk,
       const std::shared_ptr<ClientTransportParametersExtension>&
