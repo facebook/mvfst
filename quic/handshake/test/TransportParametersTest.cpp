@@ -6,8 +6,8 @@
  *
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <folly/portability/GMock.h>
+#include <folly/portability/GTest.h>
 
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/TransportParameters.h>
