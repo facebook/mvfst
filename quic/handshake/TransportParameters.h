@@ -206,7 +206,7 @@ inline folly::Optional<quic::ClientTransportParameters> getExtension(
     cursor.skip(sizeof(tryVersion));
   }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
-  return std::move(parameters);
+  return parameters;
 }
 
 template <>
@@ -229,7 +229,7 @@ inline folly::Optional<quic::ServerTransportParameters> getExtension(
     detail::readVector<uint8_t>(parameters.supported_versions, cursor);
   }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
-  return std::move(parameters);
+  return parameters;
 }
 
 template <>
@@ -251,7 +251,7 @@ inline folly::Optional<quic::TicketTransportParameters> getExtension(
     cursor.skip(sizeof(tryVersion));
   }
   detail::readVector<uint16_t>(parameters.parameters, cursor);
-  return std::move(parameters);
+  return parameters;
 }
 
 namespace detail {
