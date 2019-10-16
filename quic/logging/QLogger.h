@@ -64,6 +64,11 @@ class QLogger {
       std::string congestionEvent,
       std::string state = "",
       std::string recoveryState = "") = 0;
+  virtual void addBandwidthEstUpdate(
+      uint64_t bytes,
+      std::chrono::microseconds interval) = 0;
+  virtual void addAppLimitedUpdate() = 0;
+  virtual void addAppUnlimitedUpdate() = 0;
   virtual void addPacingMetricUpdate(
       uint64_t pacingBurstSizeIn,
       std::chrono::microseconds pacingIntervalIn) = 0;

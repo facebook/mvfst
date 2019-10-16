@@ -322,6 +322,8 @@ enum class QLogEventType : uint32_t {
   MetricUpdate,
   StreamStateUpdate,
   PacingObservation,
+  AppLimitedUpdate,
+  BandwidthEstUpdate,
 };
 
 std::string toString(QLogEventType type);
@@ -421,6 +423,32 @@ class QLogCongestionMetricUpdateEvent : public QLogEvent {
   std::string recoveryState;
 
   folly::dynamic toDynamic() const override;
+};
+
+class QLogAppLimitedUpdateEvent : public QLogEvent {
+ public:
+  explicit QLogAppLimitedUpdateEvent(
+      bool limitedIn,
+      std::chrono::microseconds refTimeIn);
+  ~QLogAppLimitedUpdateEvent() override = default;
+
+  folly::dynamic toDynamic() const override;
+
+  bool limited;
+};
+
+class QLogBandwidthEstUpdateEvent : public QLogEvent {
+ public:
+  explicit QLogBandwidthEstUpdateEvent(
+      uint64_t bytes,
+      std::chrono::microseconds interval,
+      std::chrono::microseconds refTimeIn);
+  ~QLogBandwidthEstUpdateEvent() override = default;
+
+  folly::dynamic toDynamic() const override;
+
+  uint64_t bytes;
+  std::chrono::microseconds interval;
 };
 
 class QLogPacingMetricUpdateEvent : public QLogEvent {

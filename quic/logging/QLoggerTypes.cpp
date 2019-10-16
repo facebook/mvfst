@@ -6,6 +6,7 @@
  *
  */
 #include <quic/logging/QLoggerTypes.h>
+#include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
 
@@ -389,6 +390,48 @@ folly::dynamic QLogCongestionMetricUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogAppLimitedUpdateEvent::QLogAppLimitedUpdateEvent(
+    bool limitedIn,
+    std::chrono::microseconds refTimeIn)
+    : limited(limitedIn) {
+  eventType = QLogEventType::AppLimitedUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogAppLimitedUpdateEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "APP_LIMITED_UPDATE",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+  data["app_limited"] = limited ? kAppLimited : kAppUnlimited;
+  d.push_back(std::move(data));
+  return d;
+}
+
+QLogBandwidthEstUpdateEvent::QLogBandwidthEstUpdateEvent(
+    uint64_t bytesIn,
+    std::chrono::microseconds intervalIn,
+    std::chrono::microseconds refTimeIn)
+    : bytes(bytesIn), interval(intervalIn) {
+  refTime = refTimeIn;
+  eventType = QLogEventType::BandwidthEstUpdate;
+}
+
+folly::dynamic QLogBandwidthEstUpdateEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "BANDIWDTH_EST_UPDATE",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+  data["bandwidth_bytes"] = bytes;
+  data["bandwidth_interval"] = interval.count();
+  d.push_back(std::move(data));
+  return d;
+}
+
 QLogPacingMetricUpdateEvent::QLogPacingMetricUpdateEvent(
     uint64_t pacingBurstSizeIn,
     std::chrono::microseconds pacingIntervalIn,
@@ -757,6 +800,10 @@ std::string toString(QLogEventType type) {
       return "STREAM_STATE_UPDATE";
     case QLogEventType::PacingObservation:
       return "PACING_OBSERVATION";
+    case QLogEventType::AppLimitedUpdate:
+      return "APP_LIMITED_UPDATE";
+    case QLogEventType::BandwidthEstUpdate:
+      return "BANDWIDTH_EST_UPDATE";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

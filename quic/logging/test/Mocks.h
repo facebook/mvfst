@@ -59,5 +59,10 @@ class MockQLogger : public QLogger {
           std::chrono::microseconds,
           std::chrono::microseconds));
   MOCK_METHOD2(addStreamStateUpdate, void(quic::StreamId, std::string));
+  MOCK_METHOD2(
+      addBandwidthEstUpdate,
+      void(uint64_t, std::chrono::microseconds));
+  MOCK_METHOD0(addAppLimitedUpdate, void());
+  MOCK_METHOD0(addAppUnlimitedUpdate, void());
 };
 } // namespace quic::test

@@ -33,15 +33,13 @@ void BbrBandwidthSampler::onPacketAcked(
           *ackEvent.largestAckedPacket,
           appLimitedExitTarget_.time_since_epoch().count());
       if (conn_.qLogger) {
-        conn_.qLogger->addCongestionMetricUpdate(
-            getBandwidth().units,
-            getBandwidth().units,
-            kCongestionAppUnlimited);
+        conn_.qLogger->addAppUnlimitedUpdate();
       }
     }
   }
   // TODO: If i'm smart enough, maybe we don't have to loop through the acked
   // packets. Can we calculate the bandwidth based on aggregated stats?
+  bool bandwidthUpdated = false;
   for (auto const& outstandingPacket : ackEvent.ackedPackets) {
     if (outstandingPacket.encodedSize == 0) {
       continue;
@@ -102,7 +100,13 @@ void BbrBandwidthSampler::onPacketAcked(
     if (measuredBandwidth >= windowedFilter_.GetBest() ||
         !outstandingPacket.isAppLimited) {
       windowedFilter_.Update(measuredBandwidth, rttCounter);
+      bandwidthUpdated = true;
     }
+  }
+  if (bandwidthUpdated && conn_.qLogger) {
+    auto newBandwidth = getBandwidth();
+    conn_.qLogger->addBandwidthEstUpdate(
+        newBandwidth.units, newBandwidth.interval);
   }
 }
 
@@ -112,8 +116,7 @@ void BbrBandwidthSampler::onAppLimited() {
   QUIC_TRACE(
       bbr_applimited, conn_, appLimitedExitTarget_.time_since_epoch().count());
   if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        getBandwidth().units, getBandwidth().units, kCongestionAppLimited);
+    conn_.qLogger->addAppLimitedUpdate();
   }
 }
 

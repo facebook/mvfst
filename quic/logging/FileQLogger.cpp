@@ -93,6 +93,29 @@ void FileQLogger::addCongestionMetricUpdate(
       refTime));
 }
 
+void FileQLogger::addBandwidthEstUpdate(
+    uint64_t bytes,
+    std::chrono::microseconds interval) {
+  logs.push_back(std::make_unique<quic::QLogBandwidthEstUpdateEvent>(
+      bytes,
+      interval,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now() - refTimePoint)));
+}
+
+void FileQLogger::addAppLimitedUpdate() {
+  logs.push_back(std::make_unique<quic::QLogAppLimitedUpdateEvent>(
+      true,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now() - refTimePoint)));
+}
+
+void FileQLogger::addAppUnlimitedUpdate() {
+  logs.push_back(std::make_unique<quic::QLogAppLimitedUpdateEvent>(
+      false,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now() - refTimePoint)));
+}
 void FileQLogger::addPacingMetricUpdate(
     uint64_t pacingBurstSizeIn,
     std::chrono::microseconds pacingIntervalIn) {

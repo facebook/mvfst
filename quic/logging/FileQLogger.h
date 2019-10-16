@@ -63,6 +63,10 @@ class FileQLogger : public BaseQLogger {
       std::string actual,
       std::string expected,
       std::string conclusion) override;
+  void addBandwidthEstUpdate(uint64_t bytes, std::chrono::microseconds interval)
+      override;
+  void addAppLimitedUpdate() override;
+  void addAppUnlimitedUpdate() override;
   void addAppIdleUpdate(std::string idleEvent, bool idle) override;
   void addPacketDrop(size_t packetSize, std::string dropReasonIn) override;
   void addDatagramReceived(uint64_t dataLen) override;
