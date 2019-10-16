@@ -44,7 +44,7 @@ void BbrBandwidthSampler::onPacketAcked(
     if (outstandingPacket.encodedSize == 0) {
       continue;
     }
-    folly::Optional<Bandwidth> sendRate, ackRate;
+    Bandwidth sendRate, ackRate;
     if (outstandingPacket.lastAckedPacketInfo) {
       // TODO: I think I can DCHECK this condition:
       if (outstandingPacket.time >
@@ -52,7 +52,7 @@ void BbrBandwidthSampler::onPacketAcked(
         DCHECK_GE(
             outstandingPacket.totalBytesSent,
             outstandingPacket.lastAckedPacketInfo->totalBytesSent);
-        sendRate.emplace(
+        sendRate = Bandwidth(
             outstandingPacket.totalBytesSent -
                 outstandingPacket.lastAckedPacketInfo->totalBytesSent,
             std::chrono::duration_cast<std::chrono::microseconds>(
@@ -64,7 +64,7 @@ void BbrBandwidthSampler::onPacketAcked(
         DCHECK_GE(
             conn_.lossState.totalBytesAcked,
             outstandingPacket.lastAckedPacketInfo->totalBytesAcked);
-        ackRate.emplace(
+        ackRate = Bandwidth(
             conn_.lossState.totalBytesAcked -
                 outstandingPacket.lastAckedPacketInfo->totalBytesAcked,
             std::chrono::duration_cast<std::chrono::microseconds>(
@@ -82,19 +82,12 @@ void BbrBandwidthSampler::onPacketAcked(
       // will almost always be true unless your network is very very fast, or
       // your clock is broken, or isn't steady. Anyway, in the rare cases that
       // it isn't true, divide by zero will crash.
-      sendRate.emplace(
+      sendRate = Bandwidth(
           outstandingPacket.encodedSize,
           std::chrono::duration_cast<std::chrono::microseconds>(
               ackEvent.ackTime - outstandingPacket.time));
     }
-    Bandwidth measuredBandwidth;
-    if (sendRate && ackRate) {
-      measuredBandwidth = *sendRate >= *ackRate ? *sendRate : *ackRate;
-    } else if (sendRate) {
-      measuredBandwidth = *sendRate;
-    } else if (ackRate) {
-      measuredBandwidth = *ackRate;
-    }
+    Bandwidth measuredBandwidth = sendRate > ackRate ? sendRate : ackRate;
     // If a sample is from a packet sent during app-limited period, we should
     // still use this sample if it's >= current best value.
     if (measuredBandwidth >= windowedFilter_.GetBest() ||
