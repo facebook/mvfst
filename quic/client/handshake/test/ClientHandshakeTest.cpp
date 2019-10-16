@@ -23,7 +23,8 @@
 #include <folly/io/async/test/MockAsyncTransport.h>
 #include <folly/ssl/Init.h>
 
-#include <quic/client/handshake/ClientHandshake.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/client/handshake/FizzClientHandshake.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzBridge.h>
@@ -81,7 +82,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     hostname = "Fizz";
     setupClientAndServerContext();
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
-    handshake.reset(new ClientHandshake(cryptoState));
+    handshake =
+        std::make_shared<FizzClientQuicHandshakeContext>()->makeClientHandshake(cryptoState);
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(

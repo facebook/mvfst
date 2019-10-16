@@ -20,6 +20,15 @@ class FizzClientHandshake : public ClientHandshake {
       QuicCryptoState& cryptoState,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
 
+  void connect(
+      std::shared_ptr<const fizz::client::FizzClientContext> context,
+      std::shared_ptr<const fizz::CertificateVerifier> verifier,
+      folly::Optional<std::string> hostname,
+      folly::Optional<fizz::client::CachedPsk> cachedPsk,
+      const std::shared_ptr<ClientTransportParametersExtension>&
+          transportParams,
+      HandshakeCallback* callback) override;
+
  private:
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
 };
