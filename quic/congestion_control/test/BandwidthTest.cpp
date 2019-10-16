@@ -44,6 +44,23 @@ TEST_F(BandwidthTest, Compare) {
   EXPECT_FALSE(Bandwidth(1, 1us) == Bandwidth());
 }
 
+TEST_F(BandwidthTest, CompareWithEmpty) {
+  Bandwidth emptyBandwidth, anotherEmpty;
+  Bandwidth emptyUnit(0, 1us);
+  Bandwidth emptyInterval(15, 0us);
+  Bandwidth notEmpty(10, 5us);
+  EXPECT_FALSE(emptyBandwidth);
+  EXPECT_FALSE(emptyUnit);
+  EXPECT_FALSE(emptyInterval);
+  EXPECT_TRUE(notEmpty);
+  EXPECT_EQ(emptyBandwidth, anotherEmpty);
+  EXPECT_EQ(emptyBandwidth, emptyUnit);
+  EXPECT_EQ(emptyBandwidth, emptyInterval);
+  EXPECT_GT(notEmpty, emptyBandwidth);
+  EXPECT_GT(notEmpty, emptyUnit);
+  EXPECT_GT(notEmpty, emptyInterval);
+}
+
 TEST_F(BandwidthTest, Arithmetics) {
   Bandwidth testBandwidth(1000, 10us);
   EXPECT_TRUE(testBandwidth);

@@ -28,31 +28,34 @@ bool operator<(const Bandwidth& lhs, const Bandwidth& rhs) {
 }
 
 bool operator<=(const Bandwidth& lhs, const Bandwidth& rhs) {
-  return lhs < rhs || lhs == rhs;
+  return (lhs < rhs) || (lhs == rhs);
 }
 
 bool operator>(const Bandwidth& lhs, const Bandwidth& rhs) {
-  if (lhs.units == 0 && rhs.units > 0) {
+  if (!lhs && !rhs) {
     return false;
   }
-  if (lhs.units > 0 && rhs.units == 0) {
+  if (!lhs && rhs) {
+    return false;
+  }
+  if (lhs && !rhs) {
     return true;
   }
-  return lhs.units * rhs.interval > rhs.units * lhs.interval;
+  return (lhs.units * rhs.interval) > (rhs.units * lhs.interval);
 }
 
 bool operator>=(const Bandwidth& lhs, const Bandwidth& rhs) {
-  return lhs > rhs || lhs == rhs;
+  return (lhs > rhs) || (lhs == rhs);
 }
 
 bool operator==(const Bandwidth& lhs, const Bandwidth& rhs) {
-  if (lhs.units == 0 && rhs.units > 0) {
+  if (!lhs && !rhs) {
+    return true;
+  }
+  if (!lhs || !rhs) {
     return false;
   }
-  if (rhs.units == 0 && lhs.units > 0) {
-    return false;
-  }
-  return lhs.units * rhs.interval == rhs.units * lhs.interval;
+  return (lhs.units * rhs.interval) == (rhs.units * lhs.interval);
 }
 
 std::ostream& operator<<(std::ostream& os, const Bandwidth& bandwidth) {

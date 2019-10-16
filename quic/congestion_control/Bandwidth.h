@@ -41,7 +41,7 @@ struct Bandwidth {
         unitName_(std::move(unitName)) {}
 
   explicit operator bool() const noexcept {
-    return units != 0;
+    return units != 0 && interval != 0us;
   }
 
   template <
