@@ -57,6 +57,10 @@ constexpr uint16_t kCustomTransportParameterThreshold = 0xff00;
 constexpr uint64_t kDefaultBufferSpaceAvailable =
     std::numeric_limits<uint64_t>::max();
 
+// The default min rtt to use for a new connection
+constexpr std::chrono::microseconds kDefaultMinRtt =
+    std::chrono::microseconds::max();
+
 // Frames types with values defines in Quic Draft 15+
 enum class FrameType : uint8_t {
   PADDING = 0x00,

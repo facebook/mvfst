@@ -46,11 +46,17 @@ void updateRtt(
     QuicConnectionStateBase& conn,
     std::chrono::microseconds rttSample,
     std::chrono::microseconds ackDelay) {
-  conn.lossState.mrtt = timeMin(conn.lossState.mrtt, rttSample);
+  std::chrono::microseconds minRtt = timeMin(conn.lossState.mrtt, rttSample);
   conn.lossState.maxAckDelay = timeMax(conn.lossState.maxAckDelay, ackDelay);
-  if (rttSample > conn.lossState.mrtt + ackDelay) {
+  bool shouldUseAckDelay = (rttSample > ackDelay) &&
+      (rttSample > minRtt + ackDelay || conn.lossState.mrtt == kDefaultMinRtt);
+  if (shouldUseAckDelay) {
     rttSample -= ackDelay;
   }
+  conn.lossState.mrtt = minRtt;
+  // We use the original minRtt without the ack delay included here
+  // explicitly. We might want to change this by including ackDelay
+  // as well.
   conn.lossState.lrtt = rttSample;
   if (conn.lossState.srtt == 0us) {
     conn.lossState.srtt = rttSample;

@@ -321,8 +321,10 @@ TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelay) {
   QuicServerConnectionState conn;
   auto rttSample = 1000us;
   updateRtt(conn, rttSample, 300us);
-  EXPECT_EQ(1000, conn.lossState.srtt.count());
-  EXPECT_EQ(500, conn.lossState.rttvar.count());
+  EXPECT_EQ(700, conn.lossState.srtt.count());
+  EXPECT_EQ(700, conn.lossState.lrtt.count());
+  EXPECT_EQ(1000, conn.lossState.mrtt.count());
+  EXPECT_EQ(350, conn.lossState.rttvar.count());
   EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 
@@ -332,7 +334,32 @@ TEST_F(QuicStateFunctionsTest, RttCalculationWithMrttAckDelay) {
   auto rttSample = 1000us;
   updateRtt(conn, rttSample, 300us);
   EXPECT_EQ(700, conn.lossState.srtt.count());
+  EXPECT_EQ(700, conn.lossState.lrtt.count());
+  EXPECT_EQ(100, conn.lossState.mrtt.count());
   EXPECT_EQ(350, conn.lossState.rttvar.count());
+  EXPECT_EQ(300us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationIgnoreAckDelay) {
+  QuicServerConnectionState conn;
+  conn.lossState.mrtt = 700us;
+  auto rttSample = 900us;
+  updateRtt(conn, rttSample, 300us);
+  EXPECT_EQ(900, conn.lossState.srtt.count());
+  EXPECT_EQ(900, conn.lossState.lrtt.count());
+  EXPECT_EQ(700, conn.lossState.mrtt.count());
+  EXPECT_EQ(450, conn.lossState.rttvar.count());
+  EXPECT_EQ(300us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationAckDelayLarger) {
+  QuicServerConnectionState conn;
+  auto rttSample = 10us;
+  updateRtt(conn, rttSample, 300us);
+  EXPECT_EQ(10, conn.lossState.srtt.count());
+  EXPECT_EQ(10, conn.lossState.lrtt.count());
+  EXPECT_EQ(10, conn.lossState.mrtt.count());
+  EXPECT_EQ(5, conn.lossState.rttvar.count());
   EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 

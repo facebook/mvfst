@@ -389,7 +389,7 @@ struct LossState {
   // Max ack delay received from peer
   std::chrono::microseconds maxAckDelay{0us};
   // minimum rtt. AckDelay isn't excluded from this.
-  std::chrono::microseconds mrtt{std::chrono::microseconds::max()};
+  std::chrono::microseconds mrtt{kDefaultMinRtt};
   // The sent time of the latest acked packet
   folly::Optional<TimePoint> lastAckedPacketSentTime;
   // The latest time a packet is acked
