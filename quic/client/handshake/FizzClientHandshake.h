@@ -28,6 +28,8 @@ class FizzClientHandshake : public ClientHandshake {
           transportParams,
       HandshakeCallback* callback) override;
 
+  const CryptoFactory& getCryptoFactory() const override;
+
  private:
   void processSocketData(folly::IOBufQueue& queue) override;
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>

@@ -15,7 +15,7 @@
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/handshake/CryptoFactory.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
@@ -863,7 +863,9 @@ void QuicClientTransport::startCryptoHandshake() {
     cachedPsk = std::move(quicCachedPsk->cachedPsk);
   }
 
-  FizzCryptoFactory cryptoFactory;
+  auto handshakeLayer = clientConn_->clientHandshakeLayer;
+  auto& cryptoFactory = handshakeLayer->getCryptoFactory();
+
   auto version = conn_->originalVersion.value();
   conn_->initialWriteCipher = cryptoFactory.getClientInitialCipher(
       *clientConn_->initialDestinationConnectionId, version);
@@ -890,7 +892,6 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.selfActiveConnectionIdLimit,
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
-  auto handshakeLayer = clientConn_->clientHandshakeLayer;
   handshakeLayer->connect(
       hostname_, std::move(cachedPsk), std::move(paramsExtension), this);
 

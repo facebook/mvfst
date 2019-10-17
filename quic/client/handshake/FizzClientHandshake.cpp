@@ -46,6 +46,10 @@ void FizzClientHandshake::connect(
       transportParams));
 }
 
+const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
+  return cryptoFactory_;
+}
+
 void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
   processActions(machine_.processSocketData(state_, queue));
 }
