@@ -1261,6 +1261,10 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }
+  std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+  buildCiphers(CipherKind, folly::ByteRange) override {
+    throw std::runtime_error("buildCiphers not implemented");
+  }
 };
 
 class QuicClientTransportTest : public Test {

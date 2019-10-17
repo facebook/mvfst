@@ -8,7 +8,6 @@
 
 #include <quic/client/handshake/ClientHandshake.h>
 
-#include <fizz/protocol/Protocol.h>
 #include <quic/handshake/FizzBridge.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -182,8 +181,9 @@ const folly::Optional<std::string>& ClientHandshake::getApplicationProtocol()
 }
 
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
-  auto aead = buildAead(kind, secret);
-  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
+  std::unique_ptr<Aead> aead;
+  std::unique_ptr<PacketNumberCipher> packetNumberCipher;
+  std::tie(aead, packetNumberCipher) = buildCiphers(kind, secret);
   switch (kind) {
     case CipherKind::HandshakeWrite:
       handshakeWriteCipher_ = std::move(aead);
@@ -222,27 +222,6 @@ void ClientHandshake::waitForData() {
 EncryptionLevel ClientHandshake::getReadRecordLayerEncryptionLevel() {
   return getEncryptionLevelFromFizz(
       state_.readRecordLayer()->getEncryptionLevel());
-}
-
-std::unique_ptr<Aead> ClientHandshake::buildAead(
-    CipherKind kind,
-    folly::ByteRange secret) {
-  bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
-  fizz::CipherSuite cipher =
-      isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
-  std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
-      ? state_.context()->getFactory()->makeKeyScheduler(cipher)
-      : nullptr;
-  fizz::KeyScheduler& keyScheduler =
-      isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
-
-  return FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-      *state_.context()->getFactory(),
-      keyScheduler,
-      cipher,
-      secret,
-      kQuicKeyLabel,
-      kQuicIVLabel));
 }
 
 void ClientHandshake::writeDataToStream(
