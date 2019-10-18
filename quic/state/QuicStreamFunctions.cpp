@@ -122,6 +122,14 @@ void appendDataToReadBufferCommon(
   StreamBuffer* current = &buffer;
   bool currentAlreadyInserted = false;
   bool done = false;
+  it = std::lower_bound(
+      it,
+      readBuffer.end(),
+      current->offset,
+      [](const StreamBuffer& listValue, uint64_t offset) {
+        // First element where the end offset is > start offset of the buffer.
+        return (listValue.offset + listValue.data.chainLength()) < offset;
+      });
 
   // The invariant we're trying to maintain here is that individual
   // elements of the readBuffer are assuredly non contiguous sections
