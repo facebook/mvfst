@@ -13,41 +13,13 @@
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
+#include <quic/congestion_control/test/Mocks.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
 
 namespace quic {
 namespace test {
-
-// TODO: move these Mocks to a mock file
-class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
- public:
-  ~MockMinRttSampler() override {}
-
-  MOCK_CONST_METHOD0(minRtt, std::chrono::microseconds());
-  MOCK_CONST_METHOD0(minRttExpired, bool());
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
-      newRttSample,
-      bool(std::chrono::microseconds, TimePoint));
-  GMOCK_METHOD1_(, noexcept, , timestampMinRtt, void(TimePoint));
-};
-
-class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
- public:
-  ~MockBandwidthSampler() override {}
-
-  MOCK_CONST_METHOD0(getBandwidth, Bandwidth());
-  MOCK_CONST_METHOD0(isAppLimited, bool());
-
-  MOCK_METHOD2(
-      onPacketAcked,
-      void(const CongestionController::AckEvent&, uint64_t));
-  MOCK_METHOD0(onAppLimited, void());
-};
 
 class BbrTest : public Test {};
 
@@ -284,7 +256,7 @@ TEST_F(BbrTest, ProbeRtt) {
 
   // Ack the first one without min rtt expiration.
   auto packetToAck = inflightPackets.front();
-  EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(false));
+  EXPECT_CALL(*rawRttSampler, minRttExpired(_)).WillOnce(Return(false));
   bbr.onPacketAckOrLoss(
       makeAck(
           packetToAck.first,
@@ -301,7 +273,7 @@ TEST_F(BbrTest, ProbeRtt) {
   // ends the current RTT round. The new rtt round target will be the
   // largestSent of the conn
   packetToAck = inflightPackets.front();
-  EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(true));
+  EXPECT_CALL(*rawRttSampler, minRttExpired(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.onPacketAckOrLoss(
       makeAck(

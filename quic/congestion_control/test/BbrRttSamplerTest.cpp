@@ -21,23 +21,23 @@ class BbrMinRttSamplerTest : public Test {};
 
 TEST_F(BbrMinRttSamplerTest, InitState) {
   BbrRttSampler sampler(100s);
-  EXPECT_TRUE(sampler.minRttExpired());
+  EXPECT_TRUE(sampler.minRttExpired(Clock::now()));
   EXPECT_EQ(0us, sampler.minRtt());
 }
 
 TEST_F(BbrMinRttSamplerTest, NewSampleAndExpiration) {
   BbrRttSampler sampler(10s);
   sampler.newRttSample(50us, Clock::now());
-  EXPECT_FALSE(sampler.minRttExpired());
+  EXPECT_FALSE(sampler.minRttExpired(Clock::now()));
   EXPECT_EQ(50us, sampler.minRtt());
 
   // Expire the current sample:
   sampler.timestampMinRtt(Clock::now() - 20s);
-  EXPECT_TRUE(sampler.minRttExpired());
+  EXPECT_TRUE(sampler.minRttExpired(Clock::now()));
   // Now a larger sample can replace the current sample since it's expired:
   sampler.newRttSample(100us, Clock::now());
   EXPECT_EQ(100us, sampler.minRtt());
-  EXPECT_FALSE(sampler.minRttExpired());
+  EXPECT_FALSE(sampler.minRttExpired(Clock::now()));
 }
 } // namespace test
 } // namespace quic

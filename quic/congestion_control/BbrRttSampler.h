@@ -20,7 +20,7 @@ class BbrRttSampler : public BbrCongestionController::MinRttSampler {
   ~BbrRttSampler() = default;
 
   std::chrono::microseconds minRtt() const noexcept override;
-  bool minRttExpired() const noexcept override;
+  bool minRttExpired(TimePoint currentTime) const noexcept override;
   bool newRttSample(
       std::chrono::microseconds rttSample,
       TimePoint sampledTime) noexcept override;

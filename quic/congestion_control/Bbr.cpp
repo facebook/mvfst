@@ -229,7 +229,7 @@ void BbrCongestionController::onPacketAcked(
     transitToProbeBw(ack.ackTime);
   }
 
-  if (shouldProbeRtt()) {
+  if (shouldProbeRtt(ack.ackTime)) {
     transitToProbeRtt();
   }
   exitingQuiescene_ = false;
@@ -325,16 +325,16 @@ bool BbrCongestionController::shouldExitDrain() noexcept {
       inflightBytes_ <= calculateTargetCwnd(1.0);
 }
 
-bool BbrCongestionController::shouldProbeRtt() noexcept {
+bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
   if (config_.probeRttDisabledIfAppLimited && appLimitedSinceProbeRtt_) {
-    minRttSampler_->timestampMinRtt(Clock::now());
+    minRttSampler_->timestampMinRtt(ackTime);
     return false;
   }
   // TODO: Another experiment here is that to maintain a min rtt sample since
   // last ProbeRtt, and if it's very close to the minRtt seom sampler, then skip
   // ProbeRtt.
-  if (state_ != BbrState::ProbeRtt && minRttSampler_ &&
-      minRttSampler_->minRttExpired() && !exitingQuiescene_) {
+  if (state_ != BbrState::ProbeRtt && minRttSampler_ && !exitingQuiescene_ &&
+      minRttSampler_->minRttExpired(ackTime)) {
     // TODO: also consider connection being quiescent
     return true;
   }
