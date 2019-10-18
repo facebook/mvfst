@@ -149,40 +149,6 @@ TEST_F(QuicOpenStateTest, ReceiveStreamFrameWithoutFIN) {
   ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
 }
 
-class QuicResetSentStateTest : public Test {};
-
-TEST_F(QuicResetSentStateTest, RstAck) {
-  auto conn = createConn();
-  StreamId id = 5;
-
-  QuicStreamState stream(id, *conn);
-  stream.send.state = StreamSendStates::ResetSent();
-  stream.currentReadOffset = 0xABCD;
-  stream.finalWriteOffset = 0xACDC;
-  stream.readBuffer.emplace_back(
-      folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
-  RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  invokeHandler<StreamSendStateMachine>(
-      stream.send, StreamEvents::RstAck(frame), stream);
-
-  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
-  EXPECT_FALSE(stream.finalReadOffset);
-  EXPECT_FALSE(stream.readBuffer.empty());
-}
-
-class QuicClosedStateTest : public Test {};
-
-TEST_F(QuicClosedStateTest, RstAck) {
-  auto conn = createConn();
-  StreamId id = 5;
-  QuicStreamState stream(id, *conn);
-  stream.send.state = StreamSendStates::Closed();
-  RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
-  invokeHandler<StreamSendStateMachine>(
-      stream.send, StreamEvents::RstAck(frame), stream);
-  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
-}
-
 TEST_F(QuicOpenStateTest, AckStream) {
   auto conn = createConn();
 
@@ -419,6 +385,40 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkipOneAndAHalfBuf) {
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   ASSERT_TRUE(isState<StreamSendStates::Closed>(stream->send));
   ASSERT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+}
+
+class QuicResetSentStateTest : public Test {};
+
+TEST_F(QuicResetSentStateTest, RstAck) {
+  auto conn = createConn();
+  StreamId id = 5;
+
+  QuicStreamState stream(id, *conn);
+  stream.send.state = StreamSendStates::ResetSent();
+  stream.currentReadOffset = 0xABCD;
+  stream.finalWriteOffset = 0xACDC;
+  stream.readBuffer.emplace_back(
+      folly::IOBuf::copyBuffer("One more thing"), 0xABCD, false);
+  RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
+  invokeHandler<StreamSendStateMachine>(
+      stream.send, StreamEvents::RstAck(frame), stream);
+
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
+  EXPECT_FALSE(stream.finalReadOffset);
+  EXPECT_FALSE(stream.readBuffer.empty());
+}
+
+class QuicClosedStateTest : public Test {};
+
+TEST_F(QuicClosedStateTest, RstAck) {
+  auto conn = createConn();
+  StreamId id = 5;
+  QuicStreamState stream(id, *conn);
+  stream.send.state = StreamSendStates::Closed();
+  RstStreamFrame frame(id, GenericApplicationErrorCode::UNKNOWN, 0);
+  invokeHandler<StreamSendStateMachine>(
+      stream.send, StreamEvents::RstAck(frame), stream);
+  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream.send));
 }
 
 class QuicHalfClosedLocalStateTest : public Test {};
