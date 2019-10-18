@@ -41,6 +41,8 @@ constexpr uint64_t kBandwidthWindowLength = kNumOfCycles + 2;
 constexpr std::chrono::seconds kDefaultRttSamplerExpiration{10};
 // See calculateReductionFactors in QuicCubic.cpp
 constexpr double kBbrReductionFactor = 0.9;
+// 64K, used in sendQuantum calculation:
+constexpr uint64_t k64K = 64 * 1024;
 
 // TODO: rate based startup mode
 // TODO: send extra bandwidth probers when pipe isn't sufficiently full

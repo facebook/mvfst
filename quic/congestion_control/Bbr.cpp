@@ -485,7 +485,7 @@ void BbrCongestionController::updateCwnd(
   } else if (pacingRate < kHighPacingRateForSendQuantum) {
     sendQuantum_ = conn_.udpSendPacketLen * 2;
   } else {
-    sendQuantum_ = std::min(pacingRate * 1000us, (uint64_t)64 * 1000);
+    sendQuantum_ = std::min(pacingRate * 1000us, k64K);
   }
   auto targetCwnd = calculateTargetCwnd(cwndGain_);
   if (btlbwFound_) {
