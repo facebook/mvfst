@@ -167,7 +167,14 @@ void processAckFrame(
         lastAckedPacketSentTime = rPacketIt->time;
       }
       conn.lossState.lastAckedTime = ackReceiveTime;
-      ack.ackedPackets.push_back(std::move(*rPacketIt));
+      ack.ackedPackets.push_back(
+          CongestionController::AckEvent::AckPacket::Builder()
+              .setSentTime(rPacketIt->time)
+              .setEncodedSize(rPacketIt->encodedSize)
+              .setLastAckedPacketInfo(std::move(rPacketIt->lastAckedPacketInfo))
+              .setTotalBytesSentThen(rPacketIt->totalBytesSent)
+              .setAppLimited(rPacketIt->isAppLimited)
+              .build());
       rPacketIt++;
     }
     // Done searching for acked outstanding packets in current ack block. Erase

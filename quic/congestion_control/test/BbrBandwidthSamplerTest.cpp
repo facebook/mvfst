@@ -33,10 +33,24 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacket) {
   conn_.lossState.totalBytesAcked = 1000;
   CongestionController::AckEvent ackEvent;
   ackEvent.ackedBytes = 5000;
-  ackEvent.ackedPackets.emplace_back(
-      makeTestingWritePacket(0, 1000, 1000, false));
+  ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(
+      makeTestingWritePacket(0, 1000, 1000, false)));
   sampler.onPacketAcked(ackEvent, 0);
   EXPECT_EQ(0, sampler.getBandwidth().units);
+}
+
+TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacketFallback) {
+  BbrBandwidthSampler sampler(conn_);
+  conn_.lossState.totalBytesAcked = 1000;
+  auto sentTime = Clock::now();
+  CongestionController::AckEvent ackEvent;
+  ackEvent.ackedBytes = 5000;
+  ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(
+      makeTestingWritePacket(0, 1000, 1000, false, sentTime)));
+  ackEvent.ackTime = sentTime + 50ms;
+  sampler.onPacketAcked(ackEvent, 0);
+  EXPECT_EQ(1000, sampler.getBandwidth().units);
+  EXPECT_EQ(50ms, sampler.getBandwidth().interval);
 }
 
 TEST_F(BbrBandwidthSamplerTest, RateCalculation) {
@@ -53,7 +67,8 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculation) {
     packet.lastAckedPacketInfo.emplace(
         lastAckedPacketSentTime, lastAckedPacketAckTime, 0, 0);
     packet.time = ackTime - 50us;
-    ackEvent.ackedPackets.push_back(packet);
+    ackEvent.ackedPackets.push_back(
+        makeAckPacketFromOutstandingPacket(std::move(packet)));
   }
 
   sampler.onPacketAcked(ackEvent, 0);
@@ -75,7 +90,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   packet.lastAckedPacketInfo.emplace(
       lastAckedPacketSentTime, lastAckedPacketAckTime, 1000, 1000);
   packet.time = ackTime - 50us;
-  ackEvent.ackedPackets.push_back(packet);
+  ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet));
   sampler.onPacketAcked(ackEvent, 0);
   auto firstBandwidthSample = sampler.getBandwidth();
 
@@ -87,7 +102,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   CongestionController::AckEvent ackEvent2;
   ackEvent2.ackTime = ackTime2;
   packet2.time = ackTime + 110us;
-  ackEvent2.ackedPackets.push_back(packet2);
+  ackEvent2.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet2));
   sampler.onPacketAcked(ackEvent2, kBandwidthWindowLength / 4 + 1);
   auto secondBandwidthSample = sampler.getBandwidth();
   EXPECT_EQ(firstBandwidthSample, sampler.getBandwidth());
@@ -100,7 +115,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   CongestionController::AckEvent ackEvent3;
   ackEvent3.ackTime = ackTime3;
   packet3.time = ackTime + 210us;
-  ackEvent3.ackedPackets.push_back(packet3);
+  ackEvent3.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet3));
   sampler.onPacketAcked(ackEvent3, kBandwidthWindowLength / 2 + 1);
   EXPECT_EQ(firstBandwidthSample, sampler.getBandwidth());
 
@@ -112,7 +127,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   CongestionController::AckEvent ackEvent4;
   ackEvent4.ackTime = ackTime4;
   packet4.time = ackTime + 310us;
-  ackEvent4.ackedPackets.push_back(packet4);
+  ackEvent4.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet4));
   sampler.onPacketAcked(ackEvent4, kBandwidthWindowLength + 1);
   // The bandwidth we got from packet1 has expired. Packet2 should have
   // generated the current max:
@@ -133,7 +148,8 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   auto packet =
       makeTestingWritePacket(*ackEvent.largestAckedPacket, 1000, 1000, false);
   ackEvent.largestAckedPacketSentTime = packet.time;
-  ackEvent.ackedPackets.push_back(std::move(packet));
+  ackEvent.ackedPackets.push_back(
+      makeAckPacketFromOutstandingPacket(std::move(packet)));
   sampler.onPacketAcked(ackEvent, 0);
   EXPECT_FALSE(sampler.isAppLimited());
 
@@ -164,7 +180,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   packet.lastAckedPacketInfo.emplace(
       lastAckedPacketSentTime, lastAckedPacketAckTime, 0, 0);
   packet.time = ackTime - 50us;
-  ackEvent.ackedPackets.push_back(packet);
+  ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet));
   // AppLimited packet, but sample is larger than current best
   sampler.onPacketAcked(ackEvent, 0);
   EXPECT_LT(0, sampler.getBandwidth().units);
@@ -178,7 +194,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   CongestionController::AckEvent ackEvent1;
   ackEvent1.ackedBytes = 1000;
   ackEvent1.ackTime = ackTime + 2000us;
-  ackEvent1.ackedPackets.push_back(packet1);
+  ackEvent1.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet1));
   // AppLImited packet, bandwidth sampler is less than current best
   sampler.onPacketAcked(ackEvent1, 0);
   EXPECT_EQ(bandwidth, sampler.getBandwidth());

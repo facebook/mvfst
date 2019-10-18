@@ -40,56 +40,53 @@ void BbrBandwidthSampler::onPacketAcked(
   // TODO: If i'm smart enough, maybe we don't have to loop through the acked
   // packets. Can we calculate the bandwidth based on aggregated stats?
   bool bandwidthUpdated = false;
-  for (auto const& outstandingPacket : ackEvent.ackedPackets) {
-    if (outstandingPacket.encodedSize == 0) {
+  for (auto const& ackedPacket : ackEvent.ackedPackets) {
+    if (ackedPacket.encodedSize == 0) {
       continue;
     }
     Bandwidth sendRate, ackRate;
-    if (outstandingPacket.lastAckedPacketInfo) {
-      DCHECK(
-          outstandingPacket.time >
-          outstandingPacket.lastAckedPacketInfo->sentTime);
+    if (ackedPacket.lastAckedPacketInfo) {
+      DCHECK(ackedPacket.sentTime > ackedPacket.lastAckedPacketInfo->sentTime);
       DCHECK_GE(
-          outstandingPacket.totalBytesSent,
-          outstandingPacket.lastAckedPacketInfo->totalBytesSent);
+          ackedPacket.totalBytesSentThen,
+          ackedPacket.lastAckedPacketInfo->totalBytesSent);
       sendRate = Bandwidth(
-          outstandingPacket.totalBytesSent -
-              outstandingPacket.lastAckedPacketInfo->totalBytesSent,
+          ackedPacket.totalBytesSentThen -
+              ackedPacket.lastAckedPacketInfo->totalBytesSent,
           std::chrono::duration_cast<std::chrono::microseconds>(
-              outstandingPacket.time -
-              outstandingPacket.lastAckedPacketInfo->sentTime));
+              ackedPacket.sentTime -
+              ackedPacket.lastAckedPacketInfo->sentTime));
 
-      DCHECK(ackEvent.ackTime > outstandingPacket.lastAckedPacketInfo->ackTime);
+      DCHECK(ackEvent.ackTime > ackedPacket.lastAckedPacketInfo->ackTime);
       DCHECK_GE(
           conn_.lossState.totalBytesAcked,
-          outstandingPacket.lastAckedPacketInfo->totalBytesAcked);
+          ackedPacket.lastAckedPacketInfo->totalBytesAcked);
       ackRate = Bandwidth(
           conn_.lossState.totalBytesAcked -
-              outstandingPacket.lastAckedPacketInfo->totalBytesAcked,
+              ackedPacket.lastAckedPacketInfo->totalBytesAcked,
           std::chrono::duration_cast<std::chrono::microseconds>(
-              ackEvent.ackTime -
-              outstandingPacket.lastAckedPacketInfo->ackTime));
-    } else if (ackEvent.ackTime > outstandingPacket.time) {
+              ackEvent.ackTime - ackedPacket.lastAckedPacketInfo->ackTime));
+    } else if (ackEvent.ackTime > ackedPacket.sentTime) {
       // No previous ack info from outstanding packet, fallback to units/lrtt.
       // This is a per packet delivery rate. Given there can be multiple packets
       // inflight during the time, this is clearly under estimating bandwidth.
       // But it's better than nothing.
       //
       // Note that this if condition:
-      //   ack.Event.ackTime > outstandingPackcet.time
+      //   ack.Event.ackTime > ackedPacket.sentTime
       // will almost always be true unless your network is very very fast, or
       // your clock is broken, or isn't steady. Anyway, in the rare cases that
       // it isn't true, divide by zero will crash.
       sendRate = Bandwidth(
-          outstandingPacket.encodedSize,
+          ackedPacket.encodedSize,
           std::chrono::duration_cast<std::chrono::microseconds>(
-              ackEvent.ackTime - outstandingPacket.time));
+              ackEvent.ackTime - ackedPacket.sentTime));
     }
     Bandwidth measuredBandwidth = sendRate > ackRate ? sendRate : ackRate;
     // If a sample is from a packet sent during app-limited period, we should
     // still use this sample if it's >= current best value.
     if (measuredBandwidth >= windowedFilter_.GetBest() ||
-        !outstandingPacket.isAppLimited) {
+        !ackedPacket.isAppLimited) {
       windowedFilter_.Update(measuredBandwidth, rttCounter);
       bandwidthUpdated = true;
     }

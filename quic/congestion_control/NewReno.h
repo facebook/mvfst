@@ -40,7 +40,7 @@ class NewReno : public CongestionController {
  private:
   void onPacketLoss(const LossEvent&);
   void onAckEvent(const AckEvent&);
-  void onPacketAcked(const OutstandingPacket&);
+  void onPacketAcked(const CongestionController::AckEvent::AckPacket&);
 
  private:
   QuicConnectionStateBase& conn_;

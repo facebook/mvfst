@@ -53,10 +53,10 @@ class CopaTest : public Test {
     ack.largestAckedPacket = largestAcked;
     ack.ackTime = ackTime;
     ack.ackedBytes = ackedSize;
-    ack.ackedPackets.push_back(createPacket(
+    ack.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(createPacket(
         largestAcked,
         ackedSize,
-        ackedSize /* incorrect totalSent but works for this test */));
+        ackedSize /* incorrect totalSent but works for this test */)));
     return ack;
   }
 

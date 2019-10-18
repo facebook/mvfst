@@ -269,5 +269,8 @@ auto findFrameInPacketFunc() {
   };
 }
 
+CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
+    OutstandingPacket outstandingPacket);
+
 } // namespace test
 } // namespace quic

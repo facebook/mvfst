@@ -563,9 +563,7 @@ TEST_P(AckHandlersTest, PureAckBytesSkipsCongestionControl) {
         EXPECT_FALSE(ackEvent->ackedPackets.empty());
         EXPECT_EQ(1, ackEvent->ackedPackets.size());
         EXPECT_EQ(2, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_TRUE(ackEvent->ackedPackets.front().pureAck);
-        EXPECT_EQ(2, ackEvent->ackedPackets.front().totalBytesSent);
+        EXPECT_EQ(2, ackEvent->ackedPackets.front().totalBytesSentThen);
       }));
   processAckFrame(
       conn,
@@ -589,9 +587,7 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
       .WillOnce(Invoke([&](auto ackEvent, auto) {
         EXPECT_EQ(1, ackEvent->ackedPackets.size());
         EXPECT_EQ(1, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().pureAck);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSent);
+        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSentThen);
       }));
 
   PacketNum packetNum = 0;
@@ -634,9 +630,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       .WillOnce(Invoke([&](auto ackEvent, auto) {
         EXPECT_EQ(1, ackEvent->ackedPackets.size());
         EXPECT_EQ(1, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().pureAck);
-        EXPECT_FALSE(ackEvent->ackedPackets.front().isHandshake);
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSent);
+        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSentThen);
       }));
 
   PacketNum packetNum = 0;

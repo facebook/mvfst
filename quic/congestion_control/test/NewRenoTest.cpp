@@ -43,8 +43,14 @@ CongestionController::AckEvent createAckEvent(
   ack.largestAckedPacket = largestAcked;
   ack.ackTime = Clock::now();
   ack.ackedBytes = ackedSize;
-  ack.ackedPackets.emplace_back(
-      std::move(packet), packetSentTime, ackedSize, false, false, ackedSize);
+  ack.ackedPackets.push_back(
+      makeAckPacketFromOutstandingPacket(OutstandingPacket(
+          std::move(packet),
+          packetSentTime,
+          ackedSize,
+          false,
+          false,
+          ackedSize)));
   return ack;
 }
 

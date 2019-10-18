@@ -68,8 +68,9 @@ void NewReno::onAckEvent(const AckEvent& ack) {
       conn_.transportSettings.minCwndInMss);
 }
 
-void NewReno::onPacketAcked(const OutstandingPacket& packet) {
-  if (endOfRecovery_ && packet.time < *endOfRecovery_) {
+void NewReno::onPacketAcked(
+    const CongestionController::AckEvent::AckPacket& packet) {
+  if (endOfRecovery_ && packet.sentTime < *endOfRecovery_) {
     return;
   }
   if (cwndBytes_ < ssthresh_) {

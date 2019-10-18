@@ -548,7 +548,10 @@ CongestionController::AckEvent makeAck(
   ack.ackTime = ackedTime;
   ack.largestAckedPacket = seq;
   ack.ackedPackets.emplace_back(
-      std::move(packet), sentTime, ackedSize, false, false, ackedSize);
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setSentTime(sentTime)
+          .setEncodedSize(ackedSize)
+          .build());
   ack.largestAckedPacketSentTime = sentTime;
   return ack;
 }
@@ -701,5 +704,15 @@ bool matchError(
       *errorCode.first.asTransportErrorCode() == error;
 }
 
+CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
+    OutstandingPacket outstandingPacket) {
+  return CongestionController::AckEvent::AckPacket::Builder()
+      .setSentTime(outstandingPacket.time)
+      .setEncodedSize(outstandingPacket.encodedSize)
+      .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
+      .setTotalBytesSentThen(outstandingPacket.totalBytesSent)
+      .setAppLimited(outstandingPacket.isAppLimited)
+      .build();
+}
 } // namespace test
 } // namespace quic

@@ -95,4 +95,63 @@ PacingRate PacingRate::Builder::build() && {
   return PacingRate(interval_, burstSize_);
 }
 
+CongestionController::AckEvent::AckPacket::AckPacket(
+    TimePoint sentTimeIn,
+    uint32_t encodedSizeIn,
+    folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+        lastAckedPacketInfoIn,
+    uint64_t totalBytesSentThenIn,
+    bool isAppLimitedIn)
+    : sentTime(sentTimeIn),
+      encodedSize(encodedSizeIn),
+      lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
+      totalBytesSentThen(totalBytesSentThenIn),
+      isAppLimited(isAppLimitedIn) {}
+
+CongestionController::AckEvent::AckPacket::Builder&&
+CongestionController::AckEvent::AckPacket::Builder::setSentTime(
+    TimePoint sentTimeIn) {
+  sentTime = sentTimeIn;
+  return std::move(*this);
+}
+
+CongestionController::AckEvent::AckPacket::Builder&&
+CongestionController::AckEvent::AckPacket::Builder::setEncodedSize(
+    uint32_t encodedSizeIn) {
+  encodedSize = encodedSizeIn;
+  return std::move(*this);
+}
+
+CongestionController::AckEvent::AckPacket::Builder&&
+CongestionController::AckEvent::AckPacket::Builder::setLastAckedPacketInfo(
+    folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+        lastAckedPacketInfoIn) {
+  lastAckedPacketInfo = lastAckedPacketInfoIn;
+  return std::move(*this);
+}
+
+CongestionController::AckEvent::AckPacket::Builder&&
+CongestionController::AckEvent::AckPacket::Builder::setTotalBytesSentThen(
+    uint64_t totalBytesSentThenIn) {
+  totalBytesSentThen = totalBytesSentThenIn;
+  return std::move(*this);
+}
+
+CongestionController::AckEvent::AckPacket::Builder&&
+CongestionController::AckEvent::AckPacket::Builder::setAppLimited(
+    bool appLimitedIn) {
+  isAppLimited = appLimitedIn;
+  return std::move(*this);
+}
+
+CongestionController::AckEvent::AckPacket
+CongestionController::AckEvent::AckPacket::Builder::build() && {
+  return CongestionController::AckEvent::AckPacket(
+      sentTime,
+      encodedSize,
+      std::move(lastAckedPacketInfo),
+      totalBytesSentThen,
+      isAppLimited);
+}
+
 } // namespace quic

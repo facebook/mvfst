@@ -244,8 +244,53 @@ struct CongestionController {
     // includes ack delay.
     folly::Optional<std::chrono::microseconds> mrttSample;
 
-    // OutstandingPackets acked in this ack event
-    std::vector<OutstandingPacket> ackedPackets;
+    struct AckPacket {
+      // Packet sent time when this acked pakcet was first sent.
+      TimePoint sentTime;
+      // Packet's encoded size.
+      uint32_t encodedSize;
+      // LastAckedPacketInfo from this acked packet'r original sent
+      // OutstandingPacket structure.
+      folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+          lastAckedPacketInfo;
+      // Total bytes sent on the connection when the acked packet was first
+      // sent.
+      uint64_t totalBytesSentThen;
+      // Whether this packet was sent when CongestionController is in
+      // app-limited state.
+      bool isAppLimited;
+
+      struct Builder {
+        Builder&& setSentTime(TimePoint sentTimeIn);
+        Builder&& setEncodedSize(uint32_t encodedSizeIn);
+        Builder&& setLastAckedPacketInfo(
+            folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+                lastAckedPacketInfoIn);
+        Builder&& setTotalBytesSentThen(uint64_t totalBytesSentThenIn);
+        Builder&& setAppLimited(bool appLimitedIn);
+        AckPacket build() &&;
+        explicit Builder() = default;
+
+       private:
+        TimePoint sentTime;
+        uint32_t encodedSize{0};
+        folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+            lastAckedPacketInfo;
+        uint64_t totalBytesSentThen{0};
+        bool isAppLimited{false};
+      };
+
+     private:
+      explicit AckPacket(
+          TimePoint sentTimeIn,
+          uint32_t encodedSizeIn,
+          folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+              lastAckedPacketInfoIn,
+          uint64_t totalBytesSentThenIn,
+          bool isAppLimitedIn);
+    };
+
+    std::vector<AckPacket> ackedPackets;
   };
 
   virtual ~CongestionController() = default;
