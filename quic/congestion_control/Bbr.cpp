@@ -297,20 +297,30 @@ void BbrCongestionController::handleAckInProbeBw(
     shouldAdvancePacingGainCycle = false;
   }
 
-  if (pacingGain_ < 1.0 && inflightBytes_ <= calculateTargetCwnd(1.0)) {
-    // pacingGain_ < 1.0 means BBR is draining the network queue. If
-    // inflightBytes_ is below the target, then it's done.
-    shouldAdvancePacingGainCycle = true;
+  // To avoid calculate target cwnd with 1.0 gain twice.
+  folly::Optional<uint64_t> targetCwndCache;
+  if (pacingGain_ < 1.0) {
+    targetCwndCache = calculateTargetCwnd(1.0);
+    if (inflightBytes_ <= *targetCwndCache) {
+      // pacingGain_ < 1.0 means BBR is draining the network queue. If
+      // inflightBytes_ is below the target, then it's done.
+      shouldAdvancePacingGainCycle = true;
+    }
   }
 
   if (shouldAdvancePacingGainCycle) {
     pacingCycleIndex_ = (pacingCycleIndex_ + 1) % kNumOfCycles;
     cycleStart_ = ackTime;
     if (config_.drainToTarget && pacingGain_ < 1.0 &&
-        inflightBytes_ > calculateTargetCwnd(1.0) &&
         kPacingGainCycles[pacingCycleIndex_] == 1.0) {
-      // Interestingly Chromium doesn't rollback pacingCycleIndex_ in this case.
-      return;
+      auto drainTarget =
+          targetCwndCache ? *targetCwndCache : calculateTargetCwnd(1.0);
+      if (inflightBytes_ > drainTarget) {
+        // Interestingly Chromium doesn't rollback pacingCycleIndex_ in this
+        // case.
+        // TODO: isn't this a bug? But we don't do drainToTarget today.
+        return;
+      }
     }
     pacingGain_ = kPacingGainCycles[pacingCycleIndex_];
   }
@@ -458,18 +468,10 @@ uint64_t BbrCongestionController::calculateTargetCwnd(float gain) const
   auto bandwidthEst = bandwidth();
   auto minRttEst = minRtt();
   if (!bandwidthEst || minRttEst == 0us) {
-    return boundedCwnd(
-        gain * initialCwnd_,
-        conn_.udpSendPacketLen,
-        conn_.transportSettings.maxCwndInMss,
-        kMinCwndInMssForBbr);
+    return gain * initialCwnd_;
   }
   uint64_t bdp = bandwidthEst * minRttEst;
-  return boundedCwnd(
-      bdp * gain + kQuantaFactor * sendQuantum_,
-      conn_.udpSendPacketLen,
-      conn_.transportSettings.maxCwndInMss,
-      kMinCwndInMssForBbr);
+  return bdp * gain + kQuantaFactor * sendQuantum_;
 }
 
 void BbrCongestionController::updateCwnd(
@@ -544,7 +546,11 @@ bool BbrCongestionController::isAppLimited() const noexcept {
 uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   if (state_ == BbrCongestionController::BbrState::ProbeRtt) {
     if (config_.largeProbeRttCwnd) {
-      return calculateTargetCwnd(kLargeProbeRttCwndGain);
+      return boundedCwnd(
+          calculateTargetCwnd(kLargeProbeRttCwndGain),
+          conn_.udpSendPacketLen,
+          conn_.transportSettings.maxCwndInMss,
+          kMinCwndInMssForBbr);
     }
     return conn_.udpSendPacketLen * kMinCwndInMssForBbr;
   }
