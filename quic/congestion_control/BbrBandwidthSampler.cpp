@@ -46,31 +46,29 @@ void BbrBandwidthSampler::onPacketAcked(
     }
     Bandwidth sendRate, ackRate;
     if (outstandingPacket.lastAckedPacketInfo) {
-      // TODO: I think I can DCHECK this condition:
-      if (outstandingPacket.time >
-          outstandingPacket.lastAckedPacketInfo->sentTime) {
-        DCHECK_GE(
-            outstandingPacket.totalBytesSent,
-            outstandingPacket.lastAckedPacketInfo->totalBytesSent);
-        sendRate = Bandwidth(
-            outstandingPacket.totalBytesSent -
-                outstandingPacket.lastAckedPacketInfo->totalBytesSent,
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                outstandingPacket.time -
-                outstandingPacket.lastAckedPacketInfo->sentTime));
-      }
+      DCHECK(
+          outstandingPacket.time >
+          outstandingPacket.lastAckedPacketInfo->sentTime);
+      DCHECK_GE(
+          outstandingPacket.totalBytesSent,
+          outstandingPacket.lastAckedPacketInfo->totalBytesSent);
+      sendRate = Bandwidth(
+          outstandingPacket.totalBytesSent -
+              outstandingPacket.lastAckedPacketInfo->totalBytesSent,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              outstandingPacket.time -
+              outstandingPacket.lastAckedPacketInfo->sentTime));
 
-      if (ackEvent.ackTime > outstandingPacket.lastAckedPacketInfo->ackTime) {
-        DCHECK_GE(
-            conn_.lossState.totalBytesAcked,
-            outstandingPacket.lastAckedPacketInfo->totalBytesAcked);
-        ackRate = Bandwidth(
-            conn_.lossState.totalBytesAcked -
-                outstandingPacket.lastAckedPacketInfo->totalBytesAcked,
-            std::chrono::duration_cast<std::chrono::microseconds>(
-                ackEvent.ackTime -
-                outstandingPacket.lastAckedPacketInfo->ackTime));
-      }
+      DCHECK(ackEvent.ackTime > outstandingPacket.lastAckedPacketInfo->ackTime);
+      DCHECK_GE(
+          conn_.lossState.totalBytesAcked,
+          outstandingPacket.lastAckedPacketInfo->totalBytesAcked);
+      ackRate = Bandwidth(
+          conn_.lossState.totalBytesAcked -
+              outstandingPacket.lastAckedPacketInfo->totalBytesAcked,
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              ackEvent.ackTime -
+              outstandingPacket.lastAckedPacketInfo->ackTime));
     } else if (ackEvent.ackTime > outstandingPacket.time) {
       // No previous ack info from outstanding packet, fallback to units/lrtt.
       // This is a per packet delivery rate. Given there can be multiple packets
