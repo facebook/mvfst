@@ -40,7 +40,8 @@ struct StreamEvents {
 
 // Transition the stream to an error state if there is an invalid state
 // transition.
-inline void StreamSendStateMachineInvalidHandler(const QuicStreamState& state) {
+[[noreturn]] inline void StreamSendStateMachineInvalidHandler(
+    const QuicStreamState& state) {
   throw QuicTransportException(
       folly::to<std::string>(
           "Invalid transition from state=",
@@ -62,7 +63,7 @@ struct StreamSendStateMachine {
 
 // Transition the stream to an error state if there is an invalid state
 // transition.
-inline void StreamReceiveStateMachineInvalidHandler(
+[[noreturn]] inline void StreamReceiveStateMachineInvalidHandler(
     const QuicStreamState& state) {
   throw QuicTransportException(
       folly::to<std::string>(
@@ -128,81 +129,81 @@ QUIC_DECLARE_STATE_HANDLER(
     StreamReceiveStateMachine,
     StreamReceiveStates::Open,
     ReadStreamFrame,
-    StreamReceiveStates::Closed);
+    StreamReceiveStates::Closed)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamReceiveStateMachine,
     StreamReceiveStates::Open,
     RstStreamFrame,
-    StreamReceiveStates::Closed);
+    StreamReceiveStates::Closed)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Open,
     StreamEvents::SendReset,
-    StreamSendStates::ResetSent);
+    StreamSendStates::ResetSent)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Open,
     StreamEvents::AckStreamFrame,
-    StreamSendStates::Closed);
+    StreamSendStates::Closed)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Open,
-    StopSendingFrame);
+    StopSendingFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::ResetSent,
-    StreamEvents::AckStreamFrame);
+    StreamEvents::AckStreamFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::ResetSent,
-    StopSendingFrame);
+    StopSendingFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::ResetSent,
     StreamEvents::RstAck,
-    StreamSendStates::Closed);
+    StreamSendStates::Closed)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::ResetSent,
-    StreamEvents::SendReset);
+    StreamEvents::SendReset)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamReceiveStateMachine,
     StreamReceiveStates::Closed,
-    ReadStreamFrame);
+    ReadStreamFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Closed,
-    StreamEvents::RstAck);
+    StreamEvents::RstAck)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Closed,
-    StreamEvents::AckStreamFrame);
+    StreamEvents::AckStreamFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Closed,
-    StopSendingFrame);
+    StopSendingFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamReceiveStateMachine,
     StreamReceiveStates::Closed,
-    RstStreamFrame);
+    RstStreamFrame)
 
 QUIC_DECLARE_STATE_HANDLER(
     StreamSendStateMachine,
     StreamSendStates::Closed,
-    StreamEvents::SendReset);
+    StreamEvents::SendReset)
 } // namespace quic
 
 #include <quic/state/stream/StreamClosedHandlers-inl.h>
