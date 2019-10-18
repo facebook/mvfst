@@ -110,7 +110,7 @@ void markPacketLoss(
         }
         // The original rxmt offset might have been bumped up after it was
         // shrunk due to egress partially reliable skip.
-        if (!ackFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
+        if (!streamFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
           break;
         }
         stream->lossBuffer.insert(

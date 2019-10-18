@@ -244,7 +244,7 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
         return buffer.offset < targetOffset;
       });
   if (iter != stream->retransmissionBuffer.end()) {
-    if (ackFrameMatchesRetransmitBuffer(*stream, frame, *iter)) {
+    if (streamFrameMatchesRetransmitBuffer(*stream, frame, *iter)) {
       DCHECK(!frame.len || !iter->data.empty())
           << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
           << " empty data. " << conn_;

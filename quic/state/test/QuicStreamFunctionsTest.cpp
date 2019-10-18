@@ -1940,7 +1940,9 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
 
-TEST_F(QuicStreamFunctionsTest, AckFrameMatchesRetransmitBufferFullyReliable) {
+TEST_F(
+    QuicStreamFunctionsTest,
+    StreamFrameMatchesRetransmitBufferFullyReliable) {
   conn.partialReliabilityEnabled = false;
   StreamId id = 4;
   QuicStreamState stream(id, conn);
@@ -1953,12 +1955,12 @@ TEST_F(QuicStreamFunctionsTest, AckFrameMatchesRetransmitBufferFullyReliable) {
       0 /* offset */,
       data->length() /* length */,
       true /* eof */);
-  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
 }
 
 TEST_F(
     QuicStreamFunctionsTest,
-    AckFrameMatchesRetransmitBufferPartiallyReliableNoSkip) {
+    StreamFrameMatchesRetransmitBufferPartiallyReliableNoSkip) {
   conn.partialReliabilityEnabled = true;
   StreamId id = 4;
   QuicStreamState stream(id, conn);
@@ -1971,12 +1973,12 @@ TEST_F(
       0 /* offset */,
       data->length() /* length */,
       true /* eof */);
-  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
 }
 
 TEST_F(
     QuicStreamFunctionsTest,
-    AckFrameMatchesRetransmitBufferPartiallyReliableFullBufSkipped) {
+    StreamFrameMatchesRetransmitBufferPartiallyReliableFullBufSkipped) {
   conn.partialReliabilityEnabled = true;
   StreamId id = 4;
   QuicStreamState stream(id, conn);
@@ -1989,12 +1991,12 @@ TEST_F(
       0 /* offset */,
       data->length() /* length */,
       true /* eof */);
-  EXPECT_FALSE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+  EXPECT_FALSE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
 }
 
 TEST_F(
     QuicStreamFunctionsTest,
-    AckFrameMatchesRetransmitBufferPartiallyReliableHalfBufSkipped) {
+    StreamFrameMatchesRetransmitBufferPartiallyReliableHalfBufSkipped) {
   conn.partialReliabilityEnabled = true;
   StreamId id = 4;
   QuicStreamState stream(id, conn);
@@ -2004,7 +2006,7 @@ TEST_F(
 
   WriteStreamFrame ackFrame(
       id /* streamId */, 0 /* offset */, 5 /* length */, true /* eof */);
-  EXPECT_TRUE(ackFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
+  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
 }
 } // namespace test
 } // namespace quic

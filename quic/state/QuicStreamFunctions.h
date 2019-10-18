@@ -137,13 +137,10 @@ void processCryptoStreamAck(
     uint64_t len);
 
 /**
- * Checks if ack frame matches buffer from the retransmit queue.
+ * Checks if stream frame matches buffer from the retransmit queue.
  *
- * @param stream    The stream.
- * @param ackFrame  Ack frame that allegedly acks the above buffer.
- * @param buf       Buffer from the retransmit queue.
  */
-bool ackFrameMatchesRetransmitBuffer(
+bool streamFrameMatchesRetransmitBuffer(
     const QuicStreamState& stream,
     const WriteStreamFrame& ackFrame,
     const StreamBuffer& buf);

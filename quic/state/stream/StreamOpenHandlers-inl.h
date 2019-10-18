@@ -95,7 +95,8 @@ inline void Handler<
       });
 
   if (ackedBuffer != stream.retransmissionBuffer.end()) {
-    if (ackFrameMatchesRetransmitBuffer(stream, ack.ackedFrame, *ackedBuffer)) {
+    if (streamFrameMatchesRetransmitBuffer(
+            stream, ack.ackedFrame, *ackedBuffer)) {
       VLOG(10) << "Open: acked stream data stream=" << stream.id
                << " offset=" << ackedBuffer->offset
                << " len=" << ackedBuffer->data.chainLength()

@@ -432,33 +432,33 @@ void processCryptoStreamAck(
   cryptoStream.retransmissionBuffer.erase(ackedBuffer);
 }
 
-bool ackFrameMatchesRetransmitBuffer(
+bool streamFrameMatchesRetransmitBuffer(
     const QuicStreamState& stream,
-    const WriteStreamFrame& ackFrame,
+    const WriteStreamFrame& streamFrame,
     const StreamBuffer& buf) {
   // There are 3 possible situations.
-  // 1) Fully reliable mode: the buffer's and ack frame's offsets and lengths
+  // 1) Fully reliable mode: the buffer's and stream frame's offsets and lengths
   //    must match.
   // 2) Partially reliable mode: the retransmit queue buffer has been
-  //    fully removed by an egress skip before the ack frame arrived.
+  //    fully removed by an egress skip before the stream frame arrived.
   // 3) Partially reliable mode: the retransmit queue buffer was only
   //    partially trimmed.
-  //    In this case, the retransmit buffer offset must be >= ack frame offset
-  //    and retransmit buffer length must be <= ack frame length. Also, the
-  //    retransmit buffer [offset + length] must match (ack) frame [offset +
-  //    length].
+  //    In this case, the retransmit buffer offset must be >= stream frame
+  //    offset and retransmit buffer length must be <= stream frame len field
+  //    vale. Also, the retransmit buffer [offset + length] must match stream
+  //    frame [offset + length].
 
   bool match = false;
   if (stream.conn.partialReliabilityEnabled) {
-    auto frameRightOffset = ackFrame.offset + ackFrame.len;
+    auto frameRightOffset = streamFrame.offset + streamFrame.len;
     if (frameRightOffset > buf.offset) {
       // There is overlap, buffer fully or partially matches.
-      DCHECK(buf.offset >= ackFrame.offset);
-      DCHECK(buf.data.chainLength() <= ackFrame.len);
+      DCHECK(buf.offset >= streamFrame.offset);
+      DCHECK(buf.data.chainLength() <= streamFrame.len);
 
-      // The offsets and lengths in the ack frame and buffer may be different,
-      // but their sum should stay the same (e.g. offset grows, length shrinks
-      // but sum must be the same).
+      // The offsets and lengths in the stream frame and buffer may be
+      // different, but their sum should stay the same (e.g. offset grows,
+      // length shrinks but sum must be the same).
       //
       // Example: let's say we send data buf with offset=0 and len=11 and we
       // save a copy in retransmission queue. Then we send egress skip to offset
@@ -468,14 +468,15 @@ bool ackFrameMatchesRetransmitBuffer(
       // offsets and lengths are going to be different, but their sum will be
       // the same.
       DCHECK_EQ(
-          buf.offset + buf.data.chainLength(), ackFrame.offset + ackFrame.len);
-      DCHECK_EQ(buf.eof, ackFrame.fin);
+          buf.offset + buf.data.chainLength(),
+          streamFrame.offset + streamFrame.len);
+      DCHECK_EQ(buf.eof, streamFrame.fin);
       match = true;
     } // else frameRightOffset <= buf.offset { ignore }
   } else {
-    DCHECK_EQ(buf.offset, ackFrame.offset);
-    DCHECK_EQ(buf.data.chainLength(), ackFrame.len);
-    DCHECK_EQ(buf.eof, ackFrame.fin);
+    DCHECK_EQ(buf.offset, streamFrame.offset);
+    DCHECK_EQ(buf.data.chainLength(), streamFrame.len);
+    DCHECK_EQ(buf.eof, streamFrame.fin);
     match = true;
   }
   return match;
