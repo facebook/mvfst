@@ -30,6 +30,8 @@ class FizzClientHandshake : public ClientHandshake {
 
   const CryptoFactory& getCryptoFactory() const override;
 
+  const folly::Optional<std::string>& getApplicationProtocol() const override;
+
  private:
   void processSocketData(folly::IOBufQueue& queue) override;
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>

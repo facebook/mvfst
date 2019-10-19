@@ -145,11 +145,6 @@ class ClientHandshake : public Handshake {
   folly::Optional<bool> getZeroRttRejected();
 
   /**
-   * Returns the application protocol that was negotiated by the handshake.
-   */
-  const folly::Optional<std::string>& getApplicationProtocol() const override;
-
-  /**
    * Returns the negotiated transport parameters chosen by the server
    */
   virtual folly::Optional<ServerTransportParameters> getServerTransportParams();
