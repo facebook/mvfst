@@ -564,15 +564,16 @@ struct StatelessReset {
       : token(std::move(tokenIn)) {}
 };
 
-#define QUIC_SIMPLE_FRAME(F, ...)        \
-  F(StopSendingFrame, __VA_ARGS__)       \
-  F(MinStreamDataFrame, __VA_ARGS__)     \
-  F(ExpiredStreamDataFrame, __VA_ARGS__) \
-  F(PathChallengeFrame, __VA_ARGS__)     \
-  F(PathResponseFrame, __VA_ARGS__)      \
-  F(NewConnectionIdFrame, __VA_ARGS__)   \
-  F(MaxStreamsFrame, __VA_ARGS__)        \
-  F(RetireConnectionIdFrame, __VA_ARGS__)
+#define QUIC_SIMPLE_FRAME(F, ...)         \
+  F(StopSendingFrame, __VA_ARGS__)        \
+  F(MinStreamDataFrame, __VA_ARGS__)      \
+  F(ExpiredStreamDataFrame, __VA_ARGS__)  \
+  F(PathChallengeFrame, __VA_ARGS__)      \
+  F(PathResponseFrame, __VA_ARGS__)       \
+  F(NewConnectionIdFrame, __VA_ARGS__)    \
+  F(MaxStreamsFrame, __VA_ARGS__)         \
+  F(RetireConnectionIdFrame, __VA_ARGS__) \
+  F(PingFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 
@@ -583,7 +584,6 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(ApplicationCloseFrame, __VA_ARGS__)  \
   F(MaxDataFrame, __VA_ARGS__)           \
   F(MaxStreamDataFrame, __VA_ARGS__)     \
-  F(PingFrame, __VA_ARGS__)              \
   F(DataBlockedFrame, __VA_ARGS__)       \
   F(StreamDataBlockedFrame, __VA_ARGS__) \
   F(StreamsBlockedFrame, __VA_ARGS__)    \
@@ -603,7 +603,6 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(ApplicationCloseFrame, __VA_ARGS__)  \
   F(MaxDataFrame, __VA_ARGS__)           \
   F(MaxStreamDataFrame, __VA_ARGS__)     \
-  F(PingFrame, __VA_ARGS__)              \
   F(DataBlockedFrame, __VA_ARGS__)       \
   F(StreamDataBlockedFrame, __VA_ARGS__) \
   F(StreamsBlockedFrame, __VA_ARGS__)    \
@@ -837,7 +836,8 @@ struct VersionNegotiationPacket {
 struct RegularPacket {
   PacketHeader header;
 
-  explicit RegularPacket(PacketHeader&& headerIn) : header(std::move(headerIn)) {}
+  explicit RegularPacket(PacketHeader&& headerIn)
+      : header(std::move(headerIn)) {}
 };
 
 /**

@@ -34,6 +34,7 @@ QuicTransportBase::QuicTransportBase(
       pathValidationTimeout_(this),
       idleTimeout_(this),
       drainTimeout_(this),
+      pingTimeout_(this),
       readLooper_(new FunctionLooper(
           evb,
           [this](bool /* ignored */) { invokeReadDataAndCallbacks(); },
@@ -316,6 +317,10 @@ void QuicTransportBase::closeImpl(
   if (idleTimeout_.isScheduled()) {
     idleTimeout_.cancelTimeout();
   }
+  if (pingTimeout_.isScheduled()) {
+    pingTimeout_.cancelTimeout();
+  }
+
   VLOG(10) << "Stopping read looper due to immediate close " << *this;
   readLooper_->stop();
   peekLooper_->stop();
@@ -1397,6 +1402,22 @@ folly::
   }
 }
 
+void QuicTransportBase::handlePingCallback() {
+  if (!conn_->pendingEvents.cancelPingTimeout) {
+    return; // nothing to cancel
+  }
+  if (!pingTimeout_.isScheduled()) {
+    // set cancelpingTimeOut to false, delayed acks
+    conn_->pendingEvents.cancelPingTimeout = false;
+    return; // nothing to do, as timeout has already fired
+  }
+  pingTimeout_.cancelTimeout();
+  if (pingCallback_ != nullptr) {
+    runOnEvbAsync([](auto self) { self->pingCallback_->pingAcknowledged(); });
+  }
+  conn_->pendingEvents.cancelPingTimeout = false;
+}
+
 void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (UNLIKELY(closeState_ != CloseState::OPEN)) {
     return;
@@ -1414,6 +1435,10 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     }
   }
   conn_->streamManager->clearNewPeerStreams();
+
+  // Handle pingCallbacks
+  handlePingCallback();
+
   // TODO: we're currently assuming that canceling write callbacks will not
   // cause reset of random streams. Maybe get rid of that assumption later.
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
@@ -2006,8 +2031,20 @@ void QuicTransportBase::checkForClosedStream() {
 }
 
 void QuicTransportBase::sendPing(
-    PingCallback* /*callback*/,
-    std::chrono::milliseconds /*pingTimeout*/) {}
+    PingCallback* callback,
+    std::chrono::milliseconds pingTimeout) {
+  /* Step 0: Connection should not be closed */
+  if (closeState_ == CloseState::CLOSED) {
+    return;
+  }
+
+  // Step 1: Send a simple ping frame
+  quic::sendSimpleFrame(*conn_, PingFrame());
+  updateWriteLooper(true);
+
+  // Step 2: Schedule the timeout on event base
+  schedulePingTimeout(callback, pingTimeout);
+}
 
 void QuicTransportBase::lossTimeoutExpired() noexcept {
   CHECK_NE(closeState_, CloseState::CLOSED);
@@ -2043,6 +2080,14 @@ void QuicTransportBase::ackTimeoutExpired() noexcept {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   updateAckStateOnAckTimeout(*conn_);
   pacedWriteDataToSocket(false);
+}
+
+void QuicTransportBase::pingTimeoutExpired() noexcept {
+  // If timeout expired just call the  call back Provided
+  if (pingCallback_ == nullptr) {
+    return;
+  }
+  runOnEvbAsync([](auto self) { self->pingCallback_->pingTimeout(); });
 }
 
 void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
@@ -2108,6 +2153,19 @@ void QuicTransportBase::scheduleAckTimeout() {
       ackTimeout_.cancelTimeout();
     }
   }
+}
+
+void QuicTransportBase::schedulePingTimeout(
+    PingCallback* pingCb,
+    std::chrono::milliseconds timeout) {
+  // if a ping timeout is already scheduled, nothing to do, return
+  if (pingTimeout_.isScheduled()) {
+    return;
+  }
+
+  pingCallback_ = pingCb;
+  auto& wheelTimer = getEventBase()->timer();
+  wheelTimer.scheduleTimeout(&pingTimeout_, timeout);
 }
 
 void QuicTransportBase::schedulePathValidationTimeout() {

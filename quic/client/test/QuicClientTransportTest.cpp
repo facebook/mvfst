@@ -4478,7 +4478,7 @@ TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
       client->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
-  writeFrame(pingFrame, builder);
+  writeFrame(QuicSimpleFrame(pingFrame), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(packet->coalesce());
   EXPECT_TRUE(client->getConn().pendingEvents.scheduleAckTimeout);

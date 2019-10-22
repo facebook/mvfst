@@ -20,6 +20,7 @@
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicPacingFunctions.h>
+#include <quic/state/SimpleFrameFunctions.h>
 
 namespace fsp = folly::portability::sockets;
 
@@ -351,6 +352,12 @@ void QuicClientTransport::processPacketData(
                       *cryptoStream, frame.offset, frame.len);
                   break;
                 }
+                case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+                  const quic::QuicSimpleFrame simpleFrame =
+                      *packetFrame.asQuicSimpleFrame();
+                  updateSimpleFrameOnAck(*conn_, simpleFrame);
+                  break;
+                }
                 default:
                   // ignore other frames.
                   break;
@@ -500,10 +507,6 @@ void QuicClientTransport::processPacketData(
         pktHasRetransmittableData = true;
         updateSimpleFrameOnPacketReceived(
             *conn_, simpleFrame, packetNum, false);
-        break;
-      }
-      case QuicFrame::Type::PingFrame_E: {
-        pktHasRetransmittableData = true;
         break;
       }
       default:

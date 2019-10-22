@@ -11,6 +11,7 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
+#include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
@@ -227,7 +228,7 @@ class TestQuicTransport
     transportClosed = true;
   }
 
-  void invokeAckTimeout() {
+  void AckTimeout() {
     ackTimeoutExpired();
   }
 
@@ -237,6 +238,31 @@ class TestQuicTransport
 
   void invokeIdleTimeout() {
     idleTimeout_.timeoutExpired();
+  }
+
+  void invokeAckTimeout() {
+    ackTimeout_.timeoutExpired();
+  }
+
+  void invokeSendPing(
+      quic::QuicSocket::PingCallback* cb,
+      std::chrono::milliseconds interval) {
+    sendPing(cb, interval);
+  }
+
+  void invokeCancelPingTimeout() {
+    pingTimeout_.cancelTimeout();
+  }
+
+  void invokeHandlePingCallback() {
+    handlePingCallback();
+  }
+
+  bool isPingTimeoutScheduled() {
+    if (pingTimeout_.isScheduled()) {
+      return true;
+    }
+    return false;
   }
 
   auto& writeLooper() {
@@ -2426,6 +2452,30 @@ TEST_F(QuicTransportImplTest, CloseFromCancelDeliveryCallbacksForStream) {
   EXPECT_CALL(deliveryCallback2, onCanceled(stream1, _));
   EXPECT_CALL(deliveryCallback3, onCanceled(stream2, _));
   transport->cancelDeliveryCallbacksForStream(stream1);
+}
+
+TEST_F(QuicTransportImplTest, SuccessfulPing) {
+  auto conn = transport->transportConn;
+  std::chrono::milliseconds interval(10);
+  transport->invokeSendPing(nullptr, interval);
+  EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
+  EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
+  conn->pendingEvents.cancelPingTimeout = true;
+  transport->invokeHandlePingCallback();
+  EXPECT_EQ(transport->isPingTimeoutScheduled(), false);
+  EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
+}
+
+TEST_F(QuicTransportImplTest, FailedPing) {
+  auto conn = transport->transportConn;
+  std::chrono::milliseconds interval(10);
+  transport->invokeSendPing(nullptr, interval);
+  EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
+  EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
+  conn->pendingEvents.cancelPingTimeout = true;
+  transport->invokeCancelPingTimeout();
+  transport->invokeHandlePingCallback();
+  EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
 
 } // namespace test

@@ -60,7 +60,7 @@ PaddingFrame decodePaddingFrame(folly::io::Cursor&) {
   return PaddingFrame();
 }
 
-PingFrame decodePingFrame(folly::io::Cursor& /* cursor */) {
+PingFrame decodePingFrame(folly::io::Cursor&) {
   return PingFrame();
 }
 

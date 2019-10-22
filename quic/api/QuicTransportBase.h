@@ -367,6 +367,26 @@ class QuicTransportBase : public QuicSocket {
     QuicTransportBase* transport_;
   };
 
+  class PingTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    ~PingTimeout() override = default;
+
+    explicit PingTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->pingTimeoutExpired();
+    }
+
+    void callbackCanceled() noexcept override {
+      // ignore, as this happens only when event  base dies
+      return;
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
   class PathValidationTimeout : public folly::HHWheelTimer::Callback {
    public:
     ~PathValidationTimeout() override = default;
@@ -460,6 +480,7 @@ class QuicTransportBase : public QuicSocket {
   void updateReadLooper();
   void updatePeekLooper();
   void updateWriteLooper(bool thisIteration);
+  void handlePingCallback();
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);
@@ -521,10 +542,14 @@ class QuicTransportBase : public QuicSocket {
   void pathValidationTimeoutExpired() noexcept;
   void idleTimeoutExpired(bool drain) noexcept;
   void drainTimeoutExpired() noexcept;
+  void pingTimeoutExpired() noexcept;
 
   void setIdleTimer();
   void scheduleAckTimeout();
   void schedulePathValidationTimeout();
+  void schedulePingTimeout(
+      PingCallback* callback,
+      std::chrono::milliseconds pingTimeout);
 
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
@@ -570,6 +595,7 @@ class QuicTransportBase : public QuicSocket {
       deliveryCallbacks_;
   std::unordered_map<StreamId, DataExpiredCallbackData> dataExpiredCallbacks_;
   std::unordered_map<StreamId, DataRejectedCallbackData> dataRejectedCallbacks_;
+  PingCallback* pingCallback_;
 
   WriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, WriteCallback*> pendingWriteCallbacks_;
@@ -581,6 +607,7 @@ class QuicTransportBase : public QuicSocket {
   PathValidationTimeout pathValidationTimeout_;
   IdleTimeout idleTimeout_;
   DrainTimeout drainTimeout_;
+  PingTimeout pingTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
   FunctionLooper::Ptr writeLooper_;

@@ -62,7 +62,6 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       "The sun is in the sky.",
       FrameType::ACK);
   MaxStreamsFrame maxStreamsFrame(4321, true);
-  PingFrame pingFrame;
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
@@ -78,10 +77,11 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   uint64_t cryptoOffset = 0;
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
+  PingFrame pingFrame{};
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
-  writeFrame(pingFrame, regularBuilder1);
+  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
       regularBuilder1,
@@ -135,14 +135,22 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       }
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
-        const MaxStreamsFrame* maxStreamFrame = simpleFrame.asMaxStreamsFrame();
-        EXPECT_NE(maxStreamFrame, nullptr);
-        EXPECT_EQ(4321, maxStreamFrame->maxStreams);
-        break;
-      }
-      case QuicWriteFrame::Type::PingFrame_E: {
-        const PingFrame& ping = *frame.asPingFrame();
-        EXPECT_EQ(PingFrame(), ping);
+        switch (simpleFrame.type()) {
+          case QuicSimpleFrame::Type::MaxStreamsFrame_E: {
+            const MaxStreamsFrame* maxStreamFrame =
+                simpleFrame.asMaxStreamsFrame();
+            EXPECT_NE(maxStreamFrame, nullptr);
+            EXPECT_EQ(4321, maxStreamFrame->maxStreams);
+            break;
+          }
+          case QuicSimpleFrame::Type::PingFrame_E: {
+            const PingFrame* simplePingFrame = simpleFrame.asPingFrame();
+            EXPECT_NE(simplePingFrame, nullptr);
+            break;
+          }
+          default:
+            EXPECT_TRUE(false); /* fail if this happens */
+        }
         break;
       }
       case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -356,7 +364,6 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       "The sun is in the sky.",
       FrameType::ACK);
   StreamsBlockedFrame maxStreamIdFrame(0x1024, true);
-  PingFrame pingFrame;
   IntervalSet<PacketNum> ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
@@ -367,11 +374,11 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   auto streamId = stream->id;
   auto buf =
       folly::IOBuf::copyBuffer("You can't deny you are looking for the sunset");
-
+  PingFrame pingFrame;
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(maxStreamIdFrame, regularBuilder1);
-  writeFrame(pingFrame, regularBuilder1);
+  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
       regularBuilder1,
@@ -407,7 +414,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
   PingFrame pingFrame;
-  writeFrame(pingFrame, regularBuilder);
+  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1000);
   QuicServerConnectionState conn;

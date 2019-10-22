@@ -598,6 +598,8 @@ struct QuicConnectionStateBase {
 
     // Number of probing packets to send after PTO
     uint8_t numProbePackets{0};
+
+    bool cancelPingTimeout{false};
   };
 
   PendingEvents pendingEvents;

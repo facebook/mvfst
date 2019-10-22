@@ -5,6 +5,10 @@ void addQuicSimpleFrameToEvent(
     quic::QLogPacketEvent* event,
     const quic::QuicSimpleFrame& simpleFrame) {
   switch (simpleFrame.type()) {
+    case quic::QuicSimpleFrame::Type::PingFrame_E: {
+      event->frames.push_back(std::make_unique<quic::PingFrameLog>());
+      break;
+    }
     case quic::QuicSimpleFrame::Type::StopSendingFrame_E: {
       const quic::StopSendingFrame& frame = *simpleFrame.asStopSendingFrame();
       event->frames.push_back(std::make_unique<quic::StopSendingFrameLog>(
@@ -121,10 +125,6 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         const auto& frame = *quicFrame.asMaxStreamDataFrame();
         event->frames.push_back(std::make_unique<MaxStreamDataFrameLog>(
             frame.streamId, frame.maximumData));
-        break;
-      }
-      case QuicFrame::Type::PingFrame_E: {
-        event->frames.push_back(std::make_unique<PingFrameLog>());
         break;
       }
       case QuicFrame::Type::DataBlockedFrame_E: {
@@ -244,9 +244,6 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             frame.streamLimit, frame.isForBidirectional));
         break;
       }
-      case QuicWriteFrame::Type::PingFrame_E:
-        event->frames.push_back(std::make_unique<PingFrameLog>());
-        break;
       case QuicWriteFrame::Type::DataBlockedFrame_E: {
         const DataBlockedFrame& frame = *quicFrame.asDataBlockedFrame();
         event->frames.push_back(

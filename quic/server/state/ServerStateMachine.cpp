@@ -16,6 +16,7 @@
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicTransportStatsCallback.h>
+#include <quic/state/SimpleFrameFunctions.h>
 
 namespace quic {
 using namespace std::chrono_literals;
@@ -800,6 +801,12 @@ void onServerReadDataFromOpen(
                     commonAckVisitorForAckFrame(ackState, frame);
                     break;
                   }
+                  case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+                    const QuicSimpleFrame& frame =
+                        *packetFrame.asQuicSimpleFrame();
+                    updateSimpleFrameOnAck(conn, frame);
+                    break;
+                  }
                   default: {
                     break;
                   }
@@ -962,11 +969,6 @@ void onServerReadDataFromOpen(
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
           isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
               conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
-          break;
-        }
-        case QuicFrame::Type::PingFrame_E: {
-          pktHasRetransmittableData = true;
-          isNonProbingPacket = true;
           break;
         }
         default: {
