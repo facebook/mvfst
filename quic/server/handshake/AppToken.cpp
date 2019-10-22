@@ -9,7 +9,7 @@
 #include <quic/server/handshake/AppToken.h>
 
 #include <quic/QuicConstants.h>
-#include <quic/handshake/TransportParameters.h>
+#include <quic/handshake/FizzTransportParameters.h>
 
 #include <fizz/record/Types.h>
 #include <folly/IPAddress.h>

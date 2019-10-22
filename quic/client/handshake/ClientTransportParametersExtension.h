@@ -9,7 +9,7 @@
 #pragma once
 
 #include <fizz/client/ClientExtensions.h>
-#include <quic/handshake/TransportParameters.h>
+#include <quic/handshake/FizzTransportParameters.h>
 
 namespace quic {
 
