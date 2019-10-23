@@ -399,7 +399,9 @@ void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoState) {
   // This does not include data that is already deemed as lost, or data that
   // is pending in the write buffer.
   cryptoState.initialStream.retransmissionBuffer.clear();
+  cryptoState.initialStream.lossBuffer.clear();
   cryptoState.handshakeStream.retransmissionBuffer.clear();
+  cryptoState.handshakeStream.lossBuffer.clear();
 }
 
 QuicCryptoStream* getCryptoStream(

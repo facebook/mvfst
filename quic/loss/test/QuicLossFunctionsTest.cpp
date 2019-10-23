@@ -463,6 +463,42 @@ TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostAfterCancelRetransmission) {
   EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 0);
 }
 
+TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostCancel) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+
+  auto packetSeqNum = conn->ackStates.handshakeAckState.nextPacketNum;
+  LongHeader header(
+      LongHeader::Types::Handshake,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      packetSeqNum,
+      *conn->version);
+  writeDataToQuicStream(
+      conn->cryptoState->handshakeStream, folly::IOBuf::copyBuffer("CFIN"));
+  writeCryptoAndAckDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      LongHeader::Types::Handshake,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_EQ(conn->outstandingPackets.size(), 1);
+  EXPECT_GT(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
+  auto& packet = conn->outstandingPackets.front().packet;
+  auto packetNum = packet.header.getPacketSequenceNum();
+  markPacketLoss(*conn, packet, false, packetNum);
+  EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
+  EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 1);
+  cancelHandshakeCryptoStreamRetransmissions(*conn->cryptoState);
+  EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
+  EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 0);
+}
+
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
