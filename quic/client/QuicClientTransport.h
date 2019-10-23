@@ -128,6 +128,8 @@ class QuicClientTransport
   bool setCustomTransportParameter(
       std::unique_ptr<CustomTransportParameter> customParam);
 
+  void setQLogger(std::shared_ptr<QLogger> qLogger) override;
+
   class HappyEyeballsConnAttemptDelayTimeout
       : public folly::HHWheelTimer::Callback {
    public:

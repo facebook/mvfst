@@ -460,7 +460,7 @@ class QuicTransportBase : public QuicSocket {
     conn_->logger = std::move(logger);
   }
 
-  void setQLogger(std::shared_ptr<QLogger> qLogger) {
+  virtual void setQLogger(std::shared_ptr<QLogger> qLogger) {
     conn_->qLogger = std::move(qLogger);
   }
 

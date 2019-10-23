@@ -28,6 +28,7 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/FileQLogger.h>
+#include <quic/logging/test/Mocks.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 
@@ -1830,6 +1831,14 @@ TEST_F(QuicClientTransportTest, IdleTimerResetOnWritingFirstData) {
   loopForWrites();
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_TRUE(client->idleTimeout().isScheduled());
+}
+
+TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
+  client->setQLogger(nullptr);
+  auto mockQLogger = std::make_shared<MockQLogger>();
+  client->setQLogger(mockQLogger);
+  EXPECT_EQ(client->getConn().clientConnectionId, mockQLogger->dcid);
+  client->closeNow(folly::none);
 }
 
 class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
