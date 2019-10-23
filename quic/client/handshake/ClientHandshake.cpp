@@ -208,6 +208,36 @@ const folly::Optional<std::string>& ClientHandshake::getApplicationProtocol()
   }
 }
 
+void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
+  auto aead = buildAead(kind, secret);
+  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
+  switch (kind) {
+    case CipherKind::HandshakeWrite:
+      handshakeWriteCipher_ = std::move(aead);
+      handshakeWriteHeaderCipher_ = std::move(packetNumberCipher);
+      break;
+    case CipherKind::HandshakeRead:
+      handshakeReadCipher_ = std::move(aead);
+      handshakeReadHeaderCipher_ = std::move(packetNumberCipher);
+      break;
+    case CipherKind::OneRttWrite:
+      oneRttWriteCipher_ = std::move(aead);
+      oneRttWriteHeaderCipher_ = std::move(packetNumberCipher);
+      break;
+    case CipherKind::OneRttRead:
+      oneRttReadCipher_ = std::move(aead);
+      oneRttReadHeaderCipher_ = std::move(packetNumberCipher);
+      break;
+    case CipherKind::ZeroRttWrite:
+      zeroRttWriteCipher_ = std::move(aead);
+      zeroRttWriteHeaderCipher_ = std::move(packetNumberCipher);
+      break;
+    default:
+      // Report error?
+      break;
+  }
+}
+
 EncryptionLevel ClientHandshake::getReadRecordLayerEncryptionLevel() {
   return getEncryptionLevelFromFizz(
       state_.readRecordLayer()->getEncryptionLevel());
@@ -215,6 +245,27 @@ EncryptionLevel ClientHandshake::getReadRecordLayerEncryptionLevel() {
 
 void ClientHandshake::processSocketData(folly::IOBufQueue& queue) {
   processActions(machine_.processSocketData(state_, queue));
+}
+
+std::unique_ptr<Aead> ClientHandshake::buildAead(
+    CipherKind kind,
+    folly::ByteRange secret) {
+  bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
+  fizz::CipherSuite cipher =
+      isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
+  std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
+      ? state_.context()->getFactory()->makeKeyScheduler(cipher)
+      : nullptr;
+  fizz::KeyScheduler& keyScheduler =
+      isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
+
+  return FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
+      *state_.context()->getFactory(),
+      keyScheduler,
+      cipher,
+      secret,
+      kQuicKeyLabel,
+      kQuicIVLabel));
 }
 
 void ClientHandshake::writeDataToStream(
@@ -334,67 +385,40 @@ class ClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
         secretAvailable.secret.type,
         [&](fizz::EarlySecrets earlySecrets) {
           switch (earlySecrets) {
-            case fizz::EarlySecrets::ClientEarlyTraffic: {
-              auto cipher = client_.state_.earlyDataParams()->cipher;
-              auto keyScheduler =
-                  client_.state_.context()->getFactory()->makeKeyScheduler(
-                      cipher);
-              client_.zeroRttWriteCipher_ =
-                  FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
-                      *client_.state_.context()->getFactory(),
-                      *keyScheduler,
-                      cipher,
-                      folly::range(secretAvailable.secret.secret),
-                      kQuicKeyLabel,
-                      kQuicIVLabel));
-              client_.zeroRttWriteHeaderCipher_ =
-                  client_.cryptoFactory_->makePacketNumberCipher(
-                      folly::range(secretAvailable.secret.secret));
+            case fizz::EarlySecrets::ClientEarlyTraffic:
+              client_.computeCiphers(
+                  CipherKind::ZeroRttWrite,
+                  folly::range(secretAvailable.secret.secret));
               break;
-            }
             default:
               break;
           }
         },
         [&](fizz::HandshakeSecrets handshakeSecrets) {
-          auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
-              *client_.state_.context()->getFactory(),
-              *client_.state_.keyScheduler(),
-              *client_.state_.cipher(),
-              folly::range(secretAvailable.secret.secret),
-              kQuicKeyLabel,
-              kQuicIVLabel);
-          auto headerCipher = client_.cryptoFactory_->makePacketNumberCipher(
-              folly::range(secretAvailable.secret.secret));
           switch (handshakeSecrets) {
             case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-              client_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
-              client_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
+              client_.computeCiphers(
+                  CipherKind::HandshakeWrite,
+                  folly::range(secretAvailable.secret.secret));
               break;
             case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-              client_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
-              client_.handshakeReadHeaderCipher_ = std::move(headerCipher);
+              client_.computeCiphers(
+                  CipherKind::HandshakeRead,
+                  folly::range(secretAvailable.secret.secret));
               break;
           }
         },
         [&](fizz::AppTrafficSecrets appSecrets) {
-          auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
-              *client_.state_.context()->getFactory(),
-              *client_.state_.keyScheduler(),
-              *client_.state_.cipher(),
-              folly::range(secretAvailable.secret.secret),
-              kQuicKeyLabel,
-              kQuicIVLabel);
-          auto appHeaderCipher = client_.cryptoFactory_->makePacketNumberCipher(
-              folly::range(secretAvailable.secret.secret));
           switch (appSecrets) {
             case fizz::AppTrafficSecrets::ClientAppTraffic:
-              client_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
-              client_.oneRttWriteHeaderCipher_ = std::move(appHeaderCipher);
+              client_.computeCiphers(
+                  CipherKind::OneRttWrite,
+                  folly::range(secretAvailable.secret.secret));
               break;
             case fizz::AppTrafficSecrets::ServerAppTraffic:
-              client_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
-              client_.oneRttReadHeaderCipher_ = std::move(appHeaderCipher);
+              client_.computeCiphers(
+                  CipherKind::OneRttRead,
+                  folly::range(secretAvailable.secret.secret));
               break;
           }
         },

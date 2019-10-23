@@ -159,6 +159,14 @@ class ClientHandshake : public Handshake {
   // in the stream.
   Phase phase_{Phase::Initial};
 
+  enum class CipherKind {
+    HandshakeWrite,
+    HandshakeRead,
+    OneRttWrite,
+    OneRttRead,
+    ZeroRttWrite,
+  };
+
   std::unique_ptr<Aead> handshakeWriteCipher_;
   std::unique_ptr<Aead> handshakeReadCipher_;
   std::unique_ptr<Aead> oneRttReadCipher_;
@@ -169,8 +177,9 @@ class ClientHandshake : public Handshake {
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher_;
-
   std::unique_ptr<PacketNumberCipher> zeroRttWriteHeaderCipher_;
+
+  void computeCiphers(CipherKind kind, folly::ByteRange secret);
 
   folly::Optional<bool> zeroRttRejected_;
   HandshakeCallback* callback_{nullptr};
@@ -179,6 +188,7 @@ class ClientHandshake : public Handshake {
  private:
   EncryptionLevel getReadRecordLayerEncryptionLevel();
   void processSocketData(folly::IOBufQueue& queue);
+  std::unique_ptr<Aead> buildAead(CipherKind kind, folly::ByteRange secret);
 
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
   void computeZeroRttCipher();
