@@ -15,7 +15,7 @@ namespace quic {
 namespace tperf {
 class TperfQLogger : public FileQLogger {
  public:
-  explicit TperfQLogger(std::string vantagePoint, const std::string& path);
+  explicit TperfQLogger(VantagePoint vantagePoint, const std::string& path);
   virtual ~TperfQLogger() override;
 
   void setPacingObserver(std::unique_ptr<PacingObserver> pacingObserver);

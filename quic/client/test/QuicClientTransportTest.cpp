@@ -448,7 +448,7 @@ TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
@@ -470,7 +470,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   // Point the client to a bad server.
   client->addNewPeerAddress(SocketAddress("127.0.0.1", 14114));
@@ -487,7 +487,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
 
 TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   expectTransportCallbacks();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   TransportSettings settings;
   settings.connectUDP = true;
@@ -509,7 +509,7 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
 
 TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
   expectTransportCallbacks();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   TransportSettings settings;
   settings.connectUDP = true;
@@ -584,7 +584,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   expectTransportCallbacks();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
   pskCache_->putPsk(hostname, cachedPsk);
@@ -1733,7 +1733,7 @@ TEST_F(
     NetworkUnreachableIsFatalIfContinueAfterDeadline) {
   TransportSettings settings;
   settings.continueOnNetworkUnreachable = true;
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
 
   client->setTransportSettings(settings);
@@ -2685,7 +2685,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   setConnectionIds();
 
   StreamId streamId = client->createBidirectionalStream().value();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
 
   client->setReadCallback(streamId, &readCb);
@@ -2832,7 +2832,7 @@ bool verifyFramePresent(
 
 TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   StreamId streamId = client->createBidirectionalStream().value();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
@@ -2967,7 +2967,7 @@ TEST_P(
     QuicClientTransportAfterStartTestClose,
     CloseConnectionWithErrorCleartext) {
   StreamId streamId = client->createBidirectionalStream().value();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
@@ -3271,7 +3271,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnDuplicatePacket) {
 }
 
 TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   StreamId streamId = client->createBidirectionalStream().value();
 
@@ -3372,7 +3372,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvDataAfterIdleTimeout) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(*sock, close());
   client->idleTimeout().timeoutExpired();
@@ -3802,7 +3802,7 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   // Create a stream and attempt to send some data to the server
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
 
   StreamId streamId = *client->createBidirectionalStream();
@@ -4313,7 +4313,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
 
   ShortHeader header(
@@ -4993,7 +4993,7 @@ INSTANTIATE_TEST_CASE_P(
     ::Values(0, 8));
 
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;
@@ -5032,7 +5032,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
       ConnectionId(std::vector<uint8_t>(connIdSize, 1));
   setConnectionIds();
 
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   client->getNonConstConn().qLogger = qLogger;
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;

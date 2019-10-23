@@ -32,8 +32,8 @@ TEST_F(QLoggerTest, TestRegularWritePacket) {
   RegularQuicWritePacket regularWritePacket =
       createRegularQuicWritePacket(streamId, offset, len, fin);
 
-  FileQLogger q(fakeProtocolType, kQLogClientVantagePoint);
-  EXPECT_EQ(q.vantagePoint, kQLogClientVantagePoint);
+  FileQLogger q(VantagePoint::CLIENT, fakeProtocolType);
+  EXPECT_EQ(q.vantagePoint, VantagePoint::CLIENT);
   EXPECT_EQ(q.protocolType, fakeProtocolType);
   q.addPacket(regularWritePacket, 10);
 
@@ -55,7 +55,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacket(regularQuicPacket, 10);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -70,7 +70,7 @@ TEST_F(QLoggerTest, TestRegularPacket) {
 
 TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
   bool isPacketRecvd = false;
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   auto packet = createVersionNegotiationPacket();
   q.addPacket(packet, 10, isPacketRecvd);
 
@@ -82,7 +82,7 @@ TEST_F(QLoggerTest, TestVersionNegotiationPacket) {
 }
 
 TEST_F(QLoggerTest, ConnectionCloseEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
   q.addConnectionClose(error, "Connection close", true, false);
 
@@ -94,7 +94,7 @@ TEST_F(QLoggerTest, ConnectionCloseEvent) {
 }
 
 TEST_F(QLoggerTest, TransportSummaryEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addTransportSummary(8, 9, 5, 3, 2, 554, 100, 32, 134, 238);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -113,7 +113,7 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
 }
 
 TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addCongestionMetricUpdate(
       20,
       30,
@@ -136,7 +136,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, PacingMetricUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacingMetricUpdate(10, 30us);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -147,7 +147,7 @@ TEST_F(QLoggerTest, PacingMetricUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, AppIdleUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addAppIdleUpdate(kAppIdle, false);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -158,7 +158,7 @@ TEST_F(QLoggerTest, AppIdleUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, PacketDropEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketDrop(5, kCipherUnavailable);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -169,7 +169,7 @@ TEST_F(QLoggerTest, PacketDropEvent) {
 }
 
 TEST_F(QLoggerTest, DatagramReceivedEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addDatagramReceived(100);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -179,7 +179,7 @@ TEST_F(QLoggerTest, DatagramReceivedEvent) {
 }
 
 TEST_F(QLoggerTest, LossAlarmEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addLossAlarm(PacketNum{1}, 3983, 893, kPtoAlarm);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -192,7 +192,7 @@ TEST_F(QLoggerTest, LossAlarmEvent) {
 }
 
 TEST_F(QLoggerTest, PacketsLostEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketsLost(PacketNum{42}, 332, 89);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -204,7 +204,7 @@ TEST_F(QLoggerTest, PacketsLostEvent) {
 }
 
 TEST_F(QLoggerTest, TransportStateUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   std::string update = "start";
   q.addTransportStateUpdate(update);
 
@@ -215,7 +215,7 @@ TEST_F(QLoggerTest, TransportStateUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, PacketBufferedEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -227,7 +227,7 @@ TEST_F(QLoggerTest, PacketBufferedEvent) {
 }
 
 TEST_F(QLoggerTest, PacketAckEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketAck(PacketNumberSpace{100}, PacketNum{10});
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -238,7 +238,7 @@ TEST_F(QLoggerTest, PacketAckEvent) {
 }
 
 TEST_F(QLoggerTest, MetricUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addMetricUpdate(10us, 11us, 12us, 13us);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -251,7 +251,7 @@ TEST_F(QLoggerTest, MetricUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, StreamStateUpdateEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addStreamStateUpdate(streamId, kAbort);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
@@ -262,7 +262,7 @@ TEST_F(QLoggerTest, StreamStateUpdateEvent) {
 }
 
 TEST_F(QLoggerTest, PacketPaddingFrameEvent) {
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   auto packet = createPacketWithPaddingFrames();
   q.addPacket(packet, 100);
 
@@ -346,7 +346,7 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::SERVER);
   q.addPacket(regularQuicPacket, 10);
 
   q.logs[0]->refTime = 31us;
@@ -389,7 +389,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacket(regularQuicPacket, 10);
 
   folly::dynamic gotDynamic = q.toDynamic();
@@ -428,7 +428,7 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
   RegularQuicWritePacket packet =
       createRegularQuicWritePacket(streamId, offset, len, fin);
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.dcid = getTestConnectionId(0);
   q.scid = getTestConnectionId(1);
   q.addPacket(packet, 10);
@@ -473,7 +473,7 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
        ])");
 
   RegularQuicWritePacket packet = createPacketWithAckFrames();
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacket(packet, 1001);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -503,7 +503,7 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
    ])");
 
   auto packet = createVersionNegotiationPacket();
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.dcid = getTestConnectionId(0);
   q.scid = getTestConnectionId(1);
   q.addPacket(packet, 10, isPacketRecvd);
@@ -628,7 +628,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
    ]
  })");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::SERVER);
   auto versionPacket = createVersionNegotiationPacket();
   RegularQuicWritePacket regPacket = createPacketWithAckFrames();
   auto packet = createStreamPacket(
@@ -701,7 +701,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
            ]
   ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   RegularQuicWritePacket packet =
       createNewPacket(100, PacketNumberSpace::Initial);
 
@@ -736,7 +736,7 @@ TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
            }
          ]])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   auto error = toString(LocalErrorCode::CONNECTION_RESET);
   q.addConnectionClose(error, "Connection changed", true, false);
   folly::dynamic gotDynamic = q.toDynamic();
@@ -768,7 +768,7 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
    ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addTransportSummary(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -794,7 +794,7 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addCongestionMetricUpdate(
       20,
       30,
@@ -821,7 +821,7 @@ TEST_F(QLoggerTest, PacingMetricUpdateFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacingMetricUpdate(20, 30us);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -844,7 +844,7 @@ TEST_F(QLoggerTest, AppIdleFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addAppIdleUpdate(kAppIdle, true);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -867,7 +867,7 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketDrop(100, kMaxBuffered);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -889,7 +889,7 @@ TEST_F(QLoggerTest, DatagramReceivedFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addDatagramReceived(8);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -914,7 +914,7 @@ TEST_F(QLoggerTest, LossAlarmFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addLossAlarm(PacketNum{100}, 14, 38, kHandshakeAlarm);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -938,7 +938,7 @@ TEST_F(QLoggerTest, PacketsLostFollyDynamic) {
       ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketsLost(PacketNum{10}, 9, 8);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -960,7 +960,7 @@ TEST_F(QLoggerTest, TransportStateUpdateFollyDynamic) {
     ]
 ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addTransportStateUpdate("transport ready");
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -984,7 +984,7 @@ TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
     ]
 ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -1007,7 +1007,7 @@ TEST_F(QLoggerTest, PacketAckFollyDynamic) {
     ]
 ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addPacketAck(PacketNumberSpace{100}, PacketNum{10});
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -1032,7 +1032,7 @@ TEST_F(QLoggerTest, MetricUpdateFollyDynamic) {
     ]
 ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addMetricUpdate(10us, 11us, 12us, 13us);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -1055,7 +1055,7 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
     ]
 ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   q.addStreamStateUpdate(streamId, kAbort);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
@@ -1087,7 +1087,7 @@ TEST_F(QLoggerTest, PaddingFramesFollyDynamic) {
    ]
  ])");
 
-  FileQLogger q;
+  FileQLogger q(VantagePoint::CLIENT);
   auto packet = createPacketWithPaddingFrames();
   q.addPacket(packet, 100);
   folly::dynamic gotDynamic = q.toDynamic();

@@ -248,7 +248,8 @@ folly::dynamic FileQLogger::toDynamic() const {
   folly::dynamic dynamicTrace = folly::dynamic::object;
 
   dynamicTrace["vantage_point"] =
-      folly::dynamic::object("type", vantagePoint)("name", vantagePoint);
+      folly::dynamic::object("type", vantagePointString(vantagePoint))(
+          "name", vantagePointString(vantagePoint));
   dynamicTrace["title"] = kQLogTraceTitle;
   dynamicTrace["description"] = kQLogTraceDescription;
   dynamicTrace["configuration"] =

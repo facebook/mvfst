@@ -555,7 +555,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
 
 TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   auto conn = createConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn->qLogger = qLogger;
   conn->lossState.ptoCount = 100;
   conn->lossState.reorderingThreshold = 10;
@@ -600,7 +600,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
 
 TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   auto conn = createConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn->qLogger = qLogger;
   conn->lossState.ptoCount = 10;
   conn->lossState.handshakeAlarmCount = 5;
@@ -885,7 +885,7 @@ TEST_F(
     QuicLossFunctionsTest,
     WhenHandshakeOutstandingAlarmMarksAllHandshakeAsLoss) {
   auto conn = createConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn->qLogger = qLogger;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -939,7 +939,7 @@ TEST_F(
 
 TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   auto conn = createClientConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn->qLogger = qLogger;
   conn->oneRttWriteCipher = createNoOpAead();
   conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
@@ -1268,7 +1268,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
 
 TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
   auto conn = createConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn->qLogger = qLogger;
   conn->lossState.totalPTOCount = 100;
   EXPECT_CALL(*transportInfoCb_, onPTO());
@@ -1288,7 +1288,7 @@ TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
 
 TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {
   auto conn = createConn();
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn->qLogger = qLogger;
   conn->transportSettings.maxNumPTOs = 3;
   EXPECT_CALL(*transportInfoCb_, onPTO()).Times(3);

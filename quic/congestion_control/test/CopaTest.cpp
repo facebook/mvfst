@@ -145,7 +145,7 @@ TEST_F(CopaTest, TestWritableBytes) {
 TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn;
   Copa copa(conn);
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
 
@@ -177,7 +177,7 @@ TEST_F(CopaTest, PersistentCongestion) {
 TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn;
   Copa copa(conn);
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
 
@@ -208,7 +208,7 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
 TEST_F(CopaTest, TestSlowStartAck) {
   QuicServerConnectionState conn;
   Copa copa(conn);
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   EXPECT_TRUE(copa.inSlowStart());
   // initial cwnd = 10 packets
@@ -346,7 +346,7 @@ TEST_F(CopaTest, TestVelocity) {
   QuicServerConnectionState conn;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   Copa copa(conn);
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   conn.transportSettings.pacingEnabled = true;
 
@@ -439,7 +439,7 @@ TEST_F(CopaTest, TestVelocity) {
 TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   QuicServerConnectionState conn;
   Copa copa(conn);
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;

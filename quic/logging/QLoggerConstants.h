@@ -64,8 +64,6 @@ constexpr auto kAbort = "abort";
 constexpr auto kQLogVersion = "draft-00";
 constexpr auto kQLogTitle = "mvfst qlog";
 constexpr auto kQLogDescription = "Converted from file";
-constexpr auto kQLogServerVantagePoint = "SERVER";
-constexpr auto kQLogClientVantagePoint = "CLIENT";
 constexpr auto kQLogTraceTitle = "mvfst qlog from single connection";
 constexpr auto kQLogTraceDescription = "Generated qlog from connection";
 constexpr auto kQLogTimeUnits = "us";
@@ -80,5 +78,14 @@ constexpr auto kHeaders = "headers";
 constexpr auto kOnHeaders = "on headers";
 constexpr auto kOnError = "on error";
 constexpr auto kPushPromise = "push promise";
+
+enum class VantagePoint : uint8_t {
+  CLIENT,
+  SERVER,
+};
+constexpr folly::StringPiece kQLogServerVantagePoint = "SERVER";
+constexpr folly::StringPiece kQLogClientVantagePoint = "CLIENT";
+
+folly::StringPiece vantagePointString(VantagePoint vantagePoint) noexcept;
 
 } // namespace quic

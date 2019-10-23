@@ -2,8 +2,8 @@
 
 namespace quic { namespace tperf {
 
-TperfQLogger::TperfQLogger(std::string vantagePoint, const std::string& path)
-    : FileQLogger(kHTTP3ProtocolType, std::move(vantagePoint)), path_(path) {}
+TperfQLogger::TperfQLogger(VantagePoint vantagePoint, const std::string& path)
+    : FileQLogger(vantagePoint, kHTTP3ProtocolType), path_(path) {}
 
 TperfQLogger::~TperfQLogger() {
   outputLogsToFile(path_, true /* prttyJson */);

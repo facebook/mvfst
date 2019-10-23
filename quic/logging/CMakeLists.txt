@@ -5,10 +5,11 @@
 
 add_library(
   mvfst_qlogger STATIC
-  QLogger.cpp
   BaseQLogger.cpp
-  QLoggerTypes.cpp
   FileQLogger.cpp
+  QLogger.cpp
+  QLoggerConstants.cpp
+  QLoggerTypes.cpp
 )
 
 target_include_directories(

@@ -10,6 +10,7 @@
 
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
+#include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
 
@@ -24,12 +25,15 @@ struct PacingObserver {
 
 class QLogger {
  public:
+  explicit QLogger(VantagePoint vantagePointIn, std::string protocolTypeIn)
+      : vantagePoint(vantagePointIn), protocolType(std::move(protocolTypeIn)) {}
+
   folly::Optional<ConnectionId> dcid;
   folly::Optional<ConnectionId> scid;
   std::chrono::steady_clock::time_point refTimePoint{
       std::chrono::steady_clock::now()};
+  VantagePoint vantagePoint;
   std::string protocolType;
-  std::string vantagePoint;
   QLogger() = default;
   virtual ~QLogger() = default;
   virtual void addPacket(

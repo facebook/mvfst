@@ -414,7 +414,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
 
 TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   QuicServerConnectionState conn;
-  auto qLogger = std::make_shared<FileQLogger>();
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   conn.qLogger = qLogger;
 
   // First rtt sample, will be assign to both srtt and mrtt

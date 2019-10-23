@@ -16,6 +16,9 @@ namespace quic {
 
 class BaseQLogger : public QLogger {
  public:
+  explicit BaseQLogger(VantagePoint vantagePointIn, std::string protocolTypeIn)
+      : QLogger(vantagePointIn, std::move(protocolTypeIn)) {}
+
   ~BaseQLogger() override = default;
 
  protected:
