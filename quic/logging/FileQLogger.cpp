@@ -301,7 +301,6 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
       folly::to<std::string>(path, "/", (dcid.value()).hex(), ".qlog");
   std::ofstream fileObj(outputPath);
   if (fileObj) {
-    LOG(INFO) << "Logging QLogger JSON to file: " << outputPath;
     auto qLog = prettyJson ? folly::toPrettyJson(toDynamic())
                            : folly::toJson(toDynamic());
     fileObj << qLog;
