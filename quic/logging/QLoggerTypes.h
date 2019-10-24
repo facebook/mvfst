@@ -10,6 +10,7 @@
 
 #include <folly/dynamic.h>
 #include <quic/codec/Types.h>
+#include <quic/logging/QLoggerConstants.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -603,11 +604,17 @@ class QLogStreamStateUpdateEvent : public QLogEvent {
   QLogStreamStateUpdateEvent(
       StreamId id,
       std::string update,
+      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation,
+      VantagePoint vantagePoint,
       std::chrono::microseconds refTime);
   ~QLogStreamStateUpdateEvent() override = default;
   StreamId id;
   std::string update;
+  folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation;
   folly::dynamic toDynamic() const override;
+
+ private:
+  VantagePoint vantagePoint_;
 };
 
 std::string toString(QLogEventType type);

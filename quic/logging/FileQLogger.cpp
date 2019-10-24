@@ -277,12 +277,19 @@ folly::dynamic FileQLogger::toDynamic() const {
   return dynamicObj;
 }
 
-void FileQLogger::addStreamStateUpdate(quic::StreamId id, std::string update) {
+void FileQLogger::addStreamStateUpdate(
+    quic::StreamId id,
+    std::string update,
+    folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now() - refTimePoint);
 
   logs.push_back(std::make_unique<quic::QLogStreamStateUpdateEvent>(
-      id, std::move(update), refTime));
+      id,
+      std::move(update),
+      std::move(timeSinceStreamCreation),
+      vantagePoint,
+      refTime));
 }
 
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {

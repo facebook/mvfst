@@ -107,7 +107,8 @@ class QLogger {
       std::chrono::microseconds ackDelay) = 0;
   virtual void addStreamStateUpdate(
       quic::StreamId streamId,
-      std::string update) = 0;
+      std::string update,
+      folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) = 0;
 };
 
 std::string getFlowControlEvent(int offset);

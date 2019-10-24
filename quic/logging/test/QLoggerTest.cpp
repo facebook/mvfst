@@ -252,13 +252,14 @@ TEST_F(QLoggerTest, MetricUpdateEvent) {
 
 TEST_F(QLoggerTest, StreamStateUpdateEvent) {
   FileQLogger q(VantagePoint::CLIENT);
-  q.addStreamStateUpdate(streamId, kAbort);
+  q.addStreamStateUpdate(streamId, kAbort, 20ms);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogStreamStateUpdateEvent*>(p.get());
 
   EXPECT_EQ(gotEvent->id, streamId);
   EXPECT_EQ(gotEvent->update, kAbort);
+  EXPECT_EQ(20ms, gotEvent->timeSinceStreamCreation);
 }
 
 TEST_F(QLoggerTest, PacketPaddingFrameEvent) {
@@ -1040,6 +1041,79 @@ TEST_F(QLoggerTest, MetricUpdateFollyDynamic) {
   EXPECT_EQ(expected, gotEvents);
 }
 
+TEST_F(QLoggerTest, StreamStateUpdateFollyDynamicTTFB) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "HTTP3",
+      "STREAM_STATE_UPDATE",
+      "DEFAULT",
+      {
+        "id": 10,
+        "ttfb": 20,
+        "update": "on headers"
+      }
+    ]
+])");
+
+  FileQLogger q(VantagePoint::CLIENT);
+  q.addStreamStateUpdate(streamId, kOnHeaders, 20ms);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, StreamStateUpdateFollyDynamicTTLB) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "HTTP3",
+      "STREAM_STATE_UPDATE",
+      "DEFAULT",
+      {
+        "id": 10,
+        "ttlb": 20,
+        "update": "on eom"
+      }
+    ]
+])");
+
+  FileQLogger q(VantagePoint::CLIENT);
+  q.addStreamStateUpdate(streamId, kOnEOM, 20ms);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(
+    QLoggerTest,
+    StreamStateUpdateFollyDynamicMissingTimeSinceCreationField) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "HTTP3",
+      "STREAM_STATE_UPDATE",
+      "DEFAULT",
+      {
+        "id": 10,
+        "update": "on eom"
+      }
+    ]
+])");
+
+  FileQLogger q(VantagePoint::CLIENT);
+  q.addStreamStateUpdate(streamId, kOnEOM, folly::none);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
 TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
   folly::dynamic expected = folly::parseJson(
       R"([
@@ -1050,13 +1124,14 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
       "DEFAULT",
       {
         "id": 10,
+        "ms_since_creation": 20,
         "update": "abort"
       }
     ]
 ])");
 
   FileQLogger q(VantagePoint::CLIENT);
-  q.addStreamStateUpdate(streamId, kAbort);
+  q.addStreamStateUpdate(streamId, kAbort, 20ms);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

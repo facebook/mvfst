@@ -741,8 +741,13 @@ folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
 QLogStreamStateUpdateEvent::QLogStreamStateUpdateEvent(
     StreamId idIn,
     std::string updateIn,
+    folly::Optional<std::chrono::milliseconds> timeSinceStreamCreationIn,
+    VantagePoint vantagePoint,
     std::chrono::microseconds refTimeIn)
-    : id{idIn}, update{std::move(updateIn)} {
+    : id{idIn},
+      update{std::move(updateIn)},
+      timeSinceStreamCreation(std::move(timeSinceStreamCreationIn)),
+      vantagePoint_(vantagePoint) {
   eventType = QLogEventType::StreamStateUpdate;
   refTime = refTimeIn;
 }
@@ -759,6 +764,15 @@ folly::dynamic QLogStreamStateUpdateEvent::toDynamic() const {
 
   data["id"] = id;
   data["update"] = update;
+  if (timeSinceStreamCreation) {
+    if (update == kOnEOM && vantagePoint_ == VantagePoint::CLIENT) {
+      data["ttlb"] = timeSinceStreamCreation->count();
+    } else if (update == kOnHeaders && vantagePoint_ == VantagePoint::CLIENT) {
+      data["ttfb"] = timeSinceStreamCreation->count();
+    } else {
+      data["ms_since_creation"] = timeSinceStreamCreation->count();
+    }
+  }
 
   d.push_back(std::move(data));
   return d;
