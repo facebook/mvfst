@@ -43,7 +43,7 @@ class StatelessResetGenerator {
  private:
   StatelessResetSecret secret_;
   std::string addressStr_;
-  fizz::HkdfImpl<fizz::Sha256> hdkf_;
+  fizz::HkdfImpl hkdf_;
   std::vector<uint8_t> extractedSecret_;
 };
 } // namespace quic
