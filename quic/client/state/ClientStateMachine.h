@@ -49,7 +49,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
-    originalVersion = QuicVersion::MVFST_OLD;
+    originalVersion = QuicVersion::MVFST;
     clientHandshakeLayer = new ClientHandshake(*cryptoState);
     handshakeLayer.reset(clientHandshakeLayer);
     // We shouldn't normally need to set this until we're starting the
