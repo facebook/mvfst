@@ -300,6 +300,11 @@ class QuicSocket {
   setSendBuffer(StreamId id, size_t maxUnacked, size_t maxUnsent) = 0;
 
   /**
+   * Return the amount of transport buffer space available for writing
+   */
+  virtual uint64_t getConnectionBufferAvailable() const = 0;
+
+  /**
    * Get the flow control settings for the given stream (or connection flow
    * control by passing id=0).  Settings include send and receive window
    * capacity and available.

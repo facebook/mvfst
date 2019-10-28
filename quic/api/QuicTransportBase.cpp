@@ -539,7 +539,11 @@ void QuicTransportBase::setSendBuffer(
     size_t /*maxUnacked*/,
     size_t /*maxUnsent*/) {}
 
-uint64_t QuicTransportBase::bufferSpaceAvailable() {
+uint64_t QuicTransportBase::getConnectionBufferAvailable() const {
+  return bufferSpaceAvailable();
+}
+
+uint64_t QuicTransportBase::bufferSpaceAvailable() const {
   auto bytesBuffered = conn_->flowControlState.sumCurStreamBufferLen;
   auto totalBufferSpaceAvailable =
       conn_->transportSettings.totalBufferSpaceAvailable;

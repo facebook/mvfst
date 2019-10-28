@@ -90,7 +90,9 @@ class QuicTransportBase : public QuicSocket {
 
   void setSendBuffer(StreamId id, size_t maxUnacked, size_t maxUnsent) override;
 
-  uint64_t bufferSpaceAvailable();
+  uint64_t getConnectionBufferAvailable() const override;
+
+  uint64_t bufferSpaceAvailable() const;
 
   folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getConnectionFlowControl() const override;

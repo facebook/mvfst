@@ -59,6 +59,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(getAppProtocol, folly::Optional<std::string>());
   MOCK_METHOD2(setReceiveWindow, void(StreamId, size_t));
   MOCK_METHOD3(setSendBuffer, void(StreamId, size_t, size_t));
+  MOCK_CONST_METHOD0(getConnectionBufferAvailable, uint64_t());
   MOCK_CONST_METHOD0(
       getConnectionFlowControl,
       folly::Expected<FlowControlState, LocalErrorCode>());
