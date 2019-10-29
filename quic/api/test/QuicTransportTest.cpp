@@ -247,7 +247,7 @@ void dropPackets(QuicServerConnectionState& conn) {
           [&streamFrame](const auto& buffer) {
             return streamFrame->offset == buffer.offset;
           });
-      EXPECT_TRUE(itr != stream->retransmissionBuffer.end());
+      ASSERT_TRUE(itr != stream->retransmissionBuffer.end());
       stream->lossBuffer.insert(
           std::upper_bound(
               stream->lossBuffer.begin(),

@@ -111,13 +111,9 @@ void handleRetransmissionWritten(
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    PacketNum packetNum) {
+    PacketNum packetNum,
+    std::deque<StreamBuffer>::iterator lossBufferIter) {
   conn.lossState.totalBytesRetransmitted += frameLen;
-  auto lossBufferIter = std::find_if(
-      stream.lossBuffer.begin(),
-      stream.lossBuffer.end(),
-      [&](const auto& buffer) { return frameOffset == buffer.offset; });
-  CHECK(lossBufferIter != stream.lossBuffer.end());
   VLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
            << " packetNum=" << packetNum << " " << conn;
   auto bufferLen = lossBufferIter->data.chainLength();
@@ -163,24 +159,28 @@ bool handleStreamWritten(
     return true;
   }
 
-  // If the data is in retx buffer, this is a clone write
-  auto retxBufferIter = std::find_if(
-      stream.retransmissionBuffer.begin(),
-      stream.retransmissionBuffer.end(),
-      [&](const auto& buffer) {
-        return frameOffset == buffer.offset &&
-            frameLen == buffer.data.chainLength() && frameFin == buffer.eof;
-      });
-  if (retxBufferIter != stream.retransmissionBuffer.end()) {
-    conn.lossState.totalStreamBytesCloned += frameLen;
+  // If the data is in the loss buffer, it is a retransmission.
+  auto lossBufferIter = std::lower_bound(
+      stream.lossBuffer.begin(),
+      stream.lossBuffer.end(),
+      frameOffset,
+      [](const auto& buf, auto off) { return buf.offset < off; });
+  if (lossBufferIter != stream.lossBuffer.end() &&
+      lossBufferIter->offset == frameOffset) {
+    handleRetransmissionWritten(
+        conn,
+        stream,
+        frameOffset,
+        frameLen,
+        frameFin,
+        packetNum,
+        lossBufferIter);
+    QUIC_STATS(conn.infoCallback, onPacketRetransmission);
     return false;
   }
 
-  // If it's neither new data nor clone data, then it is a retransmission and
-  // the data has to be in loss buffer.
-  handleRetransmissionWritten(
-      conn, stream, frameOffset, frameLen, frameFin, packetNum);
-  QUIC_STATS(conn.infoCallback, onPacketRetransmission);
+  // Otherwise it must be a clone write.
+  conn.lossState.totalStreamBytesCloned += frameLen;
   return false;
 }
 

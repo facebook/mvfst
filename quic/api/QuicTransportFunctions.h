@@ -119,7 +119,8 @@ void handleRetransmissionWritten(
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    PacketNum packetNum);
+    PacketNum packetNum,
+    std::deque<StreamBuffer>::iterator lossBufferIter);
 
 /**
  * Update the connection and stream state after stream data is written and deal
