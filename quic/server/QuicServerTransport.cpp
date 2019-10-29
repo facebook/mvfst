@@ -108,7 +108,10 @@ void QuicServerTransport::onReadData(
   }
   if (!notifiedRouting_ && routingCb_ && conn_->serverConnectionId) {
     notifiedRouting_ = true;
-    addConnectionId(*conn_->serverConnectionId);
+    if (routingCb_) {
+      routingCb_->onConnectionIdAvailable(
+          shared_from_this(), *conn_->serverConnectionId);
+    }
   }
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
@@ -412,17 +415,5 @@ void QuicServerTransport::maybeNotifyTransportReady() {
   }
 }
 
-void QuicServerTransport::addConnectionId(
-    const ConnectionId& connectionIdToAdd) {
-  /**
-   * Ensures that the state of serverConnectionIdDatas are synced with
-   * the server side connection id routing maps.
-   */
-  conn_->selfConnectionIds.push_back(
-      ConnectionIdData(connectionIdToAdd, kInitialSequenceNumber));
-  if (routingCb_) {
-    routingCb_->onConnectionIdAvailable(shared_from_this(), connectionIdToAdd);
-  }
-}
 
 } // namespace quic

@@ -342,7 +342,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
 
   EXPECT_CALL(*transportInfoCb_, onNewConnection());
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
-  transport_->addConnectionId(connId);
+  worker_.get()->onConnectionIdAvailable(transport_, connId);
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(connId), 1);
 
@@ -366,7 +366,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
 
   auto connId2 = connId;
   connId2.data()[7] ^= 0x1;
-  transport_->addConnectionId(connId2);
+  worker_.get()->onConnectionIdAvailable(transport_, connId2);
 
   EXPECT_EQ(connIdMap.size(), 2);
 
@@ -425,7 +425,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   ConnectionId newConnId = getTestConnectionId(hostId_);
 
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
-  transport_->addConnectionId(newConnId);
+  worker_.get()->onConnectionIdAvailable(transport_, newConnId);
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 

@@ -546,13 +546,10 @@ void onServerReadDataFromOpen(
     // serverConnIdParams must be set by the QuicServerTransport
     CHECK(conn.serverConnIdParams);
 
-    conn.serverConnectionId =
-        conn.connIdAlgo->encodeConnectionId(*conn.serverConnIdParams);
-    StatelessResetGenerator generator(
-        conn.transportSettings.statelessResetTokenSecret.value(),
-        conn.serverAddr.getFullyQualified());
-    StatelessResetToken token =
-        generator.generateToken(*conn.serverConnectionId);
+    auto newServerConnIdData = conn.createAndAddNewSelfConnId();
+    CHECK(newServerConnIdData.hasValue());
+    conn.serverConnectionId = newServerConnIdData->connId;
+
     QUIC_STATS(conn.infoCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
@@ -568,7 +565,7 @@ void onServerReadDataFromOpen(
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,
             conn.transportSettings.partialReliabilityEnabled,
-            token));
+            *newServerConnIdData->token));
     conn.transportParametersEncoded = true;
     CryptoFactory& cryptoFactory = *conn.serverHandshakeLayer->cryptoFactory_;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
