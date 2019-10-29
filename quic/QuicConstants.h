@@ -31,7 +31,7 @@ constexpr uint16_t kDefaultUDPSendPacketLen =
          : kDefaultV6UDPSendPacketLen);
 // This is the default if the transport parameter for max packet size is missing
 // or zero.
-constexpr uint16_t kDefaultMaxUDPPayload = 65527;
+constexpr uint16_t kDefaultMaxUDPPayload = 4096;
 
 // This is the minimum the max_packet_size transport parameter is allowed to be,
 // per the spec. Note this actually refers to the max UDP payload size, not the
@@ -44,7 +44,7 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 
 // Size of read buffer we provide to AsyncUDPSocket. The packet size cannot be
 // larger than this, unless configured otherwise.
-constexpr uint16_t kDefaultUDPReadBufferSize = 4096;
+constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
 constexpr uint16_t kMaxNumCoalescedPackets = 5;
 // As per version 20 of the spec, transport parameters for private use must
