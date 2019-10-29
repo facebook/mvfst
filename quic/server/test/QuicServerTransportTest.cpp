@@ -42,11 +42,13 @@ class FakeServerHandshake : public ServerHandshake {
   explicit FakeServerHandshake(
       QuicServerConnectionState& conn,
       bool chloSync = false,
-      bool cfinSync = false)
+      bool cfinSync = false,
+      folly::Optional<uint64_t> clientActiveConnectionIdLimit = folly::none)
       : ServerHandshake(*conn.cryptoState),
         conn_(conn),
         chloSync_(chloSync),
-        cfinSync_(cfinSync) {}
+        cfinSync_(cfinSync),
+        clientActiveConnectionIdLimit_(clientActiveConnectionIdLimit) {}
 
   void accept(std::shared_ptr<ServerTransportParametersExtension>) override {}
 
@@ -131,6 +133,12 @@ class FakeServerHandshake : public ServerHandshake {
         TransportParameterId::idle_timeout, kDefaultIdleTimeout.count()));
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::max_packet_size, maxRecvPacketSize));
+    if (clientActiveConnectionIdLimit_) {
+      transportParams.push_back(encodeIntegerParameter(
+          TransportParameterId::active_connection_id_limit,
+          *clientActiveConnectionIdLimit_));
+    }
+
     return ClientTransportParameters{QuicVersion::MVFST,
                                      std::move(transportParams)};
   }
@@ -178,6 +186,7 @@ class FakeServerHandshake : public ServerHandshake {
   uint64_t maxRecvPacketSize{2 * 1024};
   bool allowZeroRttKeys_{false};
   std::vector<folly::IPAddress> sourceAddrs_;
+  folly::Optional<uint64_t> clientActiveConnectionIdLimit_;
 };
 
 bool verifyFramePresent(
@@ -201,6 +210,10 @@ bool verifyFramePresent(
   }
   return false;
 }
+
+struct MigrationParam {
+  folly::Optional<uint64_t> clientSentActiveConnIdTransportParam;
+};
 
 class TestingQuicServerTransport : public QuicServerTransport {
  public:
@@ -268,7 +281,7 @@ class QuicServerTransportTest : public Test {
  public:
   void SetUp() override {
     clientAddr = folly::SocketAddress("127.0.0.1", 1000);
-    auto fakeServerAddr = folly::SocketAddress("1.2.3.4", 8080);
+    serverAddr = folly::SocketAddress("1.2.3.4", 8080);
     clientConnectionId = getTestConnectionId();
     initialDestinationConnectionId = clientConnectionId;
     // change the initialDestinationConnectionId to be different
@@ -284,7 +297,7 @@ class QuicServerTransportTest : public Test {
           serverWrites.push_back(buf->clone());
           return buf->computeChainDataLength();
         }));
-    EXPECT_CALL(*sock, address()).WillRepeatedly(ReturnRef(fakeServerAddr));
+    EXPECT_CALL(*sock, address()).WillRepeatedly(ReturnRef(serverAddr));
     supportedVersions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
     serverCtx = createServerCtx();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
@@ -305,6 +318,8 @@ class QuicServerTransportTest : public Test {
     server->getNonConstConn().serverHandshakeLayer = fakeHandshake;
     // Allow ignoring path mtu for testing negotiation.
     server->getNonConstConn().transportSettings.canIgnorePathMTU = true;
+    server->getNonConstConn().transportSettings.disableMigration =
+        getDisableMigration();
     server->setConnectionIdAlgo(connIdAlgo_.get());
     server->setClientConnectionId(*clientConnectionId);
     VLOG(20) << __func__ << " client connId=" << clientConnectionId->hex()
@@ -323,6 +338,10 @@ class QuicServerTransportTest : public Test {
 
   virtual void initializeServerHandshake() {
     fakeHandshake = new FakeServerHandshake(server->getNonConstConn());
+  }
+
+  virtual bool getDisableMigration() {
+    return true;
   }
 
   std::unique_ptr<Aead> getInitialCipher() {
@@ -471,10 +490,47 @@ class QuicServerTransportTest : public Test {
         .WillOnce(Invoke([&, clientAddr = clientAddr](auto transport) {
           EXPECT_EQ(clientAddr, transport->getOriginalPeerAddress());
         }));
+
+    EXPECT_TRUE(server->getConn().pendingEvents.frames.empty());
+    EXPECT_EQ(server->getConn().nextSelfConnectionIdSequence, 1);
     recvClientFinished();
 
     // We need an extra pump here for some reason.
     loopForWrites();
+
+    // Issue (kMinNumAvailableConnIds - 1) more connection ids on handshake
+    // complete
+    auto numNewConnIdFrames = 0;
+    for (const auto& packet : server->getConn().outstandingPackets) {
+      for (const auto& frame : packet.packet.frames) {
+        switch (frame.type()) {
+          case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+            const auto writeFrame = frame.asQuicSimpleFrame();
+            if (writeFrame->type() ==
+                QuicSimpleFrame::Type::NewConnectionIdFrame_E) {
+              ++numNewConnIdFrames;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    }
+    uint64_t connIdsToIssue = std::min(
+        server->getConn().peerActiveConnectionIdLimit,
+        kMinNumAvailableConnIds - 1);
+
+    if (server->getConn().transportSettings.disableMigration ||
+        (connIdsToIssue == 0)) {
+      EXPECT_EQ(numNewConnIdFrames, 0);
+      EXPECT_EQ(server->getConn().nextSelfConnectionIdSequence, 1);
+    } else {
+      EXPECT_EQ(numNewConnIdFrames, connIdsToIssue);
+      EXPECT_EQ(
+          server->getConn().nextSelfConnectionIdSequence, connIdsToIssue + 1);
+    }
+
     EXPECT_NE(server->getConn().readCodec, nullptr);
     EXPECT_NE(server->getConn().oneRttWriteCipher, nullptr);
     EXPECT_NE(server->getConn().oneRttWriteHeaderCipher, nullptr);
@@ -613,6 +669,7 @@ class QuicServerTransportTest : public Test {
   }
 
   EventBase evb;
+  SocketAddress serverAddr;
   SocketAddress clientAddr;
   MockConnectionCallback connCallback;
   MockRoutingCallback routingCallback;
@@ -813,7 +870,9 @@ TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
   EXPECT_TRUE(server->isClosed());
   auto serverReadCodec = makeClientEncryptedCodec();
   EXPECT_FALSE(verifyFramePresent(
-      serverWrites, *serverReadCodec, QuicFrame::Type::ApplicationCloseFrame_E));
+      serverWrites,
+      *serverReadCodec,
+      QuicFrame::Type::ApplicationCloseFrame_E));
   EXPECT_FALSE(verifyFramePresent(
       serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
 }
@@ -1975,7 +2034,35 @@ TEST_F(
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
 }
 
-TEST_F(QuicServerTransportTest, ReceiveProbingPacketFromChangedPeerAddress) {
+class QuicServerTransportAllowMigrationTest
+    : public QuicServerTransportTest,
+      public WithParamInterface<MigrationParam> {
+ public:
+  bool getDisableMigration() override {
+    return false;
+  }
+
+  virtual void initializeServerHandshake() override {
+    fakeHandshake = new FakeServerHandshake(
+        server->getNonConstConn(),
+        false,
+        false,
+        GetParam().clientSentActiveConnIdTransportParam);
+  }
+};
+
+INSTANTIATE_TEST_CASE_P(
+    QuicServerTransportMigrationTests,
+    QuicServerTransportAllowMigrationTest,
+    Values(
+        MigrationParam{folly::none},
+        MigrationParam{0},
+        MigrationParam{4},
+        MigrationParam{9}));
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ReceiveProbingPacketFromChangedPeerAddress) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
@@ -2017,8 +2104,9 @@ TEST_F(QuicServerTransportTest, ReceiveProbingPacketFromChangedPeerAddress) {
           PacketDropReason::PEER_ADDRESS_CHANGE));
 }
 
-TEST_F(QuicServerTransportTest, ReceiveReorderedDataFromChangedPeerAddress) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ReceiveReorderedDataFromChangedPeerAddress) {
   auto data = IOBuf::copyBuffer("bad data");
   auto firstPacket = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2050,8 +2138,7 @@ TEST_F(QuicServerTransportTest, ReceiveReorderedDataFromChangedPeerAddress) {
   EXPECT_EQ(server->getConn().peerAddress, peerAddress);
 }
 
-TEST_F(QuicServerTransportTest, MigrateToUnvalidatedPeer) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2128,8 +2215,7 @@ TEST_F(QuicServerTransportTest, MigrateToUnvalidatedPeer) {
   EXPECT_FALSE(server->getConn().writableBytesLimit);
 }
 
-TEST_F(QuicServerTransportTest, IgnoreInvalidPathResponse) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2187,8 +2273,9 @@ TEST_F(QuicServerTransportTest, IgnoreInvalidPathResponse) {
   EXPECT_TRUE(server->getConn().writableBytesLimit);
 }
 
-TEST_F(QuicServerTransportTest, ReceivePathResponseFromDifferentPeerAddress) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    ReceivePathResponseFromDifferentPeerAddress) {
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2259,6 +2346,7 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
+
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2296,8 +2384,7 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
           PacketDropReason::PEER_ADDRESS_CHANGE));
 }
 
-TEST_F(QuicServerTransportTest, MigrateToValidatedPeer) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   server->getNonConstConn().migrationState.previousPeerAddresses.push_back(
       newPeer);
@@ -2365,10 +2452,9 @@ TEST_F(QuicServerTransportTest, MigrateToValidatedPeer) {
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
 }
 
-TEST_F(
-    QuicServerTransportTest,
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
     MigrateToUnvalidatedPeerOverwritesCachedRttState) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   server->getNonConstConn().migrationState.previousPeerAddresses.push_back(
       newPeer);
@@ -2432,8 +2518,7 @@ TEST_F(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
 }
 
-TEST_F(QuicServerTransportTest, MigrateToStaleValidatedPeer) {
-  server->getNonConstConn().transportSettings.disableMigration = false;
+TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   server->getNonConstConn().migrationState.previousPeerAddresses.push_back(
       newPeer);

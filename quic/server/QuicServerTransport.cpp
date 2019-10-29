@@ -11,6 +11,7 @@
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <algorithm>
 
 namespace quic {
 
@@ -115,6 +116,7 @@ void QuicServerTransport::onReadData(
   }
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
+  maybeIssueConnectionIds();
   maybeNotifyTransportReady();
 }
 
@@ -298,6 +300,7 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     }
     maybeWriteNewSessionTicket();
     maybeNotifyConnectionIdBound();
+    maybeIssueConnectionIds();
     writeSocketData();
     maybeNotifyTransportReady();
   } catch (const QuicTransportException& ex) {
@@ -401,6 +404,35 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     notifiedConnIdBound_ = true;
     routingCb_->onConnectionIdBound(shared_from_this());
+  }
+}
+
+void QuicServerTransport::maybeIssueConnectionIds() {
+  if (!conn_->transportSettings.disableMigration && !connectionIdsIssued_ &&
+      serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    connectionIdsIssued_ = true;
+
+    CHECK(conn_->transportSettings.statelessResetTokenSecret.hasValue());
+
+    const uint64_t maximumIdsToIssue = std::min(
+        conn_->peerActiveConnectionIdLimit, kMinNumAvailableConnIds - 1);
+    for (size_t i = 0; i < maximumIdsToIssue; i++) {
+      auto newConnIdData = serverConn_->createAndAddNewSelfConnId();
+      if (!newConnIdData.hasValue()) {
+        return;
+      }
+
+      CHECK(routingCb_);
+      routingCb_->onConnectionIdAvailable(
+          shared_from_this(), newConnIdData->connId);
+
+      NewConnectionIdFrame frame(
+          newConnIdData->sequenceNumber,
+          0,
+          newConnIdData->connId,
+          *newConnIdData->token);
+      sendSimpleFrame(*conn_, std::move(frame));
+    }
   }
 }
 

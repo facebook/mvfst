@@ -117,9 +117,10 @@ class QuicServerTransport
 
  private:
   void processPendingData(bool async);
-  void maybeWriteNewSessionTicket();
-  void maybeNotifyConnectionIdBound();
   void maybeNotifyTransportReady();
+  void maybeNotifyConnectionIdBound();
+  void maybeWriteNewSessionTicket();
+  void maybeIssueConnectionIds();
 
  private:
   RoutingCallback* routingCb_{nullptr};
@@ -128,6 +129,7 @@ class QuicServerTransport
   bool notifiedConnIdBound_{false};
   bool newSessionTicketWritten_{false};
   bool shedConnection_{false};
+  bool connectionIdsIssued_{false};
   QuicServerConnectionState* serverConn_;
 };
 } // namespace quic

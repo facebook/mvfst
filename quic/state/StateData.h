@@ -528,8 +528,8 @@ struct QuicConnectionStateBase {
   // Time at which the connection started.
   TimePoint connectionTime;
 
-  uint64_t peerActiveConnectionIdLimit{kDefaultConnectionIdLimit};
-
+  // uint64_t peerActiveConnectionIdLimit{kDefaultConnectionIdLimit};
+  uint64_t peerActiveConnectionIdLimit{8};
   // The current connection id. This will eventually be negotiated
   // with the peer.
   folly::Optional<ConnectionId> clientConnectionId;
@@ -542,6 +542,10 @@ struct QuicConnectionStateBase {
 
   // Connection ids issued by peer - to be used as destination ids.
   std::vector<ConnectionIdData> peerConnectionIds;
+
+  // ConnectionIdAlgo implementation to encode and decode ConnectionId with
+  // various info, such as routing related info.
+  ConnectionIdAlgo* connIdAlgo{nullptr};
 
   // Negotiated version.
   folly::Optional<QuicVersion> version;
