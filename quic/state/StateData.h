@@ -543,10 +543,6 @@ struct QuicConnectionStateBase {
   // Connection ids issued by peer - to be used as destination ids.
   std::vector<ConnectionIdData> peerConnectionIds;
 
-  // ConnectionIdAlgo implementation to encode and decode ConnectionId with
-  // various info, such as routing related info.
-  ConnectionIdAlgo* connIdAlgo{nullptr};
-
   // Negotiated version.
   folly::Optional<QuicVersion> version;
 
@@ -572,6 +568,15 @@ struct QuicConnectionStateBase {
   // Supported versions in order of preference. Only meaningful to clients.
   // TODO: move to client only conn state.
   std::vector<QuicVersion> supportedVersions;
+
+  // The endpoint attempts to create a new self connection id with sequence
+  // number and stateless reset token for itself, and if successful, returns it
+  // and updates the connection's state to ensure its peer can use it.
+  virtual folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() {
+    return folly::none;
+  }
+
+  uint64_t nextSelfConnectionIdSequence{0};
 
   // Whether or not we received a new packet before a write.
   bool receivedNewPacketBeforeWrite{false};

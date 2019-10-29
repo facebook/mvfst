@@ -103,8 +103,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0
     ServerConnectionIdParams params(0, 0, 0);
-    conn->connIdAlgo = connIdAlgo_.get();
-    conn->serverConnectionId = connIdAlgo_->encodeConnectionId(params);
+    conn->serverConnectionId = connIdAlgo_.get()->encodeConnectionId(params);
     return conn;
   }
 

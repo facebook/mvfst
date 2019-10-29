@@ -95,6 +95,10 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // Parameters to generate server chosen connection id
   folly::Optional<ServerConnectionIdParams> serverConnIdParams;
 
+  // ConnectionIdAlgo implementation to encode and decode ConnectionId with
+  // various info, such as routing related info.
+  ConnectionIdAlgo* connIdAlgo{nullptr};
+
   // Source address token that can be saved to client via PSK.
   // Address with higher index is more recently used.
   std::vector<folly::IPAddress> tokenSourceAddresses;
@@ -112,6 +116,8 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 
   // Server address of VIP. Currently used as input for stateless reset token.
   folly::SocketAddress serverAddr;
+
+  folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 
   QuicServerConnectionState() : QuicConnectionStateBase(QuicNodeType::Server) {
     state = ServerState::Open;

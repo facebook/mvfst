@@ -18,6 +18,8 @@
 #include <array>
 
 namespace quic {
+constexpr uint8_t kStatelessResetTokenLength = 16;
+using StatelessResetToken = std::array<uint8_t, kStatelessResetTokenLength>;
 
 constexpr size_t kMinConnectionIdSize = 4;
 constexpr size_t kMaxConnectionIdSize = 20;
@@ -81,6 +83,7 @@ struct ConnectionIdData {
 
   const ConnectionId connId;
   const uint64_t sequenceNumber;
+  folly::Optional<StatelessResetToken> token;
 };
 
 /**

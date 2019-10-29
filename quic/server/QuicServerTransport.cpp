@@ -80,8 +80,8 @@ void QuicServerTransport::setTransportInfoCallback(
 void QuicServerTransport::setConnectionIdAlgo(
     ConnectionIdAlgo* connIdAlgo) noexcept {
   CHECK(connIdAlgo);
-  if (conn_) {
-    conn_->connIdAlgo = connIdAlgo;
+  if (serverConn_) {
+    serverConn_->connIdAlgo = connIdAlgo;
   }
 }
 

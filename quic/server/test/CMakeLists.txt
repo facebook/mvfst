@@ -33,3 +33,12 @@ quic_add_test(TARGET QuicServerTransportTest
   mvfst_test_utils
   mvfst_transport
 )
+
+quic_add_test(TARGET ServerStateMachineTest
+  SOURCES
+  ServerStateMachineTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_server
+  mvfst_test_utils
+)

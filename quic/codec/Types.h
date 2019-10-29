@@ -37,8 +37,6 @@ enum class PacketNumberSpace : uint8_t {
   AppData,
 };
 
-using StatelessResetToken = std::array<uint8_t, 16>;
-
 constexpr uint8_t kHeaderFormMask = 0x80;
 constexpr auto kMaxPacketNumEncodingSize = 4;
 
@@ -553,9 +551,6 @@ struct NoopFrame {
     return true;
   }
 };
-
-constexpr uint8_t kStatelessResetTokenLength = 16;
-using StatelessResetToken = std::array<uint8_t, kStatelessResetTokenLength>;
 
 struct StatelessReset {
   StatelessResetToken token;

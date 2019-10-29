@@ -1201,4 +1201,31 @@ void onServerCloseOpenState(QuicServerConnectionState& conn) {
   conn.state = ServerState::Closed;
 }
 
+folly::Optional<ConnectionIdData>
+QuicServerConnectionState::createAndAddNewSelfConnId() {
+  // Should be set right after server transport construction.
+  CHECK(connIdAlgo);
+  CHECK(serverConnIdParams);
+
+  if (selfConnectionIds.size() == peerActiveConnectionIdLimit + 1) {
+    return folly::none;
+  };
+
+  CHECK(transportSettings.statelessResetTokenSecret);
+
+  StatelessResetGenerator generator(
+      transportSettings.statelessResetTokenSecret.value(),
+      serverAddr.getFullyQualified());
+
+  // TODO Possibly change this mechanism later
+  // The default connectionId algo has 36 bits of randomness.
+  auto newConnIdData =
+      ConnectionIdData{connIdAlgo->encodeConnectionId(*serverConnIdParams),
+                       nextSelfConnectionIdSequence++};
+
+  newConnIdData.token = generator.generateToken(newConnIdData.connId);
+  selfConnectionIds.push_back(newConnIdData);
+  return newConnIdData;
+}
+
 } // namespace quic
