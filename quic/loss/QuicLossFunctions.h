@@ -85,14 +85,14 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
     }
     alarmDuration += conn.lossState.maxAckDelay;
     alarmDuration *=
-        1 << std::min(conn.lossState.handshakeAlarmCount, (uint16_t)15);
+        1ULL << std::min(conn.lossState.handshakeAlarmCount, (uint16_t)15);
     alarmMethod = LossState::AlarmMethod::Handshake;
     // Handshake packet loss timer shouldn't be affected by other packets.
     lastSentPacketTime = conn.lossState.lastHandshakePacketSentTime;
     DCHECK_NE(lastSentPacketTime.time_since_epoch().count(), 0);
   } else {
     auto ptoTimeout = calculatePTO(conn);
-    ptoTimeout *= 1 << std::min(conn.lossState.ptoCount, (uint32_t)31);
+    ptoTimeout *= 1ULL << std::min(conn.lossState.ptoCount, (uint32_t)31);
     alarmDuration = ptoTimeout;
     alarmMethod = LossState::AlarmMethod::PTO;
   }
