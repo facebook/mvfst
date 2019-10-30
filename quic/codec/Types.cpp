@@ -107,6 +107,8 @@ LongHeader* PacketHeader::asLong() {
       return &longHeader;
     case HeaderForm::Short:
       return nullptr;
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -116,6 +118,8 @@ ShortHeader* PacketHeader::asShort() {
       return nullptr;
     case HeaderForm::Short:
       return &shortHeader;
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -125,6 +129,8 @@ const LongHeader* PacketHeader::asLong() const {
       return &longHeader;
     case HeaderForm::Short:
       return nullptr;
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -134,6 +140,8 @@ const ShortHeader* PacketHeader::asShort() const {
       return nullptr;
     case HeaderForm::Short:
       return &shortHeader;
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -143,6 +151,8 @@ PacketNum PacketHeader::getPacketSequenceNum() const {
       return longHeader.getPacketSequenceNum();
     case HeaderForm::Short:
       return shortHeader.getPacketSequenceNum();
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -156,6 +166,8 @@ ProtectionType PacketHeader::getProtectionType() const {
       return longHeader.getProtectionType();
     case HeaderForm::Short:
       return shortHeader.getProtectionType();
+    default:
+      folly::assume_unreachable();
   }
 }
 
@@ -165,6 +177,8 @@ PacketNumberSpace PacketHeader::getPacketNumberSpace() const {
       return longHeader.getPacketNumberSpace();
     case HeaderForm::Short:
       return shortHeader.getPacketNumberSpace();
+    default:
+      folly::assume_unreachable();
   }
 }
 
