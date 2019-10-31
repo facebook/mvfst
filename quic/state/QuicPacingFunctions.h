@@ -17,4 +17,3 @@ void updatePacingOnKeyEstablished(QuicConnectionStateBase& conn);
 void updatePacingOnClose(QuicConnectionStateBase& conn);
 
 }
-

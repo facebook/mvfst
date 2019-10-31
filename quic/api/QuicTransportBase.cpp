@@ -2400,6 +2400,14 @@ void QuicTransportBase::setCongestionControl(CongestionControlType type) {
   if (!conn_->congestionController ||
       type != conn_->congestionController->type()) {
     CHECK(ccFactory_);
+
+    // We need to enable pacing if we're switching to BBR.
+    if (type == CongestionControlType::BBR) {
+      conn_->transportSettings.pacingEnabled = true;
+      conn_->pacer =
+          std::make_unique<DefaultPacer>(*conn_, kMinCwndInMssForBbr);
+    }
+
     conn_->congestionController =
         ccFactory_->makeCongestionController(*conn_, type);
   }

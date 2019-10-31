@@ -4462,6 +4462,23 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControl) {
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 }
 
+TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
+  // Default: Cubic
+  auto cc = client->getConn().congestionController.get();
+  EXPECT_EQ(CongestionControlType::Cubic, cc->type());
+
+  // Pacing should be disabled.
+  EXPECT_FALSE(isConnectionPaced(client->getConn()));
+
+  // Change to BBR
+  client->setCongestionControl(CongestionControlType::BBR);
+  cc = client->getConn().congestionController.get();
+  EXPECT_EQ(CongestionControlType::BBR, cc->type());
+
+  // Pacing should be enabled.
+  EXPECT_TRUE(isConnectionPaced(client->getConn()));
+}
+
 TEST_F(
     QuicClientTransportAfterStartTest,
     TestOneRttPacketWillNotRescheduleHandshakeAlarm) {
