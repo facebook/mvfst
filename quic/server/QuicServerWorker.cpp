@@ -67,7 +67,7 @@ void QuicServerWorker::setCongestionControllerFactory(
 
 void QuicServerWorker::start() {
   CHECK(socket_);
-  if (transportSettings_.pacingEnabled && !pacingTimer_) {
+  if (!pacingTimer_) {
     pacingTimer_ = TimerHighRes::newTimer(
         evb_, transportSettings_.pacingTimerTickInterval);
   }
