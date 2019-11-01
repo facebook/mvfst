@@ -680,9 +680,6 @@ void QuicServerWorker::onConnectionUnbound(
   transport->setRoutingCallback(nullptr);
   boundServerTransports_.erase(transport);
 
-  // TODO: verify we are removing the right transport
-  sourceAddressMap_.erase(source);
-
   if (connectionIdData.size()) {
     QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
   }
@@ -692,6 +689,9 @@ void QuicServerWorker::onConnectionUnbound(
             << ", workerId=" << (uint32_t)workerId_;
     connectionIdMap_.erase(connId.connId);
   }
+
+  // TODO: verify we are removing the right transport
+  sourceAddressMap_.erase(source);
 }
 
 void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {

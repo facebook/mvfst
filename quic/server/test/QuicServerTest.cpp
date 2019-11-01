@@ -325,7 +325,13 @@ TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
 
   EXPECT_CALL(*rawTransport, setRoutingCallback(nullptr)).Times(1);
   // Now remove it from the maps. Nothing should crash.
-  worker_->onConnectionUnbound(rawTransport, srcIdentity, std::vector<ConnectionIdData>{});
+  auto cidDataOnHeap = std::make_shared<std::vector<ConnectionIdData>>();
+  const auto& cidRef = *cidDataOnHeap;
+  EXPECT_CALL(*rawTransport, customDestructor())
+      .Times(1)
+      .WillOnce(
+          Invoke([cid = std::move(cidDataOnHeap)]() mutable { cid.reset(); }));
+  worker_->onConnectionUnbound(rawTransport, srcIdentity, cidRef);
   EXPECT_EQ(0, srcAddrMap.size());
 }
 

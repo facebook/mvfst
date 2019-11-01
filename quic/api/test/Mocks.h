@@ -173,7 +173,11 @@ class MockQuicTransport : public QuicServerTransport {
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
       : QuicServerTransport(evb, std::move(sock), cb, ctx) {}
 
-  virtual ~MockQuicTransport() = default;
+  virtual ~MockQuicTransport() {
+    customDestructor();
+  };
+
+  MOCK_METHOD0(customDestructor, void());
 
   GMOCK_METHOD0_(, const, , getEventBase, folly::EventBase*());
 
