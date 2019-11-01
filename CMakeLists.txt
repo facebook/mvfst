@@ -68,28 +68,26 @@ endif()
 list(APPEND
   _QUIC_BASE_COMPILE_OPTIONS
   -std=c++14
+)
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+list(APPEND
+  _QUIC_BASE_COMPILE_OPTIONS
   -Wall
   -Wextra
 )
+endif()
 
 list(APPEND
   _QUIC_COMMON_COMPILE_OPTIONS
   ${_QUIC_BASE_COMPILE_OPTIONS}
-  # more strict options
-  -Werror=sign-compare
-  -Werror=unused-variable
-  -Woverloaded-virtual
-  -Wnon-virtual-dtor
 )
 
-# Not all compilers support -Werror=bool-compare
-# (e.g., Apple LLVM version 10.0.1 (clang-1001.0.46.4) on MacOS Mojave 10.14.x)
-include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag(-Werror=bool-compare COMPILER_HAS_ERROR_BOOL_COMPARE)
-if (COMPILER_HAS_ERROR_BOOL_COMPARE)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
   list(APPEND
     _QUIC_COMMON_COMPILE_OPTIONS
-    -Werror=bool-compare
+    -Woverloaded-virtual
+    -Wnon-virtual-dtor
   )
 endif()
 

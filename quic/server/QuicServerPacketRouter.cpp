@@ -190,14 +190,15 @@ void TakeoverPacketHandler::processForwardedPacket(
     cursor.skip(addrLen);
   } else {
     // the address is not contiguous, copy it to a local buffer
-    uint8_t sockaddrBuf[std::min(addrLen, kMaxBufSizeForTakeoverEncapsulation)];
+    uint8_t* sockaddrBuf =
+        new uint8_t[std::min(addrLen, kMaxBufSizeForTakeoverEncapsulation)];
     if (!cursor.canAdvance(addrLen)) {
       VLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
               << " from the forwarded packet. Dropping the packet.";
       return;
     }
-    cursor.pull(&sockaddrBuf, addrLen);
-    sockaddr = (struct sockaddr*)&sockaddrBuf;
+    cursor.pull(sockaddrBuf, addrLen);
+    sockaddr = (struct sockaddr*)sockaddrBuf;
   }
   folly::SocketAddress peerAddress;
   try {
