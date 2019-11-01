@@ -1057,7 +1057,9 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHandshakeOutstanding) {
 
   MockClock::mockNow = [=]() { return thisMoment; };
   auto duration = calculateAlarmDuration<MockClock>(*conn);
-  EXPECT_EQ(kDefaultInitialRtt * 2 - packetSentDelay + 25ms, duration.first);
+  EXPECT_EQ(
+      conn->transportSettings.initialRtt * 2 - packetSentDelay + 25ms,
+      duration.first);
   EXPECT_EQ(duration.second, LossState::AlarmMethod::Handshake);
 
   conn->lossState.srtt = 100ms;

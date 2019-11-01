@@ -79,7 +79,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
     alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
   } else if (conn.outstandingHandshakePacketsCount > 0) {
     if (conn.lossState.srtt == 0us) {
-      alarmDuration = kDefaultInitialRtt * 2;
+      alarmDuration = conn.transportSettings.initialRtt * 2;
     } else {
       alarmDuration = conn.lossState.srtt * 2;
     }

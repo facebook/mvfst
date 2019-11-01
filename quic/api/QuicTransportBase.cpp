@@ -2188,7 +2188,8 @@ void QuicTransportBase::schedulePathValidationTimeout() {
         std::max(4 * conn_->lossState.rttvar, kGranularity) +
         conn_->lossState.maxAckDelay;
 
-    auto validationTimeout = std::max(3 * pto, 6 * kDefaultInitialRtt);
+    auto validationTimeout =
+        std::max(3 * pto, 6 * conn_->transportSettings.initialRtt);
     auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(
         validationTimeout);
     VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;

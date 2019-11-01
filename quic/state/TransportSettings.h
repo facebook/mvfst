@@ -110,6 +110,8 @@ struct TransportSettings {
   // default stateless reset secret for stateless reset token
   folly::Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
       statelessResetTokenSecret;
+  // Default initial RTT
+  std::chrono::microseconds initialRtt{kDefaultInitialRtt};
 };
 
 } // namespace quic
