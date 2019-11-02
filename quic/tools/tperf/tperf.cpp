@@ -129,8 +129,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   void onStreamWriteReady(
       quic::StreamId id,
       uint64_t maxToSend) noexcept override {
-    auto buf = folly::IOBuf::createChain(
-        std::max<uint64_t>(maxToSend / numStreams_, 64), blockSize_);
+    auto buf = folly::IOBuf::createChain(maxToSend, blockSize_);
     auto curBuf = buf.get();
     do {
       curBuf->append(curBuf->capacity());
