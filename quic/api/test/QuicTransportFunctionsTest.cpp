@@ -1777,7 +1777,8 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   auto conn = createConn();
   conn->flowControlState.peerAdvertisedMaxOffset = 1000;
   conn->flowControlState.sumCurWriteOffset = 800;
-  conn->streamManager->addWritable(0);
+  QuicStreamState stream(0, *conn);
+  conn->streamManager->addWritable(stream);
   EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 
   conn->oneRttWriteCipher = test::createNoOpAead();

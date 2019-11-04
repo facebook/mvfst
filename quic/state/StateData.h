@@ -676,6 +676,7 @@ struct QuicConnectionStateBase {
 
   struct PacketSchedulingState {
     StreamId nextScheduledStream{0};
+    StreamId nextScheduledControlStream{0};
   };
 
   PacketSchedulingState schedulingState;

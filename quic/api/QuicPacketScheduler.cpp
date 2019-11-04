@@ -232,11 +232,12 @@ bool RetransmissionScheduler::hasPendingData() const {
 StreamFrameScheduler::StreamFrameScheduler(QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
-void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
-  uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
-  MiddleStartingIterationWrapper wrapper(
-      conn_.streamManager->writableStreams(),
-      conn_.schedulingState.nextScheduledStream);
+StreamId StreamFrameScheduler::writeStreamsHelper(
+    PacketBuilderInterface& builder,
+    const std::set<StreamId>& writableStreams,
+    StreamId nextScheduledStream,
+    uint64_t& connWritableBytes) {
+  MiddleStartingIterationWrapper wrapper(writableStreams, nextScheduledStream);
   auto writableStreamItr = wrapper.cbegin();
   // This will write the stream frames in a round robin fashion ordered by
   // stream id. The iterator will wrap around the collection at the end, and we
@@ -250,7 +251,36 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
       break;
     }
   }
-  conn_.schedulingState.nextScheduledStream = *writableStreamItr;
+  return *writableStreamItr;
+}
+
+void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
+  DCHECK(conn_.streamManager->hasWritable());
+  uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
+  if (connWritableBytes == 0) {
+    return;
+  }
+  // Write the control streams first as a naive binary priority mechanism.
+  const auto& writableControlStreams =
+      conn_.streamManager->writableControlStreams();
+  if (!writableControlStreams.empty()) {
+    conn_.schedulingState.nextScheduledControlStream = writeStreamsHelper(
+        builder,
+        writableControlStreams,
+        conn_.schedulingState.nextScheduledControlStream,
+        connWritableBytes);
+  }
+  if (connWritableBytes == 0) {
+    return;
+  }
+  const auto& writableStreams = conn_.streamManager->writableStreams();
+  if (!writableStreams.empty()) {
+    conn_.schedulingState.nextScheduledStream = writeStreamsHelper(
+        builder,
+        writableStreams,
+        conn_.schedulingState.nextScheduledStream,
+        connWritableBytes);
+  }
 } // namespace quic
 
 bool StreamFrameScheduler::hasPendingData() const {

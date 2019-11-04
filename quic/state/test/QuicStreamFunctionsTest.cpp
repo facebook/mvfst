@@ -1511,7 +1511,7 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   auto streamId = stream->id;
   conn.streamManager->readableStreams().emplace(streamId);
   conn.streamManager->peekableStreams().emplace(streamId);
-  conn.streamManager->addWritable(streamId);
+  conn.streamManager->addWritable(*stream);
   conn.streamManager->queueBlocked(streamId, 0);
   conn.streamManager->addDeliverable(streamId);
   conn.streamManager->addLoss(streamId);

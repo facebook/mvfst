@@ -159,6 +159,12 @@ class StreamFrameScheduler {
     const MapType::key_type& start_;
   };
 
+  StreamId writeStreamsHelper(
+      PacketBuilderInterface& builder,
+      const std::set<StreamId>& writableStreams,
+      StreamId nextScheduledStream,
+      uint64_t& connWritableBytes);
+
   using WritableStreamItr =
       MiddleStartingIterationWrapper::MiddleStartingIterator;
 

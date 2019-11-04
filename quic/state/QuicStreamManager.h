@@ -216,32 +216,50 @@ class QuicStreamManager {
     return writableStreams_;
   }
 
+  // TODO figure out a better interface here.
+  /*
+   * Returns a mutable reference to the container holding the writable stream
+   * IDs.
+   */
+  auto& writableControlStreams() {
+    return writableControlStreams_;
+  }
+
   /*
    * Returns if there are any writable streams.
    */
   bool hasWritable() const {
-    return !writableStreams_.empty();
+    return !writableStreams_.empty() || !writableControlStreams_.empty();
   }
 
   /*
    * Returns if the current writable streams contains the given id.
    */
   bool writableContains(StreamId streamId) const {
-    return writableStreams_.count(streamId) > 0;
+    return writableStreams_.count(streamId) > 0 ||
+        writableControlStreams_.count(streamId) > 0;
   }
 
   /*
    * Add a writable stream id.
    */
-  void addWritable(StreamId streamId) {
-    writableStreams_.insert(streamId);
+  void addWritable(const QuicStreamState& stream) {
+    if (stream.isControl) {
+      writableControlStreams_.insert(stream.id);
+    } else {
+      writableStreams_.insert(stream.id);
+    }
   }
 
   /*
    * Remove a writable stream id.
    */
-  void removeWritable(StreamId streamId) {
-    writableStreams_.erase(streamId);
+  void removeWritable(const QuicStreamState& stream) {
+    if (stream.isControl) {
+      writableControlStreams_.erase(stream.id);
+    } else {
+      writableStreams_.erase(stream.id);
+    }
   }
 
   /*
@@ -249,6 +267,7 @@ class QuicStreamManager {
    */
   void clearWritable() {
     writableStreams_.clear();
+    writableControlStreams_.clear();
   }
 
   /*
@@ -737,8 +756,11 @@ class QuicStreamManager {
   // List of streams that have pending peeks
   std::set<StreamId> peekableStreams_;
 
-  // List of streams that have writable data
+  // List of !control streams that have writable data
   std::set<StreamId> writableStreams_;
+
+  // List of control streams that have writable data
+  std::set<StreamId> writableControlStreams_;
 
   // List of streams that were blocked
   std::unordered_map<StreamId, StreamDataBlockedFrame> blockedStreams_;

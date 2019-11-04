@@ -364,6 +364,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
   writableStreams_.erase(streamId);
+  writableControlStreams_.erase(streamId);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
   windowUpdates_.erase(streamId);
@@ -463,9 +464,9 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   if (stream.hasWritableData() && !stream.streamWriteError.hasValue()) {
-    stream.conn.streamManager->addWritable(stream.id);
+    stream.conn.streamManager->addWritable(stream);
   } else {
-    stream.conn.streamManager->removeWritable(stream.id);
+    stream.conn.streamManager->removeWritable(stream);
   }
 }
 
