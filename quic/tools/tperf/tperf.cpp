@@ -312,7 +312,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
     LOG(INFO) << "TPerfClient: new unidirectional stream=" << id;
-    eventBase_.timer().scheduleTimeout(this, duration_);
+    if (!timerScheduled_) {
+      timerScheduled_ = true;
+      eventBase_.timer().scheduleTimeout(this, duration_);
+    }
     quicClient_->setReadCallback(id, this);
   }
 
@@ -390,6 +393,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   ~TPerfClient() override = default;
 
  private:
+  bool timerScheduled_{false};
   std::string host_;
   uint16_t port_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
