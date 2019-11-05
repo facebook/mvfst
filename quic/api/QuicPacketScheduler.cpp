@@ -157,16 +157,22 @@ FrameScheduler::scheduleFramesForPacket(
   if (blockedScheduler_ && blockedScheduler_->hasPendingBlockedFrames()) {
     blockedScheduler_->writeBlockedFrames(wrapper);
   }
+  // Simple frames should be scheduled before stream frames and retx frames
+  // because those frames might fill up all available bytes for writing.
+  // If we are trying to send a PathChallenge frame it may be blocked by those,
+  // causing a connection to proceed slowly because of path validation rate
+  // limiting.
+  if (simpleFrameScheduler_ &&
+      simpleFrameScheduler_->hasPendingSimpleFrames()) {
+    simpleFrameScheduler_->writeSimpleFrames(wrapper);
+  }
   if (retransmissionScheduler_ && retransmissionScheduler_->hasPendingData()) {
     retransmissionScheduler_->writeRetransmissionStreams(wrapper);
   }
   if (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) {
     streamFrameScheduler_->writeStreams(wrapper);
   }
-  if (simpleFrameScheduler_ &&
-      simpleFrameScheduler_->hasPendingSimpleFrames()) {
-    simpleFrameScheduler_->writeSimpleFrames(wrapper);
-  }
+
   return std::make_pair(folly::none, std::move(builder).buildPacket());
 }
 
