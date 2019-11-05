@@ -780,7 +780,8 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
 }
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
