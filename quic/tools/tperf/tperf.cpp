@@ -210,6 +210,7 @@ class TPerfServer {
       bool pacing,
       uint32_t numStreams)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
+    eventBase_.setName("tperf_server");
     server_->setQuicServerTransportFactory(
         std::make_unique<TPerfServerTransportFactory>(blockSize, numStreams));
     auto serverCtx = quic::test::createServerCtx();
@@ -236,13 +237,13 @@ class TPerfServer {
     addr1.setFromHostPort(host_, port_);
     server_->start(addr1, 0);
     LOG(INFO) << "tperf server started at: " << addr1.describe();
-    eventbase_.loopForever();
+    eventBase_.loopForever();
   }
 
  private:
   std::string host_;
   uint16_t port_;
-  folly::EventBase eventbase_;
+  folly::EventBase eventBase_;
   std::shared_ptr<quic::QuicServer> server_;
 };
 
@@ -265,7 +266,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
         duration_(duration),
         window_(window),
         gso_(gso),
-        congestionControlType_(congestionControlType) {}
+        congestionControlType_(congestionControlType) {
+    eventBase_.setName("tperf_client");
+  }
 
   void timeoutExpired() noexcept override {
     quicClient_->closeNow(folly::none);
