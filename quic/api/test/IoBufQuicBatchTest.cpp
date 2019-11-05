@@ -7,7 +7,9 @@
  */
 
 #include <quic/api/IoBufQuicBatch.h>
+
 #include <gtest/gtest.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/state/StateData.h>
 
@@ -53,7 +55,8 @@ void RunTest(int numBatch) {
 
   auto batchWriter = std::make_unique<TestPacketBatchWriter>(numBatch);
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
-  QuicClientConnectionState conn;
+  QuicClientConnectionState conn(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
 
   IOBufQuicBatch ioBufBatch(

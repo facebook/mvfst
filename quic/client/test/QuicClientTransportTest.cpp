@@ -203,7 +203,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     client->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
     client->setHostname(hostname);
-    client->setFizzClientContext(clientCtx);
+    client->setFizzClientQuicHandshakeContext(clientCtx);
     client->setCertificateVerifier(createTestCertificateVerifier());
     client->addNewPeerAddress(serverAddr);
     client->setPskCache(pskCache_);

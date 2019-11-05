@@ -13,6 +13,7 @@
 #include <folly/io/async/test/MockTimeoutManager.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/MockQuicStats.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
@@ -85,7 +86,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   }
 
   std::unique_ptr<QuicClientConnectionState> createClientConn() {
-    auto conn = std::make_unique<QuicClientConnectionState>();
+    auto conn = std::make_unique<QuicClientConnectionState>(
+        std::make_shared<FizzClientQuicHandshakeContext>());
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState.nextPacketNum = 1;

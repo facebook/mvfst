@@ -12,6 +12,7 @@
 
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/FizzCryptoFactory.h>
@@ -40,7 +41,8 @@ QuicClientTransport::QuicClientTransport(
       connectionIdSize == 0 ||
       (connectionIdSize >= kMinInitialDestinationConnIdLength &&
        connectionIdSize <= kMaxConnectionIdSize));
-  auto tempConn = std::make_unique<QuicClientConnectionState>();
+  auto tempConn = std::make_unique<QuicClientConnectionState>(
+      std::make_shared<FizzClientQuicHandshakeContext>());
   clientConn_ = tempConn.get();
   conn_ = std::move(tempConn);
   std::vector<uint8_t> connIdData(
@@ -1168,7 +1170,7 @@ void QuicClientTransport::setHostname(const std::string& hostname) {
   hostname_ = hostname;
 }
 
-void QuicClientTransport::setFizzClientContext(
+void QuicClientTransport::setFizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> ctx) {
   ctx_ = std::move(ctx);
 }
