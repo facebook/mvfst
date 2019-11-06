@@ -354,6 +354,10 @@ void onConnectionMigration(
   }
   ++conn.migrationState.numMigrations;
 
+  bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.hasValue();
+  // Clear any pending path challenge frame that is not sent
+  conn.pendingEvents.pathChallenge = folly::none;
+
   auto& previousPeerAddresses = conn.migrationState.previousPeerAddresses;
   auto it = std::find(
       previousPeerAddresses.begin(),
@@ -377,7 +381,7 @@ void onConnectionMigration(
   bool isNATRebinding = maybeNATRebinding(newPeerAddress, conn.peerAddress);
 
   // Cancel current path validation if any
-  if (conn.outstandingPathValidation) {
+  if (hasPendingPathChallenge || conn.outstandingPathValidation) {
     conn.pendingEvents.schedulePathValidationTimeout = false;
     conn.outstandingPathValidation = folly::none;
 
