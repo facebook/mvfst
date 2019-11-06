@@ -49,6 +49,11 @@ DEFINE_uint32(
     quic::kLargeMaxCwndInMss,
     "Max cwnd in the unit of mss");
 DEFINE_uint32(num_streams, 1, "Number of streams to send on simultaneously");
+DEFINE_uint64(
+    bytes_per_stream,
+    0,
+    "Maximum number of bytes per stream. "
+    "0 (the default) means the stream lives for the whole duration of the test.");
 
 namespace quic {
 namespace tperf {
@@ -60,8 +65,12 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   explicit ServerStreamHandler(
       folly::EventBase* evbIn,
       uint64_t blockSize,
-      uint32_t numStreams)
-      : evb_(evbIn), blockSize_(blockSize), numStreams_(numStreams) {}
+      uint32_t numStreams,
+      uint64_t maxBytesPerStream)
+      : evb_(evbIn),
+        blockSize_(blockSize),
+        numStreams_(numStreams),
+        maxBytesPerStream_(maxBytesPerStream) {}
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock_ = socket;
@@ -96,14 +105,28 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   void onTransportReady() noexcept override {
     LOG(INFO) << "Starting sends to client.";
     for (uint32_t i = 0; i < numStreams_; i++) {
-      auto stream = sock_->createUnidirectionalStream();
-      CHECK(stream.hasValue());
-      sock_->notifyPendingWriteOnStream(stream.value(), this);
+      createNewStream();
     }
+  }
+
+  void createNewStream() noexcept {
+    if (!sock_) {
+      VLOG(4) << __func__ << ": socket is closed.";
+      return;
+    }
+    auto stream = sock_->createUnidirectionalStream();
+    VLOG(5) << "New Stream with id = " << stream.value();
+    CHECK(stream.hasValue());
+    bytesPerStream_[stream.value()] = 0;
+    notifyDataForStream(stream.value());
   }
 
   void notifyDataForStream(quic::StreamId id) {
     evb_->runInEventBaseThread([&, id]() {
+      if (!sock_) {
+        VLOG(5) << "notifyDataForStream(" << id << "): socket is closed.";
+        return;
+      }
       auto res = sock_->notifyPendingWriteOnStream(id, this);
       if (res.hasError()) {
         LOG(FATAL) << quic::toString(res.error());
@@ -129,17 +152,32 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   void onStreamWriteReady(
       quic::StreamId id,
       uint64_t maxToSend) noexcept override {
-    auto buf = folly::IOBuf::createChain(maxToSend, blockSize_);
+    bool eof = false;
+    uint64_t toSend = maxToSend;
+    if (maxBytesPerStream_ > 0) {
+      toSend =
+          std::min<uint64_t>(toSend, maxBytesPerStream_ - bytesPerStream_[id]);
+      bytesPerStream_[id] += toSend;
+      if (bytesPerStream_[id] >= maxBytesPerStream_) {
+        eof = true;
+      }
+    }
+    auto buf = folly::IOBuf::createChain(toSend, blockSize_);
     auto curBuf = buf.get();
     do {
       curBuf->append(curBuf->capacity());
       curBuf = curBuf->next();
     } while (curBuf != buf.get());
-    auto res = sock_->writeChain(id, std::move(buf), false, true, nullptr);
+    auto res = sock_->writeChain(id, std::move(buf), eof, true, nullptr);
     if (res.hasError()) {
-      LOG(FATAL) << "Go error on write: " << quic::toString(res.error());
+      LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
     }
-    notifyDataForStream(id);
+    if (!eof) {
+      notifyDataForStream(id);
+    } else {
+      bytesPerStream_.erase(id);
+      createNewStream();
+    }
   }
 
   void onStreamWriteError(
@@ -159,14 +197,21 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   folly::EventBase* evb_;
   uint64_t blockSize_;
   uint32_t numStreams_;
+  uint64_t maxBytesPerStream_;
+  std::unordered_map<quic::StreamId, uint64_t> bytesPerStream_;
 };
 
 class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
  public:
   ~TPerfServerTransportFactory() override = default;
 
-  explicit TPerfServerTransportFactory(uint64_t blockSize, uint32_t numStreams)
-      : blockSize_(blockSize), numStreams_(numStreams) {}
+  explicit TPerfServerTransportFactory(
+      uint64_t blockSize,
+      uint32_t numStreams,
+      uint64_t maxBytesPerStream)
+      : blockSize_(blockSize),
+        numStreams_(numStreams),
+        maxBytesPerStream_(maxBytesPerStream) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -175,8 +220,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<const fizz::server::FizzServerContext>
           ctx) noexcept override {
     CHECK_EQ(evb, sock->getEventBase());
-    auto serverHandler =
-        std::make_unique<ServerStreamHandler>(evb, blockSize_, numStreams_);
+    auto serverHandler = std::make_unique<ServerStreamHandler>(
+        evb, blockSize_, numStreams_, maxBytesPerStream_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), *serverHandler, ctx);
     if (!FLAGS_server_qlogger_path.empty()) {
@@ -195,6 +240,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
   std::vector<std::unique_ptr<ServerStreamHandler>> handlers_;
   uint64_t blockSize_;
   uint32_t numStreams_;
+  uint64_t maxBytesPerStream_;
 };
 
 class TPerfServer {
@@ -208,11 +254,13 @@ class TPerfServer {
       bool gso,
       uint32_t maxCwndInMss,
       bool pacing,
-      uint32_t numStreams)
+      uint32_t numStreams,
+      uint64_t maxBytesPerStream)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     eventBase_.setName("tperf_server");
     server_->setQuicServerTransportFactory(
-        std::make_unique<TPerfServerTransportFactory>(blockSize, numStreams));
+        std::make_unique<TPerfServerTransportFactory>(
+            blockSize, numStreams, maxBytesPerStream));
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
@@ -278,9 +326,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     LOG(INFO) << "Overall throughput: "
               << (receivedBytes_ / bytesPerMegabit) / duration_.count()
               << "Mb/s";
-    for (auto& p : bytesPerStream_) {
-      LOG(INFO) << "Received " << p.second << " bytes on stream " << p.first;
-    }
+    LOG(INFO) << "Per Stream throughput: "
+              << ((receivedBytes_ / receivedStreams_) / bytesPerMegabit) /
+            duration_.count()
+              << "Mb/s over " << receivedStreams_ << " streams";
   }
 
   virtual void callbackCanceled() noexcept override {}
@@ -294,7 +343,6 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
 
     auto readBytes = readData->first->computeChainDataLength();
     receivedBytes_ += readBytes;
-    bytesPerStream_[streamId] += readBytes;
   }
 
   void readError(
@@ -314,12 +362,13 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onNewUnidirectionalStream(quic::StreamId id) noexcept override {
-    LOG(INFO) << "TPerfClient: new unidirectional stream=" << id;
+    VLOG(5) << "TPerfClient: new unidirectional stream=" << id;
     if (!timerScheduled_) {
       timerScheduled_ = true;
       eventBase_.timer().scheduleTimeout(this, duration_);
     }
     quicClient_->setReadCallback(id, this);
+    receivedStreams_++;
   }
 
   void onTransportReady() noexcept override {
@@ -401,8 +450,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   uint16_t port_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   folly::EventBase eventBase_;
-  size_t receivedBytes_{0};
-  std::map<quic::StreamId, size_t> bytesPerStream_;
+  uint64_t receivedBytes_{0};
+  uint64_t receivedStreams_{0};
   std::chrono::seconds duration_;
   uint64_t window_;
   bool gso_;
@@ -451,9 +500,18 @@ int main(int argc, char* argv[]) {
         FLAGS_gso,
         FLAGS_max_cwnd_mss,
         FLAGS_pacing,
-        FLAGS_num_streams);
+        FLAGS_num_streams,
+        FLAGS_bytes_per_stream);
     server.start();
   } else if (FLAGS_mode == "client") {
+    if (FLAGS_num_streams != 1) {
+      LOG(ERROR) << "num_streams option is server only";
+      return 1;
+    }
+    if (FLAGS_bytes_per_stream != 0) {
+      LOG(ERROR) << "bytes_per_stream option is server only";
+      return 1;
+    }
     TPerfClient client(
         FLAGS_host,
         FLAGS_port,
