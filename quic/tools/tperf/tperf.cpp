@@ -12,6 +12,7 @@
 #include <folly/init/Init.h>
 #include <folly/io/async/HHWheelTimer.h>
 #include <folly/portability/GFlags.h>
+#include <folly/stats/Histogram.h>
 
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/test/TestUtils.h>
@@ -326,10 +327,25 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     LOG(INFO) << "Overall throughput: "
               << (receivedBytes_ / bytesPerMegabit) / duration_.count()
               << "Mb/s";
-    LOG(INFO) << "Per Stream throughput: "
+    // Per Stream Stats
+    LOG(INFO) << "Average per Stream throughput: "
               << ((receivedBytes_ / receivedStreams_) / bytesPerMegabit) /
             duration_.count()
               << "Mb/s over " << receivedStreams_ << " streams";
+    if (receivedStreams_ != 1) {
+      LOG(INFO) << "Histogram per Stream bytes: " << std::endl;
+      LOG(INFO) << "Lo\tHi\tNum\tSum";
+      for (const auto bytes : bytesPerStream_) {
+        bytesPerStreamHistogram_.addValue(bytes.second);
+      }
+      std::ostringstream os;
+      bytesPerStreamHistogram_.toTSV(os);
+      std::vector<folly::StringPiece> lines;
+      folly::split("\n", os.str(), lines);
+      for (const auto line : lines) {
+        LOG(INFO) << line;
+      }
+    }
   }
 
   virtual void callbackCanceled() noexcept override {}
@@ -343,6 +359,11 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
 
     auto readBytes = readData->first->computeChainDataLength();
     receivedBytes_ += readBytes;
+    bytesPerStream_[streamId] += readBytes;
+    if (readData.value().second) {
+      bytesPerStreamHistogram_.addValue(bytesPerStream_[streamId]);
+      bytesPerStream_.erase(streamId);
+    }
   }
 
   void readError(
@@ -452,6 +473,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   folly::EventBase eventBase_;
   uint64_t receivedBytes_{0};
   uint64_t receivedStreams_{0};
+  std::map<quic::StreamId, uint64_t> bytesPerStream_;
+  folly::Histogram<uint64_t> bytesPerStreamHistogram_{1024,
+                                                      0,
+                                                      1024 * 1024 * 1024};
   std::chrono::seconds duration_;
   uint64_t window_;
   bool gso_;
