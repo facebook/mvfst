@@ -356,6 +356,10 @@ class TestQuicTransport
     closeImpl(folly::none, false, false);
   }
 
+  void invokeWriteSocketData() {
+    writeSocketData();
+  }
+
   QuicServerConnectionState* transportConn;
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
@@ -1285,7 +1289,14 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
   }
   evb->loopOnce();
 }
+TEST_F(QuicTransportImplTest, TestTransportCloseWithMaxPacketNumber) {
+  transport->setServerConnectionId();
+  transport->transportConn->pendingEvents.closeTransport = false;
+  EXPECT_NO_THROW(transport->invokeWriteSocketData());
 
+  transport->transportConn->pendingEvents.closeTransport = true;
+  EXPECT_THROW(transport->invokeWriteSocketData(), QuicTransportException);
+}
 TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);

@@ -378,6 +378,8 @@ constexpr uint64_t kMinNumAvailableConnIds = 8;
 // default capability of QUIC partial reliability
 constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;
 
+constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
+
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   REJECT_IF_NO_EXACT_MATCH,
   LIMIT_IF_NO_EXACT_MATCH,

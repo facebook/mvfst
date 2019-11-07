@@ -609,6 +609,9 @@ struct QuicConnectionStateBase {
     uint8_t numProbePackets{0};
 
     bool cancelPingTimeout{false};
+
+    // close transport when the next packet number reaches kMaxPacketNum
+    bool closeTransport{false};
   };
 
   PendingEvents pendingEvents;

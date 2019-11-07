@@ -213,6 +213,9 @@ void increaseNextPacketNum(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept {
   getAckState(conn, pnSpace).nextPacketNum++;
+  if (getAckState(conn, pnSpace).nextPacketNum == kMaxPacketNumber - 1) {
+    conn.pendingEvents.closeTransport = true;
+  }
 }
 
 std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(

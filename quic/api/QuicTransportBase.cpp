@@ -2277,6 +2277,11 @@ void QuicTransportBase::writeSocketData() {
     auto packetsBefore = conn_->outstandingPackets.size();
     writeData();
     if (closeState_ != CloseState::CLOSED) {
+      if (conn_->pendingEvents.closeTransport == true) {
+        throw QuicTransportException(
+            "Max packet number reached",
+            TransportErrorCode::PROTOCOL_VIOLATION);
+      }
       setLossDetectionAlarm(*conn_, *this);
       auto packetsAfter = conn_->outstandingPackets.size();
       bool packetWritten = (packetsAfter > packetsBefore);
