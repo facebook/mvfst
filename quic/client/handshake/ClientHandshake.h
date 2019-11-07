@@ -51,7 +51,7 @@ class ClientHandshake : public Handshake {
       folly::Optional<fizz::client::CachedPsk> cachedPsk,
       const std::shared_ptr<ClientTransportParametersExtension>&
           transportParams,
-      HandshakeCallback* callback);
+      HandshakeCallback* callback) = 0;
 
   /**
    * Takes input bytes from the network and processes then in the handshake.
@@ -194,12 +194,6 @@ class ClientHandshake : public Handshake {
   void computeZeroRttCipher();
   void computeOneRttCipher(bool earlyDataAccepted);
 
-  class ActionMoveVisitor;
-  void processActions(fizz::client::Actions actions);
-
-  fizz::client::State state_;
-  fizz::client::ClientStateMachine machine_;
-
   // Whether or not to wait for more data.
   bool waitForData_{false};
 
@@ -209,8 +203,17 @@ class ClientHandshake : public Handshake {
 
   folly::exception_wrapper error_;
 
+  bool earlyDataAttempted_{false};
+
+ protected:
+  class ActionMoveVisitor;
+  void processActions(fizz::client::Actions actions);
+
+  fizz::client::State state_;
+  fizz::client::ClientStateMachine machine_;
+
   std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
-  bool earlyDataAttempted_{false};
 };
+
 } // namespace quic
