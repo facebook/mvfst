@@ -337,7 +337,8 @@ void updateTransportParamsFromTicket(
 
 void onConnectionMigration(
     QuicServerConnectionState& conn,
-    const folly::SocketAddress& newPeerAddress) {
+    const folly::SocketAddress& newPeerAddress,
+    bool isIntentional) {
   if (conn.migrationState.numMigrations >= kMaxNumMigrationsAllowed) {
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(
@@ -403,6 +404,9 @@ void onConnectionMigration(
     }
   }
 
+  if (conn.qLogger) {
+    conn.qLogger->addConnectionMigrationUpdate(isIntentional);
+  }
   conn.peerAddress = newPeerAddress;
 }
 
@@ -987,7 +991,13 @@ void onServerReadDataFromOpen(
       // TODO use new conn id, make sure the other endpoint has new conn id
       if (isNonProbingPacket) {
         if (packetNum == ackState.largestReceivedPacketNum) {
-          onConnectionMigration(conn, readData.peer);
+          ShortHeader* shortHeader = regularPacket.header.asShort();
+          bool intentionalMigration = false;
+          if (shortHeader &&
+              shortHeader->getConnectionId() != conn.serverConnectionId) {
+            intentionalMigration = true;
+          }
+          onConnectionMigration(conn, readData.peer, intentionalMigration);
         }
       } else {
         // Server will need to response with PathResponse to the new address

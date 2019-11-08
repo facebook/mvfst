@@ -325,6 +325,8 @@ enum class QLogEventType : uint32_t {
   PacingObservation,
   AppLimitedUpdate,
   BandwidthEstUpdate,
+  ConnectionMigration,
+  PathValidation
 };
 
 std::string toString(QLogEventType type);
@@ -614,6 +616,37 @@ class QLogStreamStateUpdateEvent : public QLogEvent {
   folly::dynamic toDynamic() const override;
 
  private:
+  VantagePoint vantagePoint_;
+};
+
+class QLogConnectionMigrationEvent : public QLogEvent {
+ public:
+  QLogConnectionMigrationEvent(
+      bool intentionalMigration,
+      VantagePoint vantagePoint,
+      std::chrono::microseconds refTime);
+
+  ~QLogConnectionMigrationEvent() override = default;
+
+  folly::dynamic toDynamic() const override;
+
+  bool intentionalMigration_;
+  VantagePoint vantagePoint_;
+};
+
+class QLogPathValidationEvent : public QLogEvent {
+ public:
+  // The VantagePoint represents who initiates the path validation (sends out
+  // Path Challenge).
+  QLogPathValidationEvent(
+      bool success,
+      VantagePoint vantagePoint,
+      std::chrono::microseconds refTime);
+
+  ~QLogPathValidationEvent() override = default;
+
+  folly::dynamic toDynamic() const override;
+  bool success_;
   VantagePoint vantagePoint_;
 };
 

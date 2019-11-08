@@ -1267,6 +1267,9 @@ void QuicClientTransport::replaceSocket(
     sock->pauseRead();
     sock->close();
   }
+  if (conn_->qLogger) {
+    conn_->qLogger->addConnectionMigrationUpdate(true);
+  }
   socket_ = std::move(replacementSocket);
   happyEyeballsSetUpSocket(
       *socket_, conn_->peerAddress, conn_->transportSettings, this, this);

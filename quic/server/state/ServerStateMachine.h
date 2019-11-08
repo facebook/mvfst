@@ -187,5 +187,6 @@ void updateTransportParamsFromTicket(
 
 void onConnectionMigration(
     QuicServerConnectionState& conn,
-    const folly::SocketAddress& newPeerAddress);
+    const folly::SocketAddress& newPeerAddress,
+    bool isIntentional = false);
 } // namespace quic

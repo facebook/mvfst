@@ -2099,6 +2099,9 @@ void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
 
   conn_->pendingEvents.schedulePathValidationTimeout = false;
   conn_->outstandingPathValidation = folly::none;
+  if (conn_->qLogger) {
+    conn_->qLogger->addPathValidationEvent(false);
+  }
 
   // TODO junqiw probing is not supported, so pathValidation==connMigration
   // We decide to close conn when pathValidation to migrated path fails.

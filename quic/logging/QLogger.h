@@ -109,6 +109,8 @@ class QLogger {
       quic::StreamId streamId,
       std::string update,
       folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) = 0;
+  virtual void addConnectionMigrationUpdate(bool intentionalMigration) = 0;
+  virtual void addPathValidationEvent(bool success) = 0;
 };
 
 std::string getFlowControlEvent(int offset);

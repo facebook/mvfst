@@ -69,5 +69,7 @@ class MockQLogger : public QLogger {
       void(uint64_t, std::chrono::microseconds));
   MOCK_METHOD0(addAppLimitedUpdate, void());
   MOCK_METHOD0(addAppUnlimitedUpdate, void());
+  MOCK_METHOD1(addConnectionMigrationUpdate, void(bool));
+  MOCK_METHOD1(addPathValidationEvent, void(bool));
 };
 } // namespace quic::test

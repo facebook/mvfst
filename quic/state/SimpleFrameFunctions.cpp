@@ -193,6 +193,9 @@ bool updateSimpleFrameOnPacketReceived(
           pathResponse.pathData != conn.outstandingPathValidation->pathData) {
         return false;
       }
+      if (conn.qLogger) {
+        conn.qLogger->addPathValidationEvent(true);
+      }
       // TODO update source token,
       conn.outstandingPathValidation = folly::none;
       conn.pendingEvents.schedulePathValidationTimeout = false;

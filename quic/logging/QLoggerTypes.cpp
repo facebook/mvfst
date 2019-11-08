@@ -778,6 +778,64 @@ folly::dynamic QLogStreamStateUpdateEvent::toDynamic() const {
   return d;
 }
 
+QLogConnectionMigrationEvent::QLogConnectionMigrationEvent(
+    bool intentionalMigration,
+    VantagePoint vantagePoint,
+    std::chrono::microseconds refTimeIn)
+    : intentionalMigration_{intentionalMigration}, vantagePoint_(vantagePoint) {
+  eventType = QLogEventType::ConnectionMigration;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogConnectionMigrationEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["intentional"] = intentionalMigration_;
+  if (vantagePoint_ == VantagePoint::CLIENT) {
+    data["type"] = "initiating";
+  } else {
+    data["type"] = "accepting";
+  }
+  d.push_back(std::move(data));
+  return d;
+}
+
+QLogPathValidationEvent::QLogPathValidationEvent(
+    bool success,
+    VantagePoint vantagePoint,
+    std::chrono::microseconds refTimeIn)
+    : success_{success}, vantagePoint_(vantagePoint) {
+  eventType = QLogEventType::PathValidation;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogPathValidationEvent::toDynamic() const {
+  // creating a folly::dynamic array to hold the information corresponding to
+  // the event fields relative_time, category, event_type, trigger, data
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["success"] = success_;
+  if (vantagePoint_ == VantagePoint::CLIENT) {
+    data["vantagePoint"] = "client";
+  } else {
+    data["vantagePoint"] = "server";
+  }
+  d.push_back(std::move(data));
+  return d;
+}
+
 std::string toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -818,6 +876,10 @@ std::string toString(QLogEventType type) {
       return "APP_LIMITED_UPDATE";
     case QLogEventType::BandwidthEstUpdate:
       return "BANDWIDTH_EST_UPDATE";
+    case QLogEventType::ConnectionMigration:
+      return "CONNECTION_MIGRATION";
+    case QLogEventType::PathValidation:
+      return "PATH_VALIDATION";
   }
   LOG(WARNING) << "toString has unhandled QLog event type";
   return "UNKNOWN";

@@ -292,6 +292,20 @@ void FileQLogger::addStreamStateUpdate(
       refTime));
 }
 
+void FileQLogger::addConnectionMigrationUpdate(bool intentionalMigration) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+  logs.push_back(std::make_unique<quic::QLogConnectionMigrationEvent>(
+      intentionalMigration, vantagePoint, refTime));
+}
+
+void FileQLogger::addPathValidationEvent(bool success) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+  logs.push_back(std::make_unique<quic::QLogPathValidationEvent>(
+      success, vantagePoint, refTime));
+}
+
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (!dcid.hasValue()) {
     LOG(ERROR) << "Error: No dcid found";

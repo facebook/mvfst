@@ -95,6 +95,9 @@ class FileQLogger : public BaseQLogger {
       std::string update,
       folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation)
       override;
+  virtual void addConnectionMigrationUpdate(bool intentionalMigration) override;
+  virtual void addPathValidationEvent(bool success) override;
+
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
 };

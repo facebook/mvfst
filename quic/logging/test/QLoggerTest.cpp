@@ -1171,4 +1171,50 @@ TEST_F(QLoggerTest, PaddingFramesFollyDynamic) {
   EXPECT_EQ(expected, gotEvents);
 }
 
+TEST_F(QLoggerTest, ConnectionMigration) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "TRANSPORT",
+      "CONNECTION_MIGRATION",
+      "DEFAULT",
+      {
+        "intentional": true,
+        "type": "initiating"
+      }
+    ]
+])");
+
+  FileQLogger q(VantagePoint::CLIENT);
+  q.addConnectionMigrationUpdate(true);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PathValidation) {
+  folly::dynamic expected = folly::parseJson(
+      R"([
+    [
+      "0",
+      "TRANSPORT",
+      "PATH_VALIDATION",
+      "DEFAULT",
+      {
+        "success": false,
+        "vantagePoint": "server"
+      }
+    ]
+])");
+
+  FileQLogger q(VantagePoint::SERVER);
+  q.addPathValidationEvent(false);
+  folly::dynamic gotDynamic = q.toDynamic();
+  gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
+  folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
+  EXPECT_EQ(expected, gotEvents);
+}
+
 } // namespace quic::test
