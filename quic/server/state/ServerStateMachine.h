@@ -66,6 +66,8 @@ struct CongestionAndRttState {
   std::chrono::microseconds lrtt;
   // Rtt var
   std::chrono::microseconds rttvar;
+  // Minimum rtt
+  std::chrono::microseconds mrtt;
 };
 
 struct ConnectionMigrationState {

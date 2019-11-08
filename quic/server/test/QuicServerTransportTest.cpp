@@ -2156,6 +2156,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
@@ -2173,6 +2174,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2186,6 +2188,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 
   loopForWrites();
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
@@ -2397,6 +2400,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   state.srtt = 1000us;
   state.lrtt = 2000us;
   state.rttvar = 3000us;
+  state.mrtt = 800us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2420,10 +2424,12 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   auto lastLrtt = server->getConn().migrationState.lastCongestionAndRtt->lrtt;
   auto lastRttvar =
       server->getConn().migrationState.lastCongestionAndRtt->rttvar;
+  auto lastMrtt = server->getConn().migrationState.lastCongestionAndRtt->mrtt;
   auto congestionController = server->getConn().congestionController.get();
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   deliverData(std::move(packetData), false, &newPeer);
 
@@ -2437,6 +2443,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   EXPECT_EQ(server->getConn().lossState.srtt, lastSrtt);
   EXPECT_EQ(server->getConn().lossState.lrtt, lastLrtt);
   EXPECT_EQ(server->getConn().lossState.rttvar, lastRttvar);
+  EXPECT_EQ(server->getConn().lossState.mrtt, lastMrtt);
   EXPECT_EQ(
       server->getConn().congestionController.get(), lastCongestionController);
   EXPECT_EQ(
@@ -2450,6 +2457,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 }
 
 TEST_P(
@@ -2467,6 +2475,7 @@ TEST_P(
   state.srtt = 1000us;
   state.lrtt = 2000us;
   state.rttvar = 3000us;
+  state.mrtt = 800us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2487,6 +2496,7 @@ TEST_P(
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer2("200.101.102.103", 2345);
   deliverData(std::move(packetData), false, &newPeer2);
@@ -2503,6 +2513,7 @@ TEST_P(
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2516,6 +2527,7 @@ TEST_P(
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
@@ -2531,6 +2543,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   state.srtt = 1000us;
   state.lrtt = 2000us;
   state.rttvar = 3000us;
+  state.srtt = 800us;
   server->getNonConstConn().migrationState.lastCongestionAndRtt =
       std::move(state);
 
@@ -2551,6 +2564,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   deliverData(std::move(packetData), false, &newPeer);
 
@@ -2564,6 +2578,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2577,6 +2592,7 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 }
 
 TEST_F(
@@ -2598,6 +2614,7 @@ TEST_F(
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), false, &newPeer);
@@ -2614,6 +2631,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2627,6 +2645,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 
   auto packetData2 = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2646,6 +2665,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, srtt);
   EXPECT_EQ(server->getConn().lossState.lrtt, lrtt);
   EXPECT_EQ(server->getConn().lossState.rttvar, rttvar);
+  EXPECT_EQ(server->getConn().lossState.mrtt, mrtt);
   EXPECT_EQ(server->getConn().congestionController.get(), congestionController);
   EXPECT_FALSE(server->getConn().migrationState.lastCongestionAndRtt);
 }
@@ -2669,6 +2689,7 @@ TEST_F(
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), true, &newPeer);
@@ -2684,6 +2705,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2697,6 +2719,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 
   auto packetData2 = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2719,6 +2742,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2732,6 +2756,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 }
 
 TEST_F(
@@ -2753,6 +2778,7 @@ TEST_F(
   auto srtt = server->getConn().lossState.srtt;
   auto lrtt = server->getConn().lossState.lrtt;
   auto rttvar = server->getConn().lossState.rttvar;
+  auto mrtt = server->getConn().lossState.mrtt;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   deliverData(std::move(packetData), true, &newPeer);
@@ -2768,6 +2794,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, 0us);
   EXPECT_EQ(server->getConn().lossState.lrtt, 0us);
   EXPECT_EQ(server->getConn().lossState.rttvar, 0us);
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_EQ(
@@ -2781,6 +2808,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->lrtt, lrtt);
   EXPECT_EQ(
       server->getConn().migrationState.lastCongestionAndRtt->rttvar, rttvar);
+  EXPECT_EQ(server->getConn().migrationState.lastCongestionAndRtt->mrtt, mrtt);
 
   auto packetData2 = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -2799,6 +2827,7 @@ TEST_F(
   EXPECT_EQ(server->getConn().lossState.srtt, srtt);
   EXPECT_EQ(server->getConn().lossState.lrtt, lrtt);
   EXPECT_EQ(server->getConn().lossState.rttvar, rttvar);
+  EXPECT_EQ(server->getConn().lossState.mrtt, mrtt);
   EXPECT_EQ(server->getConn().congestionController.get(), congestionController);
   EXPECT_FALSE(server->getConn().migrationState.lastCongestionAndRtt);
 }
@@ -2831,6 +2860,7 @@ TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
       server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
   EXPECT_NE(
       server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_NE(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_EQ(server->getConn().congestionController.get(), congestionController);
   EXPECT_FALSE(server->getConn().migrationState.lastCongestionAndRtt);
 }
@@ -2860,6 +2890,7 @@ TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   EXPECT_NE(server->getConn().lossState.srtt, 0us);
   EXPECT_NE(server->getConn().lossState.lrtt, 0us);
   EXPECT_NE(server->getConn().lossState.rttvar, 0us);
+  EXPECT_NE(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_EQ(server->getConn().congestionController.get(), congestionController);
   EXPECT_FALSE(server->getConn().migrationState.lastCongestionAndRtt);
 }
@@ -2894,6 +2925,7 @@ TEST_F(
       server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
   EXPECT_EQ(
       server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_NE(server->getConn().congestionController.get(), nullptr);
   EXPECT_NE(server->getConn().congestionController.get(), congestionController);
   EXPECT_TRUE(server->getConn().migrationState.lastCongestionAndRtt);
@@ -2921,6 +2953,7 @@ TEST_F(
       server->getConn().lossState.lrtt, std::chrono::microseconds::zero());
   EXPECT_EQ(
       server->getConn().lossState.rttvar, std::chrono::microseconds::zero());
+  EXPECT_EQ(server->getConn().lossState.mrtt, kDefaultMinRtt);
   EXPECT_EQ(server->getConn().congestionController.get(), newCC);
   EXPECT_TRUE(server->getConn().migrationState.lastCongestionAndRtt);
 }

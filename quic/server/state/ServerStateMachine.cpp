@@ -49,6 +49,7 @@ CongestionAndRttState moveCurrentCongestionAndRttState(
   state.srtt = conn.lossState.srtt;
   state.lrtt = conn.lossState.lrtt;
   state.rttvar = conn.lossState.rttvar;
+  state.mrtt = conn.lossState.mrtt;
   return state;
 }
 
@@ -61,6 +62,7 @@ void resetCongestionAndRttState(QuicServerConnectionState& conn) {
   conn.lossState.srtt = 0us;
   conn.lossState.lrtt = 0us;
   conn.lossState.rttvar = 0us;
+  conn.lossState.mrtt = kDefaultMinRtt;
 }
 
 void recoverOrResetCongestionAndRttState(
@@ -75,6 +77,7 @@ void recoverOrResetCongestionAndRttState(
     conn.lossState.srtt = lastState->srtt;
     conn.lossState.lrtt = lastState->lrtt;
     conn.lossState.rttvar = lastState->rttvar;
+    conn.lossState.mrtt = lastState->mrtt;
     conn.migrationState.lastCongestionAndRtt = folly::none;
   } else {
     resetCongestionAndRttState(conn);
