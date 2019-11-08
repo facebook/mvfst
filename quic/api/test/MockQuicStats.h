@@ -41,6 +41,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onPTO, void());
   MOCK_METHOD1(onRead, void(size_t));
   MOCK_METHOD1(onWrite, void(size_t));
+  MOCK_METHOD1(onUDPSocketWriteError, void(SocketErrorType));
 };
 
 class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {

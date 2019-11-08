@@ -120,11 +120,19 @@ bool IOBufQuicBatch::flushInternal() {
     }
   }
 
+  int errnoCopy = 0;
+  if (!written) {
+    errnoCopy = errno;
+    QUIC_STATS(
+        conn_.infoCallback,
+        onUDPSocketWriteError,
+        QuicTransportStatsCallback::errnoToSocketErrorType(errnoCopy));
+  }
+
   // TODO: handle ENOBUFS and backpressure the socket.
   if (!happyEyeballsState_.shouldWriteToFirstSocket &&
       !happyEyeballsState_.shouldWriteToSecondSocket) {
     // Both sockets becomes fatal, close connection
-    int errnoCopy = errno;
     std::string errorMsg = folly::to<std::string>(
         folly::errnoStr(errnoCopy),
         (errnoCopy == EMSGSIZE)

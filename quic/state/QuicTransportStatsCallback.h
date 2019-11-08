@@ -51,6 +51,16 @@ class QuicTransportStatsCallback {
     MAX
   };
 
+  enum class SocketErrorType : uint8_t {
+    AGAIN,
+    INVAL,
+    MSGSIZE,
+    NOBUFS,
+    NOMEM,
+    OTHER,
+    MAX
+  };
+
   virtual ~QuicTransportStatsCallback() = default;
 
   // packet level metrics
@@ -108,6 +118,8 @@ class QuicTransportStatsCallback {
 
   virtual void onWrite(size_t bufSize) = 0;
 
+  virtual void onUDPSocketWriteError(SocketErrorType errorType) = 0;
+
   static const char* toString(ConnectionCloseReason reason) {
     switch (reason) {
       case ConnectionCloseReason::NONE:
@@ -155,6 +167,42 @@ class QuicTransportStatsCallback {
         return "MAX";
       default:
         throw std::runtime_error("Undefined PacketDropReason passed");
+    }
+  }
+
+  static const char* toString(SocketErrorType errorType) {
+    switch (errorType) {
+      case SocketErrorType::AGAIN:
+        return "AGAIN";
+      case SocketErrorType::INVAL:
+        return "INVAL";
+      case SocketErrorType::MSGSIZE:
+        return "MSGSIZE";
+      case SocketErrorType::NOBUFS:
+        return "NOBUFS";
+      case SocketErrorType::NOMEM:
+        return "NOMEM";
+      case SocketErrorType::OTHER:
+        return "Other";
+      default:
+        throw std::runtime_error("Undefined SocketErrorType");
+    }
+  }
+
+  static SocketErrorType errnoToSocketErrorType(int err) {
+    switch (err) {
+      case EAGAIN:
+        return SocketErrorType::AGAIN;
+      case EINVAL:
+        return SocketErrorType::INVAL;
+      case EMSGSIZE:
+        return SocketErrorType::MSGSIZE;
+      case ENOBUFS:
+        return SocketErrorType::NOBUFS;
+      case ENOMEM:
+        return SocketErrorType::NOMEM;
+      default:
+        return SocketErrorType::OTHER;
     }
   }
 };
