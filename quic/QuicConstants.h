@@ -279,6 +279,9 @@ constexpr uint8_t kDefaultEmulatedConnection = 2;
 // Default W_max reduction factor when loss happens before Cwnd gets back to
 // previous W_max:
 constexpr float kDefaultLastMaxReductionFactor = 0.85f;
+// Factor to control TCP estimate cwnd increase after Ack.
+constexpr float kCubicTCPFriendlyEstimateIncreaseFactor =
+    3 * (1 - kDefaultCubicReductionFactor) / (1 + kDefaultCubicReductionFactor);
 
 /* Flow Control */
 // Default flow control window for HTTP/2 + 1K for headers

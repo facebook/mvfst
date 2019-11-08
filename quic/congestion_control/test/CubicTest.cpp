@@ -79,15 +79,6 @@ TEST_F(CubicTest, PersistentCongestion) {
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 9);
-  std::array<uint64_t, 9> cwdArr = {initCwnd,
-                                    11088,
-                                    2464,
-                                    cubic.getCongestionWindow(),
-                                    cubic.getCongestionWindow(),
-                                    cubic.getCongestionWindow(),
-                                    cubic.getCongestionWindow(),
-                                    cubic.getCongestionWindow(),
-                                    cubic.getCongestionWindow()};
   std::array<std::string, 9> congestionEventArr = {kRemoveInflight,
                                                    kCubicLoss,
                                                    kPersistentCongestion,
@@ -113,7 +104,6 @@ TEST_F(CubicTest, PersistentCongestion) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
     EXPECT_EQ(event->bytesInFlight, 0);
-    EXPECT_EQ(event->currentCwnd, cwdArr[i]);
     EXPECT_EQ(event->congestionEvent, congestionEventArr[i]);
     EXPECT_EQ(event->state, stateArr[i]);
     EXPECT_EQ(event->recoveryState, "");
@@ -129,7 +119,6 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   // initCwnd > initSsthresh: an ack will immediately make the state machine
   // transit to Steady state:
   Cubic cubic(conn, 1000);
-  cubic.setConnectionEmulation(1); // Easier to argue reduction this way
 
   // Send one and get acked, this moves the state machine to steady
   auto packet0 = makeTestingWritePacket(0, 1000, 1000);

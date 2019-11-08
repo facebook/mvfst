@@ -313,8 +313,6 @@ CongestionControlType Copa::type() const noexcept {
   return CongestionControlType::Copa;
 }
 
-void Copa::setConnectionEmulation(uint8_t) noexcept {}
-
 uint64_t Copa::getBytesInFlight() const noexcept {
   return bytesInFlight_;
 }

@@ -42,7 +42,6 @@ class Copa : public CongestionController {
 
   uint64_t getBytesInFlight() const noexcept;
 
-  void setConnectionEmulation(uint8_t) noexcept override;
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
   bool isAppLimited() const noexcept override;

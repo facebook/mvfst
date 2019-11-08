@@ -320,7 +320,6 @@ struct CongestionController {
    * controller.
    */
   virtual uint64_t getCongestionWindow() const = 0;
-  virtual void setConnectionEmulation(uint8_t) = 0;
   /**
    * Notify congestion controller that the connection has become idle or active
    * in the sense that there are active non-control streams.

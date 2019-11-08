@@ -29,7 +29,6 @@ Cubic::Cubic(
   steadyState_.tcpFriendly = tcpFriendly;
   steadyState_.estRenoCwnd = cwndBytes_;
   hystartState_.ackTrain = ackTrain;
-  calculateReductionFactors();
 }
 
 CubicStates Cubic::state() const noexcept {
@@ -163,13 +162,6 @@ void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
   }
 }
 
-void Cubic::setConnectionEmulation(uint8_t num) noexcept {
-  DCHECK_NE(0, num);
-  numEmulatedConnections_ = num;
-  // Precalculate reduction/increase factors.
-  calculateReductionFactors();
-}
-
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
   QUIC_TRACE(
       cubic_appidle,
@@ -216,26 +208,6 @@ bool Cubic::isAppLimited() const noexcept {
 
 bool Cubic::isAppIdle() const noexcept {
   return quiescenceStart_.hasValue();
-}
-
-void Cubic::calculateReductionFactors() noexcept {
-  // TODO: chromium has an experiment to use a fixed last max reduction factor,
-  // i.e., just use kDefaultLastMaxReductionFactor
-  steadyState_.lastMaxReductionFactor =
-      (numEmulatedConnections_ - 1 + kDefaultLastMaxReductionFactor) /
-      numEmulatedConnections_;
-  steadyState_.reductionFactor =
-      (numEmulatedConnections_ - 1 + kDefaultCubicReductionFactor) /
-      numEmulatedConnections_;
-  if (steadyState_.tcpFriendly) {
-    // Every RTT, one "emulated" connection should increase by:
-    auto beta = 3 * (1 - steadyState_.reductionFactor) /
-        (1 + steadyState_.reductionFactor);
-    // Then for N "emulated" connections, the increase per RTT round will be:
-    // TODO: Chromium multiplies the following alpha with an extra
-    // numEmulatedConnections. I don't really see why so I don't adopt that.
-    steadyState_.tcpEstimationIncreaseFactor = numEmulatedConnections_ * beta;
-  }
 }
 
 void Cubic::updateTimeToOrigin() noexcept {

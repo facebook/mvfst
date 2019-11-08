@@ -74,11 +74,7 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
 
 TEST_F(CubicHystartTest, AckTrain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(
-      conn,
-      std::numeric_limits<uint64_t>::max(),
-      true,
-      true);
+  Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), true, true);
   auto initCwnd = cubic.getWritableBytes();
   // srtt will be assigned to delayMin:
   conn.lossState.srtt = 2us;
@@ -313,7 +309,7 @@ TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet);
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-  EXPECT_EQ(initCwnd * 0.9, cubic.getWritableBytes());
+  EXPECT_EQ(initCwnd * kDefaultCubicReductionFactor, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
 } // namespace test

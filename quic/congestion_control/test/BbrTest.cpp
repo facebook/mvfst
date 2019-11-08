@@ -47,7 +47,6 @@ TEST_F(BbrTest, Recovery) {
   // Make a huge inflight so we don't underflow anything
   auto inflightBytes = 100 * 1000;
   bbr.onPacketSent(makeTestingWritePacket(9, inflightBytes, inflightBytes));
-  auto initCwnd = bbr.getCongestionWindow();
 
   // This also makes sure recoveryWindow_ is larger than inflightBytes
   uint64_t ackedBytes = 1000 * conn.transportSettings.minCwndInMss * 2;
@@ -55,8 +54,7 @@ TEST_F(BbrTest, Recovery) {
   loss.lostBytes = 100;
   inflightBytes -= (loss.lostBytes + ackedBytes);
   uint64_t expectedRecoveryWindow = std::max(
-      (uint64_t)(initCwnd * kBbrReductionFactor) - loss.lostBytes,
-      inflightBytes + ackedBytes);
+      inflightBytes + ackedBytes - loss.lostBytes, inflightBytes + ackedBytes);
   // This sets the connectin to recovery state, also sets both the
   // endOfRoundTrip_ and endOfRecovery_ to Clock::now()
   bbr.onPacketAckOrLoss(
@@ -71,7 +69,7 @@ TEST_F(BbrTest, Recovery) {
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
   EXPECT_EQ(event->bytesInFlight, inflightBytes);
-  EXPECT_EQ(event->currentCwnd, 449900);
+  EXPECT_EQ(event->currentCwnd, expectedRecoveryWindow);
   EXPECT_EQ(event->congestionEvent, kCongestionPacketAck);
   EXPECT_EQ(
       event->state,

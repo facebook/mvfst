@@ -39,8 +39,6 @@ constexpr float kLargeProbeRttCwndGain = 0.75f;
 constexpr uint64_t kBandwidthWindowLength = kNumOfCycles + 2;
 // RTT Sampler default expiration
 constexpr std::chrono::seconds kDefaultRttSamplerExpiration{10};
-// See calculateReductionFactors in QuicCubic.cpp
-constexpr double kBbrReductionFactor = 0.9;
 // 64K, used in sendQuantum calculation:
 constexpr uint64_t k64K = 64 * 1024;
 
@@ -150,7 +148,6 @@ class BbrCongestionController : public CongestionController {
   uint64_t getWritableBytes() const noexcept override;
 
   uint64_t getCongestionWindow() const noexcept override;
-  void setConnectionEmulation(uint8_t) noexcept override;
   CongestionControlType type() const noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
@@ -168,7 +165,7 @@ class BbrCongestionController : public CongestionController {
    */
   void
   onPacketAcked(const AckEvent& ack, uint64_t prevInflightBytes, bool hasLoss);
-  void onPacketLoss(const LossEvent&);
+  void onPacketLoss(const LossEvent&, uint64_t ackedBytes);
   void updatePacing() noexcept;
 
   /**

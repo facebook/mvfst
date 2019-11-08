@@ -160,8 +160,6 @@ CongestionControlType NewReno::type() const noexcept {
   return CongestionControlType::NewReno;
 }
 
-void NewReno::setConnectionEmulation(uint8_t) noexcept {}
-
 uint64_t NewReno::getBytesInFlight() const noexcept {
   return bytesInFlight_;
 }

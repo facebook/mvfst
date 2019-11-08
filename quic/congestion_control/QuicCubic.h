@@ -95,7 +95,6 @@ class Cubic : public CongestionController {
 
   uint64_t getWritableBytes() const noexcept override;
   uint64_t getCongestionWindow() const noexcept override;
-  void setConnectionEmulation(uint8_t) noexcept override;
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
@@ -122,7 +121,6 @@ class Cubic : public CongestionController {
   void startHystartRttRound(TimePoint time) noexcept;
 
   void cubicReduction(TimePoint lossTime) noexcept;
-  void calculateReductionFactors() noexcept;
   void updateTimeToOrigin() noexcept;
   int64_t calculateCubicCwndDelta(TimePoint timePoint) noexcept;
   uint64_t calculateCubicCwnd(int64_t delta) noexcept;
@@ -137,7 +135,6 @@ class Cubic : public CongestionController {
   folly::Optional<uint64_t> lossSsthresh_;
   uint64_t inflightBytes_;
   uint64_t ssthresh_;
-  uint8_t numEmulatedConnections_{kDefaultEmulatedConnection};
 
   struct HystartState {
     // If AckTrain method will be used to exit SlowStart
@@ -176,9 +173,9 @@ class Cubic : public CongestionController {
     folly::Optional<uint64_t> lastMaxCwndBytes;
     uint64_t estRenoCwnd;
     // cache reduction/increase factors based on numEmulatedConnections_
-    float reductionFactor;
-    float lastMaxReductionFactor;
-    float tcpEstimationIncreaseFactor;
+    float reductionFactor{kDefaultCubicReductionFactor};
+    float lastMaxReductionFactor{kDefaultLastMaxReductionFactor};
+    float tcpEstimationIncreaseFactor{kCubicTCPFriendlyEstimateIncreaseFactor};
   };
 
   struct RecoveryState {

@@ -25,7 +25,6 @@ class MockCongestionController : public CongestionController {
   MOCK_CONST_METHOD0(getWritableBytes, uint64_t());
   MOCK_CONST_METHOD0(getCongestionWindow, uint64_t());
   MOCK_METHOD0(onSpuriousLoss, void());
-  GMOCK_METHOD1_(, , , setConnectionEmulation, void(uint8_t));
   MOCK_CONST_METHOD0(type, CongestionControlType());
   GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
   MOCK_METHOD0(setAppLimited, void());

@@ -22,7 +22,6 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   // transit to Steady state:
   conn.udpSendPacketLen = 200; // initCwnd = 2000, minCwnd = 400
   Cubic cubic(conn, 1000);
-  cubic.setConnectionEmulation(1); // Easier to argue reduction this way
 
   // Send one and get acked, this moves the state machine to steady. Cwnd will
   // be 3000, inflight will be 0

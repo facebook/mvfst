@@ -43,10 +43,6 @@ BbrCongestionController::BbrCongestionController(
       // TODO: experiment with longer window len for ack aggregation filter
       maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {}
 
-void BbrCongestionController::setConnectionEmulation(uint8_t) noexcept {
-  /* unsupported for BBR */
-}
-
 CongestionControlType BbrCongestionController::type() const noexcept {
   return CongestionControlType::BBR;
 }
@@ -71,20 +67,19 @@ void BbrCongestionController::setBandwidthSampler(
   bandwidthSampler_ = std::move(sampler);
 }
 
-void BbrCongestionController::onPacketLoss(const LossEvent& loss) {
+void BbrCongestionController::onPacketLoss(
+    const LossEvent& loss,
+    uint64_t ackedBytes) {
   endOfRecovery_ = Clock::now();
 
   if (!inRecovery()) {
     recoveryState_ = BbrCongestionController::RecoveryState::CONSERVATIVE;
-    // 10% cut is what we do in our Quic Cubic implementation. Even though BBR
-    // is pacing limited, not cwnd limited, our Quic transport still use
-    // getWritableBytes() to decide if it should schedule a write. So without
-    // a similar small window drop, BBR will schedule fewer writes compared to
-    // Cubic after a loss. When they share a bottleneck link, if they both see
-    // losses, Cubic will pick up pretty quickly while BBR will wait, do a
-    // send-one-per-ack type of slow sending, undershooting the bandwidth
-    // sampler and will take a lot longer to recover from it.
-    recoveryWindow_ = (uint64_t)((double)cwnd_ * kBbrReductionFactor);
+    recoveryWindow_ = inflightBytes_ + ackedBytes;
+    recoveryWindow_ = boundedCwnd(
+        recoveryWindow_,
+        conn_.udpSendPacketLen,
+        conn_.transportSettings.maxCwndInMss,
+        kMinCwndInMssForBbr);
 
     // We need to make sure CONSERVATIVE can last for a round trip, so update
     // endOfRoundTrip_ to the latest sent packet.
@@ -157,7 +152,7 @@ void BbrCongestionController::onPacketAckOrLoss(
     subtractAndCheckUnderflow(inflightBytes_, lossEvent->lostBytes);
   }
   if (lossEvent) {
-    onPacketLoss(*lossEvent);
+    onPacketLoss(*lossEvent, ackEvent ? ackEvent->ackedBytes : 0);
     if (conn_.pacer) {
       conn_.pacer->onPacketsLoss();
     }
