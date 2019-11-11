@@ -706,7 +706,7 @@ void onServerReadDataFromOpen(
     }
 
     if (conn.peerAddress != readData.peer) {
-      if (packetNumberSpace != PacketNumberSpace::AppData) {
+      if (encryptionLevel != EncryptionLevel::AppData) {
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize,
