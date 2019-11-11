@@ -229,6 +229,8 @@ class MockQuicSocket : public QuicSocket {
           StreamId,
           uint64_t offset));
 
+  MOCK_METHOD1(setCongestionControl, void(CongestionControlType));
+
   ConnectionCallback* cb_;
 
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>

@@ -454,7 +454,7 @@ class QuicTransportBase : public QuicSocket {
   bool isLossTimeoutScheduled() const;
 
   // If you don't set it, the default is Cubic
-  void setCongestionControl(CongestionControlType type);
+  void setCongestionControl(CongestionControlType type) override;
 
   void describe(std::ostream& os) const;
 

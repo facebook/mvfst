@@ -890,5 +890,10 @@ class QuicSocket {
    * createStream() or receiving onNewBidirectionalStream()
    */
   virtual folly::Optional<LocalErrorCode> setControlStream(StreamId id) = 0;
+
+  /**
+   * Set congestion control type.
+   */
+  virtual void setCongestionControl(CongestionControlType type) = 0;
 };
 } // namespace quic
