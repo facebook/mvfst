@@ -8,6 +8,7 @@
 
 #include "SimpleFrameFunctions.h"
 
+#include <quic/QuicConstants.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -82,6 +83,8 @@ void updateSimpleFrameOnPacketSent(
       conn.outstandingPathValidation =
           std::move(conn.pendingEvents.pathChallenge);
       conn.pendingEvents.schedulePathValidationTimeout = true;
+      // Start the clock to measure Rtt
+      conn.pathChallengeStartTime = Clock::now();
       break;
     default: {
       auto& frames = conn.pendingEvents.frames;
@@ -200,6 +203,13 @@ bool updateSimpleFrameOnPacketReceived(
       conn.outstandingPathValidation = folly::none;
       conn.pendingEvents.schedulePathValidationTimeout = false;
       conn.writableBytesLimit = folly::none;
+
+      // stop the clock to measure init rtt
+      std::chrono::microseconds sampleRtt =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              Clock::now() - conn.pathChallengeStartTime);
+      updateRtt(conn, sampleRtt, 0us);
+
       return false;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E: {

@@ -750,6 +750,10 @@ struct QuicConnectionStateBase {
   // The parameter used to send the peer's active_connection_id_limit
   // does not include the connection id used in the initial handshake.
   uint64_t peerReceivedConnectionIdLimit{kDefaultConnectionIdLimit + 1};
+
+  // Measure rtt betwen pathchallenge & path response frame
+  // Use this measured rtt as init rtt (from Transport Settings)
+  TimePoint pathChallengeStartTime;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);
