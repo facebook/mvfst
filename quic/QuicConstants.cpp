@@ -13,18 +13,34 @@ namespace quic {
 folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
   switch (type) {
     case CongestionControlType::Cubic:
-      return "cubic";
+      return kCongestionControlCubicStr;
     case CongestionControlType::BBR:
-      return "bbr";
+      return kCongestionControlBbrStr;
     case CongestionControlType::Copa:
-      return "copa";
+      return kCongestionControlCopaStr;
     case CongestionControlType::NewReno:
-      return "new reno";
+      return kCongestionControlNewRenoStr;
     case CongestionControlType::None:
-      return "none";
+      return kCongestionControlNoneStr;
     default:
       return "unknown";
   }
+}
+
+folly::Optional<CongestionControlType> congestionControlStrToType(
+    folly::StringPiece str) {
+  if (str == kCongestionControlCubicStr) {
+    return quic::CongestionControlType::Cubic;
+  } else if (str == kCongestionControlBbrStr) {
+    return quic::CongestionControlType::BBR;
+  } else if (str == kCongestionControlCopaStr) {
+    return quic::CongestionControlType::Copa;
+  } else if (str == kCongestionControlNewRenoStr) {
+    return quic::CongestionControlType::NewReno;
+  } else if (str == kCongestionControlNoneStr) {
+    return quic::CongestionControlType::None;
+  }
+  return folly::none;
 }
 
 QuicBatchingMode getQuicBatchingMode(uint32_t val) {

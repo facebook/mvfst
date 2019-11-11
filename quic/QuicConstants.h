@@ -235,9 +235,17 @@ constexpr uint64_t kDefaultMinBurstPackets = 5;
 constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
 
 // Congestion control:
+constexpr folly::StringPiece kCongestionControlCubicStr = "cubic";
+constexpr folly::StringPiece kCongestionControlBbrStr = "bbr";
+constexpr folly::StringPiece kCongestionControlCopaStr = "copa";
+constexpr folly::StringPiece kCongestionControlNewRenoStr = "newreno";
+constexpr folly::StringPiece kCongestionControlNoneStr = "none";
+
 constexpr std::chrono::microseconds::rep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t { Cubic, NewReno, Copa, BBR, None };
 folly::StringPiece congestionControlTypeToString(CongestionControlType type);
+folly::Optional<CongestionControlType> congestionControlStrToType(
+    folly::StringPiece str);
 
 // This is an approximation of a small enough number for cwnd to be blocked.
 constexpr size_t kBlockedSizeBytes = 20;
