@@ -68,5 +68,82 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
   EXPECT_EQ(1234 + 1357, loss.lostBytes);
   EXPECT_EQ(110, *loss.largestLostPacketNum);
 }
+
+constexpr size_t kRtt{100000};
+
+class PendingPathRateLimiterTest : public Test {
+ public:
+  void SetUp() override {
+    now = std::chrono::steady_clock::now();
+  }
+
+ protected:
+  QuicConnectionStateBase conn_{QuicNodeType::Server};
+  PendingPathRateLimiter limiter_{conn_.udpSendPacketLen};
+  size_t maxWindowBytes{kMinCwndInMss * conn_.udpSendPacketLen};
+  TimePoint now;
+};
+
+TEST_F(PendingPathRateLimiterTest, TestSetInitialCredit) {
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+  conn_.udpSendPacketLen = 2000;
+  PendingPathRateLimiter limiter2{conn_.udpSendPacketLen};
+  EXPECT_EQ(
+      limiter2.currentCredit(now, std::chrono::microseconds{kRtt}),
+      kMinCwndInMss * 2000);
+}
+
+TEST_F(PendingPathRateLimiterTest, TestNoImmediateCreditRefresh) {
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+  limiter_.onPacketSent(420);
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes - 420);
+}
+
+TEST_F(PendingPathRateLimiterTest, TestBoundaryRttPassedCreditRefresh) {
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+  limiter_.onPacketSent(420);
+  auto halfRtt = std::chrono::microseconds(kRtt / 2);
+  now += halfRtt;
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes - 420);
+  limiter_.onPacketSent(420);
+  now += halfRtt;
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes - 840);
+
+  now += std::chrono::microseconds(10);
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+}
+
+TEST_F(PendingPathRateLimiterTest, TestCreditRefreshOnInfrequentSends) {
+  auto delta =
+      std::chrono::microseconds{kRtt} + std::chrono::microseconds{1000};
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+  limiter_.onPacketSent(420);
+  now += delta;
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+  limiter_.onPacketSent(420);
+  now += delta;
+  EXPECT_EQ(
+      limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
+      maxWindowBytes);
+}
+
 } // namespace test
 } // namespace quic

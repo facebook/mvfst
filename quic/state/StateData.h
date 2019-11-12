@@ -21,6 +21,7 @@
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/state/AckStates.h>
+#include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StateMachine.h>
@@ -445,6 +446,7 @@ struct LossState {
 class Logger;
 class CongestionControllerFactory;
 class LoopDetectorCallback;
+class PendingPathRateLimiter;
 
 struct QuicConnectionStateBase {
   virtual ~QuicConnectionStateBase() = default;
@@ -475,6 +477,8 @@ struct QuicConnectionStateBase {
   // server will limit bytes in flight to avoid amplification attack.
   // This limit should be cleared and set back to max after CFIN is received.
   folly::Optional<uint32_t> writableBytesLimit;
+
+  std::unique_ptr<PendingPathRateLimiter> limiter;
 
   // TODO: We really really should wrap outstandingPackets, all its associated
   // counters and the outstandingPacketEvents into one class.
