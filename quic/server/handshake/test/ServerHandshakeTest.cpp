@@ -168,7 +168,7 @@ class ServerHandshakeTest : public Test {
         }
       }
       setHandshakeState();
-    } catch (const QuicTransportException& e) {
+    } catch (const QuicTransportException&) {
       ex = std::current_exception();
     }
     evb.loopIgnoreKeepAlive();

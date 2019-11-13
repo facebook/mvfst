@@ -88,7 +88,7 @@ folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
     fizz::detail::read(v, cursor);
     appToken.version = v;
     fizz::detail::readBuf<uint16_t>(appToken.appParams, cursor);
-  } catch (const std::exception& ex) {
+  } catch (const std::exception&) {
     return folly::none;
   }
   return appToken;
