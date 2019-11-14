@@ -18,11 +18,13 @@ class PendingPathRateLimiter {
   explicit PendingPathRateLimiter(uint64_t udpSendPacketLen)
       : maxCredit_(kMinCwndInMss * udpSendPacketLen), credit_(maxCredit_) {}
 
-  uint64_t currentCredit(
+  virtual ~PendingPathRateLimiter() = default;
+
+  virtual uint64_t currentCredit(
       TimePoint checkTime,
       std::chrono::microseconds rtt) noexcept;
 
-  void onPacketSent(uint64_t sentBytes);
+  virtual void onPacketSent(uint64_t sentBytes);
 
  private:
   const uint64_t maxCredit_;

@@ -478,7 +478,7 @@ struct QuicConnectionStateBase {
   // This limit should be cleared and set back to max after CFIN is received.
   folly::Optional<uint32_t> writableBytesLimit;
 
-  std::unique_ptr<PendingPathRateLimiter> limiter;
+  std::unique_ptr<PendingPathRateLimiter> pathValidationLimiter;
 
   // TODO: We really really should wrap outstandingPackets, all its associated
   // counters and the outstandingPacketEvents into one class.

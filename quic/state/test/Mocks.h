@@ -42,5 +42,17 @@ class MockPacer : public Pacer {
   MOCK_METHOD0(onPacketSent, void());
   MOCK_METHOD0(onPacketsLoss, void());
 };
+
+class MockPendingPathRateLimiter : public PendingPathRateLimiter {
+ public:
+  MockPendingPathRateLimiter() : PendingPathRateLimiter(0) {}
+  MOCK_METHOD1(onPacketSent, void(uint64_t));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      currentCredit,
+      uint64_t(TimePoint, std::chrono::microseconds));
+};
 } // namespace test
 } // namespace quic

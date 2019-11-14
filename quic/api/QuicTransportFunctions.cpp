@@ -399,6 +399,10 @@ void updateConnection(
   if (conn.pacer && !pureAck) {
     conn.pacer->onPacketSent();
   }
+  if (conn.pathValidationLimiter &&
+      (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {
+    conn.pathValidationLimiter->onPacketSent(pkt.encodedSize);
+  }
   if (pkt.isHandshake) {
     ++conn.outstandingHandshakePacketsCount;
     conn.lossState.lastHandshakePacketSentTime = pkt.time;
@@ -440,14 +444,25 @@ void updateConnection(
 
 uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {
   uint64_t writableBytes = std::numeric_limits<uint64_t>::max();
-  if (conn.writableBytesLimit) {
+
+  if (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation) {
+    CHECK(conn.pathValidationLimiter);
+    // 0-RTT and path validation  rate limiting should be mutually exclusive.
+    CHECK(!conn.writableBytesLimit);
+
+    // Use the default RTT measurement when starting a new path challenge (CC is
+    // reset). This shouldn't be an RTT sample, so we do not update the CC with
+    // this value.
+    writableBytes = conn.pathValidationLimiter->currentCredit(
+        std::chrono::steady_clock::now(),
+        conn.lossState.srtt == 0us ? kDefaultInitialRtt : conn.lossState.srtt);
+  } else if (conn.writableBytesLimit) {
     if (*conn.writableBytesLimit <= conn.lossState.totalBytesSent) {
       return 0;
     }
-    writableBytes = std::min<uint64_t>(
-        writableBytes,
-        *conn.writableBytesLimit - conn.lossState.totalBytesSent);
+    writableBytes = *conn.writableBytesLimit - conn.lossState.totalBytesSent;
   }
+
   if (conn.congestionController) {
     writableBytes = std::min<uint64_t>(
         writableBytes, conn.congestionController->getWritableBytes());
@@ -1046,15 +1061,9 @@ WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
   }
   const size_t minimumDataSize = std::max(
       kLongHeaderHeaderSize + kCipherOverheadHeuristic, sizeof(Sample));
-  if (conn.writableBytesLimit &&
-      (*conn.writableBytesLimit <= conn.lossState.totalBytesSent ||
-       *conn.writableBytesLimit - conn.lossState.totalBytesSent <=
-           minimumDataSize)) {
-    QUIC_STATS(conn.infoCallback, onCwndBlocked);
-    return WriteDataReason::NO_WRITE;
-  }
-  if (conn.congestionController &&
-      conn.congestionController->getWritableBytes() <= minimumDataSize) {
+
+  uint64_t availableWriteWindow = congestionControlWritableBytes(conn);
+  if (availableWriteWindow <= minimumDataSize) {
     QUIC_STATS(conn.infoCallback, onCwndBlocked);
     return WriteDataReason::NO_WRITE;
   }

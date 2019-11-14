@@ -935,6 +935,8 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   auto& conn = transport_->getConnectionState();
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
 
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
@@ -974,6 +976,8 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   auto& conn = transport_->getConnectionState();
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
 
   EXPECT_FALSE(conn.pendingEvents.schedulePathValidationTimeout);
@@ -1004,6 +1008,8 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   auto& conn = transport_->getConnectionState();
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
   loopForWrites();
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
@@ -1044,6 +1050,8 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
   loopForWrites();
 
@@ -1078,6 +1086,8 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
   loopForWrites();
 
@@ -1106,6 +1116,8 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLoss) {
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   transport_->updateWriteLooper(true);
   loopForWrites();
 
@@ -1124,6 +1136,8 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
   auto& conn = transport_->getConnectionState();
 
   PathChallengeFrame pathChallenge(123);
+  conn.pathValidationLimiter =
+      std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   conn.pendingEvents.pathChallenge = pathChallenge;
   transport_->updateWriteLooper(true);
   loopForWrites();

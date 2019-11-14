@@ -10,7 +10,6 @@
 #include <quic/state/QuicStreamUtilities.h>
 
 namespace quic {
-
 QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
     : conn(connIn), id(idIn) {
   // Note: this will set a windowSize for a locally-initiated unidirectional

@@ -373,9 +373,11 @@ void onConnectionMigration(
     folly::Random::secureRandom(&pathData, sizeof(pathData));
     conn.pendingEvents.pathChallenge = PathChallengeFrame(pathData);
 
-    // Limit amount of bytes that can be sent to unvalidated source
-    conn.writableBytesLimit =
-        conn.transportSettings.limitedCwndInMss * conn.udpSendPacketLen;
+    // If we are already in the middle of a migration reset
+    // the available bytes in the rate-limited window, but keep the
+    // window.
+    conn.pathValidationLimiter =
+        std::make_unique<PendingPathRateLimiter>(conn.udpSendPacketLen);
   } else {
     previousPeerAddresses.erase(it);
   }
@@ -791,7 +793,8 @@ void onServerReadDataFromOpen(
                     break;
                   }
                   case QuicWriteFrame::Type::RstStreamFrame_E: {
-                    const RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
+                    const RstStreamFrame& frame =
+                        *packetFrame.asRstStreamFrame();
                     VLOG(4) << "Server received ack for reset stream="
                             << frame.streamId << " " << conn;
                     auto stream = conn.streamManager->getStream(frame.streamId);

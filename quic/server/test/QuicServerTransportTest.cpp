@@ -2162,10 +2162,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_EQ(
-      *server->getConn().writableBytesLimit,
-      server->getConn().transportSettings.limitedCwndInMss *
-          server->getConn().udpSendPacketLen);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2195,7 +2191,8 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
+  EXPECT_TRUE(server->getConn().pathValidationLimiter != nullptr);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2215,7 +2212,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToUnvalidatedPeer) {
   EXPECT_FALSE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
-  EXPECT_FALSE(server->getConn().writableBytesLimit);
 }
 
 TEST_P(QuicServerTransportAllowMigrationTest, ResetPathRttPathResponse) {
@@ -2310,13 +2306,12 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   auto peerAddress = server->getConn().peerAddress;
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
+
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_EQ(
-      *server->getConn().writableBytesLimit,
-      server->getConn().transportSettings.limitedCwndInMss *
-          server->getConn().udpSendPacketLen);
+
+  EXPECT_TRUE(server->getConn().pathValidationLimiter != nullptr);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2328,7 +2323,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2349,7 +2343,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, IgnoreInvalidPathResponse) {
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
 }
 
 TEST_P(
@@ -2373,10 +2366,6 @@ TEST_P(
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_EQ(
-      *server->getConn().writableBytesLimit,
-      server->getConn().transportSettings.limitedCwndInMss *
-          server->getConn().udpSendPacketLen);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2388,7 +2377,8 @@ TEST_P(
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_TRUE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_TRUE(server->pathValidationTimeout().isScheduled());
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
+  EXPECT_TRUE(server->getConn().pathValidationLimiter != nullptr);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2414,7 +2404,7 @@ TEST_P(
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
   EXPECT_FALSE(server->getConn().pendingEvents.schedulePathValidationTimeout);
   EXPECT_FALSE(server->pathValidationTimeout().isScheduled());
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
       server->getConn().localConnectionError->second,
@@ -2510,7 +2500,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_FALSE(server->getConn().writableBytesLimit);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2578,7 +2567,7 @@ TEST_P(
   deliverData(std::move(packetData), false, &newPeer2);
 
   EXPECT_TRUE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
   EXPECT_EQ(server->getConn().peerAddress, newPeer2);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 2);
   EXPECT_EQ(
@@ -2645,7 +2634,6 @@ TEST_P(QuicServerTransportAllowMigrationTest, MigrateToStaleValidatedPeer) {
   deliverData(std::move(packetData), false, &newPeer);
 
   EXPECT_FALSE(server->getConn().pendingEvents.pathChallenge);
-  EXPECT_FALSE(server->getConn().writableBytesLimit);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -2927,7 +2915,6 @@ TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
   deliverData(std::move(packetData), true, &newPeer);
 
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_NE(
@@ -2960,7 +2947,7 @@ TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   deliverData(std::move(packetData), true, &newPeer);
 
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_NE(server->getConn().lossState.srtt, 0us);
@@ -2992,7 +2979,7 @@ TEST_F(
   deliverData(std::move(packetData), true, &newPeer);
 
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
   EXPECT_EQ(server->getConn().peerAddress, newPeer);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(
@@ -3020,7 +3007,7 @@ TEST_F(
   deliverData(std::move(packetData2), true, &newPeer2);
 
   EXPECT_TRUE(server->getConn().outstandingPathValidation);
-  EXPECT_TRUE(server->getConn().writableBytesLimit);
+
   EXPECT_EQ(server->getConn().peerAddress, newPeer2);
   EXPECT_EQ(server->getConn().migrationState.previousPeerAddresses.size(), 1);
   EXPECT_EQ(

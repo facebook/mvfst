@@ -1657,6 +1657,67 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
+TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
+  auto conn = createConn();
+
+  // Create the CC.
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  conn->oneRttWriteCipher = test::createNoOpAead();
+
+  // Create an outstandingPathValidation + limiter so this will be applied.
+  auto pathValidationLimiter = std::make_unique<MockPendingPathRateLimiter>();
+  MockPendingPathRateLimiter* rawLimiter = pathValidationLimiter.get();
+  conn->pathValidationLimiter = std::move(pathValidationLimiter);
+  conn->outstandingPathValidation = PathChallengeFrame(1000);
+
+  // Have stream data queued up during the test so there's something TO write.
+  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = IOBuf::copyBuffer("0123456789");
+  writeDataToQuicStream(*stream1, buf->clone(), false);
+
+  // shouldWriteData checks this first
+  const size_t minimumDataSize = std::max(
+      kLongHeaderHeaderSize + kCipherOverheadHeuristic, sizeof(Sample));
+
+  // Only case that we allow the write; both CC / PathLimiter have writablebytes
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(minimumDataSize + 1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
+      .WillOnce(Return(minimumDataSize + 1));
+
+  EXPECT_CALL(*transportInfoCb_, onCwndBlocked()).Times(0);
+  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+
+  // CC has writableBytes, but PathLimiter doesn't.
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(minimumDataSize + 1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
+      .WillOnce(Return(minimumDataSize - 2));
+
+  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+
+  // PathLimiter has writableBytes, CC doesn't
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(minimumDataSize - 1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
+      .WillOnce(Return(minimumDataSize + 1));
+
+  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+
+  // Neither PathLimiter or CC have writablebytes
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(minimumDataSize - 1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
+      .WillOnce(Return(minimumDataSize - 1));
+
+  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
+}
+
 TEST_F(QuicTransportFunctionsTest, ShouldWriteStreamsNoCipher) {
   auto conn = createConn();
   auto mockCongestionController = std::make_unique<MockCongestionController>();

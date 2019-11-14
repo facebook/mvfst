@@ -202,7 +202,6 @@ bool updateSimpleFrameOnPacketReceived(
       // TODO update source token,
       conn.outstandingPathValidation = folly::none;
       conn.pendingEvents.schedulePathValidationTimeout = false;
-      conn.writableBytesLimit = folly::none;
 
       // stop the clock to measure init rtt
       std::chrono::microseconds sampleRtt =

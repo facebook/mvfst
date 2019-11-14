@@ -146,6 +146,10 @@ void updateConnection(
     TimePoint time,
     uint32_t encodedSize);
 
+/**
+ * Returns the minimum available bytes window out of path validation rate
+ * limiting, 0-rtt total bytes sent limiting, and the congestion controller.
+ */
 uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn);
 
 uint64_t unlimitedWritableBytes(const QuicConnectionStateBase&);
