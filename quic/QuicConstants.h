@@ -184,7 +184,8 @@ enum class QuicVersion : uint32_t {
   MVFST_OLD = 0xfaceb000,
   MVFST = 0xfaceb001,
   QUIC_DRAFT_22 = 0xFF000016,
-  QUIC_DRAFT = 0xFF000017, // Draft-23
+  QUIC_DRAFT_23 = 0xFF000017,
+  QUIC_DRAFT = 0xFF000018, // Draft-24
   MVFST_INVALID = 0xfaceb00f,
 };
 
