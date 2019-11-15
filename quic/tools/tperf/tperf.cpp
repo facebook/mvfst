@@ -367,11 +367,9 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   }
 
   void readError(
-      quic::StreamId streamId,
+      quic::StreamId /*streamId*/,
       std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
-    LOG(ERROR) << "TPerfClient failed read from stream=" << streamId
-               << ", error=" << toString(error);
+      /*error*/) noexcept override {
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
     // resetStream
