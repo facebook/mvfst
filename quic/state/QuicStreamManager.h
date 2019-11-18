@@ -202,7 +202,7 @@ class QuicStreamManager {
   }
 
   void addLoss(StreamId streamId) {
-    lossStreams_.push_back(streamId);
+    lossStreams_.insert(streamId);
   }
 
   bool hasLoss() const {
@@ -750,47 +750,47 @@ class QuicStreamManager {
   // A map of streams that are active.
   folly::F14NodeMap<StreamId, QuicStreamState> streams_;
 
-  std::deque<StreamId> newPeerStreams_;
+  std::vector<StreamId> newPeerStreams_;
 
-  // List of streams that have pending reads
-  std::set<StreamId> readableStreams_;
+  // Map of streams that were blocked
+  folly::F14FastMap<StreamId, StreamDataBlockedFrame> blockedStreams_;
 
-  // List of streams that have pending peeks
-  std::set<StreamId> peekableStreams_;
+  // Map of streams where the peer was asked to stop sending
+  folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
 
-  // List of !control streams that have writable data
-  std::set<StreamId> writableStreams_;
+  // Set of streams that have expired data
+  folly::F14FastSet<StreamId> dataExpiredStreams_;
 
-  // List of control streams that have writable data
-  std::set<StreamId> writableControlStreams_;
-
-  // List of streams that were blocked
-  std::unordered_map<StreamId, StreamDataBlockedFrame> blockedStreams_;
-
-  // List of streams where the peer was asked to stop sending
-  std::unordered_map<StreamId, ApplicationErrorCode> stopSendingStreams_;
-
-  // List of streams that have expired data
-  std::set<StreamId> dataExpiredStreams_;
-
-  // List of streams that have rejected data
-  std::set<StreamId> dataRejectedStreams_;
-
-  // Streams that may be able to callback DeliveryCallback
-  std::set<StreamId> deliverableStreams_;
+  // Set of streams that have rejected data
+  folly::F14FastSet<StreamId> dataRejectedStreams_;
 
   // Streams that had their stream window change and potentially need a window
   // update sent
-  std::unordered_set<StreamId> windowUpdates_;
+  folly::F14FastSet<StreamId> windowUpdates_;
 
   // Streams that had their flow control updated
-  std::set<StreamId> flowControlUpdated_;
-
-  // Streams that are closed but we still have state for
-  std::set<StreamId> closedStreams_;
+  folly::F14FastSet<StreamId> flowControlUpdated_;
 
   // Data structure to keep track of stream that have detected lost data
-  std::vector<StreamId> lossStreams_;
+  folly::F14FastSet<StreamId> lossStreams_;
+
+  // Set of streams that have pending reads
+  folly::F14FastSet<StreamId> readableStreams_;
+
+  // Set of streams that have pending peeks
+  folly::F14FastSet<StreamId> peekableStreams_;
+
+  // Set of !control streams that have writable data
+  std::set<StreamId> writableStreams_;
+
+  // Set of control streams that have writable data
+  std::set<StreamId> writableControlStreams_;
+
+  // Streams that may be able to callback DeliveryCallback
+  folly::F14FastSet<StreamId> deliverableStreams_;
+
+  // Streams that are closed but we still have state for
+  folly::F14FastSet<StreamId> closedStreams_;
 
   // Record whether or not we are app-idle.
   bool isAppIdle_{false};

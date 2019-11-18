@@ -1077,7 +1077,7 @@ TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksDeque) {
 
 TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksMap) {
   MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2;
-  std::unordered_map<
+  folly::F14FastMap<
       StreamId,
       std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>
       callbacks;
@@ -1137,8 +1137,6 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
 }
 
 TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpire) {
-  InSequence enforceOrder;
-
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -1165,8 +1163,6 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpire) {
 }
 
 TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpireCallbacksLeft) {
-  InSequence enforceOrder;
-
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -1645,8 +1641,6 @@ TEST_F(QuicTransportImplTest, IsBidirectionalStream) {
 }
 
 TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
-  InSequence enforceOrder;
-
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -2282,8 +2276,6 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackDataAvailable) {
 }
 
 TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
-  InSequence enforceOrder;
-
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -2328,8 +2320,6 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
 TEST_F(
     QuicTransportImplTest,
     DataRejecteddCallbackWithDeliveryCallbacksSomeLeft) {
-  InSequence enforceOrder;
-
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -2368,8 +2358,8 @@ TEST_F(
   Mock::VerifyAndClearExpectations(&dcb2);
   Mock::VerifyAndClearExpectations(&dataRejectedCb2);
 
-  EXPECT_CALL(dcb2, onCanceled(stream2, 29)).Times(1);
   EXPECT_CALL(dcb1, onCanceled(stream1, 25)).Times(1);
+  EXPECT_CALL(dcb2, onCanceled(stream2, 29)).Times(1);
   transport->close(folly::none);
 }
 

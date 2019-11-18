@@ -95,15 +95,11 @@ class TestingQuicClientTransport : public QuicClientTransport {
     return *dynamic_cast<QuicClientConnectionState*>(conn_.get());
   }
 
-  const std::unordered_map<StreamId, ReadCallbackData>& getReadCallbacks()
-      const {
+  const auto& getReadCallbacks() const {
     return readCallbacks_;
   }
 
-  const std::unordered_map<
-      StreamId,
-      std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>&
-  getDeliveryCallbacks() const {
+  const auto& getDeliveryCallbacks() const {
     return deliveryCallbacks_;
   }
 

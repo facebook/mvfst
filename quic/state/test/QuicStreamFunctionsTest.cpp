@@ -1540,7 +1540,7 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
   StreamId clientStream = 0x10;
-  std::deque<StreamId> newStreams = {0x0, 0x4, 0x8, 0xc, 0x10};
+  std::vector<StreamId> newStreams = {0x0, 0x4, 0x8, 0xc, 0x10};
   EXPECT_EQ(conn.streamManager->getStream(clientStream)->id, clientStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
   EXPECT_EQ(conn.streamManager->openBidirectionalPeerStreams().size(), 5);

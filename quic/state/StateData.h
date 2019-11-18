@@ -29,11 +29,8 @@
 #include <quic/state/TransportSettings.h>
 #include <chrono>
 #include <list>
-#include <map>
 #include <numeric>
 #include <queue>
-#include <set>
-#include <unordered_map>
 
 namespace quic {
 
@@ -375,7 +372,7 @@ struct RstStreamEvent {
   ApplicationErrorCode errorCode;
 };
 
-using Resets = std::unordered_map<StreamId, RstStreamFrame>;
+using Resets = folly::F14FastMap<StreamId, RstStreamFrame>;
 
 using FrameList = std::vector<QuicSimpleFrame>;
 
@@ -489,7 +486,7 @@ struct QuicConnectionStateBase {
   // associatedEvent or if it's not in this set, there is no need to process its
   // frames upon ack or loss.
   // TODO: Enforce only AppTraffic packets to be clonable
-  std::set<PacketEvent> outstandingPacketEvents;
+  folly::F14FastSet<PacketEvent> outstandingPacketEvents;
 
   // Number of pure ack packets outstanding.
   uint64_t outstandingPureAckPacketsCount{0};

@@ -432,10 +432,10 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
 }
 
 void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
-  auto it = std::find(lossStreams_.begin(), lossStreams_.end(), stream.id);
+  auto it = lossStreams_.find(stream.id);
   if (!stream.lossBuffer.empty()) {
     if (it == lossStreams_.end()) {
-      lossStreams_.push_back(stream.id);
+      lossStreams_.insert(stream.id);
     }
   } else if (it != lossStreams_.end()) {
     lossStreams_.erase(it);

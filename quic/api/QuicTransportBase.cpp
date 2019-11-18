@@ -2365,7 +2365,7 @@ void QuicTransportBase::cancelDeliveryCallbacks(
 }
 
 void QuicTransportBase::cancelDeliveryCallbacks(
-    const std::unordered_map<
+    const folly::F14FastMap<
         StreamId,
         std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>&
         deliveryCallbacks) {

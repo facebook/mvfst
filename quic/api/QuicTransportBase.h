@@ -246,7 +246,7 @@ class QuicTransportBase : public QuicSocket {
    * callbacks of the transport, so there is no need to erase anything from it.
    */
   static void cancelDeliveryCallbacks(
-      const std::unordered_map<
+      const folly::F14FastMap<
           StreamId,
           std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>&
           deliveryCallbacks);
@@ -588,15 +588,13 @@ class QuicTransportBase : public QuicSocket {
     DataRejectedCallbackData(DataRejectedCallback* cb) : dataRejectedCb(cb) {}
   };
 
-  // Map of streamID to tupl
-  std::unordered_map<StreamId, ReadCallbackData> readCallbacks_;
-  std::unordered_map<StreamId, PeekCallbackData> peekCallbacks_;
-  std::unordered_map<
-      StreamId,
-      std::deque<std::pair<uint64_t, DeliveryCallback*>>>
-      deliveryCallbacks_;
-  std::unordered_map<StreamId, DataExpiredCallbackData> dataExpiredCallbacks_;
-  std::unordered_map<StreamId, DataRejectedCallbackData> dataRejectedCallbacks_;
+  folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
+  folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
+  folly::
+      F14FastMap<StreamId, std::deque<std::pair<uint64_t, DeliveryCallback*>>>
+          deliveryCallbacks_;
+  folly::F14FastMap<StreamId, DataExpiredCallbackData> dataExpiredCallbacks_;
+  folly::F14FastMap<StreamId, DataRejectedCallbackData> dataRejectedCallbacks_;
   PingCallback* pingCallback_;
 
   WriteCallback* connWriteCallback_{nullptr};
