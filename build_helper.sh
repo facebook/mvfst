@@ -128,7 +128,8 @@ function install_dependencies_mac() {
     snappy                   \
     xz                       \
     openssl                  \
-    libsodium
+    libsodium                \
+    fmt
 
   brew link                 \
     boost                   \
@@ -139,7 +140,8 @@ function install_dependencies_mac() {
     lz4                     \
     snappy                  \
     xz                      \
-    libsodium
+    libsodium               \
+    fmt
 }
 
 function setup_folly() {
