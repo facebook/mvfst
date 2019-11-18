@@ -185,7 +185,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   void waitUntilInitialized();
 
-  void handleWorkerError(LocalErrorCode error);
+  void handleWorkerError(LocalErrorCode error) override;
 
   /**
    * Routes the given data for the given client to the correct worker that may
@@ -194,7 +194,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void routeDataToWorker(
       const folly::SocketAddress& client,
       RoutingData&& routingData,
-      NetworkData&& networkData);
+      NetworkData&& networkData,
+      bool isForwardedData = false) override;
 
   /**
    * Set an EventBaseObserver for server and all its workers. This only works

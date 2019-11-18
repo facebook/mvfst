@@ -313,7 +313,7 @@ void QuicServerWorker::forwardNetworkData(
     return;
   }
   callback_->routeDataToWorker(
-      client, std::move(routingData), std::move(networkData));
+      client, std::move(routingData), std::move(networkData), isForwardedData);
 }
 
 void QuicServerWorker::setPacingTimer(
@@ -324,7 +324,8 @@ void QuicServerWorker::setPacingTimer(
 void QuicServerWorker::dispatchPacketData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
-    NetworkData&& networkData) noexcept {
+    NetworkData&& networkData,
+    bool isForwardedData) noexcept {
   DCHECK(socket_);
   QuicServerTransport::Ptr transport;
   bool dropPacket = false;
@@ -447,7 +448,7 @@ void QuicServerWorker::dispatchPacketData(
         routingData.destinationConnId);
   }
 
-  if (!packetForwardingEnabled_) {
+  if (!packetForwardingEnabled_ || isForwardedData) {
     QUIC_STATS(
         infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
     return sendResetPacket(

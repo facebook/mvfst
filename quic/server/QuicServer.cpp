@@ -311,7 +311,8 @@ void QuicServer::pauseRead() {
 void QuicServer::routeDataToWorker(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
-    NetworkData&& networkData) {
+    NetworkData&& networkData,
+    bool isForwardedData) {
   // figure out worker idx
   if (!initialized_) {
     // drop the packet if we are not initialized. This is a janky memory
@@ -344,7 +345,10 @@ void QuicServer::routeDataToWorker(
   if (routingData.isUsingClientConnId && workerPtr_) {
     CHECK(workerPtr_->getEventBase()->isInEventBaseThread());
     workerPtr_->dispatchPacketData(
-        client, std::move(routingData), std::move(networkData));
+        client,
+        std::move(routingData),
+        std::move(networkData),
+        isForwardedData);
     return;
   }
 
@@ -358,11 +362,13 @@ void QuicServer::routeDataToWorker(
        cl = client,
        routingData = std::move(routingData),
        w = worker.get(),
-       buf = std::move(networkData)]() mutable {
+       buf = std::move(networkData),
+       isForwarded = isForwardedData]() mutable {
         if (server->shutdown_) {
           return;
         }
-        w->dispatchPacketData(cl, std::move(routingData), std::move(buf));
+        w->dispatchPacketData(
+            cl, std::move(routingData), std::move(buf), isForwarded);
       });
 }
 

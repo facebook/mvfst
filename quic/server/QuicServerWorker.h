@@ -38,7 +38,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
     virtual void routeDataToWorker(
         const folly::SocketAddress& client,
         RoutingData&& routingData,
-        NetworkData&& networkData) = 0;
+        NetworkData&& networkData,
+        bool isForwardedData) = 0;
   };
 
   explicit QuicServerWorker(std::shared_ptr<WorkerCallback> callback);
@@ -246,7 +247,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void dispatchPacketData(
       const folly::SocketAddress& client,
       RoutingData&& routingData,
-      NetworkData&& networkData) noexcept;
+      NetworkData&& networkData,
+      bool isForwardedData = false) noexcept;
 
   using ConnIdToTransportMap = std::
       unordered_map<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;

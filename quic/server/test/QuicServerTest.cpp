@@ -114,12 +114,16 @@ class QuicServerWorkerTest : public Test {
 
     auto cb = [&](const folly::SocketAddress& addr,
                   std::unique_ptr<RoutingData>& routingData,
-                  std::unique_ptr<NetworkData>& networkData) {
+                  std::unique_ptr<NetworkData>& networkData,
+                  bool isForwardedData) {
       worker_->dispatchPacketData(
-          addr, std::move(*routingData.get()), std::move(*networkData.get()));
+          addr,
+          std::move(*routingData.get()),
+          std::move(*networkData.get()),
+          isForwardedData);
     };
 
-    EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _))
+    EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _))
         .WillRepeatedly(Invoke(cb));
 
     socketFactory_ = std::make_unique<MockQuicUDPSocketFactory>();
@@ -832,11 +836,13 @@ void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
     ConnectionId /* connId */) {
   auto cb = [&](const folly::SocketAddress& addr,
                 std::unique_ptr<RoutingData>& /* routingData */,
-                std::unique_ptr<NetworkData>& /* networkData */) {
+                std::unique_ptr<NetworkData>& /* networkData */,
+                bool isForwardedData) {
     EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
     EXPECT_EQ(addr.getPort(), clientAddr.getPort());
+    EXPECT_FALSE(isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
       .WillOnce(Invoke(cb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));
@@ -937,11 +943,15 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
 
   auto cb = [&](const folly::SocketAddress& client,
                 std::unique_ptr<RoutingData>& routingData,
-                std::unique_ptr<NetworkData>& networkData) {
+                std::unique_ptr<NetworkData>& networkData,
+                bool isForwardedData) {
     takeoverWorker_->dispatchPacketData(
-        client, std::move(*routingData.get()), std::move(*networkData.get()));
+        client,
+        std::move(*routingData.get()),
+        std::move(*networkData.get()),
+        isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
       .WillOnce(Invoke(cb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));
@@ -995,15 +1005,17 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
         // test processing of the forwarded packet
         auto cb = [&](const folly::SocketAddress& addr,
                       std::unique_ptr<RoutingData>& /* routingData */,
-                      std::unique_ptr<NetworkData>& networkData) {
+                      std::unique_ptr<NetworkData>& networkData,
+                      bool isForwardedData) {
           // verify that it is the original client address
           EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
           EXPECT_EQ(addr.getPort(), clientAddr.getPort());
           // the original data should be extracted after processing takeover
           // protocol related information
           EXPECT_TRUE(eq(*data, *(networkData->data)));
+          EXPECT_TRUE(isForwardedData);
         };
-        EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _))
+        EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
             .WillOnce(Invoke(cb));
 
         takeoverCb->onDataAvailable(client, bufLen, false);
@@ -1011,11 +1023,15 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
       }));
   auto workerCb = [&](const folly::SocketAddress& client,
                       std::unique_ptr<RoutingData>& routingData,
-                      std::unique_ptr<NetworkData>& networkData) {
+                      std::unique_ptr<NetworkData>& networkData,
+                      bool isForwardedData) {
     takeoverWorker_->dispatchPacketData(
-        client, std::move(*routingData.get()), std::move(*networkData.get()));
+        client,
+        std::move(*routingData.get()),
+        std::move(*networkData.get()),
+        isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
       .WillOnce(Invoke(workerCb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));

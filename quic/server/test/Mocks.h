@@ -47,30 +47,33 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
   ~MockWorkerCallback() = default;
   MOCK_METHOD1(handleWorkerError, void(LocalErrorCode));
 
-  MOCK_METHOD3(
+  MOCK_METHOD4(
       routeDataToWorkerLong,
       void(
           const folly::SocketAddress&,
           std::unique_ptr<RoutingData>&,
-          std::unique_ptr<NetworkData>&));
+          std::unique_ptr<NetworkData>&,
+          bool isForwardedData));
 
-  MOCK_METHOD3(
+  MOCK_METHOD4(
       routeDataToWorkerShort,
       void(
           const folly::SocketAddress&,
           std::unique_ptr<RoutingData>&,
-          std::unique_ptr<NetworkData>&));
+          std::unique_ptr<NetworkData>&,
+          bool isForwardedData));
 
   void routeDataToWorker(
       const folly::SocketAddress& client,
       RoutingData&& routingDataIn,
-      NetworkData&& networkDataIn) {
+      NetworkData&& networkDataIn,
+      bool isForwardedData = false) {
     auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
     auto networkData = std::make_unique<NetworkData>(std::move(networkDataIn));
     if (routingData->headerForm == HeaderForm::Long) {
-      routeDataToWorkerLong(client, routingData, networkData);
+      routeDataToWorkerLong(client, routingData, networkData, isForwardedData);
     } else {
-      routeDataToWorkerShort(client, routingData, networkData);
+      routeDataToWorkerShort(client, routingData, networkData, isForwardedData);
     }
   }
 };
