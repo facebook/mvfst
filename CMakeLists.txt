@@ -36,6 +36,7 @@ find_package(Boost 1.62
   date_time
   program_options
 )
+find_package(fmt REQUIRED)
 find_package(folly REQUIRED)
 find_package(Fizz REQUIRED)
 find_package(Glog REQUIRED)

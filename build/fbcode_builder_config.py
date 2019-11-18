@@ -13,6 +13,7 @@ from __future__ import unicode_literals
 'fbcode_builder steps to build & test mvfst'
 
 import specs.gmock as gmock
+import specs.fmt as fmt
 import specs.folly as folly
 import specs.fizz as fizz
 
@@ -28,7 +29,7 @@ def fbcode_builder_spec(builder):
         }
     )
     return {
-        'depends_on': [gmock, folly, fizz],
+        'depends_on': [gmock, fmt, folly, fizz],
         'steps': [
             builder.fb_github_cmake_install('mvfst/_build', '..', 'facebookincubator'),
             builder.step(
