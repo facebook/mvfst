@@ -278,6 +278,32 @@ void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
   takeoverHandlerInitialized_ = true;
 }
 
+folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
+    const folly::SocketAddress& addr) {
+  // synchronously bind workers to takeover handler port.
+  // This method should not be called from a worker
+  CHECK(!workers_.empty());
+  CHECK(!shutdown_);
+  CHECK(takeoverHandlerInitialized_) << "TakeoverHanders are not initialized. ";
+
+  // this function shouldn't be called from worker's thread
+  for (auto& worker : workers_) {
+    DCHECK(
+        // if the eventbase is not running, it returns true for isInEvbThread()
+        !worker->getEventBase()->isRunning() ||
+        !worker->getEventBase()->isInEventBaseThread());
+  }
+  folly::SocketAddress boundAddress;
+  for (auto& worker : workers_) {
+    worker->getEventBase()->runInEventBaseThreadAndWait([&] {
+      std::lock_guard<std::mutex> guard(startMutex_);
+      CHECK(initialized_);
+      boundAddress = worker->overrideTakeoverHandlerAddress(addr);
+    });
+  }
+  return boundAddress;
+}
+
 void QuicServer::pauseRead() {
   runOnAllWorkers([&](auto worker) mutable { worker->pauseRead(); });
 }

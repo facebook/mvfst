@@ -96,6 +96,13 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       const folly::SocketAddress& address);
 
   /**
+   * Override listening address for takeover packets
+   * Returns const ref to SocketAddress representing the address it is bound to.
+   */
+  const folly::SocketAddress& overrideTakeoverHandlerAddress(
+      const folly::SocketAddress& address);
+
+  /**
    * Setup address that the taken over quic server is listening to forward
    * misrouted packets belonging to the old server.
    */

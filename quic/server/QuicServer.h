@@ -227,6 +227,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   void allowBeingTakenOver(const folly::SocketAddress& addr);
 
+  folly::SocketAddress overrideTakeoverHandlerAddress(
+      const folly::SocketAddress& addr);
+
   /*
    * Setup and initialize the listening socket of the old server from the given
    * address to forward misrouted packets belonging to that server during

@@ -24,12 +24,10 @@ TakeoverHandlerCallback::TakeoverHandlerCallback(
     QuicServerWorker* worker,
     TakeoverPacketHandler& takeoverPktHandler,
     const TransportSettings& transportSettings,
-    const folly::SocketAddress& address,
     std::unique_ptr<folly::AsyncUDPSocket> socket)
     : worker_(worker),
       takeoverPktHandler_(takeoverPktHandler),
       transportSettings_(transportSettings),
-      address_(address),
       socket_(std::move(socket)) {}
 
 TakeoverHandlerCallback::~TakeoverHandlerCallback() {
@@ -39,9 +37,9 @@ TakeoverHandlerCallback::~TakeoverHandlerCallback() {
   }
 }
 
-void TakeoverHandlerCallback::bind() {
+void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
   CHECK(socket_);
-  socket_->bind(address_);
+  socket_->bind(addr);
   socket_->resumeRead(this);
 }
 
@@ -49,6 +47,11 @@ void TakeoverHandlerCallback::pause() {
   if (socket_) {
     socket_->pauseRead();
   }
+}
+
+const folly::SocketAddress& TakeoverHandlerCallback::getAddress() const {
+  CHECK(socket_);
+  return socket_->address();
 }
 
 int TakeoverHandlerCallback::getSocketFD() {

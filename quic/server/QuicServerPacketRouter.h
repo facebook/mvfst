@@ -114,7 +114,6 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
       QuicServerWorker* worker,
       TakeoverPacketHandler& takeoverPktHandler,
       const TransportSettings& transportSettings,
-      const folly::SocketAddress& address,
       std::unique_ptr<folly::AsyncUDPSocket> socket);
 
   // prevent copying
@@ -123,11 +122,13 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
 
   virtual ~TakeoverHandlerCallback() override;
 
-  void bind();
+  void bind(const folly::SocketAddress& addr);
 
   void pause();
 
   int getSocketFD();
+
+  const folly::SocketAddress& getAddress() const;
 
   // AsyncUDPSocket ReadCallback methods
   void getReadBuffer(void** buf, size_t* len) noexcept override;

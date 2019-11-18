@@ -513,12 +513,15 @@ void QuicServerWorker::allowBeingTakenOver(
   // We instantiate and bind the TakeoverHandlerCallback to the given address.
   // It is reset at shutdownAllConnections (i.e. only when the process dies).
   takeoverCB_ = std::make_unique<TakeoverHandlerCallback>(
-      this,
-      takeoverPktHandler_,
-      transportSettings_,
-      address,
-      std::move(socket));
-  takeoverCB_->bind();
+      this, takeoverPktHandler_, transportSettings_, std::move(socket));
+  takeoverCB_->bind(address);
+}
+
+const folly::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
+    const folly::SocketAddress& address) {
+  CHECK(takeoverCB_);
+  takeoverCB_->bind(address);
+  return takeoverCB_->getAddress();
 }
 
 void QuicServerWorker::startPacketForwarding(
