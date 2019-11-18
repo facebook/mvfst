@@ -14,12 +14,8 @@
 #include <quic/codec/Types.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
-#include <deque>
-#include <map>
 #include <numeric>
-#include <queue>
 #include <set>
-#include <unordered_map>
 
 namespace quic {
 namespace detail {
@@ -126,18 +122,7 @@ class QuicStreamManager {
    * Check whether the stream exists. This returns false for the crypto stream,
    * thus the caller must check separately for the crypto stream.
    */
-  bool streamExists(StreamId streamId) {
-    return std::binary_search(
-               openBidirectionalPeerStreams_.begin(),
-               openBidirectionalPeerStreams_.end(),
-               streamId) ||
-        std::binary_search(
-               openUnidirectionalPeerStreams_.begin(),
-               openUnidirectionalPeerStreams_.end(),
-               streamId) ||
-        std::binary_search(
-               openLocalStreams_.begin(), openLocalStreams_.end(), streamId);
-  }
+  bool streamExists(StreamId streamId);
 
   uint64_t openableLocalBidirectionalStreams() {
     return (maxLocalBidirectionalStreamId_ -
@@ -174,7 +159,8 @@ class QuicStreamManager {
    * Clear all the currently open streams.
    */
   void clearOpenStreams() {
-    openLocalStreams_.clear();
+    openBidirectionalLocalStreams_.clear();
+    openUnidirectionalLocalStreams_.clear();
     openBidirectionalPeerStreams_.clear();
     openUnidirectionalPeerStreams_.clear();
     streams_.clear();
@@ -591,10 +577,20 @@ class QuicStreamManager {
 
   // TODO figure out a better interface here.
   /*
-   * Returns a mutable reference to the underlying open local streams container.
+   * Returns a mutable reference to the underlying open local unidirectional
+   * streams container.
    */
-  auto& openLocalStreams() {
-    return openLocalStreams_;
+  auto& openUnidirectionalLocalStreams() {
+    return openUnidirectionalLocalStreams_;
+  }
+
+  // TODO figure out a better interface here.
+  /*
+   * Returns a mutable reference to the underlying open local unidirectional
+   * streams container.
+   */
+  auto& openBidirectionalLocalStreams() {
+    return openBidirectionalLocalStreams_;
   }
 
   // TODO figure out a better interface here.
@@ -737,19 +733,21 @@ class QuicStreamManager {
   uint64_t numControlStreams_{0};
 
   // Bidirectional streams that are opened by the peer on the connection.
-  // Ordered by id.
-  std::deque<StreamId> openBidirectionalPeerStreams_;
+  folly::F14FastSet<StreamId> openBidirectionalPeerStreams_;
 
   // Unidirectional streams that are opened by the peer on the connection.
-  // Ordered by id.
-  std::deque<StreamId> openUnidirectionalPeerStreams_;
+  folly::F14FastSet<StreamId> openUnidirectionalPeerStreams_;
 
-  // Streams that are opened locally on the connection. Ordered by id.
-  std::deque<StreamId> openLocalStreams_;
+  // Bidirectional streams that are opened locally on the connection.
+  folly::F14FastSet<StreamId> openBidirectionalLocalStreams_;
+
+  // Unidirectional streams that are opened locally on the connection.
+  folly::F14FastSet<StreamId> openUnidirectionalLocalStreams_;
 
   // A map of streams that are active.
   folly::F14NodeMap<StreamId, QuicStreamState> streams_;
 
+  // Recently opened peer streams.
   std::vector<StreamId> newPeerStreams_;
 
   // Map of streams that were blocked

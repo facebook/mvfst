@@ -991,10 +991,16 @@ TEST_F(QuicServerStreamFunctionsTest, CreateQuicStreamServerOutOfOrder) {
   StreamId outOfOrderStream2 = 49;
   conn.streamManager->createStream(outOfOrderStream1).value();
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 26);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      26);
   conn.streamManager->createStream(outOfOrderStream2).value();
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 26);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      26);
 }
 
 TEST_F(QuicStreamFunctionsTest, CreateQuicStreamClientOutOfOrder) {
@@ -1002,19 +1008,25 @@ TEST_F(QuicStreamFunctionsTest, CreateQuicStreamClientOutOfOrder) {
   StreamId outOfOrderStream2 = 48;
   conn.streamManager->createStream(outOfOrderStream1);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 25);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      25);
   conn.streamManager->createStream(outOfOrderStream2).value();
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 25);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      25);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, CreateClosedServerStream) {
   StreamId outOfOrderStream1 = 101;
   StreamId outOfOrderStream2 = 49;
   conn.streamManager->createStream(outOfOrderStream1);
-  conn.streamManager->openLocalStreams().erase(std::find(
-      conn.streamManager->openLocalStreams().begin(),
-      conn.streamManager->openLocalStreams().end(),
+  conn.streamManager->openBidirectionalLocalStreams().erase(std::find(
+      conn.streamManager->openBidirectionalLocalStreams().begin(),
+      conn.streamManager->openBidirectionalLocalStreams().end(),
       outOfOrderStream2));
   EXPECT_FALSE(conn.streamManager->createStream(outOfOrderStream2));
 }
@@ -1023,9 +1035,9 @@ TEST_F(QuicStreamFunctionsTest, CreateClosedClientStream) {
   StreamId outOfOrderStream1 = 96;
   StreamId outOfOrderStream2 = 48;
   conn.streamManager->createStream(outOfOrderStream1).value();
-  conn.streamManager->openLocalStreams().erase(std::find(
-      conn.streamManager->openLocalStreams().begin(),
-      conn.streamManager->openLocalStreams().end(),
+  conn.streamManager->openBidirectionalLocalStreams().erase(std::find(
+      conn.streamManager->openBidirectionalLocalStreams().begin(),
+      conn.streamManager->openBidirectionalLocalStreams().end(),
       outOfOrderStream2));
   EXPECT_FALSE(conn.streamManager->createStream(outOfOrderStream2));
 }
@@ -1569,12 +1581,18 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerQuicStream) {
   conn.streamManager->createStream(serverStream).value();
   EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 3);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      3);
 
   StreamId serverStream2 = 0x05;
   EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 3);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      3);
 
   StreamId serverStream3 = 0x0D;
   EXPECT_THROW(
@@ -1586,14 +1604,20 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetBothDirections) {
   conn.streamManager->createStream(serverBiStream).value();
   EXPECT_EQ(conn.streamManager->getStream(serverBiStream)->id, serverBiStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 3);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      3);
 
   StreamId serverUniStream = 0x0B;
   conn.streamManager->createStream(serverUniStream).value();
   EXPECT_EQ(
       conn.streamManager->getStream(serverUniStream)->id, serverUniStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 6);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      6);
 }
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetCloseBothDirections) {
@@ -1626,12 +1650,18 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetServerUnidirectionalQuicStream) {
   conn.streamManager->createStream(serverStream).value();
   EXPECT_EQ(conn.streamManager->getStream(serverStream)->id, serverStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 4);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      4);
 
   StreamId serverStream2 = 0x0B;
   EXPECT_EQ(conn.streamManager->getStream(serverStream2)->id, serverStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 4);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      4);
 
   StreamId serverStream3 = 0x1F;
   EXPECT_THROW(
@@ -1656,12 +1686,18 @@ TEST_F(QuicStreamFunctionsTest, ClientGetClientQuicStream) {
 
   EXPECT_EQ(conn.streamManager->getStream(clientStream)->id, clientStream);
   EXPECT_EQ(conn.streamManager->streamCount(), 1);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 4);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      4);
 
   StreamId clientStream2 = 0x08;
   EXPECT_EQ(conn.streamManager->getStream(clientStream2)->id, clientStream2);
   EXPECT_EQ(conn.streamManager->streamCount(), 2);
-  EXPECT_EQ(conn.streamManager->openLocalStreams().size(), 4);
+  EXPECT_EQ(
+      conn.streamManager->openUnidirectionalLocalStreams().size() +
+          conn.streamManager->openBidirectionalLocalStreams().size(),
+      4);
 
   StreamId clientStream3 = 0x10;
   EXPECT_THROW(
