@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <folly/container/F14Map.h>
+#include <folly/container/F14Set.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/state/StreamData.h>
@@ -746,7 +748,7 @@ class QuicStreamManager {
   std::deque<StreamId> openLocalStreams_;
 
   // A map of streams that are active.
-  std::map<StreamId, QuicStreamState> streams_;
+  folly::F14NodeMap<StreamId, QuicStreamState> streams_;
 
   std::deque<StreamId> newPeerStreams_;
 
