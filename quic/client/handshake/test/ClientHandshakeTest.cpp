@@ -56,8 +56,6 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 
   virtual void connect() {
     handshake->connect(
-        clientCtx,
-        verifier,
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
@@ -81,10 +79,13 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     // Fizz is the name of the identity for our server certificate.
     hostname = "Fizz";
     setupClientAndServerContext();
+
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
-    handshake =
-        std::make_shared<FizzClientQuicHandshakeContext>()->makeClientHandshake(
-            cryptoState);
+    handshake = FizzClientQuicHandshakeContext::Builder()
+                    .setFizzClientContext(clientCtx)
+                    .setCertificateVerifier(verifier)
+                    .build()
+                    ->makeClientHandshake(cryptoState);
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
@@ -348,8 +349,6 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
 
   void connect() override {
     handshake->connect(
-        clientCtx,
-        verifier,
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
@@ -450,8 +449,6 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
 
   void connect() override {
     handshake->connect(
-        clientCtx,
-        verifier,
         hostname,
         psk.cachedPsk,
         std::make_shared<ClientTransportParametersExtension>(

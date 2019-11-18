@@ -15,6 +15,7 @@
 #include <folly/stats/Histogram.h>
 
 #include <quic/client/QuicClientTransport.h>
+#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServer.h>
@@ -431,10 +432,13 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     folly::SocketAddress addr(host_.c_str(), port_);
 
     auto sock = std::make_unique<folly::AsyncUDPSocket>(&eventBase_);
+    auto fizzClientContext =
+        FizzClientQuicHandshakeContext::Builder()
+            .setCertificateVerifier(test::createTestCertificateVerifier())
+            .build();
     quicClient_ = std::make_shared<quic::QuicClientTransport>(
-        &eventBase_, std::move(sock));
+        &eventBase_, std::move(sock), std::move(fizzClientContext));
     quicClient_->setHostname("tperf");
-    quicClient_->setCertificateVerifier(test::createTestCertificateVerifier());
     quicClient_->addNewPeerAddress(addr);
     quicClient_->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());

@@ -29,7 +29,7 @@ using PeekIterator = std::deque<StreamBuffer>::const_iterator;
 class QuicStreamFunctionsTest : public Test {
  public:
   QuicStreamFunctionsTest()
-      : conn(std::make_shared<FizzClientQuicHandshakeContext>()) {}
+      : conn(FizzClientQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
@@ -1088,7 +1088,7 @@ TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
 
 TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
   QuicClientConnectionState clientState(
-      std::make_shared<FizzClientQuicHandshakeContext>());
+      FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState;
   QuicNodeType nodeType;
   StreamId id;
@@ -1116,7 +1116,7 @@ TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
 
 TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
   QuicClientConnectionState clientState(
-      std::make_shared<FizzClientQuicHandshakeContext>());
+      FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState;
   QuicNodeType nodeType;
   StreamId id;

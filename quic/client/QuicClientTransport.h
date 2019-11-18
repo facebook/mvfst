@@ -18,6 +18,8 @@
 
 namespace quic {
 
+class ClientHandshakeFactory;
+
 class QuicClientTransport
     : public QuicTransportBase,
       public folly::AsyncUDPSocket::ReadCallback,
@@ -28,6 +30,7 @@ class QuicClientTransport
   QuicClientTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = kDefaultConnectionIdSize);
 
   ~QuicClientTransport() override;
@@ -46,9 +49,10 @@ class QuicClientTransport
   static std::shared_ptr<TransportType> newClient(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = kDefaultConnectionIdSize) {
-    auto client =
-        std::make_shared<TransportType>(evb, std::move(sock), connectionIdSize);
+    auto client = std::make_shared<TransportType>(
+        evb, std::move(sock), std::move(handshakeFactory), connectionIdSize);
     client->setSelfOwning();
     return client;
   }
@@ -58,18 +62,6 @@ class QuicClientTransport
    * start().
    */
   void setHostname(const std::string& hostname);
-
-  /**
-   * Set the client context for fizz. Must be set before start()
-   */
-  void setFizzClientQuicHandshakeContext(
-      std::shared_ptr<const fizz::client::FizzClientContext> ctx);
-
-  /**
-   * Set a custom certificate verifier. Must be set before start().
-   */
-  void setCertificateVerifier(
-      std::shared_ptr<const fizz::CertificateVerifier> verifier);
 
   /**
    * Supplies a new peer address to use for the connection. This must be called
@@ -182,8 +174,6 @@ class QuicClientTransport
 
   Buf readBuffer_;
   folly::Optional<std::string> hostname_;
-  std::shared_ptr<const fizz::client::FizzClientContext> ctx_;
-  std::shared_ptr<const fizz::CertificateVerifier> verifier_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
   bool serverInitialParamsSet_{false};
   uint64_t peerAdvertisedInitialMaxData_{0};

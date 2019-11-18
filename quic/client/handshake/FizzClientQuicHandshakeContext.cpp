@@ -12,10 +12,30 @@
 
 namespace quic {
 
+FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
+    std::shared_ptr<const fizz::client::FizzClientContext> context,
+    std::shared_ptr<const fizz::CertificateVerifier> verifier)
+    : context_(std::move(context)), verifier_(std::move(verifier)) {}
+
 std::unique_ptr<ClientHandshake>
 FizzClientQuicHandshakeContext::makeClientHandshake(
     QuicCryptoState& cryptoState) {
   return std::make_unique<FizzClientHandshake>(cryptoState, shared_from_this());
+}
+
+std::shared_ptr<FizzClientQuicHandshakeContext>
+FizzClientQuicHandshakeContext::Builder::build() {
+  if (!context_) {
+    context_ = std::make_shared<const fizz::client::FizzClientContext>();
+  }
+  if (!verifier_) {
+    verifier_ = std::make_shared<const fizz::DefaultCertificateVerifier>(
+        fizz::VerificationContext::Client);
+  }
+
+  return std::shared_ptr<FizzClientQuicHandshakeContext>(
+      new FizzClientQuicHandshakeContext(
+          std::move(context_), std::move(verifier_)));
 }
 
 } // namespace quic
