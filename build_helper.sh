@@ -99,6 +99,7 @@ function install_dependencies_linux() {
     libboost-all-dev          \
     libevent-dev              \
     libdouble-conversion-dev  \
+    libfmt-dev                \
     libgoogle-glog-dev        \
     libgflags-dev             \
     libiberty-dev             \
