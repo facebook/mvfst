@@ -444,10 +444,9 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   eventbase_.loopForever();
 
   auto streamId = client->createBidirectionalStream().value();
-  client->setStreamFlowControlWindow(streamId, 1024);
-  // TODO: change this once we negotiate the flow control window.
-  auto data = IOBuf::create(kDefaultStreamWindowSize * 4);
-  data->append(kDefaultStreamWindowSize * 4);
+  client->setStreamFlowControlWindow(streamId, 256);
+  auto data = IOBuf::create(4096);
+  data->append(4096);
   memset(data->writableData(), 'a', data->length());
 
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
