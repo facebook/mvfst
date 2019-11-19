@@ -1256,6 +1256,11 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
   uint64_t maxInitialStreamsUni{std::numeric_limits<uint32_t>::max()};
   folly::Optional<ServerTransportParameters> params_;
+
+  // Implement virtual methods we don't intend to use.
+  void processSocketData(folly::IOBufQueue&) override {
+    throw std::runtime_error("processSocketData not implemented");
+  }
 };
 
 class QuicClientTransportTest : public Test {

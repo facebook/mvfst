@@ -181,14 +181,19 @@ class ClientHandshake : public Handshake {
   HandshakeCallback* callback_{nullptr};
   QuicCryptoState& cryptoState_;
 
- private:
-  EncryptionLevel getReadRecordLayerEncryptionLevel();
-  void processSocketData(folly::IOBufQueue& queue);
-  std::unique_ptr<Aead> buildAead(CipherKind kind, folly::ByteRange secret);
-
+  /**
+   * Various utilities for concrete implementations to use.
+   */
+  void raiseError(folly::exception_wrapper error);
+  void waitForData();
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
   void computeZeroRttCipher();
   void computeOneRttCipher(bool earlyDataAccepted);
+
+ private:
+  EncryptionLevel getReadRecordLayerEncryptionLevel();
+  virtual void processSocketData(folly::IOBufQueue& queue) = 0;
+  std::unique_ptr<Aead> buildAead(CipherKind kind, folly::ByteRange secret);
 
   // Whether or not to wait for more data.
   bool waitForData_{false};
@@ -202,11 +207,7 @@ class ClientHandshake : public Handshake {
   bool earlyDataAttempted_{false};
 
  protected:
-  class ActionMoveVisitor;
-  void processActions(fizz::client::Actions actions);
-
   fizz::client::State state_;
-  fizz::client::ClientStateMachine machine_;
 
   std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;

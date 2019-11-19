@@ -28,6 +28,13 @@ class FizzClientHandshake : public ClientHandshake {
       HandshakeCallback* callback) override;
 
  private:
+  void processSocketData(folly::IOBufQueue& queue) override;
+
+  class ActionMoveVisitor;
+  void processActions(fizz::client::Actions actions);
+
+  fizz::client::ClientStateMachine machine_;
+
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
 };
 
