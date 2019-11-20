@@ -26,6 +26,28 @@ target_link_libraries(
   Folly::folly
 )
 
+add_library(
+  mvfst_bufutil STATIC
+  BufUtil.cpp
+)
+
+target_include_directories(
+  mvfst_bufutil PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_bufutil
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_bufutil PUBLIC
+  Folly::folly
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -42,5 +64,12 @@ install(
   EXPORT mvfst-exports
   DESTINATION lib
 )
+
+install(
+  TARGETS mvfst_bufutil
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
 
 add_subdirectory(test)

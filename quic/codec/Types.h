@@ -11,11 +11,11 @@
 #include <folly/Conv.h>
 #include <folly/Optional.h>
 #include <folly/io/Cursor.h>
-#include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicInteger.h>
+#include <quic/common/BufUtil.h>
 #include <quic/common/IntervalSet.h>
 #include <quic/common/Variant.h>
 
@@ -25,8 +25,6 @@
  */
 
 namespace quic {
-
-using Buf = std::unique_ptr<folly::IOBuf>;
 
 using StreamId = uint64_t;
 using PacketNum = uint64_t;

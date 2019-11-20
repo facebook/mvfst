@@ -14,16 +14,12 @@
 namespace quic {
 
 struct StreamBuffer {
-  folly::IOBufQueue data;
+  BufQueue data;
   uint64_t offset;
   bool eof{false};
 
   StreamBuffer(Buf dataIn, uint64_t offsetIn, bool eofIn = false) noexcept
-      : data(folly::IOBufQueue::cacheChainLength()),
-        offset(offsetIn),
-        eof(eofIn) {
-    data.append(std::move(dataIn));
-  }
+      : data(std::move(dataIn)), offset(offsetIn), eof(eofIn) {}
 
   StreamBuffer(StreamBuffer&& other) = default;
   StreamBuffer& operator=(StreamBuffer&& other) = default;
@@ -37,6 +33,7 @@ struct QuicStreamLike {
   std::deque<StreamBuffer> readBuffer;
 
   // List of bytes that have been written to the QUIC layer.
+  // TODO replace with BufQueue
   folly::IOBufQueue writeBuffer{folly::IOBufQueue::cacheChainLength()};
 
   // Stores a list of buffers which have been written to the socket and are

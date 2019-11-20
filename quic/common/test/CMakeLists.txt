@@ -61,9 +61,11 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   TimeUtilTest.cpp
   IntervalSetTest.cpp
   VariantTest.cpp
+  BufUtilTest.cpp
   DEPENDS
   Folly::folly
   ${LIBFIZZ_LIBRARY}
+  mvfst_bufutil
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types

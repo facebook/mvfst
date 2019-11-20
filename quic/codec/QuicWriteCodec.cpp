@@ -137,6 +137,18 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
 
 void writeStreamFrameData(
     PacketBuilderInterface& builder,
+    const BufQueue& writeBuffer,
+    uint64_t dataLen) {
+  if (dataLen > 0) {
+    Buf streamData;
+    folly::io::Cursor cursor(writeBuffer.front());
+    cursor.clone(streamData, dataLen);
+    builder.insert(std::move(streamData));
+  }
+}
+
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
     const folly::IOBufQueue& writeBuffer,
     uint64_t dataLen) {
   if (dataLen > 0) {

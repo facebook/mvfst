@@ -82,6 +82,11 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
  */
 void writeStreamFrameData(
     PacketBuilderInterface& builder,
+    const BufQueue& writeBuffer,
+    uint64_t dataLen);
+
+void writeStreamFrameData(
+    PacketBuilderInterface& builder,
     const folly::IOBufQueue& writeBuffer,
     uint64_t dataLen);
 

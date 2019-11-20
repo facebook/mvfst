@@ -25,6 +25,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_state_machine
+  mvfst_bufutil
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
@@ -35,6 +36,7 @@ target_link_libraries(
   mvfst_state_machine PUBLIC
   Folly::folly
   ${BOOST_LIBRARIES}
+  mvfst_bufutil
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
@@ -97,6 +99,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_state_stream_functions
+  mvfst_bufutil
   mvfst_codec
   mvfst_codec_types
   mvfst_state_machine
@@ -105,6 +108,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_state_stream_functions PUBLIC
   Folly::folly
+  mvfst_bufutil
   mvfst_codec
   mvfst_codec_types
   mvfst_state_machine
@@ -232,6 +236,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_state_qpr_functions
+  mvfst_bufutil
   mvfst_state_machine
   mvfst_state_stream_functions
   mvfst_codec_types
@@ -241,6 +246,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_state_qpr_functions PUBLIC
   Folly::folly
+  mvfst_bufutil
   mvfst_state_machine
   mvfst_state_stream_functions
   mvfst_codec_types
