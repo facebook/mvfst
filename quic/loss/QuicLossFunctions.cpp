@@ -7,6 +7,7 @@
  */
 
 #include "quic/loss/QuicLossFunctions.h"
+#include "quic/state/QuicStreamFunctions.h"
 
 namespace quic {
 

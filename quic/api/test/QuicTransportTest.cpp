@@ -21,6 +21,7 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace folly;
@@ -893,7 +894,7 @@ TEST_F(QuicTransportTest, RstStream) {
   auto stream =
       transport_->getConnectionState().streamManager->findStream(streamId);
   ASSERT_TRUE(stream);
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1204,7 +1205,7 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   EXPECT_EQ(0, *stream->finalWriteOffset);
 
   RstStreamFrame rstFrame(streamId, GenericApplicationErrorCode::UNKNOWN, 0);
-  invokeStreamReceiveStateMachine(conn, *stream, std::move(rstFrame));
+  receiveRstStreamSMHandler(*stream, std::move(rstFrame));
 
   // This will clone twice. :/ Maybe we should change this to clone only once in
   // the future, thus the EXPECT were written with LT and LE. But it will clone
@@ -1564,7 +1565,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   }
   EXPECT_TRUE(foundReset);
 
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1634,7 +1635,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
-  EXPECT_TRUE(isState<StreamSendStates::ResetSent>(stream->send));
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());

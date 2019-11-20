@@ -12,7 +12,6 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/state/StateData.h>
-#include <quic/state/stream/StreamStateMachine.h>
 
 namespace quic {
 
@@ -34,23 +33,6 @@ void updateRtt(
     QuicConnectionStateBase& conn,
     std::chrono::microseconds rttSample,
     std::chrono::microseconds ackDelay);
-
-template <typename Event>
-void invokeStreamSendStateMachine(
-    QuicConnectionStateBase&,
-    QuicStreamState& stream,
-    Event event) {
-  invokeHandler<StreamSendStateMachine>(stream.send, std::move(event), stream);
-}
-
-template <typename Event>
-void invokeStreamReceiveStateMachine(
-    QuicConnectionStateBase&,
-    QuicStreamState& stream,
-    Event event) {
-  invokeHandler<StreamReceiveStateMachine>(
-      stream.recv, std::move(event), stream);
-}
 
 bool isConnectionPaced(const QuicConnectionStateBase& conn) noexcept;
 

@@ -242,8 +242,8 @@ TEST_F(QuicFlowControlTest, DontSendStreamWindowUpdateTwice) {
 TEST_F(QuicFlowControlTest, DontSendStreamWindowUpdateOnRemoteHalfClosed) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
-  stream.send.state = StreamSendStates::Open();
-  stream.recv.state = StreamReceiveStates::Closed();
+  stream.sendState = StreamSendState::Open_E;
+  stream.recvState = StreamRecvState::Closed_E;
   // Should not send window update
   maybeSendStreamWindowUpdate(stream, Clock::now());
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
@@ -457,8 +457,8 @@ TEST_F(QuicFlowControlTest, LostStreamWindowUpdateHalfClosedRemote) {
   stream.currentReadOffset = 300;
   stream.flowControlState.windowSize = 500;
   stream.flowControlState.advertisedMaxOffset = 400;
-  stream.send.state = StreamSendStates::Open();
-  stream.recv.state = StreamReceiveStates::Closed();
+  stream.sendState = StreamSendState::Open_E;
+  stream.recvState = StreamRecvState::Closed_E;
 
   // Should not send window update
   onStreamWindowUpdateLost(stream);

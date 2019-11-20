@@ -19,6 +19,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace folly::test;
@@ -515,10 +516,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossAfterStreamReset) {
       *stream1,
       *buf,
       true);
-  invokeStreamSendStateMachine(
-      *conn,
-      *stream1,
-      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
+  sendRstSMHandler(*stream1, GenericApplicationErrorCode::UNKNOWN);
 
   markPacketLoss(*conn, packet, false, packet.header.getPacketSequenceNum());
 

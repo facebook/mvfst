@@ -11,6 +11,7 @@
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/FizzCryptoFactory.h>
+#include <folly/Overload.h>
 
 #include <fizz/protocol/Protocol.h>
 

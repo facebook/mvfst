@@ -12,7 +12,7 @@
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
-#include <quic/state/stream/StreamStateMachine.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 using namespace ::testing;
 
@@ -38,10 +38,8 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());
 
-  invokeHandler<StreamSendStateMachine>(
-      stream.send,
-      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN),
-      stream);
+  sendRstSMHandler(stream, GenericApplicationErrorCode::UNKNOWN);
+
   // Something are cleared:
   EXPECT_TRUE(stream.writeBuffer.empty());
   EXPECT_TRUE(stream.retransmissionBuffer.empty());

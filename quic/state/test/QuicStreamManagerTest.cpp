@@ -55,8 +55,8 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
 
   EXPECT_CALL(*mockController, setAppIdle(true, _));
   // Force transition to closed state
-  stream.value()->send.state = StreamSendStates::Closed();
-  stream.value()->recv.state = StreamReceiveStates::Closed();
+  stream.value()->sendState = StreamSendState::Closed_E;
+  stream.value()->recvState = StreamRecvState::Closed_E;
   manager.removeClosedStream(stream.value()->id);
   EXPECT_TRUE(manager.isAppIdle());
   EXPECT_EQ(manager.getStream(id), nullptr);
@@ -71,8 +71,8 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCreateUnidiStream) {
 
   // Force transition to closed state
   EXPECT_CALL(*mockController, setAppIdle(true, _));
-  stream.value()->send.state = StreamSendStates::Closed();
-  stream.value()->recv.state = StreamReceiveStates::Closed();
+  stream.value()->sendState = StreamSendState::Closed_E;
+  stream.value()->recvState = StreamRecvState::Closed_E;
   manager.removeClosedStream(stream.value()->id);
   EXPECT_TRUE(manager.isAppIdle());
 }
@@ -152,8 +152,8 @@ TEST_F(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
 
   EXPECT_CALL(*mockController, setAppIdle(true, _));
   // Force transition to closed state
-  stream->send.state = StreamSendStates::Closed();
-  stream->recv.state = StreamReceiveStates::Closed();
+  stream->sendState = StreamSendState::Closed_E;
+  stream->recvState = StreamRecvState::Closed_E;
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppIdle());
   EXPECT_EQ(manager.getStream(id), nullptr);
@@ -173,8 +173,8 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   EXPECT_TRUE(manager.isAppIdle());
 
   // Force transition to closed state
-  stream->send.state = StreamSendStates::Closed();
-  stream->recv.state = StreamReceiveStates::Closed();
+  stream->sendState = StreamSendState::Closed_E;
+  stream->recvState = StreamRecvState::Closed_E;
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.isAppIdle());
 }
@@ -191,12 +191,12 @@ TEST_F(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
   }
   for (int i = 0; i < 25; i++) {
     auto stream = manager.getStream(i * detail::kStreamIncrement);
-    stream->send.state = StreamSendStates::Closed();
-    stream->recv.state = StreamReceiveStates::Closed();
+    stream->sendState = StreamSendState::Closed_E;
+    stream->recvState = StreamRecvState::Closed_E;
     manager.removeClosedStream(stream->id);
     stream = manager.getStream(2 + i * detail::kStreamIncrement);
-    stream->send.state = StreamSendStates::Closed();
-    stream->recv.state = StreamReceiveStates::Closed();
+    stream->sendState = StreamSendState::Closed_E;
+    stream->recvState = StreamRecvState::Closed_E;
     manager.removeClosedStream(stream->id);
   }
   auto update = manager.remoteBidirectionalStreamLimitUpdate();
@@ -220,8 +220,8 @@ TEST_F(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
   }
   for (int i = 0; i < 24; i++) {
     auto stream = manager.getStream(i * detail::kStreamIncrement);
-    stream->send.state = StreamSendStates::Closed();
-    stream->recv.state = StreamReceiveStates::Closed();
+    stream->sendState = StreamSendState::Closed_E;
+    stream->recvState = StreamRecvState::Closed_E;
     manager.removeClosedStream(stream->id);
   }
   auto update = manager.remoteBidirectionalStreamLimitUpdate();
@@ -238,8 +238,8 @@ TEST_F(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
   }
   for (int i = 0; i < 50; i++) {
     auto stream = manager.getStream(i * detail::kStreamIncrement);
-    stream->send.state = StreamSendStates::Closed();
-    stream->recv.state = StreamReceiveStates::Closed();
+    stream->sendState = StreamSendState::Closed_E;
+    stream->recvState = StreamRecvState::Closed_E;
     manager.removeClosedStream(stream->id);
   }
   auto update = manager.remoteBidirectionalStreamLimitUpdate();

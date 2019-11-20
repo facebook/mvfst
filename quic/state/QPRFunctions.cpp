@@ -115,8 +115,7 @@ void onRecvMinStreamDataFrame(
     PacketNum packetNum) {
   if (isReceivingStream(stream->conn.nodeType, stream->id) ||
       (isSendingStream(stream->conn.nodeType, stream->id) &&
-       !matchesStates<StreamSendStateData, StreamSendStates::Open>(
-           stream->send.state))) {
+       stream->sendState != StreamSendState::Open_E)) {
     throw QuicTransportException(
         "MinStreamDataFrame on receiving-only stream or "
         "sending-only stream but not opened",

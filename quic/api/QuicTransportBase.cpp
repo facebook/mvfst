@@ -20,7 +20,7 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/SimpleFrameFunctions.h>
-#include <quic/state/stream/StreamStateMachine.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
 
@@ -1941,8 +1941,8 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
     // Invoke state machine
-    invokeStreamSendStateMachine(
-        *conn_, *stream, StreamEvents::SendReset(errorCode));
+    sendRstSMHandler(*stream, errorCode);
+
     for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
          closeState_ == CloseState::OPEN &&
          pendingResetIt != conn_->pendingEvents.resets.end();

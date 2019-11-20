@@ -16,6 +16,7 @@
 #include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
 namespace test {
@@ -57,8 +58,7 @@ PacketNum rstStreamAndSendPacket(
   auto aead = createNoOpAead();
   auto headerCipher = createNoOpHeaderCipher();
   auto version = conn.version.value_or(*conn.originalVersion);
-  invokeStreamSendStateMachine(
-      conn, stream, StreamEvents::SendReset(errorCode));
+  sendRstSMHandler(stream, errorCode);
   writeQuicDataToSocket(
       sock,
       conn,

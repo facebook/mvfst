@@ -15,6 +15,7 @@
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/stream/StreamStateFunctions.h>
 
 using namespace testing;
@@ -215,10 +216,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
   ASSERT_EQ(1, packet1.packet.frames.size());
 
   // Then we reset the stream
-  invokeStreamSendStateMachine(
-      conn,
-      *stream,
-      StreamEvents::SendReset(GenericApplicationErrorCode::UNKNOWN));
+  sendRstSMHandler(*stream, GenericApplicationErrorCode::UNKNOWN);
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(

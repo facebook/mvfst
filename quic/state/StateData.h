@@ -24,7 +24,6 @@
 #include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
-#include <quic/state/StateMachine.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
 #include <chrono>

@@ -17,6 +17,8 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/SimpleFrameFunctions.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
 using namespace std::chrono_literals;
@@ -776,10 +778,7 @@ void onServerReadDataFromOpen(
                     auto ackedStream =
                         conn.streamManager->getStream(frame.streamId);
                     if (ackedStream) {
-                      invokeStreamSendStateMachine(
-                          conn,
-                          *ackedStream,
-                          StreamEvents::AckStreamFrame(frame));
+                      sendAckSMHandler(*ackedStream, frame);
                     }
                     break;
                   }
@@ -799,8 +798,7 @@ void onServerReadDataFromOpen(
                             << frame.streamId << " " << conn;
                     auto stream = conn.streamManager->getStream(frame.streamId);
                     if (stream) {
-                      invokeStreamSendStateMachine(
-                          conn, *stream, StreamEvents::RstAck(frame));
+                      sendRstAckSMHandler(*stream);
                     }
                     break;
                   }
@@ -837,7 +835,7 @@ void onServerReadDataFromOpen(
           if (!stream) {
             break;
           }
-          invokeStreamReceiveStateMachine(conn, *stream, std::move(frame));
+          receiveRstStreamSMHandler(*stream, std::move(frame));
           break;
         }
         case QuicFrame::Type::ReadCryptoFrame_E: {
@@ -870,7 +868,7 @@ void onServerReadDataFromOpen(
           // Ignore data from closed streams that we don't have the
           // state for any more.
           if (stream) {
-            invokeStreamReceiveStateMachine(conn, *stream, frame);
+            receiveReadStreamFrameSMHandler(*stream, std::move(frame));
           }
           break;
         }

@@ -26,7 +26,6 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
-#include <quic/state/stream/StreamStateMachine.h>
 
 #include <folly/ExceptionWrapper.h>
 #include <folly/IPAddress.h>

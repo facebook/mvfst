@@ -1203,8 +1203,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(
       stream->retransmissionBuffer.size(),
       originalRetransSize - buffersInPacket1);
-  EXPECT_TRUE(isState<StreamSendStates::Open>(stream->send));
-  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
 
   // Dup ack
   auto packet2 = createAckPacket(
@@ -1217,8 +1217,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(
       stream->retransmissionBuffer.size(),
       originalRetransSize - buffersInPacket1);
-  EXPECT_TRUE(isState<StreamSendStates::Open>(stream->send));
-  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
 
   IntervalSet<PacketNum> acks2 = {{packetNum1, lastPacketNum}};
   auto packet3 = createAckPacket(
@@ -1229,8 +1229,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   deliverData(packetToBuf(packet3));
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 0);
-  EXPECT_TRUE(isState<StreamSendStates::Open>(stream->send));
-  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
 
   auto empty = IOBuf::create(0);
   server->writeChain(streamId, std::move(empty), true, false);
@@ -1249,8 +1249,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
       acks3,
       PacketNumberSpace::AppData);
   deliverData(packetToBuf(packet4));
-  EXPECT_TRUE(isState<StreamSendStates::Closed>(stream->send));
-  EXPECT_TRUE(isState<StreamReceiveStates::Open>(stream->recv));
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed_E);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
 }
 
 TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {

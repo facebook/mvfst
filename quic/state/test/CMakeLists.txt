@@ -9,7 +9,6 @@ endif()
 
 quic_add_test(TARGET StateMachineTest
   SOURCES
-  StateMachineTest.cpp
   StateDataTest.cpp
   DEPENDS
   Folly::folly

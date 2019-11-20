@@ -14,6 +14,7 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/state/QuicStateFunctions.h>
+#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
 
 namespace quic {

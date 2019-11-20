@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
 void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
@@ -161,7 +162,7 @@ bool updateSimpleFrameOnPacketReceived(
       const StopSendingFrame& stopSending = *frame.asStopSendingFrame();
       auto stream = conn.streamManager->getStream(stopSending.streamId);
       if (stream) {
-        invokeStreamSendStateMachine(conn, *stream, stopSending);
+        sendStopSendingSMHandler(*stream, stopSending);
       }
       return true;
     }

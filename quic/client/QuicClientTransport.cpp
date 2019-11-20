@@ -22,6 +22,8 @@
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 
 namespace fsp = folly::portability::sockets;
 
@@ -321,8 +323,7 @@ void QuicClientTransport::processPacketData(
 
                   auto stream = conn_->streamManager->getStream(frame.streamId);
                   if (stream) {
-                    invokeStreamSendStateMachine(
-                        *conn_, *stream, StreamEvents::RstAck(frame));
+                    sendRstAckSMHandler(*stream);
                   }
                   break;
                 }
@@ -338,10 +339,7 @@ void QuicClientTransport::processPacketData(
                           << " closed=" << (ackedStream == nullptr) << " "
                           << *this;
                   if (ackedStream) {
-                    invokeStreamSendStateMachine(
-                        *conn_,
-                        *ackedStream,
-                        StreamEvents::AckStreamFrame(frame));
+                    sendAckSMHandler(*ackedStream, frame);
                   }
                   break;
                 }
@@ -381,7 +379,7 @@ void QuicClientTransport::processPacketData(
         if (!stream) {
           break;
         }
-        invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
+        receiveRstStreamSMHandler(*stream, std::move(frame));
         break;
       }
       case QuicFrame::Type::ReadCryptoFrame_E: {
@@ -411,7 +409,7 @@ void QuicClientTransport::processPacketData(
                    << *conn_;
           break;
         }
-        invokeStreamReceiveStateMachine(*conn_, *stream, std::move(frame));
+        receiveReadStreamFrameSMHandler(*stream, std::move(frame));
         break;
       }
       case QuicFrame::Type::MaxDataFrame_E: {

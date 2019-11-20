@@ -251,6 +251,8 @@ target_link_libraries(
 add_library(
   mvfst_state_stream STATIC
   stream/StreamStateFunctions.cpp
+  stream/StreamSendHandlers.cpp
+  stream/StreamReceiveHandlers.cpp
 )
 
 target_include_directories(

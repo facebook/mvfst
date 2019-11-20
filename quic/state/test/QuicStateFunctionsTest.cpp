@@ -12,6 +12,8 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStateFunctions.h>
+#include <quic/state/stream/StreamReceiveHandlers.h>
+#include <quic/state/stream/StreamSendHandlers.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -369,11 +371,10 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.finalReadOffset = 1024;
   EXPECT_THROW(
-      invokeStreamReceiveStateMachine(conn, stream, std::move(rst)),
+      receiveRstStreamSMHandler(stream, std::move(rst)),
       QuicTransportException);
   // This doesn't change the send state machine implicitly anymore
-  bool matches = matchesStates<StreamSendStateData, StreamSendStates::Open>(
-      stream.send.state);
+  bool matches = (stream.sendState == StreamSendState::Open_E);
   EXPECT_TRUE(matches);
 }
 
@@ -386,10 +387,8 @@ TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   stream.flowControlState.windowSize = 100;
   conn.flowControlState.advertisedMaxOffset = 100;
   conn.flowControlState.windowSize = 100;
-  invokeStreamReceiveStateMachine(conn, stream, std::move(rst));
-  bool matches =
-      matchesStates<StreamReceiveStateData, StreamReceiveStates::Closed>(
-          stream.recv.state);
+  receiveRstStreamSMHandler(stream, std::move(rst));
+  bool matches = (stream.recvState == StreamRecvState::Closed_E);
   EXPECT_TRUE(matches);
   EXPECT_FALSE(conn.streamManager->hasWindowUpdates());
   EXPECT_TRUE(conn.pendingEvents.connWindowUpdate);
@@ -402,13 +401,12 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   try {
-    invokeStreamSendStateMachine(conn, stream, StreamEvents::RstAck(rst));
+    sendRstAckSMHandler(stream);
     ADD_FAILURE();
   } catch (QuicTransportException& ex) {
     EXPECT_EQ(ex.errorCode(), TransportErrorCode::STREAM_STATE_ERROR);
   }
-  bool matches = matchesStates<StreamSendStateData, StreamSendStates::Open>(
-      stream.send.state);
+  bool matches = (stream.sendState == StreamSendState::Open_E);
   EXPECT_TRUE(matches);
 }
 
