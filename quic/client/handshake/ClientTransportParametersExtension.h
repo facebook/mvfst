@@ -24,6 +24,7 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
+      uint64_t activeConnectionIdLimit,
       std::vector<TransportParameter> customTransportParameters =
           std::vector<TransportParameter>())
       : initialVersion_(initialVersion),
@@ -34,6 +35,7 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
+        activeConnectionLimit_(activeConnectionIdLimit),
         customTransportParameters_(customTransportParameters) {}
 
   ~ClientTransportParametersExtension() override = default;
@@ -66,6 +68,9 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
         TransportParameterId::ack_delay_exponent, ackDelayExponent_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::max_packet_size, maxRecvPacketSize_));
+    params.parameters.push_back(encodeIntegerParameter(
+        TransportParameterId::active_connection_id_limit,
+        activeConnectionLimit_));
 
     for (const auto& customParameter : customTransportParameters_) {
       params.parameters.push_back(customParameter);
@@ -99,6 +104,7 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
+  uint64_t activeConnectionLimit_;
   folly::Optional<ServerTransportParameters> serverTransportParameters_;
   std::vector<TransportParameter> customTransportParameters_;
 };

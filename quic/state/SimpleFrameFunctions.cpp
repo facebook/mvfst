@@ -215,6 +215,7 @@ bool updateSimpleFrameOnPacketReceived(
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E: {
       const NewConnectionIdFrame& newConnectionId =
           *frame.asNewConnectionIdFrame();
+
       // TODO vchynaro Ensure we ignore smaller subsequent retirePriorTos
       // than the largest seen so far.
       if (newConnectionId.retirePriorTo > newConnectionId.sequenceNumber) {

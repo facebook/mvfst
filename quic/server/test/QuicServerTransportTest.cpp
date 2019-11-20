@@ -2058,7 +2058,8 @@ INSTANTIATE_TEST_CASE_P(
         MigrationParam{folly::none},
         MigrationParam{0},
         MigrationParam{4},
-        MigrationParam{9}));
+        MigrationParam{9},
+        MigrationParam{50}));
 
 TEST_P(
     QuicServerTransportAllowMigrationTest,

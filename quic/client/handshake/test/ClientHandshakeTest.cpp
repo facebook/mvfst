@@ -66,7 +66,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
-            kDefaultUDPSendPacketLen),
+            kDefaultUDPSendPacketLen,
+            kDefaultActiveConnectionIdLimit),
         nullptr);
   }
 
@@ -359,7 +360,8 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
-            kDefaultUDPSendPacketLen),
+            kDefaultUDPSendPacketLen,
+            kDefaultActiveConnectionIdLimit),
         &mockClientHandshakeCallback_);
   }
 
@@ -459,7 +461,8 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
-            kDefaultUDPSendPacketLen),
+            kDefaultUDPSendPacketLen,
+            kDefaultActiveConnectionIdLimit),
         nullptr);
   }
 

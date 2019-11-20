@@ -887,6 +887,7 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.idleTimeout,
       conn_->transportSettings.ackDelayExponent,
       conn_->transportSettings.maxRecvPacketSize,
+      conn_->transportSettings.selfActiveConnectionIdLimit,
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
   auto handshakeLayer = clientConn_->clientHandshakeLayer;

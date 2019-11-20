@@ -39,7 +39,8 @@ TEST(ClientTransportParametersTest, TestGetChloExtensions) {
       kDefaultStreamWindowSize,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen);
+      kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit);
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -56,7 +57,8 @@ TEST(ClientTransportParametersTest, TestOnEE) {
       kDefaultStreamWindowSize,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen);
+      kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit);
   ext.getClientHelloExtensions();
   ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
 }
@@ -70,7 +72,8 @@ TEST(ClientTransportParametersTest, TestOnEEMissingServerParams) {
       kDefaultStreamWindowSize,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen);
+      kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit);
   ext.getClientHelloExtensions();
   EXPECT_THROW(
       ext.onEncryptedExtensions(TestMessages::encryptedExt().extensions),
@@ -105,6 +108,7 @@ TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit,
       customTransportParameters);
   auto extensions = ext.getClientHelloExtensions();
 

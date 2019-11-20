@@ -1237,7 +1237,6 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   auto newConnIdData =
       ConnectionIdData{connIdAlgo->encodeConnectionId(*serverConnIdParams),
                        nextSelfConnectionIdSequence++};
-
   newConnIdData.token = generator.generateToken(newConnIdData.connId);
   selfConnectionIds.push_back(newConnIdData);
   return newConnIdData;

@@ -98,7 +98,8 @@ class ServerHandshakeTest : public Test {
             initialMaxStreamDataUni,
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
-            kDefaultUDPSendPacketLen);
+            kDefaultUDPSendPacketLen,
+            kDefaultActiveConnectionIdLimit);
     fizzClient.reset(
         new fizz::client::
             FizzClient<ServerHandshakeTest, fizz::client::ClientStateMachine>(
