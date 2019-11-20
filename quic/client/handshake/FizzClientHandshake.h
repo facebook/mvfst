@@ -13,6 +13,7 @@
 namespace quic {
 
 class FizzClientQuicHandshakeContext;
+class FizzCryptoFactory;
 
 class FizzClientHandshake : public ClientHandshake {
  public:
@@ -29,6 +30,8 @@ class FizzClientHandshake : public ClientHandshake {
 
  private:
   void processSocketData(folly::IOBufQueue& queue) override;
+  std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+  buildCiphers(CipherKind kind, folly::ByteRange secret) override;
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);
@@ -36,6 +39,7 @@ class FizzClientHandshake : public ClientHandshake {
   fizz::client::ClientStateMachine machine_;
 
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
+  std::shared_ptr<FizzCryptoFactory> cryptoFactory_;
 };
 
 } // namespace quic

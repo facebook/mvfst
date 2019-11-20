@@ -20,7 +20,6 @@
 #include <quic/QuicException.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/handshake/QuicPskCache.h>
-#include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/state/StateData.h>
 
@@ -193,7 +192,8 @@ class ClientHandshake : public Handshake {
  private:
   EncryptionLevel getReadRecordLayerEncryptionLevel();
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
-  std::unique_ptr<Aead> buildAead(CipherKind kind, folly::ByteRange secret);
+  virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+  buildCiphers(CipherKind kind, folly::ByteRange secret) = 0;
 
   // Whether or not to wait for more data.
   bool waitForData_{false};
@@ -209,7 +209,6 @@ class ClientHandshake : public Handshake {
  protected:
   fizz::client::State state_;
 
-  std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
 };
 

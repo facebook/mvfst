@@ -12,6 +12,8 @@
 #include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/FizzCryptoFactory.h>
 
+#include <fizz/protocol/Protocol.h>
+
 namespace quic {
 
 FizzClientHandshake::FizzClientHandshake(
@@ -27,13 +29,12 @@ void FizzClientHandshake::connect(
   transportParams_ = transportParams;
   callback_ = callback;
 
-  auto cryptoFactory = std::make_shared<FizzCryptoFactory>();
+  cryptoFactory_ = std::make_shared<FizzCryptoFactory>();
 
   // Setup context for this handshake.
   auto context = std::make_shared<fizz::client::FizzClientContext>(
       *fizzContext_->getContext());
-  context->setFactory(cryptoFactory);
-  cryptoFactory_ = std::move(cryptoFactory);
+  context->setFactory(cryptoFactory_);
   context->setSupportedCiphers({fizz::CipherSuite::TLS_AES_128_GCM_SHA256});
   context->setCompatibilityMode(false);
   // Since Draft-17, EOED should not be sent
@@ -49,6 +50,30 @@ void FizzClientHandshake::connect(
 
 void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
   processActions(machine_.processSocketData(state_, queue));
+}
+
+std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
+  bool isEarlyTraffic = kind == CipherKind::ZeroRttWrite;
+  fizz::CipherSuite cipher =
+      isEarlyTraffic ? state_.earlyDataParams()->cipher : *state_.cipher();
+  std::unique_ptr<fizz::KeyScheduler> keySchedulerPtr = isEarlyTraffic
+      ? state_.context()->getFactory()->makeKeyScheduler(cipher)
+      : nullptr;
+  fizz::KeyScheduler& keyScheduler =
+      isEarlyTraffic ? *keySchedulerPtr : *state_.keyScheduler();
+
+  auto aead = FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
+      *state_.context()->getFactory(),
+      keyScheduler,
+      cipher,
+      secret,
+      kQuicKeyLabel,
+      kQuicIVLabel));
+
+  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
+
+  return {std::move(aead), std::move(packetNumberCipher)};
 }
 
 class FizzClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
