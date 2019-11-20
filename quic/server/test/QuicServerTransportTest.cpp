@@ -519,7 +519,7 @@ class QuicServerTransportTest : public Test {
     }
     uint64_t connIdsToIssue = std::min(
         server->getConn().peerActiveConnectionIdLimit,
-        kMinNumAvailableConnIds - 1);
+        kDefaultActiveConnectionIdLimit);
 
     if (server->getConn().transportSettings.disableMigration ||
         (connIdsToIssue == 0)) {
@@ -3041,7 +3041,7 @@ TEST_F(QuicServerTransportTest, PingIsRetransmittable) {
 
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
   auto& conn = server->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 2;
+  conn.transportSettings.selfActiveConnectionIdLimit = 2;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
@@ -3062,7 +3062,7 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
 
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
   auto& conn = server->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 0;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
@@ -3081,7 +3081,7 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdTooManyReceivedIds) {
 
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdInvalidRetire) {
   auto& conn = server->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
@@ -3099,7 +3099,7 @@ TEST_F(QuicServerTransportTest, RecvNewConnectionIdInvalidRetire) {
 
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdNoopValidDuplicate) {
   auto& conn = server->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ConnectionId connId2({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);

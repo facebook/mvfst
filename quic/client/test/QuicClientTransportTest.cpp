@@ -2604,14 +2604,14 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
 
 TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   auto& conn = client->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 2;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
   ASSERT_TRUE(builder.canBuildPacket());
-  NewConnectionIdFrame newConnId(
-      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  auto token = StatelessResetToken{1, 9, 2, 0};
+  NewConnectionIdFrame newConnId(1, 0, ConnectionId({2, 4, 2, 3}), token);
   writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
 
   auto packet = std::move(builder).buildPacket();
@@ -2628,7 +2628,7 @@ TEST_F(
     QuicClientTransportAfterStartTest,
     RecvNewConnectionIdTooManyReceivedIds) {
   auto& conn = client->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 0;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
@@ -2648,7 +2648,7 @@ TEST_F(
 
 TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdInvalidRetire) {
   auto& conn = client->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
@@ -2669,7 +2669,7 @@ TEST_F(
     QuicClientTransportAfterStartTest,
     RecvNewConnectionIdNoopValidDuplicate) {
   auto& conn = client->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ConnectionId connId2({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);
@@ -2693,7 +2693,7 @@ TEST_F(
     QuicClientTransportAfterStartTest,
     RecvNewConnectionIdExceptionInvalidDuplicate) {
   auto& conn = client->getNonConstConn();
-  conn.peerReceivedConnectionIdLimit = 1;
+  conn.transportSettings.selfActiveConnectionIdLimit = 1;
 
   ConnectionId connId2({5, 5, 5, 5});
   conn.peerConnectionIds.emplace_back(connId2, 1);

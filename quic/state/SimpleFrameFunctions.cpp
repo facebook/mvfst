@@ -244,7 +244,12 @@ bool updateSimpleFrameOnPacketReceived(
 
       // TODO Store StatelessResetToken in ConnIdData
 
-      if (conn.peerConnectionIds.size() == conn.peerReceivedConnectionIdLimit) {
+      // selfActiveConnectionIdLimit represents the active_connection_id_limit
+      // transport parameter which is the maximum amount of connection ids
+      // provided by NEW_CONNECTION_ID frames. We add 1 to represent the initial
+      // cid.
+      if (conn.peerConnectionIds.size() ==
+          conn.transportSettings.selfActiveConnectionIdLimit + 1) {
         // Unspec'd as of d-23 if a server doesn't respect the
         // active_connection_id_limit. Ignore frame.
         return false;

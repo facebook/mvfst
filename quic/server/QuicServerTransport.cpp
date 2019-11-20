@@ -411,11 +411,13 @@ void QuicServerTransport::maybeIssueConnectionIds() {
   if (!conn_->transportSettings.disableMigration && !connectionIdsIssued_ &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     connectionIdsIssued_ = true;
-
     CHECK(conn_->transportSettings.statelessResetTokenSecret.hasValue());
 
+    // If the peer specifies that they have a limit of 1,000,000 connection ids
+    // then only issue a small number at first, since the server still
+    // needs to be able to search through all issued ids for routing.
     const uint64_t maximumIdsToIssue = std::min(
-        conn_->peerActiveConnectionIdLimit, kMinNumAvailableConnIds - 1);
+        conn_->peerActiveConnectionIdLimit, kDefaultActiveConnectionIdLimit);
     for (size_t i = 0; i < maximumIdsToIssue; i++) {
       auto newConnIdData = serverConn_->createAndAddNewSelfConnId();
       if (!newConnIdData.hasValue()) {
@@ -446,6 +448,5 @@ void QuicServerTransport::maybeNotifyTransportReady() {
     connCallback_->onTransportReady();
   }
 }
-
 
 } // namespace quic

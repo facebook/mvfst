@@ -527,8 +527,9 @@ struct QuicConnectionStateBase {
   // Time at which the connection started.
   TimePoint connectionTime;
 
-  // uint64_t peerActiveConnectionIdLimit{kDefaultConnectionIdLimit};
-  uint64_t peerActiveConnectionIdLimit{8};
+  // The received active_connection_id_limit transport parameter from the peer.
+  uint64_t peerActiveConnectionIdLimit{0};
+
   // The current connection id. This will eventually be negotiated
   // with the peer.
   folly::Optional<ConnectionId> clientConnectionId;
@@ -746,10 +747,6 @@ struct QuicConnectionStateBase {
   DebugState debugState;
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
-
-  // The parameter used to send the peer's active_connection_id_limit
-  // does not include the connection id used in the initial handshake.
-  uint64_t peerReceivedConnectionIdLimit{kDefaultConnectionIdLimit + 1};
 
   // Measure rtt betwen pathchallenge & path response frame
   // Use this measured rtt as init rtt (from Transport Settings)

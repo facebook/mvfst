@@ -385,7 +385,7 @@ constexpr auto kExpectedNumOfParamsInTheTicket = 8;
 
 constexpr auto kStatelessResetTokenSecretLength = 32;
 
-constexpr uint64_t kMinNumAvailableConnIds = 8;
+constexpr uint64_t kDefaultActiveConnectionIdLimit = 7;
 
 // default capability of QUIC partial reliability
 constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;

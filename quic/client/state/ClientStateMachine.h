@@ -65,6 +65,8 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     updateFlowControlStateWithSettings(flowControlState, transportSettings);
     streamManager = std::make_unique<QuicStreamManager>(
         *this, this->nodeType, transportSettings);
+    transportSettings.selfActiveConnectionIdLimit =
+        kDefaultActiveConnectionIdLimit;
   }
 };
 
