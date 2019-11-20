@@ -122,7 +122,7 @@ class QuicClientTransport
 
   void setQLogger(std::shared_ptr<QLogger> qLogger) override;
 
-  void replaceSocket(std::unique_ptr<folly::AsyncUDPSocket> replacementSocket);
+  void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket> newSock) override;
 
   class HappyEyeballsConnAttemptDelayTimeout
       : public folly::HHWheelTimer::Callback {

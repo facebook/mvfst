@@ -1233,23 +1233,24 @@ void QuicClientTransport::setQLogger(std::shared_ptr<QLogger> qLogger) {
   QuicTransportBase::setQLogger(std::move(qLogger));
 }
 
-void QuicClientTransport::replaceSocket(
-    std::unique_ptr<folly::AsyncUDPSocket> replacementSocket) {
+void QuicClientTransport::onNetworkSwitch(
+    std::unique_ptr<folly::AsyncUDPSocket> newSock) {
   if (!conn_->oneRttWriteCipher) {
     return;
   }
-  if (socket_) {
+  if (socket_ && newSock) {
     auto sock = std::move(socket_);
     socket_ = nullptr;
     sock->setErrMessageCallback(nullptr);
     sock->pauseRead();
     sock->close();
+
+    socket_ = std::move(newSock);
+    happyEyeballsSetUpSocket(
+        *socket_, conn_->peerAddress, conn_->transportSettings, this, this);
+    if (conn_->qLogger) {
+      conn_->qLogger->addConnectionMigrationUpdate(true);
+    }
   }
-  if (conn_->qLogger) {
-    conn_->qLogger->addConnectionMigrationUpdate(true);
-  }
-  socket_ = std::move(replacementSocket);
-  happyEyeballsSetUpSocket(
-      *socket_, conn_->peerAddress, conn_->transportSettings, this, this);
 }
 } // namespace quic

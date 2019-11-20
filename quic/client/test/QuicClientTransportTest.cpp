@@ -1676,6 +1676,47 @@ TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
   client->closeNow(folly::none);
 }
 
+TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
+  client->getNonConstConn().oneRttWriteCipher = test::createNoOpAead();
+  auto mockQLogger = std::make_shared<MockQLogger>();
+  client->setQLogger(mockQLogger);
+
+  EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
+  client->onNetworkSwitch(nullptr);
+  client->closeNow(folly::none);
+}
+
+TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
+  client->getNonConstConn().oneRttWriteCipher = test::createNoOpAead();
+  auto mockQLogger = std::make_shared<MockQLogger>();
+  client->setQLogger(mockQLogger);
+
+  auto newSocket =
+      std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+  auto newSocketPtr = newSocket.get();
+  EXPECT_CALL(*sock, pauseRead());
+  EXPECT_CALL(*sock, close());
+  EXPECT_CALL(*newSocketPtr, bind(_));
+  EXPECT_CALL(*newSocketPtr, close());
+
+  client->setQLogger(mockQLogger);
+  EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true));
+  client->onNetworkSwitch(std::move(newSocket));
+
+  client->closeNow(folly::none);
+}
+
+TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
+  auto newSocket =
+      std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+  auto newSocketPtr = newSocket.get();
+  auto mockQLogger = std::make_shared<MockQLogger>();
+  EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
+  EXPECT_CALL(*newSocketPtr, bind(_)).Times(0);
+  client->onNetworkSwitch(std::move(newSocket));
+  client->closeNow(folly::none);
+}
+
 TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
   class ConnectionCallbackThatWritesOnTransportReady
       : public QuicSocket::ConnectionCallback {

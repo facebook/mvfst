@@ -305,6 +305,14 @@ class QuicSocket {
   virtual uint64_t getConnectionBufferAvailable() const = 0;
 
   /**
+   * Application can invoke this function to signal the transport to
+   * initiate migration.
+   * @param socket The new socket that should be used by the transport.
+   * If this is null then do not replace the underlying socket.
+   */
+  virtual void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket>) {}
+
+  /**
    * Get the flow control settings for the given stream (or connection flow
    * control by passing id=0).  Settings include send and receive window
    * capacity and available.
