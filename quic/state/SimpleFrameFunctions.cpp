@@ -251,8 +251,6 @@ bool updateSimpleFrameOnPacketReceived(
       }
       // TODO vchynaro Implement retire_prior_to logic
 
-      // TODO Store StatelessResetToken in ConnIdData
-
       // selfActiveConnectionIdLimit represents the active_connection_id_limit
       // transport parameter which is the maximum amount of connection ids
       // provided by NEW_CONNECTION_ID frames. We add 1 to represent the initial
@@ -264,7 +262,9 @@ bool updateSimpleFrameOnPacketReceived(
         return false;
       }
       conn.peerConnectionIds.emplace_back(
-          newConnectionId.connectionId, newConnectionId.sequenceNumber);
+          newConnectionId.connectionId,
+          newConnectionId.sequenceNumber,
+          newConnectionId.token);
       return false;
     }
     case QuicSimpleFrame::Type::MaxStreamsFrame_E: {

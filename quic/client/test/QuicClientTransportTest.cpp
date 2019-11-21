@@ -2651,6 +2651,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
   ASSERT_TRUE(builder.canBuildPacket());
+
   auto token = StatelessResetToken{1, 9, 2, 0};
   NewConnectionIdFrame newConnId(1, 0, ConnectionId({2, 4, 2, 3}), token);
   writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
@@ -2663,6 +2664,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   EXPECT_EQ(conn.peerConnectionIds.size(), 2);
   EXPECT_EQ(conn.peerConnectionIds[1].connId, newConnId.connectionId);
   EXPECT_EQ(conn.peerConnectionIds[1].sequenceNumber, newConnId.sequenceNumber);
+  EXPECT_EQ(conn.peerConnectionIds[1].token, newConnId.token);
 }
 
 TEST_F(
