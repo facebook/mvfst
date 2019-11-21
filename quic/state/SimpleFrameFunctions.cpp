@@ -238,9 +238,17 @@ bool updateSimpleFrameOnPacketReceived(
         }
       }
 
-      // TODO if peer is requesting 0-len dst conn ids, then this
-      // is also protocol violation as per d-23 #19.15
-
+      // PeerConnectionIds holds ALL peer's connection ids
+      // (initial + NEW_CONNECTION_ID).
+      // If using 0-len peer cid then this would be the only element.
+      auto peerConnId =
+          (conn.nodeType == QuicNodeType::Client ? conn.serverConnectionId
+                                                 : conn.clientConnectionId);
+      if (!peerConnId || peerConnId->size() == 0) {
+        throw QuicTransportException(
+            "Endpoint is already using 0-len connection ids.",
+            TransportErrorCode::PROTOCOL_VIOLATION);
+      }
       // TODO vchynaro Implement retire_prior_to logic
 
       // TODO Store StatelessResetToken in ConnIdData

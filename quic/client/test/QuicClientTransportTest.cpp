@@ -2706,6 +2706,35 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdInvalidRetire) {
   EXPECT_THROW(deliverData(data->coalesce()), std::runtime_error);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdUsing0LenCid) {
+  auto& conn = client->getNonConstConn();
+  conn.transportSettings.selfActiveConnectionIdLimit = 2;
+
+  conn.serverConnectionId = ConnectionId(std::vector<uint8_t>{});
+  conn.peerConnectionIds.pop_back();
+  conn.peerConnectionIds.emplace_back(*conn.serverConnectionId, 0);
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  ASSERT_TRUE(builder.canBuildPacket());
+  NewConnectionIdFrame newConnId(
+      1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
+  writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
+
+  auto packet = std::move(builder).buildPacket();
+  auto data = packetToBuf(packet);
+
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  try {
+    deliverData(data->coalesce(), false);
+    FAIL();
+  } catch (const std::runtime_error& e) {
+    EXPECT_EQ(std::string(e.what()), "Protocol violation");
+  }
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+}
+
 TEST_F(
     QuicClientTransportAfterStartTest,
     RecvNewConnectionIdNoopValidDuplicate) {
