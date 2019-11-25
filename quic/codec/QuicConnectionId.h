@@ -87,8 +87,8 @@ struct ConnectionIdData {
       StatelessResetToken tokenIn)
       : connId(connIdIn), sequenceNumber(sequenceNumberIn), token(tokenIn) {}
 
-  const ConnectionId connId;
-  const uint64_t sequenceNumber;
+  ConnectionId connId;
+  uint64_t sequenceNumber;
   folly::Optional<StatelessResetToken> token;
 };
 

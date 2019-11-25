@@ -751,6 +751,13 @@ struct QuicConnectionStateBase {
   // Measure rtt betwen pathchallenge & path response frame
   // Use this measured rtt as init rtt (from Transport Settings)
   TimePoint pathChallengeStartTime;
+
+  /**
+   * Selects a previously unused peer-issued connection id to use.
+   * If there are no available ids return false and don't change anything.
+   * Return true if replacement succeeds.
+   */
+  bool retireAndSwitchPeerConnectionIds();
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

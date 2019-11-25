@@ -1908,6 +1908,73 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   client->closeNow(folly::none);
 }
 
+TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
+  auto originalCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 2);
+  auto& conn = client->getNonConstConn();
+  conn.serverConnectionId = originalCid.connId;
+
+  conn.peerConnectionIds.push_back(originalCid);
+  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+  client->closeNow(folly::none);
+}
+
+TEST_F(QuicClientTransportTest, SwitchServerCidsOneOtherCid) {
+  auto originalCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+
+  auto& conn = client->getNonConstConn();
+  conn.serverConnectionId = originalCid.connId;
+
+  conn.peerConnectionIds.push_back(originalCid);
+  conn.peerConnectionIds.push_back(secondCid);
+
+  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 1);
+
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
+  EXPECT_EQ(retireFrame->sequenceNumber, 1);
+
+  auto replacedCid = conn.serverConnectionId;
+  EXPECT_NE(originalCid.connId, *replacedCid);
+  EXPECT_EQ(secondCid.connId, *replacedCid);
+  client->closeNow(folly::none);
+}
+
+TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
+  auto originalCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+  auto thirdCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{3, 3, 3, 3}), 3);
+
+  auto& conn = client->getNonConstConn();
+  conn.serverConnectionId = originalCid.connId;
+
+  conn.peerConnectionIds.push_back(originalCid);
+  conn.peerConnectionIds.push_back(secondCid);
+  conn.peerConnectionIds.push_back(thirdCid);
+
+  EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), true);
+  EXPECT_EQ(conn.peerConnectionIds.size(), 2);
+
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
+  EXPECT_EQ(retireFrame->sequenceNumber, 1);
+
+  // Uses the first unused connection id.
+  auto replacedCid = conn.serverConnectionId;
+  EXPECT_NE(originalCid.connId, *replacedCid);
+  EXPECT_EQ(secondCid.connId, *replacedCid);
+  client->closeNow(folly::none);
+}
+
 class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
  public:
   void SetUp() override {

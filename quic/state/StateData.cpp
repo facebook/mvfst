@@ -153,4 +153,42 @@ CongestionController::AckEvent::AckPacket::Builder::build() && {
       isAppLimited);
 }
 
+bool QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
+  const auto end = peerConnectionIds.end();
+  auto replacementConnIdDataIt{end};
+  auto currentConnIdDataIt{end};
+
+  auto& mainPeerId = nodeType == QuicNodeType::Client ? serverConnectionId
+                                                      : clientConnectionId;
+  if (!mainPeerId) {
+    throw QuicTransportException(
+        "Attempting to retire null peer conn id",
+        TransportErrorCode::INTERNAL_ERROR);
+  }
+
+  // Retrieve the sequence number of the current cId, and find an unused
+  // ConnectionIdData.
+  for (auto it = peerConnectionIds.begin(); it != end; it++) {
+    if (replacementConnIdDataIt != end && currentConnIdDataIt != end) {
+      break;
+    }
+
+    if (it->connId == mainPeerId) {
+      currentConnIdDataIt = it;
+    } else if (replacementConnIdDataIt == end) {
+      replacementConnIdDataIt = it;
+    }
+  }
+  if (replacementConnIdDataIt == end) {
+    return false;
+  }
+  DCHECK(currentConnIdDataIt != end);
+  pendingEvents.frames.push_back(
+      RetireConnectionIdFrame(currentConnIdDataIt->sequenceNumber));
+  mainPeerId = replacementConnIdDataIt->connId;
+
+  peerConnectionIds.erase(currentConnIdDataIt);
+  return true;
+}
+
 } // namespace quic
