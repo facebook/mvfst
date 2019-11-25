@@ -2961,7 +2961,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   client->close(folly::none);
 }
 
-TEST_F(QuicClientTransportAfterStartTest, RecvPathChallenge) {
+TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
   auto& conn = client->getNonConstConn();
 
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
@@ -2975,10 +2975,42 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallenge) {
   auto data = packetToBuf(packet);
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
+  EXPECT_THROW(deliverData(data->coalesce(), false), std::runtime_error);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
+  auto& conn = client->getNonConstConn();
+  auto originalCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 1);
+  auto secondCid =
+      ConnectionIdData(ConnectionId(std::vector<uint8_t>{5, 6, 7, 8}), 2);
+
+  conn.serverConnectionId = originalCid.connId;
+
+  conn.peerConnectionIds.push_back(originalCid);
+  conn.peerConnectionIds.push_back(secondCid);
+
+  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  PathChallengeFrame pathChallenge(123);
+  ASSERT_TRUE(builder.canBuildPacket());
+  writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder);
+
+  auto packet = std::move(builder).buildPacket();
+  auto data = packetToBuf(packet);
+
+  EXPECT_TRUE(conn.pendingEvents.frames.empty());
   deliverData(data->coalesce(), false);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 2);
+
+  // The RetireConnectionId frame will be enqueued before the PathResponse.
+  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
+  EXPECT_EQ(retireFrame->sequenceNumber, 1);
+
   PathResponseFrame& pathResponse =
-      *conn.pendingEvents.frames[0].asPathResponseFrame();
+      *conn.pendingEvents.frames[1].asPathResponseFrame();
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 

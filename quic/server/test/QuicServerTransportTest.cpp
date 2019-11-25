@@ -1774,6 +1774,9 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
 TEST_F(QuicServerTransportTest, RecvPathChallenge) {
   auto& conn = server->getNonConstConn();
 
+  // Add additional peer id so PathResponse completes.
+  conn.peerConnectionIds.emplace_back(ConnectionId({1, 2, 3, 4}), 1);
+
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *conn.serverConnectionId, 10);
   RegularQuicPacketBuilder builder(
@@ -1786,9 +1789,13 @@ TEST_F(QuicServerTransportTest, RecvPathChallenge) {
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
   deliverData(packetToBuf(packet), false);
-  EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
+  EXPECT_EQ(conn.pendingEvents.frames.size(), 2);
+  // The RetireConnectionId frame will be enqueued before the PathResponse.
+  auto retireFrame = conn.pendingEvents.frames[0].asRetireConnectionIdFrame();
+  EXPECT_EQ(retireFrame->sequenceNumber, 0);
+
   PathResponseFrame& pathResponse =
-      *conn.pendingEvents.frames[0].asPathResponseFrame();
+      *conn.pendingEvents.frames[1].asPathResponseFrame();
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
 }
 
@@ -2120,6 +2127,10 @@ TEST_P(
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
+
+  // Add additional peer id so PathResponse completes.
+  server->getNonConstConn().peerConnectionIds.emplace_back(
+      ConnectionId({1, 2, 3, 4}), 1);
 
   ShortHeader header(
       ProtectionType::KeyPhaseZero,

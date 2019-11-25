@@ -184,7 +184,14 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::PathChallengeFrame_E: {
+      bool rotatedId = conn.retireAndSwitchPeerConnectionIds();
+      if (!rotatedId) {
+        throw QuicTransportException(
+            "No more connection ids to use for new path.",
+            TransportErrorCode::INVALID_MIGRATION);
+      }
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
+
       conn.pendingEvents.frames.emplace_back(
           PathResponseFrame(pathChallenge.pathData));
       return false;
