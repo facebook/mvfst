@@ -116,7 +116,7 @@ static LocalErrorCode openLocalStreamIfNotClosed(
     nextAcceptableStreamId = streamId + detail::kStreamIncrement;
   }
   return LocalErrorCode::NO_ERROR;
- }
+}
 
 bool QuicStreamManager::streamExists(StreamId streamId) {
   if (isLocalStream(nodeType_, streamId)) {
@@ -280,14 +280,13 @@ QuicStreamManager::createNextUnidirectionalStream() {
 
 QuicStreamState* FOLLY_NULLABLE
 QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
-  // This function maintains 4 invariants:
+  // This function maintains 3 invariants:
   // 1. Streams below nextAcceptableStreamId are streams that have been
   //    seen before. Everything above can be opened.
   // 2. Streams that have been seen before, always have an entry in
   //    openPeerStreams. If a stream below nextAcceptableStreamId does not
   //    have an entry in openPeerStreams, then it is closed.
-  // 3. openPeerStreams is ordered by streamId.
-  // 4. If streamId n is open all streams < n will be seen.
+  // 3. If streamId n is open all streams < n will be seen.
   // It also tries to create the entire state for a stream in a lazy manner.
 
   // Validate the stream id is correct
@@ -400,8 +399,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     return;
   }
   VLOG(10) << "Removing closed stream=" << streamId;
-  bool inTerminalStates = it->second.inTerminalStates();
-  DCHECK(inTerminalStates);
+  DCHECK(it->second.inTerminalStates());
   readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
   writableStreams_.erase(streamId);
@@ -409,14 +407,8 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
   windowUpdates_.erase(streamId);
-  auto itr = std::find(lossStreams_.begin(), lossStreams_.end(), streamId);
-  if (itr != lossStreams_.end()) {
-    lossStreams_.erase(itr);
-  }
-  auto stopItr = stopSendingStreams_.find(streamId);
-  if (stopItr != stopSendingStreams_.end()) {
-    stopSendingStreams_.erase(stopItr);
-  }
+  lossStreams_.erase(streamId);
+  stopSendingStreams_.erase(streamId);
   if (it->second.isControl) {
     DCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;
@@ -427,48 +419,41 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     auto& openPeerStreams = isUnidirectionalStream(streamId)
         ? openUnidirectionalPeerStreams_
         : openBidirectionalPeerStreams_;
-    auto streamItr = openPeerStreams.find(streamId);
-    if (streamItr != openPeerStreams.end()) {
-      openPeerStreams.erase(streamItr);
-      // Check if we should send a stream limit update. We need to send an
-      // update every time we've closed a number of streams >= the set windowing
-      // fraction.
-      uint64_t initialStreamLimit = isUnidirectionalStream(streamId)
-          ? transportSettings_->advertisedInitialMaxStreamsUni
-          : transportSettings_->advertisedInitialMaxStreamsBidi;
-      uint64_t streamWindow =
-          initialStreamLimit / streamLimitWindowingFraction_;
-      uint64_t openableRemoteStreams = isUnidirectionalStream(streamId)
-          ? openableRemoteUnidirectionalStreams()
-          : openableRemoteBidirectionalStreams();
-      // The "credit" here is how much available stream space we have based on
-      // what the initial stream limit was set to.
-      uint64_t streamCredit =
-          initialStreamLimit - openableRemoteStreams - openPeerStreams.size();
-      if (streamCredit >= streamWindow) {
-        if (isUnidirectionalStream(streamId)) {
-          uint64_t maxStreams = (maxRemoteUnidirectionalStreamId_ -
-                                 initialRemoteUnidirectionalStreamId_) /
-              detail::kStreamIncrement;
-          setMaxRemoteUnidirectionalStreams(maxStreams + streamCredit);
-          remoteUnidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
-        } else {
-          uint64_t maxStreams = (maxRemoteBidirectionalStreamId_ -
-                                 initialRemoteBidirectionalStreamId_) /
-              detail::kStreamIncrement;
-          setMaxRemoteBidirectionalStreams(maxStreams + streamCredit);
-          remoteBidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
-        }
+    openPeerStreams.erase(streamId);
+    // Check if we should send a stream limit update. We need to send an
+    // update every time we've closed a number of streams >= the set windowing
+    // fraction.
+    uint64_t initialStreamLimit = isUnidirectionalStream(streamId)
+        ? transportSettings_->advertisedInitialMaxStreamsUni
+        : transportSettings_->advertisedInitialMaxStreamsBidi;
+    uint64_t streamWindow = initialStreamLimit / streamLimitWindowingFraction_;
+    uint64_t openableRemoteStreams = isUnidirectionalStream(streamId)
+        ? openableRemoteUnidirectionalStreams()
+        : openableRemoteBidirectionalStreams();
+    // The "credit" here is how much available stream space we have based on
+    // what the initial stream limit was set to.
+    uint64_t streamCredit =
+        initialStreamLimit - openableRemoteStreams - openPeerStreams.size();
+    if (streamCredit >= streamWindow) {
+      if (isUnidirectionalStream(streamId)) {
+        uint64_t maxStreams = (maxRemoteUnidirectionalStreamId_ -
+                               initialRemoteUnidirectionalStreamId_) /
+            detail::kStreamIncrement;
+        setMaxRemoteUnidirectionalStreams(maxStreams + streamCredit);
+        remoteUnidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
+      } else {
+        uint64_t maxStreams = (maxRemoteBidirectionalStreamId_ -
+                               initialRemoteBidirectionalStreamId_) /
+            detail::kStreamIncrement;
+        setMaxRemoteBidirectionalStreams(maxStreams + streamCredit);
+        remoteBidirectionalStreamLimitUpdate_ = maxStreams + streamCredit;
       }
     }
   } else {
     auto& openLocalStreams = isUnidirectionalStream(streamId)
         ? openUnidirectionalLocalStreams_
         : openBidirectionalLocalStreams_;
-    auto streamItr = openLocalStreams.find(streamId);
-    if (streamItr != openLocalStreams.end()) {
-      openLocalStreams.erase(streamItr);
-    }
+    openLocalStreams.erase(streamId);
   }
   updateAppIdleState();
 }
