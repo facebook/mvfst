@@ -1179,12 +1179,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
       if (!frame) {
         continue;
       }
-      auto it = std::find_if(
-          stream->retransmissionBuffer.begin(),
-          stream->retransmissionBuffer.end(),
-          [&](auto& buffer) {
-            return buffer.offset == frame->offset && buffer.eof == frame->fin;
-          });
+      auto it = stream->retransmissionBuffer.find(frame->offset);
       ASSERT_TRUE(it != stream->retransmissionBuffer.end());
       if (currentPacket == packetNum1 && frame->streamId == streamId) {
         buffersInPacket1++;
@@ -1358,8 +1353,10 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   writeDataToQuicStream(*stream, IOBuf::copyBuffer(words.at(3)), false);
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1413,8 +1410,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1455,8 +1454,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterCloseStream) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1496,8 +1497,10 @@ TEST_F(QuicServerTransportTest, RecvInvalidMaxStreamData) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1534,8 +1537,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   stream->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1606,8 +1611,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream1->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream1->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream1->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream1->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream1->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream1->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream1->currentReadOffset = words.at(0).length() + words.at(1).length();
@@ -1615,8 +1622,10 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   stream2->readBuffer.emplace_back(IOBuf::copyBuffer(words.at(0)), 0, false);
   stream2->readBuffer.emplace_back(
       IOBuf::copyBuffer(words.at(1)), words.at(0).length(), false);
-  stream2->retransmissionBuffer.emplace_back(
-      IOBuf::copyBuffer(words.at(2)), 0, false);
+  stream2->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(IOBuf::copyBuffer(words.at(2)), 0, false));
   stream2->writeBuffer.append(IOBuf::copyBuffer(words.at(3)));
   stream2->currentWriteOffset = words.at(2).length() + words.at(3).length();
   stream2->currentReadOffset = words.at(0).length() + words.at(1).length();

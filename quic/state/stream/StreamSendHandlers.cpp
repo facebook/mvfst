@@ -91,28 +91,25 @@ void sendAckSMHandler(
   switch (stream.sendState) {
     case StreamSendState::Open_E: {
       // Clean up the acked buffers from the retransmissionBuffer.
-      auto ackedBuffer = std::lower_bound(
-          stream.retransmissionBuffer.begin(),
-          stream.retransmissionBuffer.end(),
-          ackedFrame.offset,
-          [](const auto& buffer, const auto& offset) {
-            return buffer.offset < offset;
-          });
-
+      auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
         if (streamFrameMatchesRetransmitBuffer(
-                stream, ackedFrame, *ackedBuffer)) {
+                stream, ackedFrame, ackedBuffer->second)) {
           VLOG(10) << "Open: acked stream data stream=" << stream.id
-                   << " offset=" << ackedBuffer->offset
-                   << " len=" << ackedBuffer->data.chainLength()
-                   << " eof=" << ackedBuffer->eof << " " << stream.conn;
+                   << " offset=" << ackedBuffer->second.offset
+                   << " len=" << ackedBuffer->second.data.chainLength()
+                   << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
+          stream.ackedIntervals.insert(
+              ackedBuffer->second.offset,
+              ackedBuffer->second.offset +
+                  ackedBuffer->second.data.chainLength());
           stream.retransmissionBuffer.erase(ackedBuffer);
         } else {
           VLOG(10)
               << "Open: received an ack for already discarded buffer; stream="
-              << stream.id << " offset=" << ackedBuffer->offset
-              << " len=" << ackedBuffer->data.chainLength()
-              << " eof=" << ackedBuffer->eof << " " << stream.conn;
+              << stream.id << " offset=" << ackedBuffer->second.offset
+              << " len=" << ackedBuffer->second.data.chainLength()
+              << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
         }
       }
 

@@ -98,11 +98,13 @@ void handleNewStreamDataWritten(
   stream.currentWriteOffset += frameLen;
   auto bufWritten = stream.writeBuffer.split(folly::to<size_t>(frameLen));
   stream.currentWriteOffset += frameFin ? 1 : 0;
-  CHECK(
-      stream.retransmissionBuffer.empty() ||
-      stream.retransmissionBuffer.back().offset < originalOffset);
-  stream.retransmissionBuffer.emplace_back(
-      std::move(bufWritten), originalOffset, frameFin);
+  CHECK(stream.retransmissionBuffer
+            .emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(originalOffset),
+                std::forward_as_tuple(
+                    std::move(bufWritten), originalOffset, frameFin))
+            .second);
 }
 
 void handleRetransmissionWritten(
@@ -126,17 +128,13 @@ void handleRetransmissionWritten(
     lossBufferIter->offset += frameLen;
     bufWritten = lossBufferIter->data.split(frameLen);
   }
-  stream.retransmissionBuffer.emplace(
-      std::upper_bound(
-          stream.retransmissionBuffer.begin(),
-          stream.retransmissionBuffer.end(),
-          frameOffset,
-          [](const auto& offsetIn, const auto& buffer) {
-            return offsetIn < buffer.offset;
-          }),
-      std::move(bufWritten),
-      frameOffset,
-      frameFin);
+  CHECK(stream.retransmissionBuffer
+            .emplace(
+                std::piecewise_construct,
+                std::forward_as_tuple(frameOffset),
+                std::forward_as_tuple(
+                    std::move(bufWritten), frameOffset, frameFin))
+            .second);
 }
 
 /**

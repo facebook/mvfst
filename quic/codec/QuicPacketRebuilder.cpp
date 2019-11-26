@@ -200,23 +200,17 @@ Buf PacketRebuilder::cloneCryptoRetransmissionBuffer(
    * lost packet.
    */
   DCHECK(frame.len) << "WriteCryptoFrame cloning: frame is empty. " << conn_;
-  auto iter = std::lower_bound(
-      stream.retransmissionBuffer.begin(),
-      stream.retransmissionBuffer.end(),
-      frame.offset,
-      [](const auto& buffer, const auto& targetOffset) {
-        return buffer.offset < targetOffset;
-      });
+  auto iter = stream.retransmissionBuffer.find(frame.offset);
 
   // If the crypto stream is canceled somehow, just skip cloning this frame
   if (iter == stream.retransmissionBuffer.end()) {
     return nullptr;
   }
-  DCHECK(iter->offset == frame.offset)
+  DCHECK(iter->second.offset == frame.offset)
       << "WriteCryptoFrame cloning: offset mismatch. " << conn_;
-  DCHECK(iter->data.chainLength() == frame.len)
+  DCHECK(iter->second.data.chainLength() == frame.len)
       << "WriteCryptoFrame cloning: Len mismatch. " << conn_;
-  return iter->data.front()->clone();
+  return iter->second.data.front()->clone();
 }
 
 Buf PacketRebuilder::cloneRetransmissionBuffer(
@@ -236,19 +230,13 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
    */
   DCHECK(stream);
   DCHECK(retransmittable(*stream));
-  auto iter = std::lower_bound(
-      stream->retransmissionBuffer.begin(),
-      stream->retransmissionBuffer.end(),
-      frame.offset,
-      [](const auto& buffer, const auto& targetOffset) {
-        return buffer.offset < targetOffset;
-      });
+  auto iter = stream->retransmissionBuffer.find(frame.offset);
   if (iter != stream->retransmissionBuffer.end()) {
-    if (streamFrameMatchesRetransmitBuffer(*stream, frame, *iter)) {
-      DCHECK(!frame.len || !iter->data.empty())
+    if (streamFrameMatchesRetransmitBuffer(*stream, frame, iter->second)) {
+      DCHECK(!frame.len || !iter->second.data.empty())
           << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
           << " empty data. " << conn_;
-      return (frame.len ? iter->data.front()->clone() : nullptr);
+      return (frame.len ? iter->second.data.front()->clone() : nullptr);
     }
   }
   return nullptr;

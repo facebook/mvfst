@@ -32,8 +32,8 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
       StreamBuffer(folly::IOBuf::copyBuffer(" It is not a hotdog."), 15));
   writeDataToQuicStream(
       stream, folly::IOBuf::copyBuffer("What is it then?"), false);
-  stream.retransmissionBuffer.emplace_back(
-      folly::IOBuf::copyBuffer("How would I know?"), 34);
+  stream.retransmissionBuffer.emplace(
+      34, StreamBuffer(folly::IOBuf::copyBuffer("How would I know?"), 34));
   auto currentWriteOffset = stream.currentWriteOffset;
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());

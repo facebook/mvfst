@@ -426,9 +426,6 @@ TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
   markPacketLoss(
       *conn, packet.packet, false, packet.packet.header.getPacketSequenceNum());
   EXPECT_EQ(2, stream->retransmissionBuffer.size());
-  EXPECT_GT(
-      stream->retransmissionBuffer.back().offset,
-      stream->retransmissionBuffer.front().offset);
 }
 
 TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostAfterCancelRetransmission) {

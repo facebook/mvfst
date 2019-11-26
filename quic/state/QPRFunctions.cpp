@@ -34,6 +34,29 @@ void shrinkBuffers(std::deque<StreamBuffer>& buffers, uint64_t offset) {
   }
 }
 
+void shrinkBuffers(
+    folly::F14FastMap<uint64_t, StreamBuffer>& buffers,
+    uint64_t offset) {
+  // Do a linear search of the entire buffer, there can be exactly one trimmed
+  // buffer, since we are changing the offset for that single buffer we need to
+  // change the offset in the StreamBuffer, but keep it keyed on the same
+  // offset as before so we still remove it on ack.
+  for (auto itr = buffers.begin(); itr != buffers.end();) {
+    if (itr->second.offset >= offset) {
+      itr++;
+      continue;
+    }
+    if (itr->second.offset + itr->second.data.chainLength() <= offset) {
+      itr = buffers.erase(itr);
+    } else {
+      uint64_t amount = offset - itr->second.offset;
+      itr->second.data.trimStartAtMost(amount);
+      itr->second.offset += amount;
+      itr++;
+    }
+  }
+}
+
 void shrinkRetransmittableBuffers(
     QuicStreamState* stream,
     uint64_t minimumRetransmittableOffset) {

@@ -99,12 +99,13 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(8, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
-      stream->retransmissionBuffer.begin(), buf->clone(), 0, true);
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(buf->clone(), 0, true));
   conn.cryptoState->oneRttStream.retransmissionBuffer.emplace(
-      conn.cryptoState->oneRttStream.retransmissionBuffer.begin(),
-      cryptoBuf->clone(),
-      0,
-      true);
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(cryptoBuf->clone(), 0, true));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -240,7 +241,9 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   writeStreamFrameHeader(regularBuilder1, streamId, 0, 0, 0, true);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
-      stream->retransmissionBuffer.begin(), nullptr, 0, true);
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(nullptr, 0, true));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -294,7 +297,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(2, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
-      stream->retransmissionBuffer.begin(), buf->clone(), 0, true);
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(buf->clone(), 0, true));
   // Do not add the buf to crypto stream's retransmission buffer,
   // imagine it was cleared
 
@@ -390,7 +395,9 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   auto packet1 = std::move(regularBuilder1).buildPacket();
   ASSERT_EQ(5, packet1.packet.frames.size());
   stream->retransmissionBuffer.emplace(
-      stream->retransmissionBuffer.begin(), buf->clone(), 0, true);
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(buf->clone(), 0, true));
 
   // new builder has a much smaller writable bytes limit
   ShortHeader shortHeader2(

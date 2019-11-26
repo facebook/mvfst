@@ -36,12 +36,22 @@ struct QuicStreamLike {
   // TODO replace with BufQueue
   folly::IOBufQueue writeBuffer{folly::IOBufQueue::cacheChainLength()};
 
-  // Stores a list of buffers which have been written to the socket and are
+  // Stores a map of buffers which have been written to the socket and are
   // currently un-acked. Each one represents one StreamFrame that was written.
   // We need to buffer these because these might be retransmitted
   // in the future.
-  // These are sorted in order of start offset.
-  std::deque<StreamBuffer> retransmissionBuffer;
+  // These are associated with the starting offset of the buffer.
+  // Note: the offset in the StreamBuffer itself can be >= the offset on which
+  // it is keyed due to partial reliability - when data is skipped the offset
+  // in the StreamBuffer may be incremented, but the keyed offset must remain
+  // the same so it can be removed from the buffer on ACK.
+  folly::F14FastMap<uint64_t, StreamBuffer> retransmissionBuffer;
+
+  // Tracks intervals which we have received ACKs for. E.g. in the case of all
+  // data being acked this would contain one internval from 0 -> the largest
+  // offseet ACKed. This allows us to track which delivery callbacks can be
+  // called.
+  IntervalSet<uint64_t> ackedIntervals;
 
   // Stores a list of buffers which have been marked as loss by loss detector.
   // Each one represents one StreamFrame that was written.

@@ -175,6 +175,69 @@ TEST_F(QuicOpenStateTest, AckStream) {
   ASSERT_EQ(stream->sendState, StreamSendState::Closed_E);
 }
 
+TEST_F(QuicOpenStateTest, AckStreamMulti) {
+  auto conn = createConn();
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  folly::Optional<ConnectionId> serverChosenConnId = *conn->clientConnectionId;
+  serverChosenConnId.value().data()[0] ^= 0x01;
+  EventBase evb;
+  auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+
+  auto buf = IOBuf::copyBuffer("hello");
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *buf,
+      false);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *IOBuf::copyBuffer("world"),
+      false);
+  writeQuicPacket(
+      *conn,
+      *conn->clientConnectionId,
+      *serverChosenConnId,
+      *sock,
+      *stream,
+      *IOBuf::copyBuffer("this is bob"),
+      false);
+
+  EXPECT_EQ(stream->retransmissionBuffer.size(), 3);
+  EXPECT_EQ(3, conn->outstandingPackets.size());
+
+  auto& streamFrame3 =
+      *conn->outstandingPackets[2].packet.frames[0].asWriteStreamFrame();
+
+  sendAckSMHandler(*stream, streamFrame3);
+  ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
+  ASSERT_EQ(stream->ackedIntervals.front().start, 10);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+
+  auto& streamFrame2 =
+      *conn->outstandingPackets[1].packet.frames[0].asWriteStreamFrame();
+
+  sendAckSMHandler(*stream, streamFrame2);
+  ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
+  ASSERT_EQ(stream->ackedIntervals.front().start, 5);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+
+  auto& streamFrame1 =
+      *conn->outstandingPackets[0].packet.frames[0].asWriteStreamFrame();
+
+  sendAckSMHandler(*stream, streamFrame1);
+  ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
+  ASSERT_EQ(stream->ackedIntervals.front().start, 0);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+}
+
 TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
@@ -219,9 +282,6 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
                           .asWriteStreamFrame();
   sendAckSMHandler(*stream, streamFrame);
   EXPECT_EQ(2, stream->retransmissionBuffer.size());
-  EXPECT_GT(
-      stream->retransmissionBuffer.back().offset,
-      stream->retransmissionBuffer.front().offset);
 }
 
 TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
@@ -933,7 +993,10 @@ TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
   stream.currentWriteOffset = 2;
   auto buf = folly::IOBuf::create(1);
   buf->append(1);
-  stream.retransmissionBuffer.emplace_back(std::move(buf), 1, false);
+  stream.retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(1),
+      std::forward_as_tuple(std::move(buf), 1, false));
   sendAckSMHandler(stream, streamFrame);
   EXPECT_EQ(stream.sendState, StreamSendState::Closed_E);
   EXPECT_EQ(stream.recvState, StreamRecvState::Invalid_E);

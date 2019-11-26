@@ -382,11 +382,14 @@ uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
 
 uint64_t getStreamNextOffsetToDeliver(const QuicStreamState& stream) {
   auto minOffsetToDeliver = stream.currentWriteOffset;
+  // If the acked intervals is not empty, then the furthest acked interval
+  // starting at zero is the next offset. If there is no interval starting at
+  // zero then we cannot deliver any offsets.
   minOffsetToDeliver = std::min(
       minOffsetToDeliver,
-      stream.retransmissionBuffer.empty()
+      stream.ackedIntervals.empty() || stream.ackedIntervals.front().start != 0
           ? minOffsetToDeliver
-          : stream.retransmissionBuffer[0].offset);
+          : stream.ackedIntervals.front().end);
   minOffsetToDeliver = std::min(
       minOffsetToDeliver,
       stream.lossBuffer.empty() ? minOffsetToDeliver
@@ -426,16 +429,10 @@ void processCryptoStreamAck(
     QuicCryptoStream& cryptoStream,
     uint64_t offset,
     uint64_t len) {
-  auto ackedBuffer = std::lower_bound(
-      cryptoStream.retransmissionBuffer.begin(),
-      cryptoStream.retransmissionBuffer.end(),
-      offset,
-      [](const auto& buffer, const auto& offset) {
-        return buffer.offset < offset;
-      });
-
+  auto ackedBuffer = cryptoStream.retransmissionBuffer.find(offset);
   if (ackedBuffer == cryptoStream.retransmissionBuffer.end() ||
-      ackedBuffer->offset != offset || ackedBuffer->data.chainLength() != len) {
+      ackedBuffer->second.offset != offset ||
+      ackedBuffer->second.data.chainLength() != len) {
     // It's possible retransmissions of crypto data were canceled.
     return;
   }

@@ -96,13 +96,7 @@ void markPacketLoss(
         if (!stream) {
           break;
         }
-        auto bufferItr = std::lower_bound(
-            stream->retransmissionBuffer.begin(),
-            stream->retransmissionBuffer.end(),
-            frame.offset,
-            [](const auto& buffer, const auto& offset) {
-              return buffer.offset < offset;
-            });
+        auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
         if (bufferItr == stream->retransmissionBuffer.end()) {
           // It's possible that the stream was reset or data on the stream was
           // skipped while we discovered that its packet was lost so we might
@@ -111,18 +105,19 @@ void markPacketLoss(
         }
         // The original rxmt offset might have been bumped up after it was
         // shrunk due to egress partially reliable skip.
-        if (!streamFrameMatchesRetransmitBuffer(*stream, frame, *bufferItr)) {
+        if (!streamFrameMatchesRetransmitBuffer(
+                *stream, frame, bufferItr->second)) {
           break;
         }
         stream->lossBuffer.insert(
             std::upper_bound(
                 stream->lossBuffer.begin(),
                 stream->lossBuffer.end(),
-                bufferItr->offset,
+                bufferItr->second.offset,
                 [](const auto& offset, const auto& buffer) {
                   return offset < buffer.offset;
                 }),
-            std::move(*bufferItr));
+            std::move(bufferItr->second));
         stream->retransmissionBuffer.erase(bufferItr);
         conn.streamManager->updateLossStreams(*stream);
         break;
@@ -136,28 +131,22 @@ void markPacketLoss(
         auto encryptionLevel = protectionTypeToEncryptionLevel(protectionType);
         auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
 
-        auto bufferItr = std::lower_bound(
-            cryptoStream->retransmissionBuffer.begin(),
-            cryptoStream->retransmissionBuffer.end(),
-            frame.offset,
-            [](const auto& buffer, const auto& offset) {
-              return buffer.offset < offset;
-            });
+        auto bufferItr = cryptoStream->retransmissionBuffer.find(frame.offset);
         if (bufferItr == cryptoStream->retransmissionBuffer.end()) {
           // It's possible that the stream was reset while we discovered that
           // it's packet was lost so we might not have the offset.
           break;
         }
-        DCHECK_EQ(bufferItr->offset, frame.offset);
+        DCHECK_EQ(bufferItr->second.offset, frame.offset);
         cryptoStream->lossBuffer.insert(
             std::upper_bound(
                 cryptoStream->lossBuffer.begin(),
                 cryptoStream->lossBuffer.end(),
-                bufferItr->offset,
+                bufferItr->second.offset,
                 [](const auto& offset, const auto& buffer) {
                   return offset < buffer.offset;
                 }),
-            std::move(*bufferItr));
+            std::move(bufferItr->second));
         cryptoStream->retransmissionBuffer.erase(bufferItr);
         break;
       }
