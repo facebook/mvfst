@@ -13,7 +13,7 @@
 #include <fizz/protocol/test/Mocks.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/handshake/QuicFizzFactory.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/stream/StreamSendHandlers.h>
@@ -144,7 +144,7 @@ std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   auto certManager = std::make_unique<fizz::server::CertManager>();
   certManager->addCert(std::move(cert), true);
   auto serverCtx = std::make_shared<fizz::server::FizzServerContext>();
-  serverCtx->setFactory(std::make_shared<FizzCryptoFactory>());
+  serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
   serverCtx->setCertManager(std::move(certManager));
   serverCtx->setOmitEarlyRecordLayer(true);
   serverCtx->setClock(std::make_shared<fizz::test::MockClock>());

@@ -21,15 +21,12 @@ namespace test {
 
 class FizzCryptoTestFactory : public FizzCryptoFactory {
  public:
+  FizzCryptoTestFactory() {}
+  FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
+    fizzFactory_ = std::move(fizzFactory);
+  }
+
   ~FizzCryptoTestFactory() override = default;
-
-  std::unique_ptr<fizz::Aead> makeAead(fizz::CipherSuite) const override {
-    return std::move(aead_);
-  }
-
-  void setMockAead(std::unique_ptr<fizz::Aead> aead) {
-    aead_ = std::move(aead);
-  }
 
   using FizzCryptoFactory::makePacketNumberCipher;
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
@@ -42,8 +39,22 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
     packetNumberCipher_ = std::move(packetNumberCipher);
   }
 
-  mutable std::unique_ptr<fizz::Aead> aead_;
   mutable std::unique_ptr<MockPacketNumberCipher> packetNumberCipher_;
+};
+
+class QuicFizzTestFactory : public QuicFizzFactory {
+ public:
+  ~QuicFizzTestFactory() override = default;
+
+  std::unique_ptr<fizz::Aead> makeAead(fizz::CipherSuite) const override {
+    return std::move(aead_);
+  }
+
+  void setMockAead(std::unique_ptr<fizz::Aead> aead) {
+    aead_ = std::move(aead);
+  }
+
+  mutable std::unique_ptr<fizz::Aead> aead_;
 };
 
 class FizzCryptoFactoryTest : public Test {
@@ -84,10 +95,11 @@ TEST_F(FizzCryptoFactoryTest, TestDraft17ClearTextCipher) {
     destinationConnidVector.push_back(connid.data()[i]);
   }
   ConnectionId destinationConnid(destinationConnidVector);
-  FizzCryptoTestFactory cryptoFactory;
-  cryptoFactory.setMockAead(createMockAead());
-  auto aead = cryptoFactory.getClientInitialCipher(
-      destinationConnid, QuicVersion::MVFST_OLD);
+  auto fizzFactory = std::make_shared<QuicFizzTestFactory>();
+  fizzFactory->setMockAead(createMockAead());
+  auto aead =
+      FizzCryptoTestFactory(fizzFactory)
+          .getClientInitialCipher(destinationConnid, QuicVersion::MVFST_OLD);
 
   std::string expectedKey = "86d1830480b40f86cf9d68dcadf35dfe";
   std::string expectedIv = "12f3938aca34aa02543163d4";
@@ -106,10 +118,11 @@ TEST_F(FizzCryptoFactoryTest, TestDraft23ClearTextCipher) {
     destinationConnidVector.push_back(connid.data()[i]);
   }
   ConnectionId destinationConnid(destinationConnidVector);
-  FizzCryptoTestFactory cryptoFactory;
-  cryptoFactory.setMockAead(createMockAead());
-  auto aead = cryptoFactory.getClientInitialCipher(
-      destinationConnid, QuicVersion::QUIC_DRAFT);
+  auto fizzFactory = std::make_shared<QuicFizzTestFactory>();
+  fizzFactory->setMockAead(createMockAead());
+  auto aead =
+      FizzCryptoTestFactory(fizzFactory)
+          .getClientInitialCipher(destinationConnid, QuicVersion::QUIC_DRAFT);
 
   std::string expectedKey = "af7fd7efebd21878ff66811248983694";
   std::string expectedIv = "8681359410a70bb9c92f0420";
