@@ -370,15 +370,6 @@ void updateConnection(
   }
 
   increaseNextPacketNum(conn, packetNumberSpace);
-  QUIC_TRACE(
-      packet_sent,
-      conn,
-      toString(packetNumberSpace),
-      packetNum,
-      (uint64_t)encodedSize,
-      (int)isHandshake,
-      (int)pureAck,
-      pkt.isAppLimited);
   conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
   if (conn.congestionController && !pureAck) {
     conn.congestionController->onPacketSent(pkt);
