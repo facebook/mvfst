@@ -248,5 +248,36 @@ TEST_F(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
   EXPECT_FALSE(manager.remoteBidirectionalStreamLimitUpdate());
   EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
 }
+
+TEST_F(QuicStreamManagerTest, StreamLimitIncrementBidi) {
+  auto& manager = *conn.streamManager;
+  manager.setMaxLocalBidirectionalStreams(100, true);
+  manager.refreshTransportSettings(conn.transportSettings);
+  StreamId max;
+  for (int i = 0; i < 100; i++) {
+    max = manager.createNextBidirectionalStream().value()->id;
+  }
+  EXPECT_TRUE(manager.createNextBidirectionalStream().hasError());
+  manager.setMaxLocalBidirectionalStreams(200);
+  auto s = manager.createNextBidirectionalStream();
+  EXPECT_TRUE(s.hasValue());
+  EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
+}
+
+TEST_F(QuicStreamManagerTest, StreamLimitIncrementUni) {
+  auto& manager = *conn.streamManager;
+  manager.setMaxLocalUnidirectionalStreams(100, true);
+  manager.refreshTransportSettings(conn.transportSettings);
+  StreamId max;
+  for (int i = 0; i < 100; i++) {
+    max = manager.createNextUnidirectionalStream().value()->id;
+  }
+  EXPECT_TRUE(manager.createNextUnidirectionalStream().hasError());
+  manager.setMaxLocalUnidirectionalStreams(200);
+  auto s = manager.createNextUnidirectionalStream();
+  EXPECT_TRUE(s.hasValue());
+  EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
+}
+
 } // namespace test
 } // namespace quic

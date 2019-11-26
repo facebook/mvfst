@@ -267,14 +267,18 @@ QuicStreamState* QuicStreamManager::getStream(StreamId streamId) {
 folly::Expected<QuicStreamState*, LocalErrorCode>
 QuicStreamManager::createNextBidirectionalStream() {
   auto stream = createStream(nextBidirectionalStreamId_);
-  nextBidirectionalStreamId_ += detail::kStreamIncrement;
+  if (stream.hasValue()) {
+    nextBidirectionalStreamId_ += detail::kStreamIncrement;
+  }
   return stream;
 }
 
 folly::Expected<QuicStreamState*, LocalErrorCode>
 QuicStreamManager::createNextUnidirectionalStream() {
   auto stream = createStream(nextUnidirectionalStreamId_);
-  nextUnidirectionalStreamId_ += detail::kStreamIncrement;
+  if (stream.hasValue()) {
+    nextUnidirectionalStreamId_ += detail::kStreamIncrement;
+  }
   return stream;
 }
 
