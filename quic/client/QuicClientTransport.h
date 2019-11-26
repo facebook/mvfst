@@ -50,7 +50,7 @@ class QuicClientTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-      size_t connectionIdSize = kDefaultConnectionIdSize) {
+      size_t connectionIdSize = 0) {
     auto client = std::make_shared<TransportType>(
         evb, std::move(sock), std::move(handshakeFactory), connectionIdSize);
     client->setSelfOwning();
