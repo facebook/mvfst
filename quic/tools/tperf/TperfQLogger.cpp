@@ -1,3 +1,5 @@
+// Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+
 #include <quic/tools/tperf/TperfQLogger.h>
 
 namespace quic { namespace tperf {

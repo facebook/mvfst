@@ -1,3 +1,5 @@
+// Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+
 #include <quic/state/PendingPathRateLimiter.h>
 #include <glog/logging.h>
 
