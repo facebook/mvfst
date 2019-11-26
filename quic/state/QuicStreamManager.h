@@ -745,7 +745,7 @@ class QuicStreamManager {
   folly::F14FastSet<StreamId> openUnidirectionalLocalStreams_;
 
   // A map of streams that are active.
-  folly::F14NodeMap<StreamId, QuicStreamState> streams_;
+  folly::F14FastMap<StreamId, QuicStreamState> streams_;
 
   // Recently opened peer streams.
   std::vector<StreamId> newPeerStreams_;

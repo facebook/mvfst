@@ -186,8 +186,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   // Builds a fake packet to test with.
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
 
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  auto stream2 = conn->streamManager->createNextBidirectionalStream().value();
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
 
   auto buf = IOBuf::copyBuffer("hey whats up");
   EXPECT_CALL(*transportInfoCb_, onPacketRetransmission()).Times(2);

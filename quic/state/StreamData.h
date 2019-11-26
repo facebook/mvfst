@@ -26,6 +26,21 @@ struct StreamBuffer {
 };
 
 struct QuicStreamLike {
+  QuicStreamLike()
+      : readBuffer{},
+        writeBuffer{folly::IOBufQueue::cacheChainLength()},
+        retransmissionBuffer{},
+        ackedIntervals{},
+        lossBuffer{},
+        currentWriteOffset{},
+        minimumRetransmittableOffset{},
+        currentReadOffset{},
+        currentReceiveOffset{},
+        maxOffsetObserved{},
+        finalReadOffset{} {}
+
+  QuicStreamLike(QuicStreamLike&&) = default;
+
   virtual ~QuicStreamLike() = default;
 
   // List of bytes that have been read and buffered. We need to buffer
@@ -126,6 +141,8 @@ struct QuicStreamState : public QuicStreamLike {
   virtual ~QuicStreamState() override = default;
 
   QuicStreamState(StreamId id, QuicConnectionStateBase& conn);
+
+  QuicStreamState(QuicStreamState&&) = default;
 
   // Connection that this stream is associated with.
   QuicConnectionStateBase& conn;

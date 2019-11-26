@@ -352,8 +352,12 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   MockAsyncUDPSocket socket(&evb);
   auto conn = createConn();
   EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(2);
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  auto stream2 = conn->streamManager->createNextBidirectionalStream().value();
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
   auto buf = buildRandomInputData(20);
   writeDataToQuicStream(*stream1, buf->clone(), true);
   writeDataToQuicStream(*stream2, buf->clone(), true);
@@ -1248,14 +1252,18 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
   auto conn = createConn();
   ASSERT_TRUE(conn->outstandingPackets.empty());
   ASSERT_TRUE(conn->outstandingPacketEvents.empty());
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
   auto buf = folly::IOBuf::copyBuffer("I wrestled by the sea.");
-  auto stream2 = conn->streamManager->createNextBidirectionalStream().value();
-  conn->streamManager->queueWindowUpdate(stream2->id);
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  conn->streamManager->queueWindowUpdate(stream2Id);
   conn->pendingEvents.connWindowUpdate = true;
   auto nextPacketNum = conn->ackStates.appDataAckState.nextPacketNum;
   // writeQuicPacket will call writeQuicDataToSocket which will also take care
   // of sending the MaxStreamDataFrame for stream2
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
   auto packet = writeQuicPacket(
       *conn,
       *conn->clientConnectionId,
