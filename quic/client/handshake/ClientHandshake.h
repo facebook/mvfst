@@ -25,6 +25,8 @@
 
 namespace quic {
 
+class CryptoFactory;
+
 class ClientHandshake : public Handshake {
  public:
   class HandshakeCallback {
@@ -116,6 +118,11 @@ class ClientHandshake : public Handshake {
    * receive the header cipher subsequent calls will return null.
    */
   std::unique_ptr<PacketNumberCipher> getZeroRttWriteHeaderCipher();
+
+  /**
+   * Returns a reference to the CryptoFactory used internaly.
+   */
+  virtual const CryptoFactory& getCryptoFactory() const = 0;
 
   /**
    * Notify the crypto layer that we received one rtt protected data.

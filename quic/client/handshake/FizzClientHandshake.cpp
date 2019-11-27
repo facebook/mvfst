@@ -8,9 +8,9 @@
 
 #include <quic/client/handshake/FizzClientHandshake.h>
 
+#include <folly/Overload.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/FizzBridge.h>
-#include <folly/Overload.h>
 
 #include <fizz/protocol/Protocol.h>
 
@@ -44,6 +44,10 @@ void FizzClientHandshake::connect(
       std::move(hostname),
       std::move(cachedPsk),
       transportParams));
+}
+
+const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
+  return cryptoFactory_;
 }
 
 void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
