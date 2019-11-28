@@ -19,7 +19,7 @@ class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
   ~MockMinRttSampler() override = default;
 
   MOCK_CONST_METHOD0(minRtt, std::chrono::microseconds());
-  MOCK_CONST_METHOD1(minRttExpired, bool(TimePoint));
+  MOCK_CONST_METHOD0(minRttExpired, bool());
   GMOCK_METHOD2_(
       ,
       noexcept,

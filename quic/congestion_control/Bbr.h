@@ -58,7 +58,7 @@ class BbrCongestionController : public CongestionController {
     /**
      * Returns: true iff we have min rtt sample and it has expired.
      */
-    virtual bool minRttExpired(TimePoint currentTime) const = 0;
+    virtual bool minRttExpired() const = 0;
 
     /**
      * rttSample: current rtt sample

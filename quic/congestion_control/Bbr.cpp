@@ -339,7 +339,7 @@ bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
   // last ProbeRtt, and if it's very close to the minRtt seom sampler, then skip
   // ProbeRtt.
   if (state_ != BbrState::ProbeRtt && minRttSampler_ && !exitingQuiescene_ &&
-      minRttSampler_->minRttExpired(ackTime)) {
+      minRttSampler_->minRttExpired()) {
     // TODO: also consider connection being quiescent
     return true;
   }

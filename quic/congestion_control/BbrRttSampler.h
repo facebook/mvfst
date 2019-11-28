@@ -20,7 +20,7 @@ class BbrRttSampler : public BbrCongestionController::MinRttSampler {
   ~BbrRttSampler() = default;
 
   std::chrono::microseconds minRtt() const noexcept override;
-  bool minRttExpired(TimePoint currentTime) const noexcept override;
+  bool minRttExpired() const noexcept override;
   bool newRttSample(
       std::chrono::microseconds rttSample,
       TimePoint sampledTime) noexcept override;
@@ -28,7 +28,8 @@ class BbrRttSampler : public BbrCongestionController::MinRttSampler {
 
  private:
   std::chrono::seconds expiration_;
-  std::chrono::microseconds minRtt_{0};
-  TimePoint minRttTimestamp_;
+  std::chrono::microseconds minRtt_{kDefaultMinRtt};
+  folly::Optional<TimePoint> minRttTimestamp_;
+  bool rttSampleExpired_;
 };
 } // namespace quic

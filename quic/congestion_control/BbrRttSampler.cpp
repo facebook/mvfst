@@ -13,7 +13,7 @@
 namespace quic {
 
 BbrRttSampler::BbrRttSampler(std::chrono::seconds expiration)
-    : expiration_(expiration) {}
+    : expiration_(expiration), rttSampleExpired_{true} {}
 
 std::chrono::microseconds BbrRttSampler::minRtt() const noexcept {
   return minRtt_;
@@ -22,8 +22,10 @@ std::chrono::microseconds BbrRttSampler::minRtt() const noexcept {
 bool BbrRttSampler::newRttSample(
     std::chrono::microseconds rttSample,
     TimePoint sampledTime) noexcept {
-  if (minRttExpired(sampledTime) || minRtt_ > rttSample ||
-      UNLIKELY(minRtt_ == 0us)) {
+  rttSampleExpired_ = minRttTimestamp_.hasValue()
+      ? sampledTime > *minRttTimestamp_ + expiration_
+      : false;
+  if (rttSampleExpired_ || minRtt_ > rttSample) {
     minRtt_ = rttSample;
     minRttTimestamp_ = sampledTime;
     return true;
@@ -31,8 +33,8 @@ bool BbrRttSampler::newRttSample(
   return false;
 }
 
-bool BbrRttSampler::minRttExpired(TimePoint currentTime) const noexcept {
-  return currentTime > minRttTimestamp_ + expiration_;
+bool BbrRttSampler::minRttExpired() const noexcept {
+  return rttSampleExpired_;
 }
 
 void BbrRttSampler::timestampMinRtt(TimePoint timestamp) noexcept {

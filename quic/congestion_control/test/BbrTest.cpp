@@ -254,7 +254,7 @@ TEST_F(BbrTest, ProbeRtt) {
 
   // Ack the first one without min rtt expiration.
   auto packetToAck = inflightPackets.front();
-  EXPECT_CALL(*rawRttSampler, minRttExpired(_)).WillOnce(Return(false));
+  EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(false));
   bbr.onPacketAckOrLoss(
       makeAck(
           packetToAck.first,
@@ -271,7 +271,7 @@ TEST_F(BbrTest, ProbeRtt) {
   // ends the current RTT round. The new rtt round target will be the
   // largestSent of the conn
   packetToAck = inflightPackets.front();
-  EXPECT_CALL(*rawRttSampler, minRttExpired(_)).WillOnce(Return(true));
+  EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(true));
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.onPacketAckOrLoss(
       makeAck(
