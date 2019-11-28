@@ -50,6 +50,16 @@ const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
   return cryptoFactory_;
 }
 
+const folly::Optional<std::string>&
+FizzClientHandshake::getApplicationProtocol() const {
+  auto& earlyDataParams = state_.earlyDataParams();
+  if (earlyDataParams) {
+    return earlyDataParams->alpn;
+  } else {
+    return state_.alpn();
+  }
+}
+
 void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
   processActions(machine_.processSocketData(state_, queue));
 }

@@ -1263,6 +1263,9 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   }
 
   // Implement virtual methods we don't intend to use.
+  const folly::Optional<std::string>& getApplicationProtocol() const override {
+    throw std::runtime_error("getApplicationProtocol not implemented");
+  }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }

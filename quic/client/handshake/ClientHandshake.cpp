@@ -170,16 +170,6 @@ folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
   return std::move(zeroRttRejected_);
 }
 
-const folly::Optional<std::string>& ClientHandshake::getApplicationProtocol()
-    const {
-  auto& earlyDataParams = state_.earlyDataParams();
-  if (earlyDataParams) {
-    return earlyDataParams->alpn;
-  } else {
-    return state_.alpn();
-  }
-}
-
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> packetNumberCipher;
