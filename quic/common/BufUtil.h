@@ -64,4 +64,25 @@ class BufQueue {
   size_t chainLength_{0};
 };
 
+class BufAppender {
+ public:
+  BufAppender(folly::IOBuf* data, size_t appendLen);
+
+  template <class T>
+  void writeBE(T data) {
+    auto bigEndian = folly::Endian::big(data);
+    push((uint8_t*)(&bigEndian), sizeof(bigEndian));
+  }
+
+  void push(const uint8_t* data, size_t len);
+
+  void insert(std::unique_ptr<folly::IOBuf> data);
+
+ private:
+  folly::IOBuf* crtBuf_;
+  folly::IOBuf* head_;
+  size_t appendLen_;
+  bool lastBufShared_{false};
+};
+
 } // namespace quic

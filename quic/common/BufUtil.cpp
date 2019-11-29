@@ -74,4 +74,31 @@ void BufQueue::appendToChain(Buf& dst, Buf&& src) {
     dst->prependChain(std::move(src));
   }
 }
+
+BufAppender::BufAppender(folly::IOBuf* data, size_t appendLen)
+    : crtBuf_(CHECK_NOTNULL(data)), head_(data), appendLen_(appendLen) {}
+
+void BufAppender::push(const uint8_t* data, size_t len) {
+  if (crtBuf_->tailroom() < len || lastBufShared_) {
+    auto newBuf = folly::IOBuf::createCombined(std::max(appendLen_, len));
+    folly::IOBuf* newBufPtr = newBuf.get();
+    head_->prependChain(std::move(newBuf));
+    crtBuf_ = newBufPtr;
+  }
+  memcpy(crtBuf_->writableTail(), data, len);
+  crtBuf_->append(len);
+  lastBufShared_ = false;
+}
+
+void BufAppender::insert(std::unique_ptr<folly::IOBuf> data) {
+  // just skip the current buffer and append it to the end of the current
+  // buffer.
+  folly::IOBuf* dataPtr = data.get();
+  // If the buffer is shared we do not want to overrwrite the tail of the
+  // buffer.
+  lastBufShared_ = data->isShared();
+  head_->prependChain(std::move(data));
+  crtBuf_ = dataPtr;
+}
+
 } // namespace quic

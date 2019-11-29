@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include <folly/String.h>
 #include <quic/common/BufUtil.h>
 
 using namespace std;
@@ -110,4 +111,131 @@ TEST(BufQueue, SplitZero) {
   queue.append(IOBuf::copyBuffer(SCL("Hello world")));
   auto buf = queue.split(0);
   EXPECT_EQ(buf->computeChainDataLength(), 0);
+}
+
+TEST(BufAppender, TestPushAlreadyFits) {
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(10);
+  BufAppender appender(data.get(), 10);
+  std::string str = "12456";
+  appender.push((uint8_t*)str.data(), str.size());
+  EXPECT_EQ(data->computeChainDataLength(), str.size());
+  EXPECT_EQ(data->countChainElements(), 1);
+  EXPECT_EQ(data->moveToFbString().toStdString(), str);
+}
+
+TEST(BufAppender, TestPushLargerThanAppendLen) {
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(10);
+  BufAppender appender(data.get(), 10);
+  std::string str = "12456134134134134134134";
+  appender.push((uint8_t*)str.data(), str.size());
+  EXPECT_EQ(data->computeChainDataLength(), str.size());
+  EXPECT_EQ(data->moveToFbString().toStdString(), str);
+}
+
+TEST(BufAppender, TestPushExpands) {
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  std::string str = "12456";
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.push((uint8_t*)str.data(), str.size());
+  EXPECT_EQ(data->computeChainDataLength(), str.size() * 2);
+
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.push((uint8_t*)str.data(), str.size());
+  EXPECT_EQ(data->computeChainDataLength(), str.size() * 5);
+
+  std::string expected = str + str + str + str + str;
+  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+}
+
+TEST(BufAppender, TestInsertIOBuf) {
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  std::string str = "12456";
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.push((uint8_t*)str.data(), str.size());
+
+  auto hello = IOBuf::copyBuffer("helloworld");
+  hello->trimEnd(4);
+  appender.insert(hello->clone());
+
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.insert(hello->clone());
+
+  EXPECT_EQ(
+      data->computeChainDataLength(), str.size() * 3 + hello->length() * 2);
+
+  auto helloStr = hello->clone()->moveToFbString().toStdString();
+  std::string expected = str + str + helloStr + str + helloStr;
+  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+  hello->append(4);
+  EXPECT_EQ(hello->moveToFbString().toStdString(), "helloworld");
+}
+
+TEST(BufAppender, TestInsertIOBufMoved) {
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  std::string str = "12456";
+  appender.push((uint8_t*)str.data(), str.size());
+  appender.push((uint8_t*)str.data(), str.size());
+
+  auto hello = IOBuf::copyBuffer("helloworld");
+  hello->trimEnd(5);
+
+  size_t helloLen = hello->length();
+
+  folly::IOBuf* helloPtr = hello.get();
+  appender.insert(std::move(hello));
+
+  appender.push((uint8_t*)str.data(), str.size());
+
+  EXPECT_EQ(data->computeChainDataLength(), str.size() * 3 + helloLen);
+
+  // test that the bufAppender uses the tailroom that is available in the hello
+  // buffer.
+  auto helloStr = helloPtr->cloneOne()->moveToFbString().toStdString();
+  std::string expected = str + str + "hello" + str;
+  EXPECT_EQ(data->moveToFbString().toStdString(), expected);
+  EXPECT_EQ(helloStr, "hello12456");
+}
+
+TEST(BufAppender, TestBigEndianOneByte) {
+  uint8_t oneByte = 0x12;
+
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  appender.writeBE(oneByte);
+  std::string out = folly::hexlify(data->coalesce());
+  EXPECT_EQ(out, "12");
+}
+
+TEST(BufAppender, TestBigEndianTwoBytes) {
+  uint16_t twoBytes = 0x3412;
+
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  appender.writeBE(twoBytes);
+  std::string out = folly::hexlify(data->coalesce());
+  EXPECT_EQ(out, "3412");
+}
+
+TEST(BufAppender, TestBigEndianFourBytes) {
+  uint32_t fourBytes = 0x78563412;
+
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  appender.writeBE(fourBytes);
+  std::string out = folly::hexlify(data->coalesce());
+  EXPECT_EQ(out, "78563412");
+}
+
+TEST(BufAppender, TestBigEndianEightBytes) {
+  uint64_t eightBytes = 0xBC9A78563412;
+
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(0);
+  BufAppender appender(data.get(), 20);
+  appender.writeBE(eightBytes);
+  std::string out = folly::hexlify(data->coalesce());
+  EXPECT_EQ(out, "0000bc9a78563412");
 }

@@ -11,6 +11,7 @@
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufUtil.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {
@@ -51,10 +52,8 @@ class PacketBuilderInterface {
   virtual void writeBE(uint64_t data) = 0;
   virtual void write(const QuicInteger& quicInteger) = 0;
   virtual void appendBytes(PacketNum value, uint8_t byteNumber) = 0;
-  virtual void appendBytes(
-      folly::io::QueueAppender& appender,
-      PacketNum value,
-      uint8_t byteNumber) = 0;
+  virtual void
+  appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber) = 0;
   virtual void insert(std::unique_ptr<folly::IOBuf> buf) = 0;
   virtual void push(const uint8_t* data, size_t len) = 0;
 
@@ -103,10 +102,8 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
   void writeBE(uint64_t data) override;
   void write(const QuicInteger& quicInteger) override;
   void appendBytes(PacketNum value, uint8_t byteNumber) override;
-  void appendBytes(
-      folly::io::QueueAppender& appender,
-      PacketNum value,
-      uint8_t byteNumber) override;
+  void appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber)
+      override;
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
   void push(const uint8_t* data, size_t len) override;
 
@@ -137,10 +134,11 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
   uint32_t remainingBytes_;
   RegularQuicWritePacket packet_;
   std::vector<QuicWriteFrame> quicFrames_;
-  folly::IOBufQueue header_{folly::IOBufQueue::cacheChainLength()};
-  folly::IOBufQueue outputQueue_{folly::IOBufQueue::cacheChainLength()};
-  folly::io::QueueAppender headerAppender_;
-  folly::io::QueueAppender bodyAppender_;
+  std::unique_ptr<folly::IOBuf> header_;
+  std::unique_ptr<folly::IOBuf> body_;
+  BufAppender headerAppender_;
+  BufAppender bodyAppender_;
+
   uint32_t cipherOverhead_{0};
   folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
   QuicVersion version_;
@@ -171,8 +169,7 @@ class VersionNegotiationPacketBuilder {
  private:
   uint32_t remainingBytes_;
   VersionNegotiationPacket packet_;
-  folly::IOBufQueue outputQueue_{folly::IOBufQueue::cacheChainLength()};
-  folly::io::QueueAppender appender_;
+  std::unique_ptr<folly::IOBuf> data_;
 };
 
 class StatelessResetPacketBuilder {
@@ -184,7 +181,7 @@ class StatelessResetPacketBuilder {
   Buf buildPacket() &&;
 
  private:
-  folly::IOBufQueue outputQueue_{folly::IOBufQueue::cacheChainLength()};
+  std::unique_ptr<folly::IOBuf> data_;
 };
 
 /**
@@ -231,10 +228,8 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.appendBytes(value, byteNumber);
   }
 
-  void appendBytes(
-      folly::io::QueueAppender& appender,
-      PacketNum value,
-      uint8_t byteNumber) override {
+  void appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber)
+      override {
     builder.appendBytes(appender, value, byteNumber);
   }
 

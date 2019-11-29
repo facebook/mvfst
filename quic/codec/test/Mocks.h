@@ -42,9 +42,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD1(writeBEUint64, void(uint16_t));
 
   MOCK_METHOD2(appendBytes, void(PacketNum, uint8_t));
-  MOCK_METHOD3(
-      appendBytes,
-      void(folly::io::QueueAppender&, PacketNum, uint8_t));
+  MOCK_METHOD3(appendBytes, void(BufAppender&, PacketNum, uint8_t));
 
   void writeBE(uint8_t value) override {
     writeBEUint8(value);
@@ -63,7 +61,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
         ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);
     RegularQuicWritePacket regularPacket(std::move(header));
     regularPacket.frames = std::move(frames_);
-    return std::make_pair(std::move(regularPacket), outputQueue_.move());
+    return std::make_pair(std::move(regularPacket), std::move(data_));
   }
 
   std::pair<RegularQuicWritePacket, Buf> buildLongHeaderPacket() && {
@@ -77,13 +75,13 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
         QuicVersion::MVFST);
     RegularQuicWritePacket regularPacket(std::move(header));
     regularPacket.frames = std::move(frames_);
-    return std::make_pair(std::move(regularPacket), outputQueue_.move());
+    return std::make_pair(std::move(regularPacket), std::move(data_));
   }
 
   std::vector<QuicWriteFrame> frames_;
   uint32_t remaining_{kDefaultUDPSendPacketLen};
-  folly::IOBufQueue outputQueue_;
-  folly::io::QueueAppender appender_{&outputQueue_, 100};
+  std::unique_ptr<folly::IOBuf> data_{folly::IOBuf::create(100)};
+  BufAppender appender_{data_.get(), 100};
 };
 } // namespace test
 } // namespace quic

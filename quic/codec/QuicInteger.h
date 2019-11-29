@@ -12,6 +12,7 @@
 #include <folly/io/Cursor.h>
 #include <folly/lang/Bits.h>
 #include <quic/QuicException.h>
+#include <quic/common/BufUtil.h>
 
 namespace quic {
 
@@ -25,6 +26,10 @@ constexpr uint64_t kEightByteLimit = 0x3FFFFFFFFFFFFFFF;
  * bytes written, or an error if value is too large to be represented with the
  * variable length encoding.
  */
+folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
+    uint64_t value,
+    BufAppender& appender);
+
 folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
     uint64_t value,
     folly::io::QueueAppender& appender);
@@ -60,7 +65,7 @@ class QuicInteger {
   /**
    * Encodes a QUIC integer to the appender.
    */
-  size_t encode(folly::io::QueueAppender& appender) const;
+  size_t encode(BufAppender& appender) const;
 
   /**
    * Returns the number of bytes needed to represent the QUIC integer in

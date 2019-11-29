@@ -65,10 +65,9 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
             pktBuilder.appendBytes(pktBuilder.appender_, value, byteNumber);
           })));
   EXPECT_CALL(pktBuilder, appendBytes(_, _, _))
-      .WillRepeatedly((Invoke([&](folly::io::QueueAppender& appender,
+      .WillRepeatedly((Invoke([&](BufAppender& appender,
                                   PacketNum value,
                                   uint8_t byteNumber) {
-        appender.ensure(byteNumber);
         auto bigValue = folly::Endian::big(value);
         appender.push(
             (uint8_t*)&bigValue + sizeof(bigValue) - byteNumber, byteNumber);
@@ -119,7 +118,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToEmptyPacket) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(13, outputBuf->computeChainDataLength());
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - 3 - 10, pktBuilder.remainingSpaceInPkt());
@@ -164,7 +163,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameToPartialPacket) {
   ASSERT_TRUE(dataLen);
   EXPECT_EQ(*dataLen, 20);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 20);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(28, outputBuf->computeChainDataLength());
   size_t consumedSize = 1000 + 8 + 20;
   EXPECT_EQ(
@@ -212,7 +211,7 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 30);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 30);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(38, outputBuf->computeChainDataLength());
   size_t consumedSize = 1000 + 8 + 30;
   EXPECT_EQ(
@@ -233,7 +232,8 @@ TEST_F(QuicWriteCodecTest, WriteTwoStreamFrames) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, remainingSpace - 7);
   writeStreamFrameData(pktBuilder, inputBuf2->clone(), remainingSpace - 7);
-  auto outputBuf2 = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf2 = pktBuilder.data_->clone();
+  outputBuf2->coalesce();
   consumedSize += remainingSpace;
   EXPECT_EQ(
       kDefaultUDPSendPacketLen - consumedSize,
@@ -301,7 +301,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamFramePartialData) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 33);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 33);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(40, outputBuf->computeChainDataLength());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
   auto builtOut = std::move(pktBuilder).buildPacket();
@@ -379,7 +379,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamSpaceForOneByte) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 1);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 1);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
@@ -424,7 +424,7 @@ TEST_F(QuicWriteCodecTest, WriteFinToEmptyPacket) {
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, 10);
   writeStreamFrameData(pktBuilder, inputBuf->clone(), 10);
-  auto outputBuf = pktBuilder.outputQueue_.front()->clone();
+  auto outputBuf = pktBuilder.data_->clone();
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;

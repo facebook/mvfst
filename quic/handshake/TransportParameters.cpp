@@ -7,6 +7,7 @@
  */
 
 #include <quic/handshake/TransportParameters.h>
+#include <quic/common/BufUtil.h>
 
 namespace quic {
 folly::Optional<uint64_t> getIntegerParameter(
@@ -50,15 +51,15 @@ folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
 TransportParameter encodeIntegerParameter(
     TransportParameterId id,
     uint64_t value) {
-  folly::IOBufQueue queue{folly::IOBufQueue::cacheChainLength()};
-  folly::io::QueueAppender appender(&queue, 8);
+  std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(8);
+  BufAppender appender(data.get(), 8);
   auto encoded = encodeQuicInteger(value, appender);
   if (!encoded) {
     throw QuicTransportException(
         "Invalid integer parameter",
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
-  return {id, queue.move()};
+  return {id, std::move(data)};
 }
 
 TransportParameterId CustomTransportParameter::getParameterId() {

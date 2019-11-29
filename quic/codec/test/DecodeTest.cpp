@@ -48,8 +48,8 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
     std::vector<NormalizedAckBlock> ackBlocks = {},
     bool useRealValuesForLargestAcked = false,
     bool useRealValuesForAckDelay = false) {
-  folly::IOBufQueue ackFrame;
-  folly::io::QueueAppender wcursor(&ackFrame, 10);
+  std::unique_ptr<folly::IOBuf> ackFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(ackFrame.get(), 10);
   if (largestAcked) {
     if (useRealValuesForLargestAcked) {
       wcursor.writeBE<LargestAckedType>(largestAcked->getValue());
@@ -74,7 +74,7 @@ std::unique_ptr<folly::IOBuf> createAckFrame(
     ackBlocks[i].gap.encode(wcursor);
     ackBlocks[i].blockLen.encode(wcursor);
   }
-  return ackFrame.move();
+  return ackFrame;
 }
 
 template <class StreamIdType = StreamId>
@@ -84,8 +84,8 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
     folly::Optional<QuicInteger> dataLength = folly::none,
     Buf data = nullptr,
     bool useRealValuesForStreamId = false) {
-  folly::IOBufQueue streamFrame;
-  folly::io::QueueAppender wcursor(&streamFrame, 10);
+  std::unique_ptr<folly::IOBuf> streamFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(streamFrame.get(), 10);
   if (streamId) {
     if (useRealValuesForStreamId) {
       wcursor.writeBE<StreamIdType>(streamId->getValue());
@@ -102,15 +102,15 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
   if (data) {
     wcursor.insert(std::move(data));
   }
-  return streamFrame.move();
+  return streamFrame;
 }
 
 std::unique_ptr<folly::IOBuf> createCryptoFrame(
     folly::Optional<QuicInteger> offset = folly::none,
     folly::Optional<QuicInteger> dataLength = folly::none,
     Buf data = nullptr) {
-  folly::IOBufQueue cryptoFrame;
-  folly::io::QueueAppender wcursor(&cryptoFrame, 10);
+  std::unique_ptr<folly::IOBuf> cryptoFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(cryptoFrame.get(), 10);
   if (offset) {
     offset->encode(wcursor);
   }
@@ -120,7 +120,7 @@ std::unique_ptr<folly::IOBuf> createCryptoFrame(
   if (data) {
     wcursor.insert(std::move(data));
   }
-  return cryptoFrame.move();
+  return cryptoFrame;
 }
 
 TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
@@ -611,15 +611,15 @@ TEST_F(DecodeTest, PaddingFrameTest) {
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(
     folly::Optional<QuicInteger> tokenLength = folly::none,
     Buf token = nullptr) {
-  folly::IOBufQueue newTokenFrame;
-  folly::io::QueueAppender wcursor(&newTokenFrame, 10);
+  std::unique_ptr<folly::IOBuf> newTokenFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(newTokenFrame.get(), 10);
   if (tokenLength) {
     tokenLength->encode(wcursor);
   }
   if (token) {
     wcursor.insert(std::move(token));
   }
-  return newTokenFrame.move();
+  return newTokenFrame;
 }
 
 TEST_F(DecodeTest, NewTokenDecodeSuccess) {
@@ -650,8 +650,8 @@ std::unique_ptr<folly::IOBuf> createMinOrExpiredStreamDataFrame(
     QuicInteger streamId,
     folly::Optional<QuicInteger> maximumData = folly::none,
     folly::Optional<QuicInteger> minimumStreamOffset = folly::none) {
-  folly::IOBufQueue bufQueue;
-  folly::io::QueueAppender wcursor(&bufQueue, 10);
+  std::unique_ptr<folly::IOBuf> bufQueue = folly::IOBuf::create(0);
+  BufAppender wcursor(bufQueue.get(), 10);
 
   streamId.encode(wcursor);
 
@@ -662,7 +662,7 @@ std::unique_ptr<folly::IOBuf> createMinOrExpiredStreamDataFrame(
   if (minimumStreamOffset) {
     minimumStreamOffset->encode(wcursor);
   }
-  return bufQueue.move();
+  return bufQueue;
 }
 
 TEST_F(DecodeTest, DecodeMinStreamDataFrame) {

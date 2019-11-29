@@ -25,13 +25,13 @@ namespace quic {
 
 PacketNumEncodingResult encodeLongHeaderHelper(
     const LongHeader& longHeader,
-    folly::io::QueueAppender& appender,
+    BufAppender& appender,
     uint32_t& spaceCounter,
     PacketNum largestAckedPacketNum);
 
 PacketNumEncodingResult encodeLongHeaderHelper(
     const LongHeader& longHeader,
-    folly::io::QueueAppender& appender,
+    BufAppender& appender,
     uint32_t& spaceCounter,
     PacketNum largestAckedPacketNum) {
   uint8_t initialByte = kHeaderFormMask | LongHeader::kFixedBitMask |
@@ -107,7 +107,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     QuicInteger tokenLengthInt(tokenLength);
     tokenLengthInt.encode(appender);
     if (tokenLength > 0) {
-      appender.push(folly::StringPiece(token.data(), token.size()));
+      appender.push((const uint8_t*)token.data(), token.size());
     }
   }
 
@@ -118,7 +118,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
 
     // Write the retry token
     CHECK(!token.empty()) << "Retry packet must contain a token";
-    appender.push(folly::StringPiece(token.data(), token.size()));
+    appender.push((const uint8_t*)token.data(), token.size());
   }
   // defer write of the packet num and length till payload has been computed
   return encodedPacketNum;
@@ -131,15 +131,17 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     QuicVersion version)
     : remainingBytes_(remainingBytes),
       packet_(std::move(header)),
-      headerAppender_(&header_, kLongHeaderHeaderSize),
-      bodyAppender_(&outputQueue_, kAppenderGrowthSize),
+      header_(folly::IOBuf::create(kLongHeaderHeaderSize)),
+      body_(folly::IOBuf::create(kAppenderGrowthSize)),
+      headerAppender_(header_.get(), kLongHeaderHeaderSize),
+      bodyAppender_(body_.get(), kAppenderGrowthSize),
       version_(version) {
   quicFrames_.reserve(kPreAllocatedFramesSize);
   writeHeaderBytes(largestAckedPacketNum);
 }
 
 uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
-  return folly::to<uint32_t>(header_.chainLength());
+  return folly::to<uint32_t>(header_->computeChainDataLength());
 }
 
 uint32_t RegularQuicPacketBuilder::remainingSpaceInPkt() const {
@@ -172,10 +174,9 @@ void RegularQuicPacketBuilder::appendBytes(
 }
 
 void RegularQuicPacketBuilder::appendBytes(
-    folly::io::QueueAppender& appender,
+    BufAppender& appender,
     PacketNum value,
     uint8_t byteNumber) {
-  appender.ensure(byteNumber);
   auto bigValue = folly::Endian::big(value);
   appender.push(
       (uint8_t*)&bigValue + sizeof(bigValue) - byteNumber, byteNumber);
@@ -196,16 +197,19 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
-  while (outputQueue_.chainLength() + cipherOverhead_ < minBodySize &&
+  size_t extraDataWritten = 0;
+  size_t bodyLength = body_->computeChainDataLength();
+  while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !quicFrames_.empty() && remainingBytes_ > kMaxPacketLenSize) {
     quicFrames_.push_back(PaddingFrame());
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
     write(paddingType);
+    extraDataWritten++;
   }
   packet_.frames = std::move(quicFrames_);
   if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
-        packetNumberEncoding_->length + outputQueue_.chainLength() +
+        packetNumberEncoding_->length + body_->computeChainDataLength() +
         cipherOverhead_);
     pktLen.encode(headerAppender_);
     appendBytes(
@@ -213,7 +217,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
         packetNumberEncoding_->result,
         packetNumberEncoding_->length);
   }
-  return Packet(std::move(packet_), header_.move(), outputQueue_.move());
+  return Packet(std::move(packet_), std::move(header_), std::move(body_));
 }
 
 void RegularQuicPacketBuilder::writeHeaderBytes(
@@ -286,20 +290,21 @@ QuicVersion RegularQuicPacketBuilder::getVersion() const {
 
 StatelessResetPacketBuilder::StatelessResetPacketBuilder(
     uint16_t maxPacketSize,
-    const StatelessResetToken& resetToken) {
-  folly::io::QueueAppender appender(&outputQueue_, kAppenderGrowthSize);
+    const StatelessResetToken& resetToken)
+    : data_(folly::IOBuf::create(kAppenderGrowthSize)) {
+  BufAppender appender(data_.get(), kAppenderGrowthSize);
   // TODO: randomize the length
   uint16_t randomOctetLength = maxPacketSize - resetToken.size() - 1;
   uint8_t initialByte = ShortHeader::kFixedBitMask;
   appender.writeBE<uint8_t>(initialByte);
   auto randomOctets = folly::IOBuf::create(randomOctetLength);
   folly::Random::secureRandom(randomOctets->writableData(), randomOctetLength);
-  appender.pushAtMost(randomOctets->data(), randomOctetLength);
+  appender.push(randomOctets->data(), randomOctetLength);
   appender.push(resetToken.data(), resetToken.size());
 }
 
 Buf StatelessResetPacketBuilder::buildPacket() && {
-  return outputQueue_.move();
+  return std::move(data_);
 }
 
 VersionNegotiationPacketBuilder::VersionNegotiationPacketBuilder(
@@ -311,7 +316,7 @@ VersionNegotiationPacketBuilder::VersionNegotiationPacketBuilder(
           generateRandomPacketType(),
           sourceConnectionId,
           destinationConnectionId),
-      appender_(&outputQueue_, kAppenderGrowthSize) {
+      data_(folly::IOBuf::create(kAppenderGrowthSize)) {
   writeVersionNegotiationPacket(versions);
 }
 
@@ -322,26 +327,27 @@ uint32_t VersionNegotiationPacketBuilder::remainingSpaceInPkt() {
 std::pair<VersionNegotiationPacket, Buf>
 VersionNegotiationPacketBuilder::buildPacket() && {
   return std::make_pair<VersionNegotiationPacket, Buf>(
-      std::move(packet_), outputQueue_.move());
+      std::move(packet_), std::move(data_));
 }
 
 void VersionNegotiationPacketBuilder::writeVersionNegotiationPacket(
     const std::vector<QuicVersion>& versions) {
   // Write header
-  appender_.writeBE<decltype(packet_.packetType)>(packet_.packetType);
+  BufAppender appender(data_.get(), kAppenderGrowthSize);
+  appender.writeBE<decltype(packet_.packetType)>(packet_.packetType);
   remainingBytes_ -= sizeof(decltype(packet_.packetType));
-  appender_.writeBE(
+  appender.writeBE(
       static_cast<QuicVersionType>(QuicVersion::VERSION_NEGOTIATION));
   remainingBytes_ -= sizeof(QuicVersionType);
-  appender_.writeBE<uint8_t>(packet_.destinationConnectionId.size());
+  appender.writeBE<uint8_t>(packet_.destinationConnectionId.size());
   remainingBytes_ -= sizeof(uint8_t);
-  appender_.push(
+  appender.push(
       packet_.destinationConnectionId.data(),
       packet_.destinationConnectionId.size());
   remainingBytes_ -= packet_.destinationConnectionId.size();
-  appender_.writeBE<uint8_t>(packet_.sourceConnectionId.size());
+  appender.writeBE<uint8_t>(packet_.sourceConnectionId.size());
   remainingBytes_ -= sizeof(uint8_t);
-  appender_.push(
+  appender.push(
       packet_.sourceConnectionId.data(), packet_.sourceConnectionId.size());
   remainingBytes_ -= packet_.sourceConnectionId.size();
   // Write versions
@@ -349,7 +355,7 @@ void VersionNegotiationPacketBuilder::writeVersionNegotiationPacket(
     if (remainingBytes_ < sizeof(QuicVersionType)) {
       break;
     }
-    appender_.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
+    appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(version));
     remainingBytes_ -= sizeof(QuicVersionType);
     packet_.versions.push_back(version);
   }

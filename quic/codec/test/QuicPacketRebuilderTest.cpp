@@ -48,7 +48,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
   auto packet = std::move(regularBuilder).buildPacket();
   EXPECT_TRUE(packet.packet.frames.empty());
   EXPECT_FALSE(packet.header->empty());
-  EXPECT_TRUE(!packet.body);
+  EXPECT_TRUE(packet.body->empty());
 }
 
 TEST_F(QuicPacketRebuilderTest, RebuildPacket) {

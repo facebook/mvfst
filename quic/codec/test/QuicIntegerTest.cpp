@@ -73,8 +73,8 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
 }
 
 TEST_P(QuicIntegerEncodeTest, Encode) {
-  IOBufQueue queue;
-  folly::io::QueueAppender appender(&queue, 10);
+  auto queue = folly::IOBuf::create(0);
+  BufAppender appender(queue.get(), 10);
   if (GetParam().error) {
     auto size = encodeQuicInteger(GetParam().decoded, appender);
     EXPECT_TRUE(size.hasError());
@@ -82,8 +82,7 @@ TEST_P(QuicIntegerEncodeTest, Encode) {
     return;
   }
   auto written = encodeQuicInteger(GetParam().decoded, appender);
-  auto encodedValue =
-      folly::hexlify(queue.move()->moveToFbString().toStdString());
+  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
   LOG(INFO) << "encoded=" << encodedValue;
   LOG(INFO) << "expected=" << GetParam().hexEncoded;
 
