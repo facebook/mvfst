@@ -24,6 +24,13 @@ class TperfQLogger : public FileQLogger {
       uint64_t pacingBurstSize,
       std::chrono::microseconds pacingInterval) override;
 
+  void addPacket(const RegularQuicPacket& regularPacket, uint64_t packetSize)
+      override;
+  void addPacket(
+      const VersionNegotiationPacket& versionPacket,
+      uint64_t packetSize,
+      bool isPacketRecvd) override;
+
   void addPacket(
       const RegularQuicWritePacket& regularPacket,
       uint64_t packetSize) override;

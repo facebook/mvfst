@@ -2,7 +2,8 @@
 
 #include <quic/tools/tperf/TperfQLogger.h>
 
-namespace quic { namespace tperf {
+namespace quic {
+namespace tperf {
 
 TperfQLogger::TperfQLogger(VantagePoint vantagePoint, const std::string& path)
     : FileQLogger(vantagePoint, kHTTP3ProtocolType), path_(path) {}
@@ -13,6 +14,19 @@ TperfQLogger::~TperfQLogger() {
 
 void TperfQLogger::setPacingObserver(std::unique_ptr<PacingObserver> observer) {
   pacingObserver_ = std::move(observer);
+}
+
+void TperfQLogger::addPacket(
+    const RegularQuicPacket& regularPacket,
+    uint64_t packetSize) {
+  FileQLogger::addPacket(regularPacket, packetSize);
+}
+
+void TperfQLogger::addPacket(
+    const VersionNegotiationPacket& versionPacket,
+    uint64_t packetSize,
+    bool isPacketRecvd) {
+  FileQLogger::addPacket(versionPacket, packetSize, isPacketRecvd);
 }
 
 void TperfQLogger::addPacket(
@@ -32,4 +46,5 @@ void TperfQLogger::addPacingMetricUpdate(
   }
   FileQLogger::addPacingMetricUpdate(pacingBurstSize, pacingInterval);
 }
-}} // namespace quic::tperf
+} // namespace tperf
+} // namespace quic
