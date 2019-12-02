@@ -7,7 +7,6 @@
  */
 
 #pragma once
-#include <unordered_map>
 
 #include <folly/io/async/AsyncUDPSocket.h>
 

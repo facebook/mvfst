@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <folly/ThreadLocal.h>
+#include <folly/container/F14Map.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/QuicConstants.h>
@@ -336,9 +337,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // NOTE: QuicServer still maintains ownership of all the workers and manages
   // their destruction
   folly::ThreadLocalPtr<QuicServerWorker> workerPtr_;
-  std::unordered_map<folly::EventBase*, QuicServerWorker*> evbToWorkers_;
+  folly::F14FastMap<folly::EventBase*, QuicServerWorker*> evbToWorkers_;
   std::unique_ptr<QuicServerTransportFactory> transportFactory_;
-  std::unordered_map<folly::EventBase*, QuicServerTransportFactory*>
+  folly::F14FastMap<folly::EventBase*, QuicServerTransportFactory*>
       evbToAcceptors_;
   // factory used for workers to create their listening / bound sockets
   std::unique_ptr<QuicUDPSocketFactory> listenerSocketFactory_;

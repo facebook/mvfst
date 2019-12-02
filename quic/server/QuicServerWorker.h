@@ -7,8 +7,9 @@
  */
 
 #pragma once
-#include <unordered_map>
 
+#include <folly/container/F14Map.h>
+#include <folly/container/F14Set.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 
 #include <quic/codec/ConnectionIdAlgo.h>
@@ -250,8 +251,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       NetworkData&& networkData,
       bool isForwardedData = false) noexcept;
 
-  using ConnIdToTransportMap = std::
-      unordered_map<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;
+  using ConnIdToTransportMap = folly::
+      F14FastMap<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;
 
   struct SourceIdentityHash {
     size_t operator()(const QuicServerTransport::SourceIdentity& sid) const {
@@ -260,7 +261,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
           sid.first.hash());
     }
   };
-  using SrcToTransportMap = std::unordered_map<
+  using SrcToTransportMap = folly::F14FastMap<
       QuicServerTransport::SourceIdentity,
       QuicServerTransport::Ptr,
       SourceIdentityHash>;
@@ -352,7 +353,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   SrcToTransportMap sourceAddressMap_;
 
   // Contains every unique transport that is mapped in connectionIdMap_.
-  std::unordered_set<QuicServerTransport*> boundServerTransports_;
+  folly::F14FastSet<QuicServerTransport*> boundServerTransports_;
 
   Buf readBuffer_;
   bool shutdown_{false};
