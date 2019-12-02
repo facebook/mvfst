@@ -2051,8 +2051,6 @@ TEST_F(
 }
 
 TEST_F(QuicServerTransportTest, SwitchServerCidsNoOtherIds) {
-  auto originalCid =
-      ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 2);
   auto& conn = server->getNonConstConn();
 
   EXPECT_EQ(conn.retireAndSwitchPeerConnectionIds(), false);
