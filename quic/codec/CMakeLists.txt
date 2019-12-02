@@ -33,6 +33,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_codec_types PUBLIC
   Folly::folly
+  mvfst_bufutil
   mvfst_constants
   mvfst_exception
   PRIVATE
