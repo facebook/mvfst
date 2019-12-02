@@ -73,6 +73,19 @@ sudo apt-get install         \
 
 Then, build and install folly and fizz
 
+Please note that folly depends on latest fmt installed from source. The
+following commands will download, compile, and install fmt.
+
+```
+git clone https://github.com/fmtlib/fmt.git && cd fmt
+
+mkdir _build && cd _build
+cmake ..
+
+make -j$(nproc)
+sudo make install
+```
+
 Alternatively, run the helper script `build_helper.sh` in this subdirectory.
 It will install and link the required dependencies and also build folly and fizz.
 This may take several minutes the first time.
