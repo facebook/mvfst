@@ -233,7 +233,6 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
           std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 1s));
       transport->setQLogger(std::move(qlogger));
     }
-    auto settings = transport->getTransportSettings();
     serverHandler->setQuicSocket(transport);
     handlers_.push_back(std::move(serverHandler));
     return transport;
