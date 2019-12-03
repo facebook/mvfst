@@ -15,7 +15,7 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   auto writeBufferLen = stream.writeBuffer.chainLength();
   updateFlowControlOnWriteToSocket(stream, writeBufferLen);
   stream.retransmissionBuffer.clear();
-  stream.writeBuffer.clear();
+  stream.writeBuffer.move();
   stream.readBuffer.clear();
   stream.lossBuffer.clear();
   stream.streamWriteError = error;

@@ -303,7 +303,7 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterAPIWrite) {
   maybeWriteBlockAfterAPIWrite(stream);
   EXPECT_FALSE(conn_.streamManager->hasBlocked());
 
-  stream.writeBuffer.clear();
+  stream.writeBuffer.move();
   stream.currentWriteOffset = 600;
   stream.flowControlState.peerAdvertisedMaxOffset = 600;
   EXPECT_CALL(*transportInfoCb_, onStreamFlowControlBlocked()).Times(1);
@@ -738,7 +738,7 @@ TEST_F(QuicFlowControlTest, WritableList) {
 
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
-  stream.writeBuffer.clear();
+  stream.writeBuffer.move();
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn_.streamManager->updateWritableStreams(stream);

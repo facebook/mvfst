@@ -85,11 +85,6 @@ void writeStreamFrameData(
     const BufQueue& writeBuffer,
     uint64_t dataLen);
 
-void writeStreamFrameData(
-    PacketBuilderInterface& builder,
-    const folly::IOBufQueue& writeBuffer,
-    uint64_t dataLen);
-
 /**
  * Write stream frama data into builder
  * This writes dataLen worth of bytes from the parameter writeBuffer into the

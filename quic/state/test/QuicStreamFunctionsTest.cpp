@@ -1952,7 +1952,7 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
 
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
-  stream.writeBuffer.clear();
+  stream.writeBuffer.move();
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn.streamManager->updateWritableStreams(stream);

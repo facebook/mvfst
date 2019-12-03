@@ -26,18 +26,7 @@ struct StreamBuffer {
 };
 
 struct QuicStreamLike {
-  QuicStreamLike()
-      : readBuffer{},
-        writeBuffer{folly::IOBufQueue::cacheChainLength()},
-        retransmissionBuffer{},
-        ackedIntervals{},
-        lossBuffer{},
-        currentWriteOffset{},
-        minimumRetransmittableOffset{},
-        currentReadOffset{},
-        currentReceiveOffset{},
-        maxOffsetObserved{},
-        finalReadOffset{} {}
+  QuicStreamLike() = default;
 
   QuicStreamLike(QuicStreamLike&&) = default;
 
@@ -48,8 +37,7 @@ struct QuicStreamLike {
   std::deque<StreamBuffer> readBuffer;
 
   // List of bytes that have been written to the QUIC layer.
-  // TODO replace with BufQueue
-  folly::IOBufQueue writeBuffer{folly::IOBufQueue::cacheChainLength()};
+  BufQueue writeBuffer{};
 
   // Stores a map of buffers which have been written to the socket and are
   // currently un-acked. Each one represents one StreamFrame that was written.

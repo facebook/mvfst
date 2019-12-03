@@ -186,7 +186,7 @@ TEST_F(QPRFunctionsTest, RecvMinStreamDataFrameShrinkBuffer) {
   // case 2. where we skip beyond what we have in writeBuffer
   stream->minimumRetransmittableOffset = 100;
   stream->currentWriteOffset = 100;
-  stream->writeBuffer.clear();
+  stream->writeBuffer.move();
   stream->conn.flowControlState.sumCurStreamBufferLen = 0;
   onRecvMinStreamDataFrame(stream, shrinkMinStreamDataFrame, packetNum);
   EXPECT_EQ(stream->minimumRetransmittableOffset, 110);
