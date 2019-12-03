@@ -1263,11 +1263,21 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   }
 
   // Implement virtual methods we don't intend to use.
+  bool isTLSResumed() const override {
+    throw std::runtime_error("isTLSResumed not implemented");
+  }
+  EncryptionLevel getReadRecordLayerEncryptionLevel() override {
+    throw std::runtime_error(
+        "getReadRecordLayerEncryptionLevel not implemented");
+  }
   const folly::Optional<std::string>& getApplicationProtocol() const override {
     throw std::runtime_error("getApplicationProtocol not implemented");
   }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
+  }
+  bool matchEarlyParameters() override {
+    throw std::runtime_error("matchEarlyParameters not implemented");
   }
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(CipherKind, folly::ByteRange) override {

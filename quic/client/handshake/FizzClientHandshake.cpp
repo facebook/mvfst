@@ -60,8 +60,22 @@ FizzClientHandshake::getApplicationProtocol() const {
   }
 }
 
+bool FizzClientHandshake::isTLSResumed() const {
+  auto pskType = state_.pskType();
+  return pskType && *pskType == fizz::PskType::Resumption;
+}
+
+EncryptionLevel FizzClientHandshake::getReadRecordLayerEncryptionLevel() {
+  return getEncryptionLevelFromFizz(
+      state_.readRecordLayer()->getEncryptionLevel());
+}
+
 void FizzClientHandshake::processSocketData(folly::IOBufQueue& queue) {
   processActions(machine_.processSocketData(state_, queue));
+}
+
+bool FizzClientHandshake::matchEarlyParameters() {
+  return fizz::client::earlyParametersMatch(state_);
 }
 
 std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
@@ -107,6 +121,7 @@ class FizzClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::client::ReportEarlyHandshakeSuccess&) {
+    CHECK(client_.state_.earlyDataParams().hasValue());
     client_.computeZeroRttCipher();
   }
 

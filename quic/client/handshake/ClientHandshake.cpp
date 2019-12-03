@@ -161,11 +161,6 @@ ClientHandshake::getServerTransportParams() {
   return transportParams_->getServerTransportParams();
 }
 
-bool ClientHandshake::isTLSResumed() const {
-  auto pskType = state_.pskType();
-  return pskType && *pskType == fizz::PskType::Resumption;
-}
-
 folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
   return std::move(zeroRttRejected_);
 }
@@ -209,11 +204,6 @@ void ClientHandshake::waitForData() {
   waitForData_ = true;
 }
 
-EncryptionLevel ClientHandshake::getReadRecordLayerEncryptionLevel() {
-  return getEncryptionLevelFromFizz(
-      state_.readRecordLayer()->getEncryptionLevel());
-}
-
 void ClientHandshake::writeDataToStream(
     EncryptionLevel encryptionLevel,
     Buf data) {
@@ -227,7 +217,6 @@ void ClientHandshake::writeDataToStream(
 
 void ClientHandshake::computeZeroRttCipher() {
   VLOG(10) << "Computing Client zero rtt keys";
-  CHECK(state_.earlyDataParams().hasValue());
   earlyDataAttempted_ = true;
 }
 
@@ -237,7 +226,7 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // TODO: we need to deal with HRR based rejection as well, however we don't
   // have an API right now.
   if (earlyDataAttempted_ && !earlyDataAccepted) {
-    if (fizz::client::earlyParametersMatch(state_)) {
+    if (matchEarlyParameters()) {
       zeroRttRejected_ = true;
     } else {
       // TODO: support app retry of zero rtt data.

@@ -32,14 +32,19 @@ class FizzClientHandshake : public ClientHandshake {
 
   const folly::Optional<std::string>& getApplicationProtocol() const override;
 
+  bool isTLSResumed() const override;
+
  private:
+  EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
+  bool matchEarlyParameters() override;
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(CipherKind kind, folly::ByteRange secret) override;
 
   class ActionMoveVisitor;
   void processActions(fizz::client::Actions actions);
 
+  fizz::client::State state_;
   fizz::client::ClientStateMachine machine_;
 
   FizzCryptoFactory cryptoFactory_;

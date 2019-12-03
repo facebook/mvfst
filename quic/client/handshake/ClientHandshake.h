@@ -135,7 +135,7 @@ class ClientHandshake : public Handshake {
   /**
    * Was the TLS connection resumed or not.
    */
-  bool isTLSResumed() const;
+  virtual bool isTLSResumed() const = 0;
 
   /**
    * Edge triggered api to obtain whether or not zero rtt data was rejected.
@@ -192,8 +192,9 @@ class ClientHandshake : public Handshake {
   void computeOneRttCipher(bool earlyDataAccepted);
 
  private:
-  EncryptionLevel getReadRecordLayerEncryptionLevel();
+  virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
+  virtual bool matchEarlyParameters() = 0;
   virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(CipherKind kind, folly::ByteRange secret) = 0;
 
@@ -209,8 +210,6 @@ class ClientHandshake : public Handshake {
   bool earlyDataAttempted_{false};
 
  protected:
-  fizz::client::State state_;
-
   std::shared_ptr<ClientTransportParametersExtension> transportParams_;
 };
 
