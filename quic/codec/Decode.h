@@ -82,7 +82,7 @@ ConnectionCloseFrame decodeConnectionCloseFrame(
     folly::io::Cursor& cursor,
     const CodecParameters& params);
 
-ApplicationCloseFrame decodeApplicationCloseFrame(
+ConnectionCloseFrame decodeApplicationClose(
     folly::io::Cursor& cursor,
     const CodecParameters& params);
 

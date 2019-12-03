@@ -364,7 +364,8 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   // Create few frames
   ConnectionCloseFrame connCloseFrame(
-      TransportErrorCode::FRAME_ENCODING_ERROR, "The sun is in the sky.");
+      QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
+      "The sun is in the sky.");
   MaxStreamsFrame maxStreamFrame(999, true);
   PingFrame pingFrame;
   IntervalSet<PacketNum> ackBlocks;

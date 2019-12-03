@@ -111,12 +111,6 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
         break;
       }
-      case QuicFrame::Type::ApplicationCloseFrame_E: {
-        const auto& frame = *quicFrame.asApplicationCloseFrame();
-        event->frames.push_back(std::make_unique<ApplicationCloseFrameLog>(
-            frame.errorCode, frame.reasonPhrase));
-        break;
-      }
       case QuicFrame::Type::MaxDataFrame_E: {
         const auto& frame = *quicFrame.asMaxDataFrame();
         event->frames.push_back(
@@ -219,13 +213,6 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         const ConnectionCloseFrame& frame = *quicFrame.asConnectionCloseFrame();
         event->frames.push_back(std::make_unique<ConnectionCloseFrameLog>(
             frame.errorCode, frame.reasonPhrase, frame.closingFrameType));
-        break;
-      }
-      case QuicWriteFrame::Type::ApplicationCloseFrame_E: {
-        const ApplicationCloseFrame& frame =
-            *quicFrame.asApplicationCloseFrame();
-        event->frames.push_back(std::make_unique<ApplicationCloseFrameLog>(
-            frame.errorCode, frame.reasonPhrase));
         break;
       }
       case QuicWriteFrame::Type::MaxDataFrame_E: {

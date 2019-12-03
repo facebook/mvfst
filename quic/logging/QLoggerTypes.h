@@ -51,33 +51,19 @@ class RstStreamFrameLog : public QLogFrame {
 
 class ConnectionCloseFrameLog : public QLogFrame {
  public:
-  TransportErrorCode errorCode;
+  QuicErrorCode errorCode;
   std::string reasonPhrase;
   FrameType closingFrameType;
 
   ConnectionCloseFrameLog(
-      TransportErrorCode errorCodeIn,
+      QuicErrorCode errorCodeIn,
       std::string reasonPhraseIn,
       FrameType closingFrameTypeIn)
-      : errorCode{errorCodeIn},
+      : errorCode{std::move(errorCodeIn)},
         reasonPhrase{std::move(reasonPhraseIn)},
         closingFrameType{closingFrameTypeIn} {}
 
   ~ConnectionCloseFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
-};
-
-class ApplicationCloseFrameLog : public QLogFrame {
- public:
-  ApplicationErrorCode errorCode;
-  std::string reasonPhrase;
-
-  ApplicationCloseFrameLog(
-      ApplicationErrorCode errorCodeIn,
-      std::string reasonPhraseIn)
-      : errorCode{errorCodeIn}, reasonPhrase{std::move(reasonPhraseIn)} {}
-
-  ~ApplicationCloseFrameLog() override = default;
   folly::dynamic toDynamic() const override;
 };
 

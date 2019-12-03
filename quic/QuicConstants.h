@@ -94,7 +94,8 @@ enum class FrameType : uint8_t {
   PATH_CHALLENGE = 0x1A,
   PATH_RESPONSE = 0x1B,
   CONNECTION_CLOSE = 0x1C,
-  APPLICATION_CLOSE = 0x1D,
+  // CONNECTION_CLOSE_APP_ERR frametype is use to indicate application errors
+  CONNECTION_CLOSE_APP_ERR = 0x1D,
   MIN_STREAM_DATA = 0xFE, // subject to change (https://fburl.com/qpr)
   EXPIRED_STREAM_DATA = 0xFF, // subject to change (https://fburl.com/qpr)
 };

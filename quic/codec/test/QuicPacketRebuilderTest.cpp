@@ -59,7 +59,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
 
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
-      TransportErrorCode::FRAME_ENCODING_ERROR,
+      QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
       "The sun is in the sky.",
       FrameType::ACK);
   MaxStreamsFrame maxStreamsFrame(4321, true);
@@ -129,8 +129,10 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       case QuicWriteFrame::Type::ConnectionCloseFrame_E: {
         const ConnectionCloseFrame& closeFrame =
             *frame.asConnectionCloseFrame();
+        const TransportErrorCode* transportErrorCode =
+            closeFrame.errorCode.asTransportErrorCode();
         EXPECT_EQ(
-            TransportErrorCode::FRAME_ENCODING_ERROR, closeFrame.errorCode);
+            TransportErrorCode::FRAME_ENCODING_ERROR, *transportErrorCode);
         EXPECT_EQ("The sun is in the sky.", closeFrame.reasonPhrase);
         EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
         break;
@@ -363,7 +365,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
 
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
-      TransportErrorCode::FRAME_ENCODING_ERROR,
+      QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
       "The sun is in the sky.",
       FrameType::ACK);
   StreamsBlockedFrame maxStreamIdFrame(0x1024, true);

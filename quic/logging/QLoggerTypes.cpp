@@ -6,6 +6,7 @@
  *
  */
 #include <quic/logging/QLoggerTypes.h>
+#include <quic/QuicException.h>
 #include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
@@ -28,18 +29,20 @@ folly::dynamic RstStreamFrameLog::toDynamic() const {
 
 folly::dynamic ConnectionCloseFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::CONNECTION_CLOSE);
+
+  auto isTransportErrorCode = errorCode.asTransportErrorCode();
+  auto isApplicationErrorCode = errorCode.asApplicationErrorCode();
+  auto isLocalErrorCode = errorCode.asLocalErrorCode();
+
+  if (isTransportErrorCode || isLocalErrorCode) {
+    d["frame_type"] = toString(FrameType::CONNECTION_CLOSE);
+  } else if (isApplicationErrorCode) {
+    d["frame_type"] = toString(FrameType::CONNECTION_CLOSE_APP_ERR);
+  }
+
   d["error_code"] = toString(errorCode);
   d["reason_phrase"] = reasonPhrase;
   d["closing_frame_type"] = toString(closingFrameType);
-  return d;
-}
-
-folly::dynamic ApplicationCloseFrameLog::toDynamic() const {
-  folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::APPLICATION_CLOSE);
-  d["error_code"] = errorCode;
-  d["reason_phrase"] = reasonPhrase;
   return d;
 }
 

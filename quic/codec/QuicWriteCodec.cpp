@@ -619,13 +619,25 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
     case QuicWriteFrame::Type::ConnectionCloseFrame_E: {
       ConnectionCloseFrame& connectionCloseFrame =
           *frame.asConnectionCloseFrame();
-      QuicInteger intFrameType(
-          static_cast<uint8_t>(FrameType::CONNECTION_CLOSE));
+      // Need to distinguish between CONNECTION_CLOSE & CONNECTINO_CLOSE_APP_ERR
+      const TransportErrorCode* isTransportErrorCode =
+          connectionCloseFrame.errorCode.asTransportErrorCode();
+      const ApplicationErrorCode* isApplicationErrorCode =
+          connectionCloseFrame.errorCode.asApplicationErrorCode();
+
+      QuicInteger intFrameType(static_cast<uint8_t>(
+          isTransportErrorCode ? FrameType::CONNECTION_CLOSE
+                               : FrameType::CONNECTION_CLOSE_APP_ERR));
+
       QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
       QuicInteger closingFrameType(
           static_cast<FrameTypeType>(connectionCloseFrame.closingFrameType));
+
       QuicInteger errorCode(
-          static_cast<uint64_t>(connectionCloseFrame.errorCode));
+          isTransportErrorCode
+              ? static_cast<uint64_t>(TransportErrorCode(*isTransportErrorCode))
+              : static_cast<uint64_t>(
+                    ApplicationErrorCode(*isApplicationErrorCode)));
       auto version = builder.getVersion();
       size_t errorSize = version == QuicVersion::MVFST_OLD
           ? sizeof(TransportErrorCode)
@@ -637,8 +649,10 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         builder.write(intFrameType);
         if (version == QuicVersion::MVFST_OLD) {
           builder.writeBE(
-              static_cast<std::underlying_type<TransportErrorCode>::type>(
-                  connectionCloseFrame.errorCode));
+              isTransportErrorCode ? static_cast<uint16_t>(TransportErrorCode(
+                                         *isTransportErrorCode))
+                                   : static_cast<uint16_t>(ApplicationErrorCode(
+                                         *isApplicationErrorCode)));
         } else {
           builder.write(errorCode);
         }
@@ -649,38 +663,6 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
             connectionCloseFrame.reasonPhrase.size());
         builder.appendFrame(std::move(connectionCloseFrame));
         return connCloseFrameSize;
-      }
-      // no space left in packet
-      return size_t(0);
-    }
-    case QuicWriteFrame::Type::ApplicationCloseFrame_E: {
-      ApplicationCloseFrame& applicationCloseFrame =
-          *frame.asApplicationCloseFrame();
-      QuicInteger intFrameType(
-          static_cast<uint8_t>(FrameType::APPLICATION_CLOSE));
-      QuicInteger reasonLength(applicationCloseFrame.reasonPhrase.size());
-      QuicInteger errorCode(
-          static_cast<uint64_t>(applicationCloseFrame.errorCode));
-      auto version = builder.getVersion();
-      size_t errorSize = version == QuicVersion::MVFST_OLD
-          ? sizeof(ApplicationErrorCode)
-          : errorCode.getSize();
-      auto applicationCloseFrameSize = intFrameType.getSize() + errorSize +
-          reasonLength.getSize() + applicationCloseFrame.reasonPhrase.size();
-      if (packetSpaceCheck(spaceLeft, applicationCloseFrameSize)) {
-        builder.write(intFrameType);
-        if (version == QuicVersion::MVFST_OLD) {
-          builder.writeBE(static_cast<ApplicationErrorCode>(
-              applicationCloseFrame.errorCode));
-        } else {
-          builder.write(errorCode);
-        }
-        builder.write(reasonLength);
-        builder.push(
-            (const uint8_t*)applicationCloseFrame.reasonPhrase.data(),
-            applicationCloseFrame.reasonPhrase.size());
-        builder.appendFrame(std::move(applicationCloseFrame));
-        return applicationCloseFrameSize;
       }
       // no space left in packet
       return size_t(0);

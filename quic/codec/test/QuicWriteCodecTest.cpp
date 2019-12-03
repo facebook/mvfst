@@ -1033,7 +1033,7 @@ TEST_F(QuicWriteCodecTest, WriteConnClose) {
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase("You are fired");
   ConnectionCloseFrame connectionCloseFrame(
-      TransportErrorCode::PROTOCOL_VIOLATION, reasonPhrase);
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
   auto connCloseBytesWritten =
       writeFrame(std::move(connectionCloseFrame), pktBuilder);
 
@@ -1043,16 +1043,18 @@ TEST_F(QuicWriteCodecTest, WriteConnClose) {
   EXPECT_EQ(4 + reasonPhrase.size(), connCloseBytesWritten);
   auto& resultConnCloseFrame =
       *regularPacket.frames[0].asConnectionCloseFrame();
-  EXPECT_EQ(
-      TransportErrorCode::PROTOCOL_VIOLATION, resultConnCloseFrame.errorCode);
+  const TransportErrorCode* transportErrorCode =
+      resultConnCloseFrame.errorCode.asTransportErrorCode();
+  EXPECT_EQ(TransportErrorCode::PROTOCOL_VIOLATION, *transportErrorCode);
   EXPECT_EQ("You are fired", resultConnCloseFrame.reasonPhrase);
 
   auto wireBuf = std::move(builtOut.second);
   folly::io::Cursor cursor(wireBuf.get());
   QuicFrame decodedCloseFrame = parseQuicFrame(cursor);
   auto& wireConnCloseFrame = *decodedCloseFrame.asConnectionCloseFrame();
-  EXPECT_EQ(
-      TransportErrorCode::PROTOCOL_VIOLATION, wireConnCloseFrame.errorCode);
+  const TransportErrorCode* protocolViolationCode =
+      wireConnCloseFrame.errorCode.asTransportErrorCode();
+  EXPECT_EQ(TransportErrorCode::PROTOCOL_VIOLATION, *protocolViolationCode);
   EXPECT_EQ("You are fired", wireConnCloseFrame.reasonPhrase);
 
   // At last, verify there is nothing left in the wire format bytes:
@@ -1065,14 +1067,15 @@ TEST_F(QuicWriteCodecTest, DecodeConnCloseLarge) {
   std::string reasonPhrase;
   reasonPhrase.resize(kMaxReasonPhraseLength + 10);
   ConnectionCloseFrame connectionCloseFrame(
-      TransportErrorCode::PROTOCOL_VIOLATION, reasonPhrase);
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
   writeFrame(connectionCloseFrame, pktBuilder);
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
   auto& resultConnCloseFrame =
       *regularPacket.frames[0].asConnectionCloseFrame();
-  EXPECT_EQ(
-      TransportErrorCode::PROTOCOL_VIOLATION, resultConnCloseFrame.errorCode);
+  const TransportErrorCode* protocolViolationCode =
+      resultConnCloseFrame.errorCode.asTransportErrorCode();
+  EXPECT_EQ(TransportErrorCode::PROTOCOL_VIOLATION, *protocolViolationCode);
   EXPECT_EQ(resultConnCloseFrame.reasonPhrase, reasonPhrase);
 
   auto wireBuf = std::move(builtOut.second);
@@ -1086,7 +1089,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceConnClose) {
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase("You are all fired");
   ConnectionCloseFrame connCloseFrame(
-      TransportErrorCode::PROTOCOL_VIOLATION, reasonPhrase);
+      QuicErrorCode(TransportErrorCode::PROTOCOL_VIOLATION), reasonPhrase);
   EXPECT_EQ(0, writeFrame(std::move(connCloseFrame), pktBuilder));
 }
 
@@ -1095,16 +1098,18 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
   setupCommonExpects(pktBuilder);
   std::string reasonPhrase;
   reasonPhrase.resize(kMaxReasonPhraseLength + 10);
-  ApplicationCloseFrame applicationCloseFrame(
-      GenericApplicationErrorCode::UNKNOWN, reasonPhrase);
+  ConnectionCloseFrame applicationCloseFrame(
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
+      reasonPhrase,
+      quic::FrameType::CONNECTION_CLOSE_APP_ERR);
   writeFrame(std::move(applicationCloseFrame), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildPacket();
   auto regularPacket = builtOut.first;
-  auto& resultAppCloseFrame =
-      *regularPacket.frames[0].asApplicationCloseFrame();
+  auto& resultAppCloseFrame = *regularPacket.frames[0].asConnectionCloseFrame();
   EXPECT_EQ(
-      GenericApplicationErrorCode::UNKNOWN, resultAppCloseFrame.errorCode);
+      quic::FrameType::CONNECTION_CLOSE_APP_ERR,
+      resultAppCloseFrame.closingFrameType);
   EXPECT_EQ(resultAppCloseFrame.reasonPhrase, reasonPhrase);
 
   auto wireBuf = std::move(builtOut.second);

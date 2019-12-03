@@ -870,9 +870,7 @@ TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
   EXPECT_TRUE(server->isClosed());
   auto serverReadCodec = makeClientEncryptedCodec();
   EXPECT_FALSE(verifyFramePresent(
-      serverWrites,
-      *serverReadCodec,
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_FALSE(verifyFramePresent(
       serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
 }
@@ -901,7 +899,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
@@ -911,7 +909,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 }
 
 TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
@@ -968,7 +966,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame_E));
 }
 
 TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
@@ -1052,7 +1050,8 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       std::move(header2),
       0 /* largestAcked */);
   std::string errMsg = "Mind the gap";
-  ConnectionCloseFrame connClose(TransportErrorCode::NO_ERROR, errMsg);
+  ConnectionCloseFrame connClose(
+      QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
   writeFrame(std::move(connClose), builder2);
 
   auto packet2 = std::move(builder2).buildPacket();
@@ -1101,7 +1100,8 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
       true);
   writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
-  ConnectionCloseFrame connClose(TransportErrorCode::NO_ERROR, errMsg);
+  ConnectionCloseFrame connClose(
+      QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
   writeFrame(std::move(connClose), builder);
 
   auto packet = std::move(builder).buildPacket();
@@ -1112,7 +1112,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
   serverWrites.clear();
 
@@ -1129,7 +1129,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ApplicationCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
 }
 
@@ -1842,7 +1842,8 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
       0 /* largestAcked */,
       QuicVersion::MVFST);
   std::string errMsg = "Stand clear of the closing doors, please";
-  ConnectionCloseFrame connClose(TransportErrorCode::NO_ERROR, errMsg);
+  ConnectionCloseFrame connClose(
+      QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
   writeFrame(std::move(connClose), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onConnectionEnd());
@@ -1878,8 +1879,10 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
       std::move(header),
       0 /* largestAcked */,
       QuicVersion::MVFST);
+
   std::string errMsg = "Stand clear of the closing doors, please";
-  ApplicationCloseFrame appClose(GenericApplicationErrorCode::UNKNOWN, errMsg);
+  ConnectionCloseFrame appClose(
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN), errMsg);
   writeFrame(std::move(appClose), builder);
   auto packet = std::move(builder).buildPacket();
 
@@ -1918,7 +1921,8 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
       0 /* largestAcked */,
       QuicVersion::MVFST);
   std::string errMsg = "Mind the gap";
-  ConnectionCloseFrame connClose(TransportErrorCode::NO_ERROR, errMsg);
+  ConnectionCloseFrame connClose(
+      QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
   writeFrame(std::move(connClose), builder);
   auto packet = std::move(builder).buildPacket();
   EXPECT_CALL(connCallback, onConnectionEnd());

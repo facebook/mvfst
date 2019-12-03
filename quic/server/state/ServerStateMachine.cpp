@@ -951,25 +951,6 @@ void onServerReadDataFromOpen(
               "Peer closed", TransportErrorCode::NO_ERROR);
           break;
         }
-        case QuicFrame::Type::ApplicationCloseFrame_E: {
-          isNonProbingPacket = true;
-          ApplicationCloseFrame& appClose =
-              *quicFrame.asApplicationCloseFrame();
-          auto errMsg = folly::to<std::string>(
-              "Server closed by peer reason=", appClose.reasonPhrase);
-          VLOG(10) << errMsg << " " << conn;
-          // we want to deliver app callbacks with the peer supplied error,
-          // but send a NO_ERROR to the peer.
-          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-          if (conn.qLogger) {
-            conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-          }
-          conn.peerConnectionError = std::make_pair(
-              QuicErrorCode(appClose.errorCode), std::move(errMsg));
-          throw QuicTransportException(
-              "Peer closed", TransportErrorCode::NO_ERROR);
-          break;
-        }
         case QuicFrame::Type::PaddingFrame_E: {
           break;
         }
@@ -1140,7 +1121,6 @@ void onServerReadDataFromClosed(
   }
 
   auto& regularPacket = *regularOptional;
-  auto protectionLevel = regularPacket.header.getProtectionType();
   auto packetNum = regularPacket.header.getPacketSequenceNum();
   auto pnSpace = regularPacket.header.getPacketNumberSpace();
   if (conn.qLogger) {
@@ -1148,9 +1128,6 @@ void onServerReadDataFromClosed(
   }
   QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
 
-  bool isProtectedPacket = protectionLevel == ProtectionType::ZeroRtt ||
-      protectionLevel == ProtectionType::KeyPhaseZero ||
-      protectionLevel == ProtectionType::KeyPhaseOne;
 
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {
@@ -1168,25 +1145,6 @@ void onServerReadDataFromClosed(
         QUIC_TRACE(recvd_close, conn, errMsg.c_str());
         conn.peerConnectionError = std::make_pair(
             QuicErrorCode(connFrame.errorCode), std::move(errMsg));
-        break;
-      }
-      case QuicFrame::Type::ApplicationCloseFrame_E: {
-        if (!isProtectedPacket) {
-          return;
-        }
-        ApplicationCloseFrame& appClose = *quicFrame.asApplicationCloseFrame();
-        auto errMsg = folly::to<std::string>(
-            "Server closed by peer reason=", appClose.reasonPhrase);
-        VLOG(10) << errMsg << " " << conn;
-        if (conn.qLogger) {
-          conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-        }
-        // we want to deliver app callbacks with the peer supplied error,
-        // but send a NO_ERROR to the peer.
-        QUIC_TRACE(recvd_close, conn, errMsg.c_str());
-        conn.peerConnectionError = std::make_pair(
-            QuicErrorCode(appClose.errorCode), std::move(errMsg));
-
         break;
       }
       default:

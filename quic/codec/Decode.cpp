@@ -582,10 +582,10 @@ ConnectionCloseFrame decodeConnectionCloseFrame(
   auto reasonPhrase =
       cursor.readFixedString(folly::to<size_t>(reasonPhraseLength->first));
   return ConnectionCloseFrame(
-      errorCode, std::move(reasonPhrase), triggeringFrameType);
+      QuicErrorCode(errorCode), std::move(reasonPhrase), triggeringFrameType);
 }
 
-ApplicationCloseFrame decodeApplicationCloseFrame(
+ConnectionCloseFrame decodeApplicationClose(
     folly::io::Cursor& cursor,
     const CodecParameters& params) {
   ApplicationErrorCode errorCode{};
@@ -600,9 +600,19 @@ ApplicationCloseFrame decodeApplicationCloseFrame(
       throw QuicTransportException(
           "Failed to parse error code.",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::APPLICATION_CLOSE);
+          quic::FrameType::CONNECTION_CLOSE_APP_ERR);
     }
   }
+
+  auto frameTypeField = decodeQuicInteger(cursor);
+  if (UNLIKELY(!frameTypeField || frameTypeField->second != sizeof(uint8_t))) {
+    throw QuicTransportException(
+        "Bad connection close triggering frame type value",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::CONNECTION_CLOSE);
+  }
+  auto triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
+
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (UNLIKELY(
           !reasonPhraseLength ||
@@ -610,11 +620,13 @@ ApplicationCloseFrame decodeApplicationCloseFrame(
     throw QuicTransportException(
         "Bad reason phrase length",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::APPLICATION_CLOSE);
+        quic::FrameType::CONNECTION_CLOSE_APP_ERR);
   }
+
   auto reasonPhrase =
       cursor.readFixedString(folly::to<size_t>(reasonPhraseLength->first));
-  return ApplicationCloseFrame(errorCode, std::move(reasonPhrase));
+  return ConnectionCloseFrame(
+      QuicErrorCode(errorCode), std::move(reasonPhrase), triggeringFrameType);
 }
 
 MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
@@ -734,8 +746,8 @@ QuicFrame parseFrame(
         return QuicFrame(decodePathResponseFrame(cursor));
       case FrameType::CONNECTION_CLOSE:
         return QuicFrame(decodeConnectionCloseFrame(cursor, params));
-      case FrameType::APPLICATION_CLOSE:
-        return QuicFrame(decodeApplicationCloseFrame(cursor, params));
+      case FrameType::CONNECTION_CLOSE_APP_ERR:
+        return QuicFrame(decodeApplicationClose(cursor, params));
       case FrameType::MIN_STREAM_DATA:
         return QuicFrame(decodeMinStreamDataFrame(cursor));
       case FrameType::EXPIRED_STREAM_DATA:

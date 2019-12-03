@@ -505,17 +505,17 @@ struct PathResponseFrame {
 
 struct ConnectionCloseFrame {
   // Members are not const to allow this to be movable.
-  TransportErrorCode errorCode;
+  QuicErrorCode errorCode;
   std::string reasonPhrase;
   // Per QUIC specification: type of frame that triggered the (close) error.
   // A value of 0 (PADDING frame) implies the frame type is unknown
   FrameType closingFrameType;
 
   ConnectionCloseFrame(
-      TransportErrorCode errorCodeIn,
+      QuicErrorCode errorCodeIn,
       std::string reasonPhraseIn,
       FrameType closingFrameTypeIn = FrameType::PADDING)
-      : errorCode(errorCodeIn),
+      : errorCode(std::move(errorCodeIn)),
         reasonPhrase(std::move(reasonPhraseIn)),
         closingFrameType(closingFrameTypeIn) {}
 
@@ -524,21 +524,6 @@ struct ConnectionCloseFrame {
   }
 
   bool operator==(const ConnectionCloseFrame& rhs) const {
-    return errorCode == rhs.errorCode && reasonPhrase == rhs.reasonPhrase;
-  }
-};
-
-struct ApplicationCloseFrame {
-  // Members are not const to allow this to be movable.
-  ApplicationErrorCode errorCode;
-  std::string reasonPhrase;
-
-  ApplicationCloseFrame(
-      ApplicationErrorCode errorCodeIn,
-      std::string reasonPhraseIn)
-      : errorCode(errorCodeIn), reasonPhrase(std::move(reasonPhraseIn)) {}
-
-  bool operator==(const ApplicationCloseFrame& rhs) const {
     return errorCode == rhs.errorCode && reasonPhrase == rhs.reasonPhrase;
   }
 };
@@ -574,7 +559,6 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(PaddingFrame, __VA_ARGS__)           \
   F(RstStreamFrame, __VA_ARGS__)         \
   F(ConnectionCloseFrame, __VA_ARGS__)   \
-  F(ApplicationCloseFrame, __VA_ARGS__)  \
   F(MaxDataFrame, __VA_ARGS__)           \
   F(MaxStreamDataFrame, __VA_ARGS__)     \
   F(DataBlockedFrame, __VA_ARGS__)       \
@@ -593,7 +577,6 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(PaddingFrame, __VA_ARGS__)           \
   F(RstStreamFrame, __VA_ARGS__)         \
   F(ConnectionCloseFrame, __VA_ARGS__)   \
-  F(ApplicationCloseFrame, __VA_ARGS__)  \
   F(MaxDataFrame, __VA_ARGS__)           \
   F(MaxStreamDataFrame, __VA_ARGS__)     \
   F(DataBlockedFrame, __VA_ARGS__)       \

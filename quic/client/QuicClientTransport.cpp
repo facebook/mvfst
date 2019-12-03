@@ -486,21 +486,6 @@ void QuicClientTransport::processPacketData(
             "Peer closed", TransportErrorCode::NO_ERROR);
         break;
       }
-      case QuicFrame::Type::ApplicationCloseFrame_E: {
-        ApplicationCloseFrame& appClose = *quicFrame.asApplicationCloseFrame();
-        auto errMsg = folly::to<std::string>(
-            "Client closed by peer reason=", appClose.reasonPhrase);
-        VLOG(4) << errMsg << " " << *this;
-        if (conn_->qLogger) {
-          conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
-        }
-        QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
-        conn_->peerConnectionError = std::make_pair(
-            QuicErrorCode(appClose.errorCode), std::move(errMsg));
-        throw QuicTransportException(
-            "Peer closed", TransportErrorCode::NO_ERROR);
-        break;
-      }
       case QuicFrame::Type::PaddingFrame_E: {
         break;
       }

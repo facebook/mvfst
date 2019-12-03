@@ -743,29 +743,33 @@ void writeCloseCommon(
   if (!closeDetails) {
     written = writeFrame(
         ConnectionCloseFrame(
-            TransportErrorCode::NO_ERROR, std::string("No error")),
+            QuicErrorCode(TransportErrorCode::NO_ERROR),
+            std::string("No error")),
         packetBuilder);
   } else {
     switch (closeDetails->first.type()) {
       case QuicErrorCode::Type::ApplicationErrorCode_E:
         written = writeFrame(
-            ApplicationCloseFrame(
-                *closeDetails->first.asApplicationErrorCode(),
-                closeDetails->second),
+            ConnectionCloseFrame(
+                QuicErrorCode(*closeDetails->first.asApplicationErrorCode()),
+                closeDetails->second,
+                quic::FrameType::CONNECTION_CLOSE_APP_ERR),
             packetBuilder);
         break;
       case QuicErrorCode::Type::TransportErrorCode_E:
         written = writeFrame(
             ConnectionCloseFrame(
-                *closeDetails->first.asTransportErrorCode(),
-                closeDetails->second),
+                QuicErrorCode(*closeDetails->first.asTransportErrorCode()),
+                closeDetails->second,
+                quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         break;
       case QuicErrorCode::Type::LocalErrorCode_E:
         written = writeFrame(
             ConnectionCloseFrame(
-                TransportErrorCode::INTERNAL_ERROR,
-                std::string("Internal error")),
+                QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+                std::string("Internal error"),
+                quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         break;
     }

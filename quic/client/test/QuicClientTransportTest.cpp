@@ -3207,7 +3207,7 @@ TEST_P(
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeHandshakeCodec(),
-        QuicFrame::Type::ApplicationCloseFrame_E));
+        QuicFrame::Type::ConnectionCloseFrame_E));
 
     std::vector<int> indices =
         getQLogEventIndices(QLogEventType::ConnectionClose, qLogger);
@@ -3376,7 +3376,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
         *makeEncryptedCodec(),
-        QuicFrame::Type::ApplicationCloseFrame_E));
+        QuicFrame::Type::ConnectionCloseFrame_E));
   } else {
     client->close(folly::none);
     EXPECT_TRUE(verifyFramePresent(
@@ -3589,7 +3589,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimeoutExpired) {
   auto serverCodec = makeEncryptedCodec();
   // We expect a conn close in a cleartext packet.
   EXPECT_FALSE(verifyFramePresent(
-      socketWrites, *serverCodec, QuicFrame::Type::ApplicationCloseFrame_E));
+      socketWrites, *serverCodec, QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_FALSE(verifyFramePresent(
       socketWrites, *serverCodec, QuicFrame::Type::ConnectionCloseFrame_E));
   EXPECT_TRUE(socketWrites.empty());
@@ -4520,7 +4520,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
       0,
       QuicVersion::MVFST);
   ConnectionCloseFrame connClose(
-      TransportErrorCode::NO_ERROR, "Stand clear of the closing doors, please");
+      QuicErrorCode(TransportErrorCode::NO_ERROR),
+      "Stand clear of the closing doors, please");
   writeFrame(std::move(connClose), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   EXPECT_CALL(clientConnCallback, onConnectionEnd());
@@ -4547,8 +4548,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
       std::move(header),
       0,
       QuicVersion::MVFST);
-  ApplicationCloseFrame appClose(
-      GenericApplicationErrorCode::UNKNOWN,
+  ConnectionCloseFrame appClose(
+      QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       "Stand clear of the closing doors, please");
   writeFrame(std::move(appClose), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
