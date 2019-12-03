@@ -6,11 +6,3 @@
 if(NOT BUILD_TESTS)
   return()
 endif()
-
-quic_add_test(TARGET MacroTest
-  SOURCES
-  QuicLoggingMacroTest.cpp
-  DEPENDS
-  Folly::folly
-  mvfst_state_functions
-)
