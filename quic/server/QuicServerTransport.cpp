@@ -97,7 +97,7 @@ void QuicServerTransport::setCongestionControllerFactory(
 
 void QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
-    NetworkData&& networkData) {
+    NetworkDataSingle&& networkData) {
   ServerEvents::ReadData readData;
   readData.peer = peer;
   readData.networkData = std::move(networkData);
@@ -341,7 +341,10 @@ void QuicServerTransport::processPendingData(bool async) {
       auto serverPtr = static_cast<QuicServerTransport*>(self.get());
       for (auto& pendingPacket : *pendingData) {
         serverPtr->onNetworkData(
-            pendingPacket.peer, std::move(pendingPacket.networkData));
+            pendingPacket.peer,
+            NetworkData(
+                std::move(pendingPacket.networkData.data),
+                pendingPacket.networkData.receiveTimePoint));
         if (serverPtr->closeState_ == CloseState::CLOSED) {
           // The pending data could potentially contain a connection close, or
           // the app could have triggered a connection close with an error. It

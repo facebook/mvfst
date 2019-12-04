@@ -481,7 +481,7 @@ void handleCipherUnavailable(
     }
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
-    pendingReadData.networkData = NetworkData(
+    pendingReadData.networkData = NetworkDataSingle(
         std::move(originalData->packet), readData.networkData.receiveTimePoint);
     pendingData->emplace_back(std::move(pendingReadData));
     VLOG(10) << "Adding pending data to "

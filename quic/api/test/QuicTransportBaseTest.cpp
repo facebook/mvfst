@@ -156,7 +156,8 @@ class TestQuicTransport
     return lossTimeout_.getTimeRemaining();
   }
 
-  void onReadData(const folly::SocketAddress&, NetworkData&& data) override {
+  void onReadData(const folly::SocketAddress&, NetworkDataSingle&& data)
+      override {
     if (!data.data) {
       return;
     }

@@ -78,7 +78,7 @@ class TestQuicTransport
 
   void onReadData(
       const folly::SocketAddress& /*peer*/,
-      NetworkData&& /*networkData*/) noexcept override {}
+      NetworkDataSingle&& /*networkData*/) noexcept override {}
 
   void writeData() override {
     if (closed) {

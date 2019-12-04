@@ -89,8 +89,9 @@ class QuicClientTransport
   bool isTLSResumed() const;
 
   // From QuicTransportBase
-  void onReadData(const folly::SocketAddress& peer, NetworkData&& networkData)
-      override;
+  void onReadData(
+      const folly::SocketAddress& peer,
+      NetworkDataSingle&& networkData) override;
   void writeData() override;
   void closeTransport() override;
   void unbindConnection() override;
@@ -153,7 +154,7 @@ class QuicClientTransport
 
   void processUDPData(
       const folly::SocketAddress& peer,
-      NetworkData&& networkData);
+      NetworkDataSingle&& networkData);
 
   void processPacketData(
       const folly::SocketAddress& peer,

@@ -32,9 +32,15 @@ using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 } // namespace
 namespace test {
 
-MATCHER_P(BufMatches, buf, "") {
-  folly::IOBufEqualTo eq;
-  return eq(*arg, buf);
+MATCHER_P(NetworkDataMatches, networkData, "") {
+  for (size_t i = 0; i < arg.packets.size(); ++i) {
+    folly::IOBufEqualTo eq;
+    bool equals = eq(*arg.packets[i], networkData);
+    if (equals) {
+      return true;
+    }
+  }
+  return false;
 }
 
 class TestingEventBaseObserver : public folly::EventBaseObserver {
@@ -215,7 +221,7 @@ void QuicServerWorkerTest::createQuicConnection(
     transport = transportOverride;
   }
   expectConnectionCreation(addr, connId, transport);
-  EXPECT_CALL(*transport, onNetworkData(addr, BufMatches(*data)));
+  EXPECT_CALL(*transport, onNetworkData(addr, NetworkDataMatches(*data)));
   worker_->dispatchPacketData(
       addr, std::move(routingData), NetworkData(data->clone(), Clock::now()));
 
@@ -364,7 +370,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
 
   // routing by connid after connid available.
-  EXPECT_CALL(*transport_, onNetworkData(kClientAddr, BufMatches(*data)))
+  EXPECT_CALL(
+      *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData2(
       HeaderForm::Short, false, false, connId, folly::none);
@@ -380,7 +387,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
 
   EXPECT_EQ(connIdMap.size(), 2);
 
-  EXPECT_CALL(*transport_, onNetworkData(kClientAddr, BufMatches(*data)))
+  EXPECT_CALL(
+      *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData3(
       HeaderForm::Short, false, false, connId2, folly::none);
@@ -449,7 +457,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       0);
 
   // routing by connid after connid available.
-  EXPECT_CALL(*transport_, onNetworkData(kClientAddr, BufMatches(*data)));
+  EXPECT_CALL(
+      *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)));
   RoutingData routingData2(
       HeaderForm::Short,
       false,
@@ -1012,7 +1021,8 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
           EXPECT_EQ(addr.getPort(), clientAddr.getPort());
           // the original data should be extracted after processing takeover
           // protocol related information
-          EXPECT_TRUE(eq(*data, *(networkData->data)));
+          EXPECT_EQ(networkData->packets.size(), 1);
+          EXPECT_TRUE(eq(*data, *(networkData->packets[0])));
           EXPECT_TRUE(isForwardedData);
         };
         EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
@@ -1182,12 +1192,15 @@ class QuicServerTest : public Test {
                 transportSettings.advertisedInitialConnectionWindowSize);
           }));
       ON_CALL(*transport, onNetworkData(_, _))
-          .WillByDefault(Invoke([&, expected = data.get()](auto, auto buf) {
-            EXPECT_TRUE(folly::IOBufEqualTo()(*buf, *expected));
-            std::unique_lock<std::mutex> lg(m);
-            calledOnNetworkData = true;
-            cv.notify_one();
-          }));
+          .WillByDefault(
+              Invoke([&, expected = data.get()](auto, const auto& networkData) {
+                EXPECT_GT(networkData.packets.size(), 0);
+                EXPECT_TRUE(
+                    folly::IOBufEqualTo()(*networkData.packets[0], *expected));
+                std::unique_lock<std::mutex> lg(m);
+                calledOnNetworkData = true;
+                cv.notify_one();
+              }));
       return transport;
     };
     EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
@@ -1361,10 +1374,13 @@ class QuicServerTakeoverTest : public Test {
             EXPECT_EQ(params.workerId, 0);
           }));
       EXPECT_CALL(*transport, onNetworkData(_, _))
-          .WillOnce(Invoke([&, expected = data.get()](auto, auto buf) {
-            EXPECT_TRUE(folly::IOBufEqualTo()(*buf, *expected));
-            baton.post();
-          }));
+          .WillOnce(
+              Invoke([&, expected = data.get()](auto, const auto& networkData) {
+                EXPECT_GT(networkData.packets.size(), 0);
+                EXPECT_TRUE(
+                    folly::IOBufEqualTo()(*networkData.packets[0], *expected));
+                baton.post();
+              }));
       return transport;
     };
     EXPECT_CALL(*factory, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
@@ -1465,10 +1481,13 @@ class QuicServerTakeoverTest : public Test {
     // onNetworkData(_, _) shouldn't be called on the newServer_ transport,
     // but should be routed to oldServer_
     EXPECT_CALL(*transportCbForOldServer, onNetworkData(_, _))
-        .WillOnce(Invoke([&, expected = data.get()](auto, auto buf) {
-          EXPECT_TRUE(folly::IOBufEqualTo()(*buf, *expected));
-          b1.post();
-        }));
+        .WillOnce(
+            Invoke([&, expected = data.get()](auto, const auto& networkData) {
+              EXPECT_GT(networkData.packets.size(), 0);
+              EXPECT_TRUE(
+                  folly::IOBufEqualTo()(*networkData.packets[0], *expected));
+              b1.post();
+            }));
     // new quic server receives the packet and forwards it
     EXPECT_CALL(*newTransInfoCb_, onPacketReceived());
     EXPECT_CALL(*newTransInfoCb_, onRead(_));
@@ -1885,10 +1904,13 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
     EXPECT_CALL(*transport, accept());
     // post baton upon receiving the data
     EXPECT_CALL(*transport, onNetworkData(_, _))
-        .WillOnce(Invoke([&, expected = data.get()](auto, auto buf) {
-          EXPECT_TRUE(folly::IOBufEqualTo()(*buf, *expected));
-          b.post();
-        }));
+        .WillOnce(
+            Invoke([&, expected = data.get()](auto, const auto& networkData) {
+              EXPECT_GT(networkData.packets.size(), 0);
+              EXPECT_TRUE(
+                  folly::IOBufEqualTo()(*networkData.packets[0], *expected));
+              b.post();
+            }));
     return transport;
   };
   EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
@@ -1926,9 +1948,11 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   data = std::move(packet);
   folly::Baton<> b1;
   auto verifyZeroRtt = [&](
-      const folly::SocketAddress& peer, const folly::IOBuf* rcvdPkt) noexcept {
+      const folly::SocketAddress& peer,
+      const NetworkData& networkData) noexcept {
+    EXPECT_GT(networkData.packets.size(), 0);
     EXPECT_EQ(peer, reader->getSocket().address());
-    EXPECT_TRUE(folly::IOBufEqualTo()(*rcvdPkt, *data));
+    EXPECT_TRUE(folly::IOBufEqualTo()(*data, *networkData.packets[0]));
     b1.post();
   };
   EXPECT_CALL(*transport, onNetworkData(_, _)).WillOnce(Invoke(verifyZeroRtt));

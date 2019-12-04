@@ -34,12 +34,47 @@
 namespace quic {
 
 struct NetworkData {
-  Buf data;
   TimePoint receiveTimePoint;
+  std::vector<std::unique_ptr<folly::IOBuf>> packets;
+  size_t totalData{0};
 
   NetworkData() = default;
   NetworkData(Buf&& buf, const TimePoint& receiveTime)
-      : data(std::move(buf)), receiveTimePoint(receiveTime) {}
+      : receiveTimePoint(receiveTime) {
+    if (buf) {
+      totalData = buf->computeChainDataLength();
+      packets.emplace_back(std::move(buf));
+    }
+  }
+
+  std::unique_ptr<folly::IOBuf> moveAllData() && {
+    std::unique_ptr<folly::IOBuf> buf;
+    for (size_t i = 0; i < packets.size(); ++i) {
+      if (buf) {
+        buf->prependChain(std::move(packets[i]));
+      } else {
+        buf = std::move(packets[i]);
+      }
+    }
+    return buf;
+  }
+};
+
+struct NetworkDataSingle {
+  std::unique_ptr<folly::IOBuf> data;
+  TimePoint receiveTimePoint;
+  size_t totalData{0};
+
+  NetworkDataSingle() = default;
+
+  NetworkDataSingle(
+      std::unique_ptr<folly::IOBuf> buf,
+      const TimePoint& receiveTime)
+      : data(std::move(buf)), receiveTimePoint(receiveTime) {
+    if (data) {
+      totalData += data->computeChainDataLength();
+    }
+  }
 };
 
 /**

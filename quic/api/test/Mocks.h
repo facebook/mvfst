@@ -201,7 +201,7 @@ class MockQuicTransport : public QuicServerTransport {
   void onNetworkData(
       const folly::SocketAddress& peer,
       NetworkData&& networkData) noexcept override {
-    onNetworkData(peer, networkData.data.get());
+    onNetworkData(peer, networkData);
   }
 
   GMOCK_METHOD2_(
@@ -209,7 +209,7 @@ class MockQuicTransport : public QuicServerTransport {
       noexcept,
       ,
       onNetworkData,
-      void(const folly::SocketAddress&, const folly::IOBuf*));
+      void(const folly::SocketAddress&, const NetworkData&));
 
   GMOCK_METHOD1_(
       ,

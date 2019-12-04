@@ -1579,12 +1579,13 @@ void QuicTransportBase::onNetworkData(
     updateWriteLooper(true);
   };
   try {
-    if (networkData.data) {
-      conn_->lossState.totalBytesRecvd +=
-          networkData.data->computeChainDataLength();
-    }
+    conn_->lossState.totalBytesRecvd += networkData.totalData;
     auto originalAckVersion = currentAckStateVersion(*conn_);
-    onReadData(peer, std::move(networkData));
+    for (auto& packet : networkData.packets) {
+      onReadData(
+          peer,
+          NetworkDataSingle(std::move(packet), networkData.receiveTimePoint));
+    }
     processCallbacksAfterNetworkData();
     if (closeState_ != CloseState::CLOSED) {
       if (currentAckStateVersion(*conn_) != originalAckVersion) {

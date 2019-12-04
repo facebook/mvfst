@@ -298,8 +298,9 @@ void QuicServerWorker::forwardNetworkData(
     if (packetForwardingEnabled_ && !isForwardedData) {
       VLOG(3) << "Forwarding packet with unknown connId version from client="
               << client << " to another process";
+      auto recvTime = networkData.receiveTimePoint;
       takeoverPktHandler_.forwardPacketToAnotherServer(
-          client, std::move(networkData.data), networkData.receiveTimePoint);
+          client, std::move(networkData).moveAllData(), recvTime);
       QUIC_STATS(infoCallback_, onPacketForwarded);
       return;
     } else {
@@ -370,8 +371,7 @@ void QuicServerWorker::dispatchPacketData(
         // This could be a new connection, add it in the map
         // verify that the initial packet is at least min initial bytes
         // to avoid amplification attacks.
-        if (networkData.data->computeChainDataLength() <
-            kMinInitialPacketSize) {
+        if (networkData.totalData < kMinInitialPacketSize) {
           // Don't even attempt to forward the packet, just drop it.
           VLOG(3) << "Dropping small initial packet from client=" << client;
           QUIC_STATS(
@@ -476,8 +476,9 @@ void QuicServerWorker::dispatchPacketData(
   VLOG(4) << "Forwarding packet from client=" << client
           << " to another process, workerId=" << (uint32_t)workerId_
           << ", processId_=" << (uint32_t) static_cast<uint8_t>(processId_);
+  auto recvTime = networkData.receiveTimePoint;
   takeoverPktHandler_.forwardPacketToAnotherServer(
-      client, std::move(networkData.data), networkData.receiveTimePoint);
+      client, std::move(networkData).moveAllData(), recvTime);
   QUIC_STATS(infoCallback_, onPacketForwarded);
 }
 
@@ -490,7 +491,7 @@ void QuicServerWorker::sendResetPacket(
     // Only send resets in response to short header packets.
     return;
   }
-  uint16_t packetSize = networkData.data->computeChainDataLength();
+  uint16_t packetSize = networkData.totalData;
   uint16_t maxResetPacketSize = std::min<uint16_t>(
       std::max<uint16_t>(kMinStatelessPacketSize, packetSize),
       kDefaultUDPSendPacketLen);

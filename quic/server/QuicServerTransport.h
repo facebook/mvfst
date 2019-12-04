@@ -91,8 +91,9 @@ class QuicServerTransport
   virtual void setClientConnectionId(const ConnectionId& clientConnectionId);
 
   // From QuicTransportBase
-  void onReadData(const folly::SocketAddress& peer, NetworkData&& networkData)
-      override;
+  void onReadData(
+      const folly::SocketAddress& peer,
+      NetworkDataSingle&& networkData) override;
   void writeData() override;
   void closeTransport() override;
   void unbindConnection() override;

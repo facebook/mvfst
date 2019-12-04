@@ -1287,6 +1287,17 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
 class QuicClientTransportTest : public Test {
  public:
+  struct TestReadData {
+    std::unique_ptr<folly::IOBuf> data;
+    folly::SocketAddress addr;
+    folly::Optional<int> err;
+
+    TestReadData(folly::ByteRange dataIn, const folly::SocketAddress& addrIn)
+        : data(folly::IOBuf::copyBuffer(dataIn)), addr(addrIn) {}
+
+    explicit TestReadData(int errIn) : err(errIn) {}
+  };
+
   QuicClientTransportTest() : eventbase_(std::make_unique<folly::EventBase>()) {
     auto socket =
         std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
@@ -1306,6 +1317,30 @@ class QuicClientTransportTest : public Test {
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));
     ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
+    ON_CALL(*sock, recvmsg(_, _))
+        .WillByDefault(Invoke([&](struct msghdr* msg, int) -> ssize_t {
+          DCHECK_GT(msg->msg_iovlen, 0);
+          if (socketReads.empty()) {
+            errno = EAGAIN;
+            return -1;
+          }
+          if (socketReads[0].err) {
+            errno = *socketReads[0].err;
+            return -1;
+          }
+          auto testData = std::move(socketReads[0].data);
+          testData->coalesce();
+          size_t testDataLen = testData->length();
+          memcpy(
+              msg->msg_iov[0].iov_base, testData->data(), testData->length());
+          if (msg->msg_name) {
+            socklen_t msg_len = socketReads[0].addr.getAddress(
+                static_cast<sockaddr_storage*>(msg->msg_name));
+            msg->msg_namelen = msg_len;
+          }
+          socketReads.pop_front();
+          return testDataLen;
+        }));
     EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
     EXPECT_EQ(
         client->getConn().selfConnectionIds[0].connId,
@@ -1483,21 +1518,17 @@ class QuicClientTransportTest : public Test {
       folly::ByteRange data,
       bool writes = true) {
     ASSERT_TRUE(networkReadCallback);
-    EXPECT_CALL(*sock, recvmsg(_, _))
-        .WillOnce(Invoke([&](struct msghdr* msg, int) {
-          DCHECK_GT(msg->msg_iovlen, 0);
-          memcpy(msg->msg_iov[0].iov_base, data.data(), data.size());
-          if (msg->msg_name) {
-            socklen_t msg_len =
-                addr.getAddress(static_cast<sockaddr_storage*>(msg->msg_name));
-            msg->msg_namelen = msg_len;
-          }
-          return data.size();
-        }));
+    socketReads.emplace_back(TestReadData(data, addr));
     networkReadCallback->onNotifyDataAvailable();
     if (writes) {
       loopForWrites();
     }
+  }
+
+  void deliverNetworkError(int err) {
+    ASSERT_TRUE(networkReadCallback);
+    socketReads.emplace_back(TestReadData(err));
+    networkReadCallback->onNotifyDataAvailable();
   }
 
   void deliverDataWithoutErrorCheck(folly::ByteRange data, bool writes = true) {
@@ -1650,6 +1681,7 @@ class QuicClientTransportTest : public Test {
 
  protected:
   std::vector<std::unique_ptr<folly::IOBuf>> socketWrites;
+  std::deque<TestReadData> socketReads;
   MockDeliveryCallback deliveryCallback;
   MockReadCallback readCb;
   MockConnectionCallback clientConnCallback;
@@ -2732,6 +2764,140 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   }
   EXPECT_TRUE(dataDelivered);
   client->close(folly::none);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {
+  StreamId streamId = client->createBidirectionalStream().value();
+
+  client->setReadCallback(streamId, &readCb);
+  bool dataDelivered = false;
+  auto data = IOBuf::copyBuffer("hello");
+
+  auto expected = data->clone();
+  expected->prependChain(data->clone());
+  EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
+    auto readData = client->read(streamId, 1000);
+    auto copy = readData->first->clone();
+    LOG(INFO) << "Client received data="
+              << copy->clone()->moveToFbString().toStdString()
+              << " on stream=" << streamId;
+    EXPECT_EQ(
+        copy->moveToFbString().toStdString(),
+        expected->clone()->moveToFbString().toStdString());
+    dataDelivered = true;
+    eventbase_->terminateLoopSoon();
+  }));
+  auto packet1 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none /* longHeaderOverride */,
+      false /* eof */));
+  auto packet2 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none /* longHeaderOverride */,
+      true /* eof */,
+      folly::none /* shortHeaderOverride */,
+      data->length() /* offset */));
+
+  socketReads.emplace_back(TestReadData(packet1->coalesce(), serverAddr));
+  deliverData(packet2->coalesce());
+  if (!dataDelivered) {
+    eventbase_->loopForever();
+  }
+  EXPECT_TRUE(dataDelivered);
+  client->close(folly::none);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithRetriableError) {
+  StreamId streamId = client->createBidirectionalStream().value();
+  client->setReadCallback(streamId, &readCb);
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  EXPECT_CALL(readCb, readError(_, _)).Times(0);
+  deliverNetworkError(EAGAIN);
+  client->setReadCallback(streamId, nullptr);
+  client->close(folly::none);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReadStreamWithNonRetriableError) {
+  StreamId streamId = client->createBidirectionalStream().value();
+  client->setReadCallback(streamId, &readCb);
+  EXPECT_CALL(readCb, readAvailable(_)).Times(0);
+  // TODO: we currently do not close the socket, but maybe we can in the future.
+  EXPECT_CALL(readCb, readError(_, _)).Times(0);
+  deliverNetworkError(EBADF);
+  client->setReadCallback(streamId, nullptr);
+  client->close(folly::none);
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReadStreamMultiplePacketsWithRetriableError) {
+  StreamId streamId = client->createBidirectionalStream().value();
+
+  client->setReadCallback(streamId, &readCb);
+  bool dataDelivered = false;
+  auto expected = IOBuf::copyBuffer("hello");
+  EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
+    auto readData = client->read(streamId, 1000);
+    auto copy = readData->first->clone();
+    LOG(INFO) << "Client received data=" << copy->moveToFbString().toStdString()
+              << " on stream=" << streamId;
+    EXPECT_TRUE(folly::IOBufEqualTo()((*readData).first, expected));
+    dataDelivered = true;
+    eventbase_->terminateLoopSoon();
+  }));
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *expected,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
+  deliverNetworkError(EAGAIN);
+  if (!dataDelivered) {
+    eventbase_->loopForever();
+  }
+  EXPECT_TRUE(dataDelivered);
+  client->close(folly::none);
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReadStreamMultiplePacketsWithNonRetriableError) {
+  StreamId streamId = client->createBidirectionalStream().value();
+
+  client->setReadCallback(streamId, &readCb);
+  auto expected = IOBuf::copyBuffer("hello");
+  EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
+
+  // TODO: we currently do not close the socket, but maybe we can in the future.
+  EXPECT_CALL(readCb, readError(_, _)).Times(0);
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *expected,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
+  deliverNetworkError(EBADF);
+  client->setReadCallback(streamId, nullptr);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {

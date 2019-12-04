@@ -115,6 +115,10 @@ struct TransportSettings {
 
   // The active_connection_id_limit that is sent to the peer.
   uint64_t selfActiveConnectionIdLimit{0};
+
+  // Maximum size of the batch that should be used when receiving packets from
+  // the kernel in one event loop.
+  size_t maxRecvBatchSize{5};
 };
 
 } // namespace quic
