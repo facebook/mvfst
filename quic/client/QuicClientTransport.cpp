@@ -1015,37 +1015,62 @@ void QuicClientTransport::errMessage(
 #endif
 }
 
-void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
-  DCHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
-  readBuffer_ = folly::IOBuf::create(readBufferSize);
-  *buf = readBuffer_->writableData();
-  *len = readBufferSize;
-}
+void QuicClientTransport::getReadBuffer(void**, size_t*) noexcept {}
 
 void QuicClientTransport::onDataAvailable(
-    const folly::SocketAddress& server,
-    size_t len,
-    bool truncated) noexcept {
-  VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
+    const folly::SocketAddress&,
+    size_t,
+    bool) noexcept {}
+
+bool QuicClientTransport::shouldOnlyNotify() {
+  return true;
+}
+
+void QuicClientTransport::onNotifyDataAvailable() noexcept {
+  DCHECK(conn_) << "trying to receive packets without a connection";
+  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
+  auto readBuffer = folly::IOBuf::create(readBufferSize);
+
+  struct iovec vec;
+  vec.iov_base = readBuffer->writableData();
+  vec.iov_len = readBufferSize;
+
+  struct sockaddr_storage addrStorage;
+  socklen_t addrLen = sizeof(addrStorage);
+  memset(&addrStorage, 0, size_t(addrLen));
+  auto rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+  rawAddr->sa_family = socket_->address().getFamily();
+
+  struct msghdr msg;
+  memset(&msg, 0, sizeof(msg));
+  msg.msg_name = rawAddr;
+  msg.msg_namelen = addrLen;
+  msg.msg_iov = &vec;
+  msg.msg_iovlen = 1;
+
+  ssize_t ret = socket_->recvmsg(&msg, 0);
+  if (ret < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return;
+    }
+    return onReadError(folly::AsyncSocketException(
+        folly::AsyncSocketException::INTERNAL_ERROR,
+        "::recvmsg() failed",
+        errno));
+  }
+  size_t bytesRead = size_t(ret);
+  folly::SocketAddress server;
+  server.setFromSockaddr(rawAddr, addrLen);
+  VLOG(10) << "Got data from socket peer=" << server << " len=" << bytesRead;
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
-  Buf data = std::move(readBuffer_);
-  if (truncated) {
-    // This is an error, drop the packet.
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(len, kUdpTruncated);
-    }
-    QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
-    return;
-  }
-  data->append(len);
-  QUIC_TRACE(udp_recvd, *conn_, (uint64_t)len);
+  readBuffer->append(bytesRead);
+  QUIC_TRACE(udp_recvd, *conn_, bytesRead);
   if (conn_->qLogger) {
-    conn_->qLogger->addDatagramReceived(len);
+    conn_->qLogger->addDatagramReceived(bytesRead);
   }
-  NetworkData networkData(std::move(data), packetReceiveTime);
+  NetworkData networkData(std::move(readBuffer), packetReceiveTime);
   onNetworkData(server, std::move(networkData));
 }
 

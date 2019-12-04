@@ -1483,12 +1483,18 @@ class QuicClientTransportTest : public Test {
       folly::ByteRange data,
       bool writes = true) {
     ASSERT_TRUE(networkReadCallback);
-    uint8_t* buf = nullptr;
-    size_t len = 0;
-    networkReadCallback->getReadBuffer((void**)&buf, &len);
-    ASSERT_GT(len, data.size());
-    memcpy(buf, data.data(), data.size());
-    networkReadCallback->onDataAvailable(addr, data.size(), false);
+    EXPECT_CALL(*sock, recvmsg(_, _))
+        .WillOnce(Invoke([&](struct msghdr* msg, int) {
+          DCHECK_GT(msg->msg_iovlen, 0);
+          memcpy(msg->msg_iov[0].iov_base, data.data(), data.size());
+          if (msg->msg_name) {
+            socklen_t msg_len =
+                addr.getAddress(static_cast<sockaddr_storage*>(msg->msg_name));
+            msg->msg_namelen = msg_len;
+          }
+          return data.size();
+        }));
+    networkReadCallback->onNotifyDataAvailable();
     if (writes) {
       loopForWrites();
     }
