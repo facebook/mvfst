@@ -4,27 +4,51 @@
 
 namespace quic {
 
-Buf BufQueue::split(size_t n) {
+Buf BufQueue::split(size_t len) {
   Buf result;
-  while (n != 0) {
-    if (chain_ == nullptr) {
-      throw std::underflow_error(
-          "Attempt to remove more bytes than are present in BufQueue");
-    } else if (chain_->length() <= n) {
-      n -= chain_->length();
-      chainLength_ -= chain_->length();
-      Buf remainder = chain_->pop();
-      appendToChain(result, std::move(chain_));
-      chain_ = std::move(remainder);
+  folly::IOBuf* current = chain_.get();
+  if (current == nullptr && len > 0) {
+    throw std::underflow_error(
+        "Attempt to remove more bytes than are present in BufQueue");
+  } else if (current == nullptr) {
+    DCHECK_EQ(chainLength_, 0);
+    return folly::IOBuf::create(0);
+  }
+  size_t remaining = len;
+  while (remaining != 0) {
+    if (current->length() < remaining) {
+      remaining -= current->length();
     } else {
-      Buf clone = chain_->cloneOne();
-      clone->trimEnd(clone->length() - n);
-      appendToChain(result, std::move(clone));
-      chain_->trimStart(n);
-      chainLength_ -= n;
+      Buf clone;
+      if (remaining < current->length()) {
+        clone = current->cloneOne();
+        clone->trimStart(remaining);
+      }
+      current->trimEnd(current->length() - remaining);
+      remaining = 0;
+      auto next = current->next();
+      if (next == chain_.get()) {
+        result = std::move(chain_);
+      } else {
+        auto chain = chain_.release();
+        result = next->separateChain(chain, current);
+        if (clone) {
+          clone->prependChain(std::unique_ptr<folly::IOBuf>(next));
+        } else {
+          clone = std::unique_ptr<folly::IOBuf>(next);
+        }
+      }
+      chain_ = std::move(clone);
       break;
     }
+    current = current->next();
+    if (current == chain_.get()) {
+      throw std::underflow_error(
+          "Attempt to remove more bytes than are present in BufQueue");
+    }
   }
+  chainLength_ -= len;
+  DCHECK(chainLength_ == 0 || chain_);
   if (UNLIKELY(result == nullptr)) {
     return folly::IOBuf::create(0);
   }
@@ -33,21 +57,44 @@ Buf BufQueue::split(size_t n) {
 
 size_t BufQueue::trimStartAtMost(size_t amount) {
   auto original = amount;
+  folly::IOBuf* current = chain_.get();
+  if (current == nullptr || amount == 0) {
+    return 0;
+  }
   while (amount > 0) {
-    if (!chain_) {
-      break;
-    }
-    if (chain_->length() > amount) {
-      chain_->trimStart(amount);
-      chainLength_ -= amount;
+    if (current->length() >= amount) {
+      current->trimStart(amount);
       amount = 0;
       break;
     }
-    amount -= chain_->length();
-    chainLength_ -= chain_->length();
-    chain_ = chain_->pop();
+    amount -= current->length();
+    current = current->next();
+    if (current == chain_.get()) {
+      break;
+    }
   }
-  return original - amount;
+  auto prev = current->prev();
+  /** We are potentially in 2 states here,
+   * 1. we found the entire amount
+   * 2. or we did not.
+   * If we did not find the entire amount, then current ==
+   * chain and we can remove the entire chain.
+   * If we did, then we can split from the chain head to the previous buffer and
+   * then keep the current buffer.
+   */
+  if (prev != current && current != chain_.get()) {
+    auto chain = chain_.release();
+    current->separateChain(chain, prev);
+    chain_ = std::unique_ptr<folly::IOBuf>(current);
+  } else if (amount > 0) {
+    DCHECK_EQ(current, chain_.get());
+    chain_ = nullptr;
+  }
+  size_t trimmed = original - amount;
+  DCHECK_GE(chainLength_, trimmed);
+  chainLength_ -= trimmed;
+  DCHECK(chainLength_ == 0 || !chain_->empty());
+  return trimmed;
 }
 
 // TODO replace users with trimStartAtMost

@@ -100,6 +100,11 @@ TEST(BufQueue, Split) {
   EXPECT_EQ((IOBuf*)nullptr, queue.front());
 
   queue.append(IOBuf::copyBuffer(SCL("Hello,")));
+  prefix = queue.split(3);
+  EXPECT_EQ(3, prefix->computeChainDataLength());
+  EXPECT_EQ(3, queue.chainLength());
+  checkConsistency(queue);
+
   queue.append(IOBuf::copyBuffer(SCL(" World")));
   checkConsistency(queue);
   EXPECT_THROW({ prefix = queue.split(13); }, std::underflow_error);
@@ -111,6 +116,60 @@ TEST(BufQueue, SplitZero) {
   queue.append(IOBuf::copyBuffer(SCL("Hello world")));
   auto buf = queue.split(0);
   EXPECT_EQ(buf->computeChainDataLength(), 0);
+}
+
+TEST(BufQueue, SplitEmpty) {
+  BufQueue queue;
+  auto buf = queue.split(0);
+  EXPECT_EQ(buf->computeChainDataLength(), 0);
+}
+
+TEST(BufQueue, SplitEmptyInvalid) {
+  BufQueue queue;
+  EXPECT_THROW(queue.split(1), std::underflow_error);
+}
+
+TEST(BufQueue, TrimStartAtMost) {
+  BufQueue queue;
+  queue.append(IOBuf::copyBuffer(SCL("Hello")));
+  auto prefixLen = queue.trimStartAtMost(3);
+  EXPECT_EQ(3, prefixLen);
+  EXPECT_EQ(2, queue.chainLength());
+  checkConsistency(queue);
+
+  prefixLen = queue.trimStartAtMost(2);
+  EXPECT_EQ(2, prefixLen);
+  EXPECT_EQ(0, queue.chainLength());
+  checkConsistency(queue);
+
+  queue.append(IOBuf::copyBuffer(SCL("Hello")));
+  queue.append(IOBuf::copyBuffer(SCL("World")));
+  prefixLen = queue.trimStartAtMost(7);
+  EXPECT_EQ(7, prefixLen);
+  EXPECT_EQ(3, queue.chainLength());
+  checkConsistency(queue);
+
+  prefixLen = queue.trimStartAtMost(10);
+  EXPECT_EQ(3, prefixLen);
+  EXPECT_EQ(0, queue.chainLength());
+  checkConsistency(queue);
+
+  queue.append(IOBuf::copyBuffer(SCL("Hello")));
+  queue.append(IOBuf::copyBuffer(SCL("World")));
+
+  prefixLen = queue.trimStartAtMost(12);
+  EXPECT_EQ(10, prefixLen);
+  EXPECT_EQ(0, queue.chainLength());
+  checkConsistency(queue);
+
+  queue.append(IOBuf::copyBuffer(SCL("Hello")));
+  queue.append(IOBuf::copyBuffer(SCL("World")));
+  queue.append(IOBuf::copyBuffer(SCL("Hello")));
+
+  prefixLen = queue.trimStartAtMost(12);
+  EXPECT_EQ(12, prefixLen);
+  EXPECT_EQ(3, queue.chainLength());
+  checkConsistency(queue);
 }
 
 TEST(BufAppender, TestPushAlreadyFits) {
