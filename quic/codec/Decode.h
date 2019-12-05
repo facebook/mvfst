@@ -50,21 +50,21 @@ folly::Optional<VersionNegotiationPacket> decodeVersionNegotiation(
 
 /**
  * Decodes a single regular QUIC packet from the cursor.
- * The packet in the cursor must be at least 1 QUIC packet.
+ * PacketData represents data from 1 QUIC packet.
  * Throws with a QuicException if the data in the cursor is not a complete QUIC
  * packet or the packet could not be decoded correctly.
  */
 RegularQuicPacket decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
-    folly::io::Cursor& cursor);
+    std::unique_ptr<folly::IOBuf> packetData);
 
 /**
- * Parses a single frame from the cursor. Throws a QuicException if the frame
+ * Parses a single frame from the queue. Throws a QuicException if the frame
  * could not be parsed.
  */
 QuicFrame parseFrame(
-    folly::io::Cursor& cursor,
+    BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params);
 
@@ -132,7 +132,7 @@ ReadAckFrame decodeAckFrameWithECN(
     const CodecParameters& params);
 
 ReadStreamFrame decodeStreamFrame(
-    folly::io::Cursor& cursor,
+    BufQueue& queue,
     StreamTypeField frameTypeField);
 
 ReadCryptoFrame decodeCryptoFrame(folly::io::Cursor& cursor);

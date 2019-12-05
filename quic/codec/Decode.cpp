@@ -14,14 +14,6 @@
 
 namespace {
 
-template <class T>
-inline std::string toHex(
-    const typename std::enable_if<std::is_unsigned<T>::value, T>::type& type) {
-  auto be = folly::Endian::big(type);
-  return folly::to<std::string>(
-      "0x", folly::hexlify(folly::ByteRange(&be, sizeof(be))));
-}
-
 quic::PacketNum nextAckedPacketGap(quic::PacketNum packetNum, uint64_t gap) {
   // Gap cannot overflow because of the definition of quic integer encoding, so
   // we can just add to gap.
@@ -303,8 +295,9 @@ ReadNewTokenFrame decodeNewTokenFrame(folly::io::Cursor& cursor) {
 }
 
 ReadStreamFrame decodeStreamFrame(
-    folly::io::Cursor& cursor,
+    BufQueue& queue,
     StreamTypeField frameTypeField) {
+  folly::io::Cursor cursor(queue.front());
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     throw QuicTransportException(
@@ -343,11 +336,13 @@ ReadStreamFrame decodeStreamFrame(
           quic::FrameType::STREAM);
     }
     // If dataLength > data's actual length then the cursor will throw.
-    cursor.clone(data, dataLength->first);
+    queue.trimStart(cursor - queue.front());
+    data = queue.split(dataLength->first);
   } else {
     // Missing Data Length field doesn't mean no data. It means the rest of the
     // frame are all data.
-    cursor.clone(data, cursor.totalLength());
+    queue.trimStart(cursor - queue.front());
+    data = queue.move();
   }
   return ReadStreamFrame(
       folly::to<StreamId>(streamId->first), offset, std::move(data), fin);
@@ -677,9 +672,10 @@ ExpiredStreamDataFrame decodeExpiredStreamDataFrame(folly::io::Cursor& cursor) {
 }
 
 QuicFrame parseFrame(
-    folly::io::Cursor& cursor,
+    BufQueue& queue,
     const PacketHeader& header,
     const CodecParameters& params) {
+  folly::io::Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(FrameType))) {
     throw QuicTransportException(
         "Quic frame parsing: cursor cannot advance",
@@ -691,6 +687,16 @@ QuicFrame parseFrame(
     throw QuicTransportException(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
   }
+  queue.trimStart(cursor - queue.front());
+  bool isStream = false;
+  bool error = false;
+  SCOPE_EXIT {
+    if (isStream || error) {
+      return;
+    }
+    queue.trimStart(cursor - queue.front());
+  };
+  cursor.reset(queue.front());
   FrameType frameType = static_cast<FrameType>(initialByte->first);
   try {
     switch (frameType) {
@@ -718,8 +724,9 @@ QuicFrame parseFrame(
       case FrameType::STREAM_OFF_FIN:
       case FrameType::STREAM_OFF_LEN:
       case FrameType::STREAM_OFF_LEN_FIN:
+        isStream = true;
         return QuicFrame(
-            decodeStreamFrame(cursor, StreamTypeField(initialByte->first)));
+            decodeStreamFrame(queue, StreamTypeField(initialByte->first)));
       case FrameType::MAX_DATA:
         return QuicFrame(decodeMaxDataFrame(cursor));
       case FrameType::MAX_STREAM_DATA:
@@ -754,15 +761,16 @@ QuicFrame parseFrame(
         return QuicFrame(decodeExpiredStreamDataFrame(cursor));
     }
   } catch (const std::exception&) {
+    error = true;
     throw QuicTransportException(
         folly::to<std::string>(
-            "Frame format invalid, type=", toHex<uint8_t>(initialByte->first)),
+            "Frame format invalid, type=", initialByte->first),
         TransportErrorCode::FRAME_ENCODING_ERROR,
         frameType);
   }
+  error = true;
   throw QuicTransportException(
-      folly::to<std::string>(
-          "Unknown frame, type=", toHex<uint8_t>(initialByte->first)),
+      folly::to<std::string>("Unknown frame, type=", initialByte->first),
       TransportErrorCode::FRAME_ENCODING_ERROR,
       frameType);
 }
@@ -770,12 +778,14 @@ QuicFrame parseFrame(
 // Parse packet
 
 static std::vector<QuicFrame> framesDecodeHelper(
-    folly::io::Cursor& cursor,
+    std::unique_ptr<folly::IOBuf> packetData,
     const PacketHeader& header,
     const CodecParameters& params) {
   std::vector<QuicFrame> frames;
-  while (cursor.totalLength()) {
-    auto frame = parseFrame(cursor, header, params);
+  BufQueue queue;
+  queue.append(std::move(packetData));
+  while (queue.chainLength() > 0) {
+    auto frame = parseFrame(queue, header, params);
     frames.push_back(std::move(frame));
   }
   return frames;
@@ -784,9 +794,10 @@ static std::vector<QuicFrame> framesDecodeHelper(
 RegularQuicPacket decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
-    folly::io::Cursor& cursor) {
+    std::unique_ptr<folly::IOBuf> packetData) {
+  auto frames = framesDecodeHelper(std::move(packetData), header, params);
   RegularQuicPacket packet(std::move(header));
-  packet.frames = framesDecodeHelper(cursor, header, params);
+  packet.frames = std::move(frames);
   return packet;
 }
 

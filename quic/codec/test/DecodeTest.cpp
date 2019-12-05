@@ -523,8 +523,9 @@ TEST_F(DecodeTest, StreamDecodeSuccess) {
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
   auto streamFrame = createStreamFrame(
       streamId, offset, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(streamFrame.get());
-  auto decodedFrame = decodeStreamFrame(cursor, streamType);
+  BufQueue queue;
+  queue.append(streamFrame->clone());
+  auto decodedFrame = decodeStreamFrame(queue, streamType);
   EXPECT_EQ(decodedFrame.offset, 10);
   EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
   EXPECT_EQ(decodedFrame.streamId, 10);
@@ -537,8 +538,9 @@ TEST_F(DecodeTest, StreamLengthStreamIdInvalid) {
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
   auto streamFrame = createStreamFrame<uint8_t>(
       streamId, folly::none, folly::none, nullptr, true);
-  folly::io::Cursor cursor(streamFrame.get());
-  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+  BufQueue queue;
+  queue.append(streamFrame->clone());
+  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
 }
 
 TEST_F(DecodeTest, StreamOffsetNotPresent) {
@@ -548,8 +550,9 @@ TEST_F(DecodeTest, StreamOffsetNotPresent) {
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
   auto streamFrame = createStreamFrame(
       streamId, folly::none, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(streamFrame.get());
-  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+  BufQueue queue;
+  queue.append(streamFrame->clone());
+  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
 }
 
 TEST_F(DecodeTest, StreamIncorrectDataLength) {
@@ -560,8 +563,9 @@ TEST_F(DecodeTest, StreamIncorrectDataLength) {
       StreamTypeField::Builder().setFin().setOffset().setLength().build();
   auto streamFrame = createStreamFrame(
       streamId, offset, length, folly::IOBuf::copyBuffer("a"));
-  folly::io::Cursor cursor(streamFrame.get());
-  EXPECT_THROW(decodeStreamFrame(cursor, streamType), QuicTransportException);
+  BufQueue queue;
+  queue.append(streamFrame->clone());
+  EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
 }
 
 TEST_F(DecodeTest, CryptoDecodeSuccess) {

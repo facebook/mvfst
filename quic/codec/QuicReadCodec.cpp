@@ -228,8 +228,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     decrypted = folly::IOBuf::create(0);
   }
 
-  folly::io::Cursor packetCursor(decrypted.get());
-  return decodeRegularPacket(std::move(longHeader), params_, packetCursor);
+  return decodeRegularPacket(
+      std::move(longHeader), params_, std::move(decrypted));
 }
 
 CodecResult QuicReadCodec::parsePacket(
@@ -341,8 +341,8 @@ CodecResult QuicReadCodec::parsePacket(
     decrypted = folly::IOBuf::create(0);
   }
 
-  folly::io::Cursor packetCursor(decrypted.get());
-  return decodeRegularPacket(std::move(*shortHeader), params_, packetCursor);
+  return decodeRegularPacket(
+      std::move(*shortHeader), params_, std::move(decrypted));
 }
 
 const Aead* QuicReadCodec::getOneRttReadCipher() const {
