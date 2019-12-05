@@ -1039,7 +1039,7 @@ void QuicClientTransport::onNotifyDataAvailable() noexcept {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
+    Buf readBuffer = folly::IOBuf::create(readBufferSize);
     struct iovec vec {};
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
