@@ -78,55 +78,59 @@ TEST(BufQueue, Split) {
   checkConsistency(queue);
   EXPECT_EQ(12, queue.front()->computeChainDataLength());
 
-  unique_ptr<IOBuf> prefix(queue.split(1));
+  unique_ptr<IOBuf> prefix(queue.splitAtMost(1));
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(11, queue.front()->computeChainDataLength());
-  prefix = queue.split(2);
+  prefix = queue.splitAtMost(2);
   checkConsistency(queue);
   EXPECT_EQ(2, prefix->computeChainDataLength());
   EXPECT_EQ(9, queue.front()->computeChainDataLength());
-  prefix = queue.split(3);
+  prefix = queue.splitAtMost(3);
   checkConsistency(queue);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(6, queue.front()->computeChainDataLength());
-  prefix = queue.split(1);
+  prefix = queue.splitAtMost(1);
   checkConsistency(queue);
   EXPECT_EQ(1, prefix->computeChainDataLength());
   EXPECT_EQ(5, queue.front()->computeChainDataLength());
-  prefix = queue.split(5);
+  prefix = queue.splitAtMost(5);
   checkConsistency(queue);
   EXPECT_EQ(5, prefix->computeChainDataLength());
   EXPECT_EQ((IOBuf*)nullptr, queue.front());
 
   queue.append(IOBuf::copyBuffer(SCL("Hello,")));
-  prefix = queue.split(3);
+  prefix = queue.splitAtMost(3);
   EXPECT_EQ(3, prefix->computeChainDataLength());
   EXPECT_EQ(3, queue.chainLength());
   checkConsistency(queue);
 
   queue.append(IOBuf::copyBuffer(SCL(" World")));
   checkConsistency(queue);
-  EXPECT_THROW({ prefix = queue.split(13); }, std::underflow_error);
+
+  prefix = queue.splitAtMost(13);
+  EXPECT_EQ(9, prefix->computeChainDataLength());
+  EXPECT_EQ(0, queue.chainLength());
   checkConsistency(queue);
 }
 
 TEST(BufQueue, SplitZero) {
   BufQueue queue;
   queue.append(IOBuf::copyBuffer(SCL("Hello world")));
-  auto buf = queue.split(0);
+  auto buf = queue.splitAtMost(0);
   EXPECT_EQ(buf->computeChainDataLength(), 0);
 }
 
 TEST(BufQueue, SplitEmpty) {
   BufQueue queue;
-  auto buf = queue.split(0);
+  auto buf = queue.splitAtMost(0);
   EXPECT_EQ(buf->computeChainDataLength(), 0);
 }
 
-TEST(BufQueue, SplitEmptyInvalid) {
+TEST(BufQueue, SplitEmptt) {
   BufQueue queue;
-  EXPECT_THROW(queue.split(1), std::underflow_error);
+  auto res = queue.splitAtMost(1);
+  EXPECT_EQ(res->computeChainDataLength(), 0);
 }
 
 TEST(BufQueue, TrimStartAtMost) {

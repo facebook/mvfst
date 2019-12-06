@@ -338,7 +338,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
 
 class StreamData {
  public:
-  folly::IOBufQueue data{folly::IOBufQueue::cacheChainLength()};
+  BufQueue data;
 
   folly::Promise<StreamPair> promise;
   StreamId id;
@@ -3115,7 +3115,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
   auto expected = IOBuf::copyBuffer("hello");
   EXPECT_CALL(readCb, readAvailable(streamId)).Times(0);
   FizzCryptoFactory cryptoFactory;
-  IOBufQueue packets{IOBufQueue::cacheChainLength()};
+  BufQueue packets;
   for (int i = 0; i < kMaxNumCoalescedPackets; i++) {
     auto garbage = IOBuf::copyBuffer("garbage");
     auto initialCipher = cryptoFactory.getServerInitialCipher(

@@ -189,6 +189,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_codec
+  mvfst_bufutil
   mvfst_constants
   mvfst_codec_decode
   mvfst_codec_types

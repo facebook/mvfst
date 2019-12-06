@@ -26,6 +26,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_client
+  mvfst_bufutil
   mvfst_flowcontrol
   mvfst_happyeyeballs
   mvfst_loss

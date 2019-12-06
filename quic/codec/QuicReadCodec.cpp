@@ -23,7 +23,7 @@ namespace quic {
 QuicReadCodec::QuicReadCodec(QuicNodeType nodeType) : nodeType_(nodeType) {}
 
 folly::Optional<VersionNegotiationPacket>
-QuicReadCodec::tryParsingVersionNegotiation(folly::IOBufQueue& queue) {
+QuicReadCodec::tryParsingVersionNegotiation(BufQueue& queue) {
   folly::io::Cursor cursor(queue.front());
   if (!cursor.canAdvance(sizeof(uint8_t))) {
     return folly::none;
@@ -47,7 +47,7 @@ QuicReadCodec::tryParsingVersionNegotiation(folly::IOBufQueue& queue) {
 }
 
 CodecResult QuicReadCodec::parseLongHeaderPacket(
-    folly::IOBufQueue& queue,
+    BufQueue& queue,
     const AckStates& ackStates) {
   folly::io::Cursor cursor(queue.front());
   auto initialByte = cursor.readBE<uint8_t>();
@@ -57,7 +57,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   if (longHeaderInvariant->invariant.version ==
@@ -67,7 +67,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // function.
     // Since VN is not allowed to be coalesced with another packet
     // type, we clear out the buffer to avoid anyone else parsing it.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   auto type = parseLongHeaderType(initialByte);
@@ -79,7 +79,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   // As soon as we have parsed out the long header we can split off any
@@ -96,10 +96,10 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
       packetNumberOffset + parsedLongHeader->packetLength.packetLength;
   if (queue.chainLength() < currentPacketLen) {
     // Packet appears truncated, there's no parse-able data left.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
-  auto currentPacketData = queue.split(currentPacketLen);
+  auto currentPacketData = queue.splitAtMost(currentPacketLen);
   cursor.reset(currentPacketData.get());
   cursor.skip(packetNumberOffset);
   // Sample starts after the max packet number size. This ensures that we
@@ -108,7 +108,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     VLOG(4) << "Dropping packet, not enough for packet number "
             << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   cursor.skip(kMaxPacketNumEncodingSize);
@@ -116,7 +116,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   if (!cursor.canAdvance(sample.size())) {
     VLOG(4) << "Dropping packet, sample too small " << connIdToHex();
     // Packet appears truncated, there's no parse-able data left.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   cursor.pull(sample.data(), sample.size());
@@ -197,10 +197,10 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
       initialByteRange.data()[0], packetNumberByteRange, expectedNextPacketNum);
 
   longHeader.setPacketNumber(packetNum.first);
-  folly::IOBufQueue decryptQueue{folly::IOBufQueue::cacheChainLength()};
+  BufQueue decryptQueue;
   decryptQueue.append(std::move(currentPacketData));
   size_t aadLen = packetNumberOffset + packetNum.second;
-  auto headerData = decryptQueue.split(aadLen);
+  auto headerData = decryptQueue.splitAtMost(aadLen);
   // parsing verifies that packetLength >= packet number length.
   auto encryptedData = decryptQueue.splitAtMost(
       parsedLongHeader->packetLength.packetLength - packetNum.second);
@@ -233,7 +233,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
 }
 
 CodecResult QuicReadCodec::parsePacket(
-    folly::IOBufQueue& queue,
+    BufQueue& queue,
     const AckStates& ackStates,
     size_t dstConnIdSize) {
   if (queue.empty()) {
@@ -272,7 +272,7 @@ CodecResult QuicReadCodec::parsePacket(
     VLOG(10) << "Dropping packet, too small for sample " << connIdToHex();
     // There's not enough space for the short header packet, clear the queue
     // to indicate there's no more parse-able data.
-    queue.clear();
+    queue.move();
     return CodecResult(Nothing());
   }
   // Take it out of the queue so we can do some writing.

@@ -337,7 +337,7 @@ ReadStreamFrame decodeStreamFrame(
     }
     // If dataLength > data's actual length then the cursor will throw.
     queue.trimStart(cursor - queue.front());
-    data = queue.split(dataLength->first);
+    data = queue.splitAtMost(dataLength->first);
   } else {
     // Missing Data Length field doesn't mean no data. It means the rest of the
     // frame are all data.

@@ -10,7 +10,6 @@
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/samples/echo/EchoHandler.h>
 
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/EventBase.h>
 
 #include <gtest/gtest.h>

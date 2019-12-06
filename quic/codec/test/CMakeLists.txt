@@ -32,6 +32,7 @@ quic_add_test(TARGET QuicWriteCodecTest
   QuicWriteCodecTest.cpp
   DEPENDS
   Folly::folly
+  mvfst_bufutil
   mvfst_codec
   mvfst_codec_decode
   mvfst_codec_types

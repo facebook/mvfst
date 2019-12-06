@@ -11,11 +11,11 @@
 
 #include <folly/Random.h>
 #include <folly/io/Cursor.h>
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/common/BufUtil.h>
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/test/Mocks.h>
@@ -307,7 +307,7 @@ void verifyCorrectness(
   EXPECT_EQ(finExpected, finSet);
   // Verify retransmissionBuffer:
   EXPECT_FALSE(stream->retransmissionBuffer.empty());
-  IOBufQueue retxBufCombined;
+  BufQueue retxBufCombined;
   std::vector<StreamBuffer> rtxCopy;
   for (auto& itr : stream->retransmissionBuffer) {
     rtxCopy.push_back(StreamBuffer(
@@ -380,9 +380,6 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
   auto stream = transport_->createBidirectionalStream().value();
   auto lossStream = transport_->createBidirectionalStream().value();
   conn.streamManager->addLoss(lossStream);
-  conn.streamManager->getStream(lossStream)
-      ->lossBuffer.emplace_back(
-          IOBuf::copyBuffer("Mountains may depart"), 0, false);
   transport_->writeChain(
       stream,
       IOBuf::copyBuffer("An elephant sitting still"),

@@ -10,8 +10,8 @@
 
 #include <quic/api/QuicSocket.h>
 
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/EventBase.h>
+#include <quic/common/BufUtil.h>
 
 namespace quic {
 namespace samples {
@@ -19,7 +19,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
                     public quic::QuicSocket::ReadCallback,
                     public quic::QuicSocket::WriteCallback {
  public:
-  using StreamData = std::pair<folly::IOBufQueue, bool>;
+  using StreamData = std::pair<BufQueue, bool>;
 
   explicit EchoHandler(folly::EventBase* evbIn, bool prEnabled = false)
       : evb(evbIn), prEnabled_(prEnabled) {}
@@ -62,10 +62,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
       return;
     }
     if (input_.find(id) == input_.end()) {
-      input_.emplace(
-          id,
-          std::make_pair(
-              folly::IOBufQueue(folly::IOBufQueue::cacheChainLength()), false));
+      input_.emplace(id, std::make_pair(BufQueue(), false));
     }
     quic::Buf data = std::move(res.value().first);
     bool eof = res.value().second;
@@ -145,7 +142,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
       }
     }
 
-    originalData.split(toSplit);
+    originalData.splitAtMost(toSplit);
 
     auto res = sock->writeChain(id, originalData.move(), true, false, nullptr);
     if (res.hasError()) {

@@ -19,6 +19,7 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/common/BufUtil.h>
 #include <quic/common/test/TestUtils.h>
 
 namespace quic {
@@ -155,7 +156,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
   ~EchoClient() override = default;
 
  private:
-  void sendMessage(quic::StreamId id, folly::IOBufQueue& data) {
+  void sendMessage(quic::StreamId id, BufQueue& data) {
     auto message = data.move();
     auto res = quicClient_->writeChain(id, message->clone(), true, false);
     if (res.hasError()) {
@@ -178,7 +179,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
   uint16_t port_;
   bool prEnabled_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
-  std::map<quic::StreamId, folly::IOBufQueue> pendingOutput_;
+  std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;
 };
 } // namespace samples

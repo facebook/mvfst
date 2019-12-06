@@ -248,7 +248,8 @@ std::pair<Buf, bool> readDataInOrderFromReadBuffer(
     if (sinkData) {
       curr->data.trimStart(toRead);
     } else {
-      splice = curr->data.split(toRead);
+      splice = curr->data.splitAtMost(toRead);
+      DCHECK_EQ(splice->computeChainDataLength(), toRead);
     }
     curr->offset += toRead;
     if (curr->data.chainLength() == 0) {

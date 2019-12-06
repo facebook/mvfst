@@ -50,7 +50,7 @@ class BufQueue {
     return chain_.get();
   }
 
-  Buf split(size_t n);
+  Buf splitAtMost(size_t n);
 
   size_t trimStartAtMost(size_t amount);
 

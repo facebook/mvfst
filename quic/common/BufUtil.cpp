@@ -4,13 +4,10 @@
 
 namespace quic {
 
-Buf BufQueue::split(size_t len) {
+Buf BufQueue::splitAtMost(size_t len) {
   Buf result;
   folly::IOBuf* current = chain_.get();
-  if (current == nullptr && len > 0) {
-    throw std::underflow_error(
-        "Attempt to remove more bytes than are present in BufQueue");
-  } else if (current == nullptr) {
+  if (current == nullptr) {
     DCHECK_EQ(chainLength_, 0);
     return folly::IOBuf::create(0);
   }
@@ -43,12 +40,16 @@ Buf BufQueue::split(size_t len) {
     }
     current = current->next();
     if (current == chain_.get()) {
-      throw std::underflow_error(
-          "Attempt to remove more bytes than are present in BufQueue");
+      break;
     }
   }
-  chainLength_ -= len;
-  DCHECK(chainLength_ == 0 || chain_);
+  if (remaining > 0) {
+    // We did not find all the data we needed, so we are going to consume the
+    // entire chain instead.
+    result = std::move(chain_);
+  }
+  chainLength_ -= (len - remaining);
+  DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
   if (UNLIKELY(result == nullptr)) {
     return folly::IOBuf::create(0);
   }

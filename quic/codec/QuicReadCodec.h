@@ -13,6 +13,7 @@
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufUtil.h>
 #include <quic/handshake/Aead.h>
 #include <quic/state/AckStates.h>
 
@@ -94,7 +95,7 @@ class QuicReadCodec {
    * before the version is negotiated to detect VN.
    */
   virtual CodecResult parsePacket(
-      folly::IOBufQueue& queue,
+      BufQueue& queue,
       const AckStates& ackStates,
       size_t dstConnIdSize = kDefaultConnectionIdSize);
 
@@ -105,7 +106,7 @@ class QuicReadCodec {
    * a VN packet or is invalid.
    */
   folly::Optional<VersionNegotiationPacket> tryParsingVersionNegotiation(
-      folly::IOBufQueue& queue);
+      BufQueue& queue);
 
   const Aead* getOneRttReadCipher() const;
   const Aead* getZeroRttReadCipher() const;
@@ -151,7 +152,7 @@ class QuicReadCodec {
 
  private:
   CodecResult parseLongHeaderPacket(
-      folly::IOBufQueue& queue,
+      BufQueue& queue,
       const AckStates& ackStates);
 
   std::string connIdToHex();

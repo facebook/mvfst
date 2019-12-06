@@ -8,6 +8,7 @@
 
 #include <quic/server/state/ServerStateMachine.h>
 
+#include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/FizzCryptoFactory.h>
@@ -604,7 +605,7 @@ void onServerReadDataFromOpen(
         initialDestinationConnectionId, version);
     conn.peerAddress = conn.originalPeerAddress;
   }
-  folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};
+  BufQueue udpData;
   udpData.append(std::move(readData.networkData.data));
   for (uint16_t processedPackets = 0;
        !udpData.empty() && processedPackets < kMaxNumCoalescedPackets;
@@ -1043,7 +1044,7 @@ void onServerReadDataFromClosed(
     QuicServerConnectionState& conn,
     ServerEvents::ReadData& readData) {
   CHECK_EQ(conn.state, ServerState::Closed);
-  folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};
+  BufQueue udpData;
   udpData.append(std::move(readData.networkData.data));
   auto packetSize = udpData.empty() ? 0 : udpData.chainLength();
   if (!conn.readCodec) {

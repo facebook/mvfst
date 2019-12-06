@@ -15,6 +15,7 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/client/handshake/QuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/BufUtil.h>
 
 namespace quic {
 
@@ -159,7 +160,7 @@ class QuicClientTransport
   void processPacketData(
       const folly::SocketAddress& peer,
       TimePoint receiveTimePoint,
-      folly::IOBufQueue& packetQueue);
+      BufQueue& packetQueue);
 
   void startCryptoHandshake();
 

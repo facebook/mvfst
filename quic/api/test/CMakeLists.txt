@@ -16,6 +16,7 @@ quic_add_test(TARGET QuicTransportTest
   QuicTransportTest.cpp
   DEPENDS
   Folly::folly
+  mvfst_bufutil
   mvfst_transport
   mvfst_server
   mvfst_state_stream_functions

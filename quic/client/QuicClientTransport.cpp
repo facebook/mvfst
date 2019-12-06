@@ -96,7 +96,7 @@ QuicClientTransport::~QuicClientTransport() {
 void QuicClientTransport::processUDPData(
     const folly::SocketAddress& peer,
     NetworkDataSingle&& networkData) {
-  folly::IOBufQueue udpData{folly::IOBufQueue::cacheChainLength()};
+  BufQueue udpData;
   udpData.append(std::move(networkData.data));
 
   if (!conn_->version) {
@@ -129,7 +129,7 @@ void QuicClientTransport::processUDPData(
 void QuicClientTransport::processPacketData(
     const folly::SocketAddress& peer,
     TimePoint receiveTimePoint,
-    folly::IOBufQueue& packetQueue) {
+    BufQueue& packetQueue) {
   auto packetSize = packetQueue.chainLength();
   if (packetSize == 0) {
     return;

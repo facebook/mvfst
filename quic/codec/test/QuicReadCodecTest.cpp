@@ -124,6 +124,37 @@ TEST_F(QuicReadCodecTest, RetryPacketTest) {
   EXPECT_EQ(headerOut.getToken(), expected);
 }
 
+TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
+  LongHeader headerIn(
+      LongHeader::Types::Initial,
+      getTestConnectionId(70),
+      getTestConnectionId(90),
+      321,
+      QuicVersion::MVFST,
+      std::string("fluffydog"),
+      getTestConnectionId(110));
+
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
+  builder.setCipherOverhead(0);
+  writeCryptoFrame(0, folly::IOBuf::copyBuffer("CHLO"), builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  auto packetQueue = bufToQueue(std::move(packet));
+
+  auto tmp = packetQueue.move();
+  tmp->coalesce();
+  tmp->trimEnd(1);
+  packetQueue.append(std::move(tmp));
+
+  AckStates ackStates;
+  auto codec = makeUnencryptedCodec();
+  codec->setInitialReadCipher(createNoOpAead());
+  codec->setInitialHeaderCipher(test::createNoOpHeaderCipher());
+  auto result = codec->parsePacket(packetQueue, ackStates);
+  auto nothing = result.nothing();
+  EXPECT_NE(nothing, nullptr);
+}
+
 TEST_F(QuicReadCodecTest, EmptyVersionNegotiationPacketTest) {
   auto srcConnId = getTestConnectionId(0), destConnId = getTestConnectionId(1);
   std::vector<QuicVersion> versions;

@@ -10,7 +10,6 @@
 
 #include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
-#include <folly/io/IOBufQueue.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/HHWheelTimer.h>
 #include <quic/QuicConstants.h>

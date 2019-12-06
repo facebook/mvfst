@@ -37,7 +37,7 @@ constexpr auto kLongHeaderHeaderSize = sizeof(uint8_t) /* Type bytes */ +
 constexpr auto kCipherOverheadHeuristic = 16;
 
 // TODO: i'm sure this isn't the optimal value:
-// IOBufQueue growth byte size for in PacketBuilder:
+// Appender growth byte size for in PacketBuilder:
 constexpr size_t kAppenderGrowthSize = 100;
 
 class PacketBuilderInterface {

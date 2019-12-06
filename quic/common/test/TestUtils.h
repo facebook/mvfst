@@ -11,6 +11,7 @@
 #include <quic/client/handshake/QuicPskCache.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufUtil.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -224,7 +225,7 @@ CongestionController::AckEvent makeAck(
     TimePoint ackedTime,
     TimePoint sendTime);
 
-folly::IOBufQueue bufToQueue(Buf buf);
+BufQueue bufToQueue(Buf buf);
 
 StatelessResetToken generateStatelessResetToken();
 

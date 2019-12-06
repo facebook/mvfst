@@ -556,8 +556,8 @@ CongestionController::AckEvent makeAck(
   return ack;
 }
 
-folly::IOBufQueue bufToQueue(Buf buf) {
-  folly::IOBufQueue queue{folly::IOBufQueue::cacheChainLength()};
+BufQueue bufToQueue(Buf buf) {
+  BufQueue queue;
   buf->coalesce();
   queue.append(std::move(buf));
   return queue;

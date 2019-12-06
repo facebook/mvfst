@@ -96,7 +96,8 @@ void handleNewStreamDataWritten(
   // Idealy we should also check this data doesn't exist in either retx buffer
   // or loss buffer, but that's an expensive search.
   stream.currentWriteOffset += frameLen;
-  auto bufWritten = stream.writeBuffer.split(folly::to<size_t>(frameLen));
+  auto bufWritten = stream.writeBuffer.splitAtMost(folly::to<size_t>(frameLen));
+  DCHECK_EQ(bufWritten->computeChainDataLength(), frameLen);
   stream.currentWriteOffset += frameFin ? 1 : 0;
   CHECK(stream.retransmissionBuffer
             .emplace(
@@ -126,7 +127,7 @@ void handleRetransmissionWritten(
     stream.lossBuffer.erase(lossBufferIter);
   } else {
     lossBufferIter->offset += frameLen;
-    bufWritten = lossBufferIter->data.split(frameLen);
+    bufWritten = lossBufferIter->data.splitAtMost(frameLen);
   }
   CHECK(stream.retransmissionBuffer
             .emplace(
