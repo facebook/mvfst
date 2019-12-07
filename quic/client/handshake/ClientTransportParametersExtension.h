@@ -8,13 +8,11 @@
 
 #pragma once
 
-#include <fizz/client/ClientExtensions.h>
 #include <quic/handshake/FizzTransportParameters.h>
 
 namespace quic {
 
-class ClientTransportParametersExtension : public fizz::ClientExtensions {
- public:
+struct ClientTransportParametersExtension {
   ClientTransportParametersExtension(
       folly::Optional<QuicVersion> initialVersion,
       uint64_t initialMaxData,
@@ -38,64 +36,10 @@ class ClientTransportParametersExtension : public fizz::ClientExtensions {
         activeConnectionLimit_(activeConnectionIdLimit),
         customTransportParameters_(customTransportParameters) {}
 
-  ~ClientTransportParametersExtension() override = default;
-
-  std::vector<fizz::Extension> getClientHelloExtensions() const override {
-    std::vector<fizz::Extension> exts;
-
-    ClientTransportParameters params;
-    params.initial_version = initialVersion_;
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_bidi_local,
-        initialMaxStreamDataBidiLocal_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_bidi_remote,
-        initialMaxStreamDataBidiRemote_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_stream_data_uni,
-        initialMaxStreamDataUni_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_data, initialMaxData_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_bidi,
-        std::numeric_limits<uint32_t>::max()));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::initial_max_streams_uni,
-        std::numeric_limits<uint32_t>::max()));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::idle_timeout, idleTimeout_.count()));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::ack_delay_exponent, ackDelayExponent_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::max_packet_size, maxRecvPacketSize_));
-    params.parameters.push_back(encodeIntegerParameter(
-        TransportParameterId::active_connection_id_limit,
-        activeConnectionLimit_));
-
-    for (const auto& customParameter : customTransportParameters_) {
-      params.parameters.push_back(customParameter);
-    }
-
-    exts.push_back(encodeExtension(params));
-    return exts;
-  }
-
-  void onEncryptedExtensions(
-      const std::vector<fizz::Extension>& exts) override {
-    auto serverParams = fizz::getExtension<ServerTransportParameters>(exts);
-    if (!serverParams) {
-      throw fizz::FizzException(
-          "missing server quic transport parameters extension",
-          fizz::AlertDescription::missing_extension);
-    }
-    serverTransportParameters_ = std::move(serverParams);
-  }
-
   folly::Optional<ServerTransportParameters> getServerTransportParams() {
     return std::move(serverTransportParameters_);
   }
 
- private:
   folly::Optional<QuicVersion> initialVersion_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;

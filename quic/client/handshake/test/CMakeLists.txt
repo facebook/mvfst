@@ -10,7 +10,7 @@ endif()
 quic_add_test(TARGET ClientHandshakeTest
   SOURCES
   ClientHandshakeTest.cpp
-  ClientTransportParametersTest.cpp
+  FizzClientExtensionsTest.cpp
   DEPENDS
   Folly::folly
   ${LIBFIZZ_LIBRARY}

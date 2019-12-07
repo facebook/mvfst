@@ -1119,7 +1119,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   void connect(
       folly::Optional<std::string>,
       folly::Optional<fizz::client::CachedPsk>,
-      const std::shared_ptr<ClientTransportParametersExtension>&,
+      std::shared_ptr<ClientTransportParametersExtension>,
       HandshakeCallback* callback) override {
     connected_ = true;
     writeDataToQuicStream(

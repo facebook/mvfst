@@ -46,8 +46,7 @@ class ClientHandshake : public Handshake {
   virtual void connect(
       folly::Optional<std::string> hostname,
       folly::Optional<fizz::client::CachedPsk> cachedPsk,
-      const std::shared_ptr<ClientTransportParametersExtension>&
-          transportParams,
+      std::shared_ptr<ClientTransportParametersExtension> transportParams,
       HandshakeCallback* callback) = 0;
 
   /**
