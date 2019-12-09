@@ -350,6 +350,10 @@ void BbrCongestionController::handleAckInProbeRtt(
     bool newRoundTrip,
     TimePoint ackTime) noexcept {
   DCHECK(state_ == BbrState::ProbeRtt);
+
+  if (bandwidthSampler_) {
+    bandwidthSampler_->onAppLimited();
+  }
   // This is an ugly looking if-else pot. Here is the basic idea: we wait for
   // inflightBytes_ to reach some low level. Then we stay there for
   // max(1 RTT Round, kProbeRttDuration).
@@ -376,7 +380,8 @@ void BbrCongestionController::handleAckInProbeRtt(
       }
     }
   }
-  // TODO: need to update quiescence state
+  // reset exitingQuiescence is already done before the invocation of
+  // handleAckInProbeRtt
 }
 
 void BbrCongestionController::transitToStartup() noexcept {

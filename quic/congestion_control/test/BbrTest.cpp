@@ -272,7 +272,7 @@ TEST_F(BbrTest, ProbeRtt) {
   // largestSent of the conn
   packetToAck = inflightPackets.front();
   EXPECT_CALL(*rawRttSampler, minRttExpired()).WillOnce(Return(true));
-  EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
+  EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(AnyNumber());
   bbr.onPacketAckOrLoss(
       makeAck(
           packetToAck.first,
@@ -651,6 +651,31 @@ TEST_F(BbrTest, PacketLossInvokesPacer) {
   CongestionController::LossEvent lossEvent;
   lossEvent.addLostPacket(packet);
   bbr.onPacketAckOrLoss(folly::none, lossEvent);
+}
+
+TEST_F(BbrTest, ProbeRttSetsAppLimited) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController::BbrConfig config;
+  BbrCongestionController bbr(conn, config);
+  auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
+  auto rawBandwidthSampler = mockBandwidthSampler.get();
+  auto mockRttSampler = std::make_unique<MockMinRttSampler>();
+  auto rawRttSampler = mockRttSampler.get();
+  bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
+  bbr.setRttSampler(std::move(mockRttSampler));
+
+  bbr.onPacketSent(makeTestingWritePacket(0, 1000, 1000));
+  EXPECT_CALL(*rawRttSampler, minRttExpired()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(2);
+  bbr.onPacketAckOrLoss(
+      makeAck(0, 1000, Clock::now(), Clock::now() - 5ms), folly::none);
+  EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
+
+  bbr.onPacketSent(makeTestingWritePacket(1, 1000, 2000));
+  EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
+  bbr.onPacketAckOrLoss(
+      makeAck(1, 1000, Clock::now(), Clock::now() - 5ms), folly::none);
+  EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
 }
 
 } // namespace test
