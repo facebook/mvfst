@@ -104,7 +104,7 @@ INSTANTIATE_TEST_CASE_P(
     QuicIntegerTests,
     QuicIntegerDecodeTest,
     Values(
-        (IntegerParams){151288809941952652, "c2197c5eff14e88c", false, 8},
+        (IntegerParams){0, "00", false, 1},
         (IntegerParams){494878333, "9d7f3e7d", false, 4},
         (IntegerParams){15293, "7bbd", false, 2},
         (IntegerParams){37, "25", false, 1},
@@ -117,6 +117,8 @@ INSTANTIATE_TEST_CASE_P(
     QuicIntegerEncodeTests,
     QuicIntegerEncodeTest,
     Values(
+        (IntegerParams){0, "00", false, 1},
+        (IntegerParams){151288809941952652, "c2197c5eff14e88c", false},
         (IntegerParams){151288809941952652, "c2197c5eff14e88c", false},
         (IntegerParams){494878333, "9d7f3e7d", false},
         (IntegerParams){15293, "7bbd", false},

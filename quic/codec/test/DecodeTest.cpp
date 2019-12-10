@@ -606,10 +606,38 @@ TEST_F(DecodeTest, CryptoIncorrectDataLength) {
 TEST_F(DecodeTest, PaddingFrameTest) {
   auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
   buf->append(1);
+  memset(buf->writableData(), 0, 1);
 
   folly::io::RWPrivateCursor wcursor(buf.get());
   folly::io::Cursor cursor(buf.get());
   decodePaddingFrame(cursor);
+}
+
+TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
+  auto buf = folly::IOBuf::create(20);
+  buf->append(10);
+  memset(buf->writableData(), 0, 10);
+  buf->append(1);
+  // something which is not padding
+  memset(buf->writableData() + 10, 5, 1);
+
+  folly::io::RWPrivateCursor wcursor(buf.get());
+  folly::io::Cursor cursor(buf.get());
+  decodePaddingFrame(cursor);
+  // If we encountered an interleaved frame, leave the whole thing
+  // as is
+  EXPECT_EQ(cursor.totalLength(), 11);
+}
+
+TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
+  auto buf = folly::IOBuf::create(20);
+  buf->append(10);
+  memset(buf->writableData(), 0, 10);
+
+  folly::io::RWPrivateCursor wcursor(buf.get());
+  folly::io::Cursor cursor(buf.get());
+  decodePaddingFrame(cursor);
+  EXPECT_EQ(cursor.totalLength(), 0);
 }
 
 std::unique_ptr<folly::IOBuf> createNewTokenFrame(

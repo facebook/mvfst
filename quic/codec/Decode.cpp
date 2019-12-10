@@ -48,7 +48,23 @@ constexpr size_t kConnIdLengthOctet = 1;
 
 namespace quic {
 
-PaddingFrame decodePaddingFrame(folly::io::Cursor&) {
+PaddingFrame decodePaddingFrame(folly::io::Cursor& cursor) {
+  // we might have multiple padding frames in sequence in the common case.
+  // Let's consume all the padding and return 1 padding frame for everything.
+  static_assert(
+      static_cast<int>(FrameType::PADDING) == 0, "Padding value is 0");
+  folly::ByteRange paddingBytes = cursor.peekBytes();
+  uint8_t firstByte = paddingBytes.data()[0];
+  // While type can be variable length, since PADDING frame is always a 0
+  // byte frame, the length of the type should be 1 byte.
+  if (static_cast<FrameType>(firstByte) != FrameType::PADDING) {
+    return PaddingFrame();
+  }
+  int ret = memcmp(
+      paddingBytes.data(), paddingBytes.data() + 1, paddingBytes.size() - 1);
+  if (ret == 0) {
+    cursor.skip(paddingBytes.size());
+  }
   return PaddingFrame();
 }
 
