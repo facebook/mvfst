@@ -606,10 +606,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                  "id": 10,
                  "length": 5,
                  "offset": 0
-               },
-               {
-                 "frame_type": "PADDING",
-                 "num_frames": 11
                }
              ],
              "header": {

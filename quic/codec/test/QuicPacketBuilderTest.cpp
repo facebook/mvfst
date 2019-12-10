@@ -311,8 +311,7 @@ TEST_F(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
   // We should have padded the remaining bytes with Padding frames.
   size_t expectedOutputSize =
       sizeof(Sample) + kMaxPacketNumEncodingSize - encodedPacketNum.length;
-  EXPECT_EQ(
-      resultRegularPacket.frames.size(), expectedOutputSize - cipherOverhead);
+  EXPECT_EQ(resultRegularPacket.frames.size(), 1);
   EXPECT_EQ(
       builtOut.body->computeChainDataLength(),
       expectedOutputSize - cipherOverhead);
@@ -335,7 +334,7 @@ TEST_F(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
 
   size_t headerSize = 13;
   // We should have padded the remaining bytes with Padding frames.
-  EXPECT_EQ(resultRegularPacket.frames.size(), totalPacketSize - headerSize);
+  EXPECT_EQ(resultRegularPacket.frames.size(), 1);
   EXPECT_EQ(
       builtOut.body->computeChainDataLength(), totalPacketSize - headerSize);
 }

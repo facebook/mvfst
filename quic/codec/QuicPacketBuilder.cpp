@@ -201,7 +201,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   size_t bodyLength = body_->computeChainDataLength();
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !quicFrames_.empty() && remainingBytes_ > kMaxPacketLenSize) {
-    quicFrames_.push_back(PaddingFrame());
+    // We can add padding frames, but we don't need to store them.
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
     write(paddingType);
     extraDataWritten++;
