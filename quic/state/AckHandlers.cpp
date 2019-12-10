@@ -133,11 +133,6 @@ void processAckFrame(
       if (conn.qLogger) {
         conn.qLogger->addPacketAck(currentPacketNumberSpace, currentPacketNum);
       }
-      QUIC_TRACE(
-          packet_acked,
-          conn,
-          toString(currentPacketNumberSpace),
-          currentPacketNum);
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandingPacketEvents
       if (!rPacketIt->associatedEvent ||
@@ -205,6 +200,9 @@ void processAckFrame(
       updatedOustandingPacketsCount, conn.outstandingHandshakePacketsCount);
   DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingClonedPacketsCount);
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
+  if (ack.largestAckedPacket.hasValue()) {
+    QUIC_TRACE(packets_acked, conn, ack.ackedBytes);
+  }
   if (conn.congestionController &&
       (ack.largestAckedPacket.hasValue() || lossEvent)) {
     if (lossEvent) {
