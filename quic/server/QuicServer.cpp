@@ -357,6 +357,16 @@ void QuicServer::routeDataToWorker(
   auto& worker = workers_[workerToRunOn];
   VLOG_IF(4, !worker->getEventBase()->isInEventBaseThread())
       << " Routing to worker in different EVB, to workerId=" << workerToRunOn;
+  folly::EventBase* workerEvb = worker->getEventBase();
+  bool isInEvb = workerEvb->isInEventBaseThread();
+  if (isInEvb) {
+    worker->dispatchPacketData(
+        client,
+        std::move(routingData),
+        std::move(networkData),
+        isForwardedData);
+    return;
+  }
   worker->getEventBase()->runInEventBaseThread(
       [server = this->shared_from_this(),
        cl = client,

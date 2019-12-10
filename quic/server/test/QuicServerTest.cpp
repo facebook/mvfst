@@ -1192,8 +1192,9 @@ class QuicServerTest : public Test {
                 transportSettings.advertisedInitialConnectionWindowSize);
           }));
       ON_CALL(*transport, onNetworkData(_, _))
-          .WillByDefault(
-              Invoke([&, expected = data.get()](auto, const auto& networkData) {
+          .WillByDefault(Invoke(
+              [&, expected = std::shared_ptr<folly::IOBuf>(data->clone())](
+                  auto, const auto& networkData) mutable {
                 EXPECT_GT(networkData.packets.size(), 0);
                 EXPECT_TRUE(
                     folly::IOBufEqualTo()(*networkData.packets[0], *expected));
@@ -1314,6 +1315,58 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
   // cleanup transport
   transport->getEventBase()->runInEventBaseThreadAndWait(
       [&] { transport.reset(); });
+}
+
+TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
+  folly::ScopedEventBaseThread evbThread;
+  std::vector<folly::EventBase*> evbs;
+  evbs.emplace_back(evbThread.getEventBase());
+  MockQuicStats* stats = new MockQuicStats();
+  auto serverAddr = initializeServer(evbs, stats);
+  auto client = makeUdpClient();
+  auto transport =
+      createNewTransport(evbThread.getEventBase(), *client, serverAddr);
+  EXPECT_CALL(*transport, setTransportInfoCallback(nullptr));
+  EXPECT_CALL(*stats, onPacketDropped(PacketDropReason::SERVER_SHUTDOWN))
+      .Times(0);
+  auto clientConnId = getTestConnectionId(clientHostId_),
+       serverConnId = getTestConnectionId(serverHostId_);
+  PacketNum packetNum = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(
+      LongHeader::Types::Initial,
+      clientConnId,
+      serverConnId,
+      packetNum,
+      version);
+  auto initialData = std::shared_ptr<folly::IOBuf>(
+      folly::IOBuf::create(kMinInitialPacketSize));
+  initialData->append(kMinInitialPacketSize);
+  memset(initialData->writableData(), 'd', kMinInitialPacketSize);
+  NetworkData networkData(initialData->clone(), Clock::now());
+  RoutingData routingData(
+      HeaderForm::Long,
+      true,
+      true,
+      header.getDestinationConnId(),
+      header.getSourceConnId());
+
+  EXPECT_CALL(*transport, onNetworkData(_, _))
+      .WillOnce(Invoke([&](auto, const auto& networkData) {
+        EXPECT_GT(networkData.packets.size(), 0);
+        EXPECT_TRUE(
+            folly::IOBufEqualTo()(*networkData.packets[0], *initialData));
+      }));
+
+  server_->routeDataToWorker(
+      client->address(), std::move(routingData), std::move(networkData));
+
+  // cleanup transport
+  transport->getEventBase()->runInEventBaseThreadAndWait(
+      [&] { transport.reset(); });
+  closeUdpClient(std::move(client));
+  std::thread t([&] { server_->shutdown(); });
+  t.join();
 }
 
 class QuicServerTakeoverTest : public Test {
