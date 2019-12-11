@@ -608,7 +608,13 @@ TEST_F(DecodeTest, PaddingFrameTest) {
   buf->append(1);
   memset(buf->writableData(), 0, 1);
 
-  folly::io::RWPrivateCursor wcursor(buf.get());
+  folly::io::Cursor cursor(buf.get());
+  decodePaddingFrame(cursor);
+}
+
+TEST_F(DecodeTest, PaddingFrameNoBytesTest) {
+  auto buf = folly::IOBuf::create(sizeof(UnderlyingFrameType));
+
   folly::io::Cursor cursor(buf.get());
   decodePaddingFrame(cursor);
 }
@@ -621,7 +627,6 @@ TEST_F(DecodeTest, DecodeMultiplePaddingInterleavedTest) {
   // something which is not padding
   memset(buf->writableData() + 10, 5, 1);
 
-  folly::io::RWPrivateCursor wcursor(buf.get());
   folly::io::Cursor cursor(buf.get());
   decodePaddingFrame(cursor);
   // If we encountered an interleaved frame, leave the whole thing
@@ -634,7 +639,6 @@ TEST_F(DecodeTest, DecodeMultiplePaddingTest) {
   buf->append(10);
   memset(buf->writableData(), 0, 10);
 
-  folly::io::RWPrivateCursor wcursor(buf.get());
   folly::io::Cursor cursor(buf.get());
   decodePaddingFrame(cursor);
   EXPECT_EQ(cursor.totalLength(), 0);

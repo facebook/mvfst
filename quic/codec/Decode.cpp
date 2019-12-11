@@ -54,6 +54,9 @@ PaddingFrame decodePaddingFrame(folly::io::Cursor& cursor) {
   static_assert(
       static_cast<int>(FrameType::PADDING) == 0, "Padding value is 0");
   folly::ByteRange paddingBytes = cursor.peekBytes();
+  if (paddingBytes.size() == 0) {
+    return PaddingFrame();
+  }
   uint8_t firstByte = paddingBytes.data()[0];
   // While type can be variable length, since PADDING frame is always a 0
   // byte frame, the length of the type should be 1 byte.
