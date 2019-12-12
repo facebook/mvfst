@@ -368,7 +368,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
       "The sun is in the sky.");
   MaxStreamsFrame maxStreamFrame(999, true);
   PingFrame pingFrame;
-  IntervalSet<PacketNum> ackBlocks;
+  WriteAckFrame::AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);

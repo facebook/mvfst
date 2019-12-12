@@ -15,7 +15,7 @@ namespace quic {
 
 // Ack and PacketNumber states. This is per-packet number space.
 struct AckState {
-  using Acks = IntervalSet<PacketNum>;
+  using Acks = WriteAckFrame::AckBlocks;
   Acks acks;
   // Largest ack that has been written to a packet
   folly::Optional<PacketNum> largestAckScheduled;

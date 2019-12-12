@@ -10,10 +10,7 @@
 
 namespace quic {
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 IntervalSet<T, Unit, Container>::IntervalSet(
     std::initializer_list<Interval<T, Unit>> intervals) {
   for (auto itr = intervals.begin(); itr != intervals.end(); ++itr) {
@@ -21,10 +18,7 @@ IntervalSet<T, Unit, Container>::IntervalSet(
   }
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(
     const Interval<T, Unit>& interval) {
   auto intersectionRange = intersectingRange(interval);
@@ -47,10 +41,7 @@ void IntervalSet<T, Unit, Container>::insert(
   container_type::erase(std::next(firstIt), endIt);
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::withdraw(
     const Interval<T, Unit>& interval) {
   auto intersectionRange = intersectingRange(interval);
@@ -87,10 +78,7 @@ void IntervalSet<T, Unit, Container>::withdraw(
   container_type::erase(erasureStart, erasureEnd);
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
   if (UNLIKELY(startIt > endIt)) {
     throw std::invalid_argument("Trying to insert invalid interval");
@@ -98,18 +86,12 @@ void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
   insert(Interval<T, Unit>(startIt, endIt));
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& point) {
   insert(Interval<T, Unit>(point, point));
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 auto IntervalSet<T, Unit, Container>::intersectingRange(
     const Interval<T, Unit>& interval) -> decltype(auto) {
   auto firstIt = std::lower_bound(
@@ -128,10 +110,7 @@ auto IntervalSet<T, Unit, Container>::intersectingRange(
   return std::make_pair(firstIt, endIt);
 }
 
-template <
-    typename T,
-    T Unit,
-    template <typename I, typename = std::allocator<I>> class Container>
+template <typename T, T Unit, template <typename... I> class Container>
 uint64_t IntervalSet<T, Unit, Container>::insertVersion() const {
   return insertVersion_;
 }

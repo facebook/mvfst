@@ -63,7 +63,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       "The sun is in the sky.",
       FrameType::ACK);
   MaxStreamsFrame maxStreamsFrame(4321, true);
-  IntervalSet<PacketNum> ackBlocks;
+  WriteAckFrame::AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
@@ -369,7 +369,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       "The sun is in the sky.",
       FrameType::ACK);
   StreamsBlockedFrame maxStreamIdFrame(0x1024, true);
-  IntervalSet<PacketNum> ackBlocks;
+  WriteAckFrame::AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);

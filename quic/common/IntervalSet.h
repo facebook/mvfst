@@ -52,8 +52,7 @@ struct Interval {
 template <
     typename T,
     T Unit = (T)1,
-    template <typename I, typename = std::allocator<I>> class Container =
-        std::deque>
+    template <typename... I> class Container = std::deque>
 class IntervalSet : private Container<Interval<T, Unit>> {
  public:
   using interval_type = Interval<T, Unit>;
@@ -91,7 +90,6 @@ class IntervalSet : private Container<Interval<T, Unit>> {
   using container_type::empty;
   using container_type::front;
   using container_type::pop_back;
-  using container_type::pop_front;
   using container_type::size;
 
  private:

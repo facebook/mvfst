@@ -552,7 +552,7 @@ class QuicServerTransportTest : public Test {
 
     auto aead = getInitialCipher();
     auto headerCipher = getInitialHeaderCipher();
-    IntervalSet<quic::PacketNum> acks;
+    WriteAckFrame::AckBlocks acks;
     auto start = getFirstOutstandingPacket(
                      server->getNonConstConn(), PacketNumberSpace::Initial)
                      ->packet.header.getPacketSequenceNum();
@@ -943,7 +943,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   server->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
   loopForWrites();
 
-  IntervalSet<quic::PacketNum> acks;
+  WriteAckFrame::AckBlocks acks;
   auto start = getFirstOutstandingPacket(
                    server->getNonConstConn(), PacketNumberSpace::AppData)
                    ->packet.header.getPacketSequenceNum();
@@ -1188,7 +1188,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   }
 
   auto originalRetransSize = stream->retransmissionBuffer.size();
-  IntervalSet<PacketNum> acks = {{packetNum1, packetNum1}};
+  WriteAckFrame::AckBlocks acks = {{packetNum1, packetNum1}};
   auto packet1 = createAckPacket(
       server->getNonConstConn(),
       ++clientNextAppDataPacketNum,
@@ -1215,7 +1215,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
   EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
 
-  IntervalSet<PacketNum> acks2 = {{packetNum1, lastPacketNum}};
+  WriteAckFrame::AckBlocks acks2 = {{packetNum1, lastPacketNum}};
   auto packet3 = createAckPacket(
       server->getNonConstConn(),
       ++clientNextAppDataPacketNum,
@@ -1237,7 +1237,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
           server->getNonConstConn(), PacketNumberSpace::AppData)
           ->packet.header.getPacketSequenceNum();
 
-  IntervalSet<PacketNum> acks3 = {{lastPacketNum, finPacketNum}};
+  WriteAckFrame::AckBlocks acks3 = {{lastPacketNum, finPacketNum}};
   auto packet4 = createAckPacket(
       server->getNonConstConn(),
       ++clientNextAppDataPacketNum,
@@ -1769,7 +1769,7 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   auto op = findOutstandingPacket(server->getNonConstConn(), match);
   ASSERT_TRUE(op != nullptr);
   PacketNum packetNum = op->packet.header.getPacketSequenceNum();
-  IntervalSet<PacketNum> acks = {{packetNum, packetNum}};
+  WriteAckFrame::AckBlocks acks = {{packetNum, packetNum}};
   auto packet1 = createAckPacket(
       server->getNonConstConn(),
       ++clientNextAppDataPacketNum,
@@ -1817,7 +1817,7 @@ TEST_F(QuicServerTransportTest, TestAckRstStream) {
       *stream,
       GenericApplicationErrorCode::UNKNOWN);
 
-  IntervalSet<PacketNum> acks = {{packetNum, packetNum}};
+  WriteAckFrame::AckBlocks acks = {{packetNum, packetNum}};
   auto packet1 = createAckPacket(
       server->getNonConstConn(),
       ++clientNextAppDataPacketNum,
@@ -3245,7 +3245,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedStream) {
 TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
   server->getNonConstConn().qLogger = qLogger;
-  IntervalSet<PacketNum> acks = {{1, 2}};
+  WriteAckFrame::AckBlocks acks = {{1, 2}};
   auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = clientNextInitialPacketNum++;
   LongHeader header(

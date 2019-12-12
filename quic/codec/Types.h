@@ -46,6 +46,7 @@ enum class PacketNumberSpace : uint8_t {
 
 constexpr uint8_t kHeaderFormMask = 0x80;
 constexpr auto kMaxPacketNumEncodingSize = 4;
+constexpr auto kNumInitialAckBlocksPerFrame = 32;
 
 struct PaddingFrame {
   bool operator==(const PaddingFrame& /*rhs*/) const {
@@ -98,7 +99,7 @@ struct ReadAckFrame {
   std::chrono::microseconds ackDelay{0us};
   // Should have at least 1 block.
   // These are ordered in descending order by start packet.
-  using Vec = SmallVec<AckBlock, 32, uint16_t>;
+  using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame, uint16_t>;
   Vec ackBlocks;
 
   bool operator==(const ReadAckFrame& /*rhs*/) const {
@@ -108,7 +109,10 @@ struct ReadAckFrame {
 };
 
 struct WriteAckFrame {
-  IntervalSet<PacketNum> ackBlocks;
+  template <class T>
+  using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame, uint16_t>;
+  using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
+  AckBlocks ackBlocks;
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay{0us};
 

@@ -28,12 +28,12 @@ TEST(IntervalSet, insertAtFront) {
   auto version2 = set.insertVersion();
   set.insert(1, 2);
   auto version3 = set.insertVersion();
-  auto interval = set.front();
-  EXPECT_EQ(interval, Interval<int>(1, 2));
-  set.pop_front();
-  interval = set.front();
+  auto interval = set.back();
   EXPECT_EQ(interval, Interval<int>(4, 5));
-  set.pop_front();
+  set.pop_back();
+  interval = set.back();
+  EXPECT_EQ(interval, Interval<int>(1, 2));
+  set.pop_back();
   EXPECT_TRUE(set.empty());
   EXPECT_GT(version2, version1);
   EXPECT_GT(version3, version2);
@@ -143,7 +143,7 @@ TEST(IntervalSet, insertWithMergeAtEdge) {
   set.insert(3, 3);
   auto interval = set.front();
   EXPECT_EQ(interval, Interval<int>(1, 7));
-  set.pop_front();
+  set.pop_back();
   EXPECT_TRUE(set.empty());
 }
 

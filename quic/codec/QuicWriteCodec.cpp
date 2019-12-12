@@ -196,12 +196,12 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
 }
 
 size_t fillFrameWithAckBlocks(
-    const IntervalSet<PacketNum>& ackBlocks,
+    const WriteAckFrame::AckBlocks& ackBlocks,
     WriteAckFrame& ackFrame,
     uint64_t bytesLimit);
 
 size_t fillFrameWithAckBlocks(
-    const IntervalSet<PacketNum>& ackBlocks,
+    const WriteAckFrame::AckBlocks& ackBlocks,
     WriteAckFrame& ackFrame,
     uint64_t bytesLimit) {
   PacketNum currentSeqNum = ackBlocks.crbegin()->start;

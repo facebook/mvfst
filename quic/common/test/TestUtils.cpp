@@ -88,7 +88,7 @@ PacketNum rstStreamAndSendPacket(
 RegularQuicPacketBuilder::Packet createAckPacket(
     QuicConnectionStateBase& dstConn,
     PacketNum pn,
-    IntervalSet<PacketNum>& acks,
+    WriteAckFrame::AckBlocks& acks,
     PacketNumberSpace pnSpace,
     const Aead* aead) {
   // This function sends ACK to dstConn

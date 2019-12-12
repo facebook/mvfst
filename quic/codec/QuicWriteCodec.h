@@ -17,14 +17,14 @@ namespace quic {
 
 struct AckFrameMetaData {
   // Ack blocks. There must be at least 1 ACK block to send.
-  const IntervalSet<PacketNum>& ackBlocks;
+  const WriteAckFrame::AckBlocks& ackBlocks;
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay;
   // The ack delay exponent to use.
   uint8_t ackDelayExponent;
 
   AckFrameMetaData(
-      const IntervalSet<PacketNum>& acksIn,
+      const WriteAckFrame::AckBlocks& acksIn,
       std::chrono::microseconds ackDelayIn,
       uint8_t ackDelayExponentIn)
       : ackBlocks(acksIn),

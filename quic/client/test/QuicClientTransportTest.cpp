@@ -1592,7 +1592,7 @@ class QuicClientTransportTest : public Test {
     return codecResult.regularPacket();
   }
 
-  void verifyShortPackets(IntervalSet<PacketNum>& sentPackets) {
+  void verifyShortPackets(WriteAckFrame::AckBlocks& sentPackets) {
     AckStates ackStates;
     for (auto& write : socketWrites) {
       auto packetQueue = bufToQueue(write->clone());
@@ -3237,7 +3237,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   // ack all the packets
   ASSERT_FALSE(client->getConn().outstandingPackets.empty());
 
-  IntervalSet<quic::PacketNum> acks;
+  WriteAckFrame::AckBlocks acks;
   auto start = getFirstOutstandingPacket(
                    client->getNonConstConn(), PacketNumberSpace::AppData)
                    ->packet.header.getPacketSequenceNum();
@@ -3312,7 +3312,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   // ack all the packets
   ASSERT_FALSE(client->getConn().outstandingPackets.empty());
 
-  IntervalSet<quic::PacketNum> acks;
+  WriteAckFrame::AckBlocks acks;
   auto start = getFirstOutstandingPacket(
                    client->getNonConstConn(), PacketNumberSpace::AppData)
                    ->packet.header.getPacketSequenceNum();
@@ -3444,7 +3444,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
   auto& headerCipher = getInitialHeaderCipher();
   // initial
   {
-    IntervalSet<quic::PacketNum> acks;
+    WriteAckFrame::AckBlocks acks;
     auto start = getFirstOutstandingPacket(
                      client->getNonConstConn(), PacketNumberSpace::Initial)
                      ->packet.header.getPacketSequenceNum();
@@ -3463,7 +3463,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
   }
   // handshake
   {
-    IntervalSet<quic::PacketNum> acks;
+    WriteAckFrame::AckBlocks acks;
     auto start = getFirstOutstandingPacket(
                      client->getNonConstConn(), PacketNumberSpace::Handshake)
                      ->packet.header.getPacketSequenceNum();
@@ -3501,7 +3501,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvOneRttAck) {
   client->writeChain(streamId, expected->clone(), true, false);
   loopForWrites();
 
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   verifyShortPackets(sentPackets);
 
   // Write an AckFrame back to client:
@@ -3723,7 +3723,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   // This will clear out all the outstanding packets
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   for (auto& packet : client->getNonConstConn().outstandingPackets) {
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     sentPackets.insert(packetNum);
@@ -3976,7 +3976,7 @@ TEST_F(
 
   client->setReadCallback(streamId, nullptr);
 
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
   client->writeChain(streamId, writeData->clone(), true, false);
   loopForWrites();
@@ -4000,7 +4000,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
 
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
   client->writeChain(streamId, writeData->clone(), true, false);
   loopForWrites();
@@ -4033,7 +4033,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
   client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
@@ -4057,7 +4057,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
 
@@ -4083,7 +4083,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
 TEST_F(
     QuicClientTransportAfterStartTest,
     RegisterDeliveryCallbackForAlreadyDeliveredOffset) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
 
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
@@ -4111,7 +4111,7 @@ TEST_F(
 }
 
 TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
 
@@ -4334,7 +4334,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedStreamData) {
 }
 
 TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
-  IntervalSet<PacketNum> acks = {{1, 2}};
+  WriteAckFrame::AckBlocks acks = {{1, 2}};
   auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = initialPacketNum++;
   LongHeader header(
@@ -4402,7 +4402,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, FrameNotAllowed) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SendReset) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
@@ -4503,7 +4503,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
@@ -4533,7 +4533,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   auto data = test::buildRandomInputData(10);
@@ -4581,7 +4581,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   StreamId streamId = client->createBidirectionalStream().value();
   StreamId streamId2 = client->createBidirectionalStream().value();
 
@@ -4663,7 +4663,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   EXPECT_EQ(readCbs.count(streamId), 1);
   EXPECT_EQ(conn.streamManager->readableStreams().count(streamId), 0);
 
-  IntervalSet<PacketNum> sentPackets;
+  WriteAckFrame::AckBlocks sentPackets;
   client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
   loopForWrites();
 
