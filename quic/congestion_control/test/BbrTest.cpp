@@ -330,7 +330,7 @@ TEST_F(BbrTest, ProbeRtt) {
   }
 
   // Then sends a new one and ack it to end the previous RTT round. Now we are
-  // counting down both time duration and rtt round.
+  // counting down both time duration and has reached a new rtt round.
   sendFunc();
   packetToAck = inflightPackets.front();
   bbr.onPacketAckOrLoss(
@@ -345,22 +345,7 @@ TEST_F(BbrTest, ProbeRtt) {
   EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
   conn.lossState.totalBytesAcked += conn.udpSendPacketLen;
 
-  // Then one more send-ack to end another rtt round.
-  sendFunc();
-  packetToAck = inflightPackets.front();
-  bbr.onPacketAckOrLoss(
-      makeAck(
-          packetToAck.first,
-          conn.udpSendPacketLen,
-          packetToAck.second + 3ms,
-          packetToAck.second),
-      folly::none);
-  inflightBytes -= conn.udpSendPacketLen;
-  inflightPackets.pop_front();
-  EXPECT_EQ(BbrCongestionController::BbrState::ProbeRtt, bbr.state());
-  conn.lossState.totalBytesAcked += conn.udpSendPacketLen;
-
-  // And finally, finish the time duration count down
+  // finish the time duration count down
   sendFunc();
   packetToAck = inflightPackets.front();
   EXPECT_CALL(

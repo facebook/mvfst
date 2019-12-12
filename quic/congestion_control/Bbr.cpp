@@ -226,7 +226,7 @@ void BbrCongestionController::onPacketAcked(
   }
   exitingQuiescene_ = false;
 
-  if (state_ == BbrState::ProbeRtt) {
+  if (state_ == BbrState::ProbeRtt && minRttSampler_) {
     handleAckInProbeRtt(newRoundTrip, ack.ackTime);
   }
 
@@ -348,33 +348,28 @@ void BbrCongestionController::handleAckInProbeRtt(
     bool newRoundTrip,
     TimePoint ackTime) noexcept {
   DCHECK(state_ == BbrState::ProbeRtt);
+  CHECK(minRttSampler_);
 
   if (bandwidthSampler_) {
     bandwidthSampler_->onAppLimited();
   }
-  // This is an ugly looking if-else pot. Here is the basic idea: we wait for
-  // inflightBytes_ to reach some low level. Then we stay there for
-  // max(1 RTT Round, kProbeRttDuration).
   if (!earliestTimeToExitProbeRtt_ &&
       inflightBytes_ < getCongestionWindow() + conn_.udpSendPacketLen) {
     earliestTimeToExitProbeRtt_ = ackTime + kProbeRttDuration;
     probeRttRound_ = folly::none;
-  } else if (earliestTimeToExitProbeRtt_) {
+    return;
+  }
+  if (earliestTimeToExitProbeRtt_) {
     if (!probeRttRound_ && newRoundTrip) {
       probeRttRound_ = roundTripCounter_;
-    } else if (newRoundTrip) {
-      if (roundTripCounter_ > *probeRttRound_) {
-        if (*earliestTimeToExitProbeRtt_ < ackTime) {
-          // We are done with ProbeRtt_, bye.
-          if (minRttSampler_) {
-            minRttSampler_->timestampMinRtt(ackTime);
-          }
-          if (btlbwFound_) {
-            transitToProbeBw(ackTime);
-          } else {
-            transitToStartup();
-          }
-        }
+    }
+    if (probeRttRound_ && *earliestTimeToExitProbeRtt_ <= ackTime) {
+      // We are done with ProbeRtt_, bye.
+      minRttSampler_->timestampMinRtt(ackTime);
+      if (btlbwFound_) {
+        transitToProbeBw(ackTime);
+      } else {
+        transitToStartup();
       }
     }
   }
