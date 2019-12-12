@@ -24,7 +24,7 @@
 #include <folly/ssl/Init.h>
 
 #include <quic/QuicConstants.h>
-#include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/FizzBridge.h>
 #include <quic/handshake/HandshakeLayer.h>
@@ -151,7 +151,11 @@ class ServerHandshakeTest : public Test {
         }));
     auto cachedPsk = clientCtx->getPsk(hostname);
     fizzClient->connect(
-        clientCtx, verifier, hostname, cachedPsk, clientExtensions);
+        clientCtx,
+        verifier,
+        hostname,
+        cachedPsk,
+        std::make_shared<FizzClientExtensions>(clientExtensions));
   }
 
   void clientServerRound() {

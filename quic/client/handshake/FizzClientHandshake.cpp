@@ -9,6 +9,7 @@
 #include <quic/client/handshake/FizzClientHandshake.h>
 
 #include <folly/Overload.h>
+#include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/FizzBridge.h>
 
@@ -24,7 +25,7 @@ FizzClientHandshake::FizzClientHandshake(
 void FizzClientHandshake::connect(
     folly::Optional<std::string> hostname,
     folly::Optional<fizz::client::CachedPsk> cachedPsk,
-    const std::shared_ptr<ClientTransportParametersExtension>& transportParams,
+    std::shared_ptr<ClientTransportParametersExtension> transportParams,
     HandshakeCallback* callback) {
   transportParams_ = transportParams;
   callback_ = callback;
@@ -43,7 +44,7 @@ void FizzClientHandshake::connect(
       fizzContext_->getCertificateVerifier(),
       std::move(hostname),
       std::move(cachedPsk),
-      transportParams));
+      std::make_shared<FizzClientExtensions>(std::move(transportParams))));
 }
 
 const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {

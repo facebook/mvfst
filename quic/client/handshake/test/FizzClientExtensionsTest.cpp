@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-#include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/common/test/TestUtils.h>
 
 #include <fizz/protocol/test/TestMessages.h>
@@ -30,8 +30,8 @@ static EncryptedExtensions getEncryptedExtensions() {
   return ee;
 }
 
-TEST(ClientTransportParametersTest, TestGetChloExtensions) {
-  ClientTransportParametersExtension ext(
+TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
+  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       folly::none,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
@@ -40,7 +40,7 @@ TEST(ClientTransportParametersTest, TestGetChloExtensions) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit);
+      kDefaultActiveConnectionIdLimit));
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -48,8 +48,8 @@ TEST(ClientTransportParametersTest, TestGetChloExtensions) {
   EXPECT_TRUE(serverParams.hasValue());
 }
 
-TEST(ClientTransportParametersTest, TestOnEE) {
-  ClientTransportParametersExtension ext(
+TEST(FizzClientHandshakeTest, TestOnEE) {
+  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       MVFST1,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
@@ -58,13 +58,13 @@ TEST(ClientTransportParametersTest, TestOnEE) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit);
+      kDefaultActiveConnectionIdLimit));
   ext.getClientHelloExtensions();
   ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
 }
 
-TEST(ClientTransportParametersTest, TestOnEEMissingServerParams) {
-  ClientTransportParametersExtension ext(
+TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
+  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       MVFST1,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
@@ -73,14 +73,14 @@ TEST(ClientTransportParametersTest, TestOnEEMissingServerParams) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit);
+      kDefaultActiveConnectionIdLimit));
   ext.getClientHelloExtensions();
   EXPECT_THROW(
       ext.onEncryptedExtensions(TestMessages::encryptedExt().extensions),
       FizzException);
 }
 
-TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
+TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   std::vector<TransportParameter> customTransportParameters;
 
   std::string randomBytes = "\x01\x00\x55\x12\xff";
@@ -99,7 +99,7 @@ TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
   customTransportParameters.push_back(element2->encode());
   customTransportParameters.push_back(element3->encode());
 
-  ClientTransportParametersExtension ext(
+  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       folly::none,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
@@ -109,7 +109,7 @@ TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       kDefaultActiveConnectionIdLimit,
-      customTransportParameters);
+      customTransportParameters));
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
@@ -155,5 +155,5 @@ TEST(ClientTransportParametersTest, TestGetChloExtensionsCustomParams) {
 
   EXPECT_TRUE(eq(folly::IOBuf::copyBuffer(randomBytes), it3->value));
 }
-}
-}
+} // namespace test
+} // namespace quic
