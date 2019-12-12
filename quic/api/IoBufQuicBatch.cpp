@@ -140,9 +140,18 @@ bool IOBufQuicBatch::flushInternal() {
             : "");
     VLOG(4) << "Error writing to the socket " << errorMsg << " "
             << peerAddress_;
-    throw QuicTransportException(
-        folly::to<std::string>("Error on socket write ", errorMsg),
-        TransportErrorCode::INTERNAL_ERROR);
+
+    // We can get write error for any reason, close the conn only if network
+    // is unreachable, for all others, we throw a transport exception
+    if (isNetworkUnreachable(errno)) {
+      throw QuicInternalException(
+          folly::to<std::string>("Error on socket write ", errorMsg),
+          LocalErrorCode::CONNECTION_ABANDONED);
+    } else {
+      throw QuicTransportException(
+          folly::to<std::string>("Error on socket write ", errorMsg),
+          TransportErrorCode::INTERNAL_ERROR);
+    }
   }
 
   if (!written) {

@@ -1012,6 +1012,23 @@ TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+  auto stream = transport->createBidirectionalStream().value();
+  EXPECT_CALL(*socketPtr, write(_, _))
+      .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
+  QuicSocket::WriteResult result = transport->writeChain(
+      stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
+  transport->addDataToStream(
+      stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
+  evb->loopOnce();
+
+  EXPECT_TRUE(transport->isClosed());
+  EXPECT_EQ(
+      transport->getConnectionError(),
+      QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED));
+}
+
 TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
   auto tickInterval = evb->timer().getTickInterval();
   transport->scheduleLossTimeout(tickInterval - 1ms);
