@@ -796,27 +796,16 @@ QuicFrame parseFrame(
 
 // Parse packet
 
-static std::vector<QuicFrame> framesDecodeHelper(
-    std::unique_ptr<folly::IOBuf> packetData,
-    const PacketHeader& header,
-    const CodecParameters& params) {
-  std::vector<QuicFrame> frames;
-  BufQueue queue;
-  queue.append(std::move(packetData));
-  while (queue.chainLength() > 0) {
-    auto frame = parseFrame(queue, header, params);
-    frames.push_back(std::move(frame));
-  }
-  return frames;
-}
-
 RegularQuicPacket decodeRegularPacket(
     PacketHeader&& header,
     const CodecParameters& params,
     std::unique_ptr<folly::IOBuf> packetData) {
-  auto frames = framesDecodeHelper(std::move(packetData), header, params);
   RegularQuicPacket packet(std::move(header));
-  packet.frames = std::move(frames);
+  BufQueue queue;
+  queue.append(std::move(packetData));
+  while (queue.chainLength() > 0) {
+    packet.frames.push_back(parseFrame(queue, packet.header, params));
+  }
   return packet;
 }
 

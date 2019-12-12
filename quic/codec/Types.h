@@ -11,6 +11,7 @@
 #include <folly/Conv.h>
 #include <folly/Optional.h>
 #include <folly/io/Cursor.h>
+#include <folly/small_vector.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicConnectionId.h>
@@ -28,6 +29,14 @@ namespace quic {
 
 using StreamId = uint64_t;
 using PacketNum = uint64_t;
+
+#if !FOLLY_MOBILE
+template <class T, std::size_t N, class S>
+using SmallVec = folly::small_vector<T, N, S>;
+#else
+template <class T, std::size_t N, class S>
+using SmallVec = std::vector<T>;
+#endif
 
 enum class PacketNumberSpace : uint8_t {
   Initial,
@@ -89,7 +98,8 @@ struct ReadAckFrame {
   std::chrono::microseconds ackDelay{0us};
   // Should have at least 1 block.
   // These are ordered in descending order by start packet.
-  std::vector<AckBlock> ackBlocks;
+  using Vec = SmallVec<AckBlock, 32, uint16_t>;
+  Vec ackBlocks;
 
   bool operator==(const ReadAckFrame& /*rhs*/) const {
     // Can't compare ackBlocks, function is just here to appease compiler.
@@ -824,7 +834,8 @@ struct RegularPacket {
  * include 0-RTT, 1-RTT Phase 0 and 1-RTT Phase 1 packets.
  */
 struct RegularQuicPacket : public RegularPacket {
-  std::vector<QuicFrame> frames;
+  using Vec = SmallVec<QuicFrame, 4, uint16_t>;
+  Vec frames;
 
   explicit RegularQuicPacket(PacketHeader&& headerIn)
       : RegularPacket(std::move(headerIn)) {}
@@ -834,7 +845,8 @@ struct RegularQuicPacket : public RegularPacket {
  * A representation of a regular packet that is written to the network.
  */
 struct RegularQuicWritePacket : public RegularPacket {
-  std::vector<QuicWriteFrame> frames;
+  using Vec = SmallVec<QuicWriteFrame, 4, uint16_t>;
+  Vec frames;
 
   explicit RegularQuicWritePacket(PacketHeader&& headerIn)
       : RegularPacket(std::move(headerIn)) {}

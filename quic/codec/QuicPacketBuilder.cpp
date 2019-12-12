@@ -15,10 +15,6 @@ namespace {
 
 // maximum length of packet length.
 constexpr auto kMaxPacketLenSize = sizeof(uint16_t);
-// Amount of space to reserve in the quicFrames_ of the builder. 2 seems to be
-// good for most cases, as the heaviest path is usually 1 stream frame per
-// packet.
-constexpr auto kPreAllocatedFramesSize = 2;
 } // namespace
 
 namespace quic {
@@ -136,7 +132,6 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
       headerAppender_(header_.get(), kLongHeaderHeaderSize),
       bodyAppender_(body_.get(), kAppenderGrowthSize),
       version_(version) {
-  quicFrames_.reserve(kPreAllocatedFramesSize);
   writeHeaderBytes(largestAckedPacketNum);
 }
 
@@ -189,7 +184,7 @@ void RegularQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
 }
 
 void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
-  quicFrames_.push_back(std::move(frame));
+  packet_.frames.push_back(std::move(frame));
 }
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
@@ -200,13 +195,12 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
   size_t extraDataWritten = 0;
   size_t bodyLength = body_->computeChainDataLength();
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
-         !quicFrames_.empty() && remainingBytes_ > kMaxPacketLenSize) {
+         !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
     QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
     write(paddingType);
     extraDataWritten++;
   }
-  packet_.frames = std::move(quicFrames_);
   if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
         packetNumberEncoding_->length + body_->computeChainDataLength() +

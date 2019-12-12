@@ -133,7 +133,6 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
  private:
   uint32_t remainingBytes_;
   RegularQuicWritePacket packet_;
-  std::vector<QuicWriteFrame> quicFrames_;
   std::unique_ptr<folly::IOBuf> header_;
   std::unique_ptr<folly::IOBuf> body_;
   BufAppender headerAppender_;

@@ -78,7 +78,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     return std::make_pair(std::move(regularPacket), std::move(data_));
   }
 
-  std::vector<QuicWriteFrame> frames_;
+  RegularQuicWritePacket::Vec frames_;
   uint32_t remaining_{kDefaultUDPSendPacketLen};
   std::unique_ptr<folly::IOBuf> data_{folly::IOBuf::create(100)};
   BufAppender appender_{data_.get(), 100};

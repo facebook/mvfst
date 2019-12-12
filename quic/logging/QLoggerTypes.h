@@ -142,11 +142,11 @@ class StreamDataBlockedFrameLog : public QLogFrame {
 
 class ReadAckFrameLog : public QLogFrame {
  public:
-  std::vector<AckBlock> ackBlocks;
+  ReadAckFrame::Vec ackBlocks;
   std::chrono::microseconds ackDelay;
 
   ReadAckFrameLog(
-      const std::vector<AckBlock>& ackBlocksIn,
+      const ReadAckFrame::Vec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn)
       : ackBlocks{ackBlocksIn}, ackDelay{ackDelayIn} {}
   ~ReadAckFrameLog() override = default;
