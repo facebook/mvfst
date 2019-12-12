@@ -12,6 +12,7 @@
 #include <quic/congestion_control/Bandwidth.h>
 #include <quic/congestion_control/third_party/windowed_filter.h>
 #include <quic/state/StateData.h>
+#include <quic/state/TransportSettings.h>
 
 namespace quic {
 
@@ -91,36 +92,7 @@ class BbrCongestionController : public CongestionController {
     virtual bool isAppLimited() const = 0;
   };
 
-  // TODO: a way to give config to bbr
-  struct BbrConfig {
-    bool conservativeRecovery{false};
-
-    /**
-     * When largeProbeRttCwnd is true, kLargeProbeRttCwndGain * BDP will be used
-     * as cwnd during ProbeRtt state, otherwise, 4MSS will be the ProbeRtt cwnd.
-     */
-    bool largeProbeRttCwnd{false};
-
-    // Whether ack aggregation is also calculated during Startup phase
-    bool enableAckAggregationInStartup{false};
-
-    /**
-     * Whether we should enter ProbeRtt if connection has been app-limited since
-     * last time we ProbeRtt.
-     */
-    bool probeRttDisabledIfAppLimited{false};
-
-    /**
-     * Whether BBR should advance pacing gain cycle when BBR is draining and we
-     * haven't reached the drain target.
-     */
-    bool drainToTarget{false};
-  };
-
-  // TODO: i may move the configuration into a separate function
-  BbrCongestionController(
-      QuicConnectionStateBase& conn,
-      const BbrConfig& config);
+  explicit BbrCongestionController(QuicConnectionStateBase& conn);
 
   // TODO: these should probably come in as part of a builder. but I'm not sure
   // if the sampler interface is here to stay atm, so bear with me
@@ -219,7 +191,6 @@ class BbrCongestionController : public CongestionController {
   Bandwidth bandwidth() const noexcept;
 
   QuicConnectionStateBase& conn_;
-  BbrConfig config_;
   BbrState state_{BbrState::Startup};
   RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
 

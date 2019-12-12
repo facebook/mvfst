@@ -34,8 +34,7 @@ DefaultCongestionControllerFactory::makeCongestionController(
       congestionController = std::make_unique<Copa>(conn);
       break;
     case CongestionControlType::BBR: {
-      BbrCongestionController::BbrConfig config;
-      auto bbr = std::make_unique<BbrCongestionController>(conn, config);
+      auto bbr = std::make_unique<BbrCongestionController>(conn);
       bbr->setRttSampler(std::make_unique<BbrRttSampler>(
           std::chrono::seconds(kDefaultRttSamplerExpiration)));
       bbr->setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));

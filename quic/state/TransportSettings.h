@@ -13,6 +13,31 @@
 
 namespace quic {
 
+struct BbrConfig {
+  bool conservativeRecovery{false};
+
+  /**
+   * When largeProbeRttCwnd is true, kLargeProbeRttCwndGain * BDP will be used
+   * as cwnd during ProbeRtt state, otherwise, 4MSS will be the ProbeRtt cwnd.
+   */
+  bool largeProbeRttCwnd{false};
+
+  // Whether ack aggregation is also calculated during Startup phase
+  bool enableAckAggregationInStartup{false};
+
+  /**
+   * Whether we should enter ProbeRtt if connection has been app-limited since
+   * last time we ProbeRtt.
+   */
+  bool probeRttDisabledIfAppLimited{false};
+
+  /**
+   * Whether BBR should advance pacing gain cycle when BBR is draining and we
+   * haven't reached the drain target.
+   */
+  bool drainToTarget{false};
+};
+
 struct TransportSettings {
   // The initial connection window advertised to the peer.
   uint64_t advertisedInitialConnectionWindowSize{kDefaultConnectionWindowSize};
@@ -112,13 +137,13 @@ struct TransportSettings {
       statelessResetTokenSecret;
   // Default initial RTT
   std::chrono::microseconds initialRtt{kDefaultInitialRtt};
-
   // The active_connection_id_limit that is sent to the peer.
   uint64_t selfActiveConnectionIdLimit{0};
-
   // Maximum size of the batch that should be used when receiving packets from
   // the kernel in one event loop.
   size_t maxRecvBatchSize{5};
+  // Config struct for BBR
+  BbrConfig bbrConfig;
 };
 
 } // namespace quic

@@ -26,8 +26,7 @@ class BbrTest : public Test {};
 TEST_F(BbrTest, InitStates) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   EXPECT_EQ(CongestionControlType::BBR, bbr.type());
   EXPECT_FALSE(bbr.inRecovery());
   EXPECT_EQ("Startup", bbrStateToString(bbr.state()));
@@ -41,9 +40,8 @@ TEST_F(BbrTest, Recovery) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
   conn.transportSettings.initCwndInMss = 500; // Make a really large initCwnd
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   // Make a huge inflight so we don't underflow anything
   auto inflightBytes = 100 * 1000;
   bbr.onPacketSent(makeTestingWritePacket(9, inflightBytes, inflightBytes));
@@ -124,8 +122,7 @@ TEST_F(BbrTest, Recovery) {
 TEST_F(BbrTest, StartupCwnd) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockRttSampler = std::make_unique<MockMinRttSampler>();
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawRttSampler = mockRttSampler.get();
@@ -151,8 +148,7 @@ TEST_F(BbrTest, StartupCwnd) {
 TEST_F(BbrTest, LeaveStartup) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
@@ -208,8 +204,7 @@ TEST_F(BbrTest, LeaveStartup) {
 TEST_F(BbrTest, RemoveInflightBytes) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto writableBytesAfterInit = bbr.getWritableBytes();
   bbr.onPacketSent(makeTestingWritePacket(0, 1000, 1000, 0));
   EXPECT_EQ(writableBytesAfterInit - 1000, bbr.getWritableBytes());
@@ -220,8 +215,7 @@ TEST_F(BbrTest, RemoveInflightBytes) {
 TEST_F(BbrTest, ProbeRtt) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   auto minRttSampler = std::make_unique<MockMinRttSampler>();
@@ -387,8 +381,7 @@ TEST_F(BbrTest, ProbeRtt) {
 
 TEST_F(BbrTest, NoLargestAckedPacketNoCrash) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
   CongestionController::AckEvent ack;
@@ -400,8 +393,7 @@ TEST_F(BbrTest, AckAggregation) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto mockRttSampler = std::make_unique<MockMinRttSampler>();
   auto rawRttSampler = mockRttSampler.get();
@@ -501,8 +493,7 @@ TEST_F(BbrTest, AckAggregation) {
 
 TEST_F(BbrTest, AppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
@@ -521,8 +512,7 @@ TEST_F(BbrTest, AppLimited) {
 
 TEST_F(BbrTest, AppLimitedIgnored) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
@@ -543,9 +533,8 @@ TEST_F(BbrTest, AppLimitedIgnored) {
 
 TEST_F(BbrTest, ExtendMinRttExpiration) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  config.probeRttDisabledIfAppLimited = true;
-  BbrCongestionController bbr(conn, config);
+  conn.transportSettings.bbrConfig.probeRttDisabledIfAppLimited = true;
+  BbrCongestionController bbr(conn);
   auto mockRttSampler = std::make_unique<MockMinRttSampler>();
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawRttSampler = mockRttSampler.get();
@@ -566,8 +555,7 @@ TEST_F(BbrTest, ExtendMinRttExpiration) {
 
 TEST_F(BbrTest, BytesCounting) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   bbr.setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
 
   PacketNum packetNum = 0;
@@ -592,8 +580,7 @@ TEST_F(BbrTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
   conn.qLogger = qLogger;
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
 
   bbr.setAppIdle(true, Clock::now());
 
@@ -608,8 +595,7 @@ TEST_F(BbrTest, AppIdle) {
 
 TEST_F(BbrTest, UpdatePacerAppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
@@ -639,8 +625,7 @@ TEST_F(BbrTest, UpdatePacerAppLimited) {
 
 TEST_F(BbrTest, PacketLossInvokesPacer) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
@@ -655,8 +640,7 @@ TEST_F(BbrTest, PacketLossInvokesPacer) {
 
 TEST_F(BbrTest, ProbeRttSetsAppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  BbrCongestionController::BbrConfig config;
-  BbrCongestionController bbr(conn, config);
+  BbrCongestionController bbr(conn);
   auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   auto mockRttSampler = std::make_unique<MockMinRttSampler>();

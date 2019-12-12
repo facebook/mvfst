@@ -28,11 +28,8 @@ uint64_t kQuantaFactor = 3;
 
 namespace quic {
 
-BbrCongestionController::BbrCongestionController(
-    QuicConnectionStateBase& conn,
-    const BbrConfig& config)
+BbrCongestionController::BbrCongestionController(QuicConnectionStateBase& conn)
     : conn_(conn),
-      config_(config),
       cwnd_(conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
       initialCwnd_(
           conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
@@ -306,7 +303,7 @@ void BbrCongestionController::handleAckInProbeBw(
   if (shouldAdvancePacingGainCycle) {
     pacingCycleIndex_ = (pacingCycleIndex_ + 1) % kNumOfCycles;
     cycleStart_ = ackTime;
-    if (config_.drainToTarget && pacingGain_ < 1.0 &&
+    if (conn_.transportSettings.bbrConfig.drainToTarget && pacingGain_ < 1.0 &&
         kPacingGainCycles[pacingCycleIndex_] == 1.0) {
       auto drainTarget =
           targetCwndCache ? *targetCwndCache : calculateTargetCwnd(1.0);
@@ -331,7 +328,8 @@ bool BbrCongestionController::shouldExitDrain() noexcept {
 }
 
 bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
-  if (config_.probeRttDisabledIfAppLimited && appLimitedSinceProbeRtt_) {
+  if (conn_.transportSettings.bbrConfig.probeRttDisabledIfAppLimited &&
+      appLimitedSinceProbeRtt_) {
     minRttSampler_->timestampMinRtt(ackTime);
     return false;
   }
@@ -430,7 +428,9 @@ void BbrCongestionController::updateRecoveryWindowWithAck(
   }
 
   uint64_t recoveryIncrease =
-      config_.conservativeRecovery ? conn_.udpSendPacketLen : bytesAcked;
+      conn_.transportSettings.bbrConfig.conservativeRecovery
+      ? conn_.udpSendPacketLen
+      : bytesAcked;
   recoveryWindow_ =
       std::max(recoveryWindow_, inflightBytes_ + recoveryIncrease);
   recoveryWindow_ = boundedCwnd(
@@ -492,7 +492,7 @@ void BbrCongestionController::updateCwnd(
   auto targetCwnd = calculateTargetCwnd(cwndGain_);
   if (btlbwFound_) {
     targetCwnd += maxAckHeightFilter_.GetBest();
-  } else if (config_.enableAckAggregationInStartup) {
+  } else if (conn_.transportSettings.bbrConfig.enableAckAggregationInStartup) {
     targetCwnd += excessiveBytes;
   }
 
@@ -545,7 +545,7 @@ bool BbrCongestionController::isAppLimited() const noexcept {
 
 uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   if (state_ == BbrCongestionController::BbrState::ProbeRtt) {
-    if (config_.largeProbeRttCwnd) {
+    if (conn_.transportSettings.bbrConfig.largeProbeRttCwnd) {
       return boundedCwnd(
           calculateTargetCwnd(kLargeProbeRttCwndGain),
           conn_.udpSendPacketLen,
