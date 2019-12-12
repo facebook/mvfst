@@ -54,7 +54,10 @@ struct QuicStreamLike {
   // data being acked this would contain one internval from 0 -> the largest
   // offseet ACKed. This allows us to track which delivery callbacks can be
   // called.
-  IntervalSet<uint64_t> ackedIntervals;
+  template <class T>
+  using IntervalSetVec = SmallVec<T, 32, uint16_t>;
+  using AckedIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
+  AckedIntervals ackedIntervals;
 
   // Stores a list of buffers which have been marked as loss by loss detector.
   // Each one represents one StreamFrame that was written.
