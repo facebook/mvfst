@@ -35,8 +35,7 @@ TEST_F(StateDataTest, SingleLostPacketEvent) {
       getTestConnectionId(),
       100,
       kVersion));
-  OutstandingPacket outstandingPacket(
-      packet, Clock::now(), 1234, false, false, 1234);
+  OutstandingPacket outstandingPacket(packet, Clock::now(), 1234, false, 1234);
   CongestionController::LossEvent loss;
   loss.addLostPacket(outstandingPacket);
   EXPECT_EQ(1234, loss.lostBytes);
@@ -51,7 +50,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       100,
       kVersion));
   OutstandingPacket outstandingPacket1(
-      packet1, Clock::now(), 1234, false, false, 1234);
+      packet1, Clock::now(), 1234, false, 1234);
 
   RegularQuicWritePacket packet2(LongHeader(
       LongHeader::Types::Initial,
@@ -60,7 +59,7 @@ TEST_F(StateDataTest, MultipleLostPacketsEvent) {
       110,
       kVersion));
   OutstandingPacket outstandingPacket2(
-      packet2, Clock::now(), 1357, false, false, 1357);
+      packet2, Clock::now(), 1357, false, 1357);
 
   CongestionController::LossEvent loss;
   loss.addLostPacket(outstandingPacket1);

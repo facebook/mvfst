@@ -351,6 +351,16 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto handshakePacket = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto appDataPacket = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
 
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(
+      *stream,
+      folly::IOBuf::copyBuffer("The sun is cold and the rain is hard."),
+      true);
+  WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
+  initialPacket.packet.frames.push_back(writeStreamFrame);
+  handshakePacket.packet.frames.push_back(writeStreamFrame);
+  appDataPacket.packet.frames.push_back(writeStreamFrame);
+
   updateConnection(
       *conn,
       folly::none,
@@ -539,7 +549,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   packet.packet.frames.push_back(std::move(ackFrame));
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   packetEncodedSize =
@@ -557,7 +566,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
 
   updateConnection(
       *conn, folly::none, packet2.packet, TimePoint(), getEncodedSize(packet));
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
 
   //  verify QLogger contains correct packet and frame information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -588,7 +596,6 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   packet.packet.frames.push_back(PaddingFrame());
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
 
   // verify QLogger contains correct packet and frames information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -761,9 +768,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
-  EXPECT_EQ(1, conn->outstandingPackets.size());
-  EXPECT_TRUE(
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)->pureAck);
+  EXPECT_EQ(0, conn->outstandingPackets.size());
   EXPECT_EQ(0, conn->lossState.totalBytesAcked);
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
@@ -785,7 +790,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  // This is clearly not 555 bytes. I just need some data inside the packet.
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("Im gonna cut your hair."), true);
+  WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
+  packet.packet.frames.push_back(std::move(writeStreamFrame));
   conn->lossState.totalBytesSent = 13579;
   conn->lossState.totalBytesAcked = 8642;
   auto currentTime = Clock::now();
@@ -1585,18 +1596,18 @@ TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  writeQuicDataToSocket(
-      *rawSocket,
-      *conn,
-      *conn->clientConnectionId,
-      *conn->serverConnectionId,
-      *aead,
-      *headerCipher,
-      getVersion(*conn),
-      conn->transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
-  auto packet = *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
-  EXPECT_TRUE(packet.pureAck);
+  EXPECT_GT(
+      writeQuicDataToSocket(
+          *rawSocket,
+          *conn,
+          *conn->clientConnectionId,
+          *conn->serverConnectionId,
+          *aead,
+          *headerCipher,
+          getVersion(*conn),
+          conn->transportSettings.writeConnectionDataPacketsLimit),
+      0);
+  EXPECT_EQ(0, conn->outstandingPackets.size());
 }
 
 TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
@@ -1872,10 +1883,7 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_FALSE(conn->streamManager->hasBlocked());
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_EQ(0, conn->outstandingClonedPacketsCount);
-  EXPECT_FALSE(
-      getLastOutstandingPacket(*conn, PacketNumberSpace::Handshake)->pureAck);
 }
 
 TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
@@ -1890,10 +1898,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   updateConnection(
       *conn, packetEvent, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_EQ(1, conn->outstandingClonedPacketsCount);
-  EXPECT_FALSE(
-      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->pureAck);
 }
 
 TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
@@ -1925,9 +1930,6 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
-  EXPECT_FALSE(
-      getLastOutstandingPacket(*conn, PacketNumberSpace::Handshake)->pureAck);
 }
 
 TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
@@ -1942,10 +1944,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_EQ(0, conn->outstandingClonedPacketsCount);
-  EXPECT_FALSE(
-      getLastOutstandingPacket(*conn, PacketNumberSpace::Handshake)->pureAck);
 }
 
 TEST_F(QuicTransportFunctionsTest, ClonedRst) {
@@ -1961,10 +1960,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   updateConnection(
       *conn, packetEvent, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_EQ(1, conn->outstandingClonedPacketsCount);
-  EXPECT_FALSE(
-      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->pureAck);
 }
 
 TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {

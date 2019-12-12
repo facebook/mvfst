@@ -526,9 +526,8 @@ CloningScheduler::CloningScheduler(
 bool CloningScheduler::hasData() const {
   return frameScheduler_.hasData() ||
       (!conn_.outstandingPackets.empty() &&
-       (conn_.outstandingPackets.size() !=
-        conn_.outstandingHandshakePacketsCount +
-            conn_.outstandingPureAckPacketsCount));
+       conn_.outstandingPackets.size() !=
+           conn_.outstandingHandshakePacketsCount);
 }
 
 std::pair<
@@ -568,9 +567,8 @@ CloningScheduler::scheduleFramesForPacket(
         getAckState(conn_, builderPnSpace).largestAckedByPeer,
         conn_.version.value_or(*conn_.originalVersion));
     PacketRebuilder rebuilder(regularBuilder, conn_);
-    // We shouldn't clone Handshake packet. For PureAcks, cloning them bring
-    // perf down as shown by load test.
-    if (iter->isHandshake || iter->pureAck) {
+    // We shouldn't clone Handshake packet.
+    if (iter->isHandshake) {
       continue;
     }
     // If the packet is already a clone that has been processed, we don't clone

@@ -784,24 +784,7 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
-  auto& packet =
-      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
-  EXPECT_GE(packet.frames.size(), 1);
-
-  bool ackFound = false;
-  for (auto& frame : packet.frames) {
-    auto ackFrame = frame.asWriteAckFrame();
-    if (!ackFrame) {
-      continue;
-    }
-    EXPECT_EQ(ackFrame->ackBlocks.size(), 1);
-    EXPECT_EQ(start, ackFrame->ackBlocks.front().start);
-    EXPECT_EQ(end, ackFrame->ackBlocks.front().end);
-    ackFound = true;
-  }
-  EXPECT_TRUE(ackFound);
-
+  EXPECT_TRUE(conn.outstandingPackets.empty());
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, end);
   EXPECT_FALSE(conn.ackStates.appDataAckState.needsToSendAckImmediately);
   EXPECT_EQ(0, conn.ackStates.appDataAckState.numNonRxPacketsRecvd);
@@ -1044,7 +1027,6 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
   conn.lossState.initialLossTime.clear();
   conn.lossState.handshakeLossTime.clear();
@@ -1080,7 +1062,6 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
   conn.lossState.initialLossTime.clear();
   conn.lossState.handshakeLossTime.clear();
@@ -1223,7 +1204,6 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
   conn.lossState.initialLossTime.clear();
   conn.lossState.handshakeLossTime.clear();
@@ -1307,7 +1287,6 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
   conn.lossState.initialLossTime.clear();
   conn.lossState.handshakeLossTime.clear();
@@ -1446,7 +1425,6 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPureAckPacketsCount = 0;
   conn.outstandingPackets.clear();
   conn.lossState.initialLossTime.clear();
   conn.lossState.handshakeLossTime.clear();

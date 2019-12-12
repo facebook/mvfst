@@ -27,11 +27,11 @@ namespace test {
 class AckHandlersTest : public TestWithParam<PacketNumberSpace> {};
 
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
-  return [&lostPackets](
-             QuicConnectionStateBase&, auto& packet, bool, PacketNum) {
-    auto packetNum = packet.header.getPacketSequenceNum();
-    lostPackets.push_back(packetNum);
-  };
+  return
+      [&lostPackets](QuicConnectionStateBase&, auto& packet, bool, PacketNum) {
+        auto packetNum = packet.header.getPacketSequenceNum();
+        lostPackets.push_back(packetNum);
+      };
 }
 
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
@@ -51,7 +51,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
     WriteStreamFrame frame(currentStreamId++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
-        std::move(regularPacket), sentTime, 1, false, false, packetNum));
+        std::move(regularPacket), sentTime, 1, false, packetNum));
   }
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 101;
@@ -122,7 +122,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
     WriteStreamFrame frame(currentStreamId++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
-        std::move(regularPacket), Clock::now(), 1, false, false, packetNum));
+        std::move(regularPacket), Clock::now(), 1, false, packetNum));
   }
 
   ReadAckFrame ackFrame;
@@ -223,7 +223,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
     WriteStreamFrame frame(current++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
-        std::move(regularPacket), Clock::now(), 1, false, false, packetNum));
+        std::move(regularPacket), Clock::now(), 1, false, packetNum));
   }
 
   for (PacketNum packetNum = 20; packetNum < 40; packetNum += 3) {
@@ -232,7 +232,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
     current += 3;
     regularPacket.frames.emplace_back(std::move(frame));
     conn.outstandingPackets.emplace_back(OutstandingPacket(
-        std::move(regularPacket), Clock::now(), 1, false, false, packetNum));
+        std::move(regularPacket), Clock::now(), 1, false, packetNum));
   }
 
   ReadAckFrame ackFrame;
@@ -311,8 +311,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.ackStates.appDataAckState.acks.insert(900, 1000);
   conn.ackStates.appDataAckState.acks.insert(500, 700);
   firstPacket.frames.emplace_back(std::move(firstAckFrame));
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(firstPacket), Clock::now(), 0, false, false, 0));
+  conn.outstandingPackets.emplace_back(
+      OutstandingPacket(std::move(firstPacket), Clock::now(), 0, false, 0));
 
   auto secondPacket = createNewPacket(101 /* packetNum */, GetParam());
   WriteAckFrame secondAckFrame;
@@ -321,8 +321,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.ackStates.appDataAckState.acks.insert(1100, 2000);
   conn.ackStates.appDataAckState.acks.insert(1002, 1090);
   secondPacket.frames.emplace_back(std::move(secondAckFrame));
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(secondPacket), Clock::now(), 0, false, false, 0));
+  conn.outstandingPackets.emplace_back(
+      OutstandingPacket(std::move(secondPacket), Clock::now(), 0, false, 0));
 
   ReadAckFrame firstReceivedAck;
   firstReceivedAck.largestAcked = 100;
@@ -385,8 +385,8 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   conn.lossState.ptoCount = 1;
   PacketNum packetAfterRtoNum = 10;
   auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(packetAfterRto), Clock::now(), 0, false, false, 0));
+  conn.outstandingPackets.emplace_back(
+      OutstandingPacket(std::move(packetAfterRto), Clock::now(), 0, false, 0));
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
@@ -430,12 +430,12 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   PacketNum packetNum1 = 9;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
   conn.outstandingPackets.emplace_back(
-      std::move(regularPacket1), Clock::now(), 0, false, false, 0);
+      std::move(regularPacket1), Clock::now(), 0, false, 0);
 
   PacketNum packetNum2 = 10;
   auto regularPacket2 = createNewPacket(packetNum2, GetParam());
   conn.outstandingPackets.emplace_back(
-      std::move(regularPacket2), Clock::now(), 0, false, false, 0);
+      std::move(regularPacket2), Clock::now(), 0, false, 0);
 
   // Ack a packet one higher than the packet so that we don't trigger reordering
   // threshold.
@@ -466,7 +466,6 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         Clock::now(),
         0,
         packetNum % 2,
-        false,
         packetNum / 2);
     conn.outstandingHandshakePacketsCount += packetNum % 2;
   }
@@ -507,76 +506,6 @@ TEST_P(AckHandlersTest, PurgeAcks) {
       expectedTime, *conn.ackStates.initialAckState.largestRecvdPacketTime);
 }
 
-TEST_P(AckHandlersTest, PureAckBytesCountedTowardsTotalBytesAcked) {
-  QuicServerConnectionState conn;
-  ASSERT_EQ(0, conn.lossState.totalBytesAcked);
-  auto regularPacket = createNewPacket(10, GetParam());
-  WriteAckFrame ack;
-  ack.ackBlocks.insert(2, 5);
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), Clock::now(), 2, false, true, 2));
-  conn.outstandingPureAckPacketsCount++;
-
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 12;
-  ackFrame.ackBlocks.emplace_back(5, 12);
-
-  std::vector<PacketNum> lostPackets;
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [&](const auto&, const auto&, const auto&) {},
-      testLossHandler(lostPackets),
-      Clock::now());
-  // Packet should be removed from outstandingPackets without triggering
-  // onPacketAckOrLoss
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-  EXPECT_GT(conn.lossState.totalBytesAcked, 0);
-}
-
-TEST_P(AckHandlersTest, PureAckBytesSkipsCongestionControl) {
-  QuicServerConnectionState conn;
-  auto mockController = std::make_unique<MockCongestionController>();
-  auto rawController = mockController.get();
-  conn.congestionController = std::move(mockController);
-
-  auto regularPacket = createNewPacket(10, GetParam());
-  WriteAckFrame ack;
-  ack.ackBlocks.insert(2, 5);
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), Clock::now(), 2, false, true, 2));
-  conn.outstandingPureAckPacketsCount++;
-
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 12;
-  ackFrame.ackBlocks.emplace_back(5, 12);
-
-  std::vector<PacketNum> lostPackets;
-  // onPacketAckOrLoss will be called, but the ackedBytes is 0. We only need the
-  // largestAckedPacket
-  EXPECT_CALL(*rawController, onPacketAckOrLoss(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(0, ackEvent->ackedBytes);
-        EXPECT_EQ(10, ackEvent->largestAckedPacket.value());
-        EXPECT_FALSE(ackEvent->ackedPackets.empty());
-        EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(2, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(2, ackEvent->ackedPackets.front().totalBytesSentThen);
-      }));
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [&](const auto&, const auto&, const auto&) {},
-      testLossHandler(lostPackets),
-      Clock::now());
-  // Packet should be removed from outstandingPackets without triggering
-  // onPacketAckOrLoss
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-}
-
 TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   QuicServerConnectionState conn;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
@@ -595,8 +524,8 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   // We need to at least have one frame to trigger ackVisitor
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), Clock::now(), 1, false, false, 1));
+  conn.outstandingPackets.emplace_back(
+      OutstandingPacket(std::move(regularPacket), Clock::now(), 1, false, 1));
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
   ackFrame.ackBlocks.emplace_back(0, 0);
@@ -639,7 +568,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
   OutstandingPacket outstandingPacket(
-      std::move(regularPacket), Clock::now(), 1, false, false, 1);
+      std::move(regularPacket), Clock::now(), 1, false, 1);
   // Give this outstandingPacket an associatedEvent that's not in
   // outstandingPacketEvents
   outstandingPacket.associatedEvent = 0;
@@ -681,11 +610,11 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   regularPacket2.frames.push_back(frame);
 
   OutstandingPacket outstandingPacket1(
-      std::move(regularPacket1), Clock::now(), 1, false, false, 1);
+      std::move(regularPacket1), Clock::now(), 1, false, 1);
   outstandingPacket1.associatedEvent = packetNum1;
 
   OutstandingPacket outstandingPacket2(
-      std::move(regularPacket2), Clock::now(), 1, false, false, 1);
+      std::move(regularPacket2), Clock::now(), 1, false, 1);
   // The seconds packet has the same PacketEvent
   outstandingPacket2.associatedEvent = packetNum1;
 
@@ -743,7 +672,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
   regularPacket1.frames.push_back(frame);
   OutstandingPacket outstandingPacket1(
-      std::move(regularPacket1), Clock::now(), 1, false, false, 1);
+      std::move(regularPacket1), Clock::now(), 1, false, 1);
   outstandingPacket1.associatedEvent = packetNum1;
 
   conn.ackStates.appDataAckState.nextPacketNum++;
@@ -751,7 +680,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto regularPacket2 = createNewPacket(packetNum2, GetParam());
   regularPacket2.frames.push_back(frame);
   OutstandingPacket outstandingPacket2(
-      std::move(regularPacket2), Clock::now(), 1, false, false, 1);
+      std::move(regularPacket2), Clock::now(), 1, false, 1);
 
   conn.outstandingPackets.push_back(std::move(outstandingPacket1));
   conn.outstandingPackets.push_back(std::move(outstandingPacket2));
@@ -789,8 +718,8 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
   auto sentTime = Clock::now();
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), sentTime, 1, false, false, 1));
+  conn.outstandingPackets.emplace_back(
+      OutstandingPacket(std::move(regularPacket), sentTime, 1, false, 1));
 
   ReadAckFrame ackFrame;
   // ackDelay has no effect on mrtt
@@ -843,7 +772,6 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       Clock::now() - delayUntilLost - 20ms,
       1,
       false,
-      false,
       1);
   conn.outstandingPackets.push_back(std::move(outstandingPacket));
   conn.outstandingClonedPacketsCount++;
@@ -895,7 +823,6 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       sentTime,
       111,
       false,
-      false,
       conn.lossState.totalBytesSent + 111));
   conn.lossState.totalBytesSent += 111;
 
@@ -918,65 +845,6 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   EXPECT_EQ(111 + 1357, conn.lossState.totalBytesAcked);
 }
 
-TEST_F(AckHandlersTest, PureAckDoesNotUpdateRtt) {
-  QuicServerConnectionState conn;
-  conn.congestionController = nullptr;
-  PacketNum packetNum = 0;
-  auto regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket),
-      Clock::now() - 200ms,
-      111,
-      false /* handshake */,
-      true /* pureAck */,
-      111));
-  conn.outstandingPureAckPacketsCount++;
-  ASSERT_FALSE(conn.outstandingPackets.empty());
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = packetNum;
-  ackFrame.ackDelay = 100us;
-  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
-  processAckFrame(
-      conn,
-      PacketNumberSpace::AppData,
-      ackFrame,
-      [&](const auto&, const auto&, const auto&) {},
-      [&](auto&, auto&, bool, auto) {},
-      Clock::now() - 150ms);
-  EXPECT_EQ(std::chrono::microseconds::max(), conn.lossState.mrtt);
-  EXPECT_EQ(0us, conn.lossState.srtt);
-  EXPECT_EQ(0us, conn.lossState.lrtt);
-  EXPECT_EQ(0us, conn.lossState.rttvar);
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-
-  packetNum++;
-  regularPacket = createNewPacket(packetNum, PacketNumberSpace::AppData);
-  conn.outstandingPackets.emplace_back(OutstandingPacket(
-      std::move(regularPacket),
-      Clock::now() - 100ms,
-      111,
-      false /* handshake */,
-      false /* pureAck */,
-      111));
-  ASSERT_FALSE(conn.outstandingPackets.empty());
-  ackFrame.largestAcked = packetNum;
-  ackFrame.ackDelay = 100us;
-  ackFrame.ackBlocks.clear();
-  ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
-  processAckFrame(
-      conn,
-      PacketNumberSpace::AppData,
-      ackFrame,
-      [&](const auto&, const auto&, const auto&) {},
-      [&](auto&, auto&, bool, auto) {},
-      Clock::now());
-  EXPECT_NE(std::chrono::microseconds::max(), conn.lossState.mrtt);
-  EXPECT_NE(0us, conn.lossState.srtt);
-  EXPECT_NE(0us, conn.lossState.lrtt);
-  EXPECT_NE(0us, conn.lossState.rttvar);
-  EXPECT_TRUE(conn.outstandingPackets.empty());
-}
-
 TEST_P(AckHandlersTest, AckEventCreation) {
   QuicServerConnectionState conn;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
@@ -997,13 +865,11 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         largestSentTime,
         1,
         false /* handshake */,
-        (packetNum % 2) /* pureAck */,
         packetNum);
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandingPackets.emplace_back(sentPacket);
     packetNum++;
   }
-  conn.outstandingPureAckPacketsCount = 5;
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 9;
@@ -1015,7 +881,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(9, ack->largestAckedPacket.value());
         EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
-        EXPECT_EQ(5, ack->ackedBytes);
+        EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestAckedPacketAppLimited);
         EXPECT_EQ(
             std::chrono::duration_cast<std::chrono::microseconds>(

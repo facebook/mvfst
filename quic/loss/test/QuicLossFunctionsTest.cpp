@@ -54,7 +54,6 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   PacketNum sendPacket(
       QuicConnectionStateBase& conn,
       TimePoint time,
-      bool pureAck,
       folly::Optional<PacketEvent> associatedEvent,
       PacketType packetType);
 
@@ -131,7 +130,6 @@ auto testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
 PacketNum QuicLossFunctionsTest::sendPacket(
     QuicConnectionStateBase& conn,
     TimePoint time,
-    bool pureAck,
     folly::Optional<PacketEvent> associatedEvent,
     PacketType packetType) {
   folly::Optional<PacketHeader> header;
@@ -182,18 +180,14 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     encodedSize += packet.body->computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacket(
-      packet.packet, time, encodedSize, isHandshake, pureAck, encodedSize);
+      packet.packet, time, encodedSize, isHandshake, encodedSize);
   outstandingPacket.associatedEvent = associatedEvent;
   if (isHandshake) {
     conn.outstandingHandshakePacketsCount++;
     conn.lossState.lastHandshakePacketSentTime = time;
   }
-  if (pureAck) {
-    conn.outstandingPureAckPacketsCount++;
-  } else {
-    conn.lossState.lastRetransmittablePacketSentTime = time;
-  }
-  if (!pureAck && conn.congestionController) {
+  conn.lossState.lastRetransmittablePacketSentTime = time;
+  if (conn.congestionController) {
     conn.congestionController->onPacketSent(outstandingPacket);
   }
   if (associatedEvent) {
@@ -225,11 +219,11 @@ TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
   EXPECT_CALL(*transportInfoCb_, onPTO()).Times(0);
   auto pkt1 = conn->ackStates.appDataAckState.nextPacketNum;
-  sendPacket(*conn, Clock::now(), false, pkt1, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), pkt1, PacketType::OneRtt);
   auto pkt2 = conn->ackStates.appDataAckState.nextPacketNum;
-  sendPacket(*conn, Clock::now(), false, pkt2, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), pkt2, PacketType::OneRtt);
   auto pkt3 = conn->ackStates.appDataAckState.nextPacketNum;
-  sendPacket(*conn, Clock::now(), false, pkt3, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), pkt3, PacketType::OneRtt);
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
   setLossDetectionAlarm(*conn, timeout);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
@@ -238,52 +232,11 @@ TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
 TEST_F(QuicLossFunctionsTest, HasDataToWrite) {
   auto conn = createConn();
   // There needs to be at least one outstanding packet.
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   conn->streamManager->addLoss(1);
   conn->pendingEvents.setLossDetectionAlarm = true;
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
   EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
-  setLossDetectionAlarm(*conn, timeout);
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-}
-
-TEST_F(QuicLossFunctionsTest, NoLossTimeoutIfOnlyPureAcksAreOutstanding) {
-  auto conn = createConn();
-  conn->pendingEvents.setLossDetectionAlarm = true;
-  EXPECT_TRUE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
-
-  // Empty outstandingPackets: no timer scheduled
-  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
-  setLossDetectionAlarm(*conn, timeout);
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-
-  TimePoint now = Clock::now();
-  // Only pure acks outstanding: no timer scheduled
-  sendPacket(*conn, now, true, folly::none, PacketType::OneRtt);
-  EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
-  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
-  setLossDetectionAlarm(*conn, timeout);
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-
-  // Non-pure ack outstanding: timer scheduled
-  sendPacket(*conn, now, false, folly::none, PacketType::Handshake);
-  EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
-  EXPECT_EQ(2, conn->outstandingPackets.size());
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
-  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
-  EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
-  setLossDetectionAlarm(*conn, timeout);
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-
-  // Non-pure poped from outstanding: no timer scheduled
-  conn->outstandingPackets.pop_back();
-  conn->pendingEvents.setLossDetectionAlarm = true;
-  EXPECT_EQ(1, conn->outstandingPackets.size());
-  EXPECT_EQ(1, conn->outstandingPureAckPacketsCount);
-  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
   setLossDetectionAlarm(*conn, timeout);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
 }
@@ -296,7 +249,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
 
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   MockClock::mockNow = []() { return TimePoint(123ms); };
   std::vector<PacketNum> lostPacket;
   MockClock::mockNow = []() { return TimePoint(23ms); };
@@ -312,7 +265,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
 
   MockClock::mockNow = []() { return TimePoint(3ms); };
   EXPECT_CALL(*transportInfoCb_, onPTO());
-  sendPacket(*conn, TimePoint(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPacket)), MockClock>(
@@ -320,7 +273,6 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   EXPECT_EQ(conn->lossState.ptoCount, 2);
   // PTO doesn't take anything out of outstandingPackets
   EXPECT_FALSE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
   // PTO shouldn't mark loss
   EXPECT_TRUE(lostPacket.empty());
@@ -336,7 +288,7 @@ TEST_F(QuicLossFunctionsTest, TestOnPTOSkipProcessed) {
   // By adding an associatedEvent that doesn't exist in the
   // outstandingPacketEvents, they are all processed and will skip lossVisitor
   for (auto i = 0; i < 10; i++) {
-    sendPacket(*conn, TimePoint(), false, i, PacketType::OneRtt);
+    sendPacket(*conn, TimePoint(), i, PacketType::OneRtt);
   }
   EXPECT_EQ(10, conn->outstandingPackets.size());
   std::vector<PacketNum> lostPackets;
@@ -542,11 +494,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
         lostPacket.push_back(packetNum);
       };
   for (int i = 0; i < 6; ++i) {
-    sendPacket(
-        *conn, Clock::now(), !(i % 2), folly::none, PacketType::Handshake);
+    sendPacket(*conn, Clock::now(), folly::none, PacketType::Handshake);
   }
   EXPECT_EQ(6, conn->outstandingHandshakePacketsCount);
-  EXPECT_EQ(3, conn->outstandingPureAckPacketsCount);
   // Assume some packets are already acked
   for (auto iter =
            getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 2;
@@ -555,9 +505,6 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
        iter++) {
     if (iter->isHandshake) {
       conn->outstandingHandshakePacketsCount--;
-    }
-    if (iter->pureAck) {
-      conn->outstandingPureAckPacketsCount--;
     }
   }
   auto firstHandshakeOpIter =
@@ -580,7 +527,6 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
 
   // Packet 6 is the only thing remaining inflight, it is a handshake pkt
   EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
 
   // Packet 6 should remain in packet as the delta is less than threshold
   EXPECT_EQ(conn->outstandingPackets.size(), 1);
@@ -605,7 +551,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
   conn->outstandingPackets.emplace_back(
-      OutstandingPacket(outstandingRegularPacket, now, 0, false, false, 0));
+      OutstandingPacket(outstandingRegularPacket, now, 0, false, 0));
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool, PacketNum) {
@@ -620,7 +566,6 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
 
   EXPECT_EQ(0, conn->lossState.ptoCount);
   EXPECT_TRUE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_TRUE(testLossMarkFuncCalled);
 
@@ -642,7 +587,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   conn->lossState.handshakeAlarmCount = 5;
   conn->lossState.reorderingThreshold = 10;
 
-  sendPacket(*conn, TimePoint(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = conn->lossState.largestSent;
@@ -668,7 +613,6 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   EXPECT_EQ(0, conn->lossState.ptoCount);
   EXPECT_EQ(0, conn->lossState.handshakeAlarmCount);
   EXPECT_TRUE(conn->outstandingPackets.empty());
-  EXPECT_EQ(0, conn->outstandingPureAckPacketsCount);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_FALSE(testLossMarkFuncCalled);
   ASSERT_TRUE(conn->outstandingPackets.empty());
@@ -758,8 +702,8 @@ TEST_F(QuicLossFunctionsTest, ReorderingThresholdChecksSamePacketNumberSpace) {
   };
   PacketNum latestSent = 0;
   for (size_t i = 0; i < conn->lossState.reorderingThreshold + 1; i++) {
-    latestSent = sendPacket(
-        *conn, Clock::now(), false, folly::none, PacketType::Handshake);
+    latestSent =
+        sendPacket(*conn, Clock::now(), folly::none, PacketType::Handshake);
   }
 
   detectLossPackets(
@@ -818,7 +762,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
   PacketNum largestSent = 0;
   for (int i = 0; i < 7; ++i) {
     largestSent = sendPacket(
-        *conn, TimePoint(i * 100ms), false, folly::none, PacketType::OneRtt);
+        *conn, TimePoint(i * 100ms), folly::none, PacketType::OneRtt);
   }
   // Some packets are already acked
   conn->lossState.srtt = 400ms;
@@ -855,9 +799,9 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   auto expectedDelayUntilLost = 900000us / 8;
   auto sendTime = Clock::now();
   // Send two:
-  sendPacket(*conn, sendTime, false, folly::none, PacketType::Handshake);
-  PacketNum second = sendPacket(
-      *conn, sendTime + 1ms, false, folly::none, PacketType::Handshake);
+  sendPacket(*conn, sendTime, folly::none, PacketType::Handshake);
+  PacketNum second =
+      sendPacket(*conn, sendTime + 1ms, folly::none, PacketType::Handshake);
   auto lossTime = sendTime + 50ms;
   detectLossPackets<decltype(testingLossMarkFunc(lostPackets))>(
       *conn,
@@ -904,7 +848,7 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
   MockClock::mockNow = [&]() { return startTime; };
   std::vector<PacketNum> lostPackets;
   for (auto i = 0; i < kPacketToSendForPTO + 10; i++) {
-    sendPacket(*conn, startTime, false, folly::none, PacketType::OneRtt);
+    sendPacket(*conn, startTime, folly::none, PacketType::OneRtt);
     setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
     startTime += 1ms;
   }
@@ -936,7 +880,6 @@ TEST_F(
     auto sentPacketNum = sendPacket(
         *conn,
         TimePoint(100ms),
-        false,
         folly::none,
         (i % 2 ? PacketType::OneRtt : PacketType::Handshake));
     expectedLargestLostNum = std::max(
@@ -980,8 +923,7 @@ TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   conn->oneRttWriteCipher = createNoOpAead();
   conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
   std::vector<PacketNum> lostPackets;
-  sendPacket(
-      *conn, TimePoint(100ms), false, folly::none, PacketType::Handshake);
+  sendPacket(*conn, TimePoint(100ms), folly::none, PacketType::Handshake);
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), Clock>(
       *conn, testingLossMarkFunc(lostPackets));
 
@@ -1001,45 +943,6 @@ TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   EXPECT_EQ(event->type, kHandshakeAlarm);
 }
 
-TEST_F(QuicLossFunctionsTest, PureAckSkipsCongestionControl) {
-  std::vector<PacketNum> lostPacket;
-  auto conn = createConn();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_))
-      .WillRepeatedly(Return());
-
-  for (int i = 0; i < 5; ++i) {
-    bool pureAck = (i == 3);
-    sendPacket(*conn, TimePoint(), pureAck, folly::none, PacketType::Handshake);
-  }
-
-  // Verify that bytes for pure ack pkt won't be counted in lost bytes
-  auto sumNoPureAckBytes = std::accumulate(
-      conn->outstandingPackets.begin(),
-      conn->outstandingPackets.end(),
-      0,
-      [](uint64_t bytes, const OutstandingPacket& p) {
-        if (p.pureAck) {
-          return bytes;
-        }
-        return bytes + p.encodedSize;
-      });
-
-  // Ack for packet 9 arrives
-  auto lossEvent = detectLossPackets<decltype(testingLossMarkFunc(lostPacket))>(
-      *conn,
-      9,
-      testingLossMarkFunc(lostPacket),
-      TimePoint(80ms),
-      PacketNumberSpace::Handshake);
-  EXPECT_EQ(5, lossEvent->largestLostPacketNum.value());
-  EXPECT_EQ(sumNoPureAckBytes, lossEvent->lostBytes);
-  EXPECT_EQ(TimePoint(80ms), lossEvent->lossTime);
-  EXPECT_EQ(conn->outstandingHandshakePacketsCount, 0);
-}
-
 TEST_F(QuicLossFunctionsTest, EmptyOutstandingNoTimeout) {
   auto conn = createConn();
   EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
@@ -1053,8 +956,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHandshakeOutstanding) {
   std::chrono::milliseconds packetSentDelay = 10ms;
   auto thisMoment = lastPacketSentTime + packetSentDelay;
   MockClock::mockNow = [=]() { return thisMoment; };
-  sendPacket(
-      *conn, lastPacketSentTime, false, folly::none, PacketType::Handshake);
+  sendPacket(*conn, lastPacketSentTime, folly::none, PacketType::Handshake);
 
   MockClock::mockNow = [=]() { return thisMoment; };
   auto duration = calculateAlarmDuration<MockClock>(*conn);
@@ -1088,7 +990,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHasLossTime) {
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
-  sendPacket(*conn, lastPacketSentTime, false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, folly::none, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(100ms, duration.first);
   EXPECT_EQ(
@@ -1106,7 +1008,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationLossTimeIsZero) {
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
-  sendPacket(*conn, lastPacketSentTime, false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, folly::none, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(0ms, duration.first);
   EXPECT_EQ(
@@ -1120,7 +1022,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationNonHandshakeOutstanding) {
   conn->lossState.maxAckDelay = 25ms;
   TimePoint lastPacketSentTime = Clock::now();
   MockClock::mockNow = [=]() { return lastPacketSentTime; };
-  sendPacket(*conn, lastPacketSentTime, false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, lastPacketSentTime, folly::none, PacketType::OneRtt);
   auto duration = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(duration.second, LossState::AlarmMethod::PTO);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
@@ -1149,8 +1051,7 @@ TEST_F(QuicLossFunctionsTest, NoSkipLossVisitor) {
   // Send 5 packets, so when we ack the last one, we mark the first one loss
   PacketNum lastSent;
   for (size_t i = 0; i < 5; i++) {
-    lastSent =
-        sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+    lastSent = sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   }
   detectLossPackets(
       *conn,
@@ -1179,7 +1080,7 @@ TEST_F(QuicLossFunctionsTest, SkipLossVisitor) {
   PacketNum lastSent;
   for (size_t i = 0; i < 5; i++) {
     lastSent = conn->ackStates.appDataAckState.nextPacketNum;
-    sendPacket(*conn, Clock::now(), false, lastSent, PacketType::OneRtt);
+    sendPacket(*conn, Clock::now(), lastSent, PacketType::OneRtt);
   }
   detectLossPackets(
       *conn,
@@ -1209,8 +1110,7 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
   PacketNum lastSent;
   PacketEvent event = 0;
   for (size_t i = 0; i < 6; i++) {
-    lastSent =
-        sendPacket(*conn, Clock::now(), false, event, PacketType::OneRtt);
+    lastSent = sendPacket(*conn, Clock::now(), event, PacketType::OneRtt);
   }
   EXPECT_EQ(6, conn->outstandingPackets.size());
   // Add the PacketEvent to the outstandingPacketEvents set
@@ -1231,12 +1131,12 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
 TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
   auto conn = createConn();
   auto packet1 = conn->ackStates.appDataAckState.nextPacketNum;
-  sendPacket(*conn, Clock::now(), false, packet1, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), packet1, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   auto ackedPacket =
-      sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+      sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   auto noopLossMarker = [](auto&, auto&, bool, PacketNum) {};
   detectLossPackets<decltype(noopLossMarker)>(
       *conn,
@@ -1357,7 +1257,7 @@ TEST_F(QuicLossFunctionsTest, TotalLossCount) {
   PacketNum largestSent = 0;
   for (int i = 0; i < 10; i++) {
     largestSent =
-        sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+        sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   }
   EXPECT_EQ(10, conn->outstandingPackets.size());
   uint32_t lostPackets = 0;
@@ -1390,8 +1290,8 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejected) {
   // By adding an associatedEvent that doesn't exist in the
   // outstandingPacketEvents, they are all processed and will skip lossVisitor
   for (auto i = 0; i < 2; i++) {
-    sendPacket(*conn, TimePoint(), false, folly::none, PacketType::OneRtt);
-    sendPacket(*conn, TimePoint(), false, folly::none, PacketType::ZeroRtt);
+    sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
+    sendPacket(*conn, TimePoint(), folly::none, PacketType::ZeroRtt);
   }
   EXPECT_FALSE(conn->outstandingPackets.empty());
   EXPECT_EQ(4, conn->outstandingPackets.size());
@@ -1429,14 +1329,14 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   folly::Optional<PacketNum> lastPacket;
   for (auto i = 0; i < 2; i++) {
     lastPacket =
-        sendPacket(*conn, TimePoint(), false, lastPacket, PacketType::ZeroRtt);
+        sendPacket(*conn, TimePoint(), lastPacket, PacketType::ZeroRtt);
     zeroRttPackets.emplace(*lastPacket);
   }
   zeroRttPackets.emplace(
-      sendPacket(*conn, TimePoint(), false, folly::none, PacketType::ZeroRtt));
+      sendPacket(*conn, TimePoint(), folly::none, PacketType::ZeroRtt));
   for (auto zeroRttPacketNum : zeroRttPackets) {
-    lastPacket = sendPacket(
-        *conn, TimePoint(), false, zeroRttPacketNum, PacketType::OneRtt);
+    lastPacket =
+        sendPacket(*conn, TimePoint(), zeroRttPacketNum, PacketType::OneRtt);
   }
 
   EXPECT_EQ(6, conn->outstandingPackets.size());
@@ -1477,12 +1377,11 @@ TEST_F(QuicLossFunctionsTest, TimeThreshold) {
   auto conn = createConn();
   conn->lossState.srtt = 10ms;
   auto referenceTime = Clock::now();
-  auto packet1 = sendPacket(
-      *conn, referenceTime - 10ms, false, folly::none, PacketType::OneRtt);
+  auto packet1 =
+      sendPacket(*conn, referenceTime - 10ms, folly::none, PacketType::OneRtt);
   auto packet2 = sendPacket(
       *conn,
       referenceTime + conn->lossState.srtt / 2,
-      false,
       folly::none,
       PacketType::OneRtt);
   auto lossVisitor = [&](const auto& /*conn*/,
@@ -1503,7 +1402,7 @@ TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
   auto conn = createConn();
   conn->lossState.handshakeAlarmCount =
       std::numeric_limits<decltype(conn->lossState.handshakeAlarmCount)>::max();
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::Handshake);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::Handshake);
   ASSERT_GT(conn->outstandingHandshakePacketsCount, 0);
   calculateAlarmDuration(*conn);
 
@@ -1512,7 +1411,7 @@ TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
   conn->outstandingPackets.clear();
   conn->lossState.ptoCount =
       std::numeric_limits<decltype(conn->lossState.ptoCount)>::max();
-  sendPacket(*conn, Clock::now(), false, folly::none, PacketType::OneRtt);
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   calculateAlarmDuration(*conn);
 }
 

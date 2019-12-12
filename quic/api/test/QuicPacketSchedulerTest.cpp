@@ -36,7 +36,7 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, false, 0);
+  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, 0);
   conn.outstandingHandshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -54,21 +54,9 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, false, 0);
+  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, 0);
   conn.outstandingHandshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
-  return nextPacketNum;
-}
-
-PacketNum addPureAckOutstandingPacket(QuicConnectionStateBase& conn) {
-  PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::AppData);
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
-      nextPacketNum);
-  RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, false, true, 0);
-  increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }
 
@@ -79,8 +67,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(
-      packet, Clock::now(), 0, false, false, 0);
+  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, false, 0);
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }
@@ -433,33 +420,6 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
       conn.udpSendPacketLen,
       std::move(header),
       conn.ackStates.initialAckState.largestAckedByPeer);
-  auto result = cloningScheduler.scheduleFramesForPacket(
-      std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());
-  EXPECT_EQ(expected, *result.first);
-}
-
-TEST_F(QuicPacketSchedulerTest, DoNotClonePureAck) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
-  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
-  // Add two outstanding packets, with second one being pureAck
-  auto expected = addOutstandingPacket(conn);
-  // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
-      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
-  addPureAckOutstandingPacket(conn);
-  conn.outstandingPackets.back().packet.frames.push_back(WriteAckFrame());
-
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(getTestConnectionId()),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());

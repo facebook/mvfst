@@ -39,8 +39,6 @@ void processAckFrame(
     const AckVisitor& ackVisitor,
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
-  DCHECK_GE(
-      conn.outstandingPackets.size(), conn.outstandingPureAckPacketsCount);
   // TODO: send error if we get an ack for a packet we've not sent t18721184
   CongestionController::AckEvent ack;
   ack.ackTime = ackReceiveTime;
@@ -51,7 +49,6 @@ void processAckFrame(
   ack.ackedPackets.reserve(kRxPacketsPendingBeforeAckThresh);
   auto currentPacketIt = getLastOutstandingPacket(conn, pnSpace);
   uint64_t handshakePacketAcked = 0;
-  uint64_t pureAckPacketsAcked = 0;
   uint64_t clonedPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
@@ -109,16 +106,11 @@ void processAckFrame(
       }
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
-               << " handshake=" << (int)rPacketIt->isHandshake
-               << " pureAck=" << (int)rPacketIt->pureAck << " " << conn;
+               << " handshake=" << (int)rPacketIt->isHandshake << " " << conn;
       if (rPacketIt->isHandshake) {
         ++handshakePacketAcked;
       }
-      if (!rPacketIt->pureAck) {
-        ack.ackedBytes += rPacketIt->encodedSize;
-      } else {
-        ++pureAckPacketsAcked;
-      }
+      ack.ackedBytes += rPacketIt->encodedSize;
       if (rPacketIt->associatedEvent) {
         ++clonedPacketsAcked;
       }
@@ -127,7 +119,7 @@ void processAckFrame(
           ackReceiveTime > rPacketIt->time ? ackReceiveTime : Clock::now();
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
           ackReceiveTimeOrNow - rPacketIt->time);
-      if (currentPacketNum == frame.largestAcked && !rPacketIt->pureAck) {
+      if (currentPacketNum == frame.largestAcked) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
       if (conn.qLogger) {
@@ -190,12 +182,9 @@ void processAckFrame(
   }
   DCHECK_GE(conn.outstandingHandshakePacketsCount, handshakePacketAcked);
   conn.outstandingHandshakePacketsCount -= handshakePacketAcked;
-  DCHECK_GE(conn.outstandingPureAckPacketsCount, pureAckPacketsAcked);
-  conn.outstandingPureAckPacketsCount -= pureAckPacketsAcked;
   DCHECK_GE(conn.outstandingClonedPacketsCount, clonedPacketsAcked);
   conn.outstandingClonedPacketsCount -= clonedPacketsAcked;
   auto updatedOustandingPacketsCount = conn.outstandingPackets.size();
-  DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingPureAckPacketsCount);
   DCHECK_GE(
       updatedOustandingPacketsCount, conn.outstandingHandshakePacketsCount);
   DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingClonedPacketsCount);

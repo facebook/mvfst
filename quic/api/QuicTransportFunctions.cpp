@@ -339,16 +339,26 @@ void updateConnection(
     }
   }
 
-  // TODO: Now pureAck is equivalent to non retransmittable packet. This might
-  // change in the future.
-  auto pureAck = !retransmittable;
+  increaseNextPacketNum(conn, packetNumberSpace);
+  conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
+  // updateConnection may be called multiple times during write. If before or
+  // during any updateConnection, setLossDetectionAlarm is already set, we
+  // shouldn't clear it:
+  if (!conn.pendingEvents.setLossDetectionAlarm) {
+    conn.pendingEvents.setLossDetectionAlarm = retransmittable;
+  }
+  conn.lossState.totalBytesSent += encodedSize;
+
+  if (!retransmittable) {
+    DCHECK(!packetEvent);
+    return;
+  }
   OutstandingPacket pkt(
       std::move(packet),
       std::move(sentTime),
       encodedSize,
       isHandshake,
-      pureAck,
-      conn.lossState.totalBytesSent + encodedSize);
+      conn.lossState.totalBytesSent);
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
       : false;
@@ -362,17 +372,12 @@ void updateConnection(
   }
   if (packetEvent) {
     DCHECK(conn.outstandingPacketEvents.count(*packetEvent));
-    // CloningScheduler doesn't clone handshake packets or pureAck, and the
-    // clone result cannot be pureAck either.
     DCHECK(!isHandshake);
-    DCHECK(!pureAck);
     pkt.associatedEvent = std::move(packetEvent);
     conn.lossState.totalBytesCloned += encodedSize;
   }
 
-  increaseNextPacketNum(conn, packetNumberSpace);
-  conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
-  if (conn.congestionController && !pureAck) {
+  if (conn.congestionController) {
     conn.congestionController->onPacketSent(pkt);
     // An approximation of the app being blocked. The app
     // technically might not have bytes to write.
@@ -386,7 +391,7 @@ void updateConnection(
           conn.congestionController->getCongestionWindow());
     }
   }
-  if (conn.pacer && !pureAck) {
+  if (conn.pacer) {
     conn.pacer->onPacketSent();
   }
   if (conn.pathValidationLimiter &&
@@ -397,11 +402,7 @@ void updateConnection(
     ++conn.outstandingHandshakePacketsCount;
     conn.lossState.lastHandshakePacketSentTime = pkt.time;
   }
-  if (pureAck) {
-    ++conn.outstandingPureAckPacketsCount;
-  } else {
-    conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
-  }
+  conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
   if (pkt.associatedEvent) {
     CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);
     ++conn.outstandingClonedPacketsCount;
@@ -420,16 +421,8 @@ void updateConnection(
   conn.outstandingPackets.insert(packetIt, std::move(pkt));
 
   auto opCount = conn.outstandingPackets.size();
-  DCHECK_GE(opCount, conn.outstandingPureAckPacketsCount);
   DCHECK_GE(opCount, conn.outstandingHandshakePacketsCount);
   DCHECK_GE(opCount, conn.outstandingClonedPacketsCount);
-  // updateConnection may be called multiple times during write. If before or
-  // during any updateConnection, setLossDetectionAlarm is already set, we
-  // shouldn't clear it:
-  if (!conn.pendingEvents.setLossDetectionAlarm) {
-    conn.pendingEvents.setLossDetectionAlarm = retransmittable;
-  }
-  conn.lossState.totalBytesSent += encodedSize;
 }
 
 uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {

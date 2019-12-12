@@ -25,8 +25,8 @@ CongestionController::LossEvent createLossEvent(
   for (auto packetData : lostPackets) {
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetData.first));
-    loss.addLostPacket(OutstandingPacket(
-        std::move(packet), Clock::now(), 10, false, false, 10));
+    loss.addLostPacket(
+        OutstandingPacket(std::move(packet), Clock::now(), 10, false, 10));
     loss.lostBytes = packetData.second;
   }
   loss.lostPackets = lostPackets.size();
@@ -45,12 +45,7 @@ CongestionController::AckEvent createAckEvent(
   ack.ackedBytes = ackedSize;
   ack.ackedPackets.push_back(
       makeAckPacketFromOutstandingPacket(OutstandingPacket(
-          std::move(packet),
-          packetSentTime,
-          ackedSize,
-          false,
-          false,
-          ackedSize)));
+          std::move(packet), packetSentTime, ackedSize, false, ackedSize)));
   return ack;
 }
 
@@ -59,8 +54,7 @@ createPacket(PacketNum packetNum, uint32_t size, TimePoint sendTime) {
   auto connId = getTestConnectionId();
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
-  return OutstandingPacket(
-      std::move(packet), sendTime, size, false, false, size);
+  return OutstandingPacket(std::move(packet), sendTime, size, false, size);
 }
 
 TEST_F(NewRenoTest, TestLoss) {
@@ -143,7 +137,6 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   QuicServerConnectionState conn;
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
-
 
   conn.lossState.largestSent = 5;
   auto originalWritableBytes = reno.getWritableBytes();

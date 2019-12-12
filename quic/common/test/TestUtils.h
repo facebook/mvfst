@@ -214,7 +214,6 @@ OutstandingPacket makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
-    bool pureAck = false,
     TimePoint sentTime = Clock::now());
 
 // TODO: The way we setup packet sent, ack, loss in test cases can use some

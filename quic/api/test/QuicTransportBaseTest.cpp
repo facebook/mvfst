@@ -1090,10 +1090,8 @@ TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksMap) {
 }
 
 TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {
-  transport->transportConn->outstandingPureAckPacketsCount = 100;
   transport->transportConn->outstandingHandshakePacketsCount = 200;
   transport->closeNow(folly::none);
-  EXPECT_EQ(0, transport->transportConn->outstandingPureAckPacketsCount);
   EXPECT_EQ(0, transport->transportConn->outstandingHandshakePacketsCount);
 }
 

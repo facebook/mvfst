@@ -382,7 +382,6 @@ void QuicTransportBase::closeImpl(
   // Don't need outstanding packets.
   conn_->outstandingPackets.clear();
   conn_->outstandingHandshakePacketsCount = 0;
-  conn_->outstandingPureAckPacketsCount = 0;
 
   // We don't need no congestion control.
   conn_->congestionController = nullptr;

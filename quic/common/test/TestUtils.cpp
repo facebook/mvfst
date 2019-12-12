@@ -522,7 +522,6 @@ OutstandingPacket makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
-    bool pureAck,
     TimePoint sentTime) {
   LongHeader longHeader(
       LongHeader::Types::ZeroRtt,
@@ -532,7 +531,7 @@ OutstandingPacket makeTestingWritePacket(
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
   return OutstandingPacket(
-      packet, sentTime, desiredSize, false, pureAck, totalBytesSent);
+      packet, sentTime, desiredSize, false, totalBytesSent);
 }
 
 CongestionController::AckEvent makeAck(

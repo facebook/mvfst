@@ -482,26 +482,23 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       Clock::now(),
       135,
       false,
-      false,
       0);
   conn.outstandingPackets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Handshake),
       Clock::now(),
       1217,
       false,
-      false,
       0);
   conn.outstandingPackets.emplace_back(
-      makeTestShortPacket(), Clock::now(), 5556, false, false, 0);
+      makeTestShortPacket(), Clock::now(), 5556, false, 0);
   conn.outstandingPackets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
       56,
       false,
-      false,
       0);
   conn.outstandingPackets.emplace_back(
-      makeTestShortPacket(), Clock::now(), 6665, false, false, 0);
+      makeTestShortPacket(), Clock::now(), 6665, false, 0);
   EXPECT_EQ(
       135,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)->encodedSize);

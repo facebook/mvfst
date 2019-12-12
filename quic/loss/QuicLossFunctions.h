@@ -128,8 +128,6 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
  */
 template <class Timeout, class ClockType = Clock>
 void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
-  DCHECK_GE(
-      conn.outstandingPackets.size(), conn.outstandingPureAckPacketsCount);
   /*
    * We might have new data or lost data to send even if we don't have any
    * outstanding packets. When we get a PTO event, it is possible that only
@@ -141,16 +139,6 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
   auto totalPacketsOutstanding = conn.outstandingPackets.size();
-  if (totalPacketsOutstanding == conn.outstandingPureAckPacketsCount) {
-    VLOG(10) << __func__ << " unset alarm pure ack only"
-             << " outstanding=" << totalPacketsOutstanding
-             << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-             << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
-             << nodeToString(conn.nodeType) << " " << conn;
-    conn.pendingEvents.setLossDetectionAlarm = false;
-    timeout.cancelLossTimeout();
-    return;
-  }
   /*
    * We have this condition to disambiguate the case where we have.
    * (1) All outstanding packets that are clones that are processed and there
@@ -164,14 +152,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * so that we can write this data with the slack packet space for the clones.
    */
   if (!hasDataToWrite && conn.outstandingPacketEvents.empty() &&
-      totalPacketsOutstanding ==
-          (conn.outstandingClonedPacketsCount +
-           conn.outstandingPureAckPacketsCount)) {
+      totalPacketsOutstanding == conn.outstandingClonedPacketsCount) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
              << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-             << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
-             << conn;
+             << " " << conn;
     conn.pendingEvents.setLossDetectionAlarm = false;
     timeout.cancelLossTimeout();
     return;
@@ -180,8 +165,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     VLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"
         << " outstanding=" << totalPacketsOutstanding
-        << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-        << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
+        << " handshakePackets=" << conn.outstandingHandshakePacketsCount << " "
         << nodeToString(conn.nodeType) << " " << conn;
     return;
   }
@@ -193,8 +177,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
            << " method=" << conn.lossState.currentAlarmMethod
            << " outstanding=" << totalPacketsOutstanding
            << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-           << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
-           << nodeToString(conn.nodeType) << " " << conn;
+           << " " << nodeToString(conn.nodeType) << " " << conn;
   timeout.scheduleLossTimeout(alarmDuration.first);
   conn.pendingEvents.setLossDetectionAlarm = false;
 }
@@ -241,12 +224,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       shouldSetTimer = true;
       break;
     }
-    if (!pkt.pureAck) {
-      lossEvent.addLostPacket(pkt);
-    } else {
-      DCHECK_GT(conn.outstandingPureAckPacketsCount, 0);
-      --conn.outstandingPureAckPacketsCount;
-    }
+    lossEvent.addLostPacket(pkt);
     if (pkt.associatedEvent) {
       DCHECK_GT(conn.outstandingClonedPacketsCount, 0);
       --conn.outstandingClonedPacketsCount;
@@ -265,17 +243,15 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       --conn.outstandingHandshakePacketsCount;
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
-             << " pureAck=" << pkt.pureAck << " handshake=" << pkt.isHandshake
-             << " " << conn;
+             << " handshake=" << pkt.isHandshake << " " << conn;
     iter = conn.outstandingPackets.erase(iter);
   }
 
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);
   for (; earliest != conn.outstandingPackets.end();
        earliest = getNextOutstandingPacket(conn, pnSpace, earliest + 1)) {
-    if (!earliest->pureAck &&
-        (!earliest->associatedEvent ||
-         conn.outstandingPacketEvents.count(*earliest->associatedEvent))) {
+    if (!earliest->associatedEvent ||
+        conn.outstandingPacketEvents.count(*earliest->associatedEvent)) {
       break;
     }
   }
@@ -346,7 +322,6 @@ void onHandshakeAlarm(
       auto currentPacketNumSpace = packet.packet.header.getPacketNumberSpace();
       VLOG(10) << "HandshakeAlarm, removing packetNum=" << currentPacketNum
                << " packetNumSpace=" << currentPacketNumSpace << " " << conn;
-      DCHECK(!packet.pureAck);
       lossEvent.addLostPacket(std::move(packet));
       lossVisitor(conn, packet.packet, false, currentPacketNum);
       DCHECK(conn.outstandingHandshakePacketsCount);
@@ -405,14 +380,12 @@ void onLossDetectionAlarm(
   } else {
     onPTOAlarm(conn);
   }
-  conn.pendingEvents.setLossDetectionAlarm =
-      (conn.outstandingPackets.size() > conn.outstandingPureAckPacketsCount);
+  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandingPackets.empty();
   VLOG(10) << __func__ << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandingPackets.size()
            << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-           << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
-           << conn;
+           << " " << conn;
 }
 
 /*
@@ -446,16 +419,14 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       lossVisitor,
       ack.ackTime,
       pnSpace);
-  conn.pendingEvents.setLossDetectionAlarm =
-      (conn.outstandingPackets.size() > conn.outstandingPureAckPacketsCount);
+  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandingPackets.empty();
   VLOG(10) << __func__
            << " largestAckedInPacket=" << ack.largestAckedPacket.value_or(0)
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandingPackets.size()
            << " handshakePackets=" << conn.outstandingHandshakePacketsCount
-           << " pureAckPackets=" << conn.outstandingPureAckPacketsCount << " "
-           << conn;
+           << " " << conn;
   return lossEvent;
 }
 
@@ -475,7 +446,6 @@ void markZeroRttPacketsLost(
         iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
     if (isZeroRttPacket) {
       auto& pkt = *iter;
-      DCHECK(!pkt.pureAck);
       DCHECK(!pkt.isHandshake);
       auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
       bool processed = pkt.associatedEvent &&

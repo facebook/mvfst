@@ -83,19 +83,11 @@ TEST_F(CubicHystartTest, AckTrain) {
   // Packet 0 is sent:
   auto packetSize = kLowSsthreshInMss * conn.udpSendPacketLen;
   auto packet0 = makeTestingWritePacket(
-      0,
-      packetSize,
-      packetSize,
-      false,
-      realNow - std::chrono::milliseconds(10));
+      0, packetSize, packetSize, realNow - std::chrono::milliseconds(10));
   cubic.onPacketSent(packet0);
   // Packet 1 is sent:
   auto packet1 = makeTestingWritePacket(
-      1,
-      packetSize,
-      packetSize * 2,
-      false,
-      realNow - std::chrono::milliseconds(5));
+      1, packetSize, packetSize * 2, realNow - std::chrono::milliseconds(5));
   cubic.onPacketSent(packet1);
   // Packet 0 is acked:
   cubic.onPacketAckOrLoss(
@@ -128,7 +120,7 @@ TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
   conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
-  auto packet = makeTestingWritePacket(0, 1000, 1000, false, realNow);
+  auto packet = makeTestingWritePacket(0, 1000, 1000, realNow);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, realNow + kAckCountingGap + 2us, packet.time),
@@ -157,14 +149,14 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   auto packetsSentTime = Clock::now();
   auto firstPacketNum = packetNum++;
   auto packet0 = makeTestingWritePacket(
-      packetNum, 1000, totalSent + 1000, false, packetsSentTime);
+      packetNum, 1000, totalSent + 1000, packetsSentTime);
   totalSent += 1000;
   conn.lossState.largestSent = firstPacketNum;
   cubic.onPacketSent(packet0);
 
   auto secondPacketNum = packetNum++;
   auto packet1 = makeTestingWritePacket(
-      secondPacketNum, 1000, totalSent + 1000, false, packetsSentTime);
+      secondPacketNum, 1000, totalSent + 1000, packetsSentTime);
   totalSent += 1000;
   // Packet 1 is sent:
   conn.lossState.largestSent = secondPacketNum;
@@ -185,7 +177,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   auto estimatedRttEndTarget = Clock::now();
 
   auto packet2 = makeTestingWritePacket(
-      packetNum, 1000, totalSent + 1000, false, estimatedRttEndTarget + 1us);
+      packetNum, 1000, totalSent + 1000, estimatedRttEndTarget + 1us);
   totalSent += 1000;
   conn.lossState.largestSent = packetNum;
   cubic.onPacketSent(packet2);
@@ -203,7 +195,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   for (size_t i = 0; i < kAckSampling - 1; i++) {
     conn.lossState.largestSent = i + packetNum;
     auto packet = makeTestingWritePacket(
-        i + packetNum, 1000, totalSent + 1000, false, packetsSentTime);
+        i + packetNum, 1000, totalSent + 1000, packetsSentTime);
     cubic.onPacketSent(packet);
     totalSent += 1000;
     ackTime += ackTimeIncrease;
@@ -217,7 +209,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   // DelayIncrease:
   conn.lossState.largestSent = packetNum;
   auto packetEnd = makeTestingWritePacket(
-      packetNum, 1000, totalSent + 1000, false, packetsSentTime);
+      packetNum, 1000, totalSent + 1000, packetsSentTime);
   cubic.onPacketSent(packetEnd);
   totalSent += 1000;
   ackTime += ackTimeIncrease;
@@ -234,13 +226,13 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   auto realNow = quic::Clock::now();
 
   uint64_t totalSent = 0;
-  auto packet0 = makeTestingWritePacket(0, 1, totalSent + 1, false, realNow);
+  auto packet0 = makeTestingWritePacket(0, 1, totalSent + 1, realNow);
   // Packet 0 is sent:
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
   totalSent += 1;
 
-  auto packet1 = makeTestingWritePacket(1, 1, totalSent + 1, false, realNow);
+  auto packet1 = makeTestingWritePacket(1, 1, totalSent + 1, realNow);
   conn.lossState.largestSent = 1;
   cubic.onPacketSent(packet1);
   totalSent += 1;
@@ -255,7 +247,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(makeAck(1, 1, ackTime, packet1.time), folly::none);
 
-  auto packet2 = makeTestingWritePacket(2, 10, 10 + totalSent, false, realNow);
+  auto packet2 = makeTestingWritePacket(2, 10, 10 + totalSent, realNow);
   conn.lossState.largestSent = 2;
   cubic.onPacketSent(packet2);
   totalSent += 10;
@@ -269,8 +261,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {
     conn.lossState.largestSent = i + 3;
-    auto packet =
-        makeTestingWritePacket(i + 3, 1, 1 + totalSent, false, realNow);
+    auto packet = makeTestingWritePacket(i + 3, 1, 1 + totalSent, realNow);
     ackTime += ackTimeIncrease;
     moreAcks.push_back(makeAck(i + 3, 1, ackTime, packet.time));
     cubic.onPacketSent(packet);
@@ -283,7 +274,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
   // DelayIncrease:
   conn.lossState.largestSent = kAckSampling;
   auto packetEnd =
-      makeTestingWritePacket(kAckSampling, 1, 1 + totalSent, false, realNow);
+      makeTestingWritePacket(kAckSampling, 1, 1 + totalSent, realNow);
   cubic.onPacketSent(packetEnd);
   totalSent += 1;
   ackTime += ackTimeIncrease;

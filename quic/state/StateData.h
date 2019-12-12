@@ -93,6 +93,7 @@ struct NetworkDataSingle {
  */
 using PacketEvent = PacketNum;
 
+// Data structure to represent outstanding retransmittable packets
 struct OutstandingPacket {
   // Structure representing the frames that are outstanding including the header
   // that was sent.
@@ -103,8 +104,6 @@ struct OutstandingPacket {
   uint32_t encodedSize;
   // Whether this packet has any data from stream 0
   bool isHandshake;
-  // Whether this packet is pure ack
-  bool pureAck;
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
@@ -146,13 +145,11 @@ struct OutstandingPacket {
       TimePoint timeIn,
       uint32_t encodedSizeIn,
       bool isHandshakeIn,
-      bool pureAckIn,
       uint64_t totalBytesSentIn)
       : packet(std::move(packetIn)),
         time(std::move(timeIn)),
         encodedSize(encodedSizeIn),
         isHandshake(isHandshakeIn),
-        pureAck(pureAckIn),
         totalBytesSent(totalBytesSentIn) {}
 };
 
@@ -520,9 +517,6 @@ struct QuicConnectionStateBase {
   // frames upon ack or loss.
   // TODO: Enforce only AppTraffic packets to be clonable
   folly::F14FastSet<PacketEvent> outstandingPacketEvents;
-
-  // Number of pure ack packets outstanding.
-  uint64_t outstandingPureAckPacketsCount{0};
 
   // Number of handshake packets outstanding.
   uint64_t outstandingHandshakePacketsCount{0};
