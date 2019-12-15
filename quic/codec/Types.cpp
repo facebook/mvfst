@@ -145,17 +145,6 @@ const ShortHeader* PacketHeader::asShort() const {
   }
 }
 
-PacketNum PacketHeader::getPacketSequenceNum() const {
-  switch (headerForm_) {
-    case HeaderForm::Long:
-      return longHeader.getPacketSequenceNum();
-    case HeaderForm::Short:
-      return shortHeader.getPacketSequenceNum();
-    default:
-      folly::assume_unreachable();
-  }
-}
-
 HeaderForm PacketHeader::getHeaderForm() const {
   return headerForm_;
 }
@@ -166,17 +155,6 @@ ProtectionType PacketHeader::getProtectionType() const {
       return longHeader.getProtectionType();
     case HeaderForm::Short:
       return shortHeader.getProtectionType();
-    default:
-      folly::assume_unreachable();
-  }
-}
-
-PacketNumberSpace PacketHeader::getPacketNumberSpace() const {
-  switch (headerForm_) {
-    case HeaderForm::Long:
-      return longHeader.getPacketNumberSpace();
-    case HeaderForm::Short:
-      return shortHeader.getPacketNumberSpace();
     default:
       folly::assume_unreachable();
   }
@@ -235,20 +213,12 @@ const std::string& LongHeader::getToken() const {
   return token_;
 }
 
-PacketNum LongHeader::getPacketSequenceNum() const {
-  return packetSequenceNum_;
-}
-
 void LongHeader::setPacketNumber(PacketNum packetNum) {
   packetSequenceNum_ = packetNum;
 }
 
 ProtectionType LongHeader::getProtectionType() const {
   return longHeaderTypeToProtectionType(getHeaderType());
-}
-
-PacketNumberSpace LongHeader::getPacketNumberSpace() const {
-  return longHeaderTypeToPacketNumberSpace(getHeaderType());
 }
 
 ProtectionType longHeaderTypeToProtectionType(
@@ -267,20 +237,6 @@ ProtectionType longHeaderTypeToProtectionType(
 
 ShortHeaderInvariant::ShortHeaderInvariant(ConnectionId dcid)
     : destinationConnId(std::move(dcid)) {}
-
-PacketNumberSpace longHeaderTypeToPacketNumberSpace(
-    LongHeader::Types longHeaderType) {
-  switch (longHeaderType) {
-    case LongHeader::Types::Initial:
-    case LongHeader::Types::Retry:
-      return PacketNumberSpace::Initial;
-    case LongHeader::Types::Handshake:
-      return PacketNumberSpace::Handshake;
-    case LongHeader::Types::ZeroRtt:
-      return PacketNumberSpace::AppData;
-  }
-  folly::assume_unreachable();
-}
 
 ShortHeader::ShortHeader(
     ProtectionType protectionType,
@@ -308,16 +264,8 @@ ProtectionType ShortHeader::getProtectionType() const {
   return protectionType_;
 }
 
-PacketNumberSpace ShortHeader::getPacketNumberSpace() const {
-  return PacketNumberSpace::AppData;
-}
-
 const ConnectionId& ShortHeader::getConnectionId() const {
   return connectionId_;
-}
-
-PacketNum ShortHeader::getPacketSequenceNum() const {
-  return packetSequenceNum_;
 }
 
 void ShortHeader::setPacketNumber(PacketNum packetNum) {

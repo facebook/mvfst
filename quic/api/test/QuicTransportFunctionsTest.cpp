@@ -64,7 +64,7 @@ void writeCryptoDataProbesToSocketForTest(
     LongHeader::Types type = LongHeader::Types::Initial) {
   auto encryptionLevel =
       protectionTypeToEncryptionLevel(longHeaderTypeToProtectionType(type));
-  auto pnSpace = longHeaderTypeToPacketNumberSpace(type);
+  auto pnSpace = LongHeader::typeToPacketNumberSpace(type);
   auto scheduler = std::move(FrameScheduler::Builder(
                                  conn, encryptionLevel, pnSpace, "Crypto")
                                  .cryptoFrames())
@@ -75,7 +75,7 @@ void writeCryptoDataProbesToSocketForTest(
       *conn.clientConnectionId,
       *conn.serverConnectionId,
       LongHeaderBuilder(type),
-      longHeaderTypeToPacketNumberSpace(type),
+      LongHeader::typeToPacketNumberSpace(type),
       scheduler,
       probesToSend,
       aead,

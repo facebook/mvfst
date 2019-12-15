@@ -645,6 +645,20 @@ struct LongHeader {
     Retry = 0x3,
   };
 
+  // Note this is defined in the header so it is inlined for performance.
+  static PacketNumberSpace typeToPacketNumberSpace(Types longHeaderType) {
+    switch (longHeaderType) {
+      case LongHeader::Types::Initial:
+      case LongHeader::Types::Retry:
+        return PacketNumberSpace::Initial;
+      case LongHeader::Types::Handshake:
+        return PacketNumberSpace::Handshake;
+      case LongHeader::Types::ZeroRtt:
+        return PacketNumberSpace::AppData;
+    }
+    folly::assume_unreachable();
+  }
+
   LongHeader(
       Types type,
       const ConnectionId& srcConnId,
@@ -670,11 +684,17 @@ struct LongHeader {
   const ConnectionId& getDestinationConnId() const;
   const folly::Optional<ConnectionId>& getOriginalDstConnId() const;
   QuicVersion getVersion() const;
-  PacketNumberSpace getPacketNumberSpace() const;
+  // Note this is defined in the header so it is inlined for performance.
+  PacketNumberSpace getPacketNumberSpace() const {
+    return typeToPacketNumberSpace(longHeaderType_);
+  }
   ProtectionType getProtectionType() const;
   bool hasToken() const;
   const std::string& getToken() const;
-  PacketNum getPacketSequenceNum() const;
+  // Note this is defined in the header so it is inlined for performance.
+  PacketNum getPacketSequenceNum() const {
+    return packetSequenceNum_;
+  }
 
   void setPacketNumber(PacketNum packetNum);
 
@@ -717,8 +737,12 @@ struct ShortHeader {
       PacketNum packetNum);
 
   ProtectionType getProtectionType() const;
-  PacketNumberSpace getPacketNumberSpace() const;
-  PacketNum getPacketSequenceNum() const;
+  PacketNumberSpace getPacketNumberSpace() const {
+    return PacketNumberSpace::AppData;
+  }
+  PacketNum getPacketSequenceNum() const {
+    return packetSequenceNum_;
+  }
   const ConnectionId& getConnectionId() const;
 
   void setPacketNumber(PacketNum packetNum);
@@ -755,10 +779,30 @@ struct PacketHeader {
   const LongHeader* asLong() const;
   const ShortHeader* asShort() const;
 
-  PacketNum getPacketSequenceNum() const;
+  // Note this is defined in the header so it is inlined for performance.
+  PacketNum getPacketSequenceNum() const {
+    switch (headerForm_) {
+      case HeaderForm::Long:
+        return longHeader.getPacketSequenceNum();
+      case HeaderForm::Short:
+        return shortHeader.getPacketSequenceNum();
+      default:
+        folly::assume_unreachable();
+    }
+  }
   HeaderForm getHeaderForm() const;
   ProtectionType getProtectionType() const;
-  PacketNumberSpace getPacketNumberSpace() const;
+  // Note this is defined in the header so it is inlined for performance.
+  PacketNumberSpace getPacketNumberSpace() const {
+    switch (headerForm_) {
+      case HeaderForm::Long:
+        return longHeader.getPacketNumberSpace();
+      case HeaderForm::Short:
+        return shortHeader.getPacketNumberSpace();
+      default:
+        folly::assume_unreachable();
+    }
+  }
 
  private:
   void destroyHeader();
@@ -772,8 +816,6 @@ struct PacketHeader {
 };
 
 ProtectionType longHeaderTypeToProtectionType(LongHeader::Types type);
-
-PacketNumberSpace longHeaderTypeToPacketNumberSpace(LongHeader::Types type);
 
 struct StreamTypeField {
  public:

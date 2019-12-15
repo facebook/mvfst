@@ -570,7 +570,7 @@ uint64_t writeCryptoAndAckDataToSocket(
       std::move(FrameScheduler::Builder(
                     connection,
                     encryptionLevel,
-                    longHeaderTypeToPacketNumberSpace(packetType),
+                    LongHeader::typeToPacketNumberSpace(packetType),
                     "CryptoAndAcksScheduler")
                     .ackFrames()
                     .cryptoFrames())
@@ -583,7 +583,7 @@ uint64_t writeCryptoAndAckDataToSocket(
       srcConnId,
       dstConnId,
       std::move(builder),
-      longHeaderTypeToPacketNumberSpace(packetType),
+      LongHeader::typeToPacketNumberSpace(packetType),
       scheduler,
       congestionControlWritableBytes,
       packetLimit,
@@ -686,7 +686,7 @@ uint64_t writeZeroRttDataToSocket(
       std::move(FrameScheduler::Builder(
                     connection,
                     encryptionLevel,
-                    longHeaderTypeToPacketNumberSpace(type),
+                    LongHeader::typeToPacketNumberSpace(type),
                     "ZeroRttScheduler")
                     .streamFrames()
                     .streamRetransmissions()
@@ -701,7 +701,7 @@ uint64_t writeZeroRttDataToSocket(
       srcConnId,
       dstConnId,
       std::move(builder),
-      longHeaderTypeToPacketNumberSpace(type),
+      LongHeader::typeToPacketNumberSpace(type),
       scheduler,
       congestionControlWritableBytes,
       packetLimit,
@@ -827,7 +827,7 @@ void writeLongClose(
       srcConnId,
       dstConnId,
       getNextPacketNum(
-          connection, longHeaderTypeToPacketNumberSpace(headerType)),
+          connection, LongHeader::typeToPacketNumberSpace(headerType)),
       version);
   writeCloseCommon(
       sock,
