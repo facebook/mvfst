@@ -1,3 +1,3 @@
 ---
-Checks:          'boost-*,bugprone-*,clang-analyzer-*,modernize-*,performance-*'
+Checks:          'boost-*,bugprone-*,clang-analyzer-*,modernize-*,performance-*,-modernize-use-trailing-return-type'
 ...
