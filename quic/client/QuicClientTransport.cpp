@@ -1015,88 +1015,36 @@ void QuicClientTransport::errMessage(
 #endif
 }
 
-void QuicClientTransport::getReadBuffer(void**, size_t*) noexcept {}
-
-void QuicClientTransport::onDataAvailable(
-    const folly::SocketAddress&,
-    size_t,
-    bool) noexcept {}
-
-bool QuicClientTransport::shouldOnlyNotify() {
-  return true;
-}
-
-void QuicClientTransport::onNotifyDataAvailable() noexcept {
+void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
-  const size_t numPackets = conn_->transportSettings.maxRecvBatchSize;
+  readBuffer_ = folly::IOBuf::create(readBufferSize);
+  *buf = readBuffer_->writableData();
+  *len = readBufferSize;
+}
 
-  NetworkData networkData;
-  networkData.packets.reserve(numPackets);
-  size_t totalData = 0;
-  folly::Optional<folly::SocketAddress> server;
-  for (size_t packetNum = 0; packetNum < numPackets; ++packetNum) {
-    // We create 1 buffer per packet so that it is not shared, this enables
-    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
-    // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = folly::IOBuf::create(readBufferSize);
-    struct iovec vec {};
-    vec.iov_base = readBuffer->writableData();
-    vec.iov_len = readBufferSize;
-
-    sockaddr* rawAddr{nullptr};
-    struct sockaddr_storage addrStorage {};
-    socklen_t addrLen{sizeof(addrStorage)};
-    if (!server) {
-      memset(&addrStorage, 0, size_t(addrLen));
-      rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
-      rawAddr->sa_family = socket_->address().getFamily();
-    }
-
-    struct msghdr msg {};
-    msg.msg_name = rawAddr;
-    msg.msg_namelen = size_t(addrLen);
-    msg.msg_iov = &vec;
-    msg.msg_iovlen = 1;
-
-    ssize_t ret = socket_->recvmsg(&msg, 0);
-    if (ret < 0) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK || packetNum != 0) {
-        // If we got a retriable error, or we had previously processed
-        // a packet successfully, let's use that packet.
-        break;
-      }
-      return onReadError(folly::AsyncSocketException(
-          folly::AsyncSocketException::INTERNAL_ERROR,
-          "::recvmsg() failed",
-          errno));
-    } else if (ret == 0) {
-      break;
-    }
-    size_t bytesRead = size_t(ret);
-    totalData += bytesRead;
-    if (!server) {
-      server = folly::SocketAddress();
-      server->setFromSockaddr(rawAddr, addrLen);
-    }
-    VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
-    readBuffer->append(bytesRead);
-    networkData.packets.emplace_back(std::move(readBuffer));
-    QUIC_TRACE(udp_recvd, *conn_, bytesRead);
+void QuicClientTransport::onDataAvailable(
+    const folly::SocketAddress& server,
+    size_t len,
+    bool truncated) noexcept {
+  VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
+  auto packetReceiveTime = Clock::now();
+  Buf data = std::move(readBuffer_);
+  if (truncated) {
+    // This is an error, drop the packet.
     if (conn_->qLogger) {
-      conn_->qLogger->addDatagramReceived(bytesRead);
+      conn_->qLogger->addPacketDrop(len, kUdpTruncated);
     }
-  }
-  if (networkData.packets.empty()) {
+    QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
     return;
   }
-  DCHECK(server.hasValue());
-  // TODO: we can get better receive time accuracy than this, with
-  // SO_TIMESTAMP or SIOCGSTAMP.
-  auto packetReceiveTime = Clock::now();
-  networkData.receiveTimePoint = packetReceiveTime;
-  networkData.totalData = totalData;
-  onNetworkData(*server, std::move(networkData));
+  data->append(len);
+  QUIC_TRACE(udp_recvd, *conn_, (uint64_t)len);
+  if (conn_->qLogger) {
+    conn_->qLogger->addDatagramReceived(len);
+  }
+  NetworkData networkData(std::move(data), packetReceiveTime);
+  onNetworkData(server, std::move(networkData));
 }
 
 void QuicClientTransport::

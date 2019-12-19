@@ -150,8 +150,6 @@ class QuicClientTransport
       const folly::SocketAddress& server,
       size_t len,
       bool truncated) noexcept override;
-  bool shouldOnlyNotify() override;
-  void onNotifyDataAvailable() noexcept override;
 
   void processUDPData(
       const folly::SocketAddress& peer,
@@ -175,6 +173,7 @@ class QuicClientTransport
   void onNewCachedPsk(
       fizz::client::NewCachedPsk& newCachedPsk) noexcept override;
 
+  Buf readBuffer_;
   folly::Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
   bool serverInitialParamsSet_{false};
