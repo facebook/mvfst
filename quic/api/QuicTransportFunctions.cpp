@@ -353,7 +353,17 @@ void updateConnection(
     DCHECK(!packetEvent);
     return;
   }
-  OutstandingPacket pkt(
+  auto packetIt =
+      std::find_if(
+          conn.outstandingPackets.rbegin(),
+          conn.outstandingPackets.rend(),
+          [packetNum](const auto& packetWithTime) {
+            return packetWithTime.packet.header.getPacketSequenceNum() <
+                packetNum;
+          })
+          .base();
+  auto& pkt = *conn.outstandingPackets.emplace(
+      packetIt,
       std::move(packet),
       std::move(sentTime),
       encodedSize,
@@ -408,17 +418,6 @@ void updateConnection(
     ++conn.outstandingClonedPacketsCount;
     ++conn.lossState.timeoutBasedRtxCount;
   }
-
-  auto packetIt =
-      std::find_if(
-          conn.outstandingPackets.rbegin(),
-          conn.outstandingPackets.rend(),
-          [packetNum](const auto& packetWithTime) {
-            return packetWithTime.packet.header.getPacketSequenceNum() <
-                packetNum;
-          })
-          .base();
-  conn.outstandingPackets.insert(packetIt, std::move(pkt));
 
   auto opCount = conn.outstandingPackets.size();
   DCHECK_GE(opCount, conn.outstandingHandshakePacketsCount);
