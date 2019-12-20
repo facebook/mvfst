@@ -121,7 +121,15 @@ void BbrCongestionController::onPacketSent(const OutstandingPacket& packet) {
 }
 
 uint64_t BbrCongestionController::updateAckAggregation(const AckEvent& ack) {
-  DCHECK(ackAggregationStartTime_);
+  if (!ackAggregationStartTime_) {
+    // Ideally one'd DCHECK/CHECK ackAggregationStartTime_ has some value, as we
+    // can't possibly get an ack or loss without onPacketSent ever. However
+    // there are cases we swap/recreate congestion controller in the middle of a
+    // connection for example, connection migration. Then the newly created
+    // congestion controller will get an ack or loss before ever get an
+    // onPacketSent.
+    return 0;
+  }
   uint64_t expectedAckBytes = bandwidth() *
       std::chrono::duration_cast<std::chrono::microseconds>(
                                   ack.ackTime - *ackAggregationStartTime_);

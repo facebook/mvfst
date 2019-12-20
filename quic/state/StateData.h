@@ -450,7 +450,7 @@ struct LossState {
   // Total number of bytes cloned.
   uint64_t totalBytesCloned{0};
   // Total number of bytes acked on this connection. If a packet is acked twice,
-  // it won't be count twice. Pure acks packets are included.
+  // it won't be count twice. Pure acks packets are NOT included.
   uint64_t totalBytesAcked{0};
   // The total number of bytes sent on this connection when the last time a
   // packet is acked.
