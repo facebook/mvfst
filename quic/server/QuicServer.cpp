@@ -298,7 +298,10 @@ folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
     worker->getEventBase()->runInEventBaseThreadAndWait([&] {
       std::lock_guard<std::mutex> guard(startMutex_);
       CHECK(initialized_);
-      boundAddress = worker->overrideTakeoverHandlerAddress(addr);
+      auto workerEvb = worker->getEventBase();
+      auto localListenSocket = listenerSocketFactory_->make(workerEvb, -1);
+      boundAddress = worker->overrideTakeoverHandlerAddress(
+          std::move(localListenSocket), addr);
     });
   }
   return boundAddress;

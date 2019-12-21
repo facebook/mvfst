@@ -788,6 +788,21 @@ class QuicServerWorkerTakeoverTest : public Test {
   uint16_t clientHostId_{25};
 };
 
+TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverReInitHandler) {
+  auto takeoverSock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb_);
+  folly::SocketAddress takeoverAddr;
+  EXPECT_CALL(*takeoverSocket_, pauseRead());
+
+  EXPECT_CALL(*takeoverSock, bind(_));
+  EXPECT_CALL(*takeoverSock, resumeRead(_));
+  EXPECT_CALL(*takeoverSock, address()).WillOnce(Invoke([&]() {
+    return takeoverAddr;
+  }));
+  takeoverWorker_->overrideTakeoverHandlerAddress(
+      std::move(takeoverSock), takeoverAddr);
+  takeoverSocket_ = takeoverSock.get();
+}
+
 TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverNoForwarding) {
   ConnectionId connId = createConnIdForServer(ProcessId::ONE),
                clientConnId = getTestConnectionId(clientHostId_);
@@ -1365,6 +1380,24 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   transport->getEventBase()->runInEventBaseThreadAndWait(
       [&] { transport.reset(); });
   closeUdpClient(std::move(client));
+  std::thread t([&] { server_->shutdown(); });
+  t.join();
+}
+
+TEST_F(QuicServerTest, OverrideTakeoverAddressTest) {
+  folly::ScopedEventBaseThread evbThread;
+  std::vector<folly::EventBase*> evbs;
+  evbs.emplace_back(evbThread.getEventBase());
+  auto serverAddr = initializeServer(evbs);
+  folly::SocketAddress takeoverAddr("::1", 0);
+  server_->allowBeingTakenOver(takeoverAddr);
+  uint8_t bindAttempt = 0;
+  folly::SocketAddress boundAddr;
+  while (bindAttempt < 5) {
+    boundAddr = server_->overrideTakeoverHandlerAddress(takeoverAddr);
+    bindAttempt++;
+  }
+  EXPECT_TRUE(boundAddr.isInitialized());
   std::thread t([&] { server_->shutdown(); });
   t.join();
 }

@@ -520,9 +520,10 @@ void QuicServerWorker::allowBeingTakenOver(
 }
 
 const folly::SocketAddress& QuicServerWorker::overrideTakeoverHandlerAddress(
+    std::unique_ptr<folly::AsyncUDPSocket> socket,
     const folly::SocketAddress& address) {
   CHECK(takeoverCB_);
-  takeoverCB_->bind(address);
+  takeoverCB_->rebind(std::move(socket), address);
   return takeoverCB_->getAddress();
 }
 

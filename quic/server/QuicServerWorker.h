@@ -102,6 +102,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * Returns const ref to SocketAddress representing the address it is bound to.
    */
   const folly::SocketAddress& overrideTakeoverHandlerAddress(
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
       const folly::SocketAddress& address);
 
   /**

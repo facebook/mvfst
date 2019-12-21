@@ -39,6 +39,20 @@ TakeoverHandlerCallback::~TakeoverHandlerCallback() {
 
 void TakeoverHandlerCallback::bind(const folly::SocketAddress& addr) {
   CHECK(socket_);
+  // first reset existing socket if any
+  socket_->bind(addr);
+  socket_->resumeRead(this);
+}
+
+void TakeoverHandlerCallback::rebind(
+    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    const folly::SocketAddress& addr) {
+  if (socket_) {
+    // first reset existing socket if any
+    socket_->pauseRead();
+    socket_.reset();
+  }
+  socket_ = std::move(socket);
   socket_->bind(addr);
   socket_->resumeRead(this);
 }

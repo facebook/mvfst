@@ -123,6 +123,14 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
 
   void bind(const folly::SocketAddress& addr);
 
+  /**
+   * Rebinds the given socket to the given address
+   * Frees existing socket if any
+   */
+  void rebind(
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      const folly::SocketAddress& addr);
+
   void pause();
 
   int getSocketFD();
