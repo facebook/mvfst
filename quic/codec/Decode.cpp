@@ -618,15 +618,6 @@ ConnectionCloseFrame decodeApplicationClose(
     }
   }
 
-  auto frameTypeField = decodeQuicInteger(cursor);
-  if (UNLIKELY(!frameTypeField || frameTypeField->second != sizeof(uint8_t))) {
-    throw QuicTransportException(
-        "Bad connection close triggering frame type value",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::CONNECTION_CLOSE);
-  }
-  auto triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
-
   auto reasonPhraseLength = decodeQuicInteger(cursor);
   if (UNLIKELY(
           !reasonPhraseLength ||
@@ -640,7 +631,7 @@ ConnectionCloseFrame decodeApplicationClose(
   auto reasonPhrase =
       cursor.readFixedString(folly::to<size_t>(reasonPhraseLength->first));
   return ConnectionCloseFrame(
-      QuicErrorCode(errorCode), std::move(reasonPhrase), triggeringFrameType);
+      QuicErrorCode(errorCode), std::move(reasonPhrase));
 }
 
 MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {

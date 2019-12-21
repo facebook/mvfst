@@ -630,8 +630,11 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
                                : FrameType::CONNECTION_CLOSE_APP_ERR));
 
       QuicInteger reasonLength(connectionCloseFrame.reasonPhrase.size());
-      QuicInteger closingFrameType(
-          static_cast<FrameTypeType>(connectionCloseFrame.closingFrameType));
+      folly::Optional<QuicInteger> closingFrameType;
+      if (isTransportErrorCode) {
+        closingFrameType = QuicInteger(
+            static_cast<FrameTypeType>(connectionCloseFrame.closingFrameType));
+      }
 
       QuicInteger errorCode(
           isTransportErrorCode
@@ -643,8 +646,8 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
           ? sizeof(TransportErrorCode)
           : errorCode.getSize();
       auto connCloseFrameSize = intFrameType.getSize() + errorSize +
-          closingFrameType.getSize() + reasonLength.getSize() +
-          connectionCloseFrame.reasonPhrase.size();
+          (closingFrameType ? closingFrameType.value().getSize() : 0) +
+          reasonLength.getSize() + connectionCloseFrame.reasonPhrase.size();
       if (packetSpaceCheck(spaceLeft, connCloseFrameSize)) {
         builder.write(intFrameType);
         if (version == QuicVersion::MVFST_OLD) {
@@ -656,7 +659,9 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
         } else {
           builder.write(errorCode);
         }
-        builder.write(closingFrameType);
+        if (closingFrameType) {
+          builder.write(closingFrameType.value());
+        }
         builder.write(reasonLength);
         builder.push(
             (const uint8_t*)connectionCloseFrame.reasonPhrase.data(),
