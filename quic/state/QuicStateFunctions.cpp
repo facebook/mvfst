@@ -53,6 +53,8 @@ void updateRtt(
   if (shouldUseAckDelay) {
     rttSample -= ackDelay;
   }
+  // mrtt ignores ack delay. This is the same in the current recovery draft
+  // section A.6.
   conn.lossState.mrtt = minRtt;
   // We use the original minRtt without the ack delay included here
   // explicitly. We might want to change this by including ackDelay
