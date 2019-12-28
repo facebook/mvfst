@@ -33,28 +33,28 @@ TEST_F(QLogPacingObserverTest, Basic) {
   }
   EXPECT_CALL(*mockQLogger_, addPacingObservation(_, _, _))
       .Times(1)
-      .WillOnce(Invoke(
-          [](std::string actual, std::string expect, std::string conclustion) {
-            EXPECT_TRUE(actual.find("20packets / ") != std::string::npos);
-            EXPECT_EQ(
-                Bandwidth(0, 0s, Bandwidth::UnitType::PACKETS).describe(),
-                expect);
-            EXPECT_NE(
-                std::string::npos, conclustion.find("Pacing above expect"));
-          }));
+      .WillOnce(Invoke([](std::string actual,
+                          std::string expect,
+                          std::string conclusion) {
+        EXPECT_GT(std::stoi(actual.substr(0, actual.find("packets / "))), 20);
+        EXPECT_EQ(
+            Bandwidth(0, 0s, Bandwidth::UnitType::PACKETS).normalizedDescribe(),
+            expect);
+        EXPECT_NE(std::string::npos, conclusion.find("Pacing above expect"));
+      }));
   pacingObserver.onNewPacingRate(10, 10s);
 
   EXPECT_CALL(*mockQLogger_, addPacingObservation(_, _, _))
       .Times(1)
-      .WillOnce(Invoke(
-          [](std::string actual, std::string expect, std::string conclustion) {
-            EXPECT_TRUE(actual.find("0packets / ") != std::string::npos);
-            EXPECT_EQ(
-                Bandwidth(1, 1s, Bandwidth::UnitType::PACKETS).describe(),
-                expect);
-            EXPECT_NE(
-                std::string::npos, conclustion.find("Pacing below expect"));
-          }));
+      .WillOnce(Invoke([](std::string actual,
+                          std::string expect,
+                          std::string conclusion) {
+        EXPECT_TRUE(actual.find("0packets / ") != std::string::npos);
+        EXPECT_EQ(
+            Bandwidth(1, 1s, Bandwidth::UnitType::PACKETS).normalizedDescribe(),
+            expect);
+        EXPECT_NE(std::string::npos, conclusion.find("Pacing below expect"));
+      }));
   pacingObserver.onNewPacingRate(20, 10s);
 }
 

@@ -56,6 +56,11 @@ DEFINE_uint64(
     0,
     "Maximum number of bytes per stream. "
     "0 (the default) means the stream lives for the whole duration of the test.");
+DEFINE_string(
+    pacing_observer,
+    "second",
+    "second/rtt/ack: Pacing observer bucket type: per second, per rtt or per "
+    "ack");
 
 namespace quic {
 namespace tperf {
@@ -229,13 +234,28 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     if (!FLAGS_server_qlogger_path.empty()) {
       auto qlogger = std::make_shared<TperfQLogger>(
           VantagePoint::SERVER, FLAGS_server_qlogger_path);
-      qlogger->setPacingObserver(
-          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 1s));
+      setPacingObserver(qlogger, transport.get(), FLAGS_pacing_observer);
       transport->setQLogger(std::move(qlogger));
     }
     serverHandler->setQuicSocket(transport);
     handlers_.push_back(std::move(serverHandler));
     return transport;
+  }
+
+ private:
+  void setPacingObserver(
+      std::shared_ptr<TperfQLogger>& qlogger,
+      quic::QuicServerTransport* transport,
+      const std::string& pacingObserverType) {
+    if (pacingObserverType == "second") {
+      qlogger->setPacingObserver(
+          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 1s));
+    } else if (pacingObserverType == "rtt") {
+      qlogger->setPacingObserver(std::make_unique<RttBucketQLogPacingObserver>(
+          qlogger, *transport->getState()));
+    } else if (pacingObserverType == "ack") {
+      qlogger->setPacingObserver(std::make_unique<QLogPacingObserver>(qlogger));
+    }
   }
 
   std::vector<std::unique_ptr<ServerStreamHandler>> handlers_;

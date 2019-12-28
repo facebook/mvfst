@@ -486,7 +486,7 @@ folly::dynamic QLogPacingObservationEvent::toDynamic() const {
 
   data["actual_pacing_rate"] = actual;
   data["expect_pacing_rate"] = expect;
-  data["conclustion"] = conclusion;
+  data["conclusion"] = conclusion;
 
   d.push_back(std::move(data));
   return d;

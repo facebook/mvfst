@@ -21,10 +21,12 @@ class BucketedQLogPacingObserver : public PacingObserver {
   explicit BucketedQLogPacingObserver(
       const std::shared_ptr<QLogger>& logger,
       BucketEndPredicate predicate)
-      : logger_(logger), bucketEndPredicate_(std::move(predicate)) {}
+      : logger_(logger),
+        bucketEndPredicate_(std::move(predicate)),
+        lastSampledTime_(Clock::now()) {}
 
   explicit BucketedQLogPacingObserver(const std::shared_ptr<QLogger>& logger)
-      : logger_(logger) {}
+      : logger_(logger), lastSampledTime_(Clock::now()) {}
 
   template <typename... Args>
   explicit BucketedQLogPacingObserver(
@@ -50,8 +52,8 @@ class BucketedQLogPacingObserver : public PacingObserver {
             ? ((double)actualSendRate.normalize() / avgPacingRate.normalize())
             : 1.0;
         logger->addPacingObservation(
-            actualSendRate.describe(),
-            avgPacingRate.describe(),
+            actualSendRate.normalizedDescribe(),
+            avgPacingRate.normalizedDescribe(),
             folly::to<std::string>(
                 (actualSendRate > avgPacingRate ? "Pacing above expect"
                                                 : "Pacing below expect"),
@@ -76,9 +78,9 @@ class BucketedQLogPacingObserver : public PacingObserver {
 
  private:
   std::weak_ptr<QLogger> logger_;
+  BucketEndPredicate bucketEndPredicate_;
   uint64_t packetsSentSinceLastUpdate_{0};
   TimePoint lastSampledTime_;
-  BucketEndPredicate bucketEndPredicate_;
   Bandwidth runningExpectedPacingRateSum_{0, 0us, Bandwidth::UnitType::PACKETS};
   size_t runningExpectedPacingRateCount_{0};
 };
@@ -129,8 +131,11 @@ struct PerUpdateBucket {
   }
 };
 
+namespace {
 using RealClockRttBucket = RttBucket<Clock>;
 using RealClockFixedTimeBucket = FixedTimeBucket<Clock>;
+} // namespace
+
 using QLogPacingObserver = BucketedQLogPacingObserver<PerUpdateBucket>;
 using RttBucketQLogPacingObserver =
     BucketedQLogPacingObserver<RealClockRttBucket>;
