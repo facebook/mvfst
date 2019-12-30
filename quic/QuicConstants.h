@@ -235,6 +235,8 @@ constexpr uint64_t kDefaultMinBurstPackets = 5;
 // but the notifications can get delayed if the event loop is busy
 // this is subject to testing but I would suggest a value >= 200usec
 constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
+// Fraction of RTT that is used to limit how long a write function can loop
+constexpr std::chrono::microseconds::rep kDefaultWriteLimitRttFraction = 25;
 
 // Congestion control:
 constexpr folly::StringPiece kCongestionControlCubicStr = "cubic";

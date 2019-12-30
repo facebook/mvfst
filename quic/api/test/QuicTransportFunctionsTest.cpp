@@ -1985,5 +1985,36 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   EXPECT_EQ(247, conn->lossState.timeoutBasedRtxCount);
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
+  auto conn = createConn();
+  conn->lossState.srtt = 50ms;
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+
+  EventBase evb;
+  auto socket = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+  auto rawSocket = socket.get();
+
+  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = buildRandomInputData(2048 * 1024);
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+
+  EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(50));
+  EXPECT_GT(
+      500,
+      writeQuicDataToSocket(
+          *rawSocket,
+          *conn,
+          *conn->clientConnectionId,
+          *conn->serverConnectionId,
+          *aead,
+          *headerCipher,
+          getVersion(*conn),
+          500 /* packetLimit */));
+}
+
 } // namespace test
 } // namespace quic

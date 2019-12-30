@@ -90,6 +90,9 @@ struct TransportSettings {
   // writeConnectionDataToSocket.
   uint64_t writeConnectionDataPacketsLimit{
       kDefaultWriteConnectionDataPacketLimit};
+  // Fraction of RTT that is used to limit how long a write function can loop
+  std::chrono::microseconds::rep writeLimitRttFraction{
+      kDefaultWriteLimitRttFraction};
   // Frequency of sending flow control updates. We can send one update every
   // flowControlRttFrequency * RTT if the flow control changes.
   uint16_t flowControlRttFrequency{2};

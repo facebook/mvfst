@@ -927,7 +927,22 @@ uint64_t writeConnectionDataToSocket(
       connection.debugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
     }
   }
-  while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit) {
+  auto writeLoopBeginTime = Clock::now();
+  // helper functor to check if we have been write in a loop for longer than the
+  // RTT fraction that we are allowed to write. Only kicks in if we have write
+  // one batch in batching write mode.
+  auto timeLimitHelper = [&]() -> bool {
+    auto batchSize = connection.transportSettings.batchingMode ==
+            quic::QuicBatchingMode::BATCHING_MODE_NONE
+        ? connection.transportSettings.writeConnectionDataPacketsLimit
+        : connection.transportSettings.maxBatchSize;
+    return ioBufBatch.getPktSent() < batchSize ||
+        connection.lossState.srtt == 0us ||
+        Clock::now() - writeLoopBeginTime < connection.lossState.srtt /
+            connection.transportSettings.writeLimitRttFraction;
+  };
+  while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
+         timeLimitHelper()) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(srcConnId, dstConnId, packetNum, version, token);
     uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
