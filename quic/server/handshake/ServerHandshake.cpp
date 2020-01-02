@@ -260,7 +260,38 @@ void ServerHandshake::processActions(
   folly::DelayedDestruction::DestructorGuard dg(this);
 
   for (auto& action : actions) {
-    boost::apply_visitor(visitor_, action);
+    switch (action.type()) {
+      case fizz::server::Action::Type::DeliverAppData_E:
+        visitor_(*action.asDeliverAppData());
+        break;
+      case fizz::server::Action::Type::WriteToSocket_E:
+        visitor_(*action.asWriteToSocket());
+        break;
+      case fizz::server::Action::Type::ReportHandshakeSuccess_E:
+        visitor_(*action.asReportHandshakeSuccess());
+        break;
+      case fizz::server::Action::Type::ReportEarlyHandshakeSuccess_E:
+        visitor_(*action.asReportEarlyHandshakeSuccess());
+        break;
+      case fizz::server::Action::Type::ReportError_E:
+        visitor_(*action.asReportError());
+        break;
+      case fizz::server::Action::Type::EndOfData_E:
+        visitor_(*action.asEndOfData());
+        break;
+      case fizz::server::Action::Type::MutateState_E:
+        visitor_(*action.asMutateState());
+        break;
+      case fizz::server::Action::Type::WaitForData_E:
+        visitor_(*action.asWaitForData());
+        break;
+      case fizz::server::Action::Type::AttemptVersionFallback_E:
+        visitor_(*action.asAttemptVersionFallback());
+        break;
+      case fizz::server::Action::Type::SecretAvailable_E:
+        visitor_(*action.asSecretAvailable());
+        break;
+    }
   }
 
   actionGuard_.clear();
@@ -289,22 +320,24 @@ void ServerHandshake::processPendingEvents() {
     if (!waitForData_) {
       switch (state_.readRecordLayer()->getEncryptionLevel()) {
         case fizz::EncryptionLevel::Plaintext:
-          actions = machine_.processSocketData(state_, initialReadBuf_);
+          actions.emplace(machine_.processSocketData(state_, initialReadBuf_));
           break;
         case fizz::EncryptionLevel::Handshake:
-          actions = machine_.processSocketData(state_, handshakeReadBuf_);
+          actions.emplace(
+              machine_.processSocketData(state_, handshakeReadBuf_));
           break;
         case fizz::EncryptionLevel::EarlyData:
         case fizz::EncryptionLevel::AppTraffic:
           // TODO: Get rid of appDataReadBuf_ once we do not need EndOfEarlyData
           // any more.
-          actions = machine_.processSocketData(state_, appDataReadBuf_);
+          actions.emplace(machine_.processSocketData(state_, appDataReadBuf_));
           break;
       }
     } else if (!pendingEvents_.empty()) {
       auto write = std::move(pendingEvents_.front());
       pendingEvents_.pop_front();
-      actions = machine_.processWriteNewSessionTicket(state_, std::move(write));
+      actions.emplace(
+          machine_.processWriteNewSessionTicket(state_, std::move(write)));
     } else {
       actionGuard_.clear();
       return;

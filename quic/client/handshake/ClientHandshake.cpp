@@ -241,5 +241,4 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // stream, the server would have also acked all the client initial packets.
   phase_ = Phase::OneRttKeysDerived;
 }
-
 } // namespace quic

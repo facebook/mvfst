@@ -103,7 +103,7 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
   return {std::move(aead), std::move(packetNumberCipher)};
 }
 
-class FizzClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
+class FizzClientHandshake::ActionMoveVisitor {
  public:
   explicit ActionMoveVisitor(FizzClientHandshake& client) : client_(client) {}
 
@@ -122,7 +122,6 @@ class FizzClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::client::ReportEarlyHandshakeSuccess&) {
-    CHECK(client_.state_.earlyDataParams().hasValue());
     client_.computeZeroRttCipher();
   }
 
@@ -229,7 +228,41 @@ class FizzClientHandshake::ActionMoveVisitor : public boost::static_visitor<> {
 void FizzClientHandshake::processActions(fizz::client::Actions actions) {
   ActionMoveVisitor visitor(*this);
   for (auto& action : actions) {
-    boost::apply_visitor(visitor, action);
+    switch (action.type()) {
+      case fizz::client::Action::Type::DeliverAppData_E:
+        visitor(*action.asDeliverAppData());
+        break;
+      case fizz::client::Action::Type::WriteToSocket_E:
+        visitor(*action.asWriteToSocket());
+        break;
+      case fizz::client::Action::Type::ReportHandshakeSuccess_E:
+        visitor(*action.asReportHandshakeSuccess());
+        break;
+      case fizz::client::Action::Type::ReportEarlyHandshakeSuccess_E:
+        visitor(*action.asReportEarlyHandshakeSuccess());
+        break;
+      case fizz::client::Action::Type::ReportEarlyWriteFailed_E:
+        visitor(*action.asReportEarlyWriteFailed());
+        break;
+      case fizz::client::Action::Type::ReportError_E:
+        visitor(*action.asReportError());
+        break;
+      case fizz::client::Action::Type::EndOfData_E:
+        visitor(*action.asEndOfData());
+        break;
+      case fizz::client::Action::Type::MutateState_E:
+        visitor(*action.asMutateState());
+        break;
+      case fizz::client::Action::Type::WaitForData_E:
+        visitor(*action.asWaitForData());
+        break;
+      case fizz::client::Action::Type::NewCachedPsk_E:
+        visitor(*action.asNewCachedPsk());
+        break;
+      case fizz::client::Action::Type::SecretAvailable_E:
+        visitor(*action.asSecretAvailable());
+        break;
+    }
   }
 }
 
