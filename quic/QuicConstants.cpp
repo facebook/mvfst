@@ -71,7 +71,7 @@ std::vector<QuicVersion> filterSupportedVersions(
   return filteredVersions;
 }
 
-std::string writeDataReasonString(WriteDataReason reason) {
+folly::StringPiece writeDataReasonString(WriteDataReason reason) {
   switch (reason) {
     case WriteDataReason::PROBES:
       return "Probes";
@@ -101,7 +101,7 @@ std::string writeDataReasonString(WriteDataReason reason) {
   folly::assume_unreachable();
 }
 
-std::string writeNoWriteReasonString(NoWriteReason reason) {
+folly::StringPiece writeNoWriteReasonString(NoWriteReason reason) {
   switch (reason) {
     case NoWriteReason::WRITE_OK:
       return "WriteOk";

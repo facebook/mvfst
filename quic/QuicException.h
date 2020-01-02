@@ -60,6 +60,9 @@ class QuicInternalException : public std::runtime_error {
       const std::string& msg,
       LocalErrorCode errorCode);
   explicit QuicInternalException(const char* msg, LocalErrorCode errCode);
+  explicit QuicInternalException(
+      folly::StringPiece msg,
+      LocalErrorCode errCode);
 
   LocalErrorCode errorCode() const noexcept {
     return errorCode_;
@@ -89,8 +92,12 @@ class QuicApplicationException : public std::runtime_error {
 /**
  * Convert the error code to a string.
  */
+folly::StringPiece toString(LocalErrorCode code);
+
+// TODO: There's some dynamic string construction happening in this (related to
+// CryptoError toString). We should eventually figure out a way to avoid the
+// copy on return here as well.
 std::string toString(TransportErrorCode code);
-std::string toString(LocalErrorCode code);
 std::string toString(QuicErrorCode code);
 std::string toString(
     const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>& error);

@@ -372,7 +372,8 @@ void QuicTransportBase::closeImpl(
     if (noError) {
       connCallback_->onConnectionEnd();
     } else {
-      connCallback_->onConnectionError(cancelCode);
+      connCallback_->onConnectionError(
+          std::make_pair(cancelCode.first, cancelCode.second.str()));
     }
   }
 
@@ -2122,7 +2123,7 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
   closeImpl(
       std::make_pair(
           QuicErrorCode(LocalErrorCode::IDLE_TIMEOUT),
-          toString(LocalErrorCode::IDLE_TIMEOUT)),
+          toString(LocalErrorCode::IDLE_TIMEOUT).str()),
       drain /* drainConnection */,
       !drain /* sendCloseImmediately */);
 }
@@ -2231,7 +2232,7 @@ void QuicTransportBase::setEarlyDataAppParamsFunctions(
 }
 
 void QuicTransportBase::cancelAllAppCallbacks(
-    std::pair<QuicErrorCode, std::string> err) noexcept {
+    const std::pair<QuicErrorCode, folly::StringPiece>& err) noexcept {
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
@@ -2253,8 +2254,7 @@ void QuicTransportBase::cancelAllAppCallbacks(
   for (auto& cb : readCallbacksCopy) {
     readCallbacks_.erase(cb.first);
     if (cb.second.readCb) {
-      cb.second.readCb->readError(
-          cb.first, std::make_pair(err.first, folly::StringPiece(err.second)));
+      cb.second.readCb->readError(cb.first, err);
     }
   }
   VLOG(4) << "Clearing " << peekCallbacks_.size() << " peek callbacks";
@@ -2265,14 +2265,12 @@ void QuicTransportBase::cancelAllAppCallbacks(
   if (connWriteCallback_) {
     auto connWriteCallback = connWriteCallback_;
     connWriteCallback_ = nullptr;
-    connWriteCallback->onConnectionWriteError(
-        std::make_pair(err.first, folly::StringPiece(err.second)));
+    connWriteCallback->onConnectionWriteError(err);
   }
   auto it = pendingWriteCallbacks_.begin();
   while (it != pendingWriteCallbacks_.end()) {
     auto wcb = it->second;
-    wcb->onStreamWriteError(
-        it->first, std::make_pair(err.first, folly::StringPiece(err.second)));
+    wcb->onStreamWriteError(it->first, err);
     it = pendingWriteCallbacks_.erase(it);
   }
 }

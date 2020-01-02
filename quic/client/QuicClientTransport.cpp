@@ -143,7 +143,7 @@ void QuicClientTransport::processPacketData(
       VLOG(4) << "Received Stateless Reset " << *this;
       conn_->peerConnectionError = std::make_pair(
           QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
-          toString(LocalErrorCode::CONNECTION_RESET));
+          toString(LocalErrorCode::CONNECTION_RESET).str());
       throw QuicInternalException("Peer reset", LocalErrorCode::NO_ERROR);
     }
     VLOG(4) << "Drop StatelessReset for bad connId or token " << *this;

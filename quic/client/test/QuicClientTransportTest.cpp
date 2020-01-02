@@ -4682,7 +4682,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
   // Drain first with no active streams
   auto err = std::make_pair<QuicErrorCode, std::string>(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR));
+      toString(LocalErrorCode::INTERNAL_ERROR).str());
   client->close(err);
   EXPECT_TRUE(client->isDraining());
   client->closeNow(err);
@@ -4694,7 +4694,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
 TEST_F(QuicClientTransportAfterStartTest, ExpiredDrainTimeout) {
   auto err = std::make_pair<QuicErrorCode, std::string>(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR));
+      toString(LocalErrorCode::INTERNAL_ERROR).str());
   client->close(err);
   EXPECT_TRUE(client->isDraining());
   EXPECT_FALSE(destructionCallback->isDestroyed());
@@ -4707,7 +4707,7 @@ TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
   // Drain first with no active streams
   auto err = std::make_pair<QuicErrorCode, std::string>(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
-      toString(LocalErrorCode::INTERNAL_ERROR));
+      toString(LocalErrorCode::INTERNAL_ERROR).str());
   EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   client->close(err);
   EXPECT_FALSE(client->idleTimeout().isScheduled());

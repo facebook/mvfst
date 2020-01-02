@@ -45,6 +45,11 @@ QuicInternalException::QuicInternalException(
     LocalErrorCode errCode)
     : std::runtime_error(msg), errorCode_(errCode){};
 
+QuicInternalException::QuicInternalException(
+    folly::StringPiece msg,
+    LocalErrorCode errCode)
+    : std::runtime_error(folly::to<std::string>(msg)), errorCode_(errCode){};
+
 QuicApplicationException::QuicApplicationException(
     const std::string& msg,
     ApplicationErrorCode errorCode)
@@ -55,7 +60,7 @@ QuicApplicationException::QuicApplicationException(
     ApplicationErrorCode errorCode)
     : std::runtime_error(msg), errorCode_(errorCode){};
 
-std::string toString(LocalErrorCode code) {
+folly::StringPiece toString(LocalErrorCode code) {
   switch (code) {
     case LocalErrorCode::NO_ERROR:
       return "No Error";
@@ -175,7 +180,7 @@ std::string toString(QuicErrorCode code) {
     case QuicErrorCode::Type::ApplicationErrorCode_E:
       return folly::to<std::string>(*code.asApplicationErrorCode());
     case QuicErrorCode::Type::LocalErrorCode_E:
-      return toString(*code.asLocalErrorCode());
+      return toString(*code.asLocalErrorCode()).str();
     case QuicErrorCode::Type::TransportErrorCode_E:
       return toString(*code.asTransportErrorCode());
   }
@@ -192,7 +197,9 @@ std::string toString(
           toString(*error.first.asApplicationErrorCode()) + ", ";
       break;
     case QuicErrorCode::Type::LocalErrorCode_E:
-      err = "LocalError: " + toString(*error.first.asLocalErrorCode()) + ", ";
+      err = "LocalError: " +
+          folly::to<std::string>(toString(*error.first.asLocalErrorCode())) +
+          ", ";
       break;
     case QuicErrorCode::Type::TransportErrorCode_E:
       err = "TransportError: " + toString(*error.first.asTransportErrorCode()) +

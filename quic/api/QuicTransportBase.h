@@ -471,7 +471,7 @@ class QuicTransportBase : public QuicSocket {
   }
 
   virtual void cancelAllAppCallbacks(
-      std::pair<QuicErrorCode, std::string> error) noexcept;
+      const std::pair<QuicErrorCode, folly::StringPiece>& error) noexcept;
 
  protected:
   void processCallbacksAfterNetworkData();

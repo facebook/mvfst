@@ -450,8 +450,8 @@ enum class NoWriteReason {
   SOCKET_FAILURE,
 };
 
-std::string writeDataReasonString(WriteDataReason reason);
-std::string writeNoWriteReasonString(NoWriteReason reason);
+folly::StringPiece writeDataReasonString(WriteDataReason reason);
+folly::StringPiece writeNoWriteReasonString(NoWriteReason reason);
 
 /**
  * Filter the versions that are currently supported.
