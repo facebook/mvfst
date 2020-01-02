@@ -433,43 +433,44 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       kQuicIVLabel);
   auto headerCipher = server_.cryptoFactory_->makePacketNumberCipher(
       folly::range(secretAvailable.secret.secret));
-  folly::variant_match(
-      secretAvailable.secret.type,
-      [&](fizz::EarlySecrets earlySecrets) {
-        switch (earlySecrets) {
-          case fizz::EarlySecrets::ClientEarlyTraffic:
-            server_.zeroRttReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.zeroRttReadHeaderCipher_ = std::move(headerCipher);
-            break;
-          default:
-            break;
-        }
-      },
-      [&](fizz::HandshakeSecrets handshakeSecrets) {
-        switch (handshakeSecrets) {
-          case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-            server_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.handshakeReadHeaderCipher_ = std::move(headerCipher);
-            break;
-          case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-            server_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
-            server_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
-            break;
-        }
-      },
-      [&](fizz::AppTrafficSecrets appSecrets) {
-        switch (appSecrets) {
-          case fizz::AppTrafficSecrets::ClientAppTraffic:
-            server_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.oneRttReadHeaderCipher_ = std::move(headerCipher);
-            break;
-          case fizz::AppTrafficSecrets::ServerAppTraffic:
-            server_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
-            server_.oneRttWriteHeaderCipher_ = std::move(headerCipher);
-            break;
-        }
-      },
-      [&](auto) {});
+  switch (secretAvailable.secret.type.type()) {
+    case fizz::SecretType::Type::EarlySecrets_E:
+      switch (*secretAvailable.secret.type.asEarlySecrets()) {
+        case fizz::EarlySecrets::ClientEarlyTraffic:
+          server_.zeroRttReadCipher_ = FizzAead::wrap(std::move(aead));
+          server_.zeroRttReadHeaderCipher_ = std::move(headerCipher);
+          break;
+        default:
+          break;
+      }
+      break;
+    case fizz::SecretType::Type::HandshakeSecrets_E:
+      switch (*secretAvailable.secret.type.asHandshakeSecrets()) {
+        case fizz::HandshakeSecrets::ClientHandshakeTraffic:
+          server_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
+          server_.handshakeReadHeaderCipher_ = std::move(headerCipher);
+          break;
+        case fizz::HandshakeSecrets::ServerHandshakeTraffic:
+          server_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
+          server_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
+          break;
+      }
+      break;
+    case fizz::SecretType::Type::AppTrafficSecrets_E:
+      switch (*secretAvailable.secret.type.asAppTrafficSecrets()) {
+        case fizz::AppTrafficSecrets::ClientAppTraffic:
+          server_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
+          server_.oneRttReadHeaderCipher_ = std::move(headerCipher);
+          break;
+        case fizz::AppTrafficSecrets::ServerAppTraffic:
+          server_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
+          server_.oneRttWriteHeaderCipher_ = std::move(headerCipher);
+          break;
+      }
+      break;
+    case fizz::SecretType::Type::MasterSecrets_E:
+      break;
+  }
   server_.handshakeEventAvailable_ = true;
 }
 

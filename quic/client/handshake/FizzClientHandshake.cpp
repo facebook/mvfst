@@ -8,7 +8,6 @@
 
 #include <quic/client/handshake/FizzClientHandshake.h>
 
-#include <folly/Overload.h>
 #include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/FizzBridge.h>
@@ -177,48 +176,49 @@ class FizzClientHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::SecretAvailable& secretAvailable) {
-    folly::variant_match(
-        secretAvailable.secret.type,
-        [&](fizz::EarlySecrets earlySecrets) {
-          switch (earlySecrets) {
-            case fizz::EarlySecrets::ClientEarlyTraffic:
-              client_.computeCiphers(
-                  CipherKind::ZeroRttWrite,
-                  folly::range(secretAvailable.secret.secret));
-              break;
-            default:
-              break;
-          }
-        },
-        [&](fizz::HandshakeSecrets handshakeSecrets) {
-          switch (handshakeSecrets) {
-            case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-              client_.computeCiphers(
-                  CipherKind::HandshakeWrite,
-                  folly::range(secretAvailable.secret.secret));
-              break;
-            case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-              client_.computeCiphers(
-                  CipherKind::HandshakeRead,
-                  folly::range(secretAvailable.secret.secret));
-              break;
-          }
-        },
-        [&](fizz::AppTrafficSecrets appSecrets) {
-          switch (appSecrets) {
-            case fizz::AppTrafficSecrets::ClientAppTraffic:
-              client_.computeCiphers(
-                  CipherKind::OneRttWrite,
-                  folly::range(secretAvailable.secret.secret));
-              break;
-            case fizz::AppTrafficSecrets::ServerAppTraffic:
-              client_.computeCiphers(
-                  CipherKind::OneRttRead,
-                  folly::range(secretAvailable.secret.secret));
-              break;
-          }
-        },
-        [&](auto) {});
+    switch (secretAvailable.secret.type.type()) {
+      case fizz::SecretType::Type::EarlySecrets_E:
+        switch (*secretAvailable.secret.type.asEarlySecrets()) {
+          case fizz::EarlySecrets::ClientEarlyTraffic:
+            client_.computeCiphers(
+                CipherKind::ZeroRttWrite,
+                folly::range(secretAvailable.secret.secret));
+            break;
+          default:
+            break;
+        }
+        break;
+      case fizz::SecretType::Type::HandshakeSecrets_E:
+        switch (*secretAvailable.secret.type.asHandshakeSecrets()) {
+          case fizz::HandshakeSecrets::ClientHandshakeTraffic:
+            client_.computeCiphers(
+                CipherKind::HandshakeWrite,
+                folly::range(secretAvailable.secret.secret));
+            break;
+          case fizz::HandshakeSecrets::ServerHandshakeTraffic:
+            client_.computeCiphers(
+                CipherKind::HandshakeRead,
+                folly::range(secretAvailable.secret.secret));
+            break;
+        }
+        break;
+      case fizz::SecretType::Type::AppTrafficSecrets_E:
+        switch (*secretAvailable.secret.type.asAppTrafficSecrets()) {
+          case fizz::AppTrafficSecrets::ClientAppTraffic:
+            client_.computeCiphers(
+                CipherKind::OneRttWrite,
+                folly::range(secretAvailable.secret.secret));
+            break;
+          case fizz::AppTrafficSecrets::ServerAppTraffic:
+            client_.computeCiphers(
+                CipherKind::OneRttRead,
+                folly::range(secretAvailable.secret.secret));
+            break;
+        }
+        break;
+      case fizz::SecretType::Type::MasterSecrets_E:
+        break;
+    }
   }
 
  private:
