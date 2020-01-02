@@ -265,10 +265,10 @@ class NewConnectionIdFrameLog : public QLogFrame {
 
 class RetireConnectionIdFrameLog : public QLogFrame {
  public:
-  uint64_t sequenceNumber;
+  uint64_t sequence;
 
-  RetireConnectionIdFrameLog(uint64_t sequenceNumberIn)
-      : sequenceNumber(sequenceNumberIn) {}
+  RetireConnectionIdFrameLog(uint64_t sequenceIn)
+      : sequence(sequenceIn) {}
 
   ~RetireConnectionIdFrameLog() override = default;
   folly::dynamic toDynamic() const override;

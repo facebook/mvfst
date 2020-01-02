@@ -181,7 +181,8 @@ folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
 
 folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["sequenceNumber"] = sequenceNumber;
+  d["frame_type"] = toString(FrameType::RETIRE_CONNECTION_ID);
+  d["sequence"] = sequence;
   return d;
 }
 
