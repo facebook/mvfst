@@ -3472,25 +3472,6 @@ TEST_F(
   EXPECT_TRUE(client->getConn().readCodec->getHandshakeDoneTime().hasValue());
 }
 
-TEST_F(QuicClientTransportAfterStartTest, InvalidConnectionId) {
-  StreamId streamId = client->createBidirectionalStream().value();
-
-  client->setReadCallback(streamId, &readCb);
-
-  // Test sending packet with original conn id with correct cipher, but wrong
-  // conn id.
-  PacketNum nextPacket = appDataPacketNum++;
-  auto packet = packetToBuf(createStreamPacket(
-      *serverChosenConnId /* src */,
-      *serverChosenConnId /* dest */,
-      nextPacket,
-      streamId,
-      *IOBuf::create(10),
-      0 /* cipherOverhead */,
-      0 /* largestAcked */));
-  EXPECT_THROW(deliverData(packet->coalesce()), std::runtime_error);
-}
-
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
   // spend some time looping the evb
   for (int i = 0; i < 10; ++i) {
