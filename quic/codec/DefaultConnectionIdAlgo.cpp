@@ -28,7 +28,7 @@ constexpr uint8_t kWorkerIdSecondByteMask = 0x03;
 constexpr uint8_t kShortVersionBitsMask = 0xc0;
 
 /**
- * Sets the short version id bits (0 - 3) into the given ConnectionId
+ * Sets the short version id bits (0 - 1) into the given ConnectionId
  */
 void setVersionBitsInConnId(quic::ConnectionId& connId, uint8_t version) {
   if (connId.size() < quic::kMinConnectionIdSize) {
@@ -64,7 +64,7 @@ void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
         "ConnectionId is too small for hostid",
         quic::LocalErrorCode::INTERNAL_ERROR);
   }
-  // clear 2-7 bits
+  // clear 2 - 7 bits
   connId.data()[0] &= ~kHostIdFirstByteMask;
   // clear 8 - 15 bits
   connId.data()[1] &= ~kHostIdSecondByteMask;
@@ -80,7 +80,7 @@ void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
 }
 
 /**
- * Extract the host id bits [4 - 15] bits from the given ConnectionId
+ * Extract the host id bits [2 - 17] bits from the given ConnectionId
  */
 uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
   if (connId.size() < quic::kMinConnectionIdSize) {
@@ -101,7 +101,7 @@ uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
 }
 
 /**
- * Sets the given 8-bit workerId into the given connectionId's 16-23 bits
+ * Sets the given 8-bit workerId into the given connectionId's 18-25 bits
  */
 void setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) {
   if (connId.size() < quic::kMinConnectionIdSize) {
@@ -136,7 +136,7 @@ uint8_t getWorkerIdFromConnId(const quic::ConnectionId& connId) {
 }
 
 /**
- * Sets the server id bit (at 24th bit) into the given ConnectionId
+ * Sets the server id bit (at 26th bit) into the given ConnectionId
  */
 void setProcessIdBitsInConnId(quic::ConnectionId& connId, uint8_t processId) {
   if (connId.size() < quic::kMinConnectionIdSize) {
