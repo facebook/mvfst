@@ -202,16 +202,6 @@ void FileQLogger::addPacketBuffered(
       packetNum, protectionType, packetSize, refTime));
 }
 
-void FileQLogger::addPacketAck(
-    PacketNumberSpace packetNumSpace,
-    PacketNum packetNum) {
-  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
-
-  logs.push_back(std::make_unique<quic::QLogPacketAckEvent>(
-      packetNumSpace, packetNum, refTime));
-}
-
 void FileQLogger::addMetricUpdate(
     std::chrono::microseconds latestRtt,
     std::chrono::microseconds mrtt,

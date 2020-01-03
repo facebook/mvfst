@@ -83,8 +83,6 @@ class FileQLogger : public BaseQLogger {
       PacketNum packetNum,
       ProtectionType protectionType,
       uint64_t packetSize) override;
-  void addPacketAck(PacketNumberSpace packetNumSpace, PacketNum packetNum)
-      override;
   void addMetricUpdate(
       std::chrono::microseconds latestRtt,
       std::chrono::microseconds mrtt,

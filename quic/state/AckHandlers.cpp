@@ -122,9 +122,6 @@ void processAckFrame(
       if (currentPacketNum == frame.largestAcked) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
-      if (conn.qLogger) {
-        conn.qLogger->addPacketAck(currentPacketNumberSpace, currentPacketNum);
-      }
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandingPacketEvents
       if (!rPacketIt->associatedEvent ||

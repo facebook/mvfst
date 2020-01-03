@@ -97,9 +97,6 @@ class QLogger {
       PacketNum packetNum,
       ProtectionType protectionType,
       uint64_t packetSize) = 0;
-  virtual void addPacketAck(
-      PacketNumberSpace packetNumSpace,
-      PacketNum packetNum) = 0;
   virtual void addMetricUpdate(
       std::chrono::microseconds latestRtt,
       std::chrono::microseconds mrtt,
