@@ -6,12 +6,12 @@
  *
  */
 
-#include <quic/codec/QuicReadCodec.h>
 #include <folly/io/Cursor.h>
 #include <folly/portability/GTest.h>
 #include <quic/QuicException.h>
+#include <quic/codec/QuicReadCodec.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 
 using namespace quic;
 using namespace quic::test;

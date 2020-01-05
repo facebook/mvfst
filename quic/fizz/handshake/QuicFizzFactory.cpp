@@ -6,7 +6,7 @@
  *
  */
 
-#include <quic/handshake/QuicFizzFactory.h>
+#include <quic/fizz/handshake/QuicFizzFactory.h>
 
 namespace {
 

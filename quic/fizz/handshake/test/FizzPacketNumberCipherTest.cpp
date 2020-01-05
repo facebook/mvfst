@@ -9,8 +9,8 @@
 #include <folly/portability/GTest.h>
 
 #include <fizz/record/Types.h>
-#include <quic/handshake/FizzCryptoFactory.h>
-#include <quic/handshake/FizzPacketNumberCipher.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 
 #include <folly/String.h>
 

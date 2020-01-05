@@ -10,8 +10,8 @@
 
 #include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/state/QuicPacingFunctions.h>

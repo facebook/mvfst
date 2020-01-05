@@ -11,7 +11,7 @@
 
 #include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/test/Mocks.h>
 
 using namespace testing;

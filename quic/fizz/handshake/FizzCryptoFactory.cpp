@@ -6,10 +6,10 @@
  *
  */
 
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 
-#include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/FizzPacketNumberCipher.h>
+#include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {

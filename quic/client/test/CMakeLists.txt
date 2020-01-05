@@ -16,7 +16,7 @@ quic_add_test(TARGET QuicClientTransportTest
   mvfst_bufutil
   mvfst_client
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_server
   mvfst_test_utils
   mvfst_transport

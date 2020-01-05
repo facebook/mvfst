@@ -33,7 +33,7 @@ add_dependencies(
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_machine
   mvfst_transport
@@ -48,7 +48,7 @@ target_link_libraries(
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_machine
   mvfst_transport
@@ -69,7 +69,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   mvfst_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_looper
   mvfst_transport
   mvfst_server

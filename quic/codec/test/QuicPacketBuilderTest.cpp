@@ -14,7 +14,7 @@
 #include <quic/codec/Types.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 using namespace quic;

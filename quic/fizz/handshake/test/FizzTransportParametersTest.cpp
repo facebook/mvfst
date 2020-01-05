@@ -10,7 +10,7 @@
 #include <folly/portability/GTest.h>
 
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzTransportParameters.h>
+#include <quic/fizz/handshake/FizzTransportParameters.h>
 
 #include <fizz/record/test/ExtensionTestsBase.h>
 

@@ -8,7 +8,7 @@
 
 #include <quic/client/handshake/ClientHandshake.h>
 
-#include <quic/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {

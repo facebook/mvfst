@@ -6,7 +6,7 @@
  *
  */
 
-#include <quic/handshake/FizzPacketNumberCipher.h>
+#include <quic/fizz/handshake/FizzPacketNumberCipher.h>
 
 namespace quic {
 
