@@ -195,9 +195,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
 
   folly::Future<
       std::pair<fizz::PskType, folly::Optional<fizz::server::ResumptionState>>>
-  decrypt(
-      std::unique_ptr<folly::IOBuf>,
-      const fizz::server::State* /*state*/ = nullptr) const override {
+  decrypt(std::unique_ptr<folly::IOBuf>) const override {
     return std::make_pair(fizz::PskType::Resumption, createResumptionState());
   }
 
