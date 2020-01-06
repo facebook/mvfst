@@ -90,6 +90,8 @@ class QuicServerTransport
 
   virtual void setClientConnectionId(const ConnectionId& clientConnectionId);
 
+  void setClientChosenDestConnectionId(const ConnectionId& serverCid);
+
   // From QuicTransportBase
   void onReadData(
       const folly::SocketAddress& peer,

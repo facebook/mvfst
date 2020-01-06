@@ -49,6 +49,9 @@ class QuicTransportBase : public QuicSocket {
 
   folly::Optional<ConnectionId> getServerConnectionId() const override;
 
+  folly::Optional<ConnectionId> getClientChosenDestConnectionId()
+      const override;
+
   const folly::SocketAddress& getPeerAddress() const override;
 
   const folly::SocketAddress& getOriginalPeerAddress() const override;

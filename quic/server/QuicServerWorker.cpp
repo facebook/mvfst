@@ -347,12 +347,12 @@ void QuicServerWorker::dispatchPacketData(
     dropPacket = true;
   }
 
-  if (!dropPacket && !transport && routingData.sourceConnId) {
+  if (!dropPacket && !transport) {
     // For LongHeader packets without existing associated connection, try to
-    // route with sourceConnId chosen by the peer and IP address of the peer.
+    // route with destinationConnId chosen by the peer and IP address of the
+    // peer.
     CHECK(transportFactory_);
-    // can only route by address.
-    auto source = std::make_pair(client, *routingData.sourceConnId);
+    auto source = std::make_pair(client, routingData.destinationConnId);
     auto sit = sourceAddressMap_.find(source);
     if (sit == sourceAddressMap_.end()) {
       // TODO for O-RTT types we need to create new connections to handle
@@ -400,7 +400,10 @@ void QuicServerWorker::dispatchPacketData(
           trans->setTransportSettings(transportSettings_);
         }
         trans->setConnectionIdAlgo(connIdAlgo_.get());
-        trans->setClientConnectionId(*routingData.sourceConnId);
+        if (routingData.sourceConnId) {
+          trans->setClientConnectionId(*routingData.sourceConnId);
+        }
+        trans->setClientChosenDestConnectionId(routingData.destinationConnId);
         // parameters to create server chosen connection id
         ServerConnectionIdParams serverConnIdParams(
             hostId_, static_cast<uint8_t>(processId_), workerId_);
@@ -410,10 +413,10 @@ void QuicServerWorker::dispatchPacketData(
         }
         trans->accept();
         auto result = sourceAddressMap_.emplace(std::make_pair(
-            std::make_pair(client, *routingData.sourceConnId), trans));
+            std::make_pair(client, routingData.destinationConnId), trans));
         if (!result.second) {
           LOG(ERROR) << "Routing entry already exists for client=" << client
-                     << ", client CID=" << routingData.sourceConnId->hex();
+                     << ", dest CID=" << routingData.destinationConnId.hex();
           dropPacket = true;
         }
         transport = trans;
@@ -659,9 +662,10 @@ void QuicServerWorker::onConnectionIdAvailable(
 
 void QuicServerWorker::onConnectionIdBound(
     QuicServerTransport::Ptr transport) noexcept {
-  DCHECK(transport->getClientConnectionId());
+  auto clientInitialDestCid = transport->getClientChosenDestConnectionId();
+  CHECK(clientInitialDestCid);
   auto source = std::make_pair(
-      transport->getOriginalPeerAddress(), *transport->getClientConnectionId());
+      transport->getOriginalPeerAddress(), *clientInitialDestCid);
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
   auto iter = sourceAddressMap_.find(source);
   if (iter == sourceAddressMap_.end() || iter->second != transport) {

@@ -38,6 +38,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(
       getServerConnectionId,
       folly::Optional<quic::ConnectionId>());
+  MOCK_CONST_METHOD0(
+      getClientChosenDestConnectionId,
+      folly::Optional<quic::ConnectionId>());
   MOCK_CONST_METHOD0(getPeerAddress, const folly::SocketAddress&());
   MOCK_CONST_METHOD0(getOriginalPeerAddress, const folly::SocketAddress&());
   MOCK_CONST_METHOD0(getLocalAddress, const folly::SocketAddress&());

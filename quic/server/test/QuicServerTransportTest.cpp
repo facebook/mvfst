@@ -322,6 +322,7 @@ class QuicServerTransportTest : public Test {
         getDisableMigration();
     server->setConnectionIdAlgo(connIdAlgo_.get());
     server->setClientConnectionId(*clientConnectionId);
+    server->setClientChosenDestConnectionId(*initialDestinationConnectionId);
     VLOG(20) << __func__ << " client connId=" << clientConnectionId->hex()
              << ", server connId="
              << (server->getConn().serverConnectionId

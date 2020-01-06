@@ -37,7 +37,7 @@ struct RoutingData {
   bool isInitial;
   bool isUsingClientConnId;
 
-  // The destination connection id is the connection is picked by the
+  // The destination connection id is the connection id picked by the
   // server for non initial packets and the sourceConnId is the one chosen
   // by the peer.
   ConnectionId destinationConnId;

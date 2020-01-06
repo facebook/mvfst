@@ -362,7 +362,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(connId), 1);
 
-  EXPECT_CALL(*transport_, getClientConnectionId())
+  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
       .WillRepeatedly(Return(connId));
   worker_->onConnectionIdBound(transport_);
 
@@ -447,8 +447,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
-  EXPECT_CALL(*transport_, getClientConnectionId())
-      .WillRepeatedly(Return(getTestConnectionId(hostId_)));
+  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
+      .WillRepeatedly(Return(connId));
   worker_->onConnectionIdBound(transport_);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
@@ -555,8 +555,8 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
   createQuicConnection(kClientAddr, connId);
 
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
-  EXPECT_CALL(*transport_, getClientConnectionId())
-      .WillRepeatedly(Return(getTestConnectionId(hostId_)));
+  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
+      .WillRepeatedly(Return(connId));
   transport_->setShedConnection();
   EXPECT_CALL(
       *transport_,
@@ -567,7 +567,7 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
       transport_.get(),
-      std::make_pair(kClientAddr, getTestConnectionId(hostId_)),
+      std::make_pair(kClientAddr, connId),
       std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
 }
 

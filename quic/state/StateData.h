@@ -558,8 +558,10 @@ struct QuicConnectionStateBase {
   // The received active_connection_id_limit transport parameter from the peer.
   uint64_t peerActiveConnectionIdLimit{0};
 
-  // The current connection id. This will eventually be negotiated
-  // with the peer.
+  // The destination connection id used in client's initial packet.
+  folly::Optional<ConnectionId> clientChosenDestConnectionId;
+
+  // The source connection id used in client's initial packet.
   folly::Optional<ConnectionId> clientConnectionId;
 
   // The current server chosen connection id.

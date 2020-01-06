@@ -85,6 +85,11 @@ folly::Optional<ConnectionId> QuicTransportBase::getServerConnectionId() const {
   return conn_->serverConnectionId;
 }
 
+folly::Optional<ConnectionId>
+QuicTransportBase::getClientChosenDestConnectionId() const {
+  return conn_->clientChosenDestConnectionId;
+}
+
 const folly::SocketAddress& QuicTransportBase::getPeerAddress() const {
   return conn_->peerAddress;
 }

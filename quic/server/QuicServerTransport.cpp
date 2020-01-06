@@ -262,11 +262,14 @@ void QuicServerTransport::unbindConnection() {
   if (routingCb_) {
     auto routingCb = routingCb_;
     routingCb_ = nullptr;
-    CHECK(conn_->clientConnectionId);
-    routingCb->onConnectionUnbound(
-        this,
-        std::make_pair(getOriginalPeerAddress(), *conn_->clientConnectionId),
-        conn_->selfConnectionIds);
+    CHECK(conn_->clientChosenDestConnectionId);
+    if (conn_->serverConnectionId) {
+      routingCb->onConnectionUnbound(
+          this,
+          std::make_pair(
+              getOriginalPeerAddress(), *conn_->clientChosenDestConnectionId),
+          conn_->selfConnectionIds);
+    }
   }
 }
 
@@ -283,6 +286,11 @@ void QuicServerTransport::setClientConnectionId(
   conn_->clientConnectionId.assign(clientConnectionId);
   conn_->peerConnectionIds.emplace_back(
       clientConnectionId, kInitialSequenceNumber);
+}
+
+void QuicServerTransport::setClientChosenDestConnectionId(
+    const ConnectionId& clientChosenDestConnectionId) {
+  conn_->clientChosenDestConnectionId.assign(clientChosenDestConnectionId);
 }
 
 void QuicServerTransport::onCryptoEventAvailable() noexcept {

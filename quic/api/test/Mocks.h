@@ -254,6 +254,12 @@ class MockQuicTransport : public QuicServerTransport {
       ,
       getClientConnectionId,
       folly::Optional<ConnectionId>());
+  GMOCK_METHOD0_(
+      ,
+      const,
+      ,
+      getClientChosenDestConnectionId,
+      folly::Optional<ConnectionId>());
 
   GMOCK_METHOD1_(
       ,

@@ -196,6 +196,12 @@ class QuicSocket {
   virtual folly::Optional<ConnectionId> getServerConnectionId() const = 0;
 
   /**
+   * Get the original Quic Server Connection ID chosen by client
+   */
+  FOLLY_NODISCARD virtual folly::Optional<ConnectionId>
+  getClientChosenDestConnectionId() const = 0;
+
+  /**
    * Get the peer socket address
    */
   virtual const folly::SocketAddress& getPeerAddress() const = 0;
