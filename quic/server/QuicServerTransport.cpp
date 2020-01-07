@@ -183,7 +183,7 @@ void QuicServerTransport::writeData() {
     return;
   }
 
-  if (UNLIKELY(!conn_->initialWriteCipher)) {
+  if (!conn_->initialWriteCipher) {
     // This would be possible if we read a packet from the network which
     // could not be parsed later.
     return;

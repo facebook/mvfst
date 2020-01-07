@@ -18,7 +18,7 @@ quic::PacketNum nextAckedPacketGap(quic::PacketNum packetNum, uint64_t gap) {
   // Gap cannot overflow because of the definition of quic integer encoding, so
   // we can just add to gap.
   uint64_t adjustedGap = gap + 2;
-  if (UNLIKELY(packetNum < adjustedGap)) {
+  if (packetNum < adjustedGap) {
     throw quic::QuicTransportException(
         "Bad gap",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -31,7 +31,7 @@ quic::PacketNum nextAckedPacketLen(
     quic::PacketNum packetNum,
     uint64_t ackBlockLen) {
   // Going to allow 0 as a valid value.
-  if (UNLIKELY(packetNum < ackBlockLen)) {
+  if (packetNum < ackBlockLen) {
     throw quic::QuicTransportException(
         "Bad block len",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -81,7 +81,7 @@ ReadAckFrame decodeAckFrame(
     const CodecParameters& params) {
   ReadAckFrame frame;
   auto largestAckedInt = decodeQuicInteger(cursor);
-  if (UNLIKELY(!largestAckedInt)) {
+  if (!largestAckedInt) {
     throw QuicTransportException(
         "Bad largest acked",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -89,21 +89,21 @@ ReadAckFrame decodeAckFrame(
   }
   auto largestAcked = folly::to<PacketNum>(largestAckedInt->first);
   auto ackDelay = decodeQuicInteger(cursor);
-  if (UNLIKELY(!ackDelay)) {
+  if (!ackDelay) {
     throw QuicTransportException(
         "Bad ack delay",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK);
   }
   auto additionalAckBlocks = decodeQuicInteger(cursor);
-  if (UNLIKELY(!additionalAckBlocks)) {
+  if (!additionalAckBlocks) {
     throw QuicTransportException(
         "Bad ack block count",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK);
   }
   auto firstAckBlockLen = decodeQuicInteger(cursor);
-  if (UNLIKELY(!firstAckBlockLen)) {
+  if (!firstAckBlockLen) {
     throw QuicTransportException(
         "Bad first block",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -122,17 +122,16 @@ ReadAckFrame decodeAckFrame(
   uint8_t leftShift = (sizeof(ackDelay->first) * 8 - ackDelayExponentToUse);
   DCHECK_LT(leftShift, sizeof(delayOverflowMask) * 8);
   delayOverflowMask = delayOverflowMask << leftShift;
-  if (UNLIKELY((ackDelay->first & delayOverflowMask) != 0)) {
+  if ((ackDelay->first & delayOverflowMask) != 0) {
     throw QuicTransportException(
         "Decoded ack delay overflows",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK);
   }
   uint64_t adjustedAckDelay = ackDelay->first << ackDelayExponentToUse;
-  if (UNLIKELY(
-          adjustedAckDelay >
-          static_cast<uint64_t>(
-              std::numeric_limits<std::chrono::microseconds::rep>::max()))) {
+  if (adjustedAckDelay >
+      static_cast<uint64_t>(
+          std::numeric_limits<std::chrono::microseconds::rep>::max())) {
     throw QuicTransportException(
         "Bad ack delay",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -146,14 +145,14 @@ ReadAckFrame decodeAckFrame(
   for (uint64_t numBlocks = 0; numBlocks < additionalAckBlocks->first;
        ++numBlocks) {
     auto currentGap = decodeQuicInteger(cursor);
-    if (UNLIKELY(!currentGap)) {
+    if (!currentGap) {
       throw QuicTransportException(
           "Bad gap",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
           quic::FrameType::ACK);
     }
     auto blockLen = decodeQuicInteger(cursor);
-    if (UNLIKELY(!blockLen)) {
+    if (!blockLen) {
       throw QuicTransportException(
           "Bad block len",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -177,21 +176,21 @@ ReadAckFrame decodeAckFrameWithECN(
   auto readAckFrame = decodeAckFrame(cursor, header, params);
   // TODO we simply ignore ECN blocks in ACK-ECN frames for now.
   auto ect_0 = decodeQuicInteger(cursor);
-  if (UNLIKELY(!ect_0)) {
+  if (!ect_0) {
     throw QuicTransportException(
         "Bad ECT(0) value",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK_ECN);
   }
   auto ect_1 = decodeQuicInteger(cursor);
-  if (UNLIKELY(!ect_1)) {
+  if (!ect_1) {
     throw QuicTransportException(
         "Bad ECT(1) value",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK_ECN);
   }
   auto ect_ce = decodeQuicInteger(cursor);
-  if (UNLIKELY(!ect_ce)) {
+  if (!ect_ce) {
     throw QuicTransportException(
         "Bad ECT-CE value",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -204,7 +203,7 @@ RstStreamFrame decodeRstStreamFrame(
     folly::io::Cursor& cursor,
     const CodecParameters& params) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Bad streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -226,7 +225,7 @@ RstStreamFrame decodeRstStreamFrame(
     }
   }
   auto offset = decodeQuicInteger(cursor);
-  if (UNLIKELY(!offset)) {
+  if (!offset) {
     throw QuicTransportException(
         "Bad offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -240,7 +239,7 @@ StopSendingFrame decodeStopSendingFrame(
     folly::io::Cursor& cursor,
     const CodecParameters& params) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Bad streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -369,7 +368,7 @@ ReadStreamFrame decodeStreamFrame(
 
 MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor) {
   auto maximumData = decodeQuicInteger(cursor);
-  if (UNLIKELY(!maximumData)) {
+  if (!maximumData) {
     throw QuicTransportException(
         "Bad Max Data",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -380,14 +379,14 @@ MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor) {
 
 MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Invalid streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::MAX_STREAM_DATA);
   }
   auto offset = decodeQuicInteger(cursor);
-  if (UNLIKELY(!offset)) {
+  if (!offset) {
     throw QuicTransportException(
         "Invalid offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -399,7 +398,7 @@ MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor) {
 
 MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamCount)) {
+  if (!streamCount) {
     throw QuicTransportException(
         "Invalid Bi-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -410,7 +409,7 @@ MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
 
 MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamCount)) {
+  if (!streamCount) {
     throw QuicTransportException(
         "Invalid Uni-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -421,7 +420,7 @@ MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor) {
 
 DataBlockedFrame decodeDataBlockedFrame(folly::io::Cursor& cursor) {
   auto dataLimit = decodeQuicInteger(cursor);
-  if (UNLIKELY(!dataLimit)) {
+  if (!dataLimit) {
     throw QuicTransportException(
         "Bad offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -432,14 +431,14 @@ DataBlockedFrame decodeDataBlockedFrame(folly::io::Cursor& cursor) {
 
 StreamDataBlockedFrame decodeStreamDataBlockedFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Bad streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::STREAM_DATA_BLOCKED);
   }
   auto dataLimit = decodeQuicInteger(cursor);
-  if (UNLIKELY(!dataLimit)) {
+  if (!dataLimit) {
     throw QuicTransportException(
         "Bad offset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -451,7 +450,7 @@ StreamDataBlockedFrame decodeStreamDataBlockedFrame(folly::io::Cursor& cursor) {
 
 StreamsBlockedFrame decodeBiDiStreamsBlockedFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Bad Bi-Directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -463,7 +462,7 @@ StreamsBlockedFrame decodeBiDiStreamsBlockedFrame(folly::io::Cursor& cursor) {
 
 StreamsBlockedFrame decodeUniStreamsBlockedFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Bad Uni-direcitonal streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -475,14 +474,14 @@ StreamsBlockedFrame decodeUniStreamsBlockedFrame(folly::io::Cursor& cursor) {
 
 NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
   auto sequenceNumber = decodeQuicInteger(cursor);
-  if (UNLIKELY(!sequenceNumber)) {
+  if (!sequenceNumber) {
     throw QuicTransportException(
         "Bad sequence",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::NEW_CONNECTION_ID);
   }
   auto retirePriorTo = decodeQuicInteger(cursor);
-  if (UNLIKELY(!retirePriorTo)) {
+  if (!retirePriorTo) {
     throw QuicTransportException(
         "Bad retire prior to",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -495,7 +494,7 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
         quic::FrameType::NEW_CONNECTION_ID);
   }
   auto connIdLen = cursor.readBE<uint8_t>();
-  if (UNLIKELY(cursor.totalLength() < connIdLen)) {
+  if (cursor.totalLength() < connIdLen) {
     throw QuicTransportException(
         "Bad connid",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -521,7 +520,7 @@ RetireConnectionIdFrame decodeRetireConnectionIdFrame(
     folly::io::Cursor& cursor) {
   // TODO we parse this frame, but return NoopFrame. Add proper support for it!
   auto sequenceNum = decodeQuicInteger(cursor);
-  if (UNLIKELY(!sequenceNum)) {
+  if (!sequenceNum) {
     throw QuicTransportException(
         // TODO change the error code
         "Bad sequence num",
@@ -577,7 +576,7 @@ ConnectionCloseFrame decodeConnectionCloseFrame(
     }
   }
   auto frameTypeField = decodeQuicInteger(cursor);
-  if (UNLIKELY(!frameTypeField || frameTypeField->second != sizeof(uint8_t))) {
+  if (!frameTypeField || frameTypeField->second != sizeof(uint8_t)) {
     throw QuicTransportException(
         "Bad connection close triggering frame type value",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -585,9 +584,8 @@ ConnectionCloseFrame decodeConnectionCloseFrame(
   }
   FrameType triggeringFrameType = static_cast<FrameType>(frameTypeField->first);
   auto reasonPhraseLength = decodeQuicInteger(cursor);
-  if (UNLIKELY(
-          !reasonPhraseLength ||
-          reasonPhraseLength->first > kMaxReasonPhraseLength)) {
+  if (!reasonPhraseLength ||
+      reasonPhraseLength->first > kMaxReasonPhraseLength) {
     throw QuicTransportException(
         "Bad reason phrase length",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -619,9 +617,8 @@ ConnectionCloseFrame decodeApplicationClose(
   }
 
   auto reasonPhraseLength = decodeQuicInteger(cursor);
-  if (UNLIKELY(
-          !reasonPhraseLength ||
-          reasonPhraseLength->first > kMaxReasonPhraseLength)) {
+  if (!reasonPhraseLength ||
+      reasonPhraseLength->first > kMaxReasonPhraseLength) {
     throw QuicTransportException(
         "Bad reason phrase length",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -636,21 +633,21 @@ ConnectionCloseFrame decodeApplicationClose(
 
 MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Invalid streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::MIN_STREAM_DATA);
   }
   auto maximumData = decodeQuicInteger(cursor);
-  if (UNLIKELY(!maximumData)) {
+  if (!maximumData) {
     throw QuicTransportException(
         "Invalid maximumData",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::MIN_STREAM_DATA);
   }
   auto minimumStreamOffset = decodeQuicInteger(cursor);
-  if (UNLIKELY(!minimumStreamOffset)) {
+  if (!minimumStreamOffset) {
     throw QuicTransportException(
         "Invalid minimumStreamOffset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -664,14 +661,14 @@ MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
 
 ExpiredStreamDataFrame decodeExpiredStreamDataFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
-  if (UNLIKELY(!streamId)) {
+  if (!streamId) {
     throw QuicTransportException(
         "Invalid streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::EXPIRED_STREAM_DATA);
   }
   auto minimumStreamOffset = decodeQuicInteger(cursor);
-  if (UNLIKELY(!minimumStreamOffset)) {
+  if (!minimumStreamOffset) {
     throw QuicTransportException(
         "Invalid minimumStreamOffset",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -693,7 +690,7 @@ QuicFrame parseFrame(
   }
   auto initialByte = decodeQuicInteger(cursor);
   // TODO add an new api to determine whether the frametype is encoded minimally
-  if (UNLIKELY(!initialByte)) {
+  if (!initialByte) {
     throw QuicTransportException(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
   }
@@ -1025,7 +1022,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
   Buf token;
   if (type == LongHeader::Types::Initial) {
     auto tokenLen = decodeQuicInteger(cursor);
-    if (UNLIKELY(!tokenLen)) {
+    if (!tokenLen) {
       VLOG(5) << "Token len not found in Long header";
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
@@ -1042,7 +1039,7 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     }
   }
   auto pktLen = decodeQuicInteger(cursor);
-  if (UNLIKELY(!pktLen)) {
+  if (!pktLen) {
     VLOG(5) << "Packet len not found in Long header";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }

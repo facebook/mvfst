@@ -240,9 +240,8 @@ void Cubic::updateTimeToOrigin() noexcept {
    */
   // 2500 = kTimeScalingFactor * 1000
   auto bytesToOrigin = *steadyState_.lastMaxCwndBytes - cwndBytes_;
-  if (UNLIKELY(
-          bytesToOrigin * 1000 * 1000 / conn_.udpSendPacketLen * 2500 >
-          std::numeric_limits<double>::max())) {
+  if (bytesToOrigin * 1000 * 1000 / conn_.udpSendPacketLen * 2500 >
+      std::numeric_limits<double>::max()) {
     LOG(WARNING) << "Quic Cubic: timeToOrigin calculation overflow";
     steadyState_.timeToOrigin = std::numeric_limits<double>::max();
   } else {
@@ -262,9 +261,8 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
       ackTime - *steadyState_.lastReductionTime);
   int64_t delta = 0;
   double timeElapsedCount = static_cast<double>(timeElapsed.count());
-  if (UNLIKELY(
-          std::pow((timeElapsedCount - steadyState_.timeToOrigin), 3) >
-          std::numeric_limits<double>::max())) {
+  if (std::pow((timeElapsedCount - steadyState_.timeToOrigin), 3) >
+      std::numeric_limits<double>::max()) {
     // (timeElapsed - timeToOrigin) ^ 3 will overflow/underflow, cut delta
     // to numeric_limit
     LOG(WARNING) << "Quic Cubic: (t-K) ^ 3 overflows";
@@ -303,17 +301,13 @@ uint64_t Cubic::calculateCubicCwnd(int64_t delta) noexcept {
   // TODO: chromium has a limit on targetCwnd to be no larger than half of acked
   // packet size. Linux also has a limit the cwnd increase to 1 MSS per 2 ACKs.
   if (delta > 0 &&
-      UNLIKELY(
-          std::numeric_limits<uint64_t>::max() -
-              *steadyState_.lastMaxCwndBytes <
-          folly::to<uint64_t>(delta))) {
+      (std::numeric_limits<uint64_t>::max() - *steadyState_.lastMaxCwndBytes <
+       folly::to<uint64_t>(delta))) {
     LOG(WARNING) << "Quic Cubic: overflow cwnd cut at uint64_t max";
     return conn_.transportSettings.maxCwndInMss * conn_.udpSendPacketLen;
   } else if (
       delta < 0 &&
-      UNLIKELY(
-          folly::to<uint64_t>(std::abs(delta)) >
-          *steadyState_.lastMaxCwndBytes)) {
+      (folly::to<uint64_t>(std::abs(delta)) > *steadyState_.lastMaxCwndBytes)) {
     LOG(WARNING) << "Quic Cubic: underflow cwnd cut at minCwndBytes_ " << conn_;
     return conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   } else {
@@ -488,9 +482,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
   // TODO: Should we not increase cwnd if inflight is less than half of cwnd?
   // Note that we take bytes out of inflightBytes_ before invoke the state
   // machine. So the inflightBytes_ here is already reduced.
-  if (UNLIKELY(
-          std::numeric_limits<decltype(cwndBytes_)>::max() - cwndBytes_ <
-          ack.ackedBytes)) {
+  if (std::numeric_limits<decltype(cwndBytes_)>::max() - cwndBytes_ <
+      ack.ackedBytes) {
     throw QuicInternalException(
         "Cubic Hystart: cwnd overflow", LocalErrorCode::CWND_OVERFLOW);
   }
@@ -575,9 +568,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
     }
 
     if (!hystartState_.lastSampledRtt.hasValue() ||
-        UNLIKELY(
-            *hystartState_.lastSampledRtt >=
-            std::chrono::microseconds::max() - kDelayIncreaseLowerBound)) {
+        (*hystartState_.lastSampledRtt >=
+         std::chrono::microseconds::max() - kDelayIncreaseLowerBound)) {
       return;
     }
     auto eta = std::min(
@@ -587,9 +579,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
             std::chrono::microseconds(
                 hystartState_.lastSampledRtt.value().count() >> 4)));
     // lastSampledRtt + eta may overflow:
-    if (UNLIKELY(
-            *hystartState_.lastSampledRtt >
-            std::chrono::microseconds::max() - eta)) {
+    if (*hystartState_.lastSampledRtt >
+        std::chrono::microseconds::max() - eta) {
       // No way currSampledRtt can top this either, return
       // TODO: so our rtt is within 8us (kDelayIncreaseUpperBound) of the
       // microseconds::max(), should we just shut down the connection?
@@ -677,7 +668,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
   }
   uint64_t newCwnd = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
 
-  if (UNLIKELY(newCwnd < cwndBytes_)) {
+  if (newCwnd < cwndBytes_) {
     VLOG(10) << "Cubic steady state calculates a smaller cwnd than last round"
              << ", new cnwd = " << newCwnd << ", current cwnd = " << cwndBytes_;
   } else {

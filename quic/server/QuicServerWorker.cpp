@@ -427,14 +427,14 @@ void QuicServerWorker::dispatchPacketData(
               << *transport;
     }
   }
-  if (LIKELY(!dropPacket)) {
+  if (!dropPacket) {
     DCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(client, std::move(networkData));
     return;
   }
   ServerConnectionIdParams connIdParam =
       connIdAlgo_->parseConnectionId(routingData.destinationConnId);
-  if (UNLIKELY(connIdParam.hostId != hostId_)) {
+  if (connIdParam.hostId != hostId_) {
     VLOG(3) << "Dropping packet routed to wrong host, CID="
             << routingData.destinationConnId.hex()
             << ", workerId=" << (uint32_t)workerId_

@@ -28,10 +28,10 @@ struct Interval {
     return Unit;
   }
   Interval(const T& s, const T& e) : start(s), end(e) {
-    if (UNLIKELY(start > end)) {
+    if (start > end) {
       throw std::invalid_argument("Trying to construct invalid interval");
     }
-    if (UNLIKELY(end > std::numeric_limits<T>::max() - unitValue())) {
+    if (end > std::numeric_limits<T>::max() - unitValue()) {
       throw std::invalid_argument("Interval bound too large");
     }
   }

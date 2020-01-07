@@ -80,7 +80,7 @@ void IntervalSet<T, Unit, Container>::withdraw(
 
 template <typename T, T Unit, template <typename... I> class Container>
 void IntervalSet<T, Unit, Container>::insert(const T& startIt, const T& endIt) {
-  if (UNLIKELY(startIt > endIt)) {
+  if (startIt > endIt) {
     throw std::invalid_argument("Trying to insert invalid interval");
   }
   insert(Interval<T, Unit>(startIt, endIt));

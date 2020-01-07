@@ -29,7 +29,7 @@ PacingRate calculatePacingRate(
 
 template <class T1, class T2>
 void addAndCheckOverflow(T1& value, const T2& toAdd) {
-  if (UNLIKELY(std::numeric_limits<T1>::max() - toAdd < value)) {
+  if (std::numeric_limits<T1>::max() - toAdd < value) {
     // TODO: the error code is CWND_OVERFLOW but this function can totally be
     // used for inflight bytes.
     throw quic::QuicInternalException(
@@ -40,7 +40,7 @@ void addAndCheckOverflow(T1& value, const T2& toAdd) {
 
 template <class T1, class T2>
 void subtractAndCheckUnderflow(T1& value, const T2& toSub) {
-  if (UNLIKELY(value < toSub)) {
+  if (value < toSub) {
     // TODO: wrong error code
     throw quic::QuicInternalException(
         "Underflow bytes in flight", quic::LocalErrorCode::CWND_OVERFLOW);

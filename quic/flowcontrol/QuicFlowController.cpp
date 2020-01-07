@@ -46,7 +46,7 @@ folly::Optional<uint64_t> calculateNewWindowUpdate(
 
 template <typename T>
 inline void incrementWithOverFlowCheck(T& num, T diff) {
-  if (UNLIKELY(num > std::numeric_limits<T>::max() - diff)) {
+  if (num > std::numeric_limits<T>::max() - diff) {
     throw QuicInternalException(
         "flow control state overflow", LocalErrorCode::INTERNAL_ERROR);
   }

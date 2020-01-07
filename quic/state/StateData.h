@@ -238,9 +238,8 @@ struct CongestionController {
           persistentCongestion(false) {}
 
     void addLostPacket(const OutstandingPacket& packet) {
-      if (UNLIKELY(
-              std::numeric_limits<uint64_t>::max() - lostBytes <
-              packet.encodedSize)) {
+      if (std::numeric_limits<uint64_t>::max() - lostBytes <
+          packet.encodedSize) {
         throw QuicInternalException(
             "LossEvent: lostBytes overflow",
             LocalErrorCode::LOST_BYTES_OVERFLOW);

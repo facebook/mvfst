@@ -1428,7 +1428,7 @@ void QuicTransportBase::handlePingCallback() {
 }
 
 void QuicTransportBase::processCallbacksAfterNetworkData() {
-  if (UNLIKELY(closeState_ != CloseState::OPEN)) {
+  if (closeState_ != CloseState::OPEN) {
     return;
   }
   // TODO move all of this callback processing to individual functions.
@@ -1980,9 +1980,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
 }
 
 void QuicTransportBase::checkForClosedStream() {
-  // TODO: This UNLIKELY here could be premature. This isn't *that* unlikely,
-  // as we call this function in closeImpl (via cancelAllAppCallbacks).
-  if (UNLIKELY(closeState_ == CloseState::CLOSED)) {
+  if (closeState_ == CloseState::CLOSED) {
     return;
   }
   auto itr = conn_->streamManager->closedStreams().begin();

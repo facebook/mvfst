@@ -50,7 +50,7 @@ Buf BufQueue::splitAtMost(size_t len) {
   }
   chainLength_ -= (len - remaining);
   DCHECK_EQ(chainLength_, chain_ ? chain_->computeChainDataLength() : 0);
-  if (UNLIKELY(result == nullptr)) {
+  if (result == nullptr) {
     return folly::IOBuf::create(0);
   }
   return result;
