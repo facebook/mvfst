@@ -38,7 +38,9 @@ BbrCongestionController::BbrCongestionController(QuicConnectionStateBase& conn)
       pacingWindow_(
           conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
       // TODO: experiment with longer window len for ack aggregation filter
-      maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {}
+      maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {
+  QUIC_TRACE(initcwnd, conn_, initialCwnd_);
+}
 
 CongestionControlType BbrCongestionController::type() const noexcept {
   return CongestionControlType::BBR;

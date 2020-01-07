@@ -29,6 +29,7 @@ Cubic::Cubic(
   steadyState_.tcpFriendly = tcpFriendly;
   steadyState_.estRenoCwnd = cwndBytes_;
   hystartState_.ackTrain = ackTrain;
+  QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
 
 CubicStates Cubic::state() const noexcept {

@@ -31,6 +31,7 @@ Copa::Copa(QuicConnectionStateBase& conn)
   if (conn_.transportSettings.latencyFactor.hasValue()) {
     latencyFactor_ = conn_.transportSettings.latencyFactor.value();
   }
+  QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
 
 void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
