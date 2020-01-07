@@ -116,4 +116,5 @@ folly::StringPiece writeNoWriteReasonString(NoWriteReason reason) {
   }
   folly::assume_unreachable();
 }
+
 } // namespace quic

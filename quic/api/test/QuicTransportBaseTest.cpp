@@ -1039,7 +1039,7 @@ TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
 }
 
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   transport->transportConn->qLogger = qLogger;
   auto stream1 = transport->createBidirectionalStream().value();
 

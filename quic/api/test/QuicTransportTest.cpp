@@ -575,7 +575,7 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
 
 TEST_F(QuicTransportTest, WriteFlowControl) {
   auto& conn = transport_->getConnectionState();
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   conn.qLogger = qLogger;
 
   auto streamId = transport_->createBidirectionalStream().value();

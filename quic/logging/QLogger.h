@@ -34,7 +34,7 @@ class QLogger {
       std::chrono::steady_clock::now()};
   VantagePoint vantagePoint;
   std::string protocolType;
-  QLogger() = default;
+  QLogger() = delete;
   virtual ~QLogger() = default;
   virtual void addPacket(
       const RegularQuicPacket& regularPacket,

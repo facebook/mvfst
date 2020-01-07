@@ -37,7 +37,7 @@ TEST_F(BbrTest, InitStates) {
 
 TEST_F(BbrTest, Recovery) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
   conn.transportSettings.initCwndInMss = 500; // Make a really large initCwnd
@@ -374,7 +374,7 @@ TEST_F(BbrTest, NoLargestAckedPacketNoCrash) {
 
 TEST_F(BbrTest, AckAggregation) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1000;
   BbrCongestionController bbr(conn);
@@ -559,7 +559,7 @@ TEST_F(BbrTest, BytesCounting) {
 
 TEST_F(BbrTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   BbrCongestionController bbr(conn);
 

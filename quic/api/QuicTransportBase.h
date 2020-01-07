@@ -11,6 +11,7 @@
 #include <folly/ExceptionWrapper.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/HHWheelTimer.h>
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/common/FunctionLooper.h>

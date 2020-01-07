@@ -16,7 +16,7 @@ namespace quic::test {
 class QLogPacingObserverTest : public Test {
  public:
   void SetUp() override {
-    auto qlogger = std::make_shared<MockQLogger>();
+    auto qlogger = std::make_shared<MockQLogger>(VantagePoint::Client);
     mockQLogger_ = qlogger.get();
     qlogger_ = std::move(qlogger);
   }

@@ -769,9 +769,9 @@ folly::dynamic QLogStreamStateUpdateEvent::toDynamic() const {
   data["id"] = id;
   data["update"] = update;
   if (timeSinceStreamCreation) {
-    if (update == kOnEOM && vantagePoint_ == VantagePoint::CLIENT) {
+    if (update == kOnEOM && vantagePoint_ == VantagePoint::Client) {
       data["ttlb"] = timeSinceStreamCreation->count();
-    } else if (update == kOnHeaders && vantagePoint_ == VantagePoint::CLIENT) {
+    } else if (update == kOnHeaders && vantagePoint_ == VantagePoint::Client) {
       data["ttfb"] = timeSinceStreamCreation->count();
     } else {
       data["ms_since_creation"] = timeSinceStreamCreation->count();
@@ -802,7 +802,7 @@ folly::dynamic QLogConnectionMigrationEvent::toDynamic() const {
   folly::dynamic data = folly::dynamic::object();
 
   data["intentional"] = intentionalMigration_;
-  if (vantagePoint_ == VantagePoint::CLIENT) {
+  if (vantagePoint_ == VantagePoint::Client) {
     data["type"] = "initiating";
   } else {
     data["type"] = "accepting";
@@ -831,7 +831,7 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
   folly::dynamic data = folly::dynamic::object();
 
   data["success"] = success_;
-  if (vantagePoint_ == VantagePoint::CLIENT) {
+  if (vantagePoint_ == VantagePoint::Client) {
     data["vantagePoint"] = "client";
   } else {
     data["vantagePoint"] = "server";

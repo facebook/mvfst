@@ -136,7 +136,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
 
 TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
 
   BbrBandwidthSampler sampler(conn);

@@ -42,7 +42,7 @@ TEST_F(CubicTest, AckIncreaseWritable) {
 
 TEST_F(CubicTest, PersistentCongestion) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), false);
   auto initCwnd = cubic.getWritableBytes();
@@ -113,7 +113,7 @@ TEST_F(CubicTest, PersistentCongestion) {
 
 TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 200;
   // initCwnd > initSsthresh: an ack will immediately make the state machine
@@ -176,7 +176,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
 
 TEST_F(CubicTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1500;
   TestingCubic cubic(conn);
@@ -242,7 +242,7 @@ TEST_F(CubicTest, PacingGain) {
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
   conn.udpSendPacketLen = 1500;
   Cubic cubic(conn);

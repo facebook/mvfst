@@ -929,7 +929,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
 }
 
 TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   StreamId streamId = 4;
   clientAddr = folly::SocketAddress("127.0.0.1", 2000);
@@ -1028,7 +1028,7 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
 
   ShortHeader header(
@@ -1735,7 +1735,7 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
 
 TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto streamId = server->createBidirectionalStream().value();
-  auto qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().streamManager->getStream(streamId);
   // knock every handshake outstanding packets out
@@ -1843,7 +1843,7 @@ TEST_F(QuicServerTransportTest, TestAckRstStream) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
 
   ShortHeader header(
@@ -1881,7 +1881,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
 
   ShortHeader header(
@@ -1923,7 +1923,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
 }
 
 TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -2149,7 +2149,7 @@ INSTANTIATE_TEST_CASE_P(
 TEST_P(
     QuicServerTransportAllowMigrationTest,
     ReceiveProbingPacketFromChangedPeerAddress) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
 
@@ -2502,7 +2502,7 @@ TEST_P(
 }
 
 TEST_F(QuicServerTransportTest, TooManyMigrations) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().transportSettings.disableMigration = false;
 
@@ -3257,7 +3257,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedStream) {
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   WriteAckFrame::AckBlocks acks = {{1, 2}};
   auto expected = IOBuf::copyBuffer("hello");
@@ -3395,7 +3395,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestPendingOneRttData) {
 TEST_F(
     QuicUnencryptedServerTransportTest,
     TestReceiveClientFinishedFromChangedPeerAddress) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   recvClientHello();
 
@@ -3567,7 +3567,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestEncryptedDataBeforeCFIN) {
 TEST_F(
     QuicUnencryptedServerTransportTest,
     TestClearInFlightBytesLimitationAfterCFIN) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   getFakeHandshakeLayer()->allowZeroRttKeys();
   auto originalUdpSize = server->getConn().udpSendPacketLen;
@@ -3601,7 +3601,7 @@ TEST_F(
 TEST_F(
     QuicUnencryptedServerTransportTest,
     IncreaseLimitAfterReceivingNewPacket) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   getFakeHandshakeLayer()->allowZeroRttKeys();
 
@@ -3634,7 +3634,7 @@ TEST_F(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
 
   auto data = IOBuf::copyBuffer("bad data");
@@ -3787,7 +3787,7 @@ TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessPendingZeroRttData) {
   server->getNonConstConn().qLogger =
-      std::make_shared<quic::FileQLogger>(VantagePoint::SERVER);
+      std::make_shared<quic::FileQLogger>(VantagePoint::Server);
   recvClientHello(false);
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;
@@ -3825,7 +3825,7 @@ TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessPendingOneRttData) {
   server->getNonConstConn().qLogger =
-      std::make_shared<quic::FileQLogger>(VantagePoint::SERVER);
+      std::make_shared<quic::FileQLogger>(VantagePoint::Server);
   recvClientHello();
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;
@@ -3857,7 +3857,7 @@ TEST_P(
     QuicServerTransportPendingDataTest,
     TestNoCipherProcessingZeroAndOneRttData) {
   server->getNonConstConn().qLogger =
-      std::make_shared<quic::FileQLogger>(VantagePoint::SERVER);
+      std::make_shared<quic::FileQLogger>(VantagePoint::Server);
   recvClientHello(false);
   auto data = IOBuf::copyBuffer("bad data");
   StreamId streamId = 2;

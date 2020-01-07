@@ -182,7 +182,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   // Builds a fake packet to test with.
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
 
@@ -343,7 +343,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   conn->ackStates.initialAckState.nextPacketNum = 0;
   conn->ackStates.handshakeAckState.nextPacketNum = 1;
   conn->ackStates.appDataAckState.nextPacketNum = 2;
@@ -417,7 +417,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
 
@@ -458,7 +458,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
 
   auto stream1 = conn->streamManager->createNextUnidirectionalStream().value();
@@ -505,7 +505,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   // None of the largestAckScheduled should be changed. But since
   // buildEmptyPacket() builds a Handshake packet, we use handshakeAckState to
@@ -534,7 +534,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
   EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
@@ -584,7 +584,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
 
 TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetEncodedSize =
       packet.header ? packet.header->computeChainDataLength() : 0;
@@ -614,7 +614,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
   EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
@@ -681,7 +681,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
   EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
@@ -752,7 +752,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();
@@ -789,7 +789,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   // This is clearly not 555 bytes. I just need some data inside the packet.
@@ -845,7 +845,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
@@ -900,7 +900,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetNum = packet.packet.header.getPacketSequenceNum();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
@@ -935,7 +935,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   auto conn = createConn();
-  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::CLIENT);
+  conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetNum = packet.packet.header.getPacketSequenceNum();
   conn->pendingEvents.connWindowUpdate = true;

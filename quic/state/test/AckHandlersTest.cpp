@@ -741,7 +741,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
 // Ack only acks packets aren't outstanding, but TimeReordering still finds loss
 TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   QuicServerConnectionState conn;
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::SERVER);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   conn.qLogger = qLogger;
 
   conn.lossState.srtt = 200ms;

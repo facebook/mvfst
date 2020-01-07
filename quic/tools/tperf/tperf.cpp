@@ -233,7 +233,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
         evb, std::move(sock), *serverHandler, ctx);
     if (!FLAGS_server_qlogger_path.empty()) {
       auto qlogger = std::make_shared<TperfQLogger>(
-          VantagePoint::SERVER, FLAGS_server_qlogger_path);
+          VantagePoint::Server, FLAGS_server_qlogger_path);
       setPacingObserver(qlogger, transport.get(), FLAGS_pacing_observer);
       transport->setQLogger(std::move(qlogger));
     }

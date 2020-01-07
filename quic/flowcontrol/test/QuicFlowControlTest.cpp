@@ -592,7 +592,7 @@ TEST_F(QuicFlowControlTest, UpdateBadFlowControlOnStreamData) {
 }
 
 TEST_F(QuicFlowControlTest, UpdateFlowControlOnRead) {
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn_.qLogger = qLogger;
 
   StreamId id = 3;
@@ -677,7 +677,7 @@ TEST_F(QuicFlowControlTest, HandleStreamWindowUpdate) {
   StreamId id = 3;
   QuicStreamState stream(id, conn_);
   stream.flowControlState.peerAdvertisedMaxOffset = 200;
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn_.qLogger = qLogger;
 
   handleStreamWindowUpdate(stream, 300, 2);

@@ -185,7 +185,7 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
 
 TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
   QuicServerConnectionState conn;
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::CLIENT);
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
 
   StreamId id = 1;

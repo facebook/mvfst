@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/String.h>
+#include "quic/QuicConstants.h"
 
 namespace quic {
 constexpr folly::StringPiece kShortHeaderPacketType = "1RTT";
@@ -79,12 +80,10 @@ constexpr auto kOnHeaders = "on headers";
 constexpr auto kOnError = "on error";
 constexpr auto kPushPromise = "push promise";
 
-enum class VantagePoint : uint8_t {
-  CLIENT,
-  SERVER,
-};
-constexpr folly::StringPiece kQLogServerVantagePoint = "SERVER";
-constexpr folly::StringPiece kQLogClientVantagePoint = "CLIENT";
+constexpr folly::StringPiece kQLogServerVantagePoint = "Server";
+constexpr folly::StringPiece kQLogClientVantagePoint = "Client";
+
+using VantagePoint = QuicNodeType;
 
 folly::StringPiece vantagePointString(VantagePoint vantagePoint) noexcept;
 

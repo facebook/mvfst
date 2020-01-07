@@ -11,9 +11,9 @@
 namespace quic {
 folly::StringPiece vantagePointString(VantagePoint vantagePoint) noexcept {
   switch (vantagePoint) {
-    case VantagePoint::CLIENT:
+    case VantagePoint::Client:
       return kQLogClientVantagePoint;
-    case VantagePoint::SERVER:
+    case VantagePoint::Server:
       return kQLogServerVantagePoint;
   }
   folly::assume_unreachable();
