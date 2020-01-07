@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <folly/container/F14Map.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 
