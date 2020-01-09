@@ -766,7 +766,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   // We need to at least have one frame to trigger ackVisitor
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
-  auto delayUntilLost = 200ms * 9 / 8;
+  auto delayUntilLost = 200ms * 5 / 4;
   OutstandingPacket outstandingPacket(
       std::move(regularPacket),
       Clock::now() - delayUntilLost - 20ms,

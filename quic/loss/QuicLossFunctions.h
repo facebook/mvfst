@@ -194,8 +194,11 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     TimePoint lossTime,
     PacketNumberSpace pnSpace) {
   getLossTime(conn, pnSpace).clear();
+  // Current draft has 9 / 8. But our friends at Google told us they saw
+  // improvement with 5 / 4. Our tests also showed reduced retransmission with
+  // 5 / 4 without significantly huriting application latency.
   std::chrono::microseconds delayUntilLost =
-      std::max(conn.lossState.srtt, conn.lossState.lrtt) * 9 / 8;
+      std::max(conn.lossState.srtt, conn.lossState.lrtt) * 5 / 4;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandingPackets.size()
            << " largestAcked=" << largestAcked
            << " delayUntilLost=" << delayUntilLost.count() << "us"
