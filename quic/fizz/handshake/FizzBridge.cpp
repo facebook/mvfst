@@ -6,7 +6,7 @@
  *
  */
 
-#include <quic/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/FizzBridge.h>
 
 namespace quic {
 

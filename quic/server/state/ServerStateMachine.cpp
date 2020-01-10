@@ -10,8 +10,8 @@
 
 #include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/state/QuicPacingFunctions.h>
@@ -1128,7 +1128,6 @@ void onServerReadDataFromClosed(
     conn.qLogger->addPacket(regularPacket, packetSize);
   }
   QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
-
 
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {

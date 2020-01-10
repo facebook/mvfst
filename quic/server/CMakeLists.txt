@@ -34,7 +34,7 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_transport
@@ -47,7 +47,7 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_transport

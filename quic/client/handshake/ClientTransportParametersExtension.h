@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <quic/handshake/FizzTransportParameters.h>
+#include <quic/fizz/handshake/FizzTransportParameters.h>
 
 namespace quic {
 

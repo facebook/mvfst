@@ -28,6 +28,7 @@ add_dependencies(
   mvfst_client
   mvfst_bufutil
   mvfst_flowcontrol
+  mvfst_fizz_handshake
   mvfst_happyeyeballs
   mvfst_loss
   mvfst_qlogger
@@ -40,6 +41,7 @@ target_link_libraries(
   mvfst_client PUBLIC
   Folly::folly
   mvfst_flowcontrol
+  mvfst_fizz_handshake
   mvfst_happyeyeballs
   mvfst_loss
   mvfst_qlogger

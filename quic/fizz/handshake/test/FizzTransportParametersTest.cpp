@@ -10,7 +10,7 @@
 #include <folly/portability/GTest.h>
 
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzTransportParameters.h>
+#include <quic/fizz/handshake/FizzTransportParameters.h>
 
 #include <fizz/record/test/ExtensionTestsBase.h>
 
@@ -98,5 +98,5 @@ TEST_F(ExtensionsTest, TestD18TicketParams) {
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
 }
-}
-}
+} // namespace test
+} // namespace quic

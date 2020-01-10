@@ -4,39 +4,34 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_handshake STATIC
-  CryptoFactory.cpp
-  HandshakeLayer.cpp
-  TransportParameters.cpp
+  mvfst_fizz_handshake STATIC
+  FizzBridge.cpp
+  FizzCryptoFactory.cpp
+  FizzPacketNumberCipher.cpp
+  QuicFizzFactory.cpp
 )
 
 target_include_directories(
-  mvfst_handshake PUBLIC
+  mvfst_fizz_handshake PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:include/>
 )
 
 target_compile_options(
-  mvfst_handshake
+  mvfst_fizz_handshake
   PRIVATE
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
 add_dependencies(
+  mvfst_fizz_handshake
   mvfst_handshake
-  mvfst_constants
-  mvfst_exception
-  mvfst_codec_types
-  mvfst_codec_packet_number_cipher
 )
 
 target_link_libraries(
-  mvfst_handshake PUBLIC
-  Folly::folly
-  mvfst_constants
-  mvfst_exception
-  mvfst_codec_types
-  mvfst_codec_packet_number_cipher
+  mvfst_fizz_handshake PUBLIC
+  ${LIBFIZZ_LIBRARY}
 )
 
 file(
@@ -47,11 +42,13 @@ file(
 list(FILTER QUIC_API_HEADERS_TOINSTALL EXCLUDE REGEX test/)
 foreach(header ${QUIC_API_HEADERS_TOINSTALL})
   get_filename_component(header_dir ${header} DIRECTORY)
-  install(FILES ${header} DESTINATION include/quic/handshake/${header_dir})
+  install(FILES ${header} DESTINATION include/quic/fizz/handshake/${header_dir})
 endforeach()
 
 install(
-  TARGETS mvfst_handshake
+  TARGETS mvfst_fizz_handshake
   EXPORT mvfst-exports
   DESTINATION lib
 )
+
+add_subdirectory(test)

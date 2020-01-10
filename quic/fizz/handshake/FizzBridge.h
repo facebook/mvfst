@@ -61,7 +61,7 @@ class FizzAead final : public Aead {
 
  private:
   std::unique_ptr<fizz::Aead> fizzAead;
-  FizzAead(std::unique_ptr<fizz::Aead> fizzAeadIn)
+  explicit FizzAead(std::unique_ptr<fizz::Aead> fizzAeadIn)
       : fizzAead(std::move(fizzAeadIn)) {}
 };
 

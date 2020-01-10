@@ -9,8 +9,8 @@
 #include <quic/server/handshake/ServerHandshake.h>
 
 #include <fizz/protocol/Protocol.h>
-#include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {

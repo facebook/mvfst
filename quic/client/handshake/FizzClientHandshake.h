@@ -9,7 +9,7 @@
 #pragma once
 
 #include <quic/client/handshake/ClientHandshake.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 
 namespace quic {
 

@@ -11,7 +11,7 @@
 
 #include <fizz/crypto/aead/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/test/Mocks.h>
 
 using namespace testing;
@@ -22,7 +22,7 @@ namespace test {
 class FizzCryptoTestFactory : public FizzCryptoFactory {
  public:
   FizzCryptoTestFactory() {}
-  FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
+  explicit FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
     fizzFactory_ = std::move(fizzFactory);
   }
 

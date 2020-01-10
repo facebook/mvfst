@@ -17,7 +17,7 @@ quic_add_test(TARGET ClientHandshakeTest
   mvfst_client
   mvfst_codec_types
   mvfst_constants
-  mvfst_handshake
+  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_machine
   mvfst_test_utils

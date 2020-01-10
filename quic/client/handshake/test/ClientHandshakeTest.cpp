@@ -27,8 +27,8 @@
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/handshake/FizzBridge.h>
-#include <quic/handshake/QuicFizzFactory.h>
+#include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
 
