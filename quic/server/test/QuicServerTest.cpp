@@ -1553,6 +1553,7 @@ class QuicServerTakeoverTest : public Test {
         folly::NetworkSocket::fromFd(takeoverListeningFd));
     newServer_->startPacketForwarding(destAddr);
     auto newServerAddr = newServer_->getAddress();
+    CHECK(newServerAddr != destAddr);
 
     packet = createInitialStream(
         clientConnId,

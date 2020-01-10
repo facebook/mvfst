@@ -314,7 +314,11 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   std::unique_ptr<QuicServerWorker> newWorkerWithoutSocket();
 
-  void runOnAllWorkers(std::function<void(QuicServerWorker*)> func);
+  // helper method to run the given function in all worker asynchronously
+  void runOnAllWorkers(const std::function<void(QuicServerWorker*)>& func);
+
+  // helper method to run the given function in all worker synchronously
+  void runOnAllWorkersSync(const std::function<void(QuicServerWorker*)>& func);
 
   void bindWorkersToSocket(
       const folly::SocketAddress& address,

@@ -264,7 +264,7 @@ void QuicServer::allowBeingTakenOver(const folly::SocketAddress& addr) {
   auto numWorkers = workers_.size();
   for (size_t i = 0; i < numWorkers; ++i) {
     auto workerEvb = workers_[i]->getEventBase();
-    workerEvb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
+    workerEvb->runInEventBaseThreadAndWait([&] {
       std::lock_guard<std::mutex> guard(startMutex_);
       CHECK(initialized_);
       auto localListenSocket = listenerSocketFactory_->make(workerEvb, -1);
@@ -308,7 +308,7 @@ folly::SocketAddress QuicServer::overrideTakeoverHandlerAddress(
 }
 
 void QuicServer::pauseRead() {
-  runOnAllWorkers([&](auto worker) mutable { worker->pauseRead(); });
+  runOnAllWorkersSync([&](auto worker) mutable { worker->pauseRead(); });
 }
 
 void QuicServer::routeDataToWorker(
@@ -432,13 +432,31 @@ bool QuicServer::hasShutdown() const noexcept {
   return shutdown_;
 }
 
-void QuicServer::runOnAllWorkers(std::function<void(QuicServerWorker*)> func) {
+void QuicServer::runOnAllWorkers(
+    const std::function<void(QuicServerWorker*)>& func) {
   std::lock_guard<std::mutex> guard(startMutex_);
   if (shutdown_) {
     return;
   }
   for (auto& worker : workers_) {
     worker->getEventBase()->runInEventBaseThread(
+        [&worker, self = this->shared_from_this(), func]() mutable {
+          if (self->shutdown_) {
+            return;
+          }
+          func(worker.get());
+        });
+  }
+}
+
+void QuicServer::runOnAllWorkersSync(
+    const std::function<void(QuicServerWorker*)>& func) {
+  std::lock_guard<std::mutex> guard(startMutex_);
+  if (shutdown_) {
+    return;
+  }
+  for (auto& worker : workers_) {
+    worker->getEventBase()->runInEventBaseThreadAndWait(
         [&worker, self = this->shared_from_this(), func]() mutable {
           if (self->shutdown_) {
             return;
@@ -532,7 +550,7 @@ void QuicServer::setEventBaseObserver(
 
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
   if (initialized_) {
-    runOnAllWorkers([destAddr](auto worker) mutable {
+    runOnAllWorkersSync([destAddr](auto worker) mutable {
       worker->startPacketForwarding(destAddr);
     });
   }
@@ -544,7 +562,7 @@ void QuicServer::stopPacketForwarding(std::chrono::milliseconds delay) {
     return;
   }
   for (auto& worker : workers_) {
-    worker->getEventBase()->runInEventBaseThread(
+    worker->getEventBase()->runInEventBaseThreadAndWait(
         [&worker, self = this->shared_from_this(), delay]() mutable {
           if (self->shutdown_) {
             return;
