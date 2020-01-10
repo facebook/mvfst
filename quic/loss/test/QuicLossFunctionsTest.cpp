@@ -788,7 +788,8 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   auto conn = createConn();
   conn->lossState.srtt = 100ms;
   conn->lossState.lrtt = 100ms;
-  auto expectedDelayUntilLost = 500ms / 4;
+  auto expectedDelayUntilLost =
+      500ms / conn->transportSettings.timeReorderingThreshDivisor;
   auto sendTime = Clock::now();
   // Send two:
   sendPacket(*conn, sendTime, folly::none, PacketType::Handshake);

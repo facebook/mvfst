@@ -91,8 +91,7 @@ struct TransportSettings {
   uint64_t writeConnectionDataPacketsLimit{
       kDefaultWriteConnectionDataPacketLimit};
   // Fraction of RTT that is used to limit how long a write function can loop
-  std::chrono::microseconds::rep writeLimitRttFraction{
-      kDefaultWriteLimitRttFraction};
+  DurationRep writeLimitRttFraction{kDefaultWriteLimitRttFraction};
   // Frequency of sending flow control updates. We can send one update every
   // flowControlRttFrequency * RTT if the flow control changes.
   uint16_t flowControlRttFrequency{2};
@@ -147,6 +146,11 @@ struct TransportSettings {
   size_t maxRecvBatchSize{5};
   // Config struct for BBR
   BbrConfig bbrConfig;
+  // A packet is considered loss when a packet that's sent later by at least
+  // timeReorderingThreshold * RTT is acked by peer.
+  DurationRep timeReorderingThreshDividend{
+      kDefaultTimeReorderingThreshDividend};
+  DurationRep timeReorderingThreshDivisor{kDefaultTimeReorderingThreshDivisor};
 };
 
 } // namespace quic

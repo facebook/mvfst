@@ -18,6 +18,7 @@ namespace quic {
 
 using Clock = std::chrono::steady_clock;
 using TimePoint = std::chrono::time_point<Clock>;
+using DurationRep = std::chrono::microseconds::rep;
 using namespace std::chrono_literals;
 
 // Default QUIC packet size for both read and write.
@@ -224,6 +225,12 @@ constexpr std::chrono::microseconds kGranularity = 10000us;
 
 constexpr uint32_t kReorderingThreshold = 3;
 
+// Current draft has 9 / 8. But our friends at Google told us they saw
+// improvement with 5 / 4. Our tests also showed reduced retransmission with
+// 5 / 4 without significantly huriting application latency.
+constexpr DurationRep kDefaultTimeReorderingThreshDividend = 5;
+constexpr DurationRep kDefaultTimeReorderingThreshDivisor = 4;
+
 constexpr auto kPacketToSendForPTO = 2;
 
 // Maximum number of packets to write per writeConnectionDataToSocket call.
@@ -236,7 +243,7 @@ constexpr uint64_t kDefaultMinBurstPackets = 5;
 // this is subject to testing but I would suggest a value >= 200usec
 constexpr std::chrono::microseconds kDefaultPacingTimerTickInterval{1000};
 // Fraction of RTT that is used to limit how long a write function can loop
-constexpr std::chrono::microseconds::rep kDefaultWriteLimitRttFraction = 25;
+constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 
 // Congestion control:
 constexpr folly::StringPiece kCongestionControlCubicStr = "cubic";
@@ -245,7 +252,7 @@ constexpr folly::StringPiece kCongestionControlCopaStr = "copa";
 constexpr folly::StringPiece kCongestionControlNewRenoStr = "newreno";
 constexpr folly::StringPiece kCongestionControlNoneStr = "none";
 
-constexpr std::chrono::microseconds::rep kPersistentCongestionThreshold = 3;
+constexpr DurationRep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t { Cubic, NewReno, Copa, BBR, None };
 folly::StringPiece congestionControlTypeToString(CongestionControlType type);
 folly::Optional<CongestionControlType> congestionControlStrToType(
