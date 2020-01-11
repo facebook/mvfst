@@ -58,9 +58,8 @@ DEFINE_uint64(
     "0 (the default) means the stream lives for the whole duration of the test.");
 DEFINE_string(
     pacing_observer,
-    "second",
-    "second/rtt/ack: Pacing observer bucket type: per second, per rtt or per "
-    "ack");
+    "none",
+    "none/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
 
 namespace quic {
 namespace tperf {
@@ -247,9 +246,9 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<TperfQLogger>& qlogger,
       quic::QuicServerTransport* transport,
       const std::string& pacingObserverType) {
-    if (pacingObserverType == "second") {
+    if (pacingObserverType == "time") {
       qlogger->setPacingObserver(
-          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 1s));
+          std::make_unique<FixedBucketQLogPacingObserver>(qlogger, 3ms));
     } else if (pacingObserverType == "rtt") {
       qlogger->setPacingObserver(std::make_unique<RttBucketQLogPacingObserver>(
           qlogger, *transport->getState()));

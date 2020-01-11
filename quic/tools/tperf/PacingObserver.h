@@ -87,7 +87,7 @@ class BucketedQLogPacingObserver : public PacingObserver {
 
 template <typename ClockType>
 struct FixedTimeBucket {
-  explicit FixedTimeBucket(std::chrono::seconds interval)
+  explicit FixedTimeBucket(std::chrono::milliseconds interval)
       : interval_(interval), bucketBegin_(ClockType::now()) {}
 
   bool operator()() {
@@ -101,7 +101,7 @@ struct FixedTimeBucket {
   }
 
  private:
-  std::chrono::seconds interval_;
+  std::chrono::milliseconds interval_;
   TimePoint bucketBegin_;
 };
 
