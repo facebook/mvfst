@@ -109,15 +109,7 @@ void markPacketLoss(
                 *stream, frame, bufferItr->second)) {
           break;
         }
-        stream->lossBuffer.insert(
-            std::upper_bound(
-                stream->lossBuffer.begin(),
-                stream->lossBuffer.end(),
-                bufferItr->second.offset,
-                [](const auto& offset, const auto& buffer) {
-                  return offset < buffer.offset;
-                }),
-            std::move(bufferItr->second));
+        stream->insertIntoLossBuffer(std::move(bufferItr->second));
         stream->retransmissionBuffer.erase(bufferItr);
         conn.streamManager->updateLossStreams(*stream);
         break;
@@ -138,15 +130,7 @@ void markPacketLoss(
           break;
         }
         DCHECK_EQ(bufferItr->second.offset, frame.offset);
-        cryptoStream->lossBuffer.insert(
-            std::upper_bound(
-                cryptoStream->lossBuffer.begin(),
-                cryptoStream->lossBuffer.end(),
-                bufferItr->second.offset,
-                [](const auto& offset, const auto& buffer) {
-                  return offset < buffer.offset;
-                }),
-            std::move(bufferItr->second));
+        cryptoStream->insertIntoLossBuffer(std::move(bufferItr->second));
         cryptoStream->retransmissionBuffer.erase(bufferItr);
         break;
       }

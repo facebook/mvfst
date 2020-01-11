@@ -90,6 +90,28 @@ struct QuicStreamLike {
   // and RST. We may split write EOF into two values in the future.
   // Read side eof offset.
   folly::Optional<uint64_t> finalReadOffset;
+
+  /*
+   * Either insert a new entry into the loss buffer, or merge the buffer with
+   * an existing entry.
+   */
+  void insertIntoLossBuffer(StreamBuffer buf) {
+    // We assume here that we won't try to insert an overlapping buffer, as
+    // that should never happen in the loss buffer.
+    auto lossItr = std::upper_bound(
+        lossBuffer.begin(),
+        lossBuffer.end(),
+        buf.offset,
+        [](auto offset, const auto& buffer) { return offset < buffer.offset; });
+    if (!lossBuffer.empty() && lossItr != lossBuffer.begin() &&
+        std::prev(lossItr)->offset + std::prev(lossItr)->data.chainLength() ==
+            buf.offset) {
+      std::prev(lossItr)->data.append(buf.data.move());
+      std::prev(lossItr)->eof = buf.eof;
+    } else {
+      lossBuffer.insert(lossItr, std::move(buf));
+    }
+  }
 };
 
 struct QuicConnectionStateBase;

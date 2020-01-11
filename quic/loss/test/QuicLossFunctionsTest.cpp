@@ -347,6 +347,133 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   EXPECT_TRUE(eq(buf, buffer.data.move()));
 }
 
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+
+  auto buf1 = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf1->clone(), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+
+  auto buf2 = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf2->clone(), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+
+  auto& packet1 =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  auto packetNum = packet1.header.getPacketSequenceNum();
+  markPacketLoss(*conn, packet1, false, packetNum);
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
+  EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  auto& packet2 =
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  packetNum = packet2.header.getPacketSequenceNum();
+  markPacketLoss(*conn, packet2, false, packetNum);
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 0);
+  EXPECT_EQ(stream1->lossBuffer.size(), 1);
+
+  auto combined = buf1->clone();
+  combined->prependChain(buf2->clone());
+  auto& buffer = stream1->lossBuffer.front();
+  EXPECT_EQ(buffer.offset, 0);
+  IOBufEqualTo eq;
+  EXPECT_TRUE(eq(combined, buffer.data.move()));
+}
+
+TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
+  folly::EventBase evb;
+  MockAsyncUDPSocket socket(&evb);
+  auto conn = createConn();
+  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+
+  auto buf1 = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf1->clone(), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+
+  auto buf2 = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf2->clone(), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+
+  auto buf3 = buildRandomInputData(20);
+  writeDataToQuicStream(*stream1, buf3->clone(), false);
+  writeQuicDataToSocket(
+      socket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      *conn->version,
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(3, conn->outstandingPackets.size());
+
+  auto& packet1 =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  auto packetNum = packet1.header.getPacketSequenceNum();
+  markPacketLoss(*conn, packet1, false, packetNum);
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 2);
+  EXPECT_EQ(stream1->lossBuffer.size(), 1);
+  auto& packet3 =
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet;
+  packetNum = packet3.header.getPacketSequenceNum();
+  markPacketLoss(*conn, packet3, false, packetNum);
+  EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
+  EXPECT_EQ(stream1->lossBuffer.size(), 2);
+
+  auto& buffer1 = stream1->lossBuffer[0];
+  EXPECT_EQ(buffer1.offset, 0);
+  IOBufEqualTo eq;
+  EXPECT_TRUE(eq(buf1, buffer1.data.move()));
+
+  auto& buffer3 = stream1->lossBuffer[1];
+  EXPECT_EQ(buffer3.offset, 40);
+  EXPECT_TRUE(eq(buf3, buffer3.data.move()));
+}
+
 TEST_F(QuicLossFunctionsTest, RetxBufferSortedAfterLoss) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
