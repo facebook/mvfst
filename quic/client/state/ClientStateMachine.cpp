@@ -9,7 +9,6 @@
 #include <quic/client/state/ClientStateMachine.h>
 
 #include <folly/io/async/AsyncSocketException.h>
-#include <quic/client/handshake/ClientHandshake.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>

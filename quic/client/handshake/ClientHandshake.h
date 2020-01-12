@@ -19,7 +19,6 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
-#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/state/StateData.h>
 
