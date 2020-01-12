@@ -9,8 +9,6 @@
 #pragma once
 
 #include <fizz/client/ClientProtocol.h>
-#include <fizz/client/EarlyDataRejectionPolicy.h>
-#include <fizz/client/PskCache.h>
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>

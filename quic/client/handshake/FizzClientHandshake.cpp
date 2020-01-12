@@ -12,6 +12,7 @@
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 
+#include <fizz/client/EarlyDataRejectionPolicy.h>
 #include <fizz/protocol/Protocol.h>
 
 namespace quic {
