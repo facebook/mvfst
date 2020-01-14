@@ -60,6 +60,10 @@ DEFINE_string(
     pacing_observer,
     "none",
     "none/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
+DEFINE_uint32(
+    max_receive_packet_size,
+    quic::kDefaultUDPSendPacketLen,
+    "Maximum packet size to advertise to the peer.");
 
 namespace quic {
 namespace tperf {
@@ -275,7 +279,8 @@ class TPerfServer {
       uint32_t maxCwndInMss,
       bool pacing,
       uint32_t numStreams,
-      uint64_t maxBytesPerStream)
+      uint64_t maxBytesPerStream,
+      uint32_t maxReceivePacketSize)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     eventBase_.setName("tperf_server");
     server_->setQuicServerTransportFactory(
@@ -296,6 +301,8 @@ class TPerfServer {
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
       settings.maxBatchSize = 16;
     }
+    settings.maxRecvPacketSize = maxReceivePacketSize;
+    settings.canIgnorePathMTU = true;
     server_->setTransportSettings(settings);
   }
 
@@ -327,14 +334,16 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
       int32_t duration,
       uint64_t window,
       bool gso,
-      quic::CongestionControlType congestionControlType)
+      quic::CongestionControlType congestionControlType,
+      uint32_t maxReceivePacketSize)
       : host_(host),
         port_(port),
         eventBase_(transportTimerResolution),
         duration_(duration),
         window_(window),
         gso_(gso),
-        congestionControlType_(congestionControlType) {
+        congestionControlType_(congestionControlType),
+        maxReceivePacketSize_(maxReceivePacketSize) {
     eventBase_.setName("tperf_client");
   }
 
@@ -476,6 +485,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
       settings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
       settings.maxBatchSize = 16;
     }
+    settings.maxRecvPacketSize = maxReceivePacketSize_;
+    settings.canIgnorePathMTU = true;
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
@@ -501,6 +512,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   uint64_t window_;
   bool gso_;
   quic::CongestionControlType congestionControlType_;
+  uint32_t maxReceivePacketSize_;
 };
 
 } // namespace tperf
@@ -546,7 +558,8 @@ int main(int argc, char* argv[]) {
         FLAGS_max_cwnd_mss,
         FLAGS_pacing,
         FLAGS_num_streams,
-        FLAGS_bytes_per_stream);
+        FLAGS_bytes_per_stream,
+        FLAGS_max_receive_packet_size);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_num_streams != 1) {
@@ -564,7 +577,8 @@ int main(int argc, char* argv[]) {
         FLAGS_duration,
         FLAGS_window,
         FLAGS_gso,
-        flagsToCongestionControlType(FLAGS_congestion));
+        flagsToCongestionControlType(FLAGS_congestion),
+        FLAGS_max_receive_packet_size);
     client.start();
   }
   return 0;
