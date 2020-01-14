@@ -589,6 +589,9 @@ struct QuicConnectionStateBase {
   // Current peer address.
   folly::SocketAddress peerAddress;
 
+  // Local address. INADDR_ANY if not set.
+  folly::Optional<folly::SocketAddress> localAddress;
+
   // Local error on the connection.
   folly::Optional<std::pair<QuicErrorCode, std::string>> localConnectionError;
 

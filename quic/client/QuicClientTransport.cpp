@@ -1080,7 +1080,12 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
   setConnectionCallback(cb);
   try {
     happyEyeballsSetUpSocket(
-        *socket_, conn_->peerAddress, conn_->transportSettings, this, this);
+        *socket_,
+        conn_->localAddress,
+        conn_->peerAddress,
+        conn_->transportSettings,
+        this,
+        this);
     startCryptoHandshake();
   } catch (const QuicTransportException& ex) {
     runOnEvbAsync([ex](auto self) {
@@ -1122,6 +1127,11 @@ void QuicClientTransport::addNewPeerAddress(folly::SocketAddress peerAddress) {
       : kDefaultV4UDPSendPacketLen;
   conn_->originalPeerAddress = peerAddress;
   conn_->peerAddress = std::move(peerAddress);
+}
+
+void QuicClientTransport::setLocalAddress(folly::SocketAddress localAddress) {
+  CHECK(localAddress.isInitialized());
+  conn_->localAddress = std::move(localAddress);
 }
 
 void QuicClientTransport::setHappyEyeballsEnabled(bool happyEyeballsEnabled) {
@@ -1231,7 +1241,12 @@ void QuicClientTransport::onNetworkSwitch(
 
     socket_ = std::move(newSock);
     happyEyeballsSetUpSocket(
-        *socket_, conn_->peerAddress, conn_->transportSettings, this, this);
+        *socket_,
+        conn_->localAddress,
+        conn_->peerAddress,
+        conn_->transportSettings,
+        this,
+        this);
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionMigrationUpdate(true);
     }

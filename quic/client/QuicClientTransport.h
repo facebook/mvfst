@@ -69,6 +69,11 @@ class QuicClientTransport
    * at least once before start().
    */
   void addNewPeerAddress(folly::SocketAddress peerAddress);
+  /**
+   * Supplies the local address to use for the connection. Calling this is
+   * optional. If not called, INADDR_ANY will be used.
+   */
+  void setLocalAddress(folly::SocketAddress localAddress);
   void addNewSocket(std::unique_ptr<folly::AsyncUDPSocket> socket);
   void setHappyEyeballsEnabled(bool happyEyeballsEnabled);
   virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);

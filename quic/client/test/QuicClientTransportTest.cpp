@@ -5375,6 +5375,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
   EmptyReadCallback readCallback;
   happyEyeballsSetUpSocket(
       socket,
+      folly::none,
       folly::SocketAddress("127.0.0.1", 12345),
       transportSettings,
       &errMessageCallback,

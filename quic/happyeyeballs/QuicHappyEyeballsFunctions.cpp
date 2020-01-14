@@ -94,6 +94,7 @@ void startHappyEyeballs(
     try {
       happyEyeballsSetUpSocket(
           *connection.happyEyeballsState.secondSocket,
+          connection.localAddress,
           connection.happyEyeballsState.secondPeerAddress,
           connection.transportSettings,
           errMsgCallback,
@@ -118,12 +119,15 @@ void startHappyEyeballs(
 
 void happyEyeballsSetUpSocket(
     folly::AsyncUDPSocket& socket,
+    folly::Optional<folly::SocketAddress> localAddress,
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
     folly::AsyncUDPSocket::ReadCallback* readCallback) {
   socket.setReuseAddr(false);
-  if (peerAddress.getFamily() == AF_INET) {
+  if (localAddress.hasValue()) {
+    socket.bind(*localAddress);
+  } else if (peerAddress.getFamily() == AF_INET) {
     socket.bind(folly::SocketAddress("0.0.0.0", 0));
   } else {
     socket.bind(folly::SocketAddress("::", 0));
