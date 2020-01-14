@@ -1769,8 +1769,8 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   // new connections
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
-  server_->waitUntilInitialized();
   server_->rejectNewConnections(true);
+  server_->waitUntilInitialized();
   auto testingObserver = std::make_shared<TestingEventBaseObserver>();
   server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
@@ -1808,26 +1808,6 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   EXPECT_TRUE(testingObserver->observerCalled());
   EXPECT_EQ(versionPacket->versions.size(), 1);
   EXPECT_EQ(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
-
-  // Then reset the reject flag and check that we get a valid version instead
-  server_->rejectNewConnections(false);
-
-  buf = folly::IOBuf::copyBuffer("hello");
-  packet = createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
-  data = std::move(packet);
-  reader->getSocket().write(serverAddr, data->clone());
-
-  serverData = reader->readOne().get();
-
-  packetQueue = bufToQueue(std::move(serverData));
-  versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(versionPacket.hasValue());
-
-  EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
-  EXPECT_EQ(versionPacket->sourceConnectionId, serverConnId);
-  EXPECT_TRUE(testingObserver->observerCalled());
-  EXPECT_GE(versionPacket->versions.size(), 1);
-  EXPECT_NE(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
 }
 
 TEST_F(QuicServerTest, NetworkTestHealthCheck) {
