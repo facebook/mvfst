@@ -307,7 +307,7 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
                {
                  "fin": true,
                  "frame_type": "STREAM",
-                 "id": 10,
+                 "stream_id": "10",
                  "length": 0,
                  "offset": 0
                }
@@ -358,7 +358,7 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
              {
                "fin": true,
                "frame_type": "STREAM",
-               "id": 10,
+               "stream_id": "10",
                "length": 0,
                "offset": 0
              }
@@ -401,7 +401,7 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
                  {
                    "fin": true,
                    "frame_type": "STREAM",
-                   "id": 10,
+                   "stream_id": "10",
                    "length": 0,
                    "offset": 0
                  }
@@ -592,7 +592,7 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                {
                  "fin": true,
                  "frame_type": "STREAM",
-                 "id": 10,
+                 "stream_id": "10",
                  "length": 5,
                  "offset": 0
                }
@@ -673,7 +673,7 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
                  {
                    "fin": true,
                    "frame_type": "STREAM",
-                   "id": 10,
+                   "stream_id": "10",
                    "length": 0,
                    "offset": 0
                  }

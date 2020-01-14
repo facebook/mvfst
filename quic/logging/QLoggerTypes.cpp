@@ -113,7 +113,7 @@ folly::dynamic StreamFrameLog::toDynamic() const {
   d["offset"] = offset;
   d["length"] = len;
   d["fin"] = fin;
-  d["id"] = streamId;
+  d["stream_id"] = folly::to<std::string>(streamId);
   d["frame_type"] = toString(FrameType::STREAM);
   return d;
 }
