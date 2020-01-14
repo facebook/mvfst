@@ -80,8 +80,8 @@ constexpr auto kOnHeaders = "on headers";
 constexpr auto kOnError = "on error";
 constexpr auto kPushPromise = "push promise";
 
-constexpr folly::StringPiece kQLogServerVantagePoint = "Server";
-constexpr folly::StringPiece kQLogClientVantagePoint = "Client";
+constexpr folly::StringPiece kQLogServerVantagePoint = "server";
+constexpr folly::StringPiece kQLogClientVantagePoint = "client";
 
 using VantagePoint = QuicNodeType;
 

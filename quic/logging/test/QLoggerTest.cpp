@@ -322,8 +322,8 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
        ],
        "title": "mvfst qlog from single connection",
        "vantage_point": {
-         "name": "Server",
-         "type": "Server"
+         "name": "server",
+         "type": "server"
        }
      }
    ]
@@ -607,8 +607,8 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
        ],
        "title": "mvfst qlog from single connection",
        "vantage_point": {
-         "name": "Server",
-         "type": "Server"
+         "name": "server",
+         "type": "server"
        }
      }
    ]
