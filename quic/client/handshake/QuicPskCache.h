@@ -8,27 +8,14 @@
 
 #pragma once
 
-#include <quic/QuicConstants.h>
+#include <quic/client/handshake/CachedServerTransportParameters.h>
 
 #include <fizz/client/PskCache.h>
 #include <folly/Optional.h>
 
-#include <cstdint>
 #include <string>
 
 namespace quic {
-
-struct CachedServerTransportParameters {
-  QuicVersion negotiatedVersion;
-  uint64_t idleTimeout;
-  uint64_t maxRecvPacketSize;
-  uint64_t initialMaxData;
-  uint64_t initialMaxStreamDataBidiLocal;
-  uint64_t initialMaxStreamDataBidiRemote;
-  uint64_t initialMaxStreamDataUni;
-  uint64_t initialMaxStreamsBidi;
-  uint64_t initialMaxStreamsUni;
-};
 
 struct QuicCachedPsk {
   fizz::client::CachedPsk cachedPsk;
