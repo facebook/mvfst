@@ -151,6 +151,9 @@ struct TransportSettings {
   DurationRep timeReorderingThreshDividend{
       kDefaultTimeReorderingThreshDividend};
   DurationRep timeReorderingThreshDivisor{kDefaultTimeReorderingThreshDivisor};
+  // Whether 1-rtt client should notify onTransportReady immediately after
+  // receives first ack from peer.
+  bool clientNotifyTransportReadyWithFirstAck{false};
 };
 
 } // namespace quic

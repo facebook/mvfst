@@ -666,9 +666,13 @@ void QuicClientTransport::onReadData(
     return;
   }
   processUDPData(peer, std::move(networkData));
-  if (!transportReadyNotified_ && hasWriteCipher()) {
-    transportReadyNotified_ = true;
-    CHECK_NOTNULL(connCallback_)->onTransportReady();
+  if (!transportReadyNotified_) {
+    if ((conn_->transportSettings.clientNotifyTransportReadyWithFirstAck &&
+         conn_->lossState.lastAckedTime) ||
+        hasWriteCipher()) {
+      transportReadyNotified_ = true;
+      CHECK_NOTNULL(connCallback_)->onTransportReady();
+    }
   }
 
   // Checking connCallback_ because application will start to write data

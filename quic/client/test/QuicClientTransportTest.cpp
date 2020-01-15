@@ -1705,6 +1705,36 @@ class QuicClientTransportTest : public Test {
   QuicVersion version{QuicVersion::QUIC_DRAFT};
 };
 
+TEST_F(QuicClientTransportTest, FirstAckNotifiesTransportReady) {
+  client->getNonConstConn()
+      .transportSettings.clientNotifyTransportReadyWithFirstAck = true;
+  client->addNewPeerAddress(serverAddr);
+  client->start(&clientConnCallback);
+
+  originalConnId = client->getConn().clientConnectionId;
+  ServerConnectionIdParams params(0, 0, 0);
+  client->getNonConstConn().serverConnectionId =
+      connIdAlgo_->encodeConnectionId(params);
+
+  WriteAckFrame::AckBlocks acks;
+  acks.insert(0);
+  auto& aead = getInitialCipher();
+  auto ackPacket = packetToBufCleartext(
+      createAckPacket(
+          client->getNonConstConn(),
+          initialPacketNum,
+          acks,
+          PacketNumberSpace::Initial,
+          &aead),
+      aead,
+      getInitialHeaderCipher(),
+      initialPacketNum);
+  initialPacketNum++;
+  EXPECT_CALL(clientConnCallback, onTransportReady()).Times(1);
+  deliverData(serverAddr, ackPacket->coalesce());
+  EXPECT_FALSE(client->hasWriteCipher());
+}
+
 TEST_F(QuicClientTransportTest, CustomTransportParam) {
   EXPECT_TRUE(client->setCustomTransportParameter(
       std::make_unique<CustomIntegralTransportParameter>(
