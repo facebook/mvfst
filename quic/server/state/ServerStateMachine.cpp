@@ -674,8 +674,10 @@ void onServerReadDataFromOpen(
         auto isAck = quicFrame.asReadAckFrame();
         auto isClose = quicFrame.asConnectionCloseFrame();
         auto isCrypto = quicFrame.asReadCryptoFrame();
+        auto isSimple = quicFrame.asQuicSimpleFrame();
+        auto isPing = isSimple ? isSimple->asPingFrame() : nullptr;
         // TODO: add path challenge and response
-        if (!isPadding && !isAck && !isClose && !isCrypto) {
+        if (!isPadding && !isAck && !isClose && !isCrypto && !isPing) {
           QUIC_STATS(
               conn.infoCallback,
               onPacketDropped,

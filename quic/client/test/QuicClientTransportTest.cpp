@@ -4228,6 +4228,26 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
   EXPECT_NO_THROW(deliverData(packet->coalesce()));
 }
 
+TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedPing) {
+  PacketNum nextPacketNum = initialPacketNum++;
+  LongHeader header(
+      LongHeader::Types::Initial,
+      getTestConnectionId(),
+      *client->getConn().clientConnectionId,
+      nextPacketNum,
+      version);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  DCHECK(builder.canBuildPacket());
+  writeFrame(QuicWriteFrame(PingFrame()), builder);
+  auto packet = packetToBufCleartext(
+      std::move(builder).buildPacket(),
+      getInitialCipher(),
+      getInitialHeaderCipher(),
+      nextPacketNum);
+  EXPECT_NO_THROW(deliverData(packet->coalesce()));
+}
+
 Buf getHandshakePacketWithFrame(
     QuicWriteFrame frame,
     ConnectionId srcConnId,
