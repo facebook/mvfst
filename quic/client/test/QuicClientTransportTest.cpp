@@ -1533,7 +1533,7 @@ class QuicClientTransportTest : public Test {
   void deliverNetworkError(int err) {
     ASSERT_TRUE(networkReadCallback);
     socketReads.emplace_back(TestReadData(err));
-    networkReadCallback->onNotifyDataAvailable();
+    networkReadCallback->onNotifyDataAvailable(*sock);
   }
 
   void deliverDataWithoutErrorCheck(folly::ByteRange data, bool writes = true) {
