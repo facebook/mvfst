@@ -88,7 +88,7 @@ PacketNum rstStreamAndSendPacket(
 RegularQuicPacketBuilder::Packet createAckPacket(
     QuicConnectionStateBase& dstConn,
     PacketNum pn,
-    WriteAckFrame::AckBlocks& acks,
+    AckBlocks& acks,
     PacketNumberSpace pnSpace,
     const Aead* aead) {
   // This function sends ACK to dstConn
@@ -635,8 +635,8 @@ RegularQuicWritePacket createPacketWithAckFrames() {
       createNewPacket(100, PacketNumberSpace::Initial);
   WriteAckFrame ackFrame;
   ackFrame.ackDelay = 111us;
-  ackFrame.ackBlocks.insert(900, 1000);
-  ackFrame.ackBlocks.insert(500, 700);
+  ackFrame.ackBlocks.emplace_back(900, 1000);
+  ackFrame.ackBlocks.emplace_back(500, 700);
 
   packet.frames.emplace_back(std::move(ackFrame));
   return packet;

@@ -155,11 +155,11 @@ class ReadAckFrameLog : public QLogFrame {
 
 class WriteAckFrameLog : public QLogFrame {
  public:
-  WriteAckFrame::AckBlocks ackBlocks;
+  WriteAckFrame::AckBlockVec ackBlocks;
   std::chrono::microseconds ackDelay;
 
   WriteAckFrameLog(
-      const WriteAckFrame::AckBlocks& ackBlocksIn,
+      const WriteAckFrame::AckBlockVec& ackBlocksIn,
       std::chrono::microseconds ackDelayIn)
       : ackBlocks{ackBlocksIn}, ackDelay{ackDelayIn} {}
   ~WriteAckFrameLog() override = default;

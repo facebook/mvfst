@@ -218,7 +218,7 @@ void commonAckVisitorForAckFrame(
     iter++;
   }
   if (!frame.ackBlocks.empty()) {
-    auto largestAcked = frame.ackBlocks.back().end;
+    auto largestAcked = frame.ackBlocks.front().end;
     if (largestAcked > kAckPurgingThresh) {
       ackState.acks.withdraw({0, largestAcked - kAckPurgingThresh});
     }

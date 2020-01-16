@@ -248,7 +248,7 @@ void updateConnection(
         const WriteAckFrame& writeAckFrame = *frame.asWriteAckFrame();
         DCHECK(!ackFrameCounter++)
             << "Send more than one WriteAckFrame " << conn;
-        auto largestAckedPacketWritten = writeAckFrame.ackBlocks.back().end;
+        auto largestAckedPacketWritten = writeAckFrame.ackBlocks.front().end;
         VLOG(10) << nodeToString(conn.nodeType)
                  << " sent packet with largestAcked="
                  << largestAckedPacketWritten << " packetNum=" << packetNum

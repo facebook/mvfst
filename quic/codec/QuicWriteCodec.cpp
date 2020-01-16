@@ -195,13 +195,13 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
   return WriteCryptoFrame(offsetIn, lengthVarInt.getValue());
 }
 
-size_t fillFrameWithAckBlocks(
-    const WriteAckFrame::AckBlocks& ackBlocks,
-    WriteAckFrame& ackFrame,
-    uint64_t bytesLimit);
-
-size_t fillFrameWithAckBlocks(
-    const WriteAckFrame::AckBlocks& ackBlocks,
+/*
+ * This function will fill the parameter ack frame with ack blocks from the
+ * parameter ackBlocks until it runs out of space (bytesLimit). The largest
+ * ack block should have been inserted by the caller.
+ */
+static size_t fillFrameWithAckBlocks(
+    const AckBlocks& ackBlocks,
     WriteAckFrame& ackFrame,
     uint64_t bytesLimit) {
   PacketNum currentSeqNum = ackBlocks.crbegin()->start;
@@ -209,8 +209,9 @@ size_t fillFrameWithAckBlocks(
   // starts off with 0 which is what we assumed the initial ack block to be for
   // the largest acked.
   size_t numAdditionalAckBlocks = 0;
-  QuicInteger previousNumAckBlockInt(numAdditionalAckBlocks);
+  size_t previousNumAckBlocks = 0;
 
+  // Skip the largest, as it has already been emplaced.
   for (auto blockItr = ackBlocks.crbegin() + 1; blockItr != ackBlocks.crend();
        ++blockItr) {
     const auto& currBlock = *blockItr;
@@ -219,19 +220,26 @@ size_t fillFrameWithAckBlocks(
     PacketNum gap = currentSeqNum - currBlock.end - 2;
     PacketNum currBlockLen = currBlock.end - currBlock.start;
 
-    QuicInteger gapInt(gap);
-    QuicInteger currentBlockLenInt(currBlockLen);
-    QuicInteger numAckBlocksInt(numAdditionalAckBlocks + 1);
-    size_t additionalSize = gapInt.getSize() + currentBlockLenInt.getSize() +
-        (numAckBlocksInt.getSize() - previousNumAckBlockInt.getSize());
+    // TODO this is still extra work, as we end up duplicating these
+    // calculations in the caller, we could store the results so they
+    // can be reused by the caller when writing the frame.
+    size_t gapSize = getQuicIntegerSizeThrows(gap);
+    size_t currBlockLenSize = getQuicIntegerSizeThrows(currBlockLen);
+    size_t numAdditionalAckBlocksSize =
+        getQuicIntegerSizeThrows(numAdditionalAckBlocks + 1);
+    size_t previousNumAckBlocksSize =
+        getQuicIntegerSizeThrows(previousNumAckBlocks);
+
+    size_t additionalSize = gapSize + currBlockLenSize +
+        (numAdditionalAckBlocksSize - previousNumAckBlocksSize);
     if (bytesLimit < additionalSize) {
       break;
     }
     numAdditionalAckBlocks++;
     bytesLimit -= additionalSize;
-    previousNumAckBlockInt = numAckBlocksInt;
+    previousNumAckBlocks = numAdditionalAckBlocks;
     currentSeqNum = currBlock.start;
-    ackFrame.ackBlocks.insert(currBlock.start, currBlock.end);
+    ackFrame.ackBlocks.emplace_back(currBlock.start, currBlock.end);
   }
   return numAdditionalAckBlocks;
 }
@@ -252,6 +260,9 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   WriteAckFrame ackFrame;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
   uint64_t beginningSpace = spaceLeft;
+  // Reserve enough space a full packet of ACKs with 2 byte varints.
+  // TODO is this a good heuristic?
+  ackFrame.ackBlocks.reserve(spaceLeft / 4);
 
   // We could technically split the range if the size of the representation of
   // the integer is too large, but that gets super tricky and is of dubious
@@ -276,6 +287,7 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   }
   spaceLeft -= headerSize;
 
+  ackFrame.ackBlocks.push_back(ackFrameMetaData.ackBlocks.back());
   auto numAdditionalAckBlocks =
       fillFrameWithAckBlocks(ackFrameMetaData.ackBlocks, ackFrame, spaceLeft);
 
@@ -287,7 +299,8 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   builder.write(firstAckBlockLengthInt);
 
   PacketNum currentSeqNum = ackFrameMetaData.ackBlocks.back().start;
-  for (auto it = ackFrame.ackBlocks.crbegin(); it != ackFrame.ackBlocks.crend();
+  for (auto it = ackFrame.ackBlocks.cbegin() + 1;
+       it != ackFrame.ackBlocks.cend();
        ++it) {
     CHECK_GE(currentSeqNum, it->end + 2);
     PacketNum gap = currentSeqNum - it->end - 2;
@@ -298,11 +311,6 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
     builder.write(currentBlockLenInt);
     currentSeqNum = it->start;
   }
-  // also the largest ack block since we already accounted for the space to
-  // write to it.
-  ackFrame.ackBlocks.insert(
-      ackFrameMetaData.ackBlocks.back().start,
-      ackFrameMetaData.ackBlocks.back().end);
   ackFrame.ackDelay = ackFrameMetaData.ackDelay;
   builder.appendFrame(std::move(ackFrame));
   return AckFrameWriteResult(

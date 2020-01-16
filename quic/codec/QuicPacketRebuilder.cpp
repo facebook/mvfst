@@ -61,8 +61,11 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
             (packetHeader.getHeaderForm() == HeaderForm::Long)
             ? kDefaultAckDelayExponent
             : conn_.transportSettings.ackDelayExponent;
-        AckFrameMetaData meta(
-            ackFrame.ackBlocks, ackFrame.ackDelay, ackDelayExponent);
+        AckBlocks ackBlocks;
+        for (auto& block : ackFrame.ackBlocks) {
+          ackBlocks.insert(block.start, block.end);
+        }
+        AckFrameMetaData meta(ackBlocks, ackFrame.ackDelay, ackDelayExponent);
         auto ackWriteResult = writeAckFrame(meta, builder_);
         writeSuccess = ackWriteResult.hasValue();
         break;

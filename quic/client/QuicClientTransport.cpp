@@ -314,7 +314,7 @@ void QuicClientTransport::processPacketData(
                   const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
                   DCHECK(!frame.ackBlocks.empty());
                   VLOG(4) << "Client received ack for largestAcked="
-                          << frame.ackBlocks.back().end << " " << *this;
+                          << frame.ackBlocks.front().end << " " << *this;
                   commonAckVisitorForAckFrame(ackState, frame);
                   break;
                 }

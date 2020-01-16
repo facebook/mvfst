@@ -306,8 +306,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.connectionTime = Clock::now();
   auto firstPacket = createNewPacket(100 /* packetNum */, GetParam());
   WriteAckFrame firstAckFrame;
-  firstAckFrame.ackBlocks.insert(900, 1000);
-  firstAckFrame.ackBlocks.insert(500, 700);
+  firstAckFrame.ackBlocks.emplace_back(900, 1000);
+  firstAckFrame.ackBlocks.emplace_back(500, 700);
   conn.ackStates.appDataAckState.acks.insert(900, 1000);
   conn.ackStates.appDataAckState.acks.insert(500, 700);
   firstPacket.frames.emplace_back(std::move(firstAckFrame));
@@ -316,8 +316,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
 
   auto secondPacket = createNewPacket(101 /* packetNum */, GetParam());
   WriteAckFrame secondAckFrame;
-  secondAckFrame.ackBlocks.insert(1100, 2000);
-  secondAckFrame.ackBlocks.insert(1002, 1090);
+  secondAckFrame.ackBlocks.emplace_back(1100, 2000);
+  secondAckFrame.ackBlocks.emplace_back(1002, 1090);
   conn.ackStates.appDataAckState.acks.insert(1100, 2000);
   conn.ackStates.appDataAckState.acks.insert(1002, 1090);
   secondPacket.frames.emplace_back(std::move(secondAckFrame));
@@ -491,8 +491,8 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
 TEST_P(AckHandlersTest, PurgeAcks) {
   QuicServerConnectionState conn;
   WriteAckFrame ackFrame;
-  ackFrame.ackBlocks.insert(900, 1000);
-  ackFrame.ackBlocks.insert(500, 700);
+  ackFrame.ackBlocks.emplace_back(900, 1000);
+  ackFrame.ackBlocks.emplace_back(500, 700);
   conn.ackStates.initialAckState.acks.insert(900, 1200);
   conn.ackStates.initialAckState.acks.insert(500, 800);
   auto expectedTime = Clock::now();

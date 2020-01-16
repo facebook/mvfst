@@ -545,7 +545,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   WriteAckFrame ackFrame;
-  ackFrame.ackBlocks.insert(100);
+  ackFrame.ackBlocks.emplace_back(0, 100);
   packet.packet.frames.push_back(std::move(ackFrame));
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
@@ -591,7 +591,7 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   packetEncodedSize += packet.body ? packet.body->computeChainDataLength() : 0;
 
   WriteAckFrame ackFrame;
-  ackFrame.ackBlocks.insert(100);
+  ackFrame.ackBlocks.emplace_back(0, 100);
   packet.packet.frames.push_back(std::move(ackFrame));
   packet.packet.frames.push_back(PaddingFrame());
   updateConnection(
@@ -762,7 +762,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   conn->congestionController = std::move(mockCongestionController);
   ASSERT_EQ(0, conn->lossState.totalBytesAcked);
   WriteAckFrame ackFrame;
-  ackFrame.ackBlocks.insert(10);
+  ackFrame.ackBlocks.emplace_back(0, 10);
   packet.packet.frames.push_back(std::move(ackFrame));
   EXPECT_CALL(*rawController, onPacketSent(_)).Times(0);
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);

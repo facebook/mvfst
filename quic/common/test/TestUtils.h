@@ -55,7 +55,7 @@ const RegularQuicWritePacket& writeQuicPacket(
 RegularQuicPacketBuilder::Packet createAckPacket(
     QuicConnectionStateBase& dstConn,
     PacketNum pn,
-    WriteAckFrame::AckBlocks& acks,
+    AckBlocks& acks,
     PacketNumberSpace pnSpace,
     const Aead* aead = nullptr);
 

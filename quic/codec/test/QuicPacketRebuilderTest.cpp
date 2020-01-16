@@ -58,7 +58,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       "The sun is in the sky.",
       FrameType::ACK);
   MaxStreamsFrame maxStreamsFrame(4321, true);
-  WriteAckFrame::AckBlocks ackBlocks;
+  AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
@@ -154,8 +154,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       }
       case QuicWriteFrame::Type::WriteAckFrame_E: {
         const WriteAckFrame& ack = *frame.asWriteAckFrame();
-        EXPECT_EQ(Interval<PacketNum>(10, 100), ack.ackBlocks.front());
-        EXPECT_EQ(Interval<PacketNum>(200, 1000), ack.ackBlocks.back());
+        EXPECT_EQ(Interval<PacketNum>(10, 100), ack.ackBlocks.back());
+        EXPECT_EQ(Interval<PacketNum>(200, 1000), ack.ackBlocks.front());
         break;
       }
       case QuicWriteFrame::Type::WriteStreamFrame_E: {
@@ -364,7 +364,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       "The sun is in the sky.",
       FrameType::ACK);
   StreamsBlockedFrame maxStreamIdFrame(0x1024, true);
-  WriteAckFrame::AckBlocks ackBlocks;
+  AckBlocks ackBlocks;
   ackBlocks.insert(10, 100);
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);

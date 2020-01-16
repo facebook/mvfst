@@ -442,12 +442,12 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
                  "ack_delay": 111,
                  "acked_ranges": [
                   [
-                    500,
-                    700
-                  ],
-                  [
                     900,
                     1000
+                  ],
+                  [
+                    500,
+                    700
                   ]
                  ],
                  "frame_type": "ACK"
@@ -564,12 +564,12 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
                  "ack_delay": 111,
                  "acked_ranges": [
                    [
-                     500,
-                     700
-                   ],
-                   [
                      900,
                      1000
+                   ],
+                   [
+                     500,
+                     700
                    ]
                  ],
                  "frame_type": "ACK"
@@ -660,12 +660,12 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
                    "ack_delay": 111,
                    "acked_ranges": [
                      [
-                       100,
-                       200
-                     ],
-                     [
                        300,
                        400
+                     ],
+                     [
+                       100,
+                       200
                      ]
                    ],
                    "frame_type": "ACK"
@@ -693,8 +693,8 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
 
   WriteAckFrame ackFrame;
   ackFrame.ackDelay = 111us;
-  ackFrame.ackBlocks.insert(100, 200);
-  ackFrame.ackBlocks.insert(300, 400);
+  ackFrame.ackBlocks.emplace_back(300, 400);
+  ackFrame.ackBlocks.emplace_back(100, 200);
   WriteStreamFrame streamFrame(streamId, offset, len, fin);
 
   packet.frames.emplace_back(std::move(ackFrame));

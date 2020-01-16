@@ -24,6 +24,21 @@ folly::Expected<size_t, TransportErrorCode> getQuicIntegerSize(uint64_t value) {
   return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
 }
 
+size_t getQuicIntegerSizeThrows(uint64_t value) {
+  if (value <= kOneByteLimit) {
+    return 1;
+  } else if (value <= kTwoByteLimit) {
+    return 2;
+  } else if (value <= kFourByteLimit) {
+    return 4;
+  } else if (value <= kEightByteLimit) {
+    return 8;
+  }
+  throw QuicTransportException(
+      folly::to<std::string>("Value too large: ", value),
+      TransportErrorCode::INTERNAL_ERROR);
+}
+
 uint8_t decodeQuicIntegerLength(uint8_t firstByte) {
   return (1 << ((firstByte >> 6) & 0x03));
 }

@@ -48,6 +48,10 @@ constexpr uint8_t kHeaderFormMask = 0x80;
 constexpr auto kMaxPacketNumEncodingSize = 4;
 constexpr auto kNumInitialAckBlocksPerFrame = 32;
 
+template <class T>
+using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame, uint16_t>;
+using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
+
 struct PaddingFrame {
   bool operator==(const PaddingFrame& /*rhs*/) const {
     return true;
@@ -109,10 +113,11 @@ struct ReadAckFrame {
 };
 
 struct WriteAckFrame {
-  template <class T>
-  using IntervalSetVec = SmallVec<T, kNumInitialAckBlocksPerFrame, uint16_t>;
-  using AckBlocks = IntervalSet<PacketNum, 1, IntervalSetVec>;
-  AckBlocks ackBlocks;
+  // Since we don't need this to be an IntervalSet, they are stored directly
+  // in a vector, in reverse order.
+  // TODO should this be a small_vector?
+  using AckBlockVec = std::vector<Interval<PacketNum>>;
+  AckBlockVec ackBlocks;
   // Delay in sending ack from time that packet was received.
   std::chrono::microseconds ackDelay{0us};
 

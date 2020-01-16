@@ -809,7 +809,7 @@ void onServerReadDataFromOpen(
                     const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
                     DCHECK(!frame.ackBlocks.empty());
                     VLOG(4) << "Server received ack for largestAcked="
-                            << frame.ackBlocks.back().end << " " << conn;
+                            << frame.ackBlocks.front().end << " " << conn;
                     commonAckVisitorForAckFrame(ackState, frame);
                     break;
                   }
