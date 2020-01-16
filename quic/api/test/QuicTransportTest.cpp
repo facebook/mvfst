@@ -19,6 +19,7 @@
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/handshake/test/Mocks.h>
+#include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
@@ -575,8 +576,8 @@ TEST_F(QuicTransportTest, WriteMultipleStreams) {
 
 TEST_F(QuicTransportTest, WriteFlowControl) {
   auto& conn = transport_->getConnectionState();
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
-  conn.qLogger = qLogger;
+  auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);
+  conn.qLogger = mockQLogger;
 
   auto streamId = transport_->createBidirectionalStream().value();
   auto stream = conn.streamManager->getStream(streamId);
@@ -584,6 +585,8 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   stream->currentWriteOffset = 100;
   stream->conn.flowControlState.sumCurWriteOffset = 100;
   stream->conn.flowControlState.peerAdvertisedMaxOffset = 220;
+  EXPECT_CALL(*mockQLogger, addTransportStateUpdate(getFlowControlEvent(100)));
+  EXPECT_CALL(*mockQLogger, addTransportStateUpdate(getFlowControlEvent(220)));
 
   auto buf = buildRandomInputData(150);
   folly::IOBuf passedIn;
@@ -611,6 +614,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto buf1 = buf->clone();
   buf1->trimEnd(50);
   stream->flowControlState.peerAdvertisedMaxOffset = 200;
+  EXPECT_CALL(*mockQLogger, addTransportStateUpdate(getFlowControlEvent(200)));
   conn.streamManager->updateWritableStreams(*stream);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
   writeQuicDataToSocket(
@@ -654,16 +658,6 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   verifyCorrectness(conn, 100, streamId, *buf, false, false);
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 3);
-  std::array<int, 3> offsets = {100, 200, 220};
-  for (int i = 0; i < 3; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->update, getFlowControlEvent(offsets[i]));
-  }
 }
 
 TEST_F(QuicTransportTest, WriteErrorEagain) {
