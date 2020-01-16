@@ -155,6 +155,8 @@ class QuicClientTransport
       const folly::SocketAddress& server,
       size_t len,
       bool truncated) noexcept override;
+  bool shouldOnlyNotify() override;
+  void onNotifyDataAvailable(folly::AsyncUDPSocket& sock) noexcept override;
 
   void processUDPData(
       const folly::SocketAddress& peer,

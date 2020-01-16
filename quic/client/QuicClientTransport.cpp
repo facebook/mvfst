@@ -1053,6 +1053,85 @@ void QuicClientTransport::onDataAvailable(
   onNetworkData(server, std::move(networkData));
 }
 
+bool QuicClientTransport::shouldOnlyNotify() {
+  return conn_->transportSettings.shouldRecvBatch;
+}
+
+void QuicClientTransport::onNotifyDataAvailable(
+    folly::AsyncUDPSocket& sock) noexcept {
+  DCHECK(conn_) << "trying to receive packets without a connection";
+  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
+  const size_t numPackets = conn_->transportSettings.maxRecvBatchSize;
+
+  NetworkData networkData;
+  networkData.packets.reserve(numPackets);
+  size_t totalData = 0;
+  folly::Optional<folly::SocketAddress> server;
+  for (size_t packetNum = 0; packetNum < numPackets; ++packetNum) {
+    // We create 1 buffer per packet so that it is not shared, this enables
+    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
+    // even if shared, then we could allocate one giant IOBuf here.
+    Buf readBuffer = folly::IOBuf::create(readBufferSize);
+    struct iovec vec {};
+    vec.iov_base = readBuffer->writableData();
+    vec.iov_len = readBufferSize;
+
+    sockaddr* rawAddr{nullptr};
+    struct sockaddr_storage addrStorage {};
+    socklen_t addrLen{sizeof(addrStorage)};
+    if (!server) {
+      rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+      rawAddr->sa_family = sock.address().getFamily();
+    }
+
+    struct msghdr msg {};
+    msg.msg_name = rawAddr;
+    msg.msg_namelen = size_t(addrLen);
+    msg.msg_iov = &vec;
+    msg.msg_iovlen = 1;
+
+    ssize_t ret = sock.recvmsg(&msg, 0);
+    if (ret < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        // If we got a retriable error, let us continue.
+        break;
+      }
+      // If we got a non-retriable error, we might have received
+      // a packet that we could process, however let's just quit early.
+      sock.pauseRead();
+      return onReadError(folly::AsyncSocketException(
+          folly::AsyncSocketException::INTERNAL_ERROR,
+          "::recvmsg() failed",
+          errno));
+    } else if (ret == 0) {
+      break;
+    }
+    size_t bytesRead = size_t(ret);
+    totalData += bytesRead;
+    if (!server) {
+      server = folly::SocketAddress();
+      server->setFromSockaddr(rawAddr, addrLen);
+    }
+    VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
+    readBuffer->append(bytesRead);
+    networkData.packets.emplace_back(std::move(readBuffer));
+    QUIC_TRACE(udp_recvd, *conn_, bytesRead);
+    if (conn_->qLogger) {
+      conn_->qLogger->addDatagramReceived(bytesRead);
+    }
+  }
+  if (networkData.packets.empty()) {
+    return;
+  }
+  DCHECK(server.hasValue());
+  // TODO: we can get better receive time accuracy than this, with
+  // SO_TIMESTAMP or SIOCGSTAMP.
+  auto packetReceiveTime = Clock::now();
+  networkData.receiveTimePoint = packetReceiveTime;
+  networkData.totalData = totalData;
+  onNetworkData(*server, std::move(networkData));
+}
+
 void QuicClientTransport::
     happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
   QUIC_TRACE(happy_eyeballs, *conn_, "delay timer expired");

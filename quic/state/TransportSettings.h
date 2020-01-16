@@ -144,6 +144,8 @@ struct TransportSettings {
   // Maximum size of the batch that should be used when receiving packets from
   // the kernel in one event loop.
   size_t maxRecvBatchSize{5};
+  // Whether or not we should recv data in a batch.
+  bool shouldRecvBatch{false};
   // Config struct for BBR
   BbrConfig bbrConfig;
   // A packet is considered loss when a packet that's sent later by at least
