@@ -133,7 +133,8 @@ void processServerInitialParams(
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
   // TODO: udpSendPacketLen should also be limited by PMTU
   if (conn.transportSettings.canIgnorePathMTU) {
-    conn.udpSendPacketLen = *packetSize;
+    conn.udpSendPacketLen =
+        std::min<uint64_t>(*packetSize, kDefaultMaxUDPPayload);
   }
 
   // Currently no-op for a client; it doesn't issue connection ids
