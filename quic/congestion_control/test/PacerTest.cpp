@@ -17,7 +17,7 @@ namespace test {
 namespace {
 void consumeTokensHelper(Pacer& pacer, size_t tokensToConsume) {
   for (size_t i = 0; i < tokensToConsume; i++) {
-    pacer.onPacketSent();
+    pacer.onPacketSent(1000);
   }
 }
 } // namespace
@@ -45,16 +45,19 @@ TEST_F(PacerTest, RateCalculator) {
                                    uint64_t,
                                    uint64_t,
                                    std::chrono::microseconds) {
-    return PacingRate::Builder().setInterval(1234us).setBurstSize(4321).build();
+    return PacingRate::Builder().setInterval(500ms).setBurstSize(4321).build();
   });
+  auto currentTime = Clock::now();
   pacer.refreshPacingRate(200000, 200us);
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(
-      4321 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-  consumeTokensHelper(
-      pacer, 4321 + conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1234us, pacer.getTimeUntilNextWrite());
+  EXPECT_EQ(4321, pacer.updateAndGetWriteBatchSize(currentTime));
+  consumeTokensHelper(pacer, 4321);
+  EXPECT_NEAR(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          500ms + currentTime - Clock::now())
+          .count(),
+      pacer.getTimeUntilNextWrite().count(),
+      2000);
 }
 
 TEST_F(PacerTest, CompensateTimerDrift) {
@@ -66,23 +69,18 @@ TEST_F(PacerTest, CompensateTimerDrift) {
   });
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
-  pacer.onPacedWriteScheduled(currentTime);
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+  // After refresh, both last and next write time is very close to currentTime
+  EXPECT_NEAR(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us), 2);
+  // lastWriteTime ~= currentTime, nextWriteTime ~= currentTime + 1000us
 
-  // Query batch size again without calling onPacedWriteScheduled won't do timer
-  // drift compensation. But token_ keeps the last compenstation.
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
+  EXPECT_NEAR(20, pacer.updateAndGetWriteBatchSize(currentTime + 2000us), 2);
+  // lastWriteTime ~= currentTime + 1000us, nextWriteTime ~= currentTime +
+  // 2000us
 
   // Consume a few:
   consumeTokensHelper(pacer, 3);
 
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit - 3,
-      pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
+  EXPECT_NEAR(20, pacer.updateAndGetWriteBatchSize(currentTime + 2000us), 2);
 }
 
 TEST_F(PacerTest, NextWriteTime) {
@@ -94,17 +92,18 @@ TEST_F(PacerTest, NextWriteTime) {
                                    std::chrono::microseconds rtt) {
     return PacingRate::Builder().setInterval(rtt).setBurstSize(10).build();
   });
-  pacer.refreshPacingRate(20, 1000us);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100ms);
   // Right after refresh, it's always 0us. You can always send right after an
   // ack.
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
 
+  pacer.updateAndGetWriteBatchSize(currentTime);
   // Consume all the tokens:
-  consumeTokensHelper(
-      pacer, 10 + conn.transportSettings.writeConnectionDataPacketsLimit);
+  consumeTokensHelper(pacer, 10);
 
   // Then we use real delay:
-  EXPECT_EQ(1000us, pacer.getTimeUntilNextWrite());
+  EXPECT_NEAR(100 * 1000, pacer.getTimeUntilNextWrite().count(), 1000);
 }
 
 TEST_F(PacerTest, ImpossibleToPace) {
@@ -138,17 +137,16 @@ TEST_F(PacerTest, CachedBatchSize) {
         .setBurstSize(cwndBytes / conn.udpSendPacketLen * 2)
         .build();
   });
+  auto currentTime = Clock::now();
   pacer.refreshPacingRate(20 * conn.udpSendPacketLen, 100ms);
   EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
 
-  auto currentTime = Clock::now();
-  pacer.onPacedWriteScheduled(currentTime);
   pacer.updateAndGetWriteBatchSize(currentTime);
+  // lastWriteTime ~= currentTime, nextWriteTime_ ~= currentTime + 100ms
   EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
 
-  pacer.onPacedWriteScheduled(currentTime + 100ms);
-  pacer.updateAndGetWriteBatchSize(currentTime + 200ms);
-  EXPECT_EQ(80, pacer.getCachedWriteBatchSize());
+  EXPECT_EQ(80, pacer.updateAndGetWriteBatchSize(currentTime + 200ms));
+  EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
 }
 
 TEST_F(PacerTest, AppLimited) {
@@ -158,48 +156,19 @@ TEST_F(PacerTest, AppLimited) {
   EXPECT_EQ(12, pacer.updateAndGetWriteBatchSize(Clock::now()));
 }
 
-TEST_F(PacerTest, Tokens) {
-  // Pacer has tokens right after init:
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(
-      conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-
-  // Consume all initial tokens:
-  consumeTokensHelper(
-      pacer, conn.transportSettings.writeConnectionDataPacketsLimit);
-
-  // Pacing rate: 10 mss per 10 ms
-  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+TEST_F(PacerTest, PacingLimited) {
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase& conn,
+                                   uint64_t cwndBytes,
                                    uint64_t,
-                                   uint64_t,
-                                   std::chrono::microseconds) {
-    return PacingRate::Builder().setInterval(10ms).setBurstSize(10).build();
+                                   std::chrono::microseconds rtt) {
+    return PacingRate::Builder()
+        .setInterval(rtt)
+        .setBurstSize(cwndBytes / conn.udpSendPacketLen)
+        .build();
   });
-
-  // These input doesn't matter, the rate calculator above returns fixed values.
-  pacer.refreshPacingRate(100, 100ms);
-
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(Clock::now()));
-
-  // Consume all tokens:
-  consumeTokensHelper(pacer, 10);
-
-  EXPECT_EQ(10ms, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(Clock::now()));
-
-  // Do a schedule:
-  auto curTime = Clock::now();
-  pacer.onPacedWriteScheduled(curTime);
-  // 10ms later you should have 10 mss credit:
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(curTime + 10ms));
-
-  // Schedule again from this point:
-  pacer.onPacedWriteScheduled(curTime + 10ms);
-  // Then elapse another 10ms, and previous tokens hasn't been used:
-  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(curTime + 20ms));
+  pacer.refreshPacingRate(2000 * conn.udpSendPacketLen, 1us);
+  pacer.onPacketSent(1);
+  EXPECT_TRUE(pacer.isPacingLimited());
 }
-
 } // namespace test
 } // namespace quic

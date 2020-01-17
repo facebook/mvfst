@@ -402,7 +402,7 @@ void updateConnection(
     }
   }
   if (conn.pacer) {
-    conn.pacer->onPacketSent();
+    conn.pacer->onPacketSent(pkt.encodedSize);
   }
   if (conn.pathValidationLimiter &&
       (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {

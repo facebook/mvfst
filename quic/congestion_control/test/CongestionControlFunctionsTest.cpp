@@ -43,9 +43,7 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 100, conn.transportSettings.minCwndInMss, 100ms);
-  // 100 ms rtt, 1ms tick interval, 100 mss cwnd, 5 mss min burst -> 5 mss every
-  // 5ms
-  EXPECT_EQ(5ms, result.interval);
+  EXPECT_EQ(1ms, result.interval);
   EXPECT_EQ(conn.transportSettings.minBurstPackets, result.burstSize);
 }
 
@@ -56,7 +54,7 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 10, conn.transportSettings.minCwndInMss, 100000us);
-  EXPECT_EQ(10ms, result.interval);
+  EXPECT_EQ(1ms, result.interval);
   EXPECT_EQ(1, result.burstSize);
 }
 
@@ -71,7 +69,6 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit, result.burstSize);
 }
-
 
 } // namespace test
 } // namespace quic

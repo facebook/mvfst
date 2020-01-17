@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <quic/congestion_control/Bandwidth.h>
 #include <quic/state/StateData.h>
 
 namespace quic {
@@ -31,8 +32,6 @@ class DefaultPacer : public Pacer {
   void refreshPacingRate(uint64_t cwndBytes, std::chrono::microseconds rtt)
       override;
 
-  void onPacedWriteScheduled(TimePoint currentTime) override;
-
   std::chrono::microseconds getTimeUntilNextWrite() const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;
@@ -43,8 +42,11 @@ class DefaultPacer : public Pacer {
 
   void setAppLimited(bool limited) override;
 
-  void onPacketSent() override;
+  void onPacketSent(uint64_t bytesSent) override;
   void onPacketsLoss() override;
+
+  // Only used for test:
+  bool isPacingLimited() const noexcept;
 
  private:
   const QuicConnectionStateBase& conn_;
@@ -56,5 +58,11 @@ class DefaultPacer : public Pacer {
   uint64_t cachedBatchSize_;
   bool appLimited_{false};
   uint64_t tokens_;
+  uint64_t bytesSentSincePacingRateUpdate_{0};
+  folly::Optional<TimePoint> lastPacingRateUpdate_;
+  bool pacingLimited_{false};
+  TimePoint nextWriteTime_;
+  TimePoint lastWriteTime_;
+  bool firstUpdate_{true};
 };
 } // namespace quic

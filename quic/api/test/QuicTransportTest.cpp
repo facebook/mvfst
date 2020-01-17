@@ -2511,7 +2511,6 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(0));
   EXPECT_CALL(*rawPacer, updateAndGetWriteBatchSize(_))
       .WillRepeatedly(Return(1));
-  EXPECT_CALL(*rawPacer, onPacedWriteScheduled(_));
   EXPECT_CALL(*rawPacer, getTimeUntilNextWrite())
       .WillRepeatedly(Return(3600000ms));
   // This will write out 100 bytes, leave 100 bytes behind. FunctionLooper will

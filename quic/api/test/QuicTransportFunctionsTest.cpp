@@ -765,7 +765,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   ackFrame.ackBlocks.emplace_back(0, 10);
   packet.packet.frames.push_back(std::move(ackFrame));
   EXPECT_CALL(*rawController, onPacketSent(_)).Times(0);
-  EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
+  EXPECT_CALL(*rawPacer, onPacketSent(_)).Times(0);
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(0, conn->outstandingPackets.size());
@@ -1020,7 +1020,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
       IOBuf::copyBuffer("0123456789012012345678901201234567890120123456789012");
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
-  EXPECT_CALL(*rawPacer, onPacketSent()).Times(1);
+  EXPECT_CALL(*rawPacer, onPacketSent(_)).Times(1);
   EXPECT_CALL(*transportInfoCb_, onWrite(_));
   writeQuicDataToSocket(
       *rawSocket,
