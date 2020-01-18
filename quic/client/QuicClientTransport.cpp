@@ -665,7 +665,11 @@ void QuicClientTransport::onReadData(
     QUIC_TRACE(packet_drop, *conn_, "already_closed");
     return;
   }
+  bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
   processUDPData(peer, std::move(networkData));
+  if (connCallback_ && waitingForFirstPacket && hasReceivedPackets(*conn_)) {
+    connCallback_->onFirstPeerPacketProcessed();
+  }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
     CHECK_NOTNULL(connCallback_)->onTransportReady();

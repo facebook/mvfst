@@ -101,6 +101,7 @@ void QuicServerTransport::onReadData(
   ServerEvents::ReadData readData;
   readData.peer = peer;
   readData.networkData = std::move(networkData);
+  bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
   onServerReadData(*serverConn_, readData);
   processPendingData(true);
 
@@ -113,6 +114,9 @@ void QuicServerTransport::onReadData(
       routingCb_->onConnectionIdAvailable(
           shared_from_this(), *conn_->serverConnectionId);
     }
+  }
+  if (connCallback_ && waitingForFirstPacket && hasReceivedPackets(*conn_)) {
+    connCallback_->onFirstPeerPacketProcessed();
   }
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();

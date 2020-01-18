@@ -81,6 +81,11 @@ class QuicSocket {
      * Called when the transport is ready to send/receive data.
      */
     virtual void onTransportReady() noexcept {}
+
+    /**
+     * Called after the transport successfully processes the received packet.
+     */
+    virtual void onFirstPeerPacketProcessed() noexcept {}
   };
 
   /**

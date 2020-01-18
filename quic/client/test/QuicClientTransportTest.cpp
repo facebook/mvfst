@@ -1700,6 +1700,53 @@ class QuicClientTransportTest : public Test {
   QuicVersion version{QuicVersion::QUIC_DRAFT};
 };
 
+TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
+  client->addNewPeerAddress(serverAddr);
+  client->start(&clientConnCallback);
+
+  originalConnId = client->getConn().clientConnectionId;
+  ServerConnectionIdParams params(0, 0, 0);
+  client->getNonConstConn().serverConnectionId =
+      connIdAlgo_->encodeConnectionId(params);
+
+  AckBlocks acks;
+  acks.insert(0);
+  auto& aead = getInitialCipher();
+  auto& headerCipher = getInitialHeaderCipher();
+  auto ackPacket = packetToBufCleartext(
+      createAckPacket(
+          client->getNonConstConn(),
+          initialPacketNum,
+          acks,
+          PacketNumberSpace::Initial,
+          &aead),
+      aead,
+      headerCipher,
+      initialPacketNum);
+  initialPacketNum++;
+  EXPECT_CALL(clientConnCallback, onFirstPeerPacketProcessed()).Times(1);
+  deliverData(serverAddr, ackPacket->coalesce());
+  EXPECT_FALSE(client->hasWriteCipher());
+
+  // Another ack won't trigger it again:
+  auto oneMoreAckPacket = packetToBufCleartext(
+      createAckPacket(
+          client->getNonConstConn(),
+          initialPacketNum,
+          acks,
+          PacketNumberSpace::Initial,
+          &aead),
+      aead,
+      headerCipher,
+      initialPacketNum);
+  initialPacketNum++;
+  EXPECT_CALL(clientConnCallback, onFirstPeerPacketProcessed()).Times(0);
+  deliverData(serverAddr, oneMoreAckPacket->coalesce());
+  EXPECT_FALSE(client->hasWriteCipher());
+
+  client->closeNow(folly::none);
+}
+
 TEST_F(QuicClientTransportTest, CustomTransportParam) {
   EXPECT_TRUE(client->setCustomTransportParameter(
       std::make_unique<CustomIntegralTransportParameter>(

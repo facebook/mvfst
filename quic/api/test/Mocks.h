@@ -118,6 +118,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       void(std::pair<QuicErrorCode, std::string>));
   GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
   GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
+  GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
