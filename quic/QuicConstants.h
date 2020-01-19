@@ -328,9 +328,13 @@ constexpr uint64_t kLargestQuicTime = 0x0FFFull << (0x1F - 1);
 
 // Limit of non-retransmittable packets received before an Ack has to be
 // emitted.
-constexpr uint8_t kNonRxPacketsPendingBeforeAckThresh = 20;
-// Limit of retransmittable packets received before an Ack has to be emitted.
-constexpr uint8_t kRxPacketsPendingBeforeAckThresh = 10;
+constexpr uint8_t kNonRtxRxPacketsPendingBeforeAck = 20;
+// Default threshold before switching to the after init Ack frequency.
+constexpr uint64_t kDefaultRxPacketsBeforeAckInitThreshold = 100;
+// Default before init Ack frequency.
+constexpr uint16_t kDefaultRxPacketsBeforeAckBeforeInit = 10;
+// Default after init Ack frequency.
+constexpr uint16_t kDefaultRxPacketsBeforeAckAfterInit = 10;
 
 /* Ack timer */
 // TODO: These numbers are shamlessly taken from Chromium code. We have no idea

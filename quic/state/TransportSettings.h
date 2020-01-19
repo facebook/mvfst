@@ -123,6 +123,14 @@ struct TransportSettings {
   uint64_t maxCwndInMss{kDefaultMaxCwndInMss};
   // Limited congestion window in MSS
   uint64_t limitedCwndInMss{kLimitedCwndInMss};
+  // The following three parameters control ACK generation. ACKs are sent every
+  // time so many retransmittable packets are received. There are two values,
+  // one for earlier in the flow and one for after. These are "before" and
+  // "after" the init threshold respectively.
+  uint64_t rxPacketsBeforeAckInitThreshold{
+      kDefaultRxPacketsBeforeAckInitThreshold};
+  uint16_t rxPacketsBeforeAckBeforeInit{kDefaultRxPacketsBeforeAckBeforeInit};
+  uint16_t rxPacketsBeforeAckAfterInit{kDefaultRxPacketsBeforeAckAfterInit};
   // Limits the amount of data that should be buffered in a QuicSocket.
   // If the amount of data in the buffer equals or exceeds this amount, then
   // the callback registered through notifyPendingWriteOnConnection() will

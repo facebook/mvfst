@@ -127,7 +127,9 @@ TEST_P(UpdateAckStateTest, TestUpdateAckState) {
   conn.pendingEvents.scheduleAckTimeout = false;
 
   // Reaching retx limit
-  for (uint8_t i = 0; i < kRxPacketsPendingBeforeAckThresh - 1; ++i) {
+  for (uint8_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
+       ++i) {
     updateAckState(
         conn, GetParam(), nextPacketNum++, true, false, Clock::now());
     EXPECT_FALSE(ackState.needsToSendAckImmediately);
@@ -136,8 +138,8 @@ TEST_P(UpdateAckStateTest, TestUpdateAckState) {
   }
   // Hit the limit
   updateAckState(conn, GetParam(), nextPacketNum++, true, false, Clock::now());
-  // Should send ack immediately once we have kRxPacketsPendingBeforeAckThresh
-  // retransmittable packets
+  // Should send ack immediately once we have
+  // conn.transportSettings.rxPacketsBeforeAckBeforeInit retransmittable packets
   EXPECT_TRUE(ackState.needsToSendAckImmediately);
   EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
 
@@ -145,14 +147,14 @@ TEST_P(UpdateAckStateTest, TestUpdateAckState) {
   conn.pendingEvents.scheduleAckTimeout = false;
 
   // Nonrx limit
-  for (uint64_t i = 0; i < kNonRxPacketsPendingBeforeAckThresh; ++i) {
+  for (uint64_t i = 0; i < kNonRtxRxPacketsPendingBeforeAck; ++i) {
     EXPECT_FALSE(ackState.needsToSendAckImmediately);
     EXPECT_EQ(ackState.numNonRxPacketsRecvd, i);
     updateAckState(
         conn, GetParam(), nextPacketNum++, false, false, Clock::now());
   }
   // Should send ack immediately once we have
-  // kNonRxPacketsPendingBeforeAckThresh non retransmittable packets
+  // kNonRtxRxPacketsPendingBeforeAck non retransmittable packets
   EXPECT_TRUE(ackState.needsToSendAckImmediately);
   // Non-rx packets don't turn on Ack timer:
   EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
@@ -161,6 +163,54 @@ TEST_P(UpdateAckStateTest, TestUpdateAckState) {
 
   // Crypto always triggers immediately ack:
   updateAckState(conn, GetParam(), nextPacketNum++, true, true, Clock::now());
+  EXPECT_TRUE(ackState.needsToSendAckImmediately);
+  EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+}
+
+TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequency) {
+  QuicServerConnectionState conn;
+  conn.transportSettings.rxPacketsBeforeAckInitThreshold = 20;
+  conn.transportSettings.rxPacketsBeforeAckBeforeInit = 2;
+  conn.transportSettings.rxPacketsBeforeAckAfterInit = 10;
+  PacketNum nextPacketNum = 0;
+  auto& ackState = getAckState(conn, GetParam());
+
+  for (uint8_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
+       ++i) {
+    updateAckState(
+        conn, GetParam(), nextPacketNum++, true, false, Clock::now());
+    EXPECT_FALSE(ackState.needsToSendAckImmediately);
+    EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+    EXPECT_EQ(ackState.numRxPacketsRecvd, i + 1);
+  }
+  updateAckState(conn, GetParam(), nextPacketNum++, true, false, Clock::now());
+  EXPECT_TRUE(ackState.needsToSendAckImmediately);
+  EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+  ackState.needsToSendAckImmediately = false;
+  conn.pendingEvents.scheduleAckTimeout = false;
+
+  for (;
+       nextPacketNum <= conn.transportSettings.rxPacketsBeforeAckInitThreshold;
+       nextPacketNum++) {
+    updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
+  }
+  ASSERT_EQ(
+      ackState.largestReceivedPacketNum.value(),
+      conn.transportSettings.rxPacketsBeforeAckInitThreshold);
+  ackState.needsToSendAckImmediately = false;
+  conn.pendingEvents.scheduleAckTimeout = false;
+  ackState.numRxPacketsRecvd = 0;
+  for (uint8_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckAfterInit - 1;
+       ++i) {
+    updateAckState(
+        conn, GetParam(), nextPacketNum++, true, false, Clock::now());
+    EXPECT_FALSE(ackState.needsToSendAckImmediately);
+    EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+    EXPECT_EQ(ackState.numRxPacketsRecvd, i + 1);
+  }
+  updateAckState(conn, GetParam(), nextPacketNum++, true, false, Clock::now());
   EXPECT_TRUE(ackState.needsToSendAckImmediately);
   EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
 }
@@ -207,7 +257,9 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxLimit) {
   // Retx packets reach thresh
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
-  for (size_t i = 0; i < kRxPacketsPendingBeforeAckThresh - 1; i++) {
+  for (size_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
+       i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
     EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
     EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
@@ -225,7 +277,7 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsNonRxLimit) {
   // Non-rx packets reach thresh
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
-  for (size_t i = 0; i < kNonRxPacketsPendingBeforeAckThresh - 1; i++) {
+  for (size_t i = 0; i < kNonRtxRxPacketsPendingBeforeAck - 1; i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
     EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
     EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
@@ -247,7 +299,9 @@ TEST_P(
   auto& ackState = getAckState(conn, GetParam());
   // use 1 rx packet
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-  for (size_t i = 0; i < kRxPacketsPendingBeforeAckThresh - 2; i++) {
+  for (size_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 2;
+       i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
     EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
     EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
@@ -263,10 +317,12 @@ TEST_P(
 
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxAndNonRxMixed) {
   // Rx and non-rx mixed together. We should still just need
-  // kRxPacketsPendingBeforeAckThresh to trigger an ack
+  // conn.transportSettings.rxPacketsBeforeAckBeforeInit to trigger an ack
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
-  for (size_t i = 0; i < kRxPacketsPendingBeforeAckThresh - 1; i++) {
+  for (size_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
+       i++) {
     bool isRetransmittable = i % 2;
     updateAckSendStateOnRecvPacket(
         conn, ackState, false, isRetransmittable, false);
