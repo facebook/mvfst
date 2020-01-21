@@ -133,7 +133,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
                                                   QuicVersion::QUIC_DRAFT,
                                                   QuicVersion::QUIC_DRAFT_23}};
     originalVersion = QuicVersion::MVFST;
-    serverHandshakeLayer = new ServerHandshake(*cryptoState);
+    serverHandshakeLayer = new ServerHandshake(this, *cryptoState);
     handshakeLayer.reset(serverHandshakeLayer);
     // We shouldn't normally need to set this until we're starting the
     // transport, however writing unit tests is much easier if we set this here.

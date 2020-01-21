@@ -54,7 +54,7 @@ QuicClientTransport::QuicClientTransport(
   auto tempConn =
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
-  conn_ = std::move(tempConn);
+  conn_.reset(tempConn.release());
   std::vector<uint8_t> connIdData(
       std::max(kMinInitialDestinationConnIdLength, connectionIdSize));
   folly::Random::secureRandom(connIdData.data(), connIdData.size());
@@ -208,7 +208,7 @@ void QuicClientTransport::processPacketData(
     auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
 
     clientConn_ = tempConn.get();
-    conn_ = std::move(tempConn);
+    conn_.reset(tempConn.release());
 
     clientConn_->retryToken = longHeader->getToken();
 

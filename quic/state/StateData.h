@@ -8,10 +8,6 @@
 
 #pragma once
 
-#include <folly/Optional.h>
-#include <folly/io/IOBuf.h>
-#include <folly/io/async/AsyncUDPSocket.h>
-#include <folly/io/async/HHWheelTimer.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicReadCodec.h>
@@ -25,6 +21,13 @@
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StreamData.h>
 #include <quic/state/TransportSettings.h>
+
+#include <folly/Optional.h>
+#include <folly/io/IOBuf.h>
+#include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/io/async/DelayedDestruction.h>
+#include <folly/io/async/HHWheelTimer.h>
+
 #include <chrono>
 #include <list>
 #include <numeric>
@@ -489,7 +492,7 @@ class CongestionControllerFactory;
 class LoopDetectorCallback;
 class PendingPathRateLimiter;
 
-struct QuicConnectionStateBase {
+struct QuicConnectionStateBase : public folly::DelayedDestruction {
   virtual ~QuicConnectionStateBase() = default;
 
   explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {}
@@ -497,8 +500,7 @@ struct QuicConnectionStateBase {
   // Type of node owning this connection (client or server).
   QuicNodeType nodeType;
 
-  std::unique_ptr<Handshake, folly::DelayedDestruction::Destructor>
-      handshakeLayer;
+  std::unique_ptr<Handshake> handshakeLayer;
 
   // Crypto stream
   std::unique_ptr<QuicCryptoState> cryptoState;

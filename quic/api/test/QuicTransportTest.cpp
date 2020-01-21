@@ -42,7 +42,7 @@ class TestQuicTransport
       ConnectionCallback& cb)
       : QuicTransportBase(evb, std::move(socket)) {
     setConnectionCallback(&cb);
-    conn_ = std::make_unique<QuicServerConnectionState>();
+    conn_.reset(new QuicServerConnectionState());
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});
     conn_->serverConnectionId = ConnectionId({1, 2, 3, 4});
     conn_->version = QuicVersion::MVFST;

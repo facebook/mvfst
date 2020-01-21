@@ -1354,8 +1354,6 @@ class QuicClientTransportTest : public Test {
         new FakeOneRttHandshakeLayer(*client->getNonConstConn().cryptoState);
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;
     client->getNonConstConn().handshakeLayer.reset(mockClientHandshake);
-    handshakeDG = std::make_unique<DelayedDestruction::DestructorGuard>(
-        mockClientHandshake);
     setFakeHandshakeCiphers();
     // Allow ignoring path mtu for testing negotiation.
     client->getNonConstConn().transportSettings.canIgnorePathMTU = true;
@@ -1690,7 +1688,6 @@ class QuicClientTransportTest : public Test {
   std::unique_ptr<folly::EventBase> eventbase_;
   SocketAddress serverAddr{"127.0.0.1", 443};
   AsyncUDPSocket::ReadCallback* networkReadCallback{nullptr};
-  std::unique_ptr<DelayedDestruction::DestructorGuard> handshakeDG;
   FakeOneRttHandshakeLayer* mockClientHandshake;
   std::shared_ptr<TestingQuicClientTransport> client;
   PacketNum initialPacketNum{0}, handshakePacketNum{0}, appDataPacketNum{0};

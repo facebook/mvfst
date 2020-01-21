@@ -8,14 +8,20 @@
 
 #include <quic/server/handshake/ServerHandshake.h>
 
-#include <fizz/protocol/Protocol.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 
+#include <fizz/protocol/Protocol.h>
+
 namespace quic {
-ServerHandshake::ServerHandshake(QuicCryptoState& cryptoState)
-    : actionGuard_(nullptr), cryptoState_(cryptoState), visitor_(*this) {}
+ServerHandshake::ServerHandshake(
+    QuicConnectionStateBase* conn,
+    QuicCryptoState& cryptoState)
+    : conn_(conn),
+      actionGuard_(nullptr),
+      cryptoState_(cryptoState),
+      visitor_(*this) {}
 
 void ServerHandshake::accept(
     std::shared_ptr<ServerTransportParametersExtension> transportParams) {
@@ -238,7 +244,7 @@ void ServerHandshake::addProcessingActions(fizz::server::AsyncActions actions) {
         "Processing action while pending", TransportErrorCode::INTERNAL_ERROR));
     return;
   }
-  actionGuard_ = folly::DelayedDestruction::DestructorGuard(this);
+  actionGuard_ = folly::DelayedDestruction::DestructorGuard(conn_);
   startActions(std::move(actions));
 }
 
@@ -257,7 +263,7 @@ void ServerHandshake::processActions(
     fizz::server::ServerStateMachine::CompletedActions actions) {
   // This extra DestructorGuard is needed due to the gap between clearing
   // actionGuard_ and potentially processing another action.
-  folly::DelayedDestruction::DestructorGuard dg(this);
+  folly::DelayedDestruction::DestructorGuard dg(conn_);
 
   for (auto& action : actions) {
     switch (action.type()) {
@@ -307,7 +313,7 @@ void ServerHandshake::processPendingEvents() {
     return;
   }
 
-  folly::DelayedDestruction::DestructorGuard dg(this);
+  folly::DelayedDestruction::DestructorGuard dg(conn_);
   inProcessPendingEvents_ = true;
   SCOPE_EXIT {
     inProcessPendingEvents_ = false;
@@ -316,7 +322,7 @@ void ServerHandshake::processPendingEvents() {
   while (!actionGuard_ && !error_) {
     folly::Optional<fizz::server::ServerStateMachine::ProcessingActions>
         actions;
-    actionGuard_ = folly::DelayedDestruction::DestructorGuard(this);
+    actionGuard_ = folly::DelayedDestruction::DestructorGuard(conn_);
     if (!waitForData_) {
       switch (state_.readRecordLayer()->getEncryptionLevel()) {
         case fizz::EncryptionLevel::Plaintext:

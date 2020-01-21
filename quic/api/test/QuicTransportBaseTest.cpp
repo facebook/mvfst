@@ -136,7 +136,7 @@ class TestQuicTransport
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
     conn->version = QuicVersion::MVFST;
     transportConn = conn.get();
-    conn_ = std::move(conn);
+    conn_.reset(conn.release());
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();

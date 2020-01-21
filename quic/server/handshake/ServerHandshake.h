@@ -26,6 +26,8 @@
 
 namespace quic {
 
+// struct QuicConnectionStateBase;
+
 /**
  * ServerHandshake abstracts details of the TLS 1.3 fizz crypto handshake. The
  * TLS handshake can be async, so ServerHandshake provides an API to deal with
@@ -69,7 +71,9 @@ class ServerHandshake : public Handshake {
    */
   enum class Phase { Handshake, KeysDerived, Established };
 
-  explicit ServerHandshake(QuicCryptoState& cryptoState);
+  explicit ServerHandshake(
+      QuicConnectionStateBase* conn,
+      QuicCryptoState& cryptoState);
 
   /**
    * Starts accepting the TLS connection.
@@ -247,6 +251,7 @@ class ServerHandshake : public Handshake {
 
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
+  QuicConnectionStateBase* conn_;
   folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
   std::shared_ptr<const fizz::server::FizzServerContext> context_;
