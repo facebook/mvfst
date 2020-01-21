@@ -15,7 +15,7 @@
 
 namespace quic {
 ServerHandshake::ServerHandshake(QuicCryptoState& cryptoState)
-    : cryptoState_(cryptoState), visitor_(*this) {}
+    : actionGuard_(nullptr), cryptoState_(cryptoState), visitor_(*this) {}
 
 void ServerHandshake::accept(
     std::shared_ptr<ServerTransportParametersExtension> transportParams) {
@@ -294,7 +294,7 @@ void ServerHandshake::processActions(
     }
   }
 
-  actionGuard_.clear();
+  actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
   if (callback_ && !inHandshakeStack_ && handshakeEventAvailable_) {
     callback_->onCryptoEventAvailable();
   }
@@ -339,7 +339,7 @@ void ServerHandshake::processPendingEvents() {
       actions.emplace(
           machine_.processWriteNewSessionTicket(state_, std::move(write)));
     } else {
-      actionGuard_.clear();
+      actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
       return;
     }
     startActions(std::move(*actions));
