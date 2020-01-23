@@ -247,7 +247,7 @@ class ServerHandshake : public Handshake {
 
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
-  folly::Optional<folly::DelayedDestruction::DestructorGuard> actionGuard_;
+  folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
   std::shared_ptr<const fizz::server::FizzServerContext> context_;
   using PendingEvent = fizz::WriteNewSessionTicket;
