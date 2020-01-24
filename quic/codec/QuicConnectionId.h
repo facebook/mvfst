@@ -21,7 +21,9 @@ namespace quic {
 constexpr uint8_t kStatelessResetTokenLength = 16;
 using StatelessResetToken = std::array<uint8_t, kStatelessResetTokenLength>;
 
-constexpr size_t kMinConnectionIdSize = 4;
+// min connId size for one chosen by 'mvfst' as a peer
+constexpr size_t kMinSelfConnectionIdSize = 4;
+// max size of a connId as specified in the draft
 constexpr size_t kMaxConnectionIdSize = 20;
 
 // Minimum required length (in bytes) for the destination connection-id

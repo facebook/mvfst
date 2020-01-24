@@ -32,9 +32,7 @@ ConnectionId::ConnectionId(const std::vector<uint8_t>& connidIn) {
   static_assert(
       std::numeric_limits<uint8_t>::max() > kMaxConnectionIdSize,
       "Max connection size is too big");
-  if (connidIn.size() != 0 &&
-      (connidIn.size() < kMinConnectionIdSize ||
-       connidIn.size() > kMaxConnectionIdSize)) {
+  if (connidIn.size() > kMaxConnectionIdSize) {
     // We can't throw a transport error here because of the dependency. This is
     // sad because this will cause an internal error downstream.
     throw std::runtime_error("ConnectionId invalid size");
@@ -51,7 +49,7 @@ ConnectionId::ConnectionId(folly::io::Cursor& cursor, size_t len) {
     connidLen = 0;
     return;
   }
-  if (len < kMinConnectionIdSize || len > kMaxConnectionIdSize) {
+  if (len > kMaxConnectionIdSize) {
     // We can't throw a transport error here because of the dependency. This is
     // sad because this will cause an internal error downstream.
     throw std::runtime_error("ConnectionId invalid size");

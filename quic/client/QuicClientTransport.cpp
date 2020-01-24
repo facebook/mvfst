@@ -39,8 +39,8 @@ QuicClientTransport::QuicClientTransport(
   DCHECK(handshakeFactory);
   // TODO(T53612743) Only enforce that the initial destination connection id
   // is at least kMinInitialDestinationConnIdLength.
-  // All subsequent connection ids should be in between
-  // [kMinConnectionIdSize, kMaxConnectionIdSize]
+  // All subsequent destination connection ids should be in between
+  // [kMinSelfConnectionIdSize, kMaxConnectionIdSize]
   DCHECK(
       connectionIdSize == 0 ||
       (connectionIdSize >= kMinInitialDestinationConnIdLength &&

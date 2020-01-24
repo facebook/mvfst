@@ -31,7 +31,7 @@ constexpr uint8_t kShortVersionBitsMask = 0xc0;
  * Sets the short version id bits (0 - 1) into the given ConnectionId
  */
 void setVersionBitsInConnId(quic::ConnectionId& connId, uint8_t version) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for version",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -45,7 +45,7 @@ void setVersionBitsInConnId(quic::ConnectionId& connId, uint8_t version) {
  * Extract the version id bits (0 - 1) from the given ConnectionId
  */
 uint8_t getVersionBitsFromConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for version",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -59,7 +59,7 @@ uint8_t getVersionBitsFromConnId(const quic::ConnectionId& connId) {
  * Sets the host id bits [2 - 17] bits into the given ConnectionId
  */
 void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for hostid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -83,7 +83,7 @@ void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
  * Extract the host id bits [2 - 17] bits from the given ConnectionId
  */
 uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for hostid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -104,7 +104,7 @@ uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
  * Sets the given 8-bit workerId into the given connectionId's 18-25 bits
  */
 void setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for workerid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -123,7 +123,7 @@ void setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) {
  * Extracts the 'workerId' bits from the given ConnectionId
  */
 uint8_t getWorkerIdFromConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for workerid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -139,7 +139,7 @@ uint8_t getWorkerIdFromConnId(const quic::ConnectionId& connId) {
  * Sets the server id bit (at 26th bit) into the given ConnectionId
  */
 void setProcessIdBitsInConnId(quic::ConnectionId& connId, uint8_t processId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for processid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -153,7 +153,7 @@ void setProcessIdBitsInConnId(quic::ConnectionId& connId, uint8_t processId) {
  * Extract the server id bit (at 26th bit) from the given ConnectionId
  */
 uint8_t getProcessIdBitsFromConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinConnectionIdSize) {
+  if (connId.size() < quic::kMinSelfConnectionIdSize) {
     throw quic::QuicInternalException(
         "ConnectionId is too small for processid",
         quic::LocalErrorCode::INTERNAL_ERROR);
@@ -167,7 +167,7 @@ uint8_t getProcessIdBitsFromConnId(const quic::ConnectionId& connId) {
 namespace quic {
 
 bool DefaultConnectionIdAlgo::canParse(const ConnectionId& id) const {
-  if (id.size() < kMinConnectionIdSize) {
+  if (id.size() < kMinSelfConnectionIdSize) {
     return false;
   }
   return getVersionBitsFromConnId(id) == kShortVersionId;

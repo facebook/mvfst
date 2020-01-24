@@ -500,7 +500,7 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::NEW_CONNECTION_ID);
   }
-  if (connIdLen < kMinConnectionIdSize || connIdLen > kMaxConnectionIdSize) {
+  if (connIdLen > kMaxConnectionIdSize) {
     throw QuicTransportException(
         "ConnectionId invalid length",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,

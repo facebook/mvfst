@@ -592,7 +592,10 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);

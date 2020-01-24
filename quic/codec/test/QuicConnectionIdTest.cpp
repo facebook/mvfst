@@ -59,10 +59,10 @@ TEST(ConnectionIdTest, ConnIdSize) {
   }
   EXPECT_THROW(ConnectionId{testconnid}, std::runtime_error);
   testconnid.clear();
-  for (size_t i = 0; i < kMinConnectionIdSize - 1; ++i) {
+  for (size_t i = 0; i < kMinSelfConnectionIdSize - 1; ++i) {
     testconnid.push_back(0);
   }
-  EXPECT_THROW(ConnectionId{testconnid}, std::runtime_error);
+  EXPECT_NO_THROW(ConnectionId{testconnid});
 }
 
 struct ConnectionIdLengthParams {
