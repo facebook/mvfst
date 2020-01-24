@@ -8,12 +8,13 @@
 
 #include <quic/client/handshake/ClientHandshake.h>
 
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
 
-ClientHandshake::ClientHandshake(QuicCryptoState& cryptoState)
-    : cryptoState_(cryptoState) {}
+ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
+    : conn_(conn) {}
 
 void ClientHandshake::doHandshake(
     std::unique_ptr<folly::IOBuf> data,
@@ -194,7 +195,7 @@ void ClientHandshake::writeDataToStream(
     // Don't write 1-rtt handshake data on the client.
     return;
   }
-  auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
+  auto cryptoStream = getCryptoStream(*conn_->cryptoState, encryptionLevel);
   writeDataToQuicStream(*cryptoStream, std::move(data));
 }
 

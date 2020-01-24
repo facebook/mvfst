@@ -18,9 +18,9 @@
 namespace quic {
 
 FizzClientHandshake::FizzClientHandshake(
-    QuicCryptoState& cryptoState,
+    QuicClientConnectionState* conn,
     std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
-    : ClientHandshake(cryptoState), fizzContext_(std::move(fizzContext)) {}
+    : ClientHandshake(conn), fizzContext_(std::move(fizzContext)) {}
 
 void FizzClientHandshake::connect(
     folly::Optional<std::string> hostname,
