@@ -44,7 +44,7 @@ class FakeServerHandshake : public ServerHandshake {
       bool chloSync = false,
       bool cfinSync = false,
       folly::Optional<uint64_t> clientActiveConnectionIdLimit = folly::none)
-      : ServerHandshake(&conn, *conn.cryptoState),
+      : ServerHandshake(&conn),
         conn_(conn),
         chloSync_(chloSync),
         cfinSync_(cfinSync),

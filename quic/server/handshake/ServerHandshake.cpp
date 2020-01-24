@@ -15,12 +15,10 @@
 #include <fizz/protocol/Protocol.h>
 
 namespace quic {
-ServerHandshake::ServerHandshake(
-    QuicConnectionStateBase* conn,
-    QuicCryptoState& cryptoState)
+ServerHandshake::ServerHandshake(QuicConnectionStateBase* conn)
     : conn_(conn),
       actionGuard_(nullptr),
-      cryptoState_(cryptoState),
+      cryptoState_(*conn->cryptoState),
       visitor_(*this) {}
 
 void ServerHandshake::accept(
