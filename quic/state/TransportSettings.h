@@ -154,6 +154,8 @@ struct TransportSettings {
   size_t maxRecvBatchSize{5};
   // Whether or not we should recv data in a batch.
   bool shouldRecvBatch{false};
+  // Whether or not use recvmmsg when shouldRecvBatch is true.
+  bool shouldUseRecvmmsgForBatchRecv{false};
   // Config struct for BBR
   BbrConfig bbrConfig;
   // A packet is considered loss when a packet that's sent later by at least

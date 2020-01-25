@@ -32,9 +32,24 @@
 
 namespace quic {
 
+struct RecvmmsgStorage {
+  std::vector<struct mmsghdr> msgs;
+  std::vector<struct sockaddr_storage> addrs;
+  std::vector<Buf> readBuffers;
+  std::vector<struct iovec> iovecs;
+
+  void resize(size_t numPackets) {
+    msgs.resize(numPackets);
+    addrs.resize(numPackets);
+    readBuffers.resize(numPackets);
+    iovecs.resize(numPackets);
+  }
+};
+
 struct NetworkData {
   TimePoint receiveTimePoint;
   std::vector<std::unique_ptr<folly::IOBuf>> packets;
+  RecvmmsgStorage recvmmsgStorage;
   size_t totalData{0};
 
   NetworkData() = default;

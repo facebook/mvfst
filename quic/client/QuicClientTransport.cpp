@@ -27,6 +27,12 @@
 
 namespace fsp = folly::portability::sockets;
 
+#ifndef MSG_WAITFORONE
+#define RECVMMSG_FLAGS 0
+#else
+#define RECVMMSG_FLAGS MSG_WAITFORONE
+#endif
+
 namespace quic {
 
 QuicClientTransport::QuicClientTransport(
@@ -1057,17 +1063,14 @@ bool QuicClientTransport::shouldOnlyNotify() {
   return conn_->transportSettings.shouldRecvBatch;
 }
 
-void QuicClientTransport::onNotifyDataAvailable(
-    folly::AsyncUDPSocket& sock) noexcept {
-  DCHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
-  const size_t numPackets = conn_->transportSettings.maxRecvBatchSize;
-
-  NetworkData networkData;
-  networkData.packets.reserve(numPackets);
-  size_t totalData = 0;
-  folly::Optional<folly::SocketAddress> server;
-  for (size_t packetNum = 0; packetNum < numPackets; ++packetNum) {
+void QuicClientTransport::recvMsg(
+    folly::AsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    int numPackets,
+    NetworkData& networkData,
+    folly::Optional<folly::SocketAddress>& server,
+    size_t& totalData) {
+  for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
@@ -1120,6 +1123,97 @@ void QuicClientTransport::onNotifyDataAvailable(
       conn_->qLogger->addDatagramReceived(bytesRead);
     }
   }
+}
+
+void QuicClientTransport::recvMmsg(
+    folly::AsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    int numPackets,
+    NetworkData& networkData,
+    folly::Optional<folly::SocketAddress>& server,
+    size_t& totalData) {
+  const size_t addrLen = sizeof(struct sockaddr_storage);
+  networkData.recvmmsgStorage.resize(numPackets);
+
+  auto& msgs = networkData.recvmmsgStorage.msgs;
+  auto& addrs = networkData.recvmmsgStorage.addrs;
+  auto& readBuffers = networkData.recvmmsgStorage.readBuffers;
+  auto& iovecs = networkData.recvmmsgStorage.iovecs;
+
+  int i = 0;
+  for (; i < numPackets; ++i) {
+    // We create 1 buffer per packet so that it is not shared, this enables
+    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
+    // even if shared, then we could allocate one giant IOBuf here.
+    Buf readBuffer = folly::IOBuf::create(readBufferSize);
+    iovecs[i].iov_base = readBuffer->writableData();
+    iovecs[i].iov_len = readBufferSize;
+    readBuffers[i] = std::move(readBuffer);
+
+    auto* rawAddr = reinterpret_cast<sockaddr*>(&addrs[i]);
+    rawAddr->sa_family = socket_->address().getFamily();
+
+    struct msghdr* msg = &msgs[i].msg_hdr;
+    msg->msg_name = rawAddr;
+    msg->msg_namelen = addrLen;
+    msg->msg_iov = &iovecs[i];
+    msg->msg_iovlen = 1;
+  }
+
+  int numMsgsRecvd =
+      sock.recvmmsg(msgs.data(), numPackets, RECVMMSG_FLAGS, nullptr);
+  if (numMsgsRecvd < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      // Exit, socket will notify us again when socket is readable.
+      return;
+    }
+    // If we got a non-retriable error, we might have received
+    // a packet that we could process, however let's just quit early.
+    sock.pauseRead();
+    return onReadError(folly::AsyncSocketException(
+        folly::AsyncSocketException::INTERNAL_ERROR,
+        "::recvmmsg() failed",
+        errno));
+  }
+
+  CHECK_LE(numMsgsRecvd, numPackets);
+  for (i = 0; i < numMsgsRecvd; ++i) {
+    size_t bytesRead = msgs[i].msg_len;
+    totalData += bytesRead;
+
+    if (!server) {
+      server = folly::SocketAddress();
+      auto* rawAddr = reinterpret_cast<sockaddr*>(&addrs[i]);
+      server->setFromSockaddr(rawAddr, addrLen);
+    }
+
+    VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
+    readBuffers[i]->append(bytesRead);
+    networkData.packets.emplace_back(std::move(readBuffers[i]));
+    QUIC_TRACE(udp_recvd, *conn_, bytesRead);
+    if (conn_->qLogger) {
+      conn_->qLogger->addDatagramReceived(bytesRead);
+    }
+  }
+}
+
+void QuicClientTransport::onNotifyDataAvailable(
+    folly::AsyncUDPSocket& sock) noexcept {
+  DCHECK(conn_) << "trying to receive packets without a connection";
+  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
+  const int numPackets = conn_->transportSettings.maxRecvBatchSize;
+
+  NetworkData networkData;
+  networkData.packets.reserve(numPackets);
+  size_t totalData = 0;
+  folly::Optional<folly::SocketAddress> server;
+
+  if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
+    recvMmsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  } else {
+    recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  }
+
   if (networkData.packets.empty()) {
     return;
   }
