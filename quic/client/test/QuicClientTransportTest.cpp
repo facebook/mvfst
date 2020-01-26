@@ -1298,7 +1298,10 @@ class QuicClientTransportTest : public Test {
     explicit TestReadData(int errIn) : err(errIn) {}
   };
 
-  QuicClientTransportTest() : eventbase_(std::make_unique<folly::EventBase>()) {
+  QuicClientTransportTest()
+      : eventbase_(std::make_unique<folly::EventBase>()) {}
+
+  void SetUp() override final {
     auto socket =
         std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
     sock = socket.get();
@@ -1346,7 +1349,11 @@ class QuicClientTransportTest : public Test {
         client->getConn().selfConnectionIds[0].connId,
         *client->getConn().clientConnectionId);
     EXPECT_EQ(client->getConn().peerConnectionIds.size(), 0);
+
+    SetUpChild();
   }
+
+  virtual void SetUpChild() {}
 
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
@@ -2077,7 +2084,7 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
 
 class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
  public:
-  void SetUp() override {
+  void SetUpChild() override {
     auto secondSocket =
         std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
     secondSock = secondSocket.get();
@@ -2703,7 +2710,7 @@ TEST_F(
 
 class QuicClientTransportAfterStartTestBase : public QuicClientTransportTest {
  public:
-  void SetUp() override {
+  void SetUpChild() override {
     client->addNewPeerAddress(serverAddr);
     client->setHostname(hostname_);
     client->setCongestionControllerFactory(
@@ -4954,10 +4961,10 @@ TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
 class QuicClientTransportPskCacheTest
     : public QuicClientTransportAfterStartTestBase {
  public:
-  void SetUp() override {
+  void SetUpChild() override {
     mockPskCache_ = std::make_shared<MockQuicPskCache>();
     client->setPskCache(mockPskCache_);
-    QuicClientTransportAfterStartTestBase::SetUp();
+    QuicClientTransportAfterStartTestBase::SetUpChild();
   }
 
  protected:
@@ -5319,7 +5326,7 @@ TEST_F(
 class QuicZeroRttHappyEyeballsClientTransportTest
     : public QuicZeroRttClientTest {
  public:
-  void SetUp() override {
+  void SetUpChild() override {
     client->setHostname(hostname_);
     mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
     client->setPskCache(mockQuicPskCache_);
