@@ -367,6 +367,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
+  // address that the server is bound to
+  folly::SocketAddress boundAddress_;
 };
 
 } // namespace quic
