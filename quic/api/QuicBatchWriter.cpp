@@ -149,6 +149,91 @@ ssize_t SendmmsgPacketBatchWriter::write(
   return 0;
 }
 
+// SendmmsgGSOPacketBatchWriter
+SendmmsgGSOPacketBatchWriter::SendmmsgGSOPacketBatchWriter(size_t maxBufs)
+    : maxBufs_(maxBufs) {
+  bufs_.reserve(maxBufs);
+}
+
+bool SendmmsgGSOPacketBatchWriter::empty() const {
+  return !currSize_;
+}
+
+size_t SendmmsgGSOPacketBatchWriter::size() const {
+  return currSize_;
+}
+
+void SendmmsgGSOPacketBatchWriter::reset() {
+  bufs_.clear();
+  gso_.clear();
+  currBufs_ = 0;
+  currSize_ = 0;
+  prevSize_ = 0;
+}
+
+bool SendmmsgGSOPacketBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& buf,
+    size_t size) {
+  currSize_ += size;
+  // see if we need to start a new chain
+  if (size > prevSize_) {
+    bufs_.emplace_back(std::move(buf));
+    // set the gso_ value to 0 for now
+    // this will change if we append to this chain
+    gso_.emplace_back(0);
+    prevSize_ = size;
+    currBufs_++;
+
+    // reached max buffers
+    if (FOLLY_UNLIKELY(currBufs_ == maxBufs_)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  gso_.back() = prevSize_;
+  bufs_.back()->prependChain(std::move(buf));
+  currBufs_++;
+
+  // reached max buffers
+  if (FOLLY_UNLIKELY(currBufs_ == maxBufs_)) {
+    return true;
+  }
+
+  if (size < prevSize_) {
+    // reset the prevSize_ so in the next loop
+    // we will start a new chain
+    prevSize_ = 0;
+  }
+
+  return false;
+}
+
+ssize_t SendmmsgGSOPacketBatchWriter::write(
+    folly::AsyncUDPSocket& sock,
+    const folly::SocketAddress& address) {
+  CHECK_GT(bufs_.size(), 0);
+  if (bufs_.size() == 1) {
+    return (currBufs_ > 1) ? sock.writeGSO(address, bufs_[0], gso_[0])
+                           : sock.write(address, bufs_[0]);
+  }
+
+  int ret = sock.writemGSO(address, bufs_.data(), bufs_.size(), gso_.data());
+
+  if (ret <= 0) {
+    return ret;
+  }
+
+  if (static_cast<size_t>(ret) == bufs_.size()) {
+    return currSize_;
+  }
+
+  // this is a partial write - we just need to
+  // return a different number than currSize_
+  return 0;
+}
+
 // BatchWriterFactory
 std::unique_ptr<BatchWriter> BatchWriterFactory::makeBatchWriter(
     folly::AsyncUDPSocket& sock,
@@ -166,6 +251,13 @@ std::unique_ptr<BatchWriter> BatchWriterFactory::makeBatchWriter(
     }
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
       return std::make_unique<SendmmsgPacketBatchWriter>(batchSize);
+    case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
+      if (sock.getGSO() >= 0) {
+        return std::make_unique<SendmmsgGSOPacketBatchWriter>(batchSize);
+      }
+
+      return std::make_unique<SendmmsgPacketBatchWriter>(batchSize);
+    }
       // no default so we can catch missing case at compile time
   }
 

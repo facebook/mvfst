@@ -192,5 +192,82 @@ TEST(QuicBatchWriter, TestBatchingSendmmsg) {
   }
 }
 
+TEST(QuicBatchWriter, TestBatchingSendmmsgGSOBatchNum) {
+  folly::EventBase evb;
+  folly::AsyncUDPSocket sock(&evb);
+  sock.setReuseAddr(false);
+  sock.bind(folly::SocketAddress("127.0.0.1", 0));
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      sock, quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO, kBatchNum);
+  CHECK(batchWriter);
+  std::string strTest(kStrLen, 'A');
+  // if GSO is not available, just test we've got a regular
+  // batch writer
+  if (sock.getGSO() >= 0) {
+    // run multiple loops
+    for (size_t i = 0; i < kNumLoops; i++) {
+      // try to batch up to kBatchNum
+      CHECK(batchWriter->empty());
+      CHECK_EQ(batchWriter->size(), 0);
+      size_t size = 0;
+      for (auto j = 0; j < kBatchNum - 1; j++) {
+        auto buf = folly::IOBuf::copyBuffer(strTest);
+        EXPECT_FALSE(batchWriter->append(std::move(buf), kStrLen));
+        size += kStrLen;
+        CHECK_EQ(batchWriter->size(), size);
+      }
+
+      // add the kBatchNum buf
+      auto buf = folly::IOBuf::copyBuffer(strTest.c_str(), kStrLen);
+      CHECK(batchWriter->append(std::move(buf), kStrLen));
+      size += kStrLen;
+      CHECK_EQ(batchWriter->size(), size);
+      batchWriter->reset();
+    }
+  }
+}
+
+TEST(QuicBatchWriter, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
+  folly::EventBase evb;
+  folly::AsyncUDPSocket sock(&evb);
+  sock.setReuseAddr(false);
+  sock.bind(folly::SocketAddress("127.0.0.1", 0));
+
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      sock, quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO, 3 * kBatchNum);
+  CHECK(batchWriter);
+  std::string strTest(kStrLen, 'A');
+  // if GSO is not available, just test we've got a regular
+  // batch writer
+  if (sock.getGSO() >= 0) {
+    // run multiple loops
+    for (size_t i = 0; i < kNumLoops; i++) {
+      // try to batch up to kBatchNum
+      CHECK(batchWriter->empty());
+      CHECK_EQ(batchWriter->size(), 0);
+      size_t size = 0;
+      for (auto j = 0; j < 3 * kBatchNum - 1; j++) {
+        strTest = (j % 3 == 0) ? std::string(kStrLen, 'A')
+                               : ((j % 3 == 1) ? std::string(kStrLenLT, 'A')
+                                               : std::string(kStrLenGT, 'A'));
+        auto buf = folly::IOBuf::copyBuffer(strTest);
+        // we can add various sizes without the need to flush until we add
+        // the maxBufs buffer
+        EXPECT_FALSE(batchWriter->append(std::move(buf), strTest.length()));
+        size += strTest.length();
+        CHECK_EQ(batchWriter->size(), size);
+      }
+
+      // add the kBatchNum buf
+      auto buf = folly::IOBuf::copyBuffer(strTest.c_str(), kStrLen);
+      CHECK(batchWriter->append(std::move(buf), strTest.length()));
+      size += strTest.length();
+      CHECK_EQ(batchWriter->size(), size);
+      batchWriter->reset();
+    }
+  }
+}
+
 } // namespace testing
 } // namespace quic

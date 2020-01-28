@@ -27,7 +27,7 @@ class BatchWriter {
   // reset the internal state after a flush
   virtual void reset() = 0;
 
-  // returns false if we need to flush before adding a new packet
+  // returns true if we need to flush before adding a new packet
   virtual bool needsFlush(size_t /*unused*/);
 
   /* append returns true if the
@@ -111,6 +111,35 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   size_t currSize_{0};
   // array of IOBufs
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
+};
+
+class SendmmsgGSOPacketBatchWriter : public BatchWriter {
+ public:
+  explicit SendmmsgGSOPacketBatchWriter(size_t maxBufs);
+  ~SendmmsgGSOPacketBatchWriter() override = default;
+
+  bool empty() const override;
+
+  size_t size() const override;
+
+  void reset() override;
+  bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t size) override;
+  ssize_t write(
+      folly::AsyncUDPSocket& sock,
+      const folly::SocketAddress& address) override;
+
+ private:
+  // max number of buffer chains we can accumulate before we need to flush
+  size_t maxBufs_{1};
+  // current number of buffer chains appended the buf_
+  size_t currBufs_{0};
+  // size of data in all the buffers
+  size_t currSize_{0};
+  // size of the previous buffer chain appended to the buf_
+  size_t prevSize_{0};
+  // array of IOBufs
+  std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
+  std::vector<int> gso_;
 };
 
 class BatchWriterFactory {

@@ -204,6 +204,7 @@ enum class QuicBatchingMode : uint32_t {
   BATCHING_MODE_NONE = 0,
   BATCHING_MODE_GSO = 1,
   BATCHING_MODE_SENDMMSG = 2,
+  BATCHING_MODE_SENDMMSG_GSO = 3,
 };
 
 QuicBatchingMode getQuicBatchingMode(uint32_t val);

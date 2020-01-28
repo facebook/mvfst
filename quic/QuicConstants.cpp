@@ -51,6 +51,8 @@ QuicBatchingMode getQuicBatchingMode(uint32_t val) {
       return QuicBatchingMode::BATCHING_MODE_GSO;
     case static_cast<uint32_t>(QuicBatchingMode::BATCHING_MODE_SENDMMSG):
       return QuicBatchingMode::BATCHING_MODE_SENDMMSG;
+    case static_cast<uint32_t>(QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO):
+      return QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO;
       // no default
   }
 
