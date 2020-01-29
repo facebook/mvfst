@@ -5414,8 +5414,9 @@ TEST_F(
       .Times(2)
       .WillRepeatedly(Invoke(
           [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
-            socketWrites.push_back(buf->clone());
-            return buf->computeChainDataLength();
+            socketWrites.push_back(
+                folly::IOBuf::copyBuffer(buf->data(), buf->length(), 0, 0));
+            return buf->length();
           }));
   EXPECT_CALL(*secondSock, write(secondAddress, _))
       .Times(2)

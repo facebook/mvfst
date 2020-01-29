@@ -193,14 +193,15 @@ void writeShortClose(
  * Encrypts the packet header for the header type.
  * This will overwrite the header with the encrypted header form. It will verify
  * whether or not there are enough bytes to sample for the header encryption
- * from the encryptedBody, and if there is not enough, it will throw an
- * exception.
+ * from the encryptedBody via a CHECK.
  */
 void encryptPacketHeader(
-    HeaderForm headerType,
-    folly::IOBuf& header,
-    folly::IOBuf& encryptedBody,
-    const PacketNumberCipher& cipher);
+    HeaderForm headerForm,
+    uint8_t* header,
+    size_t headerLen,
+    const uint8_t* encryptedBody,
+    size_t bodyLen,
+    const PacketNumberCipher& headerCipher);
 
 /**
  * Writes the connections data to the socket using the header

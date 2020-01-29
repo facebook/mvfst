@@ -423,9 +423,17 @@ Buf packetToBufCleartext(
     body = packet.body->clone();
   }
   auto headerForm = packet.packet.header.getHeaderForm();
+  packet.header->coalesce();
   auto encryptedBody =
       cleartextCipher.encrypt(std::move(body), packet.header.get(), packetNum);
-  encryptPacketHeader(headerForm, *packet.header, *encryptedBody, headerCipher);
+  encryptedBody->coalesce();
+  encryptPacketHeader(
+      headerForm,
+      packet.header->writableData(),
+      packet.header->length(),
+      encryptedBody->data(),
+      encryptedBody->length(),
+      headerCipher);
   packetBuf->prependChain(std::move(encryptedBody));
   return packetBuf;
 }

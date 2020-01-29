@@ -772,9 +772,17 @@ void writeCloseCommon(
     return;
   }
   auto packet = std::move(packetBuilder).buildPacket();
+  packet.header->coalesce();
   auto body =
       aead.encrypt(std::move(packet.body), packet.header.get(), packetNum);
-  encryptPacketHeader(headerForm, *packet.header, *body, headerCipher);
+  body->coalesce();
+  encryptPacketHeader(
+      headerForm,
+      packet.header->writableData(),
+      packet.header->length(),
+      body->data(),
+      body->length(),
+      headerCipher);
   auto packetBuf = std::move(packet.header);
   packetBuf->prependChain(std::move(body));
   auto packetSize = packetBuf->computeChainDataLength();
@@ -859,26 +867,24 @@ void writeShortClose(
 
 void encryptPacketHeader(
     HeaderForm headerForm,
-    folly::IOBuf& header,
-    folly::IOBuf& encryptedBody,
+    uint8_t* header,
+    size_t headerLen,
+    const uint8_t* encryptedBody,
+    size_t bodyLen,
     const PacketNumberCipher& headerCipher) {
   // Header encryption.
-  auto packetNumberLength = parsePacketNumberLength(header.data()[0]);
+  auto packetNumberLength = parsePacketNumberLength(*header);
   Sample sample;
   size_t sampleBytesToUse = kMaxPacketNumEncodingSize - packetNumberLength;
-  folly::io::Cursor sampleCursor(&encryptedBody);
   // If there were less than 4 bytes in the packet number, some of the payload
   // bytes will also be skipped during sampling.
-  sampleCursor.skip(sampleBytesToUse);
-  CHECK(sampleCursor.canAdvance(sample.size())) << "Not enough sample bytes";
-  sampleCursor.pull(sample.data(), sample.size());
+  CHECK_GE(bodyLen, sampleBytesToUse + sample.size());
+  encryptedBody += sampleBytesToUse;
+  memcpy(sample.data(), encryptedBody, sample.size());
 
-  // This should already be a single buffer.
-  header.coalesce();
-  folly::MutableByteRange initialByteRange(header.writableData(), 1);
+  folly::MutableByteRange initialByteRange(header, 1);
   folly::MutableByteRange packetNumByteRange(
-      header.writableData() + header.length() - packetNumberLength,
-      packetNumberLength);
+      header + headerLen - packetNumberLength, packetNumberLength);
   if (headerForm == HeaderForm::Short) {
     headerCipher.encryptShortHeader(
         sample, initialByteRange, packetNumByteRange);
@@ -977,16 +983,32 @@ uint64_t writeConnectionDataToSocket(
       }
       return ioBufBatch.getPktSent();
     }
-    auto body =
-        aead.encrypt(std::move(packet->body), packet->header.get(), packetNum);
+    packet->header->coalesce();
+    auto headerLen = packet->header->length();
+    auto bodyLen = packet->body->computeChainDataLength();
+    auto unencrypted =
+        folly::IOBuf::create(headerLen + bodyLen + aead.getCipherOverhead());
+    auto bodyCursor = folly::io::Cursor(packet->body.get());
+    bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
+    unencrypted->advance(headerLen);
+    unencrypted->append(bodyLen);
+    auto packetBuf =
+        aead.encrypt(std::move(unencrypted), packet->header.get(), packetNum);
+    DCHECK(packetBuf->headroom() == headerLen);
+    packetBuf->clear();
+    auto headerCursor = folly::io::Cursor(packet->header.get());
+    headerCursor.pull(packetBuf->writableData(), headerLen);
+    packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
 
     HeaderForm headerForm = packet->packet.header.getHeaderForm();
-    encryptPacketHeader(headerForm, *packet->header, *body, headerCipher);
-
-    auto packetBuf = std::move(packet->header);
-    packetBuf->prependChain(std::move(body));
+    encryptPacketHeader(
+        headerForm,
+        packetBuf->writableData(),
+        headerLen,
+        packetBuf->data() + headerLen,
+        packetBuf->length() - headerLen,
+        headerCipher);
     auto encodedSize = packetBuf->computeChainDataLength();
-
     bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
 
     if (ret) {
