@@ -11,12 +11,6 @@
 #include <folly/Random.h>
 #include <quic/codec/PacketNumber.h>
 
-namespace {
-
-// maximum length of packet length.
-constexpr auto kMaxPacketLenSize = sizeof(uint16_t);
-} // namespace
-
 namespace quic {
 
 PacketNumEncodingResult encodeLongHeaderHelper(
@@ -136,7 +130,11 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
 }
 
 uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
-  return folly::to<uint32_t>(header_->computeChainDataLength());
+  bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
+  CHECK(packetNumberEncoding_)
+      << "packetNumberEncoding_ should be valid after ctor";
+  return folly::to<uint32_t>(header_->computeChainDataLength()) +
+      (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
 
 uint32_t RegularQuicPacketBuilder::remainingSpaceInPkt() const {

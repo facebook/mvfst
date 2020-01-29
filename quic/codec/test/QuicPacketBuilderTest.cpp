@@ -349,3 +349,43 @@ TEST_F(QuicPacketBuilderTest, PacketBuilderWrapper) {
   EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(50));
   EXPECT_EQ(0, wrapper.remainingSpaceInPkt());
 }
+
+TEST_F(QuicPacketBuilderTest, LongHeaderBytesCounting) {
+  ConnectionId clientCid = getTestConnectionId(0);
+  ConnectionId serverCid = getTestConnectionId(1);
+  PacketNum pktNum = 8 * 24;
+  PacketNum largestAcked = 8 + 24;
+  LongHeader header(
+      LongHeader::Types::Initial,
+      clientCid,
+      serverCid,
+      pktNum,
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), largestAcked);
+  auto expectedWrittenHeaderFieldLen = sizeof(uint8_t) +
+      sizeof(QuicVersionType) + sizeof(uint8_t) + clientCid.size() +
+      sizeof(uint8_t) + serverCid.size();
+  auto estimatedHeaderBytes = builder.getHeaderBytes();
+  EXPECT_GT(
+      estimatedHeaderBytes, expectedWrittenHeaderFieldLen + kMaxPacketLenSize);
+  writeFrame(PaddingFrame(), builder);
+  EXPECT_LE(
+      std::move(builder).buildPacket().header->computeChainDataLength(),
+      estimatedHeaderBytes);
+}
+
+TEST_F(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
+  PacketNum pktNum = 8 * 24;
+  ConnectionId cid = getTestConnectionId();
+  PacketNum largestAcked = 8 + 24;
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen,
+      ShortHeader(ProtectionType::KeyPhaseZero, cid, pktNum),
+      largestAcked);
+  auto headerBytes = builder.getHeaderBytes();
+  writeFrame(PaddingFrame(), builder);
+  EXPECT_EQ(
+      std::move(builder).buildPacket().header->computeChainDataLength(),
+      headerBytes);
+}

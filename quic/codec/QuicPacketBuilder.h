@@ -16,6 +16,9 @@
 
 namespace quic {
 
+// maximum length of packet length.
+constexpr auto kMaxPacketLenSize = sizeof(uint16_t);
+
 // We reserve 2 bytes for packet length in the long headers
 constexpr auto kReservedPacketLenSize = sizeof(uint16_t);
 
@@ -92,6 +95,15 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
       PacketNum largestAckedPacketNum,
       QuicVersion version = QuicVersion::MVFST_OLD);
 
+  /**
+   * Return an estimated header bytes count.
+   *
+   * For short header, this is the exact header bytes. For long header, since
+   * the writing of packet length and packet number field are deferred to the
+   * buildPacket() call, this is an estimate header bytes count that's the sum
+   * of header bytes already written, the maximum possible packet length field
+   * bytes count and packet number field bytes count.
+   */
   uint32_t getHeaderBytes() const;
 
   // PacketBuilderInterface
