@@ -701,7 +701,6 @@ void onServerReadDataFromOpen(
       conn.qLogger->dcid = conn.clientConnectionId;
       conn.qLogger->scid = conn.serverConnectionId;
     }
-    QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
     // We assume that the higher layer takes care of validating that the version
     // is supported.
     if (!conn.version) {
@@ -1130,7 +1129,6 @@ void onServerReadDataFromClosed(
   if (conn.qLogger) {
     conn.qLogger->addPacket(regularPacket, packetSize);
   }
-  QUIC_TRACE(packet_recvd, conn, packetNum, packetSize);
 
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {

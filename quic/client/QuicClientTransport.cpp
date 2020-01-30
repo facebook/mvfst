@@ -248,7 +248,6 @@ void QuicClientTransport::processPacketData(
       }
     }
   }
-  QUIC_TRACE(packet_recvd, *conn_, toString(pnSpace), packetNum, packetSize);
 
   // We got a packet that was not the version negotiation packet, that means
   // that the version is now bound to the new packet.
@@ -1051,7 +1050,6 @@ void QuicClientTransport::onDataAvailable(
     return;
   }
   data->append(len);
-  QUIC_TRACE(udp_recvd, *conn_, (uint64_t)len);
   if (conn_->qLogger) {
     conn_->qLogger->addDatagramReceived(len);
   }
@@ -1118,7 +1116,6 @@ void QuicClientTransport::recvMsg(
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
     readBuffer->append(bytesRead);
     networkData.packets.emplace_back(std::move(readBuffer));
-    QUIC_TRACE(udp_recvd, *conn_, bytesRead);
     if (conn_->qLogger) {
       conn_->qLogger->addDatagramReceived(bytesRead);
     }

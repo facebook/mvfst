@@ -186,9 +186,6 @@ void processAckFrame(
       updatedOustandingPacketsCount, conn.outstandingHandshakePacketsCount);
   DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingClonedPacketsCount);
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
-  if (ack.largestAckedPacket.hasValue()) {
-    QUIC_TRACE(packets_acked, conn, ack.ackedBytes);
-  }
   if (conn.congestionController &&
       (ack.largestAckedPacket.hasValue() || lossEvent)) {
     if (lossEvent) {
