@@ -69,12 +69,6 @@ class ClientHandshake : public Handshake {
   std::unique_ptr<Aead> getOneRttReadCipher();
 
   /**
-   * An edge triggered API to get the zeroRttWriteCipher. Once you receive the
-   * zero rtt write cipher subsequent calls will return null.
-   */
-  std::unique_ptr<Aead> getZeroRttWriteCipher();
-
-  /**
    * An edge triggered API to get the handshakeReadCipher. Once you
    * receive the handshake read cipher subsequent calls will return null.
    */
@@ -109,12 +103,6 @@ class ClientHandshake : public Handshake {
    * receive the header cipher subsequent calls will return null.
    */
   std::unique_ptr<PacketNumberCipher> getHandshakeWriteHeaderCipher();
-
-  /**
-   * An edge triggered API to get the zero rtt write header cpher. Once you
-   * receive the header cipher subsequent calls will return null.
-   */
-  std::unique_ptr<PacketNumberCipher> getZeroRttWriteHeaderCipher();
 
   /**
    * Returns a reference to the CryptoFactory used internaly.
@@ -165,13 +153,11 @@ class ClientHandshake : public Handshake {
   std::unique_ptr<Aead> handshakeReadCipher_;
   std::unique_ptr<Aead> oneRttReadCipher_;
   std::unique_ptr<Aead> oneRttWriteCipher_;
-  std::unique_ptr<Aead> zeroRttWriteCipher_;
 
   std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher_;
-  std::unique_ptr<PacketNumberCipher> zeroRttWriteHeaderCipher_;
 
   void computeCiphers(CipherKind kind, folly::ByteRange secret);
 
