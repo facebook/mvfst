@@ -514,18 +514,9 @@ void QuicClientTransport::processPacketData(
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (cryptoData) {
     handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
-    auto handshakeWriteCipher = handshakeLayer->getHandshakeWriteCipher();
     auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
     auto handshakeReadHeaderCipher =
         handshakeLayer->getHandshakeReadHeaderCipher();
-    auto handshakeWriteHeaderCipher =
-        handshakeLayer->getHandshakeWriteHeaderCipher();
-    if (handshakeWriteCipher) {
-      conn_->handshakeWriteCipher = std::move(handshakeWriteCipher);
-    }
-    if (handshakeWriteHeaderCipher) {
-      conn_->handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
-    }
     if (handshakeReadCipher) {
       conn_->readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
     }
