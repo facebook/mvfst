@@ -182,6 +182,7 @@ class ClientHandshake : public Handshake {
    * Various utilities for concrete implementations to use.
    */
   void raiseError(folly::exception_wrapper error);
+  void throwOnError();
   void waitForData();
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
   void computeZeroRttCipher();
