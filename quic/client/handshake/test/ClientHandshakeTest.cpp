@@ -90,6 +90,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
                                 .setCertificateVerifier(verifier)
                                 .build();
     conn.reset(new QuicClientConnectionState(handshakeFactory));
+    conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
+
     cryptoState = conn->cryptoState.get();
     handshake = conn->clientHandshakeLayer;
     std::vector<QuicVersion> supportedVersions = {getVersion()};
@@ -137,15 +139,15 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 
   void processHandshake() {
     auto oneRttWriteCipherTmp = handshake->getOneRttWriteCipher();
-    auto oneRttReadCipherTmp = handshake->getOneRttReadCipher();
+    auto oneRttReadCipherTmp = conn->readCodec->getOneRttReadCipher();
     auto zeroRttWriteCipherTmp = std::move(conn->zeroRttWriteCipher);
     auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
-    auto handshakeReadCipherTmp = handshake->getHandshakeReadCipher();
+    auto handshakeReadCipherTmp = conn->readCodec->getHandshakeReadCipher();
     if (oneRttWriteCipherTmp) {
       oneRttWriteCipher = std::move(oneRttWriteCipherTmp);
     }
     if (oneRttReadCipherTmp) {
-      oneRttReadCipher = std::move(oneRttReadCipherTmp);
+      oneRttReadCipher = oneRttReadCipherTmp;
     }
     if (zeroRttWriteCipherTmp) {
       zeroRttWriteCipher = std::move(zeroRttWriteCipherTmp);
@@ -154,7 +156,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
       handshakeWriteCipher = std::move(handshakeWriteCipherTmp);
     }
     if (handshakeReadCipherTmp) {
-      handshakeReadCipher = std::move(handshakeReadCipherTmp);
+      handshakeReadCipher = handshakeReadCipherTmp;
     }
     auto rejected = handshake->getZeroRttRejected();
     if (rejected) {
@@ -169,10 +171,10 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 
   void expectOneRttCipher(bool expected, bool oneRttOnly = false) {
     if (expected) {
-      EXPECT_NE(oneRttReadCipher.get(), nullptr);
+      EXPECT_NE(oneRttReadCipher, nullptr);
       EXPECT_NE(oneRttWriteCipher.get(), nullptr);
     } else {
-      EXPECT_EQ(oneRttReadCipher.get(), nullptr);
+      EXPECT_EQ(oneRttReadCipher, nullptr);
       EXPECT_EQ(oneRttWriteCipher.get(), nullptr);
     }
     if (!oneRttOnly) {
@@ -262,9 +264,9 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   std::unique_ptr<DelayedHolder, folly::DelayedDestruction::Destructor> dg;
 
   std::unique_ptr<Aead> handshakeWriteCipher;
-  std::unique_ptr<Aead> handshakeReadCipher;
+  const Aead* handshakeReadCipher = nullptr;
   std::unique_ptr<Aead> oneRttWriteCipher;
-  std::unique_ptr<Aead> oneRttReadCipher;
+  const Aead* oneRttReadCipher = nullptr;
   std::unique_ptr<Aead> zeroRttWriteCipher;
 
   folly::Optional<bool> zeroRttRejected;

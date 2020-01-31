@@ -515,19 +515,7 @@ void QuicClientTransport::processPacketData(
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (cryptoData) {
     handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
-    auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-    auto handshakeReadHeaderCipher =
-        handshakeLayer->getHandshakeReadHeaderCipher();
-    if (handshakeReadCipher) {
-      conn_->readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
-    }
-    if (handshakeReadHeaderCipher) {
-      conn_->readCodec->setHandshakeHeaderCipher(
-          std::move(handshakeReadHeaderCipher));
-    }
     auto oneRttWriteCipher = handshakeLayer->getOneRttWriteCipher();
-    auto oneRttReadCipher = handshakeLayer->getOneRttReadCipher();
-    auto oneRttReadHeaderCipher = handshakeLayer->getOneRttReadHeaderCipher();
     auto oneRttWriteHeaderCipher = handshakeLayer->getOneRttWriteHeaderCipher();
     bool oneRttKeyDerivationTriggered = false;
     if (oneRttWriteCipher) {
@@ -537,13 +525,6 @@ void QuicClientTransport::processPacketData(
     }
     if (oneRttWriteHeaderCipher) {
       conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher);
-    }
-    if (oneRttReadCipher) {
-      conn_->readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
-    }
-    if (oneRttReadHeaderCipher) {
-      conn_->readCodec->setOneRttHeaderCipher(
-          std::move(oneRttReadHeaderCipher));
     }
     bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
     if (zeroRttRejected) {

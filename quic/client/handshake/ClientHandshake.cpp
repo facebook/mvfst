@@ -70,32 +70,10 @@ std::unique_ptr<Aead> ClientHandshake::getOneRttWriteCipher() {
   return std::move(oneRttWriteCipher_);
 }
 
-std::unique_ptr<Aead> ClientHandshake::getOneRttReadCipher() {
-  throwOnError();
-  return std::move(oneRttReadCipher_);
-}
-
-std::unique_ptr<Aead> ClientHandshake::getHandshakeReadCipher() {
-  throwOnError();
-  return std::move(handshakeReadCipher_);
-}
-
-std::unique_ptr<PacketNumberCipher>
-ClientHandshake::getOneRttReadHeaderCipher() {
-  throwOnError();
-  return std::move(oneRttReadHeaderCipher_);
-}
-
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getOneRttWriteHeaderCipher() {
   throwOnError();
   return std::move(oneRttWriteHeaderCipher_);
-}
-
-std::unique_ptr<PacketNumberCipher>
-ClientHandshake::getHandshakeReadHeaderCipher() {
-  throwOnError();
-  return std::move(handshakeReadHeaderCipher_);
 }
 
 /**
@@ -131,16 +109,17 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->handshakeWriteHeaderCipher = std::move(packetNumberCipher);
       break;
     case CipherKind::HandshakeRead:
-      handshakeReadCipher_ = std::move(aead);
-      handshakeReadHeaderCipher_ = std::move(packetNumberCipher);
+      conn_->readCodec->setHandshakeReadCipher(std::move(aead));
+      conn_->readCodec->setHandshakeHeaderCipher(std::move(packetNumberCipher));
       break;
     case CipherKind::OneRttWrite:
       oneRttWriteCipher_ = std::move(aead);
       oneRttWriteHeaderCipher_ = std::move(packetNumberCipher);
       break;
     case CipherKind::OneRttRead:
-      oneRttReadCipher_ = std::move(aead);
-      oneRttReadHeaderCipher_ = std::move(packetNumberCipher);
+      conn_->readCodec->setOneRttReadCipher(std::move(aead));
+      conn_->readCodec->setOneRttHeaderCipher(
+          std::move(packetNumberCipher));
       break;
     case CipherKind::ZeroRttWrite:
       conn_->zeroRttWriteCipher = std::move(aead);

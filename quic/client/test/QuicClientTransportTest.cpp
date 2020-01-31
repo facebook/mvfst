@@ -1138,11 +1138,11 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   }
 
   void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher) {
-    oneRttReadCipher_ = std::move(oneRttReadCipher);
+    conn_->readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
   }
 
   void setHandshakeReadCipher(std::unique_ptr<Aead> handshakeReadCipher) {
-    handshakeReadCipher_ = std::move(handshakeReadCipher);
+    conn_->readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
   }
 
   void setHandshakeWriteCipher(std::unique_ptr<Aead> handshakeWriteCipher) {
@@ -1160,7 +1160,8 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
   void setHandshakeReadHeaderCipher(
       std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher) {
-    handshakeReadHeaderCipher_ = std::move(handshakeReadHeaderCipher);
+    conn_->readCodec->setHandshakeHeaderCipher(
+        std::move(handshakeReadHeaderCipher));
   }
 
   void setHandshakeWriteHeaderCipher(
@@ -1175,7 +1176,8 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
   void setOneRttReadHeaderCipher(
       std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher) {
-    oneRttReadHeaderCipher_ = std::move(oneRttReadHeaderCipher);
+    conn_->readCodec->setOneRttHeaderCipher(
+          std::move(oneRttReadHeaderCipher));
   }
 
   void setZeroRttRejected() {
