@@ -243,5 +243,6 @@ cmake -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
  -DBUILD_TESTS=On                                 \
   ../..
 make -j "$nproc"
-echo -e "${COLOR_GREEN}MVFST build is complete. To run unit test: \
+make install
+echo -e "${COLOR_GREEN}MVFST build is complete and MVFST is installed. To run unit test: \
   cd _build/build && make test ${COLOR_OFF}"
