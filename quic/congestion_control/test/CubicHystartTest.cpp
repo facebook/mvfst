@@ -64,7 +64,7 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
   conn.lossState.srtt = 2us;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
-  auto packet = makeTestingWritePacket(0, 1000, 1000);
+  auto packet = makeTestingWritePacket(0, 1000, 1000, realNow);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
       makeAck(0, 1000, realNow + 2us, packet.time), folly::none);
