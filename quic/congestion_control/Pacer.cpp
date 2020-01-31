@@ -8,7 +8,6 @@
 
 #include <quic/congestion_control/Pacer.h>
 
-#include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QuicLogger.h>
 
@@ -22,9 +21,7 @@ DefaultPacer::DefaultPacer(
       batchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
       pacingRateCalculator_(calculatePacingRate),
       cachedBatchSize_(conn.transportSettings.writeConnectionDataPacketsLimit),
-      tokens_(conn.transportSettings.writeConnectionDataPacketsLimit),
-      nextWriteTime_(Clock::now()),
-      lastWriteTime_(Clock::now()) {}
+      tokens_(conn.transportSettings.writeConnectionDataPacketsLimit) {}
 
 // TODO: we choose to keep refershing pacing rate even when we are app-limited,
 // so that when we exit app-limited, we have an updated pacing rate. But I don't
@@ -32,17 +29,15 @@ DefaultPacer::DefaultPacer(
 void DefaultPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt) {
-  auto currentTime = Clock::now();
   if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
     writeInterval_ = 0us;
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
   } else {
-    const auto pacingRate =
+    const PacingRate pacingRate =
         pacingRateCalculator_(conn_, cwndBytes, minCwndInMss_, rtt);
     writeInterval_ = pacingRate.interval;
     batchSize_ = pacingRate.burstSize;
-    lastPacingRateUpdate_ = currentTime;
-    bytesSentSincePacingRateUpdate_ = 0;
+    tokens_ += batchSize_;
   }
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
@@ -50,40 +45,16 @@ void DefaultPacer::refreshPacingRate(
   QUIC_TRACE(
       pacing_update, conn_, writeInterval_.count(), (uint64_t)batchSize_);
   cachedBatchSize_ = batchSize_;
-  tokens_ = batchSize_;
-  nextWriteTime_ = currentTime;
-  if (firstUpdate_) {
-    firstUpdate_ = false;
-    lastWriteTime_ = currentTime;
-  }
 }
 
-void DefaultPacer::onPacketSent(uint64_t bytesSent) {
+void DefaultPacer::onPacedWriteScheduled(TimePoint currentTime) {
+  scheduledWriteTime_ = currentTime;
+}
+
+void DefaultPacer::onPacketSent() {
   if (tokens_) {
     --tokens_;
   }
-  bytesSentSincePacingRateUpdate_ += bytesSent;
-  if (writeInterval_ != 0us && cachedBatchSize_ && !appLimited_ &&
-      lastPacingRateUpdate_) {
-    Bandwidth expectedBandwidth(
-        cachedBatchSize_ * conn_.udpSendPacketLen, writeInterval_);
-    if (expectedBandwidth) {
-      Bandwidth actualPacingBandwidth(
-          bytesSentSincePacingRateUpdate_,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              Clock::now() - *lastPacingRateUpdate_));
-      pacingLimited_ = actualPacingBandwidth < expectedBandwidth;
-    }
-  } else {
-    pacingLimited_ = false;
-  }
-  if (!pacingLimited_) {
-    lastWriteTime_ = Clock::now();
-  }
-}
-
-bool DefaultPacer::isPacingLimited() const noexcept {
-  return pacingLimited_;
 }
 
 void DefaultPacer::onPacketsLoss() {
@@ -91,30 +62,34 @@ void DefaultPacer::onPacketsLoss() {
 }
 
 std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
-  return (writeInterval_ == 0us || appLimited_ || tokens_ ||
-          Clock::now() + conn_.transportSettings.pacingTimerTickInterval >=
-              nextWriteTime_)
-      ? 0us
-      : timeMax(
-            conn_.transportSettings.pacingTimerTickInterval,
-            timeMin(
-                writeInterval_,
-                std::chrono::duration_cast<std::chrono::microseconds>(
-                    nextWriteTime_ - Clock::now())));
+  return (appLimited_ || tokens_) ? 0us : writeInterval_;
 }
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
-    lastWriteTime_ = nextWriteTime_;
-    nextWriteTime_ += writeInterval_;
+    scheduledWriteTime_.clear();
   };
-  if (appLimited_ || writeInterval_ == 0us) {
-    return conn_.transportSettings.writeConnectionDataPacketsLimit;
+  if (appLimited_) {
+    cachedBatchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
+    return cachedBatchSize_;
+  }
+  if (writeInterval_ == 0us) {
+    return batchSize_;
+  }
+  if (!scheduledWriteTime_ || *scheduledWriteTime_ >= currentTime) {
+    return tokens_;
   }
   auto adjustedInterval = std::chrono::duration_cast<std::chrono::microseconds>(
-      timeMax(currentTime - lastWriteTime_, writeInterval_));
-  return std::ceil(
+      currentTime - *scheduledWriteTime_ + writeInterval_);
+  cachedBatchSize_ = std::ceil(
       adjustedInterval.count() * batchSize_ * 1.0 / writeInterval_.count());
+  if (cachedBatchSize_ < batchSize_) {
+    LOG(ERROR)
+        << "Quic pacer batch size calculation: cachedBatchSize < batchSize";
+  }
+  tokens_ +=
+      (cachedBatchSize_ > batchSize_ ? cachedBatchSize_ - batchSize_ : 0);
+  return tokens_;
 }
 
 uint64_t DefaultPacer::getCachedWriteBatchSize() const {

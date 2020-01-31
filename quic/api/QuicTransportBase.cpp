@@ -49,6 +49,7 @@ QuicTransportBase::QuicTransportBase(
           LooperType::WriteLooper)) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
+      conn_->pacer->onPacedWriteScheduled(Clock::now());
       return conn_->pacer->getTimeUntilNextWrite();
     }
     return 0us;

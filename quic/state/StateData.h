@@ -180,6 +180,14 @@ struct Pacer {
       std::chrono::microseconds rtt) = 0;
 
   /**
+   * Notify the Pacer that a paced write is scheduled.
+   *
+   * currentTime: the time that the timer is scheduled. NOT the time that a
+   *              write is scheduled to happen.
+   */
+  virtual void onPacedWriteScheduled(TimePoint currentTime) = 0;
+
+  /**
    * API for Trnasport to query the interval before next write
    */
   virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;
@@ -200,7 +208,7 @@ struct Pacer {
   virtual uint64_t getCachedWriteBatchSize() const = 0;
 
   virtual void setAppLimited(bool limited) = 0;
-  virtual void onPacketSent(uint64_t sentBytes) = 0;
+  virtual void onPacketSent() = 0;
   virtual void onPacketsLoss() = 0;
 };
 
@@ -208,7 +216,6 @@ struct PacingRate {
   std::chrono::microseconds interval{0us};
   uint64_t burstSize{0};
 
-  PacingRate() = default;
   struct Builder {
     Builder&& setInterval(std::chrono::microseconds interval) &&;
     Builder&& setBurstSize(uint64_t burstSize) &&;
