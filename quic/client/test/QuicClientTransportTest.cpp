@@ -1191,6 +1191,10 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
   void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
+    if (!conn_->oneRttWriteCipher) {
+      conn_->oneRttWriteCipher = std::move(oneRttWriteCipher_);
+      conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher_);
+    }
     if (getPhase() == Phase::Initial) {
       writeDataToQuicStream(
           conn_->cryptoState->handshakeStream,
@@ -1227,6 +1231,9 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
   uint64_t maxInitialStreamsUni{std::numeric_limits<uint32_t>::max()};
   folly::Optional<ServerTransportParameters> params_;
+
+  std::unique_ptr<Aead> oneRttWriteCipher_;
+  std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
 
   FizzCryptoFactory cryptoFactory_;
   const CryptoFactory& getCryptoFactory() const override {

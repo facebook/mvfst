@@ -514,17 +514,12 @@ void QuicClientTransport::processPacketData(
       *getCryptoStream(*conn_->cryptoState, encryptionLevel));
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (cryptoData) {
+    bool hadOneRttKey = conn_->oneRttWriteCipher != nullptr;
     handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
-    auto oneRttWriteCipher = handshakeLayer->getOneRttWriteCipher();
-    auto oneRttWriteHeaderCipher = handshakeLayer->getOneRttWriteHeaderCipher();
     bool oneRttKeyDerivationTriggered = false;
-    if (oneRttWriteCipher) {
-      conn_->oneRttWriteCipher = std::move(oneRttWriteCipher);
+    if (!hadOneRttKey && conn_->oneRttWriteCipher) {
       oneRttKeyDerivationTriggered = true;
       updatePacingOnKeyEstablished(*conn_);
-    }
-    if (oneRttWriteHeaderCipher) {
-      conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher);
     }
     bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
     if (zeroRttRejected) {

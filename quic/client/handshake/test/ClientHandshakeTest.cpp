@@ -143,7 +143,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   }
 
   void processHandshake() {
-    auto oneRttWriteCipherTmp = handshake->getOneRttWriteCipher();
+    auto oneRttWriteCipherTmp = std::move(conn->oneRttWriteCipher);
     auto oneRttReadCipherTmp = conn->readCodec->getOneRttReadCipher();
     auto zeroRttWriteCipherTmp = std::move(conn->zeroRttWriteCipher);
     auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
