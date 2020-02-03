@@ -5,8 +5,6 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
 
-using namespace ::testing;
-
 namespace quic {
 
 namespace {

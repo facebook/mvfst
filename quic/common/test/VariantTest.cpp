@@ -9,9 +9,6 @@
 #include <quic/common/Variant.h>
 #include <gtest/gtest.h>
 
-using namespace std;
-using namespace quic;
-
 bool& destructor_called() {
   static bool destructor_called = false;
   return destructor_called;

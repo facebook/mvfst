@@ -18,7 +18,6 @@
 #include <quic/common/test/TestUtils.h>
 
 using namespace testing;
-using namespace folly;
 
 namespace quic {
 namespace test {
@@ -36,8 +35,6 @@ std::pair<uint8_t, Buf> encodeShortHeader(const ShortHeader& header) {
 }
 
 class TypesTest : public Test {};
-
-using FrameUnderlyingType = std::underlying_type<FrameType>::type;
 
 TEST_F(TypesTest, ReadHeaderForm) {
   EXPECT_EQ(HeaderForm::Short, getHeaderForm(0));

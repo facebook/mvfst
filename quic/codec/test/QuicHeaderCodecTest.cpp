@@ -15,7 +15,6 @@
 #include <quic/common/test/TestUtils.h>
 
 using namespace testing;
-using namespace folly;
 
 namespace quic {
 namespace test {
