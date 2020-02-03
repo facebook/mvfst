@@ -62,7 +62,9 @@ DEFINE_string(
     "none/time/rtt/ack: Pacing observer bucket type: per 3ms, per rtt or per ack");
 DEFINE_uint32(
     max_receive_packet_size,
-    quic::kDefaultUDPSendPacketLen,
+    std::max(
+        quic::kDefaultV4UDPSendPacketLen,
+        quic::kDefaultV6UDPSendPacketLen),
     "Maximum packet size to advertise to the peer.");
 
 namespace quic {
