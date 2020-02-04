@@ -127,7 +127,7 @@ bool DefaultAppTokenValidator::validate(
       !ticketMaxStreamsUni ||
       conn_->transportSettings.advertisedInitialMaxStreamsUni <
           *ticketMaxStreamsUni) {
-    VLOG(10) << "Decreased max stream data";
+    VLOG(10) << "Decreased max streams";
     return false;
   }
 

@@ -89,6 +89,8 @@ class ServerHandshakeTest : public Test {
     uint64_t initialMaxStreamDataBidiLocal = kDefaultStreamWindowSize;
     uint64_t initialMaxStreamDataBidiRemote = kDefaultStreamWindowSize;
     uint64_t initialMaxStreamDataUni = kDefaultStreamWindowSize;
+    uint64_t initialMaxStreamsBidi = kDefaultMaxStreamsBidirectional;
+    uint64_t initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional;
     auto clientExtensions =
         std::make_shared<ClientTransportParametersExtension>(
             folly::none,
@@ -96,6 +98,8 @@ class ServerHandshakeTest : public Test {
             initialMaxStreamDataBidiLocal,
             initialMaxStreamDataBidiRemote,
             initialMaxStreamDataUni,
+            initialMaxStreamsBidi,
+            initialMaxStreamsUni,
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
@@ -112,8 +116,8 @@ class ServerHandshakeTest : public Test {
         initialMaxStreamDataBidiLocal,
         initialMaxStreamDataBidiRemote,
         initialMaxStreamDataUni,
-        std::numeric_limits<uint32_t>::max(),
-        std::numeric_limits<uint32_t>::max(),
+        initialMaxStreamsBidi,
+        initialMaxStreamsUni,
         kDefaultIdleTimeout,
         kDefaultAckDelayExponent,
         kDefaultUDPSendPacketLen,

@@ -186,8 +186,8 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
         kDefaultStreamWindowSize,
         kDefaultStreamWindowSize,
         kDefaultStreamWindowSize,
-        std::numeric_limits<uint32_t>::max(),
-        std::numeric_limits<uint32_t>::max());
+        kDefaultMaxStreamsBidirectional,
+        kDefaultMaxStreamsUnidirectional);
     appToken.version = version;
     resState.appToken = encodeAppToken(appToken);
     return resState;
@@ -251,9 +251,9 @@ QuicCachedPsk setupZeroRttOnClientCtx(
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
       kDefaultStreamWindowSize;
   quicCachedPsk.transportParams.initialMaxStreamsBidi =
-      std::numeric_limits<uint32_t>::max();
+      kDefaultMaxStreamsBidirectional;
   quicCachedPsk.transportParams.initialMaxStreamsUni =
-      std::numeric_limits<uint32_t>::max();
+      kDefaultMaxStreamsUnidirectional;
   return quicCachedPsk;
 }
 

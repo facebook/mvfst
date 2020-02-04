@@ -19,6 +19,8 @@ struct ClientTransportParametersExtension {
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
       uint64_t initialMaxStreamDataUni,
+      uint64_t initialMaxStreamsBidi,
+      uint64_t initialMaxStreamsUni,
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
@@ -30,6 +32,8 @@ struct ClientTransportParametersExtension {
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
         initialMaxStreamDataBidiRemote_(initialMaxStreamDataBidiRemote),
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
+        initialMaxStreamsBidi_(initialMaxStreamsBidi),
+        initialMaxStreamsUni_(initialMaxStreamsUni),
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
@@ -45,6 +49,8 @@ struct ClientTransportParametersExtension {
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;
   uint64_t initialMaxStreamDataUni_;
+  uint64_t initialMaxStreamsBidi_;
+  uint64_t initialMaxStreamsUni_;
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;

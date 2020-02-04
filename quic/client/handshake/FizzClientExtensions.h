@@ -41,10 +41,10 @@ class FizzClientExtensions : public fizz::ClientExtensions {
         clientParameters_->initialMaxData_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_streams_bidi,
-        std::numeric_limits<uint32_t>::max()));
+        clientParameters_->initialMaxStreamsBidi_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_streams_uni,
-        std::numeric_limits<uint32_t>::max()));
+        clientParameters_->initialMaxStreamsUni_));
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::idle_timeout,
         clientParameters_->idleTimeout_.count()));

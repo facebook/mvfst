@@ -882,6 +882,8 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
       conn_->transportSettings.advertisedInitialUniStreamWindowSize,
+      conn_->transportSettings.advertisedInitialMaxStreamsBidi,
+      conn_->transportSettings.advertisedInitialMaxStreamsUni,
       conn_->transportSettings.idleTimeout,
       conn_->transportSettings.ackDelayExponent,
       conn_->transportSettings.maxRecvPacketSize,

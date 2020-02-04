@@ -393,8 +393,8 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
         conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
         conn_->transportSettings.advertisedInitialUniStreamWindowSize,
-        std::numeric_limits<uint32_t>::max(),
-        std::numeric_limits<uint32_t>::max());
+        conn_->transportSettings.advertisedInitialMaxStreamsBidi,
+        conn_->transportSettings.advertisedInitialMaxStreamsUni);
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
     appToken.version = conn_->version;
     // If a client connects to server for the first time and doesn't attempt
