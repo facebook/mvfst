@@ -9,6 +9,11 @@
 # This is a helpful script to build MVFST in the supplied dir
 # It pulls in dependencies such as folly and fizz in the _build/deps dir.
 
+# Obtain the mvfst repository root folder. Taken from:
+#   https://stackoverflow.com/questions/59895/how-to-get-the-source-directory-of-a-bash-script-from-within-the-script-itself
+# This is done at very start as it won't work if run after switching folders.
+MVFST_ROOT_FOLDER="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 # Useful constants
 COLOR_RED="\033[0;31m"
 COLOR_GREEN="\033[0;32m"
@@ -60,9 +65,8 @@ if [[ -n "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
     fi
 fi
 
-### configure necessary build and install directories
+### Configure necessary build and install directories
 
-START_DIR=$(pwd)
 cd $BUILD_DIR || exit
 BWD=$(pwd)
 DEPS_DIR=$BWD/deps
@@ -170,6 +174,18 @@ function setup_fmt() {
   cd "$BWD" || exit
 }
 
+function synch_dependency_to_commit() {
+  # Utility function to synch a dependency to a specific commit. Takes two arguments:
+  #   - $1: folder of the dependency's git repository
+  #   - $2: path to the text file containing the desired commit hash
+  DEP_REV=$(sed 's/Subproject commit //' $2)
+  pushd $1
+  git fetch
+  # Disable git warning about detached head when checking out a specific commit.
+  git -c advice.detachedHead=false checkout $DEP_REV
+  popd
+}
+
 function setup_folly() {
   FOLLY_DIR=$DEPS_DIR/folly
   FOLLY_BUILD_DIR=$DEPS_DIR/folly/build/
@@ -177,10 +193,6 @@ function setup_folly() {
   if [ ! -d "$FOLLY_DIR" ] ; then
     echo -e "${COLOR_GREEN}[ INFO ] Cloning folly repo ${COLOR_OFF}"
     git clone https://github.com/facebook/folly.git "$FOLLY_DIR"
-    cd "$FOLLY_DIR"
-    git fetch
-    FOLLY_REV=$(sed 's/Subproject commit //' "$START_DIR"/build/deps/github_hashes/facebook/folly-rev.txt)
-    git checkout "$FOLLY_REV"
     if [[ -z "${MVFST_SKIP_SYSTEM_DEPENDENCIES-}" ]]; then
       echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
       if [ "$Platform" = "Linux" ]; then
@@ -195,6 +207,8 @@ function setup_folly() {
       echo -e "${COLOR_GREEN}[ INFO ] Skipping installing dependencies ${COLOR_OFF}"
     fi
   fi
+
+  synch_dependency_to_commit $FOLLY_DIR $MVFST_ROOT_FOLDER/build/deps/github_hashes/facebook/folly-rev.txt
 
   if [ "$Platform" = "Mac" ]; then
     # Homebrew installs OpenSSL in a non-default location on MacOS >= Mojave
@@ -237,10 +251,9 @@ function setup_fizz() {
     echo -e "${COLOR_GREEN}[ INFO ] Cloning fizz repo ${COLOR_OFF}"
     git clone https://github.com/facebookincubator/fizz "$FIZZ_DIR"
   fi
-  cd "$FIZZ_DIR"
-  git fetch
-  FIZZ_REV=$(sed 's/Subproject commit //' "$START_DIR"/build/deps/github_hashes/facebookincubator/fizz-rev.txt)
-  git checkout "$FIZZ_REV"
+
+  synch_dependency_to_commit $FIZZ_DIR $MVFST_ROOT_FOLDER/build/deps/github_hashes/facebookincubator/fizz-rev.txt
+
   echo -e "${COLOR_GREEN}Building Fizz ${COLOR_OFF}"
   mkdir -p "$FIZZ_BUILD_DIR"
   cd "$FIZZ_BUILD_DIR" || exit
