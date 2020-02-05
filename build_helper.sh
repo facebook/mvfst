@@ -62,6 +62,7 @@ fi
 
 ### configure necessary build and install directories
 
+START_DIR=$(pwd)
 cd $BUILD_DIR || exit
 BWD=$(pwd)
 DEPS_DIR=$BWD/deps
@@ -176,12 +177,16 @@ function setup_folly() {
   if [ ! -d "$FOLLY_DIR" ] ; then
     echo -e "${COLOR_GREEN}[ INFO ] Cloning folly repo ${COLOR_OFF}"
     git clone https://github.com/facebook/folly.git "$FOLLY_DIR"
+    cd "$FOLLY_DIR"
+    git fetch
+    FOLLY_REV=$(sed 's/Subproject commit //' "$START_DIR"/build/deps/github_hashes/facebook/folly-rev.txt)
+    git checkout "$FOLLY_REV"
     if [[ -z "${MVFST_SKIP_SYSTEM_DEPENDENCIES-}" ]]; then
       echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
       if [ "$Platform" = "Linux" ]; then
         install_dependencies_linux
       elif [ "$Platform" = "Mac" ]; then
-          install_dependencies_mac
+        install_dependencies_mac
       else
         echo -e "${COLOR_RED}[ ERROR ] Unknown platform: $Platform ${COLOR_OFF}"
         exit 1
@@ -231,8 +236,11 @@ function setup_fizz() {
   if [ ! -d "$FIZZ_DIR" ] ; then
     echo -e "${COLOR_GREEN}[ INFO ] Cloning fizz repo ${COLOR_OFF}"
     git clone https://github.com/facebookincubator/fizz "$FIZZ_DIR"
-    echo -e "${COLOR_GREEN}[ INFO ] install dependencies ${COLOR_OFF}"
   fi
+  cd "$FIZZ_DIR"
+  git fetch
+  FIZZ_REV=$(sed 's/Subproject commit //' "$START_DIR"/build/deps/github_hashes/facebookincubator/fizz-rev.txt)
+  git checkout "$FIZZ_REV"
   echo -e "${COLOR_GREEN}Building Fizz ${COLOR_OFF}"
   mkdir -p "$FIZZ_BUILD_DIR"
   cd "$FIZZ_BUILD_DIR" || exit
