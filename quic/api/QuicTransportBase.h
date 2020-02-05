@@ -8,9 +8,6 @@
 
 #pragma once
 
-#include <folly/ExceptionWrapper.h>
-#include <folly/io/async/AsyncUDPSocket.h>
-#include <folly/io/async/HHWheelTimer.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicSocket.h>
@@ -21,6 +18,10 @@
 #include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/state/StateData.h>
+
+#include <folly/ExceptionWrapper.h>
+#include <folly/io/async/AsyncUDPSocket.h>
+#include <folly/io/async/HHWheelTimer.h>
 
 namespace quic {
 
@@ -561,7 +562,9 @@ class QuicTransportBase : public QuicSocket {
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionCallback* connCallback_{nullptr};
 
-  std::unique_ptr<QuicConnectionStateBase> conn_;
+  std::
+      unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>
+          conn_;
 
   struct ReadCallbackData {
     ReadCallback* readCb;

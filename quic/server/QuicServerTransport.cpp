@@ -24,7 +24,7 @@ QuicServerTransport::QuicServerTransport(
   auto tempConn = std::make_unique<QuicServerConnectionState>();
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
-  conn_ = std::move(tempConn);
+  conn_.reset(tempConn.release());
   // TODO: generate this when we can encode the packet sequence number
   // correctly.
   // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();

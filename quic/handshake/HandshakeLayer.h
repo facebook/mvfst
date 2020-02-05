@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <folly/io/async/DelayedDestruction.h>
-
 #include <quic/QuicConstants.h>
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/codec/Types.h>
@@ -20,13 +18,12 @@ constexpr folly::StringPiece kQuicKeyLabel = "quic key";
 constexpr folly::StringPiece kQuicIVLabel = "quic iv";
 constexpr folly::StringPiece kQuicPNLabel = "quic hp";
 
-class Handshake : public folly::DelayedDestruction {
+class Handshake {
  public:
+  virtual ~Handshake() = default;
+
   virtual const folly::Optional<std::string>& getApplicationProtocol()
       const = 0;
-
- protected:
-  virtual ~Handshake() = default;
 };
 
 constexpr folly::StringPiece kQuicDraft17Salt =

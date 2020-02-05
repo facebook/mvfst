@@ -48,10 +48,8 @@ class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
   GMOCK_METHOD0_(, noexcept, , onCryptoEventAvailable, void());
 };
 
-class TestingServerHandshake : public ServerHandshake {
- public:
-  explicit TestingServerHandshake(QuicCryptoState& cryptoState)
-      : ServerHandshake(cryptoState) {}
+struct TestingServerConnectionState : public QuicServerConnectionState {
+  explicit TestingServerConnectionState() : QuicServerConnectionState() {}
 
   uint32_t getDestructorGuardCount() const {
     return folly::DelayedDestruction::getDestructorGuardCount();
@@ -74,14 +72,15 @@ class ServerHandshakeTest : public Test {
 
   void SetUp() override {
     folly::ssl::init();
-    cryptoState = std::make_unique<QuicCryptoState>();
+    conn.reset(new TestingServerConnectionState());
+    cryptoState = conn->cryptoState.get();
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setOmitEarlyRecordLayer(true);
     clientCtx->setFactory(std::make_shared<QuicFizzFactory>());
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = quic::test::createServerCtx();
     setupClientAndServerContext();
-    handshake.reset(new TestingServerHandshake(*cryptoState));
+    handshake = conn->serverHandshakeLayer;
     hostname = kTestHostname.str();
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
 
@@ -320,8 +319,12 @@ class ServerHandshakeTest : public Test {
   std::unique_ptr<DelayedHolder, folly::DelayedDestruction::Destructor> dg;
 
   folly::EventBase evb;
-  std::unique_ptr<TestingServerHandshake> handshake;
-  std::unique_ptr<QuicCryptoState> cryptoState;
+  std::unique_ptr<
+      TestingServerConnectionState,
+      folly::DelayedDestruction::Destructor>
+      conn{nullptr};
+  ServerHandshake* handshake;
+  QuicCryptoState* cryptoState;
 
   fizz::client::State clientState;
   std::unique_ptr<fizz::client::FizzClient<
@@ -612,7 +615,7 @@ TEST_F(ServerHandshakeHRRTest, TestAsyncCancel) {
 
   handshake->cancel();
   // Let's destroy the crypto state to make sure it is not referenced.
-  cryptoState.reset();
+  conn->cryptoState.reset();
 
   promise.setValue();
   evb.loop();
@@ -641,12 +644,12 @@ TEST_F(ServerHandshakeAsyncTest, TestAsyncCancel) {
 
   handshake->cancel();
   // Let's destroy the crypto state to make sure it is not referenced.
-  cryptoState.reset();
+  conn->cryptoState.reset();
 
   promise.setValue();
   evb.loop();
 
-  EXPECT_EQ(handshake->getDestructorGuardCount(), 0);
+  EXPECT_EQ(conn->getDestructorGuardCount(), 0);
 }
 
 class ServerHandshakeAsyncErrorTest : public ServerHandshakePskTest {
@@ -685,7 +688,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelOnAsyncError) {
       .WillRepeatedly(Invoke([&] {
         handshake->cancel();
         // Let's destroy the crypto state to make sure it is not referenced.
-        cryptoState.reset();
+        conn->cryptoState.reset();
       }));
   promise.setValue();
   evb.loop();
@@ -696,7 +699,7 @@ TEST_F(ServerHandshakeAsyncErrorTest, TestCancelWhileWaitingAsyncError) {
   clientServerRound();
   handshake->cancel();
   // Let's destroy the crypto state to make sure it is not referenced.
-  cryptoState.reset();
+  conn->cryptoState.reset();
 
   promise.setValue();
   evb.loop();

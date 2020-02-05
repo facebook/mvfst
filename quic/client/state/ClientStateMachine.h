@@ -60,7 +60,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     auto tmpClientHandshake =
         handshakeFactory->makeClientHandshake(*cryptoState);
     clientHandshakeLayer = tmpClientHandshake.get();
-    handshakeLayer.reset(tmpClientHandshake.release());
+    handshakeLayer = std::move(tmpClientHandshake);
     // We shouldn't normally need to set this until we're starting the
     // transport, however writing unit tests is much easier if we set this here.
     updateFlowControlStateWithSettings(flowControlState, transportSettings);
