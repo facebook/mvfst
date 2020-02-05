@@ -127,8 +127,7 @@ function install_dependencies_mac() {
     snappy                   \
     xz                       \
     openssl                  \
-    libsodium                \
-    fmt
+    libsodium
 
   brew link                 \
     boost                   \
@@ -139,8 +138,35 @@ function install_dependencies_mac() {
     lz4                     \
     snappy                  \
     xz                      \
-    libsodium               \
-    fmt
+    libsodium
+}
+
+function setup_fmt() {
+  FMT_DIR=$DEPS_DIR/fmt
+  FMT_BUILD_DIR=$DEPS_DIR/fmt/build/
+
+  if [ ! -d "$FMT_DIR" ] ; then
+    echo -e "${COLOR_GREEN}[ INFO ] Cloning fmt repo ${COLOR_OFF}"
+    git clone https://github.com/fmtlib/fmt.git  "$FMT_DIR"
+  fi
+  cd "$FMT_DIR"
+  git fetch
+  git checkout master
+  echo -e "${COLOR_GREEN}Building fmt ${COLOR_OFF}"
+  mkdir -p "$FMT_BUILD_DIR"
+  cd "$FMT_BUILD_DIR" || exit
+
+  cmake                                           \
+    -DCMAKE_PREFIX_PATH="$DEPS_DIR"               \
+    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR"            \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo             \
+    -DFMT_DOC=OFF                                 \
+    -DFMT_TEST=OFF                                \
+    ..
+  make -j "$nproc"
+  make install
+  echo -e "${COLOR_GREEN}fmt is installed ${COLOR_OFF}"
+  cd "$BWD" || exit
 }
 
 function setup_folly() {
@@ -232,6 +258,7 @@ function detect_platform() {
 }
 
 detect_platform
+setup_fmt
 setup_folly
 setup_fizz
 
