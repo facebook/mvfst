@@ -178,11 +178,11 @@ function synch_dependency_to_commit() {
   # Utility function to synch a dependency to a specific commit. Takes two arguments:
   #   - $1: folder of the dependency's git repository
   #   - $2: path to the text file containing the desired commit hash
-  DEP_REV=$(sed 's/Subproject commit //' $2)
-  pushd $1
+  DEP_REV=$(sed 's/Subproject commit //' "$2")
+  pushd "$1"
   git fetch
   # Disable git warning about detached head when checking out a specific commit.
-  git -c advice.detachedHead=false checkout $DEP_REV
+  git -c advice.detachedHead=false checkout "$DEP_REV"
   popd
 }
 
@@ -208,7 +208,7 @@ function setup_folly() {
     fi
   fi
 
-  synch_dependency_to_commit $FOLLY_DIR $MVFST_ROOT_DIR/build/deps/github_hashes/facebook/folly-rev.txt
+  synch_dependency_to_commit "$FOLLY_DIR" "$MVFST_ROOT_DIR/build/deps/github_hashes/facebook/folly-rev.txt"
 
   if [ "$Platform" = "Mac" ]; then
     # Homebrew installs OpenSSL in a non-default location on MacOS >= Mojave
@@ -252,7 +252,7 @@ function setup_fizz() {
     git clone https://github.com/facebookincubator/fizz "$FIZZ_DIR"
   fi
 
-  synch_dependency_to_commit $FIZZ_DIR $MVFST_ROOT_DIR/build/deps/github_hashes/facebookincubator/fizz-rev.txt
+  synch_dependency_to_commit "$FIZZ_DIR" "$MVFST_ROOT_DIR/build/deps/github_hashes/facebookincubator/fizz-rev.txt"
 
   echo -e "${COLOR_GREEN}Building Fizz ${COLOR_OFF}"
   mkdir -p "$FIZZ_BUILD_DIR"
