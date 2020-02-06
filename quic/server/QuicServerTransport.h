@@ -107,12 +107,6 @@ class QuicServerTransport
   }
 
   virtual void accept();
-  void setShedConnection() {
-    shedConnection_ = true;
-  }
-  bool shouldShedConnection() {
-    return shedConnection_;
-  }
 
  protected:
   // From ServerHandshake::HandshakeCallback
@@ -131,7 +125,6 @@ class QuicServerTransport
   bool notifiedRouting_{false};
   bool notifiedConnIdBound_{false};
   bool newSessionTicketWritten_{false};
-  bool shedConnection_{false};
   bool connectionIdsIssued_{false};
   QuicServerConnectionState* serverConn_;
 };

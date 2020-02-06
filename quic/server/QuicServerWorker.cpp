@@ -384,44 +384,50 @@ void QuicServerWorker::dispatchPacketData(
         auto sock = makeSocket(getEventBase());
         auto trans = transportFactory_->make(
             getEventBase(), std::move(sock), client, ctx_);
-        trans->setPacingTimer(pacingTimer_);
-        trans->setRoutingCallback(this);
-        trans->setSupportedVersions(supportedVersions_);
-        trans->setOriginalPeerAddress(client);
-        trans->setCongestionControllerFactory(ccFactory_);
-        if (transportSettingsOverrideFn_) {
-          folly::Optional<TransportSettings> overridenTransportSettings =
-              transportSettingsOverrideFn_(
-                  transportSettings_, client.getIPAddress());
-          if (overridenTransportSettings) {
-            trans->setTransportSettings(*overridenTransportSettings);
+        if (!trans) {
+          LOG(ERROR) << "Transport factory failed to make new transport";
+          dropPacket = true;
+        } else {
+          CHECK(trans);
+          trans->setPacingTimer(pacingTimer_);
+          trans->setRoutingCallback(this);
+          trans->setSupportedVersions(supportedVersions_);
+          trans->setOriginalPeerAddress(client);
+          trans->setCongestionControllerFactory(ccFactory_);
+          if (transportSettingsOverrideFn_) {
+            folly::Optional<TransportSettings> overridenTransportSettings =
+                transportSettingsOverrideFn_(
+                    transportSettings_, client.getIPAddress());
+            if (overridenTransportSettings) {
+              trans->setTransportSettings(*overridenTransportSettings);
+            } else {
+              trans->setTransportSettings(transportSettings_);
+            }
           } else {
             trans->setTransportSettings(transportSettings_);
           }
-        } else {
-          trans->setTransportSettings(transportSettings_);
+          trans->setConnectionIdAlgo(connIdAlgo_.get());
+          if (routingData.sourceConnId) {
+            trans->setClientConnectionId(*routingData.sourceConnId);
+          }
+          trans->setClientChosenDestConnectionId(routingData.destinationConnId);
+          // parameters to create server chosen connection id
+          ServerConnectionIdParams serverConnIdParams(
+              hostId_, static_cast<uint8_t>(processId_), workerId_);
+          trans->setServerConnectionIdParams(std::move(serverConnIdParams));
+          if (infoCallback_) {
+            trans->setTransportInfoCallback(infoCallback_.get());
+          }
+          trans->accept();
+          auto result = sourceAddressMap_.emplace(std::make_pair(
+              std::make_pair(client, routingData.destinationConnId), trans));
+          if (!result.second) {
+            LOG(ERROR) << "Routing entry already exists for client=" << client
+                       << ", dest CID=" << routingData.destinationConnId.hex();
+            dropPacket = true;
+          }
+          transport = trans;
         }
-        trans->setConnectionIdAlgo(connIdAlgo_.get());
-        if (routingData.sourceConnId) {
-          trans->setClientConnectionId(*routingData.sourceConnId);
-        }
-        trans->setClientChosenDestConnectionId(routingData.destinationConnId);
-        // parameters to create server chosen connection id
-        ServerConnectionIdParams serverConnIdParams(
-            hostId_, static_cast<uint8_t>(processId_), workerId_);
-        trans->setServerConnectionIdParams(std::move(serverConnIdParams));
-        if (infoCallback_) {
-          trans->setTransportInfoCallback(infoCallback_.get());
-        }
-        trans->accept();
-        auto result = sourceAddressMap_.emplace(std::make_pair(
-            std::make_pair(client, routingData.destinationConnId), trans));
-        if (!result.second) {
-          LOG(ERROR) << "Routing entry already exists for client=" << client
-                     << ", dest CID=" << routingData.destinationConnId.hex();
-          dropPacket = true;
-        }
-        transport = trans;
       }
     } else {
       transport = sit->second;
@@ -674,12 +680,6 @@ void QuicServerWorker::onConnectionIdBound(
     LOG(ERROR) << "Transport not match, client=" << *transport;
   } else {
     sourceAddressMap_.erase(source);
-    if (transport->shouldShedConnection()) {
-      VLOG_EVERY_N(1, 100) << "Shedding connection";
-      transport->closeNow(std::make_pair(
-          QuicErrorCode(TransportErrorCode::SERVER_BUSY),
-          std::string("shedding under load")));
-    }
   }
 }
 

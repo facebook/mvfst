@@ -167,6 +167,11 @@ class QuicServerWorkerTest : public Test {
       ShortHeader shortHeader,
       QuicTransportStatsCallback::PacketDropReason dropReason);
 
+  void expectConnCreateRefused();
+  void createQuicConnectionDuringShedding(
+      const folly::SocketAddress& addr,
+      ConnectionId connId);
+
  protected:
   folly::SocketAddress fakeAddress_;
   std::unique_ptr<QuicServerWorker> worker_;
@@ -204,6 +209,38 @@ void QuicServerWorkerTest::expectConnectionCreation(
   EXPECT_CALL(*transport, setTransportSettings(_));
   EXPECT_CALL(*transport, accept());
   EXPECT_CALL(*transport, setTransportInfoCallback(transportInfoCb_));
+}
+
+void QuicServerWorkerTest::expectConnCreateRefused() {
+  MockQuicTransport::Ptr transport = transport_;
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*transport, setSupportedVersions(_)).Times(0);
+  EXPECT_CALL(*transport, setOriginalPeerAddress(_)).Times(0);
+  EXPECT_CALL(*transport, setRoutingCallback(worker_.get())).Times(0);
+  EXPECT_CALL(*transport, setConnectionIdAlgo(_)).Times(0);
+  EXPECT_CALL(*transport, setServerConnectionIdParams(_)).Times(0);
+  EXPECT_CALL(*transport, setTransportSettings(_)).Times(0);
+  EXPECT_CALL(*transport, accept()).Times(0);
+  EXPECT_CALL(*transport, setTransportInfoCallback(transportInfoCb_)).Times(0);
+  EXPECT_CALL(*transport, onNetworkData(_, _)).Times(0);
+}
+
+void QuicServerWorkerTest::createQuicConnectionDuringShedding(
+    const folly::SocketAddress& addr,
+    ConnectionId connId) {
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
+  RoutingData routingData(HeaderForm::Long, true, true, connId, connId);
+
+  auto data = createData(kMinInitialPacketSize + 10);
+  expectConnCreateRefused();
+  worker_->dispatchPacketData(
+      addr, std::move(routingData), NetworkData(data->clone(), Clock::now()));
+
+  const auto& addrMap = worker_->getSrcToTransportMap();
+  EXPECT_EQ(0, addrMap.count(std::make_pair(addr, connId)));
+  eventbase_.loop();
 }
 
 void QuicServerWorkerTest::createQuicConnection(
@@ -552,23 +589,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
 
 TEST_F(QuicServerWorkerTest, QuicShedTest) {
   auto connId = getTestConnectionId(hostId_);
-  createQuicConnection(kClientAddr, connId);
-
-  worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
-  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
-      .WillRepeatedly(Return(connId));
-  transport_->setShedConnection();
-  EXPECT_CALL(
-      *transport_,
-      closeNow(Eq(std::make_pair(
-          QuicErrorCode(TransportErrorCode::SERVER_BUSY),
-          std::string("shedding under load")))));
-  worker_->onConnectionIdBound(transport_);
-  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
-  worker_->onConnectionUnbound(
-      transport_.get(),
-      std::make_pair(kClientAddr, connId),
-      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
+  createQuicConnectionDuringShedding(kClientAddr, connId);
 }
 
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
