@@ -78,6 +78,90 @@ bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
       conn.ackStates.appDataAckState.needsToSendAckImmediately);
 }
 
+using namespace quic;
+
+uint64_t writeQuicDataToSocketImpl(
+    folly::AsyncUDPSocket& sock,
+    QuicConnectionStateBase& connection,
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher,
+    QuicVersion version,
+    uint64_t packetLimit,
+    bool exceptCryptoStream) {
+  auto builder = ShortHeaderBuilder();
+  // TODO: In FrameScheduler, Retx is prioritized over new data. We should
+  // add a flag to the Scheduler to control the priority between them and see
+  // which way is better.
+  uint64_t written = 0;
+  if (connection.pendingEvents.numProbePackets) {
+    auto probeSchedulerBuilder =
+        FrameScheduler::Builder(
+            connection,
+            EncryptionLevel::AppData,
+            PacketNumberSpace::AppData,
+            exceptCryptoStream ? "ProbeWithoutCrypto" : "ProbeScheduler")
+            .streamFrames()
+            .streamRetransmissions();
+    if (!exceptCryptoStream) {
+      probeSchedulerBuilder.cryptoFrames();
+    }
+    auto probeScheduler = std::move(probeSchedulerBuilder).build();
+    written = writeProbingDataToSocket(
+        sock,
+        connection,
+        srcConnId,
+        dstConnId,
+        builder,
+        PacketNumberSpace::AppData,
+        probeScheduler,
+        std::min<uint64_t>(
+            packetLimit, connection.pendingEvents.numProbePackets),
+        aead,
+        headerCipher,
+        version);
+    connection.pendingEvents.numProbePackets = 0;
+  }
+  auto schedulerBuilder =
+      FrameScheduler::Builder(
+          connection,
+          EncryptionLevel::AppData,
+          PacketNumberSpace::AppData,
+          exceptCryptoStream ? "FrameSchedulerWithoutCrypto" : "FrameScheduler")
+          .streamFrames()
+          .ackFrames()
+          .streamRetransmissions()
+          .resetFrames()
+          .windowUpdateFrames()
+          .blockedFrames()
+          .simpleFrames();
+  if (!exceptCryptoStream) {
+    schedulerBuilder.cryptoFrames();
+  }
+  FrameScheduler scheduler = std::move(schedulerBuilder).build();
+  written += writeConnectionDataToSocket(
+      sock,
+      connection,
+      srcConnId,
+      dstConnId,
+      std::move(builder),
+      PacketNumberSpace::AppData,
+      scheduler,
+      congestionControlWritableBytes,
+      packetLimit - written,
+      aead,
+      headerCipher,
+      version);
+  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
+                           << " written data "
+                           << (exceptCryptoStream ? "without crypto data " : "")
+                           << "to socket packets=" << written << " "
+                           << connection;
+  DCHECK_GE(packetLimit, written);
+  return written;
+}
+
 } // namespace
 
 namespace quic {
@@ -479,79 +563,6 @@ HeaderBuilder ShortHeaderBuilder() {
   };
 }
 
-uint64_t writeQuicDataToSocket(
-    folly::AsyncUDPSocket& sock,
-    QuicConnectionStateBase& connection,
-    const ConnectionId& srcConnId,
-    const ConnectionId& dstConnId,
-    const Aead& aead,
-    const PacketNumberCipher& headerCipher,
-    QuicVersion version,
-    uint64_t packetLimit) {
-  auto builder = ShortHeaderBuilder();
-  // TODO: In FrameScheduler, Retx is prioritized over new data. We should
-  // add a flag to the Scheduler to control the priority between them and see
-  // which way is better.
-  uint64_t written = 0;
-  if (connection.pendingEvents.numProbePackets) {
-    auto probeScheduler = std::move(FrameScheduler::Builder(
-                                        connection,
-                                        EncryptionLevel::AppData,
-                                        PacketNumberSpace::AppData,
-                                        "ProbeScheduler")
-                                        .streamFrames()
-                                        .streamRetransmissions()
-                                        .cryptoFrames())
-                              .build();
-    written = writeProbingDataToSocket(
-        sock,
-        connection,
-        srcConnId,
-        dstConnId,
-        builder,
-        PacketNumberSpace::AppData,
-        probeScheduler,
-        std::min<uint64_t>(
-            packetLimit, connection.pendingEvents.numProbePackets),
-        aead,
-        headerCipher,
-        version);
-    connection.pendingEvents.numProbePackets = 0;
-  }
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           connection,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "FrameScheduler")
-                                           .streamFrames()
-                                           .ackFrames()
-                                           .streamRetransmissions()
-                                           .resetFrames()
-                                           .windowUpdateFrames()
-                                           .blockedFrames()
-                                           .cryptoFrames()
-                                           .simpleFrames())
-                                 .build();
-  written += writeConnectionDataToSocket(
-      sock,
-      connection,
-      srcConnId,
-      dstConnId,
-      std::move(builder),
-      PacketNumberSpace::AppData,
-      scheduler,
-      congestionControlWritableBytes,
-      packetLimit - written,
-      aead,
-      headerCipher,
-      version);
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " written data to socket packets=" << written
-                           << " " << connection;
-  DCHECK_GE(packetLimit, written);
-  return written;
-}
-
 uint64_t writeCryptoAndAckDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
@@ -598,6 +609,27 @@ uint64_t writeCryptoAndAckDataToSocket(
   return written;
 }
 
+uint64_t writeQuicDataToSocket(
+    folly::AsyncUDPSocket& sock,
+    QuicConnectionStateBase& connection,
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher,
+    QuicVersion version,
+    uint64_t packetLimit) {
+  return writeQuicDataToSocketImpl(
+      sock,
+      connection,
+      srcConnId,
+      dstConnId,
+      aead,
+      headerCipher,
+      version,
+      packetLimit,
+      /*exceptCryptoStream=*/false);
+}
+
 uint64_t writeQuicDataExceptCryptoStreamToSocket(
     folly::AsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
@@ -607,63 +639,16 @@ uint64_t writeQuicDataExceptCryptoStreamToSocket(
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
     uint64_t packetLimit) {
-  auto builder = ShortHeaderBuilder();
-  uint64_t written = 0;
-  if (connection.pendingEvents.numProbePackets) {
-    auto probeScheduler = std::move(FrameScheduler::Builder(
-                                        connection,
-                                        EncryptionLevel::AppData,
-                                        PacketNumberSpace::AppData,
-                                        "ProbeWithoutCrypto")
-                                        .streamFrames()
-                                        .streamRetransmissions())
-                              .build();
-    written = writeProbingDataToSocket(
-        socket,
-        connection,
-        srcConnId,
-        dstConnId,
-        builder,
-        PacketNumberSpace::AppData,
-        probeScheduler,
-        std::min<uint64_t>(
-            packetLimit, connection.pendingEvents.numProbePackets),
-        aead,
-        headerCipher,
-        version);
-    connection.pendingEvents.numProbePackets = 0;
-  }
-  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
-                                           connection,
-                                           EncryptionLevel::AppData,
-                                           PacketNumberSpace::AppData,
-                                           "FrameSchedulerWithoutCrypto")
-                                           .streamFrames()
-                                           .ackFrames()
-                                           .streamRetransmissions()
-                                           .resetFrames()
-                                           .windowUpdateFrames()
-                                           .blockedFrames()
-                                           .simpleFrames())
-                                 .build();
-  written += writeConnectionDataToSocket(
+  return writeQuicDataToSocketImpl(
       socket,
       connection,
       srcConnId,
       dstConnId,
-      std::move(builder),
-      PacketNumberSpace::AppData,
-      scheduler,
-      congestionControlWritableBytes,
-      packetLimit - written,
       aead,
       headerCipher,
-      version);
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " written data except crypto data, packets="
-                           << written << " " << connection;
-  DCHECK_GE(packetLimit, written);
-  return written;
+      version,
+      packetLimit,
+      /*exceptCryptoStream=*/true);
 }
 
 uint64_t writeZeroRttDataToSocket(
