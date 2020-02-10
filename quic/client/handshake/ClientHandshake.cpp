@@ -60,84 +60,62 @@ void ClientHandshake::doHandshake(
         processSocketData(appDataReadBuf_);
         break;
     }
-    if (error_) {
-      error_.throw_exception();
-    }
+    throwOnError();
   }
 }
 
 std::unique_ptr<Aead> ClientHandshake::getOneRttWriteCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(oneRttWriteCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getOneRttReadCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(oneRttReadCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getZeroRttWriteCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(zeroRttWriteCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getHandshakeReadCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(handshakeReadCipher_);
 }
 
 std::unique_ptr<Aead> ClientHandshake::getHandshakeWriteCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(handshakeWriteCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getOneRttReadHeaderCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(oneRttReadHeaderCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getOneRttWriteHeaderCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(oneRttWriteHeaderCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getHandshakeReadHeaderCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(handshakeReadHeaderCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getHandshakeWriteHeaderCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(handshakeWriteHeaderCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
 ClientHandshake::getZeroRttWriteHeaderCipher() {
-  if (error_) {
-    error_.throw_exception();
-  }
+  throwOnError();
   return std::move(zeroRttWriteHeaderCipher_);
 }
 
@@ -197,6 +175,12 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
 
 void ClientHandshake::raiseError(folly::exception_wrapper error) {
   error_ = std::move(error);
+}
+
+void ClientHandshake::throwOnError() {
+  if (error_) {
+    error_.throw_exception();
+  }
 }
 
 void ClientHandshake::waitForData() {
