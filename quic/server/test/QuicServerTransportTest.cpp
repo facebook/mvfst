@@ -1741,9 +1741,9 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   // knock every handshake outstanding packets out
   server->getNonConstConn().outstandingHandshakePacketsCount = 0;
   server->getNonConstConn().outstandingPackets.clear();
-  server->getNonConstConn().lossState.initialLossTime.clear();
-  server->getNonConstConn().lossState.handshakeLossTime.clear();
-  server->getNonConstConn().lossState.appDataLossTime.clear();
+  for (auto& t : server->getNonConstConn().lossState.lossTimes) {
+    t.clear();
+  }
 
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();

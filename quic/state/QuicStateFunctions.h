@@ -105,6 +105,12 @@ folly::Optional<TimePoint>& getLossTime(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace) noexcept;
 
+bool canSetLossTimerForAppData(const QuicConnectionStateBase& conn) noexcept;
+
 std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
     const QuicConnectionStateBase& conn) noexcept;
+
+std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
+    const EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>& times,
+    bool considerAppData) noexcept;
 } // namespace quic

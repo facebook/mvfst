@@ -42,6 +42,8 @@ enum class PacketNumberSpace : uint8_t {
   Initial,
   Handshake,
   AppData,
+  // MAX has to be updated whenever other enumerators are added to this enum
+  MAX = PacketNumberSpace::AppData
 };
 
 constexpr uint8_t kHeaderFormMask = 0x80;

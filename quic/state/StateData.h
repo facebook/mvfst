@@ -13,6 +13,7 @@
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
+#include <quic/common/EnumArray.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/state/AckStates.h>
@@ -445,8 +446,7 @@ struct LossState {
   // Reordering threshold used
   uint32_t reorderingThreshold{kReorderingThreshold};
   // Timer for time reordering detection or early retransmit alarm.
-  folly::Optional<TimePoint> initialLossTime, handshakeLossTime,
-      appDataLossTime;
+  EnumArray<PacketNumberSpace, folly::Optional<TimePoint>> lossTimes;
   // Current method by which the loss detection alarm is set.
   AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
   // Total number of packet retransmitted on this connection, including packet
@@ -483,8 +483,10 @@ struct LossState {
   folly::Optional<TimePoint> lastAckedPacketSentTime;
   // The latest time a packet is acked
   folly::Optional<TimePoint> lastAckedTime;
-  // The time when last retranmittable packet is sent
-  TimePoint lastRetransmittablePacketSentTime;
+  // The time when last retranmittable packet is sent for every packet number
+  // space
+  EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>
+      lastRetransmittablePacketSentTimes;
 };
 
 class Logger;

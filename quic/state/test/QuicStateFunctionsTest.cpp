@@ -621,18 +621,26 @@ TEST_F(QuicStateFunctionsTest, EarliestLossTimer) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   EXPECT_FALSE(earliestLossTimer(conn).first.hasValue());
   auto currentTime = Clock::now();
-  conn.lossState.initialLossTime = currentTime;
+
+  // Before handshake completed
+  conn.lossState.lossTimes[PacketNumberSpace::Initial] = currentTime;
   EXPECT_EQ(PacketNumberSpace::Initial, earliestLossTimer(conn).second);
   EXPECT_EQ(currentTime, earliestLossTimer(conn).first.value());
-  conn.lossState.appDataLossTime = currentTime - 1s;
-  EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
-  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
-  conn.lossState.handshakeLossTime = currentTime + 1s;
-  EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
-  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
-  conn.lossState.appDataLossTime = currentTime + 1s;
+  conn.lossState.lossTimes[PacketNumberSpace::AppData] = currentTime - 2s;
   EXPECT_EQ(PacketNumberSpace::Initial, earliestLossTimer(conn).second);
   EXPECT_EQ(currentTime, earliestLossTimer(conn).first.value());
+  conn.lossState.lossTimes[PacketNumberSpace::Handshake] = currentTime - 1s;
+  EXPECT_EQ(PacketNumberSpace::Handshake, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
+
+  conn.oneRttWriteCipher = createNoOpAead();
+
+  // After one-rtt cipher is available
+  EXPECT_EQ(PacketNumberSpace::AppData, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime - 2s, earliestLossTimer(conn).first.value());
+  conn.lossState.lossTimes[PacketNumberSpace::AppData] = currentTime + 1s;
+  EXPECT_EQ(PacketNumberSpace::Handshake, earliestLossTimer(conn).second);
+  EXPECT_EQ(currentTime - 1s, earliestLossTimer(conn).first.value());
 }
 
 TEST_P(QuicStateFunctionsTest, CloseTranportStateChange) {

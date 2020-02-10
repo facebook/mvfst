@@ -1022,9 +1022,9 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
+  for (auto& t : conn.lossState.lossTimes) {
+    t.clear();
+  }
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -1057,9 +1057,9 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
+  for (auto& t : conn.lossState.lossTimes) {
+    t.clear();
+  }
 
   PathChallengeFrame pathChallenge(123);
   conn.pendingEvents.pathChallenge = pathChallenge;
@@ -1199,9 +1199,9 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
+  for (auto& t : conn.lossState.lossTimes) {
+    t.clear();
+  }
 
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
   PathResponseFrame pathResponse(123);
@@ -1282,9 +1282,9 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
+  for (auto& t : conn.lossState.lossTimes) {
+    t.clear();
+  }
 
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
@@ -1420,9 +1420,9 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   // knock every handshake outstanding packets out
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
-  conn.lossState.initialLossTime.clear();
-  conn.lossState.handshakeLossTime.clear();
-  conn.lossState.appDataLossTime.clear();
+  for (auto& t : conn.lossState.lossTimes) {
+    t.clear();
+  }
 
   RetireConnectionIdFrame retireConnId(1);
   sendSimpleFrame(conn, retireConnId);

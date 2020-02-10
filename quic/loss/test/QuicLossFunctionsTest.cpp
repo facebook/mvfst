@@ -83,6 +83,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     ServerConnectionIdParams params(0, 0, 0);
     conn->connIdAlgo = connIdAlgo_.get();
     conn->serverConnectionId = connIdAlgo_->encodeConnectionId(params);
+    // for canSetLossTimerForAppData()
+    conn->oneRttWriteCipher = createNoOpAead();
     return conn;
   }
 
@@ -187,7 +189,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     conn.outstandingHandshakePacketsCount++;
     conn.lossState.lastHandshakePacketSentTime = time;
   }
-  conn.lossState.lastRetransmittablePacketSentTime = time;
+  conn.lossState.lastRetransmittablePacketSentTimes[packetNumberSpace] = time;
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(outstandingPacket);
   }
@@ -900,7 +902,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
   auto packetNum = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
                        ->packet.header.getPacketSequenceNum();
   EXPECT_EQ(packetNum, 6);
-  EXPECT_TRUE(conn->lossState.appDataLossTime);
+  EXPECT_TRUE(conn->lossState.lossTimes[PacketNumberSpace::AppData]);
 }
 
 TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
@@ -923,10 +925,11 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
       lossTime,
       PacketNumberSpace::Handshake);
   EXPECT_TRUE(lostPackets.empty());
-  EXPECT_TRUE(conn->lossState.handshakeLossTime.hasValue());
+  EXPECT_TRUE(
+      conn->lossState.lossTimes[PacketNumberSpace::Handshake].hasValue());
   EXPECT_EQ(
       expectedDelayUntilLost + sendTime,
-      conn->lossState.handshakeLossTime.value());
+      conn->lossState.lossTimes[PacketNumberSpace::Handshake].value());
 
   MockClock::mockNow = [=]() { return sendTime; };
   auto alarm = calculateAlarmDuration<MockClock>(*conn);
@@ -945,7 +948,8 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
       *conn, testingLossMarkFunc(lostPackets));
   EXPECT_EQ(1, lostPackets.size());
-  EXPECT_FALSE(conn->lossState.handshakeLossTime.hasValue());
+  EXPECT_FALSE(
+      conn->lossState.lossTimes[PacketNumberSpace::Handshake].hasValue());
   EXPECT_TRUE(conn->outstandingPackets.empty());
 }
 
@@ -1081,7 +1085,7 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationHasLossTime) {
   TimePoint lastPacketSentTime = Clock::now();
   auto thisMoment = lastPacketSentTime;
   MockClock::mockNow = [=]() { return thisMoment; };
-  conn->lossState.appDataLossTime = thisMoment + 100ms;
+  conn->lossState.lossTimes[PacketNumberSpace::AppData] = thisMoment + 100ms;
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 
@@ -1099,7 +1103,8 @@ TEST_F(QuicLossFunctionsTest, AlarmDurationLossTimeIsZero) {
   TimePoint lastPacketSentTime = Clock::now();
   auto thisMoment = lastPacketSentTime + 200ms;
   MockClock::mockNow = [=]() { return thisMoment; };
-  conn->lossState.appDataLossTime = lastPacketSentTime + 100ms;
+  conn->lossState.lossTimes[PacketNumberSpace::AppData] =
+      lastPacketSentTime + 100ms;
   conn->lossState.srtt = 200ms;
   conn->lossState.lrtt = 150ms;
 

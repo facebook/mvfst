@@ -496,7 +496,8 @@ void updateConnection(
     ++conn.outstandingHandshakePacketsCount;
     conn.lossState.lastHandshakePacketSentTime = pkt.time;
   }
-  conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
+  conn.lossState.lastRetransmittablePacketSentTimes[packetNumberSpace] =
+      pkt.time;
   if (pkt.associatedEvent) {
     CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);
     ++conn.outstandingClonedPacketsCount;
