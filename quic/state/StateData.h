@@ -485,8 +485,7 @@ struct LossState {
   folly::Optional<TimePoint> lastAckedTime;
   // The time when last retranmittable packet is sent for every packet number
   // space
-  EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>
-      lastRetransmittablePacketSentTimes;
+  TimePoint lastRetransmittablePacketSentTime;
 };
 
 class Logger;

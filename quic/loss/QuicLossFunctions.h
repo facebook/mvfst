@@ -64,11 +64,8 @@ std::pair<std::chrono::milliseconds, LossState::AlarmMethod>
 calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   std::chrono::microseconds alarmDuration;
   folly::Optional<LossState::AlarmMethod> alarmMethod;
-  auto lastSentPacketTimeAndSpace = earliestTimeAndSpace(
-      conn.lossState.lastRetransmittablePacketSentTimes,
-      canSetLossTimerForAppData(conn));
-  DCHECK(lastSentPacketTimeAndSpace.first.hasValue());
-  TimePoint lastSentPacketTime = lastSentPacketTimeAndSpace.first.value();
+  TimePoint lastSentPacketTime =
+      conn.lossState.lastRetransmittablePacketSentTime;
   auto lossTimeAndSpace = earliestLossTimer(conn);
   if (lossTimeAndSpace.first) {
     if (*lossTimeAndSpace.first > lastSentPacketTime) {

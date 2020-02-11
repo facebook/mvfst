@@ -189,7 +189,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     conn.outstandingHandshakePacketsCount++;
     conn.lossState.lastHandshakePacketSentTime = time;
   }
-  conn.lossState.lastRetransmittablePacketSentTimes[packetNumberSpace] = time;
+  conn.lossState.lastRetransmittablePacketSentTime = time;
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(outstandingPacket);
   }
