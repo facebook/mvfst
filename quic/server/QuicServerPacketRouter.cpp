@@ -199,7 +199,14 @@ void TakeoverPacketHandler::processForwardedPacket(
     return;
   }
   uint16_t addrLen = cursor.readBE<uint16_t>();
+  if (addrLen > kMaxBufSizeForTakeoverEncapsulation) {
+    VLOG(2) << "Buffer size for takeover encapsulation: " << addrLen
+            << " exceeds the max limit: "
+            << kMaxBufSizeForTakeoverEncapsulation;
+    return;
+  }
   struct sockaddr* sockaddr = nullptr;
+  uint8_t sockaddrBuf[addrLen];
   std::pair<const uint8_t*, size_t> addrData = cursor.peek();
   if (addrData.second >= addrLen) {
     // the address is contiguous in the queue
@@ -207,8 +214,6 @@ void TakeoverPacketHandler::processForwardedPacket(
     cursor.skip(addrLen);
   } else {
     // the address is not contiguous, copy it to a local buffer
-    uint8_t* sockaddrBuf =
-        new uint8_t[std::min(addrLen, kMaxBufSizeForTakeoverEncapsulation)];
     if (!cursor.canAdvance(addrLen)) {
       VLOG(4) << "Cannot extract peerAddress address of length=" << addrLen
               << " from the forwarded packet. Dropping the packet.";
