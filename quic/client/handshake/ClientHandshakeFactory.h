@@ -13,7 +13,7 @@
 namespace quic {
 
 class ClientHandshake;
-struct QuicCryptoState;
+struct QuicClientConnectionState;
 
 class ClientHandshakeFactory {
  public:
@@ -26,7 +26,7 @@ class ClientHandshakeFactory {
    * of the ClientHandshake.
    */
   virtual std::unique_ptr<ClientHandshake> makeClientHandshake(
-      QuicCryptoState& cryptoState) = 0;
+      QuicClientConnectionState* conn) = 0;
 };
 
 } // namespace quic

@@ -26,6 +26,7 @@
 #include <quic/client/handshake/FizzClientHandshake.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
@@ -84,11 +85,13 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     setupClientAndServerContext();
 
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
-    handshake = FizzClientQuicHandshakeContext::Builder()
-                    .setFizzClientContext(clientCtx)
-                    .setCertificateVerifier(verifier)
-                    .build()
-                    ->makeClientHandshake(cryptoState);
+    auto handshakeFactory = FizzClientQuicHandshakeContext::Builder()
+                                .setFizzClientContext(clientCtx)
+                                .setCertificateVerifier(verifier)
+                                .build();
+    conn.reset(new QuicClientConnectionState(handshakeFactory));
+    cryptoState = conn->cryptoState.get();
+    handshake = conn->clientHandshakeLayer;
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
@@ -189,14 +192,14 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 
   Buf getHandshakeWriteBytes() {
     auto buf = folly::IOBuf::create(0);
-    if (!cryptoState.initialStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState.initialStream.writeBuffer.move());
+    if (!cryptoState->initialStream.writeBuffer.empty()) {
+      buf->prependChain(cryptoState->initialStream.writeBuffer.move());
     }
-    if (!cryptoState.handshakeStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState.handshakeStream.writeBuffer.move());
+    if (!cryptoState->handshakeStream.writeBuffer.empty()) {
+      buf->prependChain(cryptoState->handshakeStream.writeBuffer.move());
     }
-    if (!cryptoState.oneRttStream.writeBuffer.empty()) {
-      buf->prependChain(cryptoState.oneRttStream.writeBuffer.move());
+    if (!cryptoState->oneRttStream.writeBuffer.empty()) {
+      buf->prependChain(cryptoState->oneRttStream.writeBuffer.move());
     }
     return buf;
   }
@@ -238,8 +241,12 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   class DelayedHolder : public folly::DelayedDestruction {};
 
   folly::EventBase evb;
-  std::unique_ptr<ClientHandshake> handshake;
-  QuicCryptoState cryptoState;
+  std::unique_ptr<
+      QuicClientConnectionState,
+      folly::DelayedDestruction::Destructor>
+      conn{nullptr};
+  ClientHandshake* handshake;
+  QuicCryptoState* cryptoState;
   std::string hostname;
 
   fizz::server::ServerStateMachine machine;

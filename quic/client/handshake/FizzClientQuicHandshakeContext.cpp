@@ -19,8 +19,8 @@ FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
 
 std::unique_ptr<ClientHandshake>
 FizzClientQuicHandshakeContext::makeClientHandshake(
-    QuicCryptoState& cryptoState) {
-  return std::make_unique<FizzClientHandshake>(cryptoState, shared_from_this());
+    QuicClientConnectionState* conn) {
+  return std::make_unique<FizzClientHandshake>(conn, shared_from_this());
 }
 
 std::shared_ptr<FizzClientQuicHandshakeContext>

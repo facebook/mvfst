@@ -14,11 +14,12 @@
 namespace quic {
 
 class FizzClientQuicHandshakeContext;
+struct QuicClientConnectionState;
 
 class FizzClientHandshake : public ClientHandshake {
  public:
   FizzClientHandshake(
-      QuicCryptoState& cryptoState,
+      QuicClientConnectionState* conn,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
 
   void connect(

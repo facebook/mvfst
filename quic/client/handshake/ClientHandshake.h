@@ -10,19 +10,20 @@
 
 #include <fizz/client/ClientProtocol.h>
 
+#include <folly/ExceptionWrapper.h>
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
-#include <folly/ExceptionWrapper.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
-#include <quic/state/StateData.h>
 
 namespace quic {
 
 class CryptoFactory;
+struct QuicClientConnectionState;
 
 class ClientHandshake : public Handshake {
  public:
@@ -35,7 +36,7 @@ class ClientHandshake : public Handshake {
 
   enum class Phase { Initial, Handshake, OneRttKeysDerived, Established };
 
-  explicit ClientHandshake(QuicCryptoState& cryptoState);
+  explicit ClientHandshake(QuicClientConnectionState* conn);
 
   /**
    * Initiate the handshake with the supplied parameters.
@@ -176,7 +177,7 @@ class ClientHandshake : public Handshake {
 
   folly::Optional<bool> zeroRttRejected_;
   HandshakeCallback* callback_{nullptr};
-  QuicCryptoState& cryptoState_;
+  QuicClientConnectionState* conn_;
 
   /**
    * Various utilities for concrete implementations to use.

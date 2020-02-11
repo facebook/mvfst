@@ -22,7 +22,7 @@ class FizzClientQuicHandshakeContext
       public std::enable_shared_from_this<FizzClientQuicHandshakeContext> {
  public:
   std::unique_ptr<ClientHandshake> makeClientHandshake(
-      QuicCryptoState& cryptoState) override;
+      QuicClientConnectionState* conn) override;
 
   const std::shared_ptr<const fizz::client::FizzClientContext>& getContext()
       const {

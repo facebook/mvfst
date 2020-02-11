@@ -1113,8 +1113,8 @@ INSTANTIATE_TEST_CASE_P(
 // from the server.
 class FakeOneRttHandshakeLayer : public ClientHandshake {
  public:
-  explicit FakeOneRttHandshakeLayer(QuicCryptoState& cryptoState)
-      : ClientHandshake(cryptoState) {}
+  explicit FakeOneRttHandshakeLayer(QuicClientConnectionState* conn)
+      : ClientHandshake(conn) {}
 
   void connect(
       folly::Optional<std::string>,
@@ -1123,7 +1123,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
       HandshakeCallback* callback) override {
     connected_ = true;
     writeDataToQuicStream(
-        cryptoState_.initialStream, IOBuf::copyBuffer("CHLO"));
+        conn_->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
     createServerTransportParameters();
     callback_ = callback;
   }
@@ -1223,7 +1223,8 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     EXPECT_EQ(writeBuf.get(), nullptr);
     if (getPhase() == Phase::Initial) {
       writeDataToQuicStream(
-          cryptoState_.handshakeStream, IOBuf::copyBuffer("ClientFinished"));
+          conn_->cryptoState->handshakeStream,
+          IOBuf::copyBuffer("ClientFinished"));
       phase_ = Phase::Handshake;
     }
   }
@@ -1358,7 +1359,7 @@ class QuicClientTransportTest : public Test {
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
     mockClientHandshake =
-        new FakeOneRttHandshakeLayer(*client->getNonConstConn().cryptoState);
+        new FakeOneRttHandshakeLayer(&client->getNonConstConn());
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;
     client->getNonConstConn().handshakeLayer.reset(mockClientHandshake);
     setFakeHandshakeCiphers();
