@@ -71,9 +71,7 @@ class ServerHandshake : public Handshake {
    */
   enum class Phase { Handshake, KeysDerived, Established };
 
-  explicit ServerHandshake(
-      QuicConnectionStateBase* conn,
-      QuicCryptoState& cryptoState);
+  explicit ServerHandshake(QuicConnectionStateBase* conn);
 
   /**
    * Starts accepting the TLS connection.
