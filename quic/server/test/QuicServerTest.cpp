@@ -625,6 +625,58 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   eventbase_.loop();
 }
 
+TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
+  auto data = createData(kDefaultUDPSendPacketLen);
+  auto dstConnId = ConnectionId::createWithoutChecks({3});
+  auto srcConnId = ConnectionId::createWithoutChecks({3});
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(
+      LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
+  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  NetworkData networkData(std::move(packet), Clock::now());
+  worker_->dispatchPacketData(
+      kClientAddr, std::move(routingData), std::move(networkData));
+  eventbase_.loop();
+}
+
+TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
+  auto data = createData(kDefaultUDPSendPacketLen);
+  auto dstConnId = ConnectionId::createWithoutChecks({21});
+  auto srcConnId = ConnectionId::createWithoutChecks({3});
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(
+      LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
+  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  NetworkData networkData(std::move(packet), Clock::now());
+  worker_->dispatchPacketData(
+      kClientAddr, std::move(routingData), std::move(networkData));
+  eventbase_.loop();
+}
+
 TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);

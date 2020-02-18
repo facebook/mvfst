@@ -440,6 +440,15 @@ void QuicServerWorker::dispatchPacketData(
     transport->onNetworkData(client, std::move(networkData));
     return;
   }
+  if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
+    VLOG(3) << "Dropping packet with bad DCID, CID="
+            << routingData.destinationConnId.hex()
+            << ", workerId=" << (uint32_t)workerId_
+            << ", hostId=" << (uint32_t)hostId_;
+    QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    // TODO do we need to reset?
+    return;
+  }
   ServerConnectionIdParams connIdParam =
       connIdAlgo_->parseConnectionId(routingData.destinationConnId);
   if (connIdParam.hostId != hostId_) {
