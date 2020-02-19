@@ -30,25 +30,28 @@ constexpr uint8_t kShortVersionBitsMask = 0xc0;
 /**
  * Sets the short version id bits (0 - 1) into the given ConnectionId
  */
-void setVersionBitsInConnId(quic::ConnectionId& connId, uint8_t version) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<folly::Unit, quic::QuicInternalException>
+setVersionBitsInConnId(quic::ConnectionId& connId, uint8_t version) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for version",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   // clear 0-1 bits
   connId.data()[0] &= (~kShortVersionBitsMask);
   connId.data()[0] |= (kShortVersionBitsMask & (version << 6));
+  return folly::unit;
 }
 
 /**
  * Extract the version id bits (0 - 1) from the given ConnectionId
  */
-uint8_t getVersionBitsFromConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<uint8_t, quic::QuicInternalException> getVersionBitsFromConnId(
+    const quic::ConnectionId& connId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for version",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   uint8_t version = 0;
   version = (kShortVersionBitsMask & connId.data()[0]) >> 6;
@@ -58,11 +61,13 @@ uint8_t getVersionBitsFromConnId(const quic::ConnectionId& connId) {
 /**
  * Sets the host id bits [2 - 17] bits into the given ConnectionId
  */
-void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<folly::Unit, quic::QuicInternalException> setHostIdBitsInConnId(
+    quic::ConnectionId& connId,
+    uint16_t hostId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for hostid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   // clear 2 - 7 bits
   connId.data()[0] &= ~kHostIdFirstByteMask;
@@ -77,16 +82,18 @@ void setHostIdBitsInConnId(quic::ConnectionId& connId, uint16_t hostId) {
   connId.data()[1] |= (kHostIdSecondByteMask & (hostId >> 2));
   // set 16 - 17 bits in the connId with the last 2 bits of the worker id
   connId.data()[2] |= (kHostIdThirdByteMask & (hostId << 6));
+  return folly::unit;
 }
 
 /**
  * Extract the host id bits [2 - 17] bits from the given ConnectionId
  */
-uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<uint16_t, quic::QuicInternalException> getHostIdBitsInConnId(
+    const quic::ConnectionId& connId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for hostid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   uint16_t hostId = 0;
   // get 2 - 7 bits from the connId and set first 6 bits of the host id
@@ -103,11 +110,12 @@ uint16_t getHostIdBitsInConnId(const quic::ConnectionId& connId) {
 /**
  * Sets the given 8-bit workerId into the given connectionId's 18-25 bits
  */
-void setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<folly::Unit, quic::QuicInternalException>
+setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for workerid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   // clear 18-23 bits
   connId.data()[2] &= 0xc0;
@@ -117,16 +125,18 @@ void setWorkerIdBitsInConnId(quic::ConnectionId& connId, uint8_t workerId) {
   connId.data()[2] |= (kWorkerIdFirstByteMask & workerId) >> 2;
   // set 24 - 25 bits in the connId with the last 2 bits of the worker id
   connId.data()[3] |= (kWorkerIdSecondByteMask & workerId) << 6;
+  return folly::unit;
 }
 
 /**
  * Extracts the 'workerId' bits from the given ConnectionId
  */
-uint8_t getWorkerIdFromConnId(const quic::ConnectionId& connId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<uint8_t, quic::QuicInternalException> getWorkerIdFromConnId(
+    const quic::ConnectionId& connId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for workerid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   // get 18 - 23 bits from the connId
   uint8_t workerId = connId.data()[2] << 2;
@@ -138,25 +148,30 @@ uint8_t getWorkerIdFromConnId(const quic::ConnectionId& connId) {
 /**
  * Sets the server id bit (at 26th bit) into the given ConnectionId
  */
-void setProcessIdBitsInConnId(quic::ConnectionId& connId, uint8_t processId) {
-  if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+folly::Expected<folly::Unit, quic::QuicInternalException>
+setProcessIdBitsInConnId(
+    quic::ConnectionId& connId,
+    uint8_t processId) noexcept {
+  if (UNLIKELY(connId.size() < quic::kMinSelfConnectionIdSize)) {
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for processid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   // clear the 26th bit
   connId.data()[3] &= (~kProcessIdBitMask);
   connId.data()[3] |= (kProcessIdBitMask & (processId << 5));
+  return folly::unit;
 }
 
 /**
  * Extract the server id bit (at 26th bit) from the given ConnectionId
  */
-uint8_t getProcessIdBitsFromConnId(const quic::ConnectionId& connId) {
+folly::Expected<uint8_t, quic::QuicInternalException>
+getProcessIdBitsFromConnId(const quic::ConnectionId& connId) noexcept {
   if (connId.size() < quic::kMinSelfConnectionIdSize) {
-    throw quic::QuicInternalException(
+    return folly::makeUnexpected(quic::QuicInternalException(
         "ConnectionId is too small for processid",
-        quic::LocalErrorCode::INTERNAL_ERROR);
+        quic::LocalErrorCode::INTERNAL_ERROR));
   }
   uint8_t processId = 0;
   processId = (kProcessIdBitMask & connId.data()[3]) >> 5;
@@ -166,33 +181,53 @@ uint8_t getProcessIdBitsFromConnId(const quic::ConnectionId& connId) {
 
 namespace quic {
 
-bool DefaultConnectionIdAlgo::canParse(const ConnectionId& id) const {
+bool DefaultConnectionIdAlgo::canParse(const ConnectionId& id) const noexcept {
   if (id.size() < kMinSelfConnectionIdSize) {
     return false;
   }
-  return getVersionBitsFromConnId(id) == kShortVersionId;
+  return *getVersionBitsFromConnId(id) == kShortVersionId;
 }
 
-ServerConnectionIdParams DefaultConnectionIdAlgo::parseConnectionId(
-    const ConnectionId& id) {
+folly::Expected<ServerConnectionIdParams, QuicInternalException>
+DefaultConnectionIdAlgo::parseConnectionId(const ConnectionId& id) noexcept {
+  auto expectingVersion = getVersionBitsFromConnId(id);
+  if (UNLIKELY(!expectingVersion)) {
+    return folly::makeUnexpected(expectingVersion.error());
+  }
+  auto expectingHost = getHostIdBitsInConnId(id);
+  if (UNLIKELY(!expectingHost)) {
+    return folly::makeUnexpected(expectingHost.error());
+  }
+  auto expectingProcess = getProcessIdBitsFromConnId(id);
+  if (UNLIKELY(!expectingProcess)) {
+    return folly::makeUnexpected(expectingProcess.error());
+  }
+  auto expectingWorker = getWorkerIdFromConnId(id);
+  if (UNLIKELY(!expectingWorker)) {
+    return folly::makeUnexpected(expectingWorker.error());
+  }
   ServerConnectionIdParams serverConnIdParams(
-      getVersionBitsFromConnId(id),
-      getHostIdBitsInConnId(id),
-      getProcessIdBitsFromConnId(id),
-      getWorkerIdFromConnId(id));
+      *expectingVersion, *expectingHost, *expectingProcess, *expectingWorker);
   return serverConnIdParams;
 }
 
-ConnectionId DefaultConnectionIdAlgo::encodeConnectionId(
-    const ServerConnectionIdParams& params) {
+folly::Expected<ConnectionId, QuicInternalException>
+DefaultConnectionIdAlgo::encodeConnectionId(
+    const ServerConnectionIdParams& params) noexcept {
   // In case there is no client cid, create a random connection id.
   std::vector<uint8_t> connIdData(kDefaultConnectionIdSize);
   folly::Random::secureRandom(connIdData.data(), connIdData.size());
   ConnectionId connId = ConnectionId(std::move(connIdData));
-  setVersionBitsInConnId(connId, params.version);
-  setHostIdBitsInConnId(connId, params.hostId);
-  setProcessIdBitsInConnId(connId, params.processId);
-  setWorkerIdBitsInConnId(connId, params.workerId);
+  auto expected =
+      setVersionBitsInConnId(connId, params.version)
+          .then([&](auto) { setHostIdBitsInConnId(connId, params.hostId); })
+          .then(
+              [&](auto) { setProcessIdBitsInConnId(connId, params.processId); })
+          .then(
+              [&](auto) { setWorkerIdBitsInConnId(connId, params.workerId); });
+  if (UNLIKELY(expected.hasError())) {
+    return folly::makeUnexpected(expected.error());
+  }
   return connId;
 }
 

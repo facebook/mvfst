@@ -448,7 +448,7 @@ uint64_t computeExpectedDelay(
 ConnectionId getTestConnectionId(uint16_t hostId) {
   ServerConnectionIdParams params(hostId, 0, 0);
   DefaultConnectionIdAlgo connIdAlgo;
-  auto connId = connIdAlgo.encodeConnectionId(params);
+  auto connId = *connIdAlgo.encodeConnectionId(params);
   connId.data()[3] = 3;
   connId.data()[4] = 4;
   connId.data()[5] = 5;

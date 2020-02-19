@@ -526,8 +526,7 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
   // create server chosen connId with processId = 0 and workerId = 0
   ServerConnectionIdParams params(0, 0, 0);
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
-  folly::Optional<ConnectionId> serverChosenConnId =
-      connIdAlgo->encodeConnectionId(params);
+  auto serverChosenConnId = connIdAlgo->encodeConnectionId(params);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   stream->sendState = StreamSendState::Open_E;
   stream->recvState = StreamRecvState::Closed_E;
@@ -565,8 +564,7 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
   // create server chosen connId with processId = 0 and workerId = 0
   ServerConnectionIdParams params(0, 0, 0);
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
-  folly::Optional<ConnectionId> serverChosenConnId =
-      connIdAlgo->encodeConnectionId(params);
+  auto serverChosenConnId = connIdAlgo->encodeConnectionId(params);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   stream->sendState = StreamSendState::Open_E;
   stream->recvState = StreamRecvState::Closed_E;

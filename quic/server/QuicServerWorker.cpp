@@ -450,7 +450,7 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   ServerConnectionIdParams connIdParam =
-      connIdAlgo_->parseConnectionId(routingData.destinationConnId);
+      *connIdAlgo_->parseConnectionId(routingData.destinationConnId);
   if (connIdParam.hostId != hostId_) {
     VLOG(3) << "Dropping packet routed to wrong host, CID="
             << routingData.destinationConnId.hex()

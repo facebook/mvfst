@@ -8,7 +8,8 @@
 
 #pragma once
 
-#include <folly/Optional.h>
+#include <folly/Expected.h>
+#include <quic/QuicException.h>
 #include <quic/codec/QuicConnectionId.h>
 
 namespace quic {
@@ -28,19 +29,19 @@ class ConnectionIdAlgo {
   /**
    * Check if this implementation of algorithm can parse the given ConnectionId
    */
-  virtual bool canParse(const ConnectionId& id) const = 0;
+  virtual bool canParse(const ConnectionId& id) const noexcept = 0;
 
   /**
    * Parses ServerConnectionIdParams from the given connection id.
    */
-  virtual ServerConnectionIdParams parseConnectionId(
-      const ConnectionId& id) = 0;
+  virtual folly::Expected<ServerConnectionIdParams, QuicInternalException>
+  parseConnectionId(const ConnectionId& id) noexcept = 0;
 
   /**
    * Encodes the given ServerConnectionIdParams into connection id
    */
-  virtual ConnectionId encodeConnectionId(
-      const ServerConnectionIdParams& params) = 0;
+  virtual folly::Expected<ConnectionId, QuicInternalException>
+  encodeConnectionId(const ServerConnectionIdParams& params) noexcept = 0;
 };
 
 /**

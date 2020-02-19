@@ -201,14 +201,14 @@ TEST_F(TypesTest, TestConnIdWorkerId) {
     uint16_t hostId = folly::Random::rand32() % 4095;
     ServerConnectionIdParams params(hostId, processId, i);
     auto paramsAfterEncode =
-        connIdAlgo->parseConnectionId(connIdAlgo->encodeConnectionId(params));
-    EXPECT_TRUE(connIdAlgo->canParse(connIdAlgo->encodeConnectionId(params)));
-    EXPECT_EQ(paramsAfterEncode.hostId, hostId);
-    EXPECT_EQ(paramsAfterEncode.workerId, i);
-    EXPECT_EQ(paramsAfterEncode.processId, processId);
+        connIdAlgo->parseConnectionId(*connIdAlgo->encodeConnectionId(params));
+    EXPECT_TRUE(connIdAlgo->canParse(*connIdAlgo->encodeConnectionId(params)));
+    EXPECT_EQ(paramsAfterEncode->hostId, hostId);
+    EXPECT_EQ(paramsAfterEncode->workerId, i);
+    EXPECT_EQ(paramsAfterEncode->processId, processId);
   }
   ServerConnectionIdParams vParam(0x2, 7, 7, 7);
-  EXPECT_FALSE(connIdAlgo->canParse(connIdAlgo->encodeConnectionId(vParam)));
+  EXPECT_FALSE(connIdAlgo->canParse(*connIdAlgo->encodeConnectionId(vParam)));
 }
 
 TEST_F(TypesTest, ShortHeaderPacketNumberSpace) {

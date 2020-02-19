@@ -810,7 +810,7 @@ ConnectionId createConnIdForServer(ProcessId server) {
   auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
   uint8_t processId = (server == ProcessId::ONE) ? 1 : 0;
   ServerConnectionIdParams params(0, processId, 0);
-  return connIdAlgo->encodeConnectionId(params);
+  return *connIdAlgo->encodeConnectionId(params);
 }
 
 class QuicServerWorkerTakeoverTest : public Test {

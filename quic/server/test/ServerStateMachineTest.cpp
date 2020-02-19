@@ -51,9 +51,9 @@ TEST(ServerStateMachineTest, TestAddConnId) {
   EXPECT_EQ(newConnId2->token->size(), kStatelessResetTokenLength);
   EXPECT_EQ(newConnId3->token->size(), kStatelessResetTokenLength);
 
-  auto params1 = serverState.connIdAlgo->parseConnectionId(newConnId1->connId);
-  auto params2 = serverState.connIdAlgo->parseConnectionId(newConnId2->connId);
-  auto params3 = serverState.connIdAlgo->parseConnectionId(newConnId3->connId);
+  auto params1 = *serverState.connIdAlgo->parseConnectionId(newConnId1->connId);
+  auto params2 = *serverState.connIdAlgo->parseConnectionId(newConnId2->connId);
+  auto params3 = *serverState.connIdAlgo->parseConnectionId(newConnId3->connId);
 
   // Server connection id params are correctly encoded/decoded.
   assertServerConnIdParamsEq(originalParams, params1);

@@ -1193,9 +1193,12 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
 
   // TODO Possibly change this mechanism later
   // The default connectionId algo has 36 bits of randomness.
+  auto encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
+  if (encodedCid.hasError()) {
+    return folly::none;
+  }
   auto newConnIdData =
-      ConnectionIdData{connIdAlgo->encodeConnectionId(*serverConnIdParams),
-                       nextSelfConnectionIdSequence++};
+      ConnectionIdData{std::move(*encodedCid), nextSelfConnectionIdSequence++};
   newConnIdData.token = generator.generateToken(newConnIdData.connId);
   selfConnectionIds.push_back(newConnIdData);
   return newConnIdData;

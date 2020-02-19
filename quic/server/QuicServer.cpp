@@ -26,7 +26,8 @@ size_t getWorkerToRouteTo(
     const RoutingData& routingData,
     size_t numWorkers,
     ConnectionIdAlgo* connIdAlgo) {
-  return connIdAlgo->parseConnectionId(routingData.destinationConnId).workerId %
+  return connIdAlgo->parseConnectionId(routingData.destinationConnId)
+             ->workerId %
       numWorkers;
 }
 } // namespace

@@ -1418,7 +1418,7 @@ class QuicClientTransportTest : public Test {
   void setConnectionIds() {
     originalConnId = client->getConn().clientConnectionId;
     ServerConnectionIdParams params(0, 0, 0);
-    serverChosenConnId = connIdAlgo_->encodeConnectionId(params);
+    serverChosenConnId = *connIdAlgo_->encodeConnectionId(params);
   }
 
   void recvServerHello(const folly::SocketAddress& addr) {
@@ -1712,7 +1712,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   originalConnId = client->getConn().clientConnectionId;
   ServerConnectionIdParams params(0, 0, 0);
   client->getNonConstConn().serverConnectionId =
-      connIdAlgo_->encodeConnectionId(params);
+      *connIdAlgo_->encodeConnectionId(params);
 
   AckBlocks acks;
   acks.insert(0);
@@ -2755,7 +2755,7 @@ class QuicClientTransportVersionAndRetryTest
     originalConnId = client->getConn().clientConnectionId;
     // create server chosen connId with processId = 0 and workerId = 0
     ServerConnectionIdParams params(0, 0, 0);
-    serverChosenConnId = connIdAlgo_->encodeConnectionId(params);
+    serverChosenConnId = *connIdAlgo_->encodeConnectionId(params);
     // The tests that we do here create streams before crypto is finished,
     // so we initialize the peer streams, to allow for this behavior. TODO: when
     // 0-rtt support exists, remove this.
