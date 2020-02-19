@@ -1742,7 +1742,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   server->getNonConstConn().outstandingHandshakePacketsCount = 0;
   server->getNonConstConn().outstandingPackets.clear();
   for (auto& t : server->getNonConstConn().lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);

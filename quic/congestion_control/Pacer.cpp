@@ -67,7 +67,7 @@ std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
-    scheduledWriteTime_.clear();
+    scheduledWriteTime_.reset();
   };
   if (appLimited_) {
     cachedBatchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;

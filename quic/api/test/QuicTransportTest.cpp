@@ -1023,7 +1023,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
   for (auto& t : conn.lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   PathChallengeFrame pathChallenge(123);
@@ -1058,7 +1058,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
   for (auto& t : conn.lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   PathChallengeFrame pathChallenge(123);
@@ -1200,7 +1200,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
   for (auto& t : conn.lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
@@ -1283,7 +1283,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
   for (auto& t : conn.lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   NewConnectionIdFrame newConnId(
@@ -1421,7 +1421,7 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   conn.outstandingHandshakePacketsCount = 0;
   conn.outstandingPackets.clear();
   for (auto& t : conn.lossState.lossTimes) {
-    t.clear();
+    t.reset();
   }
 
   RetireConnectionIdFrame retireConnId(1);
