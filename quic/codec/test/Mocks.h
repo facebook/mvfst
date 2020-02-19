@@ -23,6 +23,25 @@ std::ostream& operator<<(std::ostream& out, const QuicWriteFrame& /*rhs*/) {
 namespace quic {
 namespace test {
 
+class MockConnectoinIdAlgo : public ConnectionIdAlgo {
+ public:
+  GMOCK_METHOD1_(, const noexcept, , canParse, bool(const ConnectionId& id));
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      parseConnectionId,
+      folly::Expected<ServerConnectionIdParams, QuicInternalException>(
+          const ConnectionId&));
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      encodeConnectionId,
+      folly::Expected<ConnectionId, QuicInternalException>(
+          const ServerConnectionIdParams&));
+};
+
 class MockQuicPacketBuilder : public PacketBuilderInterface {
  public:
   // override method with unique_ptr since gmock doesn't support it

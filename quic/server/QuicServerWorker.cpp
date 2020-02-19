@@ -449,14 +449,25 @@ void QuicServerWorker::dispatchPacketData(
     // TODO do we need to reset?
     return;
   }
-  ServerConnectionIdParams connIdParam =
-      *connIdAlgo_->parseConnectionId(routingData.destinationConnId);
-  if (connIdParam.hostId != hostId_) {
+  auto connIdParam =
+      connIdAlgo_->parseConnectionId(routingData.destinationConnId);
+  if (connIdParam.hasError()) {
+    VLOG(3) << "Dropping packet due to DCID parsing error="
+            << connIdParam.error().what()
+            << ", errorCode=" << connIdParam.error().errorCode()
+            << ", DCID=" << routingData.destinationConnId.hex()
+            << ", workerId=" << (uint32_t)workerId_
+            << ", hostId=" << (uint32_t)hostId_;
+    QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    // TODO do we need to reset?
+    return;
+  }
+  if (connIdParam->hostId != hostId_) {
     VLOG(3) << "Dropping packet routed to wrong host, CID="
             << routingData.destinationConnId.hex()
             << ", workerId=" << (uint32_t)workerId_
             << ", hostId=" << (uint32_t)hostId_
-            << ", received hostId=" << (uint32_t)connIdParam.hostId;
+            << ", received hostId=" << (uint32_t)connIdParam->hostId;
     QUIC_STATS(
         infoCallback_,
         onPacketDropped,
@@ -480,7 +491,7 @@ void QuicServerWorker::dispatchPacketData(
 
   // There's no existing connection for the packet's CID or the client's
   // addr, and doesn't belong to the old server. Send a Reset.
-  if (connIdParam.processId == static_cast<uint8_t>(processId_)) {
+  if (connIdParam->processId == static_cast<uint8_t>(processId_)) {
     QUIC_STATS(
         infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
     return sendResetPacket(

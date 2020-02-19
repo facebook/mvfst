@@ -17,6 +17,7 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
+#include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
@@ -622,6 +623,46 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
+  eventbase_.loop();
+}
+
+TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
+  auto data = createData(kDefaultUDPSendPacketLen);
+  auto srcConnId = getTestConnectionId(0);
+  auto dstConnId = getTestConnectionId(1);
+  auto mockConnIdAlgo = std::make_unique<MockConnectoinIdAlgo>();
+  auto rawConnIdAlgo = mockConnIdAlgo.get();
+  worker_->setConnectionIdAlgo(std::move(mockConnIdAlgo));
+
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(
+      LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  // To force dropping path, set initial to false
+  RoutingData routingData(
+      HeaderForm::Long,
+      false /* isInitial */,
+      true /* isUsingClientCid */,
+      dstConnId,
+      srcConnId);
+  NetworkData networkData(std::move(packet), Clock::now());
+
+  EXPECT_CALL(*rawConnIdAlgo, canParse(_)).WillOnce(Return(true));
+  EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
+      .WillOnce(Return(folly::makeUnexpected(QuicInternalException(
+          "This CID has COVID-19", LocalErrorCode::INTERNAL_ERROR))));
+  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  worker_->dispatchPacketData(
+      kClientAddr, std::move(routingData), std::move(networkData));
   eventbase_.loop();
 }
 
