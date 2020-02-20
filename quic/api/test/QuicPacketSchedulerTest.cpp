@@ -140,7 +140,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   EXPECT_GT(builder2.remainingSpaceInPkt(), 0);
 }
 
-TEST_F(QuicPacketSchedulerTest, CryptoServerInitialNotPadded) {
+TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   QuicServerConnectionState conn;
   auto connId = getTestConnectionId();
   PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
@@ -159,7 +159,22 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialNotPadded) {
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
   scheduler.writeCryptoData(builder1);
-  EXPECT_GT(builder1.remainingSpaceInPkt(), 0);
+  EXPECT_EQ(builder1.remainingSpaceInPkt(), 0);
+  nextPacketNum++;
+  LongHeader longHeader2(
+      LongHeader::Types::Initial,
+      getTestConnectionId(1),
+      connId,
+      nextPacketNum,
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(longHeader2),
+      conn.ackStates.initialAckState.largestAckedByPeer);
+  writeDataToQuicStream(
+      conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
+  scheduler.writeCryptoData(builder2);
+  EXPECT_GT(builder2.remainingSpaceInPkt(), 0);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {

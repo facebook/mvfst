@@ -476,11 +476,13 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
       cryptoDataWritten = true;
     }
   }
-  if (cryptoDataWritten && conn_.nodeType == QuicNodeType::Client) {
+  if (cryptoDataWritten) {
     const LongHeader* longHeader = builder.getPacketHeader().asLong();
     bool initialPacket =
         longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
-    if (initialPacket) {
+    if (initialPacket &&
+        (conn_.nodeType == QuicNodeType::Client ||
+         longHeader->getPacketSequenceNum() == 0)) {
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
         writeFrame(PaddingFrame(), builder);
