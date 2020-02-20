@@ -289,7 +289,8 @@ class QuicServerTransportTest : public Test {
     initialDestinationConnectionId->data()[0] ^= 0x1;
     // set server chosen connId with processId = 0 and workerId = 1
     ServerConnectionIdParams params(0, 0, 1);
-    auto sock = std::make_unique<folly::test::MockAsyncUDPSocket>(&evb);
+    auto sock =
+        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
     socket = sock.get();
     EXPECT_CALL(*sock, write(_, _))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -311,7 +312,7 @@ class QuicServerTransportTest : public Test {
     server->setServerConnectionIdParams(params);
     server->getNonConstConn().transportSettings.statelessResetTokenSecret =
         getRandSecret();
-    transportInfoCb_ = std::make_unique<MockQuicStats>();
+    transportInfoCb_ = std::make_unique<NiceMock<MockQuicStats>>();
     server->setTransportInfoCallback(transportInfoCb_.get());
     initializeServerHandshake();
     server->getNonConstConn().handshakeLayer.reset(fakeHandshake);
@@ -672,8 +673,8 @@ class QuicServerTransportTest : public Test {
   EventBase evb;
   SocketAddress serverAddr;
   SocketAddress clientAddr;
-  MockConnectionCallback connCallback;
-  MockRoutingCallback routingCallback;
+  NiceMock<MockConnectionCallback> connCallback;
+  NiceMock<MockRoutingCallback> routingCallback;
   folly::Optional<ConnectionId> clientConnectionId;
   folly::Optional<ConnectionId> initialDestinationConnectionId;
   folly::Optional<ConnectionId> serverConnectionId;

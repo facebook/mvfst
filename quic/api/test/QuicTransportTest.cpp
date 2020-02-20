@@ -178,13 +178,13 @@ class QuicTransportTest : public Test {
 
   void SetUp() override {
     std::unique_ptr<MockAsyncUDPSocket> sock =
-        std::make_unique<MockAsyncUDPSocket>(&evb_);
+        std::make_unique<NiceMock<MockAsyncUDPSocket>>(&evb_);
     socket_ = sock.get();
     transport_.reset(
         new TestQuicTransport(&evb_, std::move(sock), connCallback_));
     // Set the write handshake state to tell the client that the handshake has
     // a cipher.
-    auto aead = std::make_unique<MockAead>();
+    auto aead = std::make_unique<NiceMock<MockAead>>();
     aead_ = aead.get();
     EXPECT_CALL(*aead_, _encrypt(_, _, _))
         .WillRepeatedly(
@@ -221,8 +221,8 @@ class QuicTransportTest : public Test {
  protected:
   folly::EventBase evb_;
   MockAsyncUDPSocket* socket_;
-  MockConnectionCallback connCallback_;
-  MockWriteCallback writeCallback_;
+  NiceMock<MockConnectionCallback> connCallback_;
+  NiceMock<MockWriteCallback> writeCallback_;
   MockAead* aead_;
   std::unique_ptr<PacketNumberCipher> headerCipher_;
   std::shared_ptr<TestQuicTransport> transport_;
@@ -333,7 +333,8 @@ void verifyCorrectness(
 TEST_F(QuicTransportTest, WriteDataWithProbing) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
@@ -372,7 +373,8 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
 TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -395,7 +397,8 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
 TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -421,7 +424,8 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
 TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -438,7 +442,8 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
 TEST_F(QuicTransportTest, AppLimited) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -1318,7 +1323,8 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
   ASSERT_FALSE(conn.debugState.needsWriteLoopDetect);
   ASSERT_EQ(0, conn.debugState.currentEmptyLoopCount);
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -1793,7 +1799,7 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
-  MockDeliveryCallback mockedDeliveryCallback;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
@@ -1824,7 +1830,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
-  MockDeliveryCallback mockedDeliveryCallback;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(20);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
@@ -1846,7 +1852,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
-  MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
+      mockedDeliveryCallback2;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
@@ -1884,7 +1891,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
-  MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
+      mockedDeliveryCallback2;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
@@ -1927,8 +1935,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
 }
 
 TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
-  MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2,
-      mockedDeliveryCallback3;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
+      mockedDeliveryCallback2, mockedDeliveryCallback3;
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
   EXPECT_CALL(*socket_, write(_, _)).WillRepeatedly(Invoke(bufLength));
@@ -2291,7 +2299,8 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   auto s1 = transport_->createBidirectionalStream().value();
   auto s2 = transport_->createBidirectionalStream().value();
 
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
@@ -2471,12 +2480,13 @@ TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {
 
 TEST_F(QuicTransportTest, PacingWillBurstFirst) {
   auto& conn = transport_->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
-  auto mockPacer = std::make_unique<MockPacer>();
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -2494,12 +2504,13 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
 TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   transport_->setPacingTimer(TimerHighRes::newTimer(&evb_, 1ms));
   auto& conn = transport_->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
-  auto mockPacer = std::make_unique<MockPacer>();
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
@@ -2526,12 +2537,13 @@ TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
 
 TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   auto& conn = transport_->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   conn.transportSettings.pacingEnabled = true;
   conn.canBePaced = true;
-  auto mockPacer = std::make_unique<MockPacer>();
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
   auto rawPacer = mockPacer.get();
   conn.pacer = std::move(mockPacer);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())

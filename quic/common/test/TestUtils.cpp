@@ -147,7 +147,7 @@ std::shared_ptr<fizz::server::FizzServerContext> createServerCtx() {
   serverCtx->setFactory(std::make_shared<QuicFizzFactory>());
   serverCtx->setCertManager(std::move(certManager));
   serverCtx->setOmitEarlyRecordLayer(true);
-  serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
+  serverCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
   return serverCtx;
 }
 
@@ -229,7 +229,7 @@ QuicCachedPsk setupZeroRttOnClientCtx(
   psk.version = clientCtx.getSupportedVersions()[0];
   psk.cipher = clientCtx.getSupportedCiphers()[0];
   psk.group = clientCtx.getSupportedGroups()[0];
-  auto mockCert = std::make_shared<fizz::test::MockCert>();
+  auto mockCert = std::make_shared<NiceMock<fizz::test::MockCert>>();
   ON_CALL(*mockCert, getIdentity()).WillByDefault(Return(hostname));
   psk.serverCert = mockCert;
   psk.alpn = clientCtx.getSupportedAlpns()[0];

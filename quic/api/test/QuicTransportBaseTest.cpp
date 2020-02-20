@@ -373,7 +373,8 @@ class QuicTransportImplTest : public Test {
  public:
   void SetUp() override {
     evb = std::make_unique<folly::EventBase>();
-    auto socket = std::make_unique<folly::test::MockAsyncUDPSocket>(evb.get());
+    auto socket =
+        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(evb.get());
     socketPtr = socket.get();
     transport = std::make_shared<TestQuicTransport>(
         evb.get(), std::move(socket), connCallback);
@@ -394,7 +395,7 @@ class QuicTransportImplTest : public Test {
 
  protected:
   std::unique_ptr<folly::EventBase> evb;
-  MockConnectionCallback connCallback;
+  NiceMock<MockConnectionCallback> connCallback;
   std::shared_ptr<TestQuicTransport> transport;
   folly::test::MockAsyncUDPSocket* socketPtr;
 };
@@ -448,9 +449,9 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailable) {
   auto stream2 = transport->createBidirectionalStream().value();
   StreamId stream3 = 0x6;
 
-  MockReadCallback readCb1;
-  MockReadCallback readCb2;
-  MockReadCallback readCb3;
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
+  NiceMock<MockReadCallback> readCb3;
 
   transport->setReadCallback(stream1, &readCb1);
   transport->setReadCallback(stream2, &readCb2);
@@ -493,8 +494,8 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailable) {
 TEST_F(QuicTransportImplTest, ReadCallbackChangeReadCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
 
   EXPECT_TRUE(transport->setReadCallback(stream1, nullptr).hasError());
 
@@ -526,8 +527,8 @@ TEST_F(QuicTransportImplTest, ReadCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
 
   // Set the read callbacks, and then add data to the stream, and see that the
   // callbacks are, in fact, called.
@@ -566,8 +567,8 @@ TEST_F(QuicTransportImplTest, ReadCallbackUnsetAll) {
 TEST_F(QuicTransportImplTest, ReadCallbackPauseResume) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
-  MockReadCallback readCb1;
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
 
   transport->setReadCallback(stream1, &readCb1);
   transport->setReadCallback(stream2, &readCb2);
@@ -611,7 +612,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackNoCallbackSet) {
 }
 
 TEST_F(QuicTransportImplTest, ReadCallbackInvalidStream) {
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(transport->setReadCallback(invalidStream, &readCb1).hasError());
   transport.reset();
@@ -620,7 +621,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackInvalidStream) {
 TEST_F(QuicTransportImplTest, ReadData) {
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   transport->setReadCallback(stream1, &readCb1);
@@ -654,7 +655,7 @@ TEST_F(QuicTransportImplTest, ReadData) {
 TEST_F(QuicTransportImplTest, UnidirectionalReadData) {
   auto stream1 = 0x6;
 
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0));
@@ -686,7 +687,7 @@ TEST_F(QuicTransportImplTest, ReadDataUnsetReadCallbackInCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   transport->setReadCallback(stream1, &readCb1);
 
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0, true));
@@ -721,7 +722,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
 
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
-  MockReadCallback streamRead;
+  NiceMock<MockReadCallback> streamRead;
 
   for (StreamId start = 0x00; start <= clientOutOfOrderStream;
        start += kStreamIncrement) {
@@ -770,7 +771,7 @@ TEST_F(QuicTransportImplTest, ReadDataInvalidStream) {
 TEST_F(QuicTransportImplTest, ReadError) {
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   transport->setReadCallback(stream1, &readCb1);
@@ -786,8 +787,8 @@ TEST_F(QuicTransportImplTest, ReadCallbackDeleteTransport) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
 
   transport->setReadCallback(stream1, &readCb1);
   transport->setReadCallback(stream2, &readCb2);
@@ -866,7 +867,7 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   transport->addCryptoData(StreamBuffer(readData->clone(), 0, true));
 
-  MockReadCallback stream2Read;
+  NiceMock<MockReadCallback> stream2Read;
   StreamId stream2 = 0x00;
   EXPECT_CALL(connCallback, onNewBidirectionalStream(stream2))
       .WillOnce(Invoke(
@@ -874,7 +875,7 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
   transport->addDataToStream(stream2, StreamBuffer(readData->clone(), 0, true));
 
   StreamId stream3 = 0x10;
-  MockReadCallback streamRead;
+  NiceMock<MockReadCallback> streamRead;
   for (StreamId start = stream2 + kStreamIncrement; start <= stream3;
        start += kStreamIncrement) {
     EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
@@ -1043,7 +1044,7 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
   transport->transportConn->qLogger = qLogger;
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
   transport->setReadCallback(stream1, &readCb1);
 
   transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
@@ -1065,7 +1066,7 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
 
 TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
   auto stream2 = transport->createBidirectionalStream().value();
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb2;
   transport->setReadCallback(stream2, &readCb2);
 
   transport->addDataToStream(
@@ -1083,7 +1084,8 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
 }
 
 TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksDeque) {
-  MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
+      mockedDeliveryCallback2;
   std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>> callbacks;
   callbacks.emplace_back(0, &mockedDeliveryCallback1);
   callbacks.emplace_back(100, &mockedDeliveryCallback2);
@@ -1094,7 +1096,8 @@ TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksDeque) {
 }
 
 TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksMap) {
-  MockDeliveryCallback mockedDeliveryCallback1, mockedDeliveryCallback2;
+  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
+      mockedDeliveryCallback2;
   folly::F14FastMap<
       StreamId,
       std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>
@@ -1115,8 +1118,8 @@ TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {
 TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
@@ -1135,8 +1138,8 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetAll) {
 TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
@@ -1157,8 +1160,8 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpire) {
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
@@ -1183,8 +1186,8 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpireCallbacksLeft) {
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream1, 20, &dcb1);
@@ -1206,9 +1209,9 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpireCallbacksLeft) {
 
 TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpected) {
   auto stream = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
-  MockDeliveryCallback dcb3;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+  NiceMock<MockDeliveryCallback> dcb3;
 
   transport->registerDeliveryCallback(stream, 10, &dcb1);
   transport->registerDeliveryCallback(stream, 20, &dcb2);
@@ -1228,7 +1231,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpected) {
 
 TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpectedClose) {
   auto stream = transport->createBidirectionalStream().value();
-  MockDeliveryCallback dcb;
+  NiceMock<MockDeliveryCallback> dcb;
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   streamState->currentWriteOffset = 7;
 
@@ -1239,7 +1242,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpectedClose) {
 }
 
 TEST_F(QuicTransportImplTest, TestNotifyPendingConnWriteOnCloseWithoutError) {
-  MockWriteCallback wcb;
+  NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(wcb, onConnectionWriteError(IsError(LocalErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnConnection(&wcb);
   transport->close(folly::none);
@@ -1247,7 +1250,7 @@ TEST_F(QuicTransportImplTest, TestNotifyPendingConnWriteOnCloseWithoutError) {
 }
 
 TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
-  MockWriteCallback wcb;
+  NiceMock<MockWriteCallback> wcb;
   transport->notifyPendingWriteOnConnection(&wcb);
   if (GetParam()) {
     EXPECT_CALL(
@@ -1265,7 +1268,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
 
 TEST_F(QuicTransportImplTest, TestNotifyPendingWriteWithActiveCallback) {
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
+  NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(wcb, onStreamWriteReady(stream, _));
   auto ok1 = transport->notifyPendingWriteOnStream(stream, &wcb);
   EXPECT_TRUE(ok1.hasValue());
@@ -1276,7 +1279,7 @@ TEST_F(QuicTransportImplTest, TestNotifyPendingWriteWithActiveCallback) {
 
 TEST_F(QuicTransportImplTest, TestNotifyPendingWriteOnCloseWithoutError) {
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
+  NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(
       wcb, onStreamWriteError(stream, IsError(LocalErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnStream(stream, &wcb);
@@ -1286,7 +1289,7 @@ TEST_F(QuicTransportImplTest, TestNotifyPendingWriteOnCloseWithoutError) {
 
 TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
+  NiceMock<MockWriteCallback> wcb;
   transport->notifyPendingWriteOnStream(stream, &wcb);
   if (GetParam()) {
     EXPECT_CALL(
@@ -1314,10 +1317,10 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
 
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
-  MockWriteCallback wcbConn;
-  MockReadCallback rcb;
-  MockDeliveryCallback deliveryCb;
+  NiceMock<MockWriteCallback> wcb;
+  NiceMock<MockWriteCallback> wcbConn;
+  NiceMock<MockReadCallback> rcb;
+  NiceMock<MockDeliveryCallback> deliveryCb;
   EXPECT_CALL(
       wcb, onStreamWriteError(stream, IsError(LocalErrorCode::NO_ERROR)));
   EXPECT_CALL(
@@ -1362,10 +1365,10 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
 
 TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
-  MockWriteCallback wcbConn;
-  MockReadCallback rcb;
-  MockDeliveryCallback deliveryCb;
+  NiceMock<MockWriteCallback> wcb;
+  NiceMock<MockWriteCallback> wcbConn;
+  NiceMock<MockReadCallback> rcb;
+  NiceMock<MockDeliveryCallback> deliveryCb;
   EXPECT_CALL(rcb, readError(stream, IsError(LocalErrorCode::NO_ERROR)));
   EXPECT_CALL(deliveryCb, onDeliveryAck(stream, _, _));
 
@@ -1401,10 +1404,10 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
 
 TEST_F(QuicTransportImplTest, TestImmediateClose) {
   auto stream = transport->createBidirectionalStream().value();
-  MockWriteCallback wcb;
-  MockWriteCallback wcbConn;
-  MockReadCallback rcb;
-  MockDeliveryCallback deliveryCb;
+  NiceMock<MockWriteCallback> wcb;
+  NiceMock<MockWriteCallback> wcbConn;
+  NiceMock<MockReadCallback> rcb;
+  NiceMock<MockDeliveryCallback> deliveryCb;
   EXPECT_CALL(
       wcb,
       onStreamWriteError(
@@ -1536,7 +1539,8 @@ INSTANTIATE_TEST_CASE_P(
 
 TEST_P(QuicTransportImplTestUniBidi, AppIdleTest) {
   auto& conn = transport->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
@@ -1549,7 +1553,8 @@ TEST_P(QuicTransportImplTestUniBidi, AppIdleTest) {
 
 TEST_P(QuicTransportImplTestUniBidi, AppIdleTestControlStreams) {
   auto& conn = transport->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
@@ -1570,7 +1575,8 @@ TEST_P(QuicTransportImplTestUniBidi, AppIdleTestControlStreams) {
 
 TEST_P(QuicTransportImplTestUniBidi, AppIdleTestOnlyControlStreams) {
   auto& conn = transport->getConnectionState();
-  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
@@ -1660,8 +1666,8 @@ TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockPeekCallback peekCb1;
-  MockPeekCallback peekCb2;
+  NiceMock<MockPeekCallback> peekCb1;
+  NiceMock<MockPeekCallback> peekCb2;
 
   transport->setPeekCallback(stream1, &peekCb1);
   transport->setPeekCallback(stream2, &peekCb2);
@@ -1703,8 +1709,8 @@ TEST_F(QuicTransportImplTest, PeekCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockPeekCallback peekCb1;
-  MockPeekCallback peekCb2;
+  NiceMock<MockPeekCallback> peekCb1;
+  NiceMock<MockPeekCallback> peekCb2;
 
   // Set the peek callbacks and add data to the streams, and see that the
   // callbacks do indeed fire
@@ -1743,8 +1749,8 @@ TEST_F(QuicTransportImplTest, PeekCallbackChangePeekCallback) {
 
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockPeekCallback peekCb1;
-  MockPeekCallback peekCb2;
+  NiceMock<MockPeekCallback> peekCb1;
+  NiceMock<MockPeekCallback> peekCb2;
 
   transport->setPeekCallback(stream1, &peekCb1);
 
@@ -1767,7 +1773,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackPauseResume) {
   InSequence enforceOrder;
 
   auto stream1 = transport->createBidirectionalStream().value();
-  MockPeekCallback peekCb1;
+  NiceMock<MockPeekCallback> peekCb1;
 
   transport->setPeekCallback(stream1, &peekCb1);
 
@@ -1805,7 +1811,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackNoCallbackSet) {
 }
 
 TEST_F(QuicTransportImplTest, PeekCallbackInvalidStream) {
-  MockPeekCallback peekCb1;
+  NiceMock<MockPeekCallback> peekCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(transport->setPeekCallback(invalidStream, &peekCb1).hasError());
   transport.reset();
@@ -1816,7 +1822,7 @@ TEST_F(QuicTransportImplTest, PeekData) {
 
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockPeekCallback peekCb1;
+  NiceMock<MockPeekCallback> peekCb1;
   auto peekData = folly::IOBuf::copyBuffer("actual stream data");
 
   transport->setPeekCallback(stream1, &peekCb1);
@@ -1899,8 +1905,8 @@ TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
-  MockPeekCallback peekCb;
-  MockReadCallback readCb;
+  NiceMock<MockPeekCallback> peekCb;
+  NiceMock<MockReadCallback> readCb;
 
   transport->setPeekCallback(stream1, &peekCb);
   transport->setReadCallback(stream1, &readCb);
@@ -2077,9 +2083,9 @@ TEST_F(QuicTransportImplTest, DataExpiredCallbackDataAvailable) {
   auto stream2 = transport->createBidirectionalStream().value();
   StreamId stream3 = 0x6;
 
-  MockDataExpiredCallback dataExpiredCb1;
-  MockDataExpiredCallback dataExpiredCb2;
-  MockDataExpiredCallback dataExpiredCb3;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb1;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb2;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb3;
 
   transport->setDataExpiredCallback(stream1, &dataExpiredCb1);
   transport->setDataExpiredCallback(stream2, &dataExpiredCb2);
@@ -2104,8 +2110,8 @@ TEST_F(QuicTransportImplTest, DataExpiredCallbackDataAvailableWithDataRead) {
 
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockDataExpiredCallback dataExpiredCb1;
-  MockReadCallback readCb1;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb1;
+  NiceMock<MockReadCallback> readCb1;
 
   transport->setDataExpiredCallback(stream1, &dataExpiredCb1);
   transport->setReadCallback(stream1, &readCb1);
@@ -2157,7 +2163,7 @@ TEST_F(
 
   TestDataExpiredCallback peekExecCb =
       TestDataExpiredCallback(*transport, stream1);
-  MockReadCallback readCb1;
+  NiceMock<MockReadCallback> readCb1;
 
   transport->setDataExpiredCallback(stream1, &peekExecCb);
   transport->setReadCallback(stream1, &readCb1);
@@ -2181,8 +2187,8 @@ TEST_F(QuicTransportImplTest, DataExpiredCallbackChangeCallback) {
 
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockDataExpiredCallback dataExpiredCb1;
-  MockDataExpiredCallback dataExpiredCb2;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb1;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb2;
 
   transport->setDataExpiredCallback(stream1, &dataExpiredCb1);
   EXPECT_CALL(dataExpiredCb1, onDataExpired(stream1, 5));
@@ -2214,7 +2220,7 @@ TEST_F(QuicTransportImplTest, DataExpiredCallbackNoCallbackSet) {
 TEST_F(QuicTransportImplTest, DataExpiredCallbackInvalidStream) {
   transport->transportConn->partialReliabilityEnabled = true;
 
-  MockDataExpiredCallback dataExpiredCb1;
+  NiceMock<MockDataExpiredCallback> dataExpiredCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(transport->setDataExpiredCallback(invalidStream, &dataExpiredCb1)
                   .hasError());
@@ -2270,9 +2276,9 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackDataAvailable) {
   auto stream2 = transport->createBidirectionalStream().value();
   StreamId stream3 = 0x6;
 
-  MockDataRejectedCallback dataRejectedCb1;
-  MockDataRejectedCallback dataRejectedCb2;
-  MockDataRejectedCallback dataRejectedCb3;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb1;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb2;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb3;
 
   transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
   transport->setDataRejectedCallback(stream2, &dataRejectedCb2);
@@ -2297,10 +2303,10 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
-  MockDataRejectedCallback dataRejectedCb1;
-  MockDataRejectedCallback dataRejectedCb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb1;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
@@ -2341,10 +2347,10 @@ TEST_F(
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
-  MockDeliveryCallback dcb1;
-  MockDeliveryCallback dcb2;
-  MockDataRejectedCallback dataRejectedCb1;
-  MockDataRejectedCallback dataRejectedCb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb1;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb2;
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream1, 25, &dcb1);
@@ -2384,8 +2390,8 @@ TEST_F(QuicTransportImplTest, DataRejectedCallbackChangeCallback) {
 
   auto stream1 = transport->createBidirectionalStream().value();
 
-  MockDataRejectedCallback dataRejectedCb1;
-  MockDataRejectedCallback dataRejectedCb2;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb1;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb2;
 
   transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
   EXPECT_CALL(dataRejectedCb1, onDataRejected(stream1, 5));
@@ -2417,7 +2423,7 @@ TEST_F(QuicTransportImplTest, DataRejectedCallbackNoCallbackSet) {
 TEST_F(QuicTransportImplTest, DataRejectedCallbackInvalidStream) {
   transport->transportConn->partialReliabilityEnabled = true;
 
-  MockDataRejectedCallback dataRejectedCb1;
+  NiceMock<MockDataRejectedCallback> dataRejectedCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(
       transport->setDataRejectedCallback(invalidStream, &dataRejectedCb1)
@@ -2455,9 +2461,9 @@ TEST_F(QuicTransportImplTest, SendDataRejected) {
 TEST_F(QuicTransportImplTest, CloseFromCancelDeliveryCallbacksForStream) {
   auto stream1 = *transport->createBidirectionalStream();
   auto stream2 = *transport->createBidirectionalStream();
-  MockDeliveryCallback deliveryCallback1;
-  MockDeliveryCallback deliveryCallback2;
-  MockDeliveryCallback deliveryCallback3;
+  NiceMock<MockDeliveryCallback> deliveryCallback1;
+  NiceMock<MockDeliveryCallback> deliveryCallback2;
+  NiceMock<MockDeliveryCallback> deliveryCallback3;
 
   transport->registerDeliveryCallback(stream1, 10, &deliveryCallback1);
   transport->registerDeliveryCallback(stream1, 20, &deliveryCallback2);

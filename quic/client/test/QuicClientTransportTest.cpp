@@ -197,7 +197,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<fizz::client::FizzClientContext> createClientContext() {
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setSupportedAlpns({"h1q-fb"});
-    clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
+    clientCtx->setClock(std::make_shared<NiceMock<fizz::test::MockClock>>());
     return clientCtx;
   }
 
@@ -325,8 +325,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::string hostname;
   folly::EventBase eventbase_;
   folly::SocketAddress serverAddr;
-  MockConnectionCallback clientConnCallback;
-  MockReadCallback readCb;
+  NiceMock<MockConnectionCallback> clientConnCallback;
+  NiceMock<MockReadCallback> readCb;
   std::shared_ptr<TestingQuicClientTransport> client;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
   std::shared_ptr<fizz::client::FizzClientContext> clientCtx;
@@ -808,7 +808,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb2;
   folly::ScopedEventBaseThread newEvb;
   expectTransportCallbacks();
   client->start(&clientConnCallback);
@@ -869,7 +869,7 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
   auto server2Addr = server2->getAddress();
   client->getNonConstConn().peerAddress = server2Addr;
 
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb2;
   bool resetRecvd = false;
   auto streamId2 = client->createBidirectionalStream().value();
   auto f2 = sendRequestAndResponse(data->clone(), streamId2, &readCb2)
@@ -914,7 +914,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
   auto server2Addr = server2->getAddress();
   client->getNonConstConn().peerAddress = server2Addr;
 
-  MockReadCallback readCb2;
+  NiceMock<MockReadCallback> readCb2;
   bool resetRecvd = false;
   auto streamId2 = client->createBidirectionalStream().value();
   sendRequestAndResponse(data->clone(), streamId2, &readCb2)
@@ -1303,8 +1303,8 @@ class QuicClientTransportTest : public Test {
       : eventbase_(std::make_unique<folly::EventBase>()) {}
 
   void SetUp() override final {
-    auto socket =
-        std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+    auto socket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+        eventbase_.get());
     sock = socket.get();
 
     auto fizzClientContext =
@@ -1688,9 +1688,9 @@ class QuicClientTransportTest : public Test {
  protected:
   std::vector<std::unique_ptr<folly::IOBuf>> socketWrites;
   std::deque<TestReadData> socketReads;
-  MockDeliveryCallback deliveryCallback;
-  MockReadCallback readCb;
-  MockConnectionCallback clientConnCallback;
+  NiceMock<MockDeliveryCallback> deliveryCallback;
+  NiceMock<MockReadCallback> readCb;
+  NiceMock<MockConnectionCallback> clientConnCallback;
   folly::test::MockAsyncUDPSocket* sock;
   std::shared_ptr<DestructionCallback> destructionCallback;
   std::unique_ptr<folly::EventBase> eventbase_;
@@ -1799,8 +1799,8 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
-  auto newSocket =
-      std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+  auto newSocket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+      eventbase_.get());
   auto newSocketPtr = newSocket.get();
   EXPECT_CALL(*sock, pauseRead());
   EXPECT_CALL(*sock, close());
@@ -1815,8 +1815,8 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
 }
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
-  auto newSocket =
-      std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+  auto newSocket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+      eventbase_.get());
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
@@ -2087,7 +2087,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
  public:
   void SetUpChild() override {
     auto secondSocket =
-        std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+            eventbase_.get());
     secondSock = secondSocket.get();
 
     client->setHappyEyeballsEnabled(true);
@@ -4172,7 +4173,7 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
-  MockWriteCallback writeCallback;
+  NiceMock<MockWriteCallback> writeCallback;
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_));
   client->notifyPendingWriteOnConnection(&writeCallback);
   loopForWrites();
@@ -4180,7 +4181,7 @@ TEST_F(QuicClientTransportAfterStartTest, NotifyPendingWrite) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SwitchEvbWhileAsyncEventPending) {
-  MockWriteCallback writeCallback;
+  NiceMock<MockWriteCallback> writeCallback;
   EventBase evb2;
   EXPECT_CALL(writeCallback, onConnectionWriteReady(_)).Times(0);
   client->notifyPendingWriteOnConnection(&writeCallback);
@@ -4640,7 +4641,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
   StreamId streamId = client->createBidirectionalStream().value();
   StreamId streamId2 = client->createBidirectionalStream().value();
 
-  MockDeliveryCallback deliveryCallback2;
+  NiceMock<MockDeliveryCallback> deliveryCallback2;
   auto data = IOBuf::copyBuffer("hello");
   client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
   client->writeChain(streamId2, data->clone(), true, false, &deliveryCallback2);
@@ -4963,7 +4964,7 @@ class QuicClientTransportPskCacheTest
     : public QuicClientTransportAfterStartTestBase {
  public:
   void SetUpChild() override {
-    mockPskCache_ = std::make_shared<MockQuicPskCache>();
+    mockPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockPskCache_);
     QuicClientTransportAfterStartTestBase::SetUpChild();
   }
@@ -5061,7 +5062,7 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
     // Ignore path mtu to test negotiation.
     clientSettings.canIgnorePathMTU = true;
     client->setTransportSettings(clientSettings);
-    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    mockQuicPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockQuicPskCache_);
   }
 
@@ -5329,11 +5330,12 @@ class QuicZeroRttHappyEyeballsClientTransportTest
  public:
   void SetUpChild() override {
     client->setHostname(hostname_);
-    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    mockQuicPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockQuicPskCache_);
 
     auto secondSocket =
-        std::make_unique<folly::test::MockAsyncUDPSocket>(eventbase_.get());
+        std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+            eventbase_.get());
     secondSock = secondSocket.get();
 
     client->setHappyEyeballsEnabled(true);

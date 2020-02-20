@@ -474,7 +474,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  MockFrameScheduler mockScheduler;
+  NiceMock<MockFrameScheduler> mockScheduler;
   CloningScheduler cloningScheduler(mockScheduler, conn, "Mocker", 0);
   ShortHeader header(
       ProtectionType::KeyPhaseOne,
@@ -743,7 +743,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   EXPECT_EQ(conn.schedulingState.nextScheduledStream, 4);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
-  MockQuicPacketBuilder builder2;
+  NiceMock<MockQuicPacketBuilder> builder2;
   EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
   EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
     builder2.frames_.push_back(f);
@@ -818,7 +818,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
   // Should write frames for stream2, stream4, followed by stream 3 then 1.
-  MockQuicPacketBuilder builder2;
+  NiceMock<MockQuicPacketBuilder> builder2;
   EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
   EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
     builder2.frames_.push_back(f);
@@ -872,7 +872,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
   StreamFrameScheduler scheduler(conn);
-  MockQuicPacketBuilder builder;
+  NiceMock<MockQuicPacketBuilder> builder;
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   auto stream2 =
