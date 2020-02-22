@@ -17,6 +17,7 @@
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
 #include <folly/io/Cursor.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
@@ -5565,7 +5566,8 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
       folly::SocketAddress("127.0.0.1", 12345),
       transportSettings,
       &errMessageCallback,
-      &readCallback);
+      &readCallback,
+      folly::emptySocketOptionMap);
 
   socket.pauseRead();
   socket.close();

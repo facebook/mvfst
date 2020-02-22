@@ -14,6 +14,7 @@
 
 #include <folly/ThreadLocal.h>
 #include <folly/container/F14Map.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/QuicConstants.h>
@@ -123,6 +124,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void setFizzContext(
       folly::EventBase* evb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx);
+
+  /**
+   * Set socket options for the underlying socket.
+   * Options are being set before and after bind, and not at the time of
+   * invoking this function.
+   */
+  void setSocketOptions(const folly::SocketOptionMap& options) noexcept {
+    socketOptions_ = options;
+  }
 
   /**
    * Set the server id of the quic server.
@@ -369,6 +379,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
   // address that the server is bound to
   folly::SocketAddress boundAddress_;
+  folly::SocketOptionMap socketOptions_;
 };
 
 } // namespace quic

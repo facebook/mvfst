@@ -13,7 +13,6 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
-#include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
 
@@ -206,6 +205,7 @@ void QuicServer::bindWorkersToSocket(
       if (self->listeningFDs_.size() > idx) {
         takeoverOverFd = self->listeningFDs_[idx];
       }
+      worker->setSocketOptions(&self->socketOptions_);
       // dup the takenover socket on only one worker and bind the rest
       if (takeoverOverFd >= 0) {
         workerSocket->setFD(
@@ -219,6 +219,7 @@ void QuicServer::bindWorkersToSocket(
         }
         VLOG(4) << "Set up dup()'ed fd for address=" << self->boundAddress_
                 << " on workerId=" << (int)worker->getWorkerId();
+        worker->applyAllSocketOptions();
       } else {
         VLOG(4) << "No valid takenover fd found for address="
                 << self->boundAddress_ << ". binding on worker=" << worker

@@ -10,6 +10,7 @@
 
 #include <folly/container/F14Map.h>
 #include <folly/container/F14Set.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 
 #include <quic/codec/ConnectionIdAlgo.h>
@@ -64,6 +65,13 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void setSocket(std::unique_ptr<folly::AsyncUDPSocket> socket);
 
   /**
+   * Sets the socket options
+   */
+  void setSocketOptions(folly::SocketOptionMap* options) {
+    socketOptions_ = options;
+  }
+
+  /**
    * Binds to the given address
    */
   void bind(const folly::SocketAddress& address);
@@ -87,6 +95,12 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * Returns the File Descriptor of the listening socket
    */
   int getFD();
+
+  /*
+   * Apply all the socket options (pre/post bind).
+   * Called after takeover.
+   */
+  void applyAllSocketOptions();
 
   /**
    * Initialize and bind given listening socket to the given takeover address
@@ -341,6 +355,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       LongHeaderInvariant& invariant);
 
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
+  folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
   folly::EventBase* evb_{nullptr};
 

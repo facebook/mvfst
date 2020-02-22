@@ -1246,7 +1246,8 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
             ? kHappyEyeballsV4Delay
             : kHappyEyeballsConnAttemptDelayWithCache,
         this,
-        this);
+        this,
+        socketOptions_);
   }
 
   CHECK(conn_->peerAddress.isInitialized());
@@ -1263,7 +1264,8 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
         conn_->peerAddress,
         conn_->transportSettings,
         this,
-        this);
+        this,
+        socketOptions_);
     startCryptoHandshake();
   } catch (const QuicTransportException& ex) {
     runOnEvbAsync([ex](auto self) {
@@ -1424,7 +1426,8 @@ void QuicClientTransport::onNetworkSwitch(
         conn_->peerAddress,
         conn_->transportSettings,
         this,
-        this);
+        this,
+        socketOptions_);
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionMigrationUpdate(true);
     }

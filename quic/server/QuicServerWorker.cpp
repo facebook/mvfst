@@ -7,8 +7,10 @@
  */
 
 #include <folly/io/Cursor.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
+#include <quic/common/SocketUtil.h>
 #include <quic/common/Timers.h>
 
 #include <quic/server/QuicServerWorker.h>
@@ -33,8 +35,38 @@ void QuicServerWorker::setSocket(
 void QuicServerWorker::bind(const folly::SocketAddress& address) {
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
+  if (socketOptions_) {
+    applySocketOptions(
+        *socket_.get(),
+        *socketOptions_,
+        address.getFamily(),
+        folly::SocketOptionKey::ApplyPos::PRE_BIND);
+  }
   socket_->bind(address);
+  if (socketOptions_) {
+    applySocketOptions(
+        *socket_.get(),
+        *socketOptions_,
+        address.getFamily(),
+        folly::SocketOptionKey::ApplyPos::POST_BIND);
+  }
   socket_->setDFAndTurnOffPMTU();
+}
+
+void QuicServerWorker::applyAllSocketOptions() {
+  CHECK(socket_);
+  if (socketOptions_) {
+    applySocketOptions(
+        *socket_.get(),
+        *socketOptions_,
+        getAddress().getFamily(),
+        folly::SocketOptionKey::ApplyPos::PRE_BIND);
+    applySocketOptions(
+        *socket_.get(),
+        *socketOptions_,
+        getAddress().getFamily(),
+        folly::SocketOptionKey::ApplyPos::POST_BIND);
+  }
 }
 
 void QuicServerWorker::setTransportSettingsOverrideFn(

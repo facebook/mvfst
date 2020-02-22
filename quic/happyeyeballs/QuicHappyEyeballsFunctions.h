@@ -10,6 +10,7 @@
 
 #include <quic/state/StateData.h>
 
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetOps.h>
 
@@ -39,7 +40,8 @@ void startHappyEyeballs(
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttemptDelay,
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback);
+    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    const folly::SocketOptionMap& options);
 
 void resetHappyEyeballs(QuicConnectionStateBase& connection);
 
@@ -49,7 +51,8 @@ void happyEyeballsSetUpSocket(
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback);
+    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    const folly::SocketOptionMap& options);
 
 void happyEyeballsStartSecondSocket(
     QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState);

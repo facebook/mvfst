@@ -10,6 +10,7 @@
 
 #include <folly/Random.h>
 #include <folly/SocketAddress.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetOps.h>
 #include <quic/api/QuicTransportBase.h>
@@ -115,6 +116,15 @@ class QuicClientTransport
   void setSupportedVersions(const std::vector<QuicVersion>& versions) override;
 
   /**
+   * Set socket options for the underlying socket.
+   * Options are being set before and after bind, and not at the time of
+   * invoking this function.
+   */
+  void setSocketOptions(const folly::SocketOptionMap& options) noexcept {
+    socketOptions_ = options;
+  }
+
+  /**
    * Make QuicClient transport self owning.
    */
   void setSelfOwning();
@@ -215,7 +225,6 @@ class QuicClientTransport
   void removePsk();
   void setPartialReliabilityTransportParameter();
 
- private:
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned
   // up when the caller invokes a terminal call to the transport.
@@ -225,5 +234,6 @@ class QuicClientTransport
   std::shared_ptr<QuicPskCache> pskCache_;
   QuicClientConnectionState* clientConn_;
   std::vector<TransportParameter> customTransportParameters_;
+  folly::SocketOptionMap socketOptions_;
 };
 } // namespace quic

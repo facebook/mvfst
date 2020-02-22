@@ -8,10 +8,12 @@
 
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
+#include <quic/common/SocketUtil.h>
 #include <quic/logging/QuicLogger.h>
 #include <quic/state/StateData.h>
 
 #include <folly/SocketAddress.h>
+#include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/HHWheelTimer.h>
@@ -64,7 +66,8 @@ void startHappyEyeballs(
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::chrono::milliseconds connAttempDelay,
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback) {
+    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    const folly::SocketOptionMap& options) {
   if (connection.happyEyeballsState.v6PeerAddress.isInitialized() &&
       connection.happyEyeballsState.v4PeerAddress.isInitialized()) {
     // A second socket has to be added before happy eyeballs starts
@@ -98,7 +101,8 @@ void startHappyEyeballs(
           connection.happyEyeballsState.secondPeerAddress,
           connection.transportSettings,
           errMsgCallback,
-          readCallback);
+          readCallback,
+          options);
     } catch (const std::exception&) {
       // If second socket bind throws exception, give it up
       connAttemptDelayTimeout.cancelTimeout();
@@ -123,7 +127,13 @@ void happyEyeballsSetUpSocket(
     const folly::SocketAddress& peerAddress,
     const TransportSettings& transportSettings,
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
-    folly::AsyncUDPSocket::ReadCallback* readCallback) {
+    folly::AsyncUDPSocket::ReadCallback* readCallback,
+    const folly::SocketOptionMap& options) {
+  auto sockFamily = localAddress.hasValue() ? localAddress->getFamily()
+                                            : peerAddress.getFamily();
+
+  applySocketOptions(
+      socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   socket.setReuseAddr(false);
   if (localAddress.hasValue()) {
     socket.bind(*localAddress);
@@ -132,6 +142,8 @@ void happyEyeballsSetUpSocket(
   } else {
     socket.bind(folly::SocketAddress("::", 0));
   }
+  applySocketOptions(
+      socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
   if (transportSettings.turnoffPMTUD) {
     socket.setDFAndTurnOffPMTU();
   } else {
