@@ -23,9 +23,9 @@ std::ostream& operator<<(std::ostream& out, const QuicWriteFrame& /*rhs*/) {
 namespace quic {
 namespace test {
 
-class MockConnectoinIdAlgo : public ConnectionIdAlgo {
+class MockConnectionIdAlgo : public ConnectionIdAlgo {
  public:
-  GMOCK_METHOD1_(, const noexcept, , canParse, bool(const ConnectionId& id));
+  GMOCK_METHOD1_(, noexcept, , canParseNonConst, bool(const ConnectionId& id));
   GMOCK_METHOD1_(
       ,
       noexcept,
@@ -40,6 +40,10 @@ class MockConnectoinIdAlgo : public ConnectionIdAlgo {
       encodeConnectionId,
       folly::Expected<ConnectionId, QuicInternalException>(
           const ServerConnectionIdParams&));
+
+  bool canParse(const ConnectionId& id) const noexcept override {
+    return const_cast<MockConnectionIdAlgo&>(*this).canParseNonConst(id);
+  }
 };
 
 class MockQuicPacketBuilder : public PacketBuilderInterface {

@@ -633,7 +633,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   auto data = createData(kDefaultUDPSendPacketLen);
   auto srcConnId = getTestConnectionId(0);
   auto dstConnId = getTestConnectionId(1);
-  auto mockConnIdAlgo = std::make_unique<MockConnectoinIdAlgo>();
+  auto mockConnIdAlgo = std::make_unique<MockConnectionIdAlgo>();
   auto rawConnIdAlgo = mockConnIdAlgo.get();
   worker_->setConnectionIdAlgo(std::move(mockConnIdAlgo));
 
@@ -656,7 +656,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
       srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
 
-  EXPECT_CALL(*rawConnIdAlgo, canParse(_)).WillOnce(Return(true));
+  EXPECT_CALL(*rawConnIdAlgo, canParseNonConst(_)).WillOnce(Return(true));
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
       .WillOnce(Return(folly::makeUnexpected(QuicInternalException(
           "This CID has COVID-19", LocalErrorCode::INTERNAL_ERROR))));
