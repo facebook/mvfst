@@ -714,7 +714,14 @@ void QuicServerWorker::onConnectionIdAvailable(
   auto result =
       connectionIdMap_.emplace(std::make_pair(id, std::move(transport)));
   if (!result.second) {
-    LOG(ERROR) << "connectionIdMap_ already has CID=" << id;
+    // In the case of duplicates, log if they represent the same transport,
+    // or different ones.
+    auto it = result.first;
+    QuicServerTransport* existingTransportPtr = it->second.get();
+    LOG(ERROR) << "connectionIdMap_ already has CID=" << id
+               << " Is same transport: "
+               << (existingTransportPtr == transportPtr);
+
   } else if (boundServerTransports_.insert(transportPtr).second) {
     QUIC_STATS(infoCallback_, onNewConnection);
   }
@@ -751,7 +758,31 @@ void QuicServerWorker::onConnectionUnbound(
   for (auto& connId : connectionIdData) {
     VLOG(4) << "Removing from connectionIdMap_ for CID=" << connId.connId
             << ", workerId=" << (uint32_t)workerId_;
+    auto it = connectionIdMap_.find(connId.connId);
+    // This should be nullptr in most cases. In order to investigate if
+    // an incorrect server transport is removed, this will be set to the value
+    // of the incorrect transport, to see if boundServerTransports_ will
+    // still hold a pointer to the incorrect transport.
+    QuicServerTransport* incorrectTransportPtr = nullptr;
+    if (it == connectionIdMap_.end()) {
+      LOG(ERROR) << "connectionIdMap_ didn't include CID= " << connId.connId;
+    } else {
+      QuicServerTransport* existingPtr = it->second.get();
+      if (existingPtr != transport) {
+        LOG(ERROR) << "Incorrect transport being removed for duplicate CID="
+                   << connId.connId;
+        incorrectTransportPtr = existingPtr;
+      }
+    }
     connectionIdMap_.erase(connId.connId);
+    if (incorrectTransportPtr != nullptr) {
+      if (boundServerTransports_.find(incorrectTransportPtr) !=
+          boundServerTransports_.end()) {
+        LOG(ERROR)
+            << "boundServerTransports_ contains deleted transport for duplicate CID="
+            << connId.connId;
+      }
+    }
   }
 
   // TODO: verify we are removing the right transport
