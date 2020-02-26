@@ -285,7 +285,7 @@ TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
   serverClientRound();
   expectHandshakeCipher(true);
 
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
 
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::OneRttKeysDerived);
   clientServerRound();
@@ -296,7 +296,7 @@ TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
 
   handshake->onRecvOneRttProtectedData();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Established);
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
   EXPECT_TRUE(handshakeSuccess);
 }
 
@@ -313,7 +313,7 @@ TEST_F(ClientHandshakeTest, TestNoErrorAfterAppClose) {
   // RTT 1/2 server -> client
   EXPECT_NO_THROW(serverClientRound());
   expectOneRttCipher(true);
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
   EXPECT_TRUE(handshakeSuccess);
 }
 
@@ -332,7 +332,7 @@ TEST_F(ClientHandshakeTest, TestAppBytesInterpretedAsHandshake) {
   // RTT 1/2 server -> client
   serverClientRound();
   expectOneRttCipher(true);
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
   EXPECT_TRUE(handshakeSuccess);
 }
 
@@ -428,7 +428,7 @@ TEST_F(ClientHandshakeHRRTest, TestFullHRR) {
   clientServerRound();
   expectOneRttCipher(true);
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::OneRttKeysDerived);
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
   EXPECT_TRUE(handshakeSuccess);
 }
 
@@ -494,7 +494,7 @@ TEST_F(ClientHandshakeZeroRttTest, TestZeroRttSuccess) {
   serverClientRound();
   expectHandshakeCipher(true);
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::OneRttKeysDerived);
-  EXPECT_FALSE(zeroRttRejected.hasValue());
+  EXPECT_FALSE(zeroRttRejected.has_value());
   expectZeroRttCipher(true, true);
   clientServerRound();
   handshake->onRecvOneRttProtectedData();

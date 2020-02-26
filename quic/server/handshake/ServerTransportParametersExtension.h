@@ -57,7 +57,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           fizz::AlertDescription::missing_extension);
     }
     clientTransportParameters_ = std::move(clientParams);
-    if (!clientTransportParameters_->initial_version.hasValue()) {
+    if (!clientTransportParameters_->initial_version.has_value()) {
       negotiatedVersion_ = folly::none;
     }
 

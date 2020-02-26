@@ -337,7 +337,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());
+  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
   EXPECT_EQ(packetNum, *result.first);
 }
 
@@ -383,7 +383,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(regularBuilder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());
+  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
   EXPECT_EQ(packetNum, *result.first);
   // written packet (result.second) should not have any frame in the builder
   auto& writtenPacket = *result.second;
@@ -437,7 +437,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
       conn.ackStates.initialAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());
+  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
   EXPECT_EQ(expected, *result.first);
 }
 
@@ -482,7 +482,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.hasValue() && result.second.hasValue());
+  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
   EXPECT_EQ(expected, *result.first);
 }
 

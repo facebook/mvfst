@@ -757,8 +757,8 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       .WillOnce(Invoke(
           [&](folly::Optional<CongestionController::AckEvent> ackEvent,
               folly::Optional<CongestionController::LossEvent> lossEvent) {
-            EXPECT_FALSE(ackEvent->largestAckedPacket.hasValue());
-            EXPECT_TRUE(lossEvent->largestLostPacketNum.hasValue());
+            EXPECT_FALSE(ackEvent->largestAckedPacket.has_value());
+            EXPECT_TRUE(lossEvent->largestLostPacketNum.has_value());
           }));
 
   // But packet 1 has been outstanding for longer than delayUntilLost:

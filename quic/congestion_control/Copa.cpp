@@ -28,7 +28,7 @@ Copa::Copa(QuicConnectionStateBase& conn)
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
            << conn_;
-  if (conn_.transportSettings.latencyFactor.hasValue()) {
+  if (conn_.transportSettings.latencyFactor.has_value()) {
     latencyFactor_ = conn_.transportSettings.latencyFactor.value();
   }
   QUIC_TRACE(initcwnd, conn_, cwndBytes_);
@@ -72,7 +72,7 @@ void Copa::onPacketSent(const OutstandingPacket& packet) {
  *  has remained the same for three RTTs
  */
 void Copa::checkAndUpdateDirection(const TimePoint ackTime) {
-  if (!velocityState_.lastCwndRecordTime.hasValue()) {
+  if (!velocityState_.lastCwndRecordTime.has_value()) {
     velocityState_.lastCwndRecordTime = ackTime;
     velocityState_.lastRecordedCwndBytes = cwndBytes_;
     return;
@@ -133,14 +133,14 @@ void Copa::onPacketAckOrLoss(
     }
     QUIC_TRACE(copa_loss, conn_, cwndBytes_, bytesInFlight_);
   }
-  if (ack && ack->largestAckedPacket.hasValue()) {
+  if (ack && ack->largestAckedPacket.has_value()) {
     onPacketAcked(*ack);
     QUIC_TRACE(copa_ack, conn_, cwndBytes_, bytesInFlight_);
   }
 }
 
 void Copa::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.hasValue());
+  DCHECK(ack.largestAckedPacket.has_value());
   subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
@@ -215,7 +215,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
     if (isSlowStart_) {
       // When a flow starts, Copa performs slow-start where
       // cwnd doubles once per RTT until current rate exceeds target rate".
-      if (!lastCwndDoubleTime_.hasValue()) {
+      if (!lastCwndDoubleTime_.has_value()) {
         lastCwndDoubleTime_ = ack.ackTime;
       } else if (
           ack.ackTime - lastCwndDoubleTime_.value() > conn_.lossState.srtt) {
@@ -276,7 +276,7 @@ void Copa::onPacketLoss(const LossEvent& loss) {
     conn_.qLogger->addCongestionMetricUpdate(
         bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss);
   }
-  DCHECK(loss.largestLostPacketNum.hasValue());
+  DCHECK(loss.largestLostPacketNum.has_value());
   subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here

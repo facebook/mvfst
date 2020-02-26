@@ -362,7 +362,7 @@ void onConnectionMigration(
   }
   ++conn.migrationState.numMigrations;
 
-  bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.hasValue();
+  bool hasPendingPathChallenge = conn.pendingEvents.pathChallenge.has_value();
   // Clear any pending path challenge frame that is not sent
   conn.pendingEvents.pathChallenge = folly::none;
 
@@ -559,12 +559,12 @@ void onServerReadDataFromOpen(
     }
 
     CHECK(conn.connIdAlgo) << "ConnectionIdAlgo is not set.";
-    CHECK(!conn.serverConnectionId.hasValue());
+    CHECK(!conn.serverConnectionId.has_value());
     // serverConnIdParams must be set by the QuicServerTransport
     CHECK(conn.serverConnIdParams);
 
     auto newServerConnIdData = conn.createAndAddNewSelfConnId();
-    CHECK(newServerConnIdData.hasValue());
+    CHECK(newServerConnIdData.has_value());
     conn.serverConnectionId = newServerConnIdData->connId;
 
     QUIC_STATS(conn.infoCallback, onStatelessReset);

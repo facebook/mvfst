@@ -49,7 +49,7 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.hasValue() && !ack.ackedPackets.empty());
+  DCHECK(ack.largestAckedPacket.has_value() && !ack.ackedPackets.empty());
   subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
@@ -93,7 +93,7 @@ void NewReno::onPacketAckOrLoss(
     // When we start to support pacing in NewReno, we need to call onPacketsLoss
     // on the pacer when there is loss.
   }
-  if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
+  if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
     onAckEvent(*ackEvent);
   }
   // TODO: Pacing isn't supported with NewReno
@@ -101,8 +101,8 @@ void NewReno::onPacketAckOrLoss(
 
 void NewReno::onPacketLoss(const LossEvent& loss) {
   DCHECK(
-      loss.largestLostPacketNum.hasValue() &&
-      loss.largestLostSentTime.hasValue());
+      loss.largestLostPacketNum.has_value() &&
+      loss.largestLostSentTime.has_value());
   subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
   if (!endOfRecovery_ || *endOfRecovery_ < *loss.largestLostSentTime) {
     endOfRecovery_ = Clock::now();

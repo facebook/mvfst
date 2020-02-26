@@ -134,7 +134,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
         LOG(ERROR) << "skip error=" << toString(skipRes.error());
       } else {
         auto v = skipRes.value();
-        if (v.hasValue()) {
+        if (v.has_value()) {
           LOG(INFO) << "new offset = " << v.value();
         } else {
           LOG(INFO) << "new offset doesn't have value";

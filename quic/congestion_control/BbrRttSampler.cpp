@@ -22,7 +22,7 @@ std::chrono::microseconds BbrRttSampler::minRtt() const noexcept {
 bool BbrRttSampler::newRttSample(
     std::chrono::microseconds rttSample,
     TimePoint sampledTime) noexcept {
-  rttSampleExpired_ = minRttTimestamp_.hasValue()
+  rttSampleExpired_ = minRttTimestamp_.has_value()
       ? sampledTime > *minRttTimestamp_ + expiration_
       : false;
   if (rttSampleExpired_ || minRtt_ > rttSample) {

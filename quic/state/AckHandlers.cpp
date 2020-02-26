@@ -187,7 +187,7 @@ void processAckFrame(
   DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingClonedPacketsCount);
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
-      (ack.largestAckedPacket.hasValue() || lossEvent)) {
+      (ack.largestAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       lossEvent->persistentCongestion = isPersistentCongestion(

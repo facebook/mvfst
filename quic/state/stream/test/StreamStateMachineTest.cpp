@@ -28,7 +28,7 @@ void verifyStreamReset(
     const QuicStreamState& stream,
     uint64_t readOffsetExpected) {
   EXPECT_TRUE(stream.readBuffer.empty());
-  EXPECT_TRUE(stream.finalReadOffset.hasValue());
+  EXPECT_TRUE(stream.finalReadOffset.has_value());
   EXPECT_EQ(readOffsetExpected, stream.finalReadOffset.value());
 }
 

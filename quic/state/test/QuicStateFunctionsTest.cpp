@@ -619,7 +619,7 @@ TEST_P(QuicStateFunctionsTest, HasNotReceivedNewPacketsSinceLastClose) {
 
 TEST_F(QuicStateFunctionsTest, EarliestLossTimer) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
-  EXPECT_FALSE(earliestLossTimer(conn).first.hasValue());
+  EXPECT_FALSE(earliestLossTimer(conn).first.has_value());
   auto currentTime = Clock::now();
 
   // Before handshake completed

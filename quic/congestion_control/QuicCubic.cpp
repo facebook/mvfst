@@ -95,8 +95,8 @@ void Cubic::onPacketSent(const OutstandingPacket& packet) {
 void Cubic::onPacketLoss(const LossEvent& loss) {
   quiescenceStart_ = folly::none;
   DCHECK(
-      loss.largestLostPacketNum.hasValue() &&
-      loss.largestLostSentTime.hasValue());
+      loss.largestLostPacketNum.has_value() &&
+      loss.largestLostSentTime.has_value());
   onRemoveBytesFromInflight(loss.lostBytes);
   // If the loss occurred past the endOfRecovery then we need to move the
   // endOfRecovery back and invoke the state machine, otherwise ignore the loss
@@ -208,7 +208,7 @@ bool Cubic::isAppLimited() const noexcept {
 }
 
 bool Cubic::isAppIdle() const noexcept {
-  return quiescenceStart_.hasValue();
+  return quiescenceStart_.has_value();
 }
 
 void Cubic::updateTimeToOrigin() noexcept {
@@ -355,7 +355,7 @@ void Cubic::onPacketAckOrLoss(
       conn_.pacer->onPacketsLoss();
     }
   }
-  if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
+  if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
     CHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent);
   }
@@ -365,7 +365,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
   auto currentCwnd = cwndBytes_;
   DCHECK_LE(ack.ackedBytes, inflightBytes_);
   inflightBytes_ -= ack.ackedBytes;
-  if (recoveryState_.endOfRecovery.hasValue() &&
+  if (recoveryState_.endOfRecovery.has_value() &&
       *recoveryState_.endOfRecovery >= ack.largestAckedPacketSentTime) {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_ack");
     if (conn_.qLogger) {
@@ -393,7 +393,8 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
         cwndBytes_ * pacingGain(), conn_.lossState.srtt);
   }
   if (cwndBytes_ == currentCwnd) {
-    QUIC_TRACE(fst_trace, conn_, "cwnd_no_change", quiescenceStart_.hasValue());
+    QUIC_TRACE(
+        fst_trace, conn_, "cwnd_no_change", quiescenceStart_.has_value());
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           inflightBytes_,
@@ -430,7 +431,7 @@ void Cubic::startHystartRttRound(TimePoint time) noexcept {
 }
 
 bool Cubic::isRecovered(TimePoint packetSentTime) noexcept {
-  CHECK(recoveryState_.endOfRecovery.hasValue());
+  CHECK(recoveryState_.endOfRecovery.has_value());
   return packetSentTime > *recoveryState_.endOfRecovery;
 }
 
@@ -502,7 +503,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
         cwndBytes_ >= kLowSsthreshInMss * conn_.udpSendPacketLen) {
       exitReason = Cubic::ExitReason::EXITPOINT;
     }
-    if (exitReason.hasValue()) {
+    if (exitReason.has_value()) {
       VLOG(15) << "Cubic exit slow start, reason = "
                << (*exitReason == Cubic::ExitReason::SSTHRESH
                        ? "cwnd > ssthresh"
@@ -568,7 +569,7 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
       }
     }
 
-    if (!hystartState_.lastSampledRtt.hasValue() ||
+    if (!hystartState_.lastSampledRtt.has_value() ||
         (*hystartState_.lastSampledRtt >=
          std::chrono::microseconds::max() - kDelayIncreaseLowerBound)) {
       return;
@@ -711,8 +712,8 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
     // lastMaxCwndBytes and lastReductionTime are only cleared when Hystart
     // transits to Steady. For state machine to be in FastRecovery, a Loss
     // should have happened, and set values to them.
-    DCHECK(steadyState_.lastMaxCwndBytes.hasValue());
-    DCHECK(steadyState_.lastReductionTime.hasValue());
+    DCHECK(steadyState_.lastMaxCwndBytes.has_value());
+    DCHECK(steadyState_.lastReductionTime.has_value());
     updateTimeToOrigin();
     cwndBytes_ = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
     if (conn_.qLogger) {

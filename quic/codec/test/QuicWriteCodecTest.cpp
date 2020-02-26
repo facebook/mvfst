@@ -358,7 +358,7 @@ TEST_F(QuicWriteCodecTest, WriteStreamNoSpaceForData) {
   // => 3 bytes
   auto dataLen =
       writeStreamFrameHeader(pktBuilder, streamId, offset, 10, 10, fin);
-  EXPECT_FALSE(dataLen.hasValue());
+  EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 3);
 }
 
@@ -525,7 +525,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeader) {
   bool fin = true;
   auto dataLen =
       writeStreamFrameHeader(pktBuilder, streamId, offset, 20, 20, fin);
-  EXPECT_FALSE(dataLen.hasValue());
+  EXPECT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
 
@@ -542,7 +542,7 @@ TEST_F(QuicWriteCodecTest, PacketOnlyHasSpaceForStreamHeaderWithFin) {
   bool fin = true;
   auto dataLen =
       writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin);
-  ASSERT_TRUE(dataLen.hasValue());
+  ASSERT_TRUE(dataLen.has_value());
   EXPECT_EQ(*dataLen, 0);
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 0);
 }
@@ -560,7 +560,7 @@ TEST_F(QuicWriteCodecTest, PacketNotEnoughSpaceForStreamHeaderWithFin) {
   bool fin = true;
   auto dataLen =
       writeStreamFrameHeader(pktBuilder, streamId, offset, 0, 0, fin);
-  ASSERT_FALSE(dataLen.hasValue());
+  ASSERT_FALSE(dataLen.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 2);
 }
 
@@ -622,7 +622,7 @@ TEST_F(QuicWriteCodecTest, AckFrameNotEnoughForAnything) {
   AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
 
   auto result = writeAckFrame(ackMetadata, pktBuilder);
-  EXPECT_FALSE(result.hasValue());
+  EXPECT_FALSE(result.has_value());
   EXPECT_EQ(pktBuilder.remainingSpaceInPkt(), 4);
 }
 
@@ -874,7 +874,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForAckBlockSection) {
   AckBlocks ackBlocks = {{1000, 1000}, {701, 900}, {501, 600}};
   AckFrameMetaData ackMetadata(ackBlocks, 555us, kDefaultAckDelayExponent);
   auto ackFrameWriteResult = writeAckFrame(ackMetadata, pktBuilder);
-  EXPECT_FALSE(ackFrameWriteResult.hasValue());
+  EXPECT_FALSE(ackFrameWriteResult.has_value());
 }
 
 TEST_F(QuicWriteCodecTest, OnlyHasSpaceForFirstAckBlock) {

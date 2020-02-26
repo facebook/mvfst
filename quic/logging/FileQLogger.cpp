@@ -245,8 +245,8 @@ folly::dynamic FileQLogger::toDynamic() const {
   dynamicTrace["configuration"] =
       folly::dynamic::object("time_offset", 0)("time_units", kQLogTimeUnits);
 
-  std::string dcidStr = dcid.hasValue() ? dcid.value().hex() : "";
-  std::string scidStr = scid.hasValue() ? scid.value().hex() : "";
+  std::string dcidStr = dcid.has_value() ? dcid.value().hex() : "";
+  std::string scidStr = scid.has_value() ? scid.value().hex() : "";
   folly::dynamic commonFieldsObj = folly::dynamic::object;
   commonFieldsObj["reference_time"] = "0";
   commonFieldsObj["dcid"] = dcidStr;
@@ -297,7 +297,7 @@ void FileQLogger::addPathValidationEvent(bool success) {
 }
 
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
-  if (!dcid.hasValue()) {
+  if (!dcid.has_value()) {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }

@@ -13,7 +13,7 @@ void PendingPathRateLimiter::onPacketSent(uint64_t sentBytes) {
 uint64_t PendingPathRateLimiter::currentCredit(
     TimePoint checkTime,
     std::chrono::microseconds rtt) noexcept {
-  if ((!lastChecked_.hasValue()) || (checkTime > *lastChecked_ + rtt)) {
+  if ((!lastChecked_.has_value()) || (checkTime > *lastChecked_ + rtt)) {
     lastChecked_ = checkTime;
     credit_ = maxCredit_;
   }

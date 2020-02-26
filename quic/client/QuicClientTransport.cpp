@@ -957,7 +957,7 @@ void QuicClientTransport::removePsk() {
 
 void QuicClientTransport::onNewCachedPsk(
     fizz::client::NewCachedPsk& newCachedPsk) noexcept {
-  DCHECK(conn_->version.hasValue());
+  DCHECK(conn_->version.has_value());
   DCHECK(serverInitialParamsSet_);
 
   if (!pskCache_ || !hostname_) {
@@ -1216,7 +1216,7 @@ void QuicClientTransport::onNotifyDataAvailable(
   if (networkData.packets.empty()) {
     return;
   }
-  DCHECK(server.hasValue());
+  DCHECK(server.has_value());
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();

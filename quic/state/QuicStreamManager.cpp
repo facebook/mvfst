@@ -476,7 +476,7 @@ void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   updateHolBlockedTime(stream);
   auto itr = readableStreams_.find(stream.id);
-  if (!stream.hasReadableData() && !stream.streamReadError.hasValue()) {
+  if (!stream.hasReadableData() && !stream.streamReadError.has_value()) {
     if (itr != readableStreams_.end()) {
       VLOG(10) << __func__ << " remove stream=" << stream.id << " "
                << stream.conn;
@@ -494,7 +494,7 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
-  if (stream.hasWritableData() && !stream.streamWriteError.hasValue()) {
+  if (stream.hasWritableData() && !stream.streamWriteError.has_value()) {
     stream.conn.streamManager->addWritable(stream);
   } else {
     stream.conn.streamManager->removeWritable(stream);
@@ -503,7 +503,7 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
 
 void QuicStreamManager::updatePeekableStreams(QuicStreamState& stream) {
   auto itr = peekableStreams_.find(stream.id);
-  if (!stream.hasPeekableData() || stream.streamReadError.hasValue()) {
+  if (!stream.hasPeekableData() || stream.streamReadError.has_value()) {
     if (itr != peekableStreams_.end()) {
       VLOG(10) << __func__ << " remove stream=" << stream.id << " "
                << stream.conn;

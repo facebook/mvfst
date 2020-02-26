@@ -826,7 +826,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->totalBytesSent);
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
-                  ->lastAckedPacketInfo.hasValue());
+                  ->lastAckedPacketInfo.has_value());
   EXPECT_EQ(
       currentTime - 123s,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
@@ -933,7 +933,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   EXPECT_EQ(frame->maximumData, 0);
 
   EXPECT_EQ(packetNum, *stream->latestMaxStreamDataPacket);
-  EXPECT_FALSE(conn->latestMaxDataPacket.hasValue());
+  EXPECT_FALSE(conn->latestMaxDataPacket.has_value());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
@@ -965,7 +965,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   auto frame = static_cast<MaxDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
 
-  EXPECT_FALSE(stream->latestMaxStreamDataPacket.hasValue());
+  EXPECT_FALSE(stream->latestMaxStreamDataPacket.has_value());
   EXPECT_EQ(packetNum, *conn->latestMaxDataPacket);
 }
 
@@ -1550,10 +1550,10 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotWriteOtherFrames) {
   EXPECT_EQ(stream1->currentWriteOffset, currentStreamWriteOffset);
   EXPECT_TRUE(stream1->retransmissionBuffer.empty());
   // No Ack scheduled:
-  EXPECT_FALSE(conn->ackStates.initialAckState.largestAckScheduled.hasValue());
+  EXPECT_FALSE(conn->ackStates.initialAckState.largestAckScheduled.has_value());
   EXPECT_FALSE(
-      conn->ackStates.handshakeAckState.largestAckScheduled.hasValue());
-  EXPECT_FALSE(conn->ackStates.appDataAckState.largestAckScheduled.hasValue());
+      conn->ackStates.handshakeAckState.largestAckScheduled.has_value());
+  EXPECT_FALSE(conn->ackStates.appDataAckState.largestAckScheduled.has_value());
   // Pending resets are still here:
   EXPECT_NE(
       conn->pendingEvents.resets.end(),

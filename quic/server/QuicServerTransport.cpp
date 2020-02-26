@@ -426,7 +426,7 @@ void QuicServerTransport::maybeIssueConnectionIds() {
   if (!conn_->transportSettings.disableMigration && !connectionIdsIssued_ &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     connectionIdsIssued_ = true;
-    CHECK(conn_->transportSettings.statelessResetTokenSecret.hasValue());
+    CHECK(conn_->transportSettings.statelessResetTokenSecret.has_value());
 
     // If the peer specifies that they have a limit of 1,000,000 connection ids
     // then only issue a small number at first, since the server still
@@ -435,7 +435,7 @@ void QuicServerTransport::maybeIssueConnectionIds() {
         conn_->peerActiveConnectionIdLimit, kDefaultActiveConnectionIdLimit);
     for (size_t i = 0; i < maximumIdsToIssue; i++) {
       auto newConnIdData = serverConn_->createAndAddNewSelfConnId();
-      if (!newConnIdData.hasValue()) {
+      if (!newConnIdData.has_value()) {
         return;
       }
 

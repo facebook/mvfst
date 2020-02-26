@@ -563,7 +563,7 @@ void QuicServerWorker::sendResetPacket(
   uint16_t maxResetPacketSize = std::min<uint16_t>(
       std::max<uint16_t>(kMinStatelessPacketSize, packetSize),
       kDefaultUDPSendPacketLen);
-  CHECK(transportSettings_.statelessResetTokenSecret.hasValue());
+  CHECK(transportSettings_.statelessResetTokenSecret.has_value());
   StatelessResetGenerator generator(
       *transportSettings_.statelessResetTokenSecret,
       getAddress().getFullyQualified());

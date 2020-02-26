@@ -129,13 +129,13 @@ void happyEyeballsSetUpSocket(
     folly::AsyncUDPSocket::ErrMessageCallback* errMsgCallback,
     folly::AsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options) {
-  auto sockFamily = localAddress.hasValue() ? localAddress->getFamily()
-                                            : peerAddress.getFamily();
+  auto sockFamily = localAddress.has_value() ? localAddress->getFamily()
+                                             : peerAddress.getFamily();
 
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   socket.setReuseAddr(false);
-  if (localAddress.hasValue()) {
+  if (localAddress.has_value()) {
     socket.bind(*localAddress);
   } else if (peerAddress.getFamily() == AF_INET) {
     socket.bind(folly::SocketAddress("0.0.0.0", 0));

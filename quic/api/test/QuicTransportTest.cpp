@@ -1768,7 +1768,7 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
-  EXPECT_FALSE(conn.streamManager->popFlowControlUpdated().hasValue());
+  EXPECT_FALSE(conn.streamManager->popFlowControlUpdated().has_value());
 }
 
 TEST_F(QuicTransportTest, DeliveryCallbackClosesClosedTransport) {

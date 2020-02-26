@@ -926,7 +926,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
       PacketNumberSpace::Handshake);
   EXPECT_TRUE(lostPackets.empty());
   EXPECT_TRUE(
-      conn->lossState.lossTimes[PacketNumberSpace::Handshake].hasValue());
+      conn->lossState.lossTimes[PacketNumberSpace::Handshake].has_value());
   EXPECT_EQ(
       expectedDelayUntilLost + sendTime,
       conn->lossState.lossTimes[PacketNumberSpace::Handshake].value());
@@ -949,7 +949,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
       *conn, testingLossMarkFunc(lostPackets));
   EXPECT_EQ(1, lostPackets.size());
   EXPECT_FALSE(
-      conn->lossState.lossTimes[PacketNumberSpace::Handshake].hasValue());
+      conn->lossState.lossTimes[PacketNumberSpace::Handshake].has_value());
   EXPECT_TRUE(conn->outstandingPackets.empty());
 }
 

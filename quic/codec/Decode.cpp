@@ -346,7 +346,7 @@ ReadStreamFrame decodeStreamFrame(
     }
   }
   Buf data;
-  if (dataLength.hasValue()) {
+  if (dataLength.has_value()) {
     if (cursor.totalLength() < dataLength->first) {
       throw QuicTransportException(
           "Length mismatch",

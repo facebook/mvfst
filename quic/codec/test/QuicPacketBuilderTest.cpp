@@ -103,7 +103,7 @@ TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   auto decodedVersionNegotiationPacket =
       makeCodec(destConnId, QuicNodeType::Client)
           ->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(decodedVersionNegotiationPacket.hasValue());
+  ASSERT_TRUE(decodedVersionNegotiationPacket.has_value());
   EXPECT_EQ(decodedVersionNegotiationPacket->sourceConnectionId, srcConnId);
   EXPECT_EQ(
       decodedVersionNegotiationPacket->destinationConnectionId, destConnId);
@@ -174,7 +174,7 @@ TEST_F(QuicPacketBuilderTest, TooManyVersions) {
   auto packetQueue = bufToQueue(std::move(resultBuf));
   auto decodedPacket = makeCodec(destConnId, QuicNodeType::Client)
                            ->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(decodedPacket.hasValue());
+  ASSERT_TRUE(decodedPacket.has_value());
   EXPECT_EQ(decodedPacket->destinationConnectionId, destConnId);
   EXPECT_EQ(decodedPacket->sourceConnectionId, srcConnId);
   EXPECT_EQ(decodedPacket->versions, expectedWrittenVersions);

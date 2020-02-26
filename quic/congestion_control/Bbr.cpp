@@ -164,9 +164,9 @@ void BbrCongestionController::onPacketAckOrLoss(
       conn_.pacer->onPacketsLoss();
     }
   }
-  if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
+  if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
     CHECK(!ackEvent->ackedPackets.empty());
-    onPacketAcked(*ackEvent, prevInflightBytes, lossEvent.hasValue());
+    onPacketAcked(*ackEvent, prevInflightBytes, lossEvent.has_value());
   }
 }
 
@@ -197,7 +197,7 @@ void BbrCongestionController::onPacketAcked(
     }
   }
   if (inRecovery()) {
-    CHECK(endOfRecovery_.hasValue());
+    CHECK(endOfRecovery_.has_value());
     if (newRoundTrip &&
         recoveryState_ != BbrCongestionController::RecoveryState::GROWTH) {
       recoveryState_ = BbrCongestionController::RecoveryState::GROWTH;

@@ -469,11 +469,11 @@ class QuicServerTransportTest : public Test {
     EXPECT_NE(server->getConn().handshakeWriteHeaderCipher, nullptr);
     EXPECT_NE(server->getConn().readCodec->getHandshakeHeaderCipher(), nullptr);
 
-    EXPECT_FALSE(server->getConn().localConnectionError.hasValue());
+    EXPECT_FALSE(server->getConn().localConnectionError.has_value());
     EXPECT_EQ(server->getConn().version, QuicVersion::MVFST);
     EXPECT_EQ(server->getConn().serverConnIdParams->processId, 0);
     EXPECT_EQ(server->getConn().serverConnIdParams->workerId, 1);
-    EXPECT_TRUE(server->getConn().serverConnectionId.hasValue());
+    EXPECT_TRUE(server->getConn().serverConnectionId.has_value());
     EXPECT_EQ(server->getConn().selfConnectionIds.size(), 1);
     serverConnectionId = *server->getConn().serverConnectionId;
     EXPECT_EQ(
@@ -542,7 +542,7 @@ class QuicServerTransportTest : public Test {
                     *server->getConn().cryptoState, EncryptionLevel::Initial)
                     ->readBuffer.empty());
     EXPECT_NE(server->getConn().initialWriteCipher, nullptr);
-    EXPECT_FALSE(server->getConn().localConnectionError.hasValue());
+    EXPECT_FALSE(server->getConn().localConnectionError.has_value());
     verifyTransportParameters(kDefaultIdleTimeout);
     serverWrites.clear();
 
@@ -746,8 +746,9 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(2); // for x08, x0C
   deliverData(packetToBuf(packet));
 
-  EXPECT_TRUE(server->getConn()
-                  .ackStates.appDataAckState.largestRecvdPacketTime.hasValue());
+  EXPECT_TRUE(
+      server->getConn()
+          .ackStates.appDataAckState.largestRecvdPacketTime.has_value());
   EXPECT_EQ(server->getConn().ackStates.appDataAckState.acks.size(), 1);
   EXPECT_EQ(
       server->getConn().ackStates.appDataAckState.acks.front().start,
@@ -1282,7 +1283,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {
   deliverData(packetToBuf(packet));
 
   auto stream = server->getNonConstConn().streamManager->getStream(streamId);
-  ASSERT_TRUE(stream->streamReadError.hasValue());
+  ASSERT_TRUE(stream->streamReadError.has_value());
 }
 
 TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
@@ -1577,7 +1578,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   ASSERT_TRUE(builder.canBuildPacket());
   auto dataLen = writeStreamFrameHeader(
       builder, 0x00, stream->currentReadOffset, 0, 10, true);
-  ASSERT_TRUE(dataLen.hasValue());
+  ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
@@ -3598,7 +3599,7 @@ TEST_F(
   setupClientReadCodec();
 
   recvClientHello();
-  ASSERT_TRUE(server->getNonConstConn().writableBytesLimit.hasValue());
+  ASSERT_TRUE(server->getNonConstConn().writableBytesLimit.has_value());
   EXPECT_EQ(
       *server->getNonConstConn().writableBytesLimit,
       server->getConn().transportSettings.limitedCwndInMss * originalUdpSize);

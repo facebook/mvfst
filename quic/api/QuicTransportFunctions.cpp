@@ -356,7 +356,7 @@ void updateConnection(
         if (resetIter != conn.pendingEvents.resets.end()) {
           conn.pendingEvents.resets.erase(resetIter);
         } else {
-          DCHECK(packetEvent.hasValue())
+          DCHECK(packetEvent.has_value())
               << " reset missing from pendingEvents for non-clone packet";
         }
         break;
@@ -403,7 +403,7 @@ void updateConnection(
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         retransmittable = true;
         // We don't want this triggered for cloned frames.
-        if (!packetEvent.hasValue()) {
+        if (!packetEvent.has_value()) {
           updateSimpleFrameOnPacketSent(conn, simpleFrame);
         }
         break;
@@ -456,8 +456,8 @@ void updateConnection(
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
       : false;
-  if (conn.lossState.lastAckedTime.hasValue() &&
-      conn.lossState.lastAckedPacketSentTime.hasValue()) {
+  if (conn.lossState.lastAckedTime.has_value() &&
+      conn.lossState.lastAckedPacketSentTime.has_value()) {
     pkt.lastAckedPacketInfo.emplace(
         *conn.lossState.lastAckedPacketSentTime,
         *conn.lossState.lastAckedTime,

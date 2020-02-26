@@ -1922,7 +1922,7 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   auto packetQueue = bufToQueue(std::move(serverData));
   auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(versionPacket.hasValue());
+  ASSERT_TRUE(versionPacket.has_value());
 
   EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
   EXPECT_TRUE(testingObserver->observerCalled());
@@ -1965,7 +1965,7 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
 
   auto packetQueue = bufToQueue(std::move(serverData));
   auto versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(versionPacket.hasValue());
+  ASSERT_TRUE(versionPacket.has_value());
 
   EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
   EXPECT_EQ(versionPacket->sourceConnectionId, serverConnId);

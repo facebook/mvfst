@@ -109,7 +109,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
@@ -221,7 +221,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
@@ -249,7 +249,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 2000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size());
   EXPECT_TRUE(
@@ -307,7 +307,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
   auto packet2 = std::move(regularBuilder2).buildPacket();
   // rebuilder writes frames to regularBuilder2
   EXPECT_EQ(packet1.packet.frames.size(), packet2.packet.frames.size() + 1);
@@ -349,7 +349,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
@@ -407,7 +407,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
-  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).hasValue());
+  EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
 }
 
 TEST_F(QuicPacketRebuilderTest, CloneCounter) {
@@ -426,7 +426,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
   PacketRebuilder rebuilder(regularBuilder2, conn);
   rebuilder.rebuildFromPacket(outstandingPacket);
-  EXPECT_TRUE(outstandingPacket.associatedEvent.hasValue());
+  EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());
   EXPECT_EQ(1, conn.outstandingClonedPacketsCount);
 }
 

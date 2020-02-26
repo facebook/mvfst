@@ -931,8 +931,8 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
   eventbase_.loopForever();
 
   EXPECT_TRUE(resetRecvd);
-  EXPECT_TRUE(token1.hasValue());
-  EXPECT_TRUE(token2.hasValue());
+  EXPECT_TRUE(token1.has_value());
+  EXPECT_TRUE(token2.has_value());
   EXPECT_EQ(token1.value(), token2.value());
 }
 
@@ -1412,8 +1412,8 @@ class QuicClientTransportTest : public Test {
     socketWrites.clear();
     performFakeHandshake();
     EXPECT_TRUE(
-        client->getConn().readCodec->getStatelessResetToken().hasValue());
-    EXPECT_TRUE(client->getConn().statelessResetToken.hasValue());
+        client->getConn().readCodec->getStatelessResetToken().has_value());
+    EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
   }
 
   void setConnectionIds() {
@@ -3634,7 +3634,7 @@ TEST_F(
       true));
   deliverData(packet->coalesce());
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
-  EXPECT_TRUE(client->getConn().readCodec->getHandshakeDoneTime().hasValue());
+  EXPECT_TRUE(client->getConn().readCodec->getHandshakeDoneTime().has_value());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {

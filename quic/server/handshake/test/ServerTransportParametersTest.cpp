@@ -53,8 +53,8 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.hasValue());
-  EXPECT_FALSE(serverParams->negotiated_version.hasValue());
+  EXPECT_TRUE(serverParams.has_value());
+  EXPECT_FALSE(serverParams->negotiated_version.has_value());
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
@@ -77,8 +77,8 @@ TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.hasValue());
-  EXPECT_TRUE(serverParams->negotiated_version.hasValue());
+  EXPECT_TRUE(serverParams.has_value());
+  EXPECT_TRUE(serverParams->negotiated_version.has_value());
 
   folly::Optional<StatelessResetToken> tokWrapper =
       getStatelessResetTokenParameter(serverParams->parameters);

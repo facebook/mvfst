@@ -1491,17 +1491,17 @@ TEST_F(QuicTransportImplTest, AsyncStreamFlowControlWrite) {
   auto stream = transport->createBidirectionalStream().value();
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   transport->setServerConnectionId();
-  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.hasValue());
+  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.has_value());
   transport->writeLooper()->stop();
   streamState->flowControlState.advertisedMaxOffset = 0; // Easier to calculate
   transport->setStreamFlowControlWindow(stream, 4000);
   EXPECT_EQ(0, streamState->flowControlState.advertisedMaxOffset);
-  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.hasValue());
+  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.has_value());
   // Loop it:
   EXPECT_TRUE(transport->writeLooper()->isRunning());
   transport->writeLooper()->runLoopCallback();
   EXPECT_EQ(4000, streamState->flowControlState.advertisedMaxOffset);
-  EXPECT_TRUE(streamState->latestMaxStreamDataPacket.hasValue());
+  EXPECT_TRUE(streamState->latestMaxStreamDataPacket.has_value());
 }
 
 TEST_F(QuicTransportImplTest, ExceptionInWriteLooperDoesNotCrash) {
@@ -2242,7 +2242,7 @@ TEST_F(QuicTransportImplTest, SendDataExpired) {
   EXPECT_EQ(res.hasError(), false);
 
   auto newOffsetOpt = res.value();
-  EXPECT_EQ(newOffsetOpt.hasValue(), true);
+  EXPECT_EQ(newOffsetOpt.has_value(), true);
   EXPECT_EQ(newOffsetOpt.value(), 5);
 
   EXPECT_EQ(streamState->minimumRetransmittableOffset, 5);
@@ -2252,7 +2252,7 @@ TEST_F(QuicTransportImplTest, SendDataExpired) {
   res = transport->sendDataExpired(stream1, 3);
   EXPECT_EQ(res.hasError(), false);
   newOffsetOpt = res.value();
-  EXPECT_EQ(newOffsetOpt.hasValue(), false);
+  EXPECT_EQ(newOffsetOpt.has_value(), false);
   EXPECT_EQ(streamState->minimumRetransmittableOffset, 5);
 
   // Expect minimumRetransmittableOffset be set to 10
@@ -2260,7 +2260,7 @@ TEST_F(QuicTransportImplTest, SendDataExpired) {
   res = transport->sendDataExpired(stream1, 11);
   EXPECT_EQ(res.hasError(), false);
   newOffsetOpt = res.value();
-  EXPECT_EQ(newOffsetOpt.hasValue(), true);
+  EXPECT_EQ(newOffsetOpt.has_value(), true);
   EXPECT_EQ(newOffsetOpt.value(), 10);
   EXPECT_EQ(
       streamState->minimumRetransmittableOffset,
@@ -2444,7 +2444,7 @@ TEST_F(QuicTransportImplTest, SendDataRejected) {
   auto res = transport->sendDataRejected(stream1, 5);
   EXPECT_EQ(res.hasError(), false);
   auto newOffsetOpt = res.value();
-  EXPECT_EQ(newOffsetOpt.hasValue(), true);
+  EXPECT_EQ(newOffsetOpt.has_value(), true);
   EXPECT_EQ(newOffsetOpt.value(), 5);
   EXPECT_EQ(streamState->currentReceiveOffset, 5);
 
@@ -2452,7 +2452,7 @@ TEST_F(QuicTransportImplTest, SendDataRejected) {
   res = transport->sendDataRejected(stream1, 3);
   EXPECT_EQ(res.hasError(), false);
   newOffsetOpt = res.value();
-  EXPECT_EQ(newOffsetOpt.hasValue(), false);
+  EXPECT_EQ(newOffsetOpt.has_value(), false);
   EXPECT_EQ(streamState->currentReceiveOffset, 5);
 
   transport.reset();

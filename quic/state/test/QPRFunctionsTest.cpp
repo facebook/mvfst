@@ -80,13 +80,13 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   stream->currentWriteOffset = 0;
   auto result = advanceMinimumRetransmittableOffset(stream, 4);
   EXPECT_EQ(stream->currentWriteOffset, 4);
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(stream->minimumRetransmittableOffset, 4);
 
   // case1. minimumRetransmittableOffset to set is too small
   stream->minimumRetransmittableOffset = 10;
   result = advanceMinimumRetransmittableOffset(stream, 1);
-  EXPECT_FALSE(result.hasValue());
+  EXPECT_FALSE(result.has_value());
   EXPECT_EQ(stream->minimumRetransmittableOffset, 10);
 
   auto buf = folly::IOBuf::copyBuffer("aaaaaaaaaa");
@@ -94,7 +94,7 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   stream->currentWriteOffset = 150;
   stream->retransmissionBuffer.emplace(140, StreamBuffer(buf->clone(), 140));
   result = advanceMinimumRetransmittableOffset(stream, 139);
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 139);
   EXPECT_EQ(stream->minimumRetransmittableOffset, 139);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
@@ -103,7 +103,7 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   stream->minimumRetransmittableOffset = 139;
   stream->retransmissionBuffer.emplace(140, StreamBuffer(buf->clone(), 140));
   result = advanceMinimumRetransmittableOffset(stream, 150);
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 150);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
   {
@@ -122,7 +122,7 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   stream->conn.pendingEvents.frames.emplace_back(
       ExpiredStreamDataFrame(stream->id, 160));
   result = advanceMinimumRetransmittableOffset(stream, 200);
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 200);
   EXPECT_EQ(stream->conn.pendingEvents.frames.size(), 1);
   {
@@ -214,7 +214,7 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
   stream->currentReceiveOffset = 10;
   auto result = advanceCurrentReceiveOffset(stream, 1);
   EXPECT_EQ(stream->currentReceiveOffset, 10);
-  EXPECT_FALSE(result.hasValue());
+  EXPECT_FALSE(result.has_value());
 
   // case2. MinStreamDataFrame is put on the wire
   stream->currentReadOffset = 10;
@@ -228,7 +228,7 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
       EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 100);
     }
   }
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 100);
 
   // case3. update existing pending event
@@ -246,7 +246,7 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
       EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 150);
     }
   }
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 150);
 
   // case4. where offset was adjusted
@@ -262,7 +262,7 @@ TEST_F(QPRFunctionsTest, AdvanceCurrentReceiveOffset) {
       EXPECT_EQ(minStreamDataFrame->minimumStreamOffset, 120);
     }
   }
-  EXPECT_TRUE(result.hasValue());
+  EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 120);
 }
 

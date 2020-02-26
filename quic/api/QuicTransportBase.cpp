@@ -137,7 +137,7 @@ bool QuicTransportBase::replaySafe() const {
 }
 
 bool QuicTransportBase::error() const {
-  return conn_->localConnectionError.hasValue();
+  return conn_->localConnectionError.has_value();
 }
 
 void QuicTransportBase::close(
@@ -1457,7 +1457,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     cancelDeliveryCallbacksForStream(pendingResetIt->first);
   }
   auto deliverableStreamId = conn_->streamManager->popDeliverable();
-  while (closeState_ == CloseState::OPEN && deliverableStreamId.hasValue()) {
+  while (closeState_ == CloseState::OPEN && deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
     auto stream = conn_->streamManager->getStream(streamId);
     // stream shouldn't be cleaned as long as it's still on deliveryList

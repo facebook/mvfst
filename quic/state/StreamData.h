@@ -222,7 +222,8 @@ struct QuicStreamState : public QuicStreamLike {
 
   // If the stream is still writable.
   bool writable() const {
-    return sendState == StreamSendState::Open_E && !finalWriteOffset.hasValue();
+    return sendState == StreamSendState::Open_E &&
+        !finalWriteOffset.has_value();
   }
 
   bool shouldSendFlowControl() const {

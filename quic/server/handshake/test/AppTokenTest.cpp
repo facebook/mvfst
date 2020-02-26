@@ -25,7 +25,7 @@ namespace test {
 void expectAppTokenEqual(
     const folly::Optional<AppToken>& decodedAppToken,
     const AppToken& appToken) {
-  EXPECT_TRUE(decodedAppToken.hasValue());
+  EXPECT_TRUE(decodedAppToken.has_value());
 
   EXPECT_EQ(
       decodedAppToken->transportParams.negotiated_version,

@@ -88,7 +88,7 @@ TEST_F(QuicReadCodecTest, VersionNegotiationPacketTest) {
   auto packetQueue = bufToQueue(std::move(packet.second));
   auto versionNegotiationPacket =
       makeUnencryptedCodec()->tryParsingVersionNegotiation(packetQueue);
-  ASSERT_TRUE(versionNegotiationPacket.hasValue());
+  ASSERT_TRUE(versionNegotiationPacket.has_value());
   EXPECT_EQ(versionNegotiationPacket->destinationConnectionId, destConnId);
   EXPECT_EQ(versionNegotiationPacket->sourceConnectionId, srcConnId);
   EXPECT_EQ(versionNegotiationPacket->versions, versions);

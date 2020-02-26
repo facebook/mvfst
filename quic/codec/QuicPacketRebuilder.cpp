@@ -67,7 +67,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         }
         AckFrameMetaData meta(ackBlocks, ackFrame.ackDelay, ackDelayExponent);
         auto ackWriteResult = writeAckFrame(meta, builder_);
-        writeSuccess = ackWriteResult.hasValue();
+        writeSuccess = ackWriteResult.has_value();
         break;
       }
       case QuicWriteFrame::Type::WriteStreamFrame_E: {
@@ -84,7 +84,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
               bufferLen,
               bufferLen,
               streamFrame.fin);
-          bool ret = dataLen.hasValue() && *dataLen == streamFrame.len;
+          bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
             writeStreamFrameData(builder_, std::move(streamData), *dataLen);
             notPureAck = true;
@@ -120,7 +120,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         }
         auto cryptoWriteResult =
             writeCryptoFrame(cryptoFrame.offset, std::move(buf), builder_);
-        bool ret = cryptoWriteResult.hasValue() &&
+        bool ret = cryptoWriteResult.has_value() &&
             cryptoWriteResult->offset == cryptoFrame.offset &&
             cryptoWriteResult->len == cryptoFrame.len;
         notPureAck |= ret;

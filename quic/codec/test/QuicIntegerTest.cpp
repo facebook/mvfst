@@ -43,7 +43,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
     auto originalLength = cursor.length();
     auto decodedValue = decodeQuicInteger(cursor);
     if (GetParam().error || atMost != GetParam().encodedLength) {
-      EXPECT_FALSE(decodedValue.hasValue());
+      EXPECT_FALSE(decodedValue.has_value());
       EXPECT_EQ(cursor.length(), originalLength);
     } else {
       EXPECT_EQ(decodedValue->first, GetParam().decoded);
@@ -62,7 +62,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
     auto originalLength = cursor.length();
     auto decodedValue = decodeQuicInteger(cursor, atMost);
     if (GetParam().error || atMost != GetParam().encodedLength) {
-      EXPECT_FALSE(decodedValue.hasValue());
+      EXPECT_FALSE(decodedValue.has_value());
       EXPECT_EQ(cursor.length(), originalLength);
     } else {
       EXPECT_EQ(decodedValue->first, GetParam().decoded);

@@ -47,7 +47,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ClientTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.hasValue());
+  EXPECT_TRUE(serverParams.has_value());
 }
 
 TEST(FizzClientHandshakeTest, TestOnEE) {
@@ -122,7 +122,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ClientTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.hasValue());
+  EXPECT_TRUE(serverParams.has_value());
 
   // check to see that the custom parameters are present
   auto it1 = std::find_if(
