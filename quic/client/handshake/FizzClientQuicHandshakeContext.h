@@ -10,6 +10,8 @@
 
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 
+#include <quic/client/handshake/QuicPskCache.h>
+
 #include <fizz/client/FizzClientContext.h>
 #include <fizz/protocol/DefaultCertificateVerifier.h>
 
@@ -34,6 +36,10 @@ class FizzClientQuicHandshakeContext
     return verifier_;
   }
 
+  folly::Optional<QuicCachedPsk> getPsk(
+      const folly::Optional<std::string>& hostname);
+  void removePsk(const folly::Optional<std::string>& hostname);
+
  private:
   /**
    * We make the constructor private so that users have to use the Builder
@@ -45,10 +51,12 @@ class FizzClientQuicHandshakeContext
    */
   FizzClientQuicHandshakeContext(
       std::shared_ptr<const fizz::client::FizzClientContext> context,
-      std::shared_ptr<const fizz::CertificateVerifier> verifier);
+      std::shared_ptr<const fizz::CertificateVerifier> verifier,
+      std::shared_ptr<QuicPskCache> pskCache);
 
   std::shared_ptr<const fizz::client::FizzClientContext> context_;
   std::shared_ptr<const fizz::CertificateVerifier> verifier_;
+  std::shared_ptr<QuicPskCache> pskCache_;
 
  public:
   class Builder {
@@ -65,11 +73,17 @@ class FizzClientQuicHandshakeContext
       return *this;
     }
 
+    Builder& setPskCache(std::shared_ptr<QuicPskCache> pskCache) {
+      pskCache_ = std::move(pskCache);
+      return *this;
+    }
+
     std::shared_ptr<FizzClientQuicHandshakeContext> build();
 
    private:
     std::shared_ptr<const fizz::client::FizzClientContext> context_;
     std::shared_ptr<const fizz::CertificateVerifier> verifier_;
+    std::shared_ptr<QuicPskCache> pskCache_;
   };
 };
 

@@ -88,6 +88,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     auto handshakeFactory = FizzClientQuicHandshakeContext::Builder()
                                 .setFizzClientContext(clientCtx)
                                 .setCertificateVerifier(verifier)
+                                .setPskCache(getPskCache())
                                 .build();
     conn.reset(new QuicClientConnectionState(handshakeFactory));
     conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
@@ -116,6 +117,10 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     connect();
     processHandshake();
     fizzServer->accept(&evb, serverCtx, serverTransportParameters);
+  }
+
+  virtual std::shared_ptr<QuicPskCache> getPskCache() {
+    return nullptr;
   }
 
   void clientServerRound() {
@@ -459,6 +464,12 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
     setupCtxWithTestCert(*serverCtx);
     psk = setupZeroRttOnClientCtx(*clientCtx, hostname);
     setupZeroRttServer();
+  }
+
+  std::shared_ptr<QuicPskCache> getPskCache() override {
+    auto pskCache = std::make_shared<BasicQuicPskCache>();
+    pskCache->putPsk(hostname, psk);
+    return pskCache;
   }
 
   void connect() override {
