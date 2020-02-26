@@ -6,10 +6,10 @@
  *
  */
 
-#include <quic/api/test/MockQuicStats.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/state/test/MockQuicStats.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

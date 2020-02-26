@@ -12,7 +12,6 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/io/async/test/MockTimeoutManager.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/api/test/MockQuicStats.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
@@ -21,6 +20,7 @@
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace folly::test;

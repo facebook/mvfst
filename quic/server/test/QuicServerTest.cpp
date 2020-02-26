@@ -13,7 +13,6 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/api/test/MockQuicSocket.h>
-#include <quic/api/test/MockQuicStats.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
@@ -21,6 +20,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
+#include <quic/state/test/MockQuicStats.h>
 
 using namespace testing;
 using namespace folly;

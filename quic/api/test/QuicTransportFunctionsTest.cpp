@@ -9,12 +9,12 @@
 #include <quic/api/QuicTransportFunctions.h>
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
-#include <quic/api/test/MockQuicStats.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/test/MockQuicStats.h>
 #include <quic/state/test/Mocks.h>
 
 #include <gtest/gtest.h>

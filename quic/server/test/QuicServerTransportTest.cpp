@@ -12,7 +12,6 @@
 #include <gtest/gtest.h>
 
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/api/test/MockQuicStats.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicPacketBuilder.h>
@@ -24,6 +23,7 @@
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/test/MockQuicStats.h>
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 
