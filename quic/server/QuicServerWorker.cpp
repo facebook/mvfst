@@ -263,6 +263,11 @@ void QuicServerWorker::handleNetworkData(
     bool isUsingClientConnId =
         isInitial || longHeaderType == LongHeader::Types::ZeroRtt;
 
+    if (isInitial) {
+      // This stats gets updated even if the client initial will be dropped.
+      QUIC_STATS(infoCallback_, onClientInitialReceived);
+    }
+
     if (maybeSendVersionNegotiationPacketOrDrop(
             client, isInitial, parsedLongHeader->invariant)) {
       return;

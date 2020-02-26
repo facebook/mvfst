@@ -84,6 +84,8 @@ class QuicTransportStatsCallback {
 
   virtual void onForwardedPacketProcessed() = 0;
 
+  virtual void onClientInitialReceived() = 0;
+
   // connection level metrics:
   virtual void onNewConnection() = 0;
 

@@ -611,6 +611,45 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   eventbase_.loop();
 }
 
+TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
+  auto srcConnId = getTestConnectionId(0);
+  auto destConnId = getTestConnectionId(1);
+  QuicVersion version = QuicVersion::MVFST;
+  PacketNum num = 1;
+  LongHeader initialHeader(
+      LongHeader::Types::Initial, srcConnId, destConnId, num, version);
+  RegularQuicPacketBuilder initialBuilder(
+      kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
+  auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
+  worker_->handleNetworkData(
+      kClientAddr, std::move(initialPacket), Clock::now());
+  eventbase_.loop();
+
+  // Initial with any packet number should also increate the counting
+  PacketNum bignum = 200;
+  LongHeader initialHeaderBigNum(
+      LongHeader::Types::Initial, srcConnId, destConnId, bignum, version);
+  RegularQuicPacketBuilder initialBuilderBigNum(
+      kDefaultUDPSendPacketLen, std::move(initialHeaderBigNum), 0);
+  auto initialPacketBigNum =
+      packetToBuf(std::move(initialBuilderBigNum).buildPacket());
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
+  worker_->handleNetworkData(
+      kClientAddr, std::move(initialPacketBigNum), Clock::now());
+  eventbase_.loop();
+
+  LongHeader handshakeHeader(
+      LongHeader::Types::Handshake, srcConnId, destConnId, num, version);
+  RegularQuicPacketBuilder handshakeBuilder(
+      kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
+  auto handshakePacket = packetToBuf(std::move(handshakeBuilder).buildPacket());
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(0);
+  worker_->handleNetworkData(
+      kClientAddr, std::move(handshakePacket), Clock::now());
+  eventbase_.loop();
+}
+
 TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   auto data = createData(kDefaultUDPSendPacketLen);
   auto connId = ConnectionId::createWithoutChecks({1});
