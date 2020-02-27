@@ -242,25 +242,28 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   }
   auto handshakeWriteCipher = handshakeLayer->getHandshakeWriteCipher();
   auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-  if (handshakeWriteCipher) {
-    conn.handshakeWriteCipher = std::move(handshakeWriteCipher);
-  }
-  if (handshakeReadCipher) {
-    conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
-  }
   auto handshakeWriteHeaderCipher =
       handshakeLayer->getHandshakeWriteHeaderCipher();
   auto handshakeReadHeaderCipher =
       handshakeLayer->getHandshakeReadHeaderCipher();
-  if (handshakeWriteHeaderCipher) {
+  if (handshakeWriteCipher) {
+    CHECK(
+        handshakeReadCipher && handshakeWriteHeaderCipher &&
+        handshakeReadHeaderCipher);
+    conn.handshakeWriteCipher = std::move(handshakeWriteCipher);
     conn.handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
-  }
-  if (handshakeReadHeaderCipher) {
+    conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
     conn.readCodec->setHandshakeHeaderCipher(
         std::move(handshakeReadHeaderCipher));
   }
   if (handshakeLayer->isHandshakeDone()) {
-    conn.readCodec->onHandshakeDone(Clock::now());
+    CHECK(conn.oneRttWriteCipher);
+    if (conn.handshakeWriteCipher) {
+      handshakeConfirmed(conn);
+      if (conn.version == QuicVersion::QUIC_DRAFT) {
+        sendSimpleFrame(conn, HandshakeDoneFrame());
+      }
+    }
   }
 }
 
@@ -968,6 +971,14 @@ void onServerReadDataFromOpen(
           break;
         }
       }
+    }
+    // If we've processed a handshake packet, we can dicard the initial cipher.
+    if (encryptionLevel == EncryptionLevel::Handshake) {
+      conn.initialWriteCipher.reset();
+      conn.initialHeaderCipher.reset();
+      conn.readCodec->setInitialReadCipher(nullptr);
+      conn.readCodec->setInitialHeaderCipher(nullptr);
+      cancelCryptoStream(conn.cryptoState->initialStream);
     }
 
     // Update writable limit before processing the handshake data. This is so

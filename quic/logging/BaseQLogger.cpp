@@ -65,6 +65,10 @@ void addQuicSimpleFrameToEvent(
               frame.sequenceNumber));
       break;
     }
+    case quic::QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
+      event->frames.push_back(std::make_unique<quic::HandshakeDoneFrameLog>());
+      break;
+    }
   }
 }
 } // namespace

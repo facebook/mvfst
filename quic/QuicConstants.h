@@ -62,7 +62,6 @@ constexpr uint64_t kDefaultBufferSpaceAvailable =
 constexpr std::chrono::microseconds kDefaultMinRtt =
     std::chrono::microseconds::max();
 
-// Frames types with values defines in Quic Draft 15+
 enum class FrameType : uint8_t {
   PADDING = 0x00,
   PING = 0x01,
@@ -97,8 +96,9 @@ enum class FrameType : uint8_t {
   CONNECTION_CLOSE = 0x1C,
   // CONNECTION_CLOSE_APP_ERR frametype is use to indicate application errors
   CONNECTION_CLOSE_APP_ERR = 0x1D,
-  MIN_STREAM_DATA = 0xFE, // subject to change (https://fburl.com/qpr)
-  EXPIRED_STREAM_DATA = 0xFF, // subject to change (https://fburl.com/qpr)
+  HANDSHAKE_DONE = 0x1E,
+  MIN_STREAM_DATA = 0xFE, // subject to change
+  EXPIRED_STREAM_DATA = 0xFF, // subject to change
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {
@@ -187,7 +187,7 @@ enum class QuicVersion : uint32_t {
   MVFST = 0xfaceb001,
   QUIC_DRAFT_22 = 0xFF000016,
   QUIC_DRAFT_23 = 0xFF000017,
-  QUIC_DRAFT = 0xFF000018, // Draft-24
+  QUIC_DRAFT = 0xFF000019, // Draft-25
   MVFST_INVALID = 0xfaceb00f,
 };
 
@@ -383,10 +383,6 @@ constexpr std::chrono::milliseconds kHappyEyeballsConnAttemptDelayWithCache =
     15s;
 
 constexpr size_t kMaxNumTokenSourceAddresses = 3;
-
-// Amount of time to retain initial keys until they are dropped after handshake
-// completion.
-constexpr std::chrono::seconds kTimeToRetainInitialKeys = 20s;
 
 // Amount of time to retain zero rtt keys until they are dropped after handshake
 // completion.

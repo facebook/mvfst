@@ -398,14 +398,10 @@ uint64_t getStreamNextOffsetToDeliver(const QuicStreamState& stream) {
   return minOffsetToDeliver;
 }
 
-void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoState) {
-  // Cancel any retransmissions we might want to do for the crypto stream.
-  // This does not include data that is already deemed as lost, or data that
-  // is pending in the write buffer.
-  cryptoState.initialStream.retransmissionBuffer.clear();
-  cryptoState.initialStream.lossBuffer.clear();
-  cryptoState.handshakeStream.retransmissionBuffer.clear();
-  cryptoState.handshakeStream.lossBuffer.clear();
+void cancelCryptoStream(QuicCryptoStream& cryptoStream) {
+  cryptoStream.retransmissionBuffer.clear();
+  cryptoStream.lossBuffer.clear();
+  cryptoStream.writeBuffer.move();
 }
 
 QuicCryptoStream* getCryptoStream(

@@ -7,6 +7,7 @@
  */
 
 #include <quic/state/QuicStateFunctions.h>
+#include <quic/state/QuicStreamFunctions.h>
 
 #include <quic/common/TimeUtil.h>
 #include <quic/logging/QuicLogger.h>
@@ -309,6 +310,18 @@ std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
     }
   }
   return res;
+}
+
+void handshakeConfirmed(QuicConnectionStateBase& conn) {
+  if (conn.nodeType == QuicNodeType::Client) {
+    conn.handshakeLayer->handshakeConfirmed();
+  }
+  conn.readCodec->onHandshakeDone(Clock::now());
+  conn.handshakeWriteCipher.reset();
+  conn.handshakeWriteHeaderCipher.reset();
+  conn.readCodec->setHandshakeReadCipher(nullptr);
+  conn.readCodec->setHandshakeHeaderCipher(nullptr);
+  cancelCryptoStream(conn.cryptoState->handshakeStream);
 }
 
 } // namespace quic

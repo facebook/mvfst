@@ -294,7 +294,7 @@ TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
 
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::OneRttKeysDerived);
 
-  handshake->onRecvOneRttProtectedData();
+  handshake->handshakeConfirmed();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Established);
   EXPECT_FALSE(zeroRttRejected.has_value());
   EXPECT_TRUE(handshakeSuccess);
@@ -497,7 +497,7 @@ TEST_F(ClientHandshakeZeroRttTest, TestZeroRttSuccess) {
   EXPECT_FALSE(zeroRttRejected.has_value());
   expectZeroRttCipher(true, true);
   clientServerRound();
-  handshake->onRecvOneRttProtectedData();
+  handshake->handshakeConfirmed();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Established);
   EXPECT_EQ(handshake->getApplicationProtocol(), "h1q-fb");
 }
@@ -521,7 +521,7 @@ TEST_F(ClientHandshakeZeroRttReject, TestZeroRttRejection) {
   // We will still keep the zero rtt key lying around.
   expectZeroRttCipher(true, true);
   clientServerRound();
-  handshake->onRecvOneRttProtectedData();
+  handshake->handshakeConfirmed();
   EXPECT_EQ(handshake->getPhase(), ClientHandshake::Phase::Established);
 }
 

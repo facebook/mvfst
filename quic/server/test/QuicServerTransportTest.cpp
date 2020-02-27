@@ -541,36 +541,13 @@ class QuicServerTransportTest : public Test {
     EXPECT_TRUE(getCryptoStream(
                     *server->getConn().cryptoState, EncryptionLevel::Initial)
                     ->readBuffer.empty());
-    EXPECT_NE(server->getConn().initialWriteCipher, nullptr);
     EXPECT_FALSE(server->getConn().localConnectionError.has_value());
     verifyTransportParameters(kDefaultIdleTimeout);
     serverWrites.clear();
 
-    // Simulate ack from client
     auto& cryptoState = server->getConn().cryptoState;
-    EXPECT_GT(cryptoState->initialStream.retransmissionBuffer.size(), 0);
     EXPECT_EQ(cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
     EXPECT_EQ(cryptoState->oneRttStream.retransmissionBuffer.size(), 0);
-
-    auto aead = getInitialCipher();
-    auto headerCipher = getInitialHeaderCipher();
-    AckBlocks acks;
-    auto start = getFirstOutstandingPacket(
-                     server->getNonConstConn(), PacketNumberSpace::Initial)
-                     ->packet.header.getPacketSequenceNum();
-    auto end = getLastOutstandingPacket(
-                   server->getNonConstConn(), PacketNumberSpace::Initial)
-                   ->packet.header.getPacketSequenceNum();
-    acks.insert(start, end);
-    auto pn = clientNextInitialPacketNum++;
-    auto ackPkt = createAckPacket(
-        server->getNonConstConn(),
-        pn,
-        acks,
-        PacketNumberSpace::Initial,
-        aead.get());
-    deliverData(packetToBufCleartext(ackPkt, *aead, *headerCipher, pn));
-    EXPECT_EQ(cryptoState->initialStream.retransmissionBuffer.size(), 0);
   }
 
   void verifyTransportParameters(std::chrono::milliseconds idleTimeout) {
@@ -829,6 +806,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
 TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   // Clear the receivedNewPacketBeforeWrite flag, since we may reveice from
   // client during the SetUp of the test case.
+  server->getNonConstConn().outstandingPackets.clear();
   server->getNonConstConn().receivedNewPacketBeforeWrite = false;
   StreamId streamId = server->createBidirectionalStream().value();
 
@@ -841,18 +819,18 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
       false);
   loopForWrites();
   // It was the first packet
-  ASSERT_TRUE(server->idleTimeout().isScheduled());
+  EXPECT_TRUE(server->idleTimeout().isScheduled());
 
   // cancel it and write something else. This time idle timer shouldn't set.
   server->idleTimeout().cancelTimeout();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  EXPECT_FALSE(server->idleTimeout().isScheduled());
   server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the daylight feels like it's a long way off"),
       false,
       false);
   loopForWrites();
-  ASSERT_FALSE(server->idleTimeout().isScheduled());
+  EXPECT_FALSE(server->idleTimeout().isScheduled());
 }
 
 TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
@@ -2991,6 +2969,22 @@ TEST_F(
 TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
   server->getNonConstConn().transportSettings.disableMigration = false;
 
+  StreamId streamId = server->createBidirectionalStream().value();
+  auto data1 = IOBuf::copyBuffer("Aloha");
+  server->writeChain(streamId, data1->clone(), false, false);
+  loopForWrites();
+  PacketNum packetNum1 =
+      getFirstOutstandingPacket(
+          server->getNonConstConn(), PacketNumberSpace::AppData)
+          ->packet.header.getPacketSequenceNum();
+  AckBlocks acks = {{packetNum1, packetNum1}};
+  auto packet1 = createAckPacket(
+      server->getNonConstConn(),
+      ++clientNextAppDataPacketNum,
+      acks,
+      PacketNumberSpace::AppData);
+  deliverData(packetToBuf(packet1));
+
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
       *clientConnectionId,
@@ -3022,6 +3016,21 @@ TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
 
 TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   server->getNonConstConn().transportSettings.disableMigration = false;
+  StreamId streamId = server->createBidirectionalStream().value();
+  auto data1 = IOBuf::copyBuffer("Aloha");
+  server->writeChain(streamId, data1->clone(), false, false);
+  loopForWrites();
+  PacketNum packetNum1 =
+      getFirstOutstandingPacket(
+          server->getNonConstConn(), PacketNumberSpace::AppData)
+          ->packet.header.getPacketSequenceNum();
+  AckBlocks acks = {{packetNum1, packetNum1}};
+  auto packet1 = createAckPacket(
+      server->getNonConstConn(),
+      ++clientNextAppDataPacketNum,
+      acks,
+      PacketNumberSpace::AppData);
+  deliverData(packetToBuf(packet1));
 
   auto data = IOBuf::copyBuffer("bad data");
   auto packetData = packetToBuf(createStreamPacket(
