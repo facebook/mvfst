@@ -38,6 +38,10 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // Save the server transport params here so that client can access the value
   // when it wants to write the values to psk cache
   // TODO Save TicketTransportParams here instead of in QuicClientTransport
+  uint64_t peerAdvertisedInitialMaxData{0};
+  uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal{0};
+  uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote{0};
+  uint64_t peerAdvertisedInitialMaxStreamDataUni{0};
   uint64_t peerAdvertisedInitialMaxStreamsBidi{0};
   uint64_t peerAdvertisedInitialMaxStreamsUni{0};
 

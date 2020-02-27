@@ -919,12 +919,12 @@ void QuicClientTransport::cacheServerInitialParams(
     uint64_t peerAdvertisedInitialMaxStreamsBidi,
     uint64_t peerAdvertisedInitialMaxStreamUni) {
   serverInitialParamsSet_ = true;
-  peerAdvertisedInitialMaxData_ = peerAdvertisedInitialMaxData;
-  peerAdvertisedInitialMaxStreamDataBidiLocal_ =
+  clientConn_->peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
+  clientConn_->peerAdvertisedInitialMaxStreamDataBidiLocal =
       peerAdvertisedInitialMaxStreamDataBidiLocal;
-  peerAdvertisedInitialMaxStreamDataBidiRemote_ =
+  clientConn_->peerAdvertisedInitialMaxStreamDataBidiRemote =
       peerAdvertisedInitialMaxStreamDataBidiRemote;
-  peerAdvertisedInitialMaxStreamDataUni_ =
+  clientConn_->peerAdvertisedInitialMaxStreamDataUni =
       peerAdvertisedInitialMaxStreamDataUni;
   clientConn_->peerAdvertisedInitialMaxStreamsBidi =
       peerAdvertisedInitialMaxStreamsBidi;
@@ -952,13 +952,14 @@ void QuicClientTransport::onNewCachedPsk(
 
   quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
   quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
-  quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;
+  quicCachedPsk.transportParams.initialMaxData =
+      clientConn_->peerAdvertisedInitialMaxData;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-      peerAdvertisedInitialMaxStreamDataBidiLocal_;
+      clientConn_->peerAdvertisedInitialMaxStreamDataBidiLocal;
   quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-      peerAdvertisedInitialMaxStreamDataBidiRemote_;
+      clientConn_->peerAdvertisedInitialMaxStreamDataBidiRemote;
   quicCachedPsk.transportParams.initialMaxStreamDataUni =
-      peerAdvertisedInitialMaxStreamDataUni_;
+      clientConn_->peerAdvertisedInitialMaxStreamDataUni;
   quicCachedPsk.transportParams.initialMaxStreamsBidi =
       clientConn_->peerAdvertisedInitialMaxStreamsBidi;
   quicCachedPsk.transportParams.initialMaxStreamsUni =

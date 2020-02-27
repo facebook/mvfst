@@ -145,19 +145,19 @@ class TestingQuicClientTransport : public QuicClientTransport {
   }
 
   auto& peerAdvertisedInitialMaxData() {
-    return peerAdvertisedInitialMaxData_;
+    return getConn().peerAdvertisedInitialMaxData;
   }
 
   auto& peerAdvertisedInitialMaxStreamDataBidiLocal() const {
-    return peerAdvertisedInitialMaxStreamDataBidiLocal_;
+    return getConn().peerAdvertisedInitialMaxStreamDataBidiLocal;
   }
 
   auto& peerAdvertisedInitialMaxStreamDataBidiRemote() const {
-    return peerAdvertisedInitialMaxStreamDataBidiRemote_;
+    return getConn().peerAdvertisedInitialMaxStreamDataBidiRemote;
   }
 
   auto& peerAdvertisedInitialMaxStreamDataUni() const {
-    return peerAdvertisedInitialMaxStreamDataUni_;
+    return getConn().peerAdvertisedInitialMaxStreamDataUni;
   }
 
   void setDestructionCallback(
