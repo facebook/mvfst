@@ -20,8 +20,6 @@ namespace quic {
 
 class CryptoFactory {
  public:
-  // TODO remove version parameter when we don't need to support MVFST_OLD
-  // anymore.
   std::unique_ptr<Aead> getClientInitialCipher(
       const ConnectionId& clientDestinationConnId,
       QuicVersion version) const;

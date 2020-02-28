@@ -407,14 +407,8 @@ std::string toString(QuicVersion version) {
   switch (version) {
     case QuicVersion::VERSION_NEGOTIATION:
       return "VERSION_NEGOTIATION";
-    case QuicVersion::MVFST_OLD:
-      return "MVFST_OLD";
     case QuicVersion::MVFST:
       return "MVFST";
-    case QuicVersion::QUIC_DRAFT_22:
-      return "QUIC_DRAFT_22";
-    case QuicVersion::QUIC_DRAFT_23:
-      return "QUIC_DRAFT_23";
     case QuicVersion::QUIC_DRAFT:
       return "QUIC_DRAFT";
     case QuicVersion::MVFST_INVALID:

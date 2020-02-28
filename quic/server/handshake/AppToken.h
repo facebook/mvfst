@@ -33,7 +33,7 @@ namespace quic {
 struct AppToken {
   TicketTransportParameters transportParams;
   std::vector<folly::IPAddress> sourceAddresses;
-  folly::Optional<QuicVersion> version;
+  QuicVersion version;
   std::unique_ptr<folly::IOBuf> appParams;
 };
 

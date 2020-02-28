@@ -21,18 +21,13 @@ namespace test {
 
 static EncryptedExtensions getEncryptedExtensions() {
   auto ee = TestMessages::encryptedExt();
-
   ServerTransportParameters serverParams;
-  serverParams.supported_versions = {QuicVersion::MVFST};
-
   ee.extensions.push_back(encodeExtension(std::move(serverParams)));
-
   return ee;
 }
 
 TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      folly::none,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -52,7 +47,6 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
 
 TEST(FizzClientHandshakeTest, TestOnEE) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      MVFST1,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -69,7 +63,6 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
 
 TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      MVFST1,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -106,7 +99,6 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   customTransportParameters.push_back(element3->encode());
 
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
-      folly::none,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,

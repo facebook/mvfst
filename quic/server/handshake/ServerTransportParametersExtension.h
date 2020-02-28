@@ -17,8 +17,6 @@ namespace quic {
 class ServerTransportParametersExtension : public fizz::ServerExtensions {
  public:
   ServerTransportParametersExtension(
-      folly::Optional<QuicVersion> negotiatedVersion,
-      const std::vector<QuicVersion>& supportedVersions,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
@@ -30,9 +28,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t maxRecvPacketSize,
       TransportPartialReliabilitySetting partialReliability,
       const StatelessResetToken& token)
-      : negotiatedVersion_(negotiatedVersion),
-        supportedVersions_(supportedVersions),
-        initialMaxData_(initialMaxData),
+      : initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
         initialMaxStreamDataBidiRemote_(initialMaxStreamDataBidiRemote),
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
@@ -57,15 +53,10 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           fizz::AlertDescription::missing_extension);
     }
     clientTransportParameters_ = std::move(clientParams);
-    if (!clientTransportParameters_->initial_version.has_value()) {
-      negotiatedVersion_ = folly::none;
-    }
 
     std::vector<fizz::Extension> exts;
 
     ServerTransportParameters params;
-    params.negotiated_version = negotiatedVersion_;
-    params.supported_versions = supportedVersions_;
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
         initialMaxStreamDataBidiLocal_));
@@ -110,8 +101,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   }
 
  private:
-  folly::Optional<QuicVersion> negotiatedVersion_;
-  std::vector<QuicVersion> supportedVersions_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;

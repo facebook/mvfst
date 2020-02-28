@@ -74,17 +74,11 @@ QuicFrame parseFrame(
  */
 PaddingFrame decodePaddingFrame(folly::io::Cursor&);
 
-RstStreamFrame decodeRstStreamFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params);
+RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor);
 
-ConnectionCloseFrame decodeConnectionCloseFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params);
+ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor);
 
-ConnectionCloseFrame decodeApplicationClose(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params);
+ConnectionCloseFrame decodeApplicationClose(folly::io::Cursor& cursor);
 
 MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor);
 
@@ -113,9 +107,7 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor);
 RetireConnectionIdFrame decodeRetireConnectionIdFrame(
     folly::io::Cursor& cursor);
 
-StopSendingFrame decodeStopSendingFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params);
+StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor);
 
 PathChallengeFrame decodePathChallengeFrame(folly::io::Cursor& cursor);
 

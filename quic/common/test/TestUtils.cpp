@@ -177,7 +177,6 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     resState.ticketAgeAdd = 0;
     resState.ticketIssueTime = std::chrono::system_clock::time_point();
     resState.handshakeTime = std::chrono::system_clock::time_point();
-    auto version = cachedPsk_.transportParams.negotiatedVersion;
     AppToken appToken;
     appToken.transportParams = createTicketTransportParameters(
         kDefaultIdleTimeout.count(),
@@ -188,7 +187,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
         kDefaultStreamWindowSize,
         kDefaultMaxStreamsBidirectional,
         kDefaultMaxStreamsUnidirectional);
-    appToken.version = version;
+    appToken.version = QuicVersion::MVFST;
     resState.appToken = encodeAppToken(appToken);
     return resState;
   }
@@ -217,8 +216,7 @@ void setupZeroRttOnServerCtx(
 
 QuicCachedPsk setupZeroRttOnClientCtx(
     fizz::client::FizzClientContext& clientCtx,
-    std::string hostname,
-    QuicVersion version) {
+    std::string hostname) {
   clientCtx.setSendEarlyData(true);
 
   QuicCachedPsk quicCachedPsk;
@@ -240,7 +238,6 @@ QuicCachedPsk setupZeroRttOnClientCtx(
   psk.ticketHandshakeTime = std::chrono::system_clock::time_point();
   psk.maxEarlyDataSize = 2;
 
-  quicCachedPsk.transportParams.negotiatedVersion = version;
   quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
   quicCachedPsk.transportParams.maxRecvPacketSize = kDefaultUDPReadBufferSize;
   quicCachedPsk.transportParams.initialMaxData = kDefaultConnectionWindowSize;

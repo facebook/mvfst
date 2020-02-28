@@ -26,7 +26,6 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     std::vector<fizz::Extension> exts;
 
     ClientTransportParameters params;
-    params.initial_version = clientParameters_->initialVersion_;
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
         clientParameters_->initialMaxStreamDataBidiLocal_));

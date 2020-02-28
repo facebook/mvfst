@@ -47,50 +47,24 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     QuicInteger tokenLengthInt(tokenLength);
     tokenHeaderLength = tokenLengthInt.getSize() + tokenLength;
   }
-  auto version = longHeader.getVersion();
-  if (version == QuicVersion::MVFST_OLD) {
-    auto longHeaderSize = sizeof(uint8_t) /* initialByte */ +
-        sizeof(QuicVersionType) + sizeof(uint8_t) /* DCIL | SCIL */ +
-        longHeader.getSourceConnId().size() +
-        longHeader.getDestinationConnId().size() + tokenHeaderLength +
-        kMaxPacketLenSize + encodedPacketNum.length;
-    if (spaceCounter < longHeaderSize) {
-      spaceCounter = 0;
-    } else {
-      spaceCounter -= longHeaderSize;
-    }
-    appender.writeBE<uint32_t>(folly::to<uint32_t>(longHeader.getVersion()));
-    auto connidSize = encodeConnectionIdLengths(
-        longHeader.getDestinationConnId().size(),
-        longHeader.getSourceConnId().size());
-    appender.writeBE<uint8_t>(connidSize);
-    appender.push(
-        longHeader.getDestinationConnId().data(),
-        longHeader.getDestinationConnId().size());
-    appender.push(
-        longHeader.getSourceConnId().data(),
-        longHeader.getSourceConnId().size());
+  auto longHeaderSize = sizeof(uint8_t) /* initialByte */ +
+      sizeof(QuicVersionType) + sizeof(uint8_t) +
+      longHeader.getSourceConnId().size() + sizeof(uint8_t) +
+      longHeader.getDestinationConnId().size() + tokenHeaderLength +
+      kMaxPacketLenSize + encodedPacketNum.length;
+  if (spaceCounter < longHeaderSize) {
+    spaceCounter = 0;
   } else {
-    auto longHeaderSize = sizeof(uint8_t) /* initialByte */ +
-        sizeof(QuicVersionType) + sizeof(uint8_t) +
-        longHeader.getSourceConnId().size() + sizeof(uint8_t) +
-        longHeader.getDestinationConnId().size() + tokenHeaderLength +
-        kMaxPacketLenSize + encodedPacketNum.length;
-    if (spaceCounter < longHeaderSize) {
-      spaceCounter = 0;
-    } else {
-      spaceCounter -= longHeaderSize;
-    }
-    appender.writeBE<uint32_t>(folly::to<uint32_t>(longHeader.getVersion()));
-    appender.writeBE<uint8_t>(longHeader.getDestinationConnId().size());
-    appender.push(
-        longHeader.getDestinationConnId().data(),
-        longHeader.getDestinationConnId().size());
-    appender.writeBE<uint8_t>(longHeader.getSourceConnId().size());
-    appender.push(
-        longHeader.getSourceConnId().data(),
-        longHeader.getSourceConnId().size());
+    spaceCounter -= longHeaderSize;
   }
+  appender.writeBE<uint32_t>(folly::to<uint32_t>(longHeader.getVersion()));
+  appender.writeBE<uint8_t>(longHeader.getDestinationConnId().size());
+  appender.push(
+      longHeader.getDestinationConnId().data(),
+      longHeader.getDestinationConnId().size());
+  appender.writeBE<uint8_t>(longHeader.getSourceConnId().size());
+  appender.push(
+      longHeader.getSourceConnId().data(), longHeader.getSourceConnId().size());
 
   if (isInitial) {
     uint64_t tokenLength = token.size();
@@ -117,15 +91,13 @@ PacketNumEncodingResult encodeLongHeaderHelper(
 RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     uint32_t remainingBytes,
     PacketHeader header,
-    PacketNum largestAckedPacketNum,
-    QuicVersion version)
+    PacketNum largestAckedPacketNum)
     : remainingBytes_(remainingBytes),
       packet_(std::move(header)),
       header_(folly::IOBuf::create(kLongHeaderHeaderSize)),
       body_(folly::IOBuf::create(kAppenderGrowthSize)),
       headerAppender_(header_.get(), kLongHeaderHeaderSize),
-      bodyAppender_(body_.get(), kAppenderGrowthSize),
-      version_(version) {
+      bodyAppender_(body_.get(), kAppenderGrowthSize) {
   writeHeaderBytes(largestAckedPacketNum);
 }
 
@@ -274,10 +246,6 @@ const PacketHeader& RegularQuicPacketBuilder::getPacketHeader() const {
 
 void RegularQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
   cipherOverhead_ = overhead;
-}
-
-QuicVersion RegularQuicPacketBuilder::getVersion() const {
-  return version_;
 }
 
 StatelessResetPacketBuilder::StatelessResetPacketBuilder(

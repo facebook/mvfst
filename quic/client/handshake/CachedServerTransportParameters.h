@@ -15,7 +15,6 @@
 namespace quic {
 
 struct CachedServerTransportParameters {
-  QuicVersion negotiatedVersion;
   uint64_t idleTimeout;
   uint64_t maxRecvPacketSize;
   uint64_t initialMaxData;

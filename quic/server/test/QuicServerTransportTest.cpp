@@ -111,7 +111,6 @@ class FakeServerHandshake : public ServerHandshake {
 
   Optional<ClientTransportParameters> getClientTransportParams() override {
     std::vector<TransportParameter> transportParams;
-    // TODO Split out into individual flow control parameters.
     transportParams.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
         kDefaultStreamWindowSize));
@@ -139,8 +138,7 @@ class FakeServerHandshake : public ServerHandshake {
           *clientActiveConnectionIdLimit_));
     }
 
-    return ClientTransportParameters{QuicVersion::MVFST,
-                                     std::move(transportParams)};
+    return ClientTransportParameters{std::move(transportParams)};
   }
 
   void setEarlyKeys() {
@@ -1071,7 +1069,8 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       serverWrites,
       *makeClientEncryptedCodec(),
       QuicFrame::Type::ConnectionCloseFrame_E));
-  checkTransportStateUpdate(qLogger, "Server closed by peer reason=");
+  checkTransportStateUpdate(
+      qLogger, "Server closed by peer reason=Mind the gap");
 }
 
 TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
@@ -1277,8 +1276,7 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      *server->getConn().version);
+      0 /* largestAcked */);
   writeFrame(rstFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(std::move(packet));
@@ -1293,8 +1291,7 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
   RegularQuicPacketBuilder builder2(
       server->getConn().udpSendPacketLen,
       std::move(header2),
-      0 /* largestAcked */,
-      *server->getConn().version);
+      0 /* largestAcked */);
   writeFrame(rstFrame, builder2);
 
   auto data = folly::IOBuf::copyBuffer("hello");
@@ -1364,8 +1361,7 @@ TEST_F(QuicServerTransportTest, RecvRstStreamFrame) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   RstStreamFrame rstFrame(
       streamId,
@@ -1421,8 +1417,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrame) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -1548,8 +1543,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -1576,8 +1570,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingBeforeStream) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -1633,8 +1626,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   StopSendingFrame stopSendingFrame1(
       streamId1, GenericApplicationErrorCode::UNKNOWN);
@@ -1663,8 +1655,7 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      server->getConn().ackStates.appDataAckState.largestAckedByPeer,
-      QuicVersion::MVFST);
+      server->getConn().ackStates.appDataAckState.largestAckedByPeer);
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
@@ -1694,8 +1685,7 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      server->getConn().ackStates.appDataAckState.largestAckedByPeer,
-      QuicVersion::MVFST);
+      server->getConn().ackStates.appDataAckState.largestAckedByPeer);
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
@@ -1833,8 +1823,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
   std::string errMsg = "Stand clear of the closing doors, please";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
@@ -1871,8 +1860,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
 
   std::string errMsg = "Stand clear of the closing doors, please";
   ConnectionCloseFrame appClose(
@@ -1912,8 +1900,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      QuicVersion::MVFST);
+      0 /* largestAcked */);
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);

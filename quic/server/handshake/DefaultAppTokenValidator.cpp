@@ -52,11 +52,6 @@ bool DefaultAppTokenValidator::validate(
     return false;
   }
 
-  if (conn_->version != appToken->version) {
-    VLOG(10) << "QuicVersion mismatch";
-    return false;
-  }
-
   auto& params = appToken->transportParams.parameters;
 
   // TODO T33454954 Simplify ticket transport params. see comments in D9324131

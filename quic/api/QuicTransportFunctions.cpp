@@ -714,8 +714,7 @@ void writeCloseCommon(
   RegularQuicPacketBuilder packetBuilder(
       connection.udpSendPacketLen,
       std::move(header),
-      getAckState(connection, pnSpace).largestAckedByPeer,
-      connection.version.value_or(*connection.originalVersion));
+      getAckState(connection, pnSpace).largestAckedByPeer);
   packetBuilder.setCipherOverhead(aead.getCipherOverhead());
   size_t written = 0;
   if (!closeDetails) {
@@ -947,8 +946,7 @@ uint64_t writeConnectionDataToSocket(
     RegularQuicPacketBuilder pktBuilder(
         connection.udpSendPacketLen,
         std::move(header),
-        getAckState(connection, pnSpace).largestAckedByPeer,
-        connection.version.value_or(*connection.originalVersion));
+        getAckState(connection, pnSpace).largestAckedByPeer);
     pktBuilder.setCipherOverhead(cipherOverhead);
     auto result =
         scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);

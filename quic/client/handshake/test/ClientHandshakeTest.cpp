@@ -60,7 +60,6 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
-            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -95,8 +94,6 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
-            folly::none,
-            supportedVersions,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -362,7 +359,6 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
-            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -456,7 +452,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
     serverCtx->setSupportedAlpns({"h1q-fb"});
     serverCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupCtxWithTestCert(*serverCtx);
-    psk = setupZeroRttOnClientCtx(*clientCtx, hostname, QuicVersion::MVFST);
+    psk = setupZeroRttOnClientCtx(*clientCtx, hostname);
     setupZeroRttServer();
   }
 
@@ -465,7 +461,6 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
         hostname,
         psk.cachedPsk,
         std::make_shared<ClientTransportParametersExtension>(
-            folly::none,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),

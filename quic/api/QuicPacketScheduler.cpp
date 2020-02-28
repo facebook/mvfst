@@ -566,8 +566,7 @@ CloningScheduler::scheduleFramesForPacket(
     RegularQuicPacketBuilder regularBuilder(
         conn_.udpSendPacketLen,
         builder.getPacketHeader(),
-        getAckState(conn_, builderPnSpace).largestAckedByPeer,
-        conn_.version.value_or(*conn_.originalVersion));
+        getAckState(conn_, builderPnSpace).largestAckedByPeer);
     PacketRebuilder rebuilder(regularBuilder, conn_);
     // We shouldn't clone Handshake packet.
     if (iter->isHandshake) {

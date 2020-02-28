@@ -18,7 +18,6 @@
 
 #include <cstdint>
 
-
 namespace quic {
 namespace test {
 
@@ -26,10 +25,6 @@ void expectAppTokenEqual(
     const folly::Optional<AppToken>& decodedAppToken,
     const AppToken& appToken) {
   EXPECT_TRUE(decodedAppToken.has_value());
-
-  EXPECT_EQ(
-      decodedAppToken->transportParams.negotiated_version,
-      appToken.transportParams.negotiated_version);
 
   EXPECT_EQ(
       decodedAppToken->transportParams.parameters.size(),
@@ -221,8 +216,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeWithAppToken) {
       kDefaultStreamWindowSize,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
-  appToken.version = QuicVersion::MVFST;
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);
@@ -243,8 +238,8 @@ TEST(AppTokenTest, TestEncodeAndDecodeIPv6AndIPv4AddressesWithAppToken) {
       folly::IPAddress("2401:db00:2111:7283:face::46:0"),
       folly::IPAddress("1.2.3.4"),
       folly::IPAddress("2401:db00:2111:7283:face::46:2")};
-  appToken.version = QuicVersion::MVFST;
   appToken.appParams = folly::IOBuf::copyBuffer("QPACK Params");
+  appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 
   expectAppTokenEqual(decodeAppToken(*buf), appToken);

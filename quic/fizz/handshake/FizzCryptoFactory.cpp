@@ -23,20 +23,15 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
   auto connIdRange = folly::range(clientDestinationConnId);
   folly::StringPiece salt;
   switch (version) {
-    case QuicVersion::MVFST_OLD:
-      salt = kQuicDraft17Salt;
-      break;
     case QuicVersion::MVFST:
-    case QuicVersion::QUIC_DRAFT_22:
       salt = kQuicDraft22Salt;
       break;
-    case QuicVersion::QUIC_DRAFT_23:
     case QuicVersion::QUIC_DRAFT:
       salt = kQuicDraft23Salt;
       break;
     default:
       // Default to one arbitrarily.
-      salt = kQuicDraft17Salt;
+      salt = kQuicDraft23Salt;
   }
   auto initialSecret = deriver->hkdfExtract(salt, connIdRange);
   auto trafficSecret = deriver->expandLabel(

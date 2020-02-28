@@ -65,11 +65,6 @@ class PacketBuilderInterface {
 
   // Returns the packet header for the current packet.
   virtual const PacketHeader& getPacketHeader() const = 0;
-
-  // Horrible hack, remove when we stop having to support MVFST_OLD
-  virtual QuicVersion getVersion() const {
-    return QuicVersion::MVFST;
-  }
 };
 
 class RegularQuicPacketBuilder : public PacketBuilderInterface {
@@ -92,8 +87,7 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
   RegularQuicPacketBuilder(
       uint32_t remainingBytes,
       PacketHeader header,
-      PacketNum largestAckedPacketNum,
-      QuicVersion version = QuicVersion::MVFST_OLD);
+      PacketNum largestAckedPacketNum);
 
   /**
    * Return an estimated header bytes count.
@@ -131,8 +125,6 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
 
   void setCipherOverhead(uint8_t overhead) noexcept;
 
-  QuicVersion getVersion() const override;
-
  private:
   void writeHeaderBytes(PacketNum largestAckedPacketNum);
   void encodeLongHeader(
@@ -152,7 +144,6 @@ class RegularQuicPacketBuilder : public PacketBuilderInterface {
 
   uint32_t cipherOverhead_{0};
   folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
-  QuicVersion version_;
 };
 
 class VersionNegotiationPacketBuilder {
@@ -258,10 +249,6 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   const PacketHeader& getPacketHeader() const override {
     return builder.getPacketHeader();
-  }
-
-  QuicVersion getVersion() const override {
-    return builder.getVersion();
   }
 
  private:

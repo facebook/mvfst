@@ -841,11 +841,6 @@ folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
   if (!conn_->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
   } else if (
-      quicCachedPsk->transportParams.negotiatedVersion !=
-      conn_->originalVersion) {
-    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-    removePsk();
-  } else if (
       earlyDataAppParamsValidator_ &&
       !earlyDataAppParamsValidator_(
           quicCachedPsk->cachedPsk.alpn,
@@ -895,7 +890,6 @@ void QuicClientTransport::startCryptoHandshake() {
   setPartialReliabilityTransportParameter();
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
-      folly::none,
       conn_->transportSettings.advertisedInitialConnectionWindowSize,
       conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
@@ -985,7 +979,6 @@ void QuicClientTransport::onNewCachedPsk(
   QuicCachedPsk quicCachedPsk;
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
 
-  quicCachedPsk.transportParams.negotiatedVersion = *conn_->version;
   quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
   quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
   quicCachedPsk.transportParams.initialMaxData = peerAdvertisedInitialMaxData_;

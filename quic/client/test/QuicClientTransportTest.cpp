@@ -556,7 +556,7 @@ TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
-  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
+  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
   // Change the ctx
@@ -609,7 +609,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   expectTransportCallbacks();
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
-  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
+  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
@@ -686,54 +686,9 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   }
 }
 
-TEST_P(QuicClientTransportIntegrationTest, TestZeroRttVersionDoesNotMatch) {
-  expectTransportCallbacks();
-  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
-  pskCache_->putPsk(hostname, cachedPsk);
-  // Change the ctx
-  server_->setFizzContext(serverCtx);
-  // This needs to be a version that's not in getVersion() but in server's
-  // supported version list.
-  client->getNonConstConn().originalVersion = MVFST1;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
-        EXPECT_TRUE(false);
-        return true;
-      },
-      []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
-  EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
-  EXPECT_FALSE(client->serverInitialParamsSet());
-
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
-    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
-    CHECK(client->getConn().oneRttWriteCipher);
-    eventbase_.terminateLoopSoon();
-  }));
-  eventbase_.loopForever();
-
-  auto streamId = client->createBidirectionalStream().value();
-  auto data = IOBuf::copyBuffer("hello");
-  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
-  expected->prependChain(data->clone());
-  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  EXPECT_TRUE(client->serverInitialParamsSet());
-  EXPECT_EQ(
-      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
-  EXPECT_EQ(
-      client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
-      kDefaultStreamWindowSize);
-  EXPECT_EQ(
-      client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
-      kDefaultStreamWindowSize);
-  EXPECT_EQ(
-      client->peerAdvertisedInitialMaxStreamDataUni(),
-      kDefaultStreamWindowSize);
-}
-
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
   expectTransportCallbacks();
-  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
+  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
@@ -774,7 +729,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
   expectTransportCallbacks();
-  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname, getVersion());
+  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
   pskCache_->putPsk(hostname, cachedPsk);
   // Change the ctx
   server_->setFizzContext(serverCtx);
@@ -1112,7 +1067,6 @@ INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTest,
     ::testing::Values(
         TestingParams(QuicVersion::MVFST),
-        TestingParams(QuicVersion::MVFST_OLD),
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
@@ -1163,9 +1117,6 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
     parameters.push_back(encodeIntegerParameter(
         TransportParameterId::max_packet_size, maxRecvPacketSize));
     ServerTransportParameters params;
-    params.negotiated_version = folly::none;
-    params.supported_versions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
-
     StatelessResetToken testStatelessResetToken = generateStatelessResetToken();
     TransportParameter statelessReset;
     statelessReset.parameter = TransportParameterId::stateless_reset_token;
@@ -3899,8 +3850,7 @@ TEST_F(
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      *client->getConn().version);
+      0 /* largestAcked */);
   writeFrame(rstFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(packet->coalesce());
@@ -3913,8 +3863,7 @@ TEST_F(
   RegularQuicPacketBuilder builder2(
       client->getConn().udpSendPacketLen,
       std::move(header),
-      0 /* largestAcked */,
-      *client->getConn().version);
+      0 /* largestAcked */);
   writeFrame(rstFrame, builder2);
 
   auto data = folly::IOBuf::copyBuffer("hello");
@@ -3966,10 +3915,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
-      client->getConn().udpSendPacketLen,
-      std::move(header),
-      0,
-      QuicVersion::MVFST);
+      client->getConn().udpSendPacketLen, std::move(header), 0);
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(rstFrame, builder);
   auto packet2 = packetToBuf(std::move(builder).buildPacket());
@@ -4737,10 +4683,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
-      client->getConn().udpSendPacketLen,
-      std::move(header),
-      0,
-      QuicVersion::MVFST);
+      client->getConn().udpSendPacketLen, std::move(header), 0);
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
       "Stand clear of the closing doors, please");
@@ -4766,10 +4709,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
-      client->getConn().udpSendPacketLen,
-      std::move(header),
-      0,
-      QuicVersion::MVFST);
+      client->getConn().udpSendPacketLen, std::move(header), 0);
   ConnectionCloseFrame appClose(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       "Stand clear of the closing doors, please");
@@ -5089,7 +5029,6 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
             kDefaultStreamWindowSize;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
@@ -5160,7 +5099,6 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
             kDefaultStreamWindowSize;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
@@ -5212,7 +5150,6 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
             kDefaultStreamWindowSize;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
@@ -5257,7 +5194,6 @@ TEST_F(
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
             kDefaultStreamWindowSize;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
@@ -5356,7 +5292,6 @@ TEST_F(
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
         QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.negotiatedVersion = QuicVersion::MVFST;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
             kDefaultStreamWindowSize;
         quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =

@@ -401,7 +401,7 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
         conn_->transportSettings.advertisedInitialMaxStreamsBidi,
         conn_->transportSettings.advertisedInitialMaxStreamsUni);
     appToken.sourceAddresses = serverConn_->tokenSourceAddresses;
-    appToken.version = conn_->version;
+    appToken.version = conn_->version.value();
     // If a client connects to server for the first time and doesn't attempt
     // early data, tokenSourceAddresses will not be set because
     // validateAndUpdateSourceAddressToken is not called in this case.

@@ -21,11 +21,10 @@ using namespace fizz::test;
 namespace quic {
 namespace test {
 
-static ClientHello getClientHello(folly::Optional<QuicVersion> initialVersion) {
+static ClientHello getClientHello() {
   auto chlo = TestMessages::clientHello();
 
   ClientTransportParameters clientParams;
-  clientParams.initial_version = initialVersion;
   clientParams.parameters.emplace_back(
       CustomIntegralTransportParameter(0xffff, 0xffff).encode());
 
@@ -36,8 +35,6 @@ static ClientHello getClientHello(folly::Optional<QuicVersion> initialVersion) {
 
 TEST(ServerTransportParametersTest, TestGetExtensions) {
   ServerTransportParametersExtension ext(
-      QuicVersion::MVFST,
-      {MVFST1, QuicVersion::MVFST},
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -49,49 +46,15 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       kDefaultUDPSendPacketLen,
       kDefaultPartialReliability,
       generateStatelessResetToken());
-  auto extensions = ext.getExtensions(getClientHello(folly::none));
+  auto extensions = ext.getExtensions(getClientHello());
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.has_value());
-  EXPECT_FALSE(serverParams->negotiated_version.has_value());
-}
-
-TEST(ServerTransportParametersTest, TestGetExtensionsD18) {
-  StatelessResetToken token = generateStatelessResetToken();
-  ServerTransportParametersExtension ext(
-      QuicVersion::MVFST_OLD,
-      {MVFST1, QuicVersion::MVFST_OLD},
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultStreamWindowSize,
-      std::numeric_limits<uint32_t>::max(),
-      std::numeric_limits<uint32_t>::max(),
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      kDefaultUDPSendPacketLen,
-      kDefaultPartialReliability,
-      token);
-  auto extensions = ext.getExtensions(getClientHello(QuicVersion::MVFST_OLD));
-
-  EXPECT_EQ(extensions.size(), 1);
-  auto serverParams = getExtension<ServerTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.has_value());
-  EXPECT_TRUE(serverParams->negotiated_version.has_value());
-
-  folly::Optional<StatelessResetToken> tokWrapper =
-      getStatelessResetTokenParameter(serverParams->parameters);
-
-  StatelessResetToken expectedToken;
-  EXPECT_NO_THROW(expectedToken = *tokWrapper);
-  EXPECT_EQ(token, expectedToken);
+  EXPECT_TRUE(serverParams.hasValue());
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
   ServerTransportParametersExtension ext(
-      QuicVersion::MVFST,
-      {MVFST1, QuicVersion::MVFST},
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,

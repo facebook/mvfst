@@ -40,10 +40,6 @@ quic::PacketNum nextAckedPacketLen(
   return packetNum - ackBlockLen;
 }
 
-// The octet following the version contains the lengths of the two connection ID
-// fields that follow it
-constexpr size_t kConnIdLengthOctet = 1;
-
 } // namespace
 
 namespace quic {
@@ -199,9 +195,7 @@ ReadAckFrame decodeAckFrameWithECN(
   return readAckFrame;
 }
 
-RstStreamFrame decodeRstStreamFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params) {
+RstStreamFrame decodeRstStreamFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     throw QuicTransportException(
@@ -210,19 +204,14 @@ RstStreamFrame decodeRstStreamFrame(
         quic::FrameType::RST_STREAM);
   }
   ApplicationErrorCode errorCode;
-  if (params.version == QuicVersion::MVFST_OLD) {
-    errorCode = static_cast<ApplicationErrorCode>(
-        cursor.readBE<ApplicationErrorCode>());
+  auto varCode = decodeQuicInteger(cursor);
+  if (varCode) {
+    errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
-    auto varCode = decodeQuicInteger(cursor);
-    if (varCode) {
-      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
-    } else {
-      throw QuicTransportException(
-          "Cannot decode error code",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::RST_STREAM);
-    }
+    throw QuicTransportException(
+        "Cannot decode error code",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::RST_STREAM);
   }
   auto offset = decodeQuicInteger(cursor);
   if (!offset) {
@@ -235,9 +224,7 @@ RstStreamFrame decodeRstStreamFrame(
       folly::to<StreamId>(streamId->first), errorCode, offset->first);
 }
 
-StopSendingFrame decodeStopSendingFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params) {
+StopSendingFrame decodeStopSendingFrame(folly::io::Cursor& cursor) {
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     throw QuicTransportException(
@@ -246,19 +233,14 @@ StopSendingFrame decodeStopSendingFrame(
         quic::FrameType::STOP_SENDING);
   }
   ApplicationErrorCode errorCode;
-  if (params.version == QuicVersion::MVFST_OLD) {
-    errorCode = static_cast<ApplicationErrorCode>(
-        cursor.readBE<ApplicationErrorCode>());
+  auto varCode = decodeQuicInteger(cursor);
+  if (varCode) {
+    errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
-    auto varCode = decodeQuicInteger(cursor);
-    if (varCode) {
-      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
-    } else {
-      throw QuicTransportException(
-          "Cannot decode error code",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::STOP_SENDING);
-    }
+    throw QuicTransportException(
+        "Cannot decode error code",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::STOP_SENDING);
   }
   return StopSendingFrame(folly::to<StreamId>(streamId->first), errorCode);
 }
@@ -556,24 +538,16 @@ PathResponseFrame decodePathResponseFrame(folly::io::Cursor& cursor) {
   return PathResponseFrame(pathData);
 }
 
-ConnectionCloseFrame decodeConnectionCloseFrame(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params) {
+ConnectionCloseFrame decodeConnectionCloseFrame(folly::io::Cursor& cursor) {
   TransportErrorCode errorCode{};
-  if (params.version == QuicVersion::MVFST_OLD) {
-    auto detailedCode =
-        cursor.readBE<std::underlying_type<TransportErrorCode>::type>();
-    errorCode = static_cast<TransportErrorCode>(detailedCode);
+  auto varCode = decodeQuicInteger(cursor);
+  if (varCode) {
+    errorCode = static_cast<TransportErrorCode>(varCode->first);
   } else {
-    auto varCode = decodeQuicInteger(cursor);
-    if (varCode) {
-      errorCode = static_cast<TransportErrorCode>(varCode->first);
-    } else {
-      throw QuicTransportException(
-          "Failed to parse error code.",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::CONNECTION_CLOSE);
-    }
+    throw QuicTransportException(
+        "Failed to parse error code.",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::CONNECTION_CLOSE);
   }
   auto frameTypeField = decodeQuicInteger(cursor);
   if (!frameTypeField || frameTypeField->second != sizeof(uint8_t)) {
@@ -597,23 +571,16 @@ ConnectionCloseFrame decodeConnectionCloseFrame(
       QuicErrorCode(errorCode), std::move(reasonPhrase), triggeringFrameType);
 }
 
-ConnectionCloseFrame decodeApplicationClose(
-    folly::io::Cursor& cursor,
-    const CodecParameters& params) {
+ConnectionCloseFrame decodeApplicationClose(folly::io::Cursor& cursor) {
   ApplicationErrorCode errorCode{};
-  if (params.version == QuicVersion::MVFST_OLD) {
-    auto detailedCode = cursor.readBE<ApplicationErrorCode>();
-    errorCode = static_cast<ApplicationErrorCode>(detailedCode);
+  auto varCode = decodeQuicInteger(cursor);
+  if (varCode) {
+    errorCode = static_cast<ApplicationErrorCode>(varCode->first);
   } else {
-    auto varCode = decodeQuicInteger(cursor);
-    if (varCode) {
-      errorCode = static_cast<ApplicationErrorCode>(varCode->first);
-    } else {
-      throw QuicTransportException(
-          "Failed to parse error code.",
-          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::CONNECTION_CLOSE_APP_ERR);
-    }
+    throw QuicTransportException(
+        "Failed to parse error code.",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::CONNECTION_CLOSE_APP_ERR);
   }
 
   auto reasonPhraseLength = decodeQuicInteger(cursor);
@@ -720,9 +687,9 @@ QuicFrame parseFrame(
       case FrameType::ACK_ECN:
         return QuicFrame(decodeAckFrameWithECN(cursor, header, params));
       case FrameType::RST_STREAM:
-        return QuicFrame(decodeRstStreamFrame(cursor, params));
+        return QuicFrame(decodeRstStreamFrame(cursor));
       case FrameType::STOP_SENDING:
-        return QuicFrame(decodeStopSendingFrame(cursor, params));
+        return QuicFrame(decodeStopSendingFrame(cursor));
       case FrameType::CRYPTO_FRAME:
         return QuicFrame(decodeCryptoFrame(cursor));
       case FrameType::NEW_TOKEN:
@@ -763,9 +730,9 @@ QuicFrame parseFrame(
       case FrameType::PATH_RESPONSE:
         return QuicFrame(decodePathResponseFrame(cursor));
       case FrameType::CONNECTION_CLOSE:
-        return QuicFrame(decodeConnectionCloseFrame(cursor, params));
+        return QuicFrame(decodeConnectionCloseFrame(cursor));
       case FrameType::CONNECTION_CLOSE_APP_ERR:
-        return QuicFrame(decodeApplicationClose(cursor, params));
+        return QuicFrame(decodeApplicationClose(cursor));
       case FrameType::MIN_STREAM_DATA:
         return QuicFrame(decodeMinStreamDataFrame(cursor));
       case FrameType::EXPIRED_STREAM_DATA:
@@ -851,64 +818,32 @@ parseLongHeaderInvariant(uint8_t initialByte, folly::io::Cursor& cursor) {
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   auto version = static_cast<QuicVersion>(cursor.readBE<QuicVersionType>());
-  if (version == QuicVersion::MVFST_OLD) {
-    if (!cursor.canAdvance(kConnIdLengthOctet)) {
-      VLOG(5) << "Not enough input bytes to read ConnectionId lengths";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    // Octet with source and destination connId lens encoded as: DCIL(4)|SCIL(4)
-    uint8_t encodedConnIdlens = cursor.readBE<uint8_t>();
-    auto connIdLens = decodeConnectionIdLengths(encodedConnIdlens);
-    uint8_t destConnIdLen = connIdLens.first;
-    uint8_t srcConnIdLen = connIdLens.second;
-
-    if (!cursor.canAdvance(destConnIdLen)) {
-      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    ConnectionId destConnId(cursor, destConnIdLen);
-
-    if (!cursor.canAdvance(srcConnIdLen)) {
-      VLOG(5) << "Not enough input bytes to read Source ConnectionId";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    ConnectionId srcConnId(cursor, srcConnIdLen);
-    size_t currentLength = cursor.totalLength();
-    size_t bytesRead = initialLength - currentLength;
-    return ParsedLongHeaderInvariant(
-        initialByte,
-        LongHeaderInvariant(
-            version, std::move(srcConnId), std::move(destConnId)),
-        bytesRead);
-  } else {
-    if (!cursor.canAdvance(1)) {
-      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId length";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    uint8_t destConnIdLen = cursor.readBE<uint8_t>();
-    if (!cursor.canAdvance(destConnIdLen)) {
-      VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    ConnectionId destConnId(cursor, destConnIdLen);
-    if (!cursor.canAdvance(1)) {
-      VLOG(5) << "Not enough input bytes to read Source ConnectionId length";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    uint8_t srcConnIdLen = cursor.readBE<uint8_t>();
-    if (!cursor.canAdvance(srcConnIdLen)) {
-      VLOG(5) << "Not enough input bytes to read Source ConnectionId";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    ConnectionId srcConnId(cursor, srcConnIdLen);
-    size_t currentLength = cursor.totalLength();
-    size_t bytesRead = initialLength - currentLength;
-    return ParsedLongHeaderInvariant(
-        initialByte,
-        LongHeaderInvariant(
-            version, std::move(srcConnId), std::move(destConnId)),
-        bytesRead);
+  if (!cursor.canAdvance(1)) {
+    VLOG(5) << "Not enough input bytes to read Dest. ConnectionId length";
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
+  uint8_t destConnIdLen = cursor.readBE<uint8_t>();
+  if (!cursor.canAdvance(destConnIdLen)) {
+    VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  ConnectionId destConnId(cursor, destConnIdLen);
+  if (!cursor.canAdvance(1)) {
+    VLOG(5) << "Not enough input bytes to read Source ConnectionId length";
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  uint8_t srcConnIdLen = cursor.readBE<uint8_t>();
+  if (!cursor.canAdvance(srcConnIdLen)) {
+    VLOG(5) << "Not enough input bytes to read Source ConnectionId";
+    return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
+  }
+  ConnectionId srcConnId(cursor, srcConnIdLen);
+  size_t currentLength = cursor.totalLength();
+  size_t bytesRead = initialLength - currentLength;
+  return ParsedLongHeaderInvariant(
+      initialByte,
+      LongHeaderInvariant(version, std::move(srcConnId), std::move(destConnId)),
+      bytesRead);
 }
 
 LongHeader::Types parseLongHeaderType(uint8_t initialByte) {

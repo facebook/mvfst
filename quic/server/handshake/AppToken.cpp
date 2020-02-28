@@ -63,9 +63,7 @@ std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
   auto ext = encodeExtension(appToken.transportParams);
   fizz::detail::write(ext, appender);
   fizz::detail::writeVector<uint8_t>(appToken.sourceAddresses, appender);
-  if (appToken.version) {
-    fizz::detail::write(appToken.version.value(), appender);
-  }
+  fizz::detail::write(appToken.version, appender);
   fizz::detail::writeBuf<uint16_t>(appToken.appParams, appender);
   return buf;
 }
@@ -84,9 +82,7 @@ folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
     if (cursor.isAtEnd()) {
       return appToken;
     }
-    QuicVersion v{QuicVersion::MVFST_INVALID};
-    fizz::detail::read(v, cursor);
-    appToken.version = v;
+    fizz::detail::read(appToken.version, cursor);
     fizz::detail::readBuf<uint16_t>(appToken.appParams, cursor);
   } catch (const std::exception&) {
     return folly::none;

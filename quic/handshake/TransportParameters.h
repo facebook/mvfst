@@ -93,18 +93,14 @@ class CustomIntegralTransportParameter : public CustomTransportParameter {
 };
 
 struct ClientTransportParameters {
-  folly::Optional<QuicVersion> initial_version;
   std::vector<TransportParameter> parameters;
 };
 
 struct ServerTransportParameters {
-  folly::Optional<QuicVersion> negotiated_version;
-  std::vector<QuicVersion> supported_versions;
   std::vector<TransportParameter> parameters;
 };
 
 struct TicketTransportParameters {
-  folly::Optional<QuicVersion> negotiated_version;
   std::vector<TransportParameter> parameters;
 };
 

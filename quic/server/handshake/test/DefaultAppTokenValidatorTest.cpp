@@ -18,7 +18,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-
 using namespace fizz::server;
 using namespace testing;
 
@@ -40,7 +39,6 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
-  appToken.version = conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -69,7 +67,6 @@ TEST(
       conn.transportSettings.advertisedInitialUniStreamWindowSize,
       conn.transportSettings.advertisedInitialMaxStreamsBidi,
       conn.transportSettings.advertisedInitialMaxStreamsUni);
-  appToken.version = conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -100,66 +97,12 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   EXPECT_FALSE(validator.validate(resState));
 }
 
-TEST(DefaultAppTokenValidatorTest, TestNoVersionMismatch) {
-  QuicServerConnectionState conn;
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
-  conn.version = QuicVersion::QUIC_DRAFT;
-
-  AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialMaxStreamsBidi,
-      conn.transportSettings.advertisedInitialMaxStreamsUni);
-  appToken.version = conn.version;
-  ResumptionState resState;
-  resState.appToken = encodeAppToken(appToken);
-
-  auto appParamsValidator = [](const folly::Optional<std::string>&,
-                               const Buf&) { return true; };
-  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
-  EXPECT_TRUE(validator.validate(resState));
-}
-
-TEST(DefaultAppTokenValidatorTest, TestVersionMismatch) {
-  QuicServerConnectionState conn;
-  conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
-  conn.version = QuicVersion::QUIC_DRAFT;
-
-  AppToken appToken;
-  appToken.transportParams = createTicketTransportParameters(
-      conn.transportSettings.idleTimeout.count(),
-      conn.transportSettings.maxRecvPacketSize,
-      conn.transportSettings.advertisedInitialConnectionWindowSize,
-      conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
-      conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,
-      conn.transportSettings.advertisedInitialUniStreamWindowSize,
-      conn.transportSettings.advertisedInitialMaxStreamsBidi,
-      conn.transportSettings.advertisedInitialMaxStreamsUni);
-  appToken.version = QuicVersion::MVFST;
-  ResumptionState resState;
-  resState.appToken = encodeAppToken(appToken);
-
-  auto appParamsValidator = [](const folly::Optional<std::string>&,
-                               const Buf&) {
-    EXPECT_TRUE(false);
-    return true;
-  };
-  DefaultAppTokenValidator validator(&conn, std::move(appParamsValidator));
-  EXPECT_FALSE(validator.validate(resState));
-}
-
 TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
   AppToken appToken;
-  appToken.transportParams.negotiated_version = *conn.version;
   ResumptionState resState;
   resState.appToken = encodeAppToken(appToken);
 
@@ -178,7 +121,6 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   conn.version = QuicVersion::MVFST;
 
   AppToken appToken;
-  appToken.transportParams.negotiated_version = *conn.version;
   auto& params = appToken.transportParams;
   params.parameters.push_back(encodeIntegerParameter(
       TransportParameterId::initial_max_stream_data_bidi_local,
@@ -359,7 +301,6 @@ class SourceAddressTokenTest : public Test {
         conn_.transportSettings.advertisedInitialUniStreamWindowSize,
         conn_.transportSettings.advertisedInitialMaxStreamsBidi,
         conn_.transportSettings.advertisedInitialMaxStreamsUni);
-    appToken_.version = QuicVersion::MVFST;
   }
 
   void encodeAndValidate(bool acceptZeroRtt = true) {

@@ -131,8 +131,7 @@ void setupZeroRttOnServerCtx(
 
 QuicCachedPsk setupZeroRttOnClientCtx(
     fizz::client::FizzClientContext& clientCtx,
-    std::string hostname,
-    QuicVersion version);
+    std::string hostname);
 
 std::unique_ptr<MockAead> createNoOpAead();
 
