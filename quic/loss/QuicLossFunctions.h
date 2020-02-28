@@ -193,7 +193,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     const LossVisitor& lossVisitor,
     TimePoint lossTime,
     PacketNumberSpace pnSpace) {
-  getLossTime(conn, pnSpace).clear();
+  getLossTime(conn, pnSpace).reset();
   std::chrono::microseconds delayUntilLost =
       std::max(conn.lossState.srtt, conn.lossState.lrtt) *
       conn.transportSettings.timeReorderingThreshDividend /
