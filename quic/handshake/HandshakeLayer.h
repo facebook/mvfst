@@ -24,10 +24,6 @@ class Handshake {
 
   virtual const folly::Optional<std::string>& getApplicationProtocol()
       const = 0;
-
-  virtual void handshakeConfirmed() {
-    LOG(FATAL) << "Not implemented";
-  }
 };
 
 constexpr folly::StringPiece kQuicDraft22Salt =

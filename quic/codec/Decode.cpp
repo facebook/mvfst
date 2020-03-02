@@ -645,10 +645,6 @@ ExpiredStreamDataFrame decodeExpiredStreamDataFrame(folly::io::Cursor& cursor) {
       folly::to<StreamId>(streamId->first), minimumStreamOffset->first);
 }
 
-HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& /*cursor*/) {
-  return HandshakeDoneFrame();
-}
-
 QuicFrame parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
@@ -737,8 +733,6 @@ QuicFrame parseFrame(
         return QuicFrame(decodeMinStreamDataFrame(cursor));
       case FrameType::EXPIRED_STREAM_DATA:
         return QuicFrame(decodeExpiredStreamDataFrame(cursor));
-      case FrameType::HANDSHAKE_DONE:
-        return QuicFrame(decodeHandshakeDoneFrame(cursor));
     }
   } catch (const std::exception&) {
     error = true;

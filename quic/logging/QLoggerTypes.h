@@ -267,7 +267,8 @@ class RetireConnectionIdFrameLog : public QLogFrame {
  public:
   uint64_t sequence;
 
-  RetireConnectionIdFrameLog(uint64_t sequenceIn) : sequence(sequenceIn) {}
+  RetireConnectionIdFrameLog(uint64_t sequenceIn)
+      : sequence(sequenceIn) {}
 
   ~RetireConnectionIdFrameLog() override = default;
   folly::dynamic toDynamic() const override;
@@ -277,13 +278,6 @@ class ReadNewTokenFrameLog : public QLogFrame {
  public:
   ReadNewTokenFrameLog() = default;
   ~ReadNewTokenFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
-};
-
-class HandshakeDoneFrameLog : public QLogFrame {
- public:
-  HandshakeDoneFrameLog() = default;
-  ~HandshakeDoneFrameLog() override = default;
   folly::dynamic toDynamic() const override;
 };
 

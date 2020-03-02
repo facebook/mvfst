@@ -549,12 +549,6 @@ struct ConnectionCloseFrame {
   }
 };
 
-struct HandshakeDoneFrame {
-  bool operator==(const HandshakeDoneFrame& /*rhs*/) const {
-    return true;
-  }
-};
-
 // Frame to represent ones we skip
 struct NoopFrame {
   bool operator==(const NoopFrame&) const {
@@ -578,8 +572,7 @@ struct StatelessReset {
   F(NewConnectionIdFrame, __VA_ARGS__)    \
   F(MaxStreamsFrame, __VA_ARGS__)         \
   F(RetireConnectionIdFrame, __VA_ARGS__) \
-  F(PingFrame, __VA_ARGS__)               \
-  F(HandshakeDoneFrame, __VA_ARGS__)
+  F(PingFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 

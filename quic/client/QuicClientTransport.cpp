@@ -306,13 +306,13 @@ void QuicClientTransport::processPacketData(
                 // If we received an ack for data that we sent in 1-rtt from
                 // the server, we can assume that the server had successfully
                 // derived the 1-rtt keys and hence received the client
-                // finished message. Thus we can drop the ciphers and cancel
-                // the handshake stream.
-                DCHECK(conn_->oneRttWriteCipher);
-                DCHECK(conn_->oneRttWriteHeaderCipher);
-                if (conn_->handshakeWriteCipher) {
-                  handshakeConfirmed(*conn_);
-                }
+                // finished message. Thus we don't need to retransmit any of
+                // the crypto data any longer.
+                //
+                // This will not cancel oneRttStream.
+                //
+                // TODO: replace this with a better solution later.
+                cancelHandshakeCryptoStreamRetransmissions(*conn_->cryptoState);
               }
               switch (packetFrame.type()) {
                 case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -516,29 +516,22 @@ void QuicClientTransport::processPacketData(
     handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
     auto handshakeWriteCipher = handshakeLayer->getHandshakeWriteCipher();
     auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-    auto handshakeWriteHeaderCipher =
-        handshakeLayer->getHandshakeWriteHeaderCipher();
     auto handshakeReadHeaderCipher =
         handshakeLayer->getHandshakeReadHeaderCipher();
+    auto handshakeWriteHeaderCipher =
+        handshakeLayer->getHandshakeWriteHeaderCipher();
     if (handshakeWriteCipher) {
-      CHECK(handshakeWriteHeaderCipher);
       conn_->handshakeWriteCipher = std::move(handshakeWriteCipher);
+    }
+    if (handshakeWriteHeaderCipher) {
       conn_->handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
     }
     if (handshakeReadCipher) {
-      CHECK(handshakeReadHeaderCipher);
       conn_->readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
+    }
+    if (handshakeReadHeaderCipher) {
       conn_->readCodec->setHandshakeHeaderCipher(
           std::move(handshakeReadHeaderCipher));
-    }
-    if (conn_->handshakeWriteCipher &&
-        conn_->readCodec->getHandshakeReadCipher()) {
-      // We can now drop the initial ciphers.
-      conn_->initialWriteCipher.reset();
-      conn_->initialHeaderCipher.reset();
-      conn_->readCodec->setInitialReadCipher(nullptr);
-      conn_->readCodec->setInitialHeaderCipher(nullptr);
-      cancelCryptoStream(conn_->cryptoState->initialStream);
     }
     auto oneRttWriteCipher = handshakeLayer->getOneRttWriteCipher();
     auto oneRttReadCipher = handshakeLayer->getOneRttReadCipher();
@@ -546,23 +539,19 @@ void QuicClientTransport::processPacketData(
     auto oneRttWriteHeaderCipher = handshakeLayer->getOneRttWriteHeaderCipher();
     bool oneRttKeyDerivationTriggered = false;
     if (oneRttWriteCipher) {
-      CHECK(oneRttWriteHeaderCipher);
       conn_->oneRttWriteCipher = std::move(oneRttWriteCipher);
-      conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher);
       oneRttKeyDerivationTriggered = true;
       updatePacingOnKeyEstablished(*conn_);
     }
+    if (oneRttWriteHeaderCipher) {
+      conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher);
+    }
     if (oneRttReadCipher) {
-      CHECK(oneRttReadHeaderCipher);
       conn_->readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
+    }
+    if (oneRttReadHeaderCipher) {
       conn_->readCodec->setOneRttHeaderCipher(
           std::move(oneRttReadHeaderCipher));
-    }
-    if (oneRttWriteCipher && oneRttReadCipher) {
-      conn_->zeroRttWriteCipher.reset();
-      conn_->zeroRttWriteHeaderCipher.reset();
-      conn_->readCodec->setZeroRttReadCipher(nullptr);
-      conn_->readCodec->setZeroRttHeaderCipher(nullptr);
     }
     bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
     if (zeroRttRejected) {
@@ -654,6 +643,12 @@ void QuicClientTransport::processPacketData(
       markZeroRttPacketsLost(*conn_, markPacketLoss);
     }
   }
+  if (protectionLevel == ProtectionType::KeyPhaseZero ||
+      protectionLevel == ProtectionType::KeyPhaseOne) {
+    DCHECK(conn_->oneRttWriteCipher);
+    clientConn_->clientHandshakeLayer->onRecvOneRttProtectedData();
+    conn_->readCodec->onHandshakeDone(receiveTimePoint);
+  }
   updateAckSendStateOnRecvPacket(
       *conn_,
       ackState,
@@ -701,6 +696,7 @@ void QuicClientTransport::writeData() {
   // TODO: replace with write in state machine.
   // TODO: change to draining when we move the client to have a draining state
   // as well.
+  auto phase = clientConn_->clientHandshakeLayer->getPhase();
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
   const ConnectionId* destConnId =
@@ -709,39 +705,29 @@ void QuicClientTransport::writeData() {
     destConnId = &(*conn_->serverConnectionId);
   }
   if (closeState_ == CloseState::CLOSED) {
-    if (conn_->initialWriteCipher) {
+    // TODO: get rid of phase
+    if (phase == ClientHandshake::Phase::Established &&
+        conn_->oneRttWriteCipher) {
+      CHECK(conn_->oneRttWriteHeaderCipher);
+      writeShortClose(
+          *socket_,
+          *conn_,
+          *destConnId /* dst */,
+          conn_->localConnectionError,
+          *conn_->oneRttWriteCipher,
+          *conn_->oneRttWriteHeaderCipher);
+    } else if (conn_->initialWriteCipher) {
       CHECK(conn_->initialHeaderCipher);
       writeLongClose(
           *socket_,
           *conn_,
-          srcConnId,
-          *destConnId,
+          srcConnId /* src */,
+          *destConnId /* dst */,
           LongHeader::Types::Initial,
           conn_->localConnectionError,
           *conn_->initialWriteCipher,
           *conn_->initialHeaderCipher,
           version);
-    } else if (conn_->handshakeWriteCipher) {
-      CHECK(conn_->handshakeWriteHeaderCipher);
-      writeLongClose(
-          *socket_,
-          *conn_,
-          srcConnId,
-          *destConnId,
-          LongHeader::Types::Handshake,
-          conn_->localConnectionError,
-          *conn_->handshakeWriteCipher,
-          *conn_->handshakeWriteHeaderCipher,
-          version);
-    } else if (conn_->oneRttWriteCipher) {
-      CHECK(conn_->oneRttWriteHeaderCipher);
-      writeShortClose(
-          *socket_,
-          *conn_,
-          *destConnId,
-          conn_->localConnectionError,
-          *conn_->oneRttWriteCipher,
-          *conn_->oneRttWriteHeaderCipher);
     }
     return;
   }
@@ -750,53 +736,49 @@ void QuicClientTransport::writeData() {
       (isConnectionPaced(*conn_)
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
-  if (conn_->initialWriteCipher) {
-    CryptoStreamScheduler initialScheduler(
+  CryptoStreamScheduler initialScheduler(
+      *conn_, *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
+  CryptoStreamScheduler handshakeScheduler(
+      *conn_,
+      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
+  if (initialScheduler.hasData() ||
+      (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
+       hasAcksToSchedule(conn_->ackStates.initialAckState))) {
+    CHECK(conn_->initialWriteCipher);
+    CHECK(conn_->initialHeaderCipher);
+    packetLimit -= writeCryptoAndAckDataToSocket(
+        *socket_,
         *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
-
-    if (initialScheduler.hasData() ||
-        (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.initialAckState))) {
-      CHECK(conn_->initialHeaderCipher);
-      packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          *destConnId /* dst */,
-          LongHeader::Types::Initial,
-          *conn_->initialWriteCipher,
-          *conn_->initialHeaderCipher,
-          version,
-          packetLimit,
-          clientConn_->retryToken);
-    }
-    if (!packetLimit) {
-      return;
-    }
+        srcConnId /* src */,
+        *destConnId /* dst */,
+        LongHeader::Types::Initial,
+        *conn_->initialWriteCipher,
+        *conn_->initialHeaderCipher,
+        version,
+        packetLimit,
+        clientConn_->retryToken);
   }
-  if (conn_->handshakeWriteCipher) {
-    CryptoStreamScheduler handshakeScheduler(
+  if (!packetLimit) {
+    return;
+  }
+  if (handshakeScheduler.hasData() ||
+      (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
+       hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
+    CHECK(conn_->handshakeWriteCipher);
+    CHECK(conn_->handshakeWriteHeaderCipher);
+    packetLimit -= writeCryptoAndAckDataToSocket(
+        *socket_,
         *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
-    if (handshakeScheduler.hasData() ||
-        (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
-         hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
-      CHECK(conn_->handshakeWriteHeaderCipher);
-      packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          *destConnId /* dst */,
-          LongHeader::Types::Handshake,
-          *conn_->handshakeWriteCipher,
-          *conn_->handshakeWriteHeaderCipher,
-          version,
-          packetLimit);
-    }
-    if (!packetLimit) {
-      return;
-    }
+        srcConnId /* src */,
+        *destConnId /* dst */,
+        LongHeader::Types::Handshake,
+        *conn_->handshakeWriteCipher,
+        *conn_->handshakeWriteHeaderCipher,
+        version,
+        packetLimit);
+  }
+  if (!packetLimit) {
+    return;
   }
   if (clientConn_->zeroRttWriteCipher && !conn_->oneRttWriteCipher) {
     CHECK(clientConn_->zeroRttWriteHeaderCipher);

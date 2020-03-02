@@ -21,6 +21,7 @@ void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
 void updateSimpleFrameOnAck(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
+  // TODO implement.
   switch (frame.type()) {
     case QuicSimpleFrame::Type::PingFrame_E: {
       conn.pendingEvents.cancelPingTimeout = true;
@@ -70,8 +71,6 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     case QuicSimpleFrame::Type::MaxStreamsFrame_E:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
       // TODO junqiw
-      return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
       return QuicSimpleFrame(frame);
   }
   folly::assume_unreachable();
@@ -145,7 +144,6 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
     case QuicSimpleFrame::Type::MaxStreamsFrame_E:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -290,16 +288,6 @@ bool updateSimpleFrameOnPacketReceived(
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E: {
       // TODO junqiw
       return false;
-    }
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
-      if (conn.nodeType == QuicNodeType::Server) {
-        throw QuicTransportException(
-            "Received HANDSHAKE_DONE from client.",
-            TransportErrorCode::PROTOCOL_VIOLATION,
-            FrameType::HANDSHAKE_DONE);
-      }
-      handshakeConfirmed(conn);
-      return true;
     }
   }
   folly::assume_unreachable();

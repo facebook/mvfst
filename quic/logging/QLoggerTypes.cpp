@@ -219,12 +219,6 @@ folly::dynamic ReadNewTokenFrameLog::toDynamic() const {
   return d;
 }
 
-folly::dynamic HandshakeDoneFrameLog::toDynamic() const {
-  folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::HANDSHAKE_DONE);
-  return d;
-}
-
 folly::dynamic VersionNegotiationLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d = folly::dynamic::array();

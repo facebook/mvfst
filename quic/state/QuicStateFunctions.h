@@ -113,7 +113,4 @@ std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestLossTimer(
 std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
     const EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>& times,
     bool considerAppData) noexcept;
-
-void handshakeConfirmed(QuicConnectionStateBase& conn);
-
 } // namespace quic

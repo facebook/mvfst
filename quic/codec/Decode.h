@@ -131,8 +131,6 @@ ReadCryptoFrame decodeCryptoFrame(folly::io::Cursor& cursor);
 
 ReadNewTokenFrame decodeNewTokenFrame(folly::io::Cursor& cursor);
 
-HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& cursor);
-
 /**
  * Parse the Invariant fields in Long Header.
  *

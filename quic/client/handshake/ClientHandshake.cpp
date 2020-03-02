@@ -120,8 +120,14 @@ ClientHandshake::getZeroRttWriteHeaderCipher() {
   return std::move(zeroRttWriteHeaderCipher_);
 }
 
-void ClientHandshake::handshakeConfirmed() {
-  phase_ = Phase::Established;
+/**
+ * Notify the crypto layer that we received one rtt protected data.
+ * This allows us to know that the peer has implicitly acked the 1-rtt keys.
+ */
+void ClientHandshake::onRecvOneRttProtectedData() {
+  if (phase_ != Phase::Established) {
+    phase_ = Phase::Established;
+  }
 }
 
 ClientHandshake::Phase ClientHandshake::getPhase() const {

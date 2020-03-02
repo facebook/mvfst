@@ -534,7 +534,7 @@ TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   auto packetQueue =
       bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
   EXPECT_TRUE(parseSuccess(codec->parsePacket(packetQueue, ackStates)));
-  codec->onHandshakeDone(Clock::now());
+  codec->onHandshakeDone(Clock::now() - kTimeToRetainInitialKeys * 2);
   EXPECT_FALSE(parseSuccess(codec->parsePacket(packetQueue, ackStates)));
 }
 

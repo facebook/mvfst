@@ -372,18 +372,22 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
   auto streamData = new StreamData(streamId);
   auto dataCopy = std::shared_ptr<folly::IOBuf>(std::move(data));
   EXPECT_CALL(*readCallback, readAvailable(streamId))
-      .WillRepeatedly(
-          Invoke([c = client.get(), id = streamId, streamData, dataCopy](
-                     auto) mutable {
-            auto readData = c->read(id, 1000);
-            auto copy = readData->first->clone();
-            LOG(INFO) << "Client received data="
-                      << copy->moveToFbString().toStdString()
-                      << " on stream=" << id
-                      << " read=" << readData->first->computeChainDataLength()
-                      << " sent=" << dataCopy->computeChainDataLength();
-            streamData->append(std::move(readData->first), readData->second);
-          }));
+      .WillRepeatedly(Invoke([c = client.get(),
+                              id = streamId,
+                              streamData,
+                              dataCopy](auto) mutable {
+        EXPECT_EQ(
+            dynamic_cast<ClientHandshake*>(c->getConn().handshakeLayer.get())
+                ->getPhase(),
+            ClientHandshake::Phase::Established);
+        auto readData = c->read(id, 1000);
+        auto copy = readData->first->clone();
+        LOG(INFO) << "Client received data="
+                  << copy->moveToFbString().toStdString() << " on stream=" << id
+                  << " read=" << readData->first->computeChainDataLength()
+                  << " sent=" << dataCopy->computeChainDataLength();
+        streamData->append(std::move(readData->first), readData->second);
+      }));
   ON_CALL(*readCallback, readError(streamId, _))
       .WillByDefault(Invoke([streamData](auto, auto err) mutable {
         streamData->setException(err);
@@ -424,16 +428,6 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
   expected->prependChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  if (getVersion() == QuicVersion::QUIC_DRAFT) {
-    EXPECT_EQ(client->getConn().initialWriteCipher, nullptr);
-    EXPECT_EQ(client->getConn().initialHeaderCipher, nullptr);
-    EXPECT_EQ(client->getConn().handshakeWriteCipher, nullptr);
-    EXPECT_EQ(client->getConn().handshakeWriteHeaderCipher, nullptr);
-    EXPECT_EQ(client->getConn().readCodec->getInitialCipher(), nullptr);
-    EXPECT_EQ(client->getConn().readCodec->getInitialHeaderCipher(), nullptr);
-    EXPECT_EQ(client->getConn().readCodec->getHandshakeReadCipher(), nullptr);
-    EXPECT_EQ(client->getConn().readCodec->getHandshakeHeaderCipher(), nullptr);
-  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
@@ -1180,10 +1174,6 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
     if (getPhase() == Phase::Initial) {
-      handshakeWriteCipher_ = test::createNoOpAead();
-      handshakeWriteHeaderCipher_ = test::createNoOpHeaderCipher();
-      handshakeReadCipher_ = test::createNoOpAead();
-      handshakeReadHeaderCipher_ = test::createNoOpHeaderCipher();
       writeDataToQuicStream(
           conn_->cryptoState->handshakeStream,
           IOBuf::copyBuffer("ClientFinished"));
@@ -1332,13 +1322,17 @@ class QuicClientTransportTest : public Test {
   virtual void setFakeHandshakeCiphers() {
     auto readAead = test::createNoOpAead();
     auto writeAead = test::createNoOpAead();
-    mockClientHandshake->setHandshakeReadCipher(nullptr);
-    mockClientHandshake->setHandshakeWriteCipher(nullptr);
+    auto handshakeReadAead = test::createNoOpAead();
+    auto handshakeWriteAead = test::createNoOpAead();
+    mockClientHandshake->setHandshakeReadCipher(std::move(handshakeReadAead));
+    mockClientHandshake->setHandshakeWriteCipher(std::move(handshakeWriteAead));
     mockClientHandshake->setOneRttReadCipher(std::move(readAead));
     mockClientHandshake->setOneRttWriteCipher(std::move(writeAead));
 
-    mockClientHandshake->setHandshakeReadHeaderCipher(nullptr);
-    mockClientHandshake->setHandshakeWriteHeaderCipher(nullptr);
+    mockClientHandshake->setHandshakeReadHeaderCipher(
+        test::createNoOpHeaderCipher());
+    mockClientHandshake->setHandshakeWriteHeaderCipher(
+        test::createNoOpHeaderCipher());
     mockClientHandshake->setOneRttWriteHeaderCipher(
         test::createNoOpHeaderCipher());
     mockClientHandshake->setOneRttReadHeaderCipher(
@@ -1469,16 +1463,12 @@ class QuicClientTransportTest : public Test {
 
   void verifyCiphers() {
     EXPECT_NE(client->getConn().oneRttWriteCipher, nullptr);
-    EXPECT_NE(client->getConn().oneRttWriteHeaderCipher, nullptr);
     EXPECT_NE(client->getConn().handshakeWriteCipher, nullptr);
     EXPECT_NE(client->getConn().handshakeWriteHeaderCipher, nullptr);
-    EXPECT_EQ(client->getConn().initialWriteCipher, nullptr);
-    EXPECT_EQ(client->getConn().initialHeaderCipher, nullptr);
+    EXPECT_NE(client->getConn().oneRttWriteHeaderCipher, nullptr);
 
-    EXPECT_NE(client->getConn().readCodec->getOneRttReadCipher(), nullptr);
-    EXPECT_NE(client->getConn().readCodec->getOneRttHeaderCipher(), nullptr);
-    EXPECT_NE(client->getConn().readCodec->getHandshakeReadCipher(), nullptr);
     EXPECT_NE(client->getConn().readCodec->getHandshakeHeaderCipher(), nullptr);
+    EXPECT_NE(client->getConn().readCodec->getOneRttHeaderCipher(), nullptr);
   }
 
   void deliverDataWithoutErrorCheck(
@@ -1548,12 +1538,12 @@ class QuicClientTransportTest : public Test {
       }
     }
     if (shortHeader) {
-      ASSERT_GT(numShort, 0);
+      EXPECT_GT(numShort, 0);
     }
     if (longHeader) {
-      CHECK_GT(numLong, 0);
+      EXPECT_GT(numLong, 0);
     }
-    ASSERT_EQ(numOthers, 0);
+    EXPECT_EQ(numOthers, 0);
   }
 
   RegularQuicPacket* parseRegularQuicPacket(CodecResult& codecResult) {
@@ -1748,8 +1738,6 @@ TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
   client->getNonConstConn().oneRttWriteCipher = test::createNoOpAead();
-  client->getNonConstConn().oneRttWriteHeaderCipher =
-      test::createNoOpHeaderCipher();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
@@ -1760,8 +1748,6 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchNoReplace) {
 
 TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   client->getNonConstConn().oneRttWriteCipher = test::createNoOpAead();
-  client->getNonConstConn().oneRttWriteHeaderCipher =
-      test::createNoOpHeaderCipher();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   client->setQLogger(mockQLogger);
 
@@ -3091,7 +3077,6 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   auto garbage = IOBuf::copyBuffer("garbage");
   auto initialCipher = cryptoFactory.getServerInitialCipher(
       *serverChosenConnId, QuicVersion::MVFST);
-  auto initialHeaderCipher = test::createNoOpHeaderCipher();
   auto firstPacketNum = appDataPacketNum++;
   auto packet1 = packetToBufCleartext(
       createStreamPacket(
@@ -3104,7 +3089,7 @@ TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
           0 /* largestAcked */,
           std::make_pair(LongHeader::Types::Initial, QuicVersion::MVFST)),
       *initialCipher,
-      *initialHeaderCipher,
+      getInitialHeaderCipher(),
       firstPacketNum);
   packet1->coalesce();
   auto packet2 = packetToBuf(createStreamPacket(
@@ -3143,7 +3128,6 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
     auto garbage = IOBuf::copyBuffer("garbage");
     auto initialCipher = cryptoFactory.getServerInitialCipher(
         *serverChosenConnId, QuicVersion::MVFST);
-    auto initialHeaderCipher = test::createNoOpHeaderCipher();
     auto packetNum = appDataPacketNum++;
     auto packet1 = packetToBufCleartext(
         createStreamPacket(
@@ -3156,7 +3140,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStreamCoalescedMany) {
             0 /* largestAcked */,
             std::make_pair(LongHeader::Types::Initial, QuicVersion::MVFST)),
         *initialCipher,
-        *initialHeaderCipher,
+        getInitialHeaderCipher(),
         packetNum);
     packets.append(std::move(packet1));
   }
@@ -3226,32 +3210,6 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
   PathResponseFrame& pathResponse =
       *conn.pendingEvents.frames[1].asPathResponseFrame();
   EXPECT_EQ(pathResponse.pathData, pathChallenge.pathData);
-}
-
-TEST_F(QuicClientTransportAfterStartTest, HandshakeDoneDrop) {
-  auto& conn = client->getNonConstConn();
-  conn.handshakeWriteCipher = test::createNoOpAead();
-  conn.handshakeWriteHeaderCipher = test::createNoOpHeaderCipher();
-  conn.readCodec->setHandshakeReadCipher(test::createNoOpAead());
-  conn.readCodec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
-  conn.cryptoState->handshakeStream.writeBuffer.append(
-      folly::IOBuf::copyBuffer("blah"));
-
-  ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
-  ASSERT_TRUE(builder.canBuildPacket());
-  writeSimpleFrame(QuicSimpleFrame(HandshakeDoneFrame()), builder);
-
-  auto packet = std::move(builder).buildPacket();
-  auto data = packetToBuf(packet);
-  deliverData(data->coalesce(), false);
-
-  EXPECT_EQ(conn.handshakeWriteCipher, nullptr);
-  EXPECT_EQ(conn.handshakeWriteHeaderCipher, nullptr);
-  EXPECT_EQ(conn.readCodec->getHandshakeReadCipher(), nullptr);
-  EXPECT_EQ(conn.readCodec->getHandshakeHeaderCipher(), nullptr);
-  EXPECT_EQ(conn.cryptoState->handshakeStream.writeBuffer.chainLength(), 0);
 }
 
 bool verifyFramePresent(
@@ -3486,9 +3444,31 @@ TEST_F(QuicClientTransportAfterStartTest, RecvRetransmittedHandshakeData) {
 TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
   // Simulate ack from server
   auto& cryptoState = client->getConn().cryptoState;
+  EXPECT_GT(cryptoState->initialStream.retransmissionBuffer.size(), 0);
   EXPECT_GT(cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   EXPECT_EQ(cryptoState->oneRttStream.retransmissionBuffer.size(), 0);
 
+  auto& aead = getInitialCipher();
+  auto& headerCipher = getInitialHeaderCipher();
+  // initial
+  {
+    AckBlocks acks;
+    auto start = getFirstOutstandingPacket(
+                     client->getNonConstConn(), PacketNumberSpace::Initial)
+                     ->packet.header.getPacketSequenceNum();
+    auto end = getLastOutstandingPacket(
+                   client->getNonConstConn(), PacketNumberSpace::Initial)
+                   ->packet.header.getPacketSequenceNum();
+    acks.insert(start, end);
+    auto pn = initialPacketNum++;
+    auto ackPkt = createAckPacket(
+        client->getNonConstConn(), pn, acks, PacketNumberSpace::Initial, &aead);
+    deliverData(
+        packetToBufCleartext(ackPkt, aead, headerCipher, pn)->coalesce());
+    EXPECT_EQ(cryptoState->initialStream.retransmissionBuffer.size(), 0);
+    EXPECT_GT(cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
+    EXPECT_EQ(cryptoState->oneRttStream.retransmissionBuffer.size(), 0);
+  }
   // handshake
   {
     AckBlocks acks;
@@ -3510,6 +3490,9 @@ TEST_F(QuicClientTransportAfterStartTest, RecvAckOfCryptoStream) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, RecvOneRttAck) {
+  EXPECT_GT(
+      client->getConn().cryptoState->initialStream.retransmissionBuffer.size(),
+      0);
   EXPECT_GT(
       client->getConn()
           .cryptoState->handshakeStream.retransmissionBuffer.size(),
@@ -3538,6 +3521,9 @@ TEST_F(QuicClientTransportAfterStartTest, RecvOneRttAck) {
   deliverData(ackPacket->coalesce());
 
   // Should have canceled retransmissions
+  EXPECT_EQ(
+      client->getConn().cryptoState->initialStream.retransmissionBuffer.size(),
+      0);
   EXPECT_EQ(
       client->getConn()
           .cryptoState->handshakeStream.retransmissionBuffer.size(),
@@ -3569,15 +3555,37 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
-        *makeHandshakeCodec(),
+        *makeEncryptedCodec(),
         QuicFrame::Type::ConnectionCloseFrame_E));
   } else {
     client->close(folly::none);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
-        *makeHandshakeCodec(),
+        *makeEncryptedCodec(),
         QuicFrame::Type::ConnectionCloseFrame_E));
   }
+}
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    HandshakeCipherTimeoutAfterFirstData) {
+  StreamId streamId = client->createBidirectionalStream().value();
+
+  EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
+  auto expected = IOBuf::copyBuffer("hello");
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *expected,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true));
+  deliverData(packet->coalesce());
+  EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
+  EXPECT_TRUE(client->getConn().readCodec->getHandshakeDoneTime().has_value());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
@@ -3803,7 +3811,6 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
 
   auto initialCipher = cryptoFactory.getServerInitialCipher(
       *serverChosenConnId, QuicVersion::MVFST);
-  auto initialHeaderCipher = test::createNoOpHeaderCipher();
   auto packet = packetToBufCleartext(
       createStreamPacket(
           *serverChosenConnId /* src */,
@@ -3815,7 +3822,7 @@ TEST_F(QuicClientTransportAfterStartTest, WrongCleartextCipher) {
           0 /* largestAcked */,
           std::make_pair(LongHeader::Types::Initial, QuicVersion::MVFST)),
       *initialCipher,
-      *initialHeaderCipher,
+      getInitialHeaderCipher(),
       nextPacketNum);
   deliverData(packet->coalesce());
 }

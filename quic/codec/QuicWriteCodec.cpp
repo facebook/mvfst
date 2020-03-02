@@ -486,18 +486,6 @@ size_t writeSimpleFrame(
       // no space left in packet
       return size_t(0);
     }
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
-      const HandshakeDoneFrame& handshakeDoneFrame =
-          *frame.asHandshakeDoneFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::HANDSHAKE_DONE));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
-        builder.write(intFrameType);
-        builder.appendFrame(QuicSimpleFrame(handshakeDoneFrame));
-        return intFrameType.getSize();
-      }
-      // no space left in packet
-      return size_t(0);
-    }
   }
   folly::assume_unreachable();
 }

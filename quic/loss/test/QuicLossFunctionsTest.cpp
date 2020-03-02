@@ -542,7 +542,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostAfterCancelRetransmission) {
   EXPECT_GT(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   auto& packet = conn->outstandingPackets.front().packet;
   auto packetNum = packet.header.getPacketSequenceNum();
-  cancelCryptoStream(conn->cryptoState->handshakeStream);
+  cancelHandshakeCryptoStreamRetransmissions(*conn->cryptoState);
   markPacketLoss(*conn, packet, false, packetNum);
   EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 0);
@@ -579,7 +579,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkCryptoLostCancel) {
   markPacketLoss(*conn, packet, false, packetNum);
   EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 1);
-  cancelCryptoStream(conn->cryptoState->handshakeStream);
+  cancelHandshakeCryptoStreamRetransmissions(*conn->cryptoState);
   EXPECT_EQ(conn->cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
   EXPECT_EQ(conn->cryptoState->handshakeStream.lossBuffer.size(), 0);
 }

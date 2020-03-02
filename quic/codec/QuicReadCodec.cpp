@@ -125,11 +125,14 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   auto protectionType = longHeader.getProtectionType();
   switch (protectionType) {
     case ProtectionType::Initial:
-      if (!initialHeaderCipher_) {
-        VLOG(4) << nodeToString(nodeType_)
-                << " dropping initial packet after initial keys dropped"
-                << connIdToHex();
-        return CodecResult(Nothing());
+      if (handshakeDoneTime_) {
+        auto timeBetween = Clock::now() - *handshakeDoneTime_;
+        if (timeBetween > kTimeToRetainZeroRttKeys) {
+          VLOG(4) << nodeToString(nodeType_)
+                  << " dropping initial packet for exceeding key timeout"
+                  << connIdToHex();
+          return CodecResult(Nothing());
+        }
       }
       headerCipher = initialHeaderCipher_.get();
       cipher = initialReadCipher_.get();
@@ -140,7 +143,6 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
       break;
     case ProtectionType::ZeroRtt:
       if (handshakeDoneTime_) {
-        // TODO actually drop the 0-rtt keys in addition to dropping packets.
         auto timeBetween = Clock::now() - *handshakeDoneTime_;
         if (timeBetween > kTimeToRetainZeroRttKeys) {
           VLOG(4) << nodeToString(nodeType_)

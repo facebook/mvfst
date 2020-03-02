@@ -396,8 +396,6 @@ std::string toString(FrameType frame) {
       return "MIN_STREAM_DATA";
     case FrameType::EXPIRED_STREAM_DATA:
       return "EXPIRED_STREAM_DATA";
-    case FrameType::HANDSHAKE_DONE:
-      return "HANDSHAKE_DONE";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";
