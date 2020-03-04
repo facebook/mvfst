@@ -15,7 +15,8 @@ namespace quic {
 class LoopDetectorCallback {
  public:
   virtual ~LoopDetectorCallback() = default;
-  virtual void onSuspiciousLoops(
+
+  virtual void onSuspiciousWriteLoops(
       uint64_t emptyLoopCount,
       WriteDataReason writeReason,
       NoWriteReason noWriteReason,

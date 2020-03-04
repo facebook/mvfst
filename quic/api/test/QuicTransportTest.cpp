@@ -1357,7 +1357,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
   EXPECT_CALL(
       *rawLoopDetectorCallback,
-      onSuspiciousLoops(1, WriteDataReason::STREAM_WINDOW_UPDATE, _, _))
+      onSuspiciousWriteLoops(1, WriteDataReason::STREAM_WINDOW_UPDATE, _, _))
       .Times(1);
   loopForWrites();
   EXPECT_EQ(1, conn.outstandingPackets.size());

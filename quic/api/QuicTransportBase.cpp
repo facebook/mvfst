@@ -2299,7 +2299,7 @@ void QuicTransportBase::writeSocketData() {
         // TODO: Currently we will to get some stats first. Then we may filter
         // out some errors here. For example, socket fail to write might be a
         // legit case to filter out.
-        conn_->loopDetectorCallback->onSuspiciousLoops(
+        conn_->loopDetectorCallback->onSuspiciousWriteLoops(
             ++conn_->debugState.currentEmptyLoopCount,
             conn_->debugState.writeDataReason,
             conn_->debugState.noWriteReason,

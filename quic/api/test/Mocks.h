@@ -276,7 +276,7 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
  public:
   ~MockLoopDetectorCallback() override = default;
   MOCK_METHOD4(
-      onSuspiciousLoops,
+      onSuspiciousWriteLoops,
       void(uint64_t, WriteDataReason, NoWriteReason, const std::string&));
 };
 
