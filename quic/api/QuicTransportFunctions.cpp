@@ -911,10 +911,10 @@ uint64_t writeConnectionDataToSocket(
       connection.transportSettings.continueOnNetworkUnreachable);
 
   if (connection.loopDetectorCallback) {
-    connection.debugState.schedulerName = scheduler.name();
-    connection.debugState.noWriteReason = NoWriteReason::WRITE_OK;
+    connection.writeDebugState.schedulerName = scheduler.name();
+    connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;
     if (!scheduler.hasData()) {
-      connection.debugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
+      connection.writeDebugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
     }
   }
   auto writeLoopBeginTime = Clock::now();
@@ -954,7 +954,7 @@ uint64_t writeConnectionDataToSocket(
     if (!packet || packet->packet.frames.empty()) {
       ioBufBatch.flush();
       if (connection.loopDetectorCallback) {
-        connection.debugState.noWriteReason = NoWriteReason::NO_FRAME;
+        connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
       }
       return ioBufBatch.getPktSent();
     }
@@ -962,7 +962,7 @@ uint64_t writeConnectionDataToSocket(
       // No more space remaining.
       ioBufBatch.flush();
       if (connection.loopDetectorCallback) {
-        connection.debugState.noWriteReason = NoWriteReason::NO_BODY;
+        connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
       }
       return ioBufBatch.getPktSent();
     }
@@ -1011,7 +1011,8 @@ uint64_t writeConnectionDataToSocket(
     // it is because a flush() call failed
     if (!ret) {
       if (connection.loopDetectorCallback) {
-        connection.debugState.noWriteReason = NoWriteReason::SOCKET_FAILURE;
+        connection.writeDebugState.noWriteReason =
+            NoWriteReason::SOCKET_FAILURE;
       }
       return ioBufBatch.getPktSent();
     }

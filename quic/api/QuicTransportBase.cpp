@@ -1142,7 +1142,7 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
              << *this;
     writeLooper_->run(thisIteration);
     if (conn_->loopDetectorCallback) {
-      conn_->debugState.needsWriteLoopDetect =
+      conn_->writeDebugState.needsWriteLoopDetect =
           (conn_->loopDetectorCallback != nullptr);
     }
   } else {
@@ -1150,12 +1150,12 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
              << *this;
     writeLooper_->stop();
     if (conn_->loopDetectorCallback) {
-      conn_->debugState.needsWriteLoopDetect = false;
-      conn_->debugState.currentEmptyLoopCount = 0;
+      conn_->writeDebugState.needsWriteLoopDetect = false;
+      conn_->writeDebugState.currentEmptyLoopCount = 0;
     }
   }
   if (conn_->loopDetectorCallback) {
-    conn_->debugState.writeDataReason = writeDataReason;
+    conn_->writeDebugState.writeDataReason = writeDataReason;
   }
 }
 
@@ -2292,18 +2292,18 @@ void QuicTransportBase::writeSocketData() {
       auto packetsAfter = conn_->outstandingPackets.size();
       bool packetWritten = (packetsAfter > packetsBefore);
       if (conn_->loopDetectorCallback && packetWritten) {
-        conn_->debugState.currentEmptyLoopCount = 0;
+        conn_->writeDebugState.currentEmptyLoopCount = 0;
       } else if (
-          conn_->debugState.needsWriteLoopDetect &&
+          conn_->writeDebugState.needsWriteLoopDetect &&
           conn_->loopDetectorCallback) {
         // TODO: Currently we will to get some stats first. Then we may filter
         // out some errors here. For example, socket fail to write might be a
         // legit case to filter out.
         conn_->loopDetectorCallback->onSuspiciousWriteLoops(
-            ++conn_->debugState.currentEmptyLoopCount,
-            conn_->debugState.writeDataReason,
-            conn_->debugState.noWriteReason,
-            conn_->debugState.schedulerName);
+            ++conn_->writeDebugState.currentEmptyLoopCount,
+            conn_->writeDebugState.writeDataReason,
+            conn_->writeDebugState.noWriteReason,
+            conn_->writeDebugState.schedulerName);
       }
       // If we sent a new packet and the new packet was either the first
       // packet

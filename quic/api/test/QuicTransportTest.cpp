@@ -1321,8 +1321,8 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
   auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
   conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-  ASSERT_FALSE(conn.debugState.needsWriteLoopDetect);
-  ASSERT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  ASSERT_FALSE(conn.writeDebugState.needsWriteLoopDetect);
+  ASSERT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -1332,28 +1332,29 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
 
   // There should be no data to send at this point
   transport_->updateWriteLooper(true);
-  EXPECT_FALSE(conn.debugState.needsWriteLoopDetect);
-  EXPECT_EQ(WriteDataReason::NO_WRITE, conn.debugState.writeDataReason);
-  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  EXPECT_FALSE(conn.writeDebugState.needsWriteLoopDetect);
+  EXPECT_EQ(WriteDataReason::NO_WRITE, conn.writeDebugState.writeDataReason);
+  EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
   loopForWrites();
 
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100);
   transport_->writeChain(stream, buf->clone(), true, false);
   transport_->updateWriteLooper(true);
-  EXPECT_TRUE(conn.debugState.needsWriteLoopDetect);
-  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
-  EXPECT_EQ(WriteDataReason::STREAM, conn.debugState.writeDataReason);
+  EXPECT_TRUE(conn.writeDebugState.needsWriteLoopDetect);
+  EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
+  EXPECT_EQ(WriteDataReason::STREAM, conn.writeDebugState.writeDataReason);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(1000));
   loopForWrites();
   EXPECT_EQ(1, conn.outstandingPackets.size());
-  EXPECT_EQ(0, conn.debugState.currentEmptyLoopCount);
+  EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
 
   // Queue a window update for a stream doesn't exist
   conn.streamManager->queueWindowUpdate(stream + 1);
   transport_->updateWriteLooper(true);
   EXPECT_TRUE(
-      WriteDataReason::STREAM_WINDOW_UPDATE == conn.debugState.writeDataReason);
+      WriteDataReason::STREAM_WINDOW_UPDATE ==
+      conn.writeDebugState.writeDataReason);
   EXPECT_CALL(*socket_, write(_, _)).Times(0);
   EXPECT_CALL(
       *rawLoopDetectorCallback,
@@ -1361,7 +1362,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
       .Times(1);
   loopForWrites();
   EXPECT_EQ(1, conn.outstandingPackets.size());
-  EXPECT_EQ(1, conn.debugState.currentEmptyLoopCount);
+  EXPECT_EQ(1, conn.writeDebugState.currentEmptyLoopCount);
 
   transport_->close(folly::none);
 }

@@ -786,7 +786,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Debug information. Currently only used to debug busy loop of Transport
   // WriteLooper.
-  struct DebugState {
+  struct WriteDebugState {
     bool needsWriteLoopDetect{false};
     uint64_t currentEmptyLoopCount{0};
     WriteDataReason writeDataReason{WriteDataReason::NO_WRITE};
@@ -794,7 +794,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     std::string schedulerName;
   };
 
-  DebugState debugState;
+  WriteDebugState writeDebugState;
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
 
