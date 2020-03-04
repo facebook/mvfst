@@ -278,6 +278,7 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD4(
       onSuspiciousWriteLoops,
       void(uint64_t, WriteDataReason, NoWriteReason, const std::string&));
+  MOCK_METHOD2(onSuspiciousReadLoops, void(uint64_t, NoReadReason));
 };
 
 inline std::ostream& operator<<(std::ostream& os, const MockQuicTransport&) {

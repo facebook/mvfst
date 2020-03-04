@@ -165,6 +165,17 @@ class TestingQuicClientTransport : public QuicClientTransport {
     destructionCallback_ = destructionCallback;
   }
 
+  void invokeOnDataAvailable(
+      const folly::SocketAddress& addr,
+      size_t len,
+      bool truncated) {
+    onDataAvailable(addr, len, truncated);
+  }
+
+  void invokeOnNotifyDataAvailable(folly::AsyncUDPSocket& sock) {
+    onNotifyDataAvailable(sock);
+  }
+
  private:
   std::shared_ptr<DestructionCallback> destructionCallback_;
 };
@@ -2769,6 +2780,157 @@ TEST_F(QuicClientTransportAfterStartTest, ReadStream) {
   }
   EXPECT_TRUE(dataDelivered);
   client->close(folly::none);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, CleanupReadLoopCounting) {
+  auto streamId = client->createBidirectionalStream().value();
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  conn.readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+  conn.readDebugState.loopCount = 20;
+
+  auto data = IOBuf::copyBuffer("Short Trip Home");
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(packet->coalesce());
+  EXPECT_EQ(NoReadReason::READ_OK, conn.readDebugState.noReadReason);
+  EXPECT_EQ(0, conn.readDebugState.loopCount);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, StaleReadLoopCounting) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  auto data = IOBuf::copyBuffer("Short Trip Home");
+  deliverData(data->coalesce());
+  EXPECT_EQ(NoReadReason::STALE_DATA, conn.readDebugState.noReadReason);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, TruncatedReadLoopCounting) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::TRUNCATED));
+  client->invokeOnDataAvailable(serverAddr, 1000, true);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, RetriableErrorLoopCounting) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  conn.transportSettings.maxRecvBatchSize = 1;
+  // Empty socketReads will lead to EAGAIN in mock setup.
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::RETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReadLoopTwice) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  conn.transportSettings.maxRecvBatchSize = 1;
+  socketReads.emplace_back(TestReadData(EBADF));
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::NONRETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
+  socketReads.clear();
+
+  socketReads.emplace_back(TestReadData(EBADF));
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(2, NoReadReason::NONRETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, NonretriableErrorLoopCounting) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  conn.transportSettings.maxRecvBatchSize = 1;
+  socketReads.emplace_back(TestReadData(EBADF));
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::NONRETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, PartialReadLoopCounting) {
+  auto streamId = client->createBidirectionalStream().value();
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  auto data = IOBuf::copyBuffer("Short Trip Home");
+  auto packet = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  // Read twice in the loop, once success, then fail. Loop detector shouldn't
+  // fire.
+  conn.transportSettings.maxRecvBatchSize = 2;
+  socketReads.emplace_back(TestReadData(packet->coalesce(), serverAddr));
+  socketReads.emplace_back(TestReadData(EBADF));
+  EXPECT_CALL(*rawLoopDetectorCallback, onSuspiciousReadLoops(_, _)).Times(0);
+  client->invokeOnNotifyDataAvailable(*sock);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReadLoopCountingRecvmmsg) {
+  auto& conn = client->getNonConstConn();
+  auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
+  auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
+  conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
+
+  conn.transportSettings.shouldUseRecvmmsgForBatchRecv = true;
+  conn.transportSettings.maxRecvBatchSize = 1;
+  EXPECT_CALL(*sock, recvmmsg(_, 1, _, nullptr))
+      .WillOnce(Invoke(
+          [](struct mmsghdr*, unsigned int, unsigned int, struct timespec*) {
+            errno = EAGAIN;
+            return -1;
+          }));
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(1, NoReadReason::RETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
+
+  EXPECT_CALL(*sock, recvmmsg(_, 1, _, nullptr))
+      .WillOnce(Invoke(
+          [](struct mmsghdr*, unsigned int, unsigned int, struct timespec*) {
+            errno = EBADF;
+            return -1;
+          }));
+  EXPECT_CALL(
+      *rawLoopDetectorCallback,
+      onSuspiciousReadLoops(2, NoReadReason::NONRETRIABLE_ERROR));
+  client->invokeOnNotifyDataAvailable(*sock);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ReadStreamMultiplePackets) {

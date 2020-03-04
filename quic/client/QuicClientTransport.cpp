@@ -10,6 +10,7 @@
 
 #include <folly/portability/Sockets.h>
 
+#include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
@@ -1036,12 +1037,19 @@ void QuicClientTransport::onDataAvailable(
   VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
   auto packetReceiveTime = Clock::now();
   Buf data = std::move(readBuffer_);
+
   if (truncated) {
     // This is an error, drop the packet.
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(len, kUdpTruncated);
     }
     QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
+    if (conn_->loopDetectorCallback) {
+      conn_->readDebugState.noReadReason = NoReadReason::TRUNCATED;
+      conn_->loopDetectorCallback->onSuspiciousReadLoops(
+          ++conn_->readDebugState.loopCount,
+          conn_->readDebugState.noReadReason);
+    }
     return;
   }
   data->append(len);
@@ -1090,11 +1098,17 @@ void QuicClientTransport::recvMsg(
     if (ret < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         // If we got a retriable error, let us continue.
+        if (conn_->loopDetectorCallback) {
+          conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+        }
         break;
       }
       // If we got a non-retriable error, we might have received
       // a packet that we could process, however let's just quit early.
       sock.pauseRead();
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
+      }
       return onReadError(folly::AsyncSocketException(
           folly::AsyncSocketException::INTERNAL_ERROR,
           "::recvmsg() failed",
@@ -1157,11 +1171,17 @@ void QuicClientTransport::recvMmsg(
   if (numMsgsRecvd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       // Exit, socket will notify us again when socket is readable.
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+      }
       return;
     }
     // If we got a non-retriable error, we might have received
     // a packet that we could process, however let's just quit early.
     sock.pauseRead();
+    if (conn_->loopDetectorCallback) {
+      conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
+    }
     return onReadError(folly::AsyncSocketException(
         folly::AsyncSocketException::INTERNAL_ERROR,
         "::recvmmsg() failed",
@@ -1207,6 +1227,17 @@ void QuicClientTransport::onNotifyDataAvailable(
   }
 
   if (networkData.packets.empty()) {
+    // recvMmsg and recvMsg might have already set the reason and counter
+    if (conn_->loopDetectorCallback) {
+      if (conn_->readDebugState.noReadReason == NoReadReason::READ_OK) {
+        conn_->readDebugState.noReadReason = NoReadReason::EMPTY_DATA;
+      }
+      if (conn_->readDebugState.noReadReason != NoReadReason::READ_OK) {
+        conn_->loopDetectorCallback->onSuspiciousReadLoops(
+            ++conn_->readDebugState.loopCount,
+            conn_->readDebugState.noReadReason);
+      }
+    }
     return;
   }
   DCHECK(server.has_value());

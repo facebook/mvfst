@@ -459,8 +459,18 @@ enum class NoWriteReason {
   SOCKET_FAILURE,
 };
 
+enum class NoReadReason {
+  READ_OK,
+  TRUNCATED,
+  EMPTY_DATA,
+  RETRIABLE_ERROR,
+  NONRETRIABLE_ERROR,
+  STALE_DATA,
+};
+
 folly::StringPiece writeDataReasonString(WriteDataReason reason);
 folly::StringPiece writeNoWriteReasonString(NoWriteReason reason);
+folly::StringPiece readNoReadReasonString(NoReadReason reason);
 
 /**
  * Filter the versions that are currently supported.

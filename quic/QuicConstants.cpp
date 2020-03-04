@@ -119,4 +119,22 @@ folly::StringPiece writeNoWriteReasonString(NoWriteReason reason) {
   folly::assume_unreachable();
 }
 
+folly::StringPiece readNoReadReasonString(NoReadReason reason) {
+  switch (reason) {
+    case NoReadReason::READ_OK:
+      return "ReadOK";
+    case NoReadReason::TRUNCATED:
+      return "Truncated";
+    case NoReadReason::EMPTY_DATA:
+      return "Empty data";
+    case NoReadReason::RETRIABLE_ERROR:
+      return "Retriable error";
+    case NoReadReason::NONRETRIABLE_ERROR:
+      return "Nonretriable error";
+    case NoReadReason::STALE_DATA:
+      return "Stale data";
+  }
+  folly::assume_unreachable();
+}
+
 } // namespace quic

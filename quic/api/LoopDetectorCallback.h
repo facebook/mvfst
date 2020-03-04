@@ -21,6 +21,10 @@ class LoopDetectorCallback {
       WriteDataReason writeReason,
       NoWriteReason noWriteReason,
       const std::string& scheduler) = 0;
+
+  virtual void onSuspiciousReadLoops(
+      uint64_t emptyLoopCount,
+      NoReadReason noReadReason) = 0;
 };
 
 } // namespace quic

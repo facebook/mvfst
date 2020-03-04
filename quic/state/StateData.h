@@ -794,7 +794,13 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     std::string schedulerName;
   };
 
+  struct ReadDebugState {
+    uint64_t loopCount{0};
+    NoReadReason noReadReason{NoReadReason::READ_OK};
+  };
+
   WriteDebugState writeDebugState;
+  ReadDebugState readDebugState;
 
   std::shared_ptr<LoopDetectorCallback> loopDetectorCallback;
 
