@@ -50,7 +50,7 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
 
   EXPECT_EQ(extensions.size(), 1);
   auto serverParams = getExtension<ServerTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.hasValue());
+  EXPECT_TRUE(serverParams.has_value());
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
