@@ -23,7 +23,7 @@ folly::Optional<uint64_t> getIntegerParameter(
     throw QuicTransportException(
         folly::to<std::string>(
             "Failed to decode integer from TransportParameterId: ",
-            static_cast<uint16_t>(id)),
+            static_cast<uint64_t>(id)),
         TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
   return parameter->first;
@@ -67,7 +67,7 @@ TransportParameterId CustomTransportParameter::getParameterId() {
 }
 
 CustomStringTransportParameter::CustomStringTransportParameter(
-    uint16_t id,
+    uint64_t id,
     std::string value)
     : CustomTransportParameter(id), value_(value) {}
 
@@ -77,7 +77,7 @@ TransportParameter CustomStringTransportParameter::encode() const {
 }
 
 CustomBlobTransportParameter::CustomBlobTransportParameter(
-    uint16_t id,
+    uint64_t id,
     std::unique_ptr<folly::IOBuf> value)
     : CustomTransportParameter(id), value_(std::move(value)) {}
 
@@ -86,7 +86,7 @@ TransportParameter CustomBlobTransportParameter::encode() const {
 }
 
 CustomIntegralTransportParameter::CustomIntegralTransportParameter(
-    uint16_t id,
+    uint64_t id,
     uint64_t value)
     : CustomTransportParameter(id), value_(value) {}
 

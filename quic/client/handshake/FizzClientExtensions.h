@@ -62,13 +62,15 @@ class FizzClientExtensions : public fizz::ClientExtensions {
       params.parameters.push_back(customParameter);
     }
 
-    exts.push_back(encodeExtension(params));
+    exts.push_back(
+        encodeExtension(params, clientParameters_->encodingVersion_));
     return exts;
   }
 
   void onEncryptedExtensions(
       const std::vector<fizz::Extension>& exts) override {
-    auto serverParams = fizz::getExtension<ServerTransportParameters>(exts);
+    auto serverParams =
+        fizz::getServerExtension(exts, clientParameters_->encodingVersion_);
     if (!serverParams) {
       throw fizz::FizzException(
           "missing server quic transport parameters extension",

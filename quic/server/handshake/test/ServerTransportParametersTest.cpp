@@ -28,13 +28,14 @@ static ClientHello getClientHello() {
   clientParams.parameters.emplace_back(
       CustomIntegralTransportParameter(0xffff, 0xffff).encode());
 
-  chlo.extensions.push_back(encodeExtension(std::move(clientParams)));
+  chlo.extensions.push_back(encodeExtension(clientParams, QuicVersion::MVFST));
 
   return chlo;
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensions) {
   ServerTransportParametersExtension ext(
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -49,12 +50,13 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
   auto extensions = ext.getExtensions(getClientHello());
 
   EXPECT_EQ(extensions.size(), 1);
-  auto serverParams = getExtension<ServerTransportParameters>(extensions);
+  auto serverParams = getServerExtension(extensions, QuicVersion::MVFST);
   EXPECT_TRUE(serverParams.has_value());
 }
 
 TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
   ServerTransportParametersExtension ext(
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,

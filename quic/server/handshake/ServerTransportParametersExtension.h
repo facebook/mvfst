@@ -17,6 +17,7 @@ namespace quic {
 class ServerTransportParametersExtension : public fizz::ServerExtensions {
  public:
   ServerTransportParametersExtension(
+      QuicVersion encodingVersion,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
@@ -28,7 +29,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t maxRecvPacketSize,
       TransportPartialReliabilitySetting partialReliability,
       const StatelessResetToken& token)
-      : initialMaxData_(initialMaxData),
+      : encodingVersion_(encodingVersion),
+        initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
         initialMaxStreamDataBidiRemote_(initialMaxStreamDataBidiRemote),
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
@@ -45,7 +47,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   std::vector<fizz::Extension> getExtensions(
       const fizz::ClientHello& chlo) override {
     auto clientParams =
-        fizz::getExtension<ClientTransportParameters>(chlo.extensions);
+        fizz::getClientExtension(chlo.extensions, encodingVersion_);
 
     if (!clientParams) {
       throw fizz::FizzException(
@@ -92,7 +94,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         static_cast<TransportParameterId>(kPartialReliabilityParameterId),
         partialReliabilitySetting));
 
-    exts.push_back(encodeExtension(params));
+    exts.push_back(encodeExtension(params, encodingVersion_));
     return exts;
   }
 
@@ -101,6 +103,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   }
 
  private:
+  QuicVersion encodingVersion_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;

@@ -60,7 +60,7 @@ TicketTransportParameters createTicketTransportParameters(
 std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken) {
   auto buf = folly::IOBuf::create(20);
   folly::io::Appender appender(buf.get(), 20);
-  auto ext = encodeExtension(appToken.transportParams);
+  auto ext = encodeExtension(appToken.transportParams, QuicVersion::MVFST);
   fizz::detail::write(ext, appender);
   fizz::detail::writeVector<uint8_t>(appToken.sourceAddresses, appender);
   fizz::detail::write(appToken.version, appender);
@@ -76,8 +76,9 @@ folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf) {
   try {
     fizz::detail::read(ext, cursor);
     extensions.push_back(std::move(ext));
+    // TODO plumb version
     appToken.transportParams =
-        *fizz::getExtension<TicketTransportParameters>(extensions);
+        *fizz::getTicketExtension(extensions, QuicVersion::MVFST);
     fizz::detail::readVector<uint8_t>(appToken.sourceAddresses, cursor);
     if (cursor.isAtEnd()) {
       return appToken;

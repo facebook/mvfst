@@ -92,6 +92,7 @@ class ServerHandshakeTest : public Test {
     uint64_t initialMaxStreamsUni = kDefaultMaxStreamsUnidirectional;
     auto clientExtensions =
         std::make_shared<ClientTransportParametersExtension>(
+            getVersion(),
             initialMaxData,
             initialMaxStreamDataBidiLocal,
             initialMaxStreamDataBidiRemote,
@@ -108,6 +109,7 @@ class ServerHandshakeTest : public Test {
                 clientState, clientReadBuffer, *this, dg.get()));
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto params = std::make_shared<ServerTransportParametersExtension>(
+        getVersion(),
         initialMaxData,
         initialMaxStreamDataBidiLocal,
         initialMaxStreamDataBidiRemote,

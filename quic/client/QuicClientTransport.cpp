@@ -873,6 +873,7 @@ void QuicClientTransport::startCryptoHandshake() {
   setPartialReliabilityTransportParameter();
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
+      conn_->originalVersion.value(),
       conn_->transportSettings.advertisedInitialConnectionWindowSize,
       conn_->transportSettings.advertisedInitialBidiLocalStreamWindowSize,
       conn_->transportSettings.advertisedInitialBidiRemoteStreamWindowSize,

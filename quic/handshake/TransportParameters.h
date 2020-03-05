@@ -14,7 +14,7 @@
 
 namespace quic {
 
-enum class TransportParameterId : uint16_t {
+enum class TransportParameterId : uint64_t {
   original_connection_id = 0x0000,
   idle_timeout = 0x0001,
   stateless_reset_token = 0x0002,
@@ -34,11 +34,11 @@ enum class TransportParameterId : uint16_t {
 
 struct TransportParameter {
   TransportParameterId parameter;
-  std::unique_ptr<folly::IOBuf> value;
+  Buf value;
 
   TransportParameter() {}
 
-  TransportParameter(TransportParameterId p, std::unique_ptr<folly::IOBuf> v)
+  TransportParameter(TransportParameterId p, Buf v)
       : parameter(p), value(v ? std::move(v) : nullptr) {}
 
   TransportParameter(const TransportParameter& other)
@@ -55,14 +55,14 @@ class CustomTransportParameter {
   virtual ~CustomTransportParameter() = default;
 
  protected:
-  explicit CustomTransportParameter(uint16_t id) : id_(id) {}
+  explicit CustomTransportParameter(uint64_t id) : id_(id) {}
 
-  uint16_t id_;
+  uint64_t id_;
 };
 
 class CustomStringTransportParameter : public CustomTransportParameter {
  public:
-  CustomStringTransportParameter(uint16_t id, std::string value);
+  CustomStringTransportParameter(uint64_t id, std::string value);
 
   TransportParameter encode() const override;
 
@@ -73,7 +73,7 @@ class CustomStringTransportParameter : public CustomTransportParameter {
 class CustomBlobTransportParameter : public CustomTransportParameter {
  public:
   CustomBlobTransportParameter(
-      uint16_t id,
+      uint64_t id,
       std::unique_ptr<folly::IOBuf> value);
 
   TransportParameter encode() const override;
@@ -84,7 +84,7 @@ class CustomBlobTransportParameter : public CustomTransportParameter {
 
 class CustomIntegralTransportParameter : public CustomTransportParameter {
  public:
-  CustomIntegralTransportParameter(uint16_t id, uint64_t value);
+  CustomIntegralTransportParameter(uint64_t id, uint64_t value);
 
   TransportParameter encode() const override;
 

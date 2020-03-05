@@ -22,12 +22,13 @@ namespace test {
 static EncryptedExtensions getEncryptedExtensions() {
   auto ee = TestMessages::encryptedExt();
   ServerTransportParameters serverParams;
-  ee.extensions.push_back(encodeExtension(std::move(serverParams)));
+  ee.extensions.push_back(encodeExtension(serverParams, QuicVersion::MVFST));
   return ee;
 }
 
 TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
+      QuicVersion::QUIC_DRAFT,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -41,12 +42,14 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
-  auto serverParams = getExtension<ClientTransportParameters>(extensions);
-  EXPECT_TRUE(serverParams.has_value());
+  auto serverParams = getClientExtension(extensions, QuicVersion::QUIC_DRAFT);
+  ASSERT_TRUE(serverParams.has_value());
+  EXPECT_EQ(serverParams->parameters.size(), 10);
 }
 
 TEST(FizzClientHandshakeTest, TestOnEE) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -63,6 +66,7 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
 
 TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
+      QuicVersion::MVFST,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -99,6 +103,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   customTransportParameters.push_back(element3->encode());
 
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
+      QuicVersion::QUIC_DRAFT,
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultStreamWindowSize,
@@ -113,7 +118,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
-  auto serverParams = getExtension<ClientTransportParameters>(extensions);
+  auto serverParams = getClientExtension(extensions, QuicVersion::QUIC_DRAFT);
   EXPECT_TRUE(serverParams.has_value());
 
   // check to see that the custom parameters are present

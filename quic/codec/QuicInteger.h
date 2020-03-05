@@ -41,7 +41,7 @@ folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
  */
 folly::Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     folly::io::Cursor& cursor,
-    uint64_t atMost = std::numeric_limits<uint64_t>::max());
+    uint64_t atMost = sizeof(uint64_t));
 
 /**
  * Returns the length of a quic integer given the first byte

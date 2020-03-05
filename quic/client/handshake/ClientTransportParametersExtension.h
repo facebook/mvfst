@@ -14,6 +14,7 @@ namespace quic {
 
 struct ClientTransportParametersExtension {
   ClientTransportParametersExtension(
+      QuicVersion encodingVersion,
       uint64_t initialMaxData,
       uint64_t initialMaxStreamDataBidiLocal,
       uint64_t initialMaxStreamDataBidiRemote,
@@ -26,7 +27,8 @@ struct ClientTransportParametersExtension {
       uint64_t activeConnectionIdLimit,
       std::vector<TransportParameter> customTransportParameters =
           std::vector<TransportParameter>())
-      : initialMaxData_(initialMaxData),
+      : encodingVersion_(encodingVersion),
+        initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
         initialMaxStreamDataBidiRemote_(initialMaxStreamDataBidiRemote),
         initialMaxStreamDataUni_(initialMaxStreamDataUni),
@@ -42,6 +44,7 @@ struct ClientTransportParametersExtension {
     return std::move(serverTransportParameters_);
   }
 
+  QuicVersion encodingVersion_;
   uint64_t initialMaxData_;
   uint64_t initialMaxStreamDataBidiLocal_;
   uint64_t initialMaxStreamDataBidiRemote_;

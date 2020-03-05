@@ -576,6 +576,7 @@ void onServerReadDataFromOpen(
     QUIC_STATS(conn.infoCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
+            version,
             conn.transportSettings.advertisedInitialConnectionWindowSize,
             conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize,
             conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize,

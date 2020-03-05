@@ -60,6 +60,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
+            QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -94,6 +95,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(
+            getVersion(),
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -359,6 +361,7 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
         hostname,
         folly::none,
         std::make_shared<ClientTransportParametersExtension>(
+            QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
@@ -461,6 +464,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
         hostname,
         psk.cachedPsk,
         std::make_shared<ClientTransportParametersExtension>(
+            QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
             folly::to<uint32_t>(kDefaultStreamWindowSize),
