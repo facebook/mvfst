@@ -534,7 +534,14 @@ uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {
         writableBytes, conn.congestionController->getWritableBytes());
   }
 
-  return writableBytes;
+  if (writableBytes == std::numeric_limits<uint64_t>::max()) {
+    return writableBytes;
+  }
+
+  // For real-CC/PathChallenge cases, round the result up to the nearest
+  // multiple of udpSendPacketLen.
+  return (writableBytes + conn.udpSendPacketLen - 1) / conn.udpSendPacketLen *
+      conn.udpSendPacketLen;
 }
 
 uint64_t unlimitedWritableBytes(const QuicConnectionStateBase&) {
@@ -1066,11 +1073,8 @@ WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
              << conn;
     return WriteDataReason::ACK;
   }
-  const size_t minimumDataSize = std::max(
-      kLongHeaderHeaderSize + kCipherOverheadHeuristic, sizeof(Sample));
 
-  uint64_t availableWriteWindow = congestionControlWritableBytes(conn);
-  if (availableWriteWindow <= minimumDataSize) {
+  if (!congestionControlWritableBytes(conn)) {
     QUIC_STATS(conn.infoCallback, onCwndBlocked);
     return WriteDataReason::NO_WRITE;
   }

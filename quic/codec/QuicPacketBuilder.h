@@ -34,11 +34,6 @@ constexpr auto kLongHeaderHeaderSize = sizeof(uint8_t) /* Type bytes */ +
     kReservedPacketLenSize /* minimal size of length */ +
     kReservedPacketNumSize /* packet number */;
 
-// A possible cipher overhead. The real overhead depends on the AEAD we will
-// use. But we need a ball-park value when deciding if we should schedule a
-// write.
-constexpr auto kCipherOverheadHeuristic = 16;
-
 // TODO: i'm sure this isn't the optimal value:
 // Appender growth byte size for in PacketBuilder:
 constexpr size_t kAppenderGrowthSize = 100;

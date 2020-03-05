@@ -971,6 +971,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
   auto conn = createConn();
+  conn->udpSendPacketLen = 30;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -1199,7 +1200,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithNoBytesForHeader) {
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillRepeatedly(Return(10));
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
   writeQuicDataToSocket(
       *rawSocket,
@@ -1719,42 +1720,30 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
   auto buf = IOBuf::copyBuffer("0123456789");
   writeDataToQuicStream(*stream1, buf->clone(), false);
 
-  // shouldWriteData checks this first
-  const size_t minimumDataSize = std::max(
-      kLongHeaderHeaderSize + kCipherOverheadHeuristic, sizeof(Sample));
-
   // Only case that we allow the write; both CC / PathLimiter have writablebytes
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillOnce(Return(minimumDataSize + 1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
-      .WillOnce(Return(minimumDataSize + 1));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
 
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked()).Times(0);
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // CC has writableBytes, but PathLimiter doesn't.
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillOnce(Return(minimumDataSize + 1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
-      .WillOnce(Return(minimumDataSize - 2));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
 
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // PathLimiter has writableBytes, CC doesn't
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillOnce(Return(minimumDataSize - 1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
-      .WillOnce(Return(minimumDataSize + 1));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
 
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // Neither PathLimiter or CC have writablebytes
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillOnce(Return(minimumDataSize - 1));
-  EXPECT_CALL(*rawLimiter, currentCredit(_, _))
-      .WillOnce(Return(minimumDataSize - 1));
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
+  EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
 
   EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
@@ -2049,6 +2038,33 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
           *headerCipher,
           getVersion(*conn),
           500 /* packetLimit */));
+}
+
+TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 2000;
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
+  EXPECT_EQ(conn->udpSendPacketLen, congestionControlWritableBytes(*conn));
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(1000));
+  EXPECT_EQ(conn->udpSendPacketLen, congestionControlWritableBytes(*conn));
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
+  EXPECT_EQ(0, congestionControlWritableBytes(*conn));
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(2000));
+  EXPECT_EQ(conn->udpSendPacketLen, congestionControlWritableBytes(*conn));
+
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillOnce(Return(2001));
+  EXPECT_EQ(conn->udpSendPacketLen * 2, congestionControlWritableBytes(*conn));
 }
 
 } // namespace test
