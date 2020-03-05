@@ -263,7 +263,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     auto doneTime = conn.readCodec->getHandshakeDoneTime();
     if (!doneTime) {
       conn.readCodec->onHandshakeDone(Clock::now());
-      if (conn.version == QuicVersion::QUIC_DRAFT) {
+      if (conn.version != QuicVersion::MVFST_D24) {
         sendSimpleFrame(conn, HandshakeDoneFrame());
       }
     }

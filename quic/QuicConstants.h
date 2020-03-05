@@ -183,7 +183,8 @@ enum class QuicNodeType : bool {
 
 enum class QuicVersion : uint32_t {
   VERSION_NEGOTIATION = 0x00000000,
-  MVFST = 0xfaceb001,
+  MVFST_D24 = 0xfaceb001,
+  MVFST = 0xfaceb002,
   QUIC_DRAFT = 0xFF00001b, // Draft-27
   MVFST_INVALID = 0xfaceb00f,
 };

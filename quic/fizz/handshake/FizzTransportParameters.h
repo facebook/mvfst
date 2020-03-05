@@ -53,7 +53,7 @@ inline fizz::Extension encodeExtension(
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion != QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == QuicVersion::MVFST_D24) {
     folly::io::Appender appender(ext.extension_data.get(), 40);
     fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   } else {
@@ -69,7 +69,7 @@ inline fizz::Extension encodeExtension(
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion != QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == QuicVersion::MVFST_D24) {
     folly::io::Appender appender(ext.extension_data.get(), 40);
     fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   } else {
@@ -85,7 +85,7 @@ inline fizz::Extension encodeExtension(
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion != QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == QuicVersion::MVFST_D24) {
     folly::io::Appender appender(ext.extension_data.get(), 40);
     fizz::detail::writeVector<uint16_t>(params.parameters, appender);
   } else {
@@ -108,7 +108,7 @@ inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
   }
   quic::ClientTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion != quic::QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
     detail::readVector<uint16_t>(parameters.parameters, cursor);
   } else {
     decodeVarintParams(parameters.parameters, cursor);
@@ -125,7 +125,7 @@ inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
   }
   quic::ServerTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion != quic::QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
     detail::readVector<uint16_t>(parameters.parameters, cursor);
   } else {
     decodeVarintParams(parameters.parameters, cursor);
@@ -142,7 +142,7 @@ inline folly::Optional<quic::TicketTransportParameters> getTicketExtension(
   }
   quic::TicketTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion != quic::QuicVersion::QUIC_DRAFT) {
+  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
     detail::readVector<uint16_t>(parameters.parameters, cursor);
   } else {
     decodeVarintParams(parameters.parameters, cursor);

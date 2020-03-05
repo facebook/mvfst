@@ -1072,6 +1072,7 @@ INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTest,
     ::testing::Values(
         TestingParams(QuicVersion::MVFST),
+        TestingParams(QuicVersion::MVFST_D24),
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 

@@ -833,6 +833,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   // Clear the receivedNewPacketBeforeWrite flag, since we may reveice from
   // client during the SetUp of the test case.
   server->getNonConstConn().receivedNewPacketBeforeWrite = false;
+  server->getNonConstConn().outstandingPackets.clear();
   StreamId streamId = server->createBidirectionalStream().value();
 
   server->idleTimeout().cancelTimeout();
