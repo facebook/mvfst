@@ -344,16 +344,18 @@ class QuicServerTransportTest : public Test {
     return true;
   }
 
-  std::unique_ptr<Aead> getInitialCipher() {
+  std::unique_ptr<Aead> getInitialCipher(
+      QuicVersion version = QuicVersion::MVFST) {
     FizzCryptoFactory cryptoFactory;
     return cryptoFactory.getClientInitialCipher(
-        *initialDestinationConnectionId, QuicVersion::MVFST);
+        *initialDestinationConnectionId, version);
   }
 
-  std::unique_ptr<PacketNumberCipher> getInitialHeaderCipher() {
+  std::unique_ptr<PacketNumberCipher> getInitialHeaderCipher(
+      QuicVersion version = QuicVersion::MVFST) {
     FizzCryptoFactory cryptoFactory;
     return cryptoFactory.makeClientInitialHeaderCipher(
-        *initialDestinationConnectionId, QuicVersion::MVFST);
+        *initialDestinationConnectionId, version);
   }
 
   Buf recvEncryptedStream(
@@ -378,17 +380,19 @@ class QuicServerTransportTest : public Test {
     return packetData;
   }
 
-  void recvClientHello(bool writes = true) {
+  void recvClientHello(
+      bool writes = true,
+      QuicVersion version = QuicVersion::MVFST) {
     auto chlo = IOBuf::copyBuffer("CHLO");
     auto nextPacketNum = clientNextInitialPacketNum++;
-    auto aead = getInitialCipher();
-    auto headerCipher = getInitialHeaderCipher();
+    auto aead = getInitialCipher(version);
+    auto headerCipher = getInitialHeaderCipher(version);
     auto initialPacket = packetToBufCleartext(
         createInitialCryptoPacket(
             *clientConnectionId,
             *initialDestinationConnectionId,
             nextPacketNum,
-            QuicVersion::MVFST,
+            version,
             *chlo,
             *aead,
             0 /* largestAcked */),
@@ -400,7 +404,8 @@ class QuicServerTransportTest : public Test {
 
   void recvClientFinished(
       bool writes = true,
-      folly::SocketAddress* peerAddress = nullptr) {
+      folly::SocketAddress* peerAddress = nullptr,
+      QuicVersion version = QuicVersion::MVFST) {
     auto finished = IOBuf::copyBuffer("FINISHED");
     auto nextPacketNum = clientNextHandshakePacketNum++;
     auto headerCipher = test::createNoOpHeaderCipher();
@@ -414,7 +419,7 @@ class QuicServerTransportTest : public Test {
             *clientConnectionId,
             *server->getConn().serverConnectionId,
             nextPacketNum,
-            QuicVersion::MVFST,
+            version,
             ProtectionType::Handshake,
             *finished,
             *handshakeCipher,
@@ -3607,6 +3612,27 @@ TEST_F(
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
     EXPECT_EQ(event->update, updateArray[i]);
   }
+}
+
+TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
+  getFakeHandshakeLayer()->allowZeroRttKeys();
+  setupClientReadCodec();
+  recvClientHello(true, QuicVersion::QUIC_DRAFT);
+  recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
+  auto& packets = server->getConn().outstandingPackets;
+  ASSERT_FALSE(packets.empty());
+  int numHandshakeDone = 0;
+  for (auto& p : packets) {
+    for (auto& f : p.packet.frames) {
+      auto s = f.asQuicSimpleFrame();
+      if (s) {
+        if (s->asHandshakeDoneFrame()) {
+          numHandshakeDone++;
+        }
+      }
+    }
+  }
+  EXPECT_EQ(numHandshakeDone, 1);
 }
 
 TEST_F(

@@ -260,7 +260,13 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
         std::move(handshakeReadHeaderCipher));
   }
   if (handshakeLayer->isHandshakeDone()) {
-    conn.readCodec->onHandshakeDone(Clock::now());
+    auto doneTime = conn.readCodec->getHandshakeDoneTime();
+    if (!doneTime) {
+      conn.readCodec->onHandshakeDone(Clock::now());
+      if (conn.version == QuicVersion::QUIC_DRAFT) {
+        sendSimpleFrame(conn, HandshakeDoneFrame());
+      }
+    }
   }
 }
 
