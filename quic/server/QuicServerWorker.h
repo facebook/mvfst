@@ -369,7 +369,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   SrcToTransportMap sourceAddressMap_;
 
   // Contains every unique transport that is mapped in connectionIdMap_.
-  folly::F14FastSet<QuicServerTransport*> boundServerTransports_;
+  folly::F14FastMap<QuicServerTransport*, std::weak_ptr<QuicServerTransport>>
+      boundServerTransports_;
 
   Buf readBuffer_;
   bool shutdown_{false};

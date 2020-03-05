@@ -716,6 +716,7 @@ void QuicServerWorker::onConnectionIdAvailable(
     ConnectionId id) noexcept {
   VLOG(4) << "Adding into connectionIdMap_ for CID=" << id << " " << *transport;
   QuicServerTransport* transportPtr = transport.get();
+  std::weak_ptr<QuicServerTransport> weakTransport = transport;
   auto result =
       connectionIdMap_.emplace(std::make_pair(id, std::move(transport)));
   if (!result.second) {
@@ -726,8 +727,8 @@ void QuicServerWorker::onConnectionIdAvailable(
     LOG(ERROR) << "connectionIdMap_ already has CID=" << id
                << " Is same transport: "
                << (existingTransportPtr == transportPtr);
-
-  } else if (boundServerTransports_.insert(transportPtr).second) {
+  } else if (boundServerTransports_.emplace(transportPtr, weakTransport)
+                 .second) {
     QUIC_STATS(infoCallback_, onNewConnection);
   }
 }
@@ -821,11 +822,13 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
 
   // Shut down all transports with bound connection ids.
   for (auto transport : boundServerTransports_) {
-    transport->setRoutingCallback(nullptr);
-    transport->setTransportInfoCallback(nullptr);
-    transport->closeNow(
-        std::make_pair(QuicErrorCode(error), std::string("shutting down")));
-    QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
+    if (auto t = transport.second.lock()) {
+      t->setRoutingCallback(nullptr);
+      t->setTransportInfoCallback(nullptr);
+      t->closeNow(
+          std::make_pair(QuicErrorCode(error), std::string("shutting down")));
+      QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
+    }
   }
   sourceAddressMap_.clear();
   connectionIdMap_.clear();
