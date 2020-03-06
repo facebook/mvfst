@@ -90,6 +90,8 @@ void processServerInitialParams(
       TransportParameterId::active_connection_id_limit,
       serverParams.parameters);
 
+  // TODO Validate active_connection_id_limit
+
   if (!packetSize || *packetSize == 0) {
     packetSize = kDefaultMaxUDPPayload;
   }
