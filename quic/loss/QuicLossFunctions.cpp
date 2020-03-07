@@ -12,6 +12,9 @@
 namespace quic {
 
 std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
+  if (conn.lossState.srtt == 0us) {
+    return 2 * conn.transportSettings.initialRtt;
+  }
   return conn.lossState.srtt + 4 * conn.lossState.rttvar +
       conn.lossState.maxAckDelay;
 }

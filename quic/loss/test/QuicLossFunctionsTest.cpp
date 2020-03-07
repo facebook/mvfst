@@ -1451,8 +1451,15 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
 
 TEST_F(QuicLossFunctionsTest, PTOLargerThanMaxDelay) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.lossState.srtt = 1ms;
   conn.lossState.maxAckDelay = 20s;
   EXPECT_GE(calculatePTO(conn), 20s);
+}
+
+TEST_F(QuicLossFunctionsTest, InitialPTOs) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.transportSettings.initialRtt = 20ms;
+  EXPECT_EQ(40ms, calculatePTO(conn));
 }
 
 TEST_F(QuicLossFunctionsTest, TimeThreshold) {
