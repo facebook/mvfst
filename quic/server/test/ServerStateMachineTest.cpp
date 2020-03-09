@@ -1,9 +1,17 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
 #include <quic/server/state/ServerStateMachine.h>
-#include <gtest/gtest.h>
+
+#include <folly/portability/GMock.h>
+#include <folly/portability/GTest.h>
+
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicConnectionId.h>
+#include <quic/codec/test/Mocks.h>
+#include <quic/common/test/TestUtils.h>
+#include <quic/server/test/Mocks.h>
+
+using namespace testing;
 
 namespace quic {
 
@@ -66,5 +74,92 @@ TEST(ServerStateMachineTest, TestAddConnId) {
   EXPECT_EQ(serverState.selfConnectionIds.size(), 3);
   EXPECT_EQ(serverState.nextSelfConnectionIdSequence, 3);
 }
+
+TEST(ServerStateMachineTest, TestCidRejected) {
+  QuicServerConnectionState serverConn;
+  MockServerConnectionIdRejector mockRejector;
+  ServerConnectionIdParams serverCidParams(10, 11, 12);
+  MockConnectionIdAlgo mockCidAlgo;
+
+  serverConn.connIdAlgo = &mockCidAlgo;
+  serverConn.connIdRejector = &mockRejector;
+  serverConn.serverConnIdParams = serverCidParams;
+  serverConn.peerActiveConnectionIdLimit = 10;
+  std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+  serverConn.transportSettings.statelessResetTokenSecret = secret;
+  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 225);
+
+  auto firstCid = getTestConnectionId(0);
+  auto secondCid = getTestConnectionId(1);
+  EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
+      .WillOnce(Return(firstCid))
+      .WillOnce(Return(secondCid));
+  EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
+      .WillOnce(Invoke([&](const ConnectionId& inputCid) {
+        EXPECT_EQ(inputCid, firstCid);
+        return true;
+      }))
+      .WillOnce(Invoke([&](const ConnectionId& inputCid) {
+        EXPECT_EQ(inputCid, secondCid);
+        return false;
+      }));
+  serverConn.createAndAddNewSelfConnId();
+}
+
+TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
+  QuicServerConnectionState serverConn;
+  MockServerConnectionIdRejector mockRejector;
+  ServerConnectionIdParams serverCidParams(10, 11, 12);
+  MockConnectionIdAlgo mockCidAlgo;
+
+  serverConn.connIdAlgo = &mockCidAlgo;
+  serverConn.connIdRejector = &mockRejector;
+  serverConn.serverConnIdParams = serverCidParams;
+  serverConn.peerActiveConnectionIdLimit = 10;
+  std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+  serverConn.transportSettings.statelessResetTokenSecret = secret;
+  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+
+  auto firstCid = getTestConnectionId(0);
+  EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
+      .WillOnce(Return(firstCid))
+      .WillOnce(Return(folly::makeUnexpected(QuicInternalException(
+          "Tumbledown", quic::LocalErrorCode::INTERNAL_ERROR))));
+  EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
+      .WillOnce(Invoke([&](const ConnectionId& inputCid) {
+        EXPECT_EQ(inputCid, firstCid);
+        return true;
+      }));
+  serverConn.createAndAddNewSelfConnId();
+}
+
+TEST(ServerStateMachineTest, TestCidRejectedGiveUp) {
+  QuicServerConnectionState serverConn;
+  MockServerConnectionIdRejector mockRejector;
+  ServerConnectionIdParams serverCidParams(10, 11, 12);
+  MockConnectionIdAlgo mockCidAlgo;
+
+  serverConn.connIdAlgo = &mockCidAlgo;
+  serverConn.connIdRejector = &mockRejector;
+  serverConn.serverConnIdParams = serverCidParams;
+  serverConn.peerActiveConnectionIdLimit = 10;
+  std::array<uint8_t, kStatelessResetTokenSecretLength> secret;
+  serverConn.transportSettings.statelessResetTokenSecret = secret;
+  serverConn.serverAddr = folly::SocketAddress("0.0.0.0", 770);
+
+  auto firstCid = getTestConnectionId(0);
+  EXPECT_CALL(mockCidAlgo, encodeConnectionId(serverCidParams))
+      .WillRepeatedly(Return(firstCid));
+  size_t rejectCounter = 0;
+  EXPECT_CALL(mockRejector, rejectConnectionIdNonConst(_))
+      .WillRepeatedly(Invoke([&](const ConnectionId& inputCid) {
+        EXPECT_EQ(inputCid, firstCid);
+        rejectCounter++;
+        return true;
+      }));
+  serverConn.createAndAddNewSelfConnId();
+  EXPECT_EQ(rejectCounter, 16);
+}
+
 } // namespace test
 } // namespace quic

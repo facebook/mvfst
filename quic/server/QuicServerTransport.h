@@ -13,6 +13,7 @@
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/handshake/ServerTransportParametersExtension.h>
+#include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
@@ -79,6 +80,9 @@ class QuicServerTransport
    * various info, such as routing related info.
    */
   virtual void setConnectionIdAlgo(ConnectionIdAlgo* connIdAlgo) noexcept;
+
+  void setServerConnectionIdRejector(
+      ServerConnectionIdRejector* connIdRejector) noexcept;
 
   /**
    * Set factory to create specific congestion controller instances

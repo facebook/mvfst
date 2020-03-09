@@ -13,8 +13,24 @@
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicServerWorker.h>
+#include <quic/server/state/ServerConnectionIdRejector.h>
 
 namespace quic {
+
+class MockServerConnectionIdRejector : public ServerConnectionIdRejector {
+ public:
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      rejectConnectionIdNonConst,
+      bool(const ConnectionId));
+
+  bool rejectConnectionId(const ConnectionId& id) const noexcept override {
+    return const_cast<MockServerConnectionIdRejector&>(*this)
+        .rejectConnectionIdNonConst(id);
+  }
+};
 
 class MockQuicServerTransportFactory : public QuicServerTransportFactory {
  public:

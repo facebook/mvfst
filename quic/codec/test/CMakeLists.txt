@@ -105,3 +105,11 @@ quic_add_test(TARGET QuicIntegerTest
   mvfst_codec_types
   mvfst_exception
 )
+
+quic_add_test(TARGET ServerConnectionIdParamsTest
+  SOURCES
+  ServerConnectionIdParamsTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_codec_types
+)

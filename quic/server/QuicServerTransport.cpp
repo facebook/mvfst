@@ -86,6 +86,14 @@ void QuicServerTransport::setConnectionIdAlgo(
   }
 }
 
+void QuicServerTransport::setServerConnectionIdRejector(
+    ServerConnectionIdRejector* connIdRejector) noexcept {
+  CHECK(connIdRejector);
+  if (serverConn_) {
+    serverConn_->connIdRejector = connIdRejector;
+  }
+}
+
 void QuicServerTransport::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
   CHECK(ccFactory);

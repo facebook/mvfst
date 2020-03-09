@@ -74,6 +74,36 @@ class SimpleQuicServerWorkerTest : public Test {
   folly::test::MockAsyncUDPSocket* rawSocket_{nullptr};
 };
 
+TEST_F(SimpleQuicServerWorkerTest, RejectCid) {
+  folly::SocketAddress addr("::1", 0);
+  auto mockSock =
+      std::make_unique<folly::test::MockAsyncUDPSocket>(&eventbase_);
+  EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(addr));
+  MockConnectionCallback mockConnectionCallback;
+  MockQuicTransport::Ptr transportPtr = std::make_shared<MockQuicTransport>(
+      &eventbase_, std::move(mockSock), mockConnectionCallback, nullptr);
+  workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
+  worker_ = std::make_unique<QuicServerWorker>(workerCb_);
+  auto includeCid = getTestConnectionId(0);
+  auto excludeCid = getTestConnectionId(1);
+  EXPECT_FALSE(worker_->rejectConnectionId(includeCid));
+  EXPECT_FALSE(worker_->rejectConnectionId(excludeCid));
+
+  worker_->onConnectionIdAvailable(transportPtr, includeCid);
+
+  EXPECT_TRUE(worker_->rejectConnectionId(includeCid));
+  EXPECT_FALSE(worker_->rejectConnectionId(excludeCid));
+
+  QuicServerTransport::SourceIdentity sourceId(addr, includeCid);
+  std::vector<ConnectionIdData> cidDataVec;
+  cidDataVec.emplace_back(includeCid, 0);
+
+  EXPECT_CALL(*transportPtr, setRoutingCallback(nullptr)).Times(1);
+  worker_->onConnectionUnbound(transportPtr.get(), sourceId, cidDataVec);
+  EXPECT_FALSE(worker_->rejectConnectionId(includeCid));
+  EXPECT_FALSE(worker_->rejectConnectionId(excludeCid));
+}
+
 TEST_F(SimpleQuicServerWorkerTest, TurnOffPMTU) {
   auto sock =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);

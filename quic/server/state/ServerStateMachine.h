@@ -20,6 +20,7 @@
 #include <quic/logging/QuicLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/handshake/ServerHandshake.h>
+#include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QPRFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -99,6 +100,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // ConnectionIdAlgo implementation to encode and decode ConnectionId with
   // various info, such as routing related info.
   ConnectionIdAlgo* connIdAlgo{nullptr};
+
+  // ServerConnectionIdRejector can reject a ConnectionId from ConnectionIdAlgo
+  ServerConnectionIdRejector* connIdRejector{nullptr};
 
   // Source address token that can be saved to client via PSK.
   // Address with higher index is more recently used.

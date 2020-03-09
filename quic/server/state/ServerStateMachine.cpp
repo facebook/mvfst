@@ -26,6 +26,7 @@ using namespace std::chrono_literals;
 
 namespace {
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
+constexpr size_t kConnIdEncodingRetryLimit = 16;
 } // namespace
 namespace {
 bool maybeNATRebinding(
@@ -1201,6 +1202,14 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   // TODO Possibly change this mechanism later
   // The default connectionId algo has 36 bits of randomness.
   auto encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
+  size_t encodedTimes = 0;
+  while (encodedCid && connIdRejector &&
+         connIdRejector->rejectConnectionId(*encodedCid) &&
+         ++encodedTimes < kConnIdEncodingRetryLimit) {
+    encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
+  }
+  LOG_IF(ERROR, encodedTimes == kConnIdEncodingRetryLimit)
+      << "Quic CIDRejector rejected all conneectionIDs";
   if (encodedCid.hasError()) {
     return folly::none;
   }

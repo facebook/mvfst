@@ -444,6 +444,7 @@ void QuicServerWorker::dispatchPacketData(
             trans->setTransportSettings(transportSettings_);
           }
           trans->setConnectionIdAlgo(connIdAlgo_.get());
+          trans->setServerConnectionIdRejector(this);
           if (routingData.sourceConnId) {
             trans->setClientConnectionId(*routingData.sourceConnId);
           }
@@ -842,5 +843,10 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
 
 QuicServerWorker::~QuicServerWorker() {
   shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
+}
+
+bool QuicServerWorker::rejectConnectionId(const ConnectionId& candidate) const
+    noexcept {
+  return connectionIdMap_.find(candidate) != connectionIdMap_.end();
 }
 } // namespace quic

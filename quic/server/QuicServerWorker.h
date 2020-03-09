@@ -19,12 +19,14 @@
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicUDPSocketFactory.h>
+#include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
 
 class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
-                         public QuicServerTransport::RoutingCallback {
+                         public QuicServerTransport::RoutingCallback,
+                         public ServerConnectionIdRejector {
  public:
   using TransportSettingsOverrideFn =
       std::function<folly::Optional<quic::TransportSettings>(
@@ -255,6 +257,10 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       QuicServerTransport* transport,
       const QuicServerTransport::SourceIdentity& source,
       const std::vector<ConnectionIdData>& connectionIdData) noexcept override;
+
+  // From ServerConnectionIdRejector:
+  bool rejectConnectionId(const ConnectionId& candidate) const
+      noexcept override;
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override;
 

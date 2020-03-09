@@ -149,6 +149,14 @@ struct ServerConnectionIdParams {
   uint8_t workerId{0};
 };
 
+bool operator==(
+    const ServerConnectionIdParams& lhs,
+    const ServerConnectionIdParams& rhs);
+
+bool operator!=(
+    const ServerConnectionIdParams& lhs,
+    const ServerConnectionIdParams& rhs);
+
 /**
  * Returns a pair of length of the connection ids decoded from the long header.
  * Returns (Destination connid length, Source connid length)

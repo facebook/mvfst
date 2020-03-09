@@ -112,4 +112,17 @@ uint8_t encodeConnectionIdLengths(
       sourceConnectionIdSize == 0 ? 0 : sourceConnectionIdSize - 3;
   return ((dstByte << 4)) | (srcByte);
 }
+
+bool operator==(
+    const ServerConnectionIdParams& lhs,
+    const ServerConnectionIdParams& rhs) {
+  return lhs.version == rhs.version && lhs.hostId == rhs.hostId &&
+      lhs.processId == rhs.processId && lhs.workerId == rhs.workerId;
+}
+
+bool operator!=(
+    const ServerConnectionIdParams& lhs,
+    const ServerConnectionIdParams& rhs) {
+  return !(lhs == rhs);
+}
 } // namespace quic
