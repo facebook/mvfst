@@ -26,37 +26,42 @@ NewReno::NewReno(QuicConnectionStateBase& conn)
 }
 
 void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(bytesInFlight_, bytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kRemoveInflight);
+        conn_.lossState.inflightBytes, getCongestionWindow(), kRemoveInflight);
   }
 }
 
 void NewReno::onPacketSent(const OutstandingPacket& packet) {
-  addAndCheckOverflow(bytesInFlight_, packet.encodedSize);
+  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.encodedSize);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes
            << " packetNum=" << packet.packet.header.getPacketSequenceNum()
            << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketSent);
   }
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
   DCHECK(ack.largestAckedPacket.has_value() && !ack.ackedPackets.empty());
-  subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketAck);
   }
   for (const auto& packet : ack.ackedPackets) {
     onPacketAcked(packet);
@@ -103,7 +108,7 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
   DCHECK(
       loss.largestLostPacketNum.has_value() &&
       loss.largestLostSentTime.has_value());
-  subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, loss.lostBytes);
   if (!endOfRecovery_ || *endOfRecovery_ < *loss.largestLostSentTime) {
     endOfRecovery_ = Clock::now();
     cwndBytes_ = (cwndBytes_ >> kRenoLossReductionFactorShift);
@@ -117,34 +122,38 @@ void NewReno::onPacketLoss(const LossEvent& loss) {
     VLOG(10) << __func__ << " exit slow start, ssthresh=" << ssthresh_
              << " packetNum=" << *loss.largestLostPacketNum
              << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-             << " inflight=" << bytesInFlight_ << " " << conn_;
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   } else {
     VLOG(10) << __func__ << " packetNum=" << *loss.largestLostPacketNum
              << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-             << " inflight=" << bytesInFlight_ << " " << conn_;
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   }
 
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketLoss);
   }
   if (loss.persistentCongestion) {
     VLOG(10) << __func__ << " writable=" << getWritableBytes()
-             << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-             << conn_;
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          bytesInFlight_, getCongestionWindow(), kPersistentCongestion);
+          conn_.lossState.inflightBytes,
+          getCongestionWindow(),
+          kPersistentCongestion);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
   }
 }
 
 uint64_t NewReno::getWritableBytes() const noexcept {
-  if (bytesInFlight_ > cwndBytes_) {
+  if (conn_.lossState.inflightBytes > cwndBytes_) {
     return 0;
   } else {
-    return cwndBytes_ - bytesInFlight_;
+    return cwndBytes_ - conn_.lossState.inflightBytes;
   }
 }
 
@@ -161,7 +170,7 @@ CongestionControlType NewReno::type() const noexcept {
 }
 
 uint64_t NewReno::getBytesInFlight() const noexcept {
-  return bytesInFlight_;
+  return conn_.lossState.inflightBytes;
 }
 
 void NewReno::setAppIdle(bool, TimePoint) noexcept { /* unsupported */

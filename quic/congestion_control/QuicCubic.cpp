@@ -19,10 +19,7 @@ Cubic::Cubic(
     bool tcpFriendly,
     bool ackTrain,
     bool spreadAcrossRtt)
-    : conn_(conn),
-      inflightBytes_(0),
-      ssthresh_(initSsthresh),
-      spreadAcrossRtt_(spreadAcrossRtt) {
+    : conn_(conn), ssthresh_(initSsthresh), spreadAcrossRtt_(spreadAcrossRtt) {
   cwndBytes_ = std::min(
       conn.transportSettings.maxCwndInMss * conn.udpSendPacketLen,
       conn.transportSettings.initCwndInMss * conn.udpSendPacketLen);
@@ -37,7 +34,9 @@ CubicStates Cubic::state() const noexcept {
 }
 
 uint64_t Cubic::getWritableBytes() const noexcept {
-  return cwndBytes_ > inflightBytes_ ? cwndBytes_ - inflightBytes_ : 0;
+  return cwndBytes_ > conn_.lossState.inflightBytes
+      ? cwndBytes_ - conn_.lossState.inflightBytes
+      : 0;
 }
 
 uint64_t Cubic::getCongestionWindow() const noexcept {
@@ -71,11 +70,11 @@ void Cubic::onPersistentCongestion() {
       conn_,
       cubicStateToString(state_).data(),
       cwndBytes_,
-      inflightBytes_,
+      conn_.lossState.inflightBytes,
       steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         getCongestionWindow(),
         kPersistentCongestion,
         cubicStateToString(state_).str());
@@ -83,13 +82,13 @@ void Cubic::onPersistentCongestion() {
 }
 
 void Cubic::onPacketSent(const OutstandingPacket& packet) {
-  if (std::numeric_limits<uint64_t>::max() - inflightBytes_ <
+  if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
       packet.encodedSize) {
     throw QuicInternalException(
-        "Cubic: inflightBytes_ overflow",
+        "Cubic: inflightBytes overflow",
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
-  inflightBytes_ += packet.encodedSize;
+  conn_.lossState.inflightBytes += packet.encodedSize;
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {
@@ -118,11 +117,11 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
         conn_,
         cubicStateToString(state_).str().data(),
         cwndBytes_,
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         steadyState_.lastMaxCwndBytes.value_or(0));
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kCubicLoss,
           cubicStateToString(state_).str());
@@ -132,7 +131,7 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_loss");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kCubicSkipLoss,
           cubicStateToString(state_).str());
@@ -145,18 +144,18 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
 }
 
 void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
-  DCHECK_LE(bytes, inflightBytes_);
-  inflightBytes_ -= bytes;
+  DCHECK_LE(bytes, conn_.lossState.inflightBytes);
+  conn_.lossState.inflightBytes -= bytes;
   QUIC_TRACE(
       cubic_remove_inflight,
       conn_,
       cubicStateToString(state_).str().data(),
       cwndBytes_,
-      inflightBytes_,
+      conn_.lossState.inflightBytes,
       steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         getCongestionWindow(),
         kRemoveInflight,
         cubicStateToString(state_).str());
@@ -290,7 +289,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
       static_cast<uint64_t>(timeElapsedCount));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         getCongestionWindow(),
         kCubicSteadyCwnd,
         cubicStateToString(state_).str());
@@ -363,14 +362,14 @@ void Cubic::onPacketAckOrLoss(
 
 void Cubic::onPacketAcked(const AckEvent& ack) {
   auto currentCwnd = cwndBytes_;
-  DCHECK_LE(ack.ackedBytes, inflightBytes_);
-  inflightBytes_ -= ack.ackedBytes;
+  DCHECK_LE(ack.ackedBytes, conn_.lossState.inflightBytes);
+  conn_.lossState.inflightBytes -= ack.ackedBytes;
   if (recoveryState_.endOfRecovery.has_value() &&
       *recoveryState_.endOfRecovery >= ack.largestAckedPacketSentTime) {
     QUIC_TRACE(fst_trace, conn_, "cubic_skip_ack");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kCubicSkipAck,
           cubicStateToString(state_).str());
@@ -397,7 +396,7 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
         fst_trace, conn_, "cwnd_no_change", quiescenceStart_.has_value());
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kCwndNoChange,
           cubicStateToString(state_).str());
@@ -408,11 +407,11 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
       conn_,
       cubicStateToString(state_).str().data(),
       cwndBytes_,
-      inflightBytes_,
+      conn_.lossState.inflightBytes,
       steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         getCongestionWindow(),
         kCongestionPacketAck,
         cubicStateToString(state_).str());
@@ -482,8 +481,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
   }
 
   // TODO: Should we not increase cwnd if inflight is less than half of cwnd?
-  // Note that we take bytes out of inflightBytes_ before invoke the state
-  // machine. So the inflightBytes_ here is already reduced.
+  // Note that we take bytes out of inflightBytes before invoke the state
+  // machine. So the inflightBytes here is already reduced.
   if (std::numeric_limits<decltype(cwndBytes_)>::max() - cwndBytes_ <
       ack.ackedBytes) {
     throw QuicInternalException(
@@ -620,7 +619,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     QUIC_TRACE(fst_trace, conn_, "ack_in_quiescence");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kAckInQuiescence,
           cubicStateToString(state_).str());
@@ -641,7 +640,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     QUIC_TRACE(fst_trace, conn_, "reset_timetoorigin");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kResetTimeToOrigin,
           cubicStateToString(state_).str());
@@ -662,7 +661,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     steadyState_.lastReductionTime = ack.ackTime;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kResetLastReductionTime,
           cubicStateToString(state_).str());
@@ -692,7 +691,7 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     cwndBytes_ = std::max(cwndBytes_, steadyState_.estRenoCwnd);
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kRenoCwndEstimation,
           cubicStateToString(state_).str());
@@ -718,7 +717,7 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
     cwndBytes_ = calculateCubicCwnd(calculateCubicCwndDelta(ack.ackTime));
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kPacketAckedInRecovery,
           cubicStateToString(state_).str());

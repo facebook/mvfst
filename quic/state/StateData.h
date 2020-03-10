@@ -486,6 +486,8 @@ struct LossState {
   // The time when last retranmittable packet is sent for every packet number
   // space
   TimePoint lastRetransmittablePacketSentTime;
+  // Inflight bytes
+  uint64_t inflightBytes{0};
 };
 
 class Logger;

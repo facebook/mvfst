@@ -133,7 +133,6 @@ class Cubic : public CongestionController {
   folly::Optional<uint64_t> lossCwndBytes_;
   // the value of ssthresh_ at the last loss event
   folly::Optional<uint64_t> lossSsthresh_;
-  uint64_t inflightBytes_;
   uint64_t ssthresh_;
 
   struct HystartState {

@@ -26,8 +26,8 @@ Copa::Copa(QuicConnectionStateBase& conn)
           0us,
           0) {
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.transportSettings.latencyFactor.has_value()) {
     latencyFactor_ = conn_.transportSettings.latencyFactor.value();
   }
@@ -35,27 +35,30 @@ Copa::Copa(QuicConnectionStateBase& conn)
 }
 
 void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
-  subtractAndCheckUnderflow(bytesInFlight_, bytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-           << conn_;
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kRemoveInflight);
+        conn_.lossState.inflightBytes, getCongestionWindow(), kRemoveInflight);
   }
 }
 
 void Copa::onPacketSent(const OutstandingPacket& packet) {
-  addAndCheckOverflow(bytesInFlight_, packet.encodedSize);
+  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.encodedSize);
 
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
-           << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_
+           << " cwnd=" << cwndBytes_
+           << " inflight=" << conn_.lossState.inflightBytes
            << " bytesBufferred=" << conn_.flowControlState.sumCurStreamBufferLen
            << " packetNum=" << packet.packet.header.getPacketSequenceNum()
            << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketSent);
   }
 }
 
@@ -131,17 +134,17 @@ void Copa::onPacketAckOrLoss(
     if (conn_.pacer) {
       conn_.pacer->onPacketsLoss();
     }
-    QUIC_TRACE(copa_loss, conn_, cwndBytes_, bytesInFlight_);
+    QUIC_TRACE(copa_loss, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
   if (ack && ack->largestAckedPacket.has_value()) {
     onPacketAcked(*ack);
-    QUIC_TRACE(copa_ack, conn_, cwndBytes_, bytesInFlight_);
+    QUIC_TRACE(copa_ack, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
 }
 
 void Copa::onPacketAcked(const AckEvent& ack) {
   DCHECK(ack.largestAckedPacket.has_value());
-  subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())
@@ -157,7 +160,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
   VLOG(10) << __func__ << "ack size=" << ack.ackedBytes
            << " num packets acked=" << ack.ackedBytes / conn_.udpSendPacketLen
            << " writable=" << getWritableBytes() << " cwnd=" << cwndBytes_
-           << " inflight=" << bytesInFlight_ << " rttMin=" << rttMin.count()
+           << " inflight=" << conn_.lossState.inflightBytes
+           << " rttMin=" << rttMin.count()
            << " sRTT=" << conn_.lossState.srtt.count()
            << " lRTT=" << conn_.lossState.lrtt.count()
            << " mRTT=" << conn_.lossState.mrtt.count()
@@ -169,7 +173,9 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketAck);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketAck);
   }
 
   auto delayInMicroSec =
@@ -271,21 +277,25 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 void Copa::onPacketLoss(const LossEvent& loss) {
   VLOG(10) << __func__ << " lostBytes=" << loss.lostBytes
            << " lostPackets=" << loss.lostPackets << " cwnd=" << cwndBytes_
-           << " inflight=" << bytesInFlight_ << " " << conn_;
+           << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketLoss);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketLoss);
   }
   DCHECK(loss.largestLostPacketNum.has_value());
-  subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, loss.lostBytes);
   if (loss.persistentCongestion) {
     // TODO See if we should go to slowStart here
     VLOG(10) << __func__ << " writable=" << getWritableBytes()
-             << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
-             << conn_;
+             << " cwnd=" << cwndBytes_
+             << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          bytesInFlight_, getCongestionWindow(), kPersistentCongestion);
+          conn_.lossState.inflightBytes,
+          getCongestionWindow(),
+          kPersistentCongestion);
     }
     cwndBytes_ = conn_.transportSettings.minCwndInMss * conn_.udpSendPacketLen;
     if (conn_.pacer) {
@@ -295,10 +305,10 @@ void Copa::onPacketLoss(const LossEvent& loss) {
 }
 
 uint64_t Copa::getWritableBytes() const noexcept {
-  if (bytesInFlight_ > cwndBytes_) {
+  if (conn_.lossState.inflightBytes > cwndBytes_) {
     return 0;
   } else {
-    return cwndBytes_ - bytesInFlight_;
+    return cwndBytes_ - conn_.lossState.inflightBytes;
   }
 }
 
@@ -315,7 +325,7 @@ CongestionControlType Copa::type() const noexcept {
 }
 
 uint64_t Copa::getBytesInFlight() const noexcept {
-  return bytesInFlight_;
+  return conn_.lossState.inflightBytes;
 }
 
 void Copa::setAppIdle(bool, TimePoint) noexcept { /* unsupported */

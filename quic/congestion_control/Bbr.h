@@ -131,7 +131,7 @@ class BbrCongestionController : public CongestionController {
   BbrState state() const noexcept;
 
  private:
-  /* prevInflightBytes: the inflightBytes_ value before the current
+  /* prevInflightBytes: the inflightBytes value before the current
    *                    onPacketAckOrLoss invocation.
    * hasLoss: whether current onPacketAckOrLoss has loss.
    */
@@ -170,7 +170,7 @@ class BbrCongestionController : public CongestionController {
   /**
    * Special handling of AckEvent when connection is in ProbeBw state.
    *
-   * prevInflightBytes: the inflightBytes_ value before the current
+   * prevInflightBytes: the inflightBytes value before the current
    *                    onPacketAckOrLoss invocation.
    * hasLoss: whether the current onpacketAckOrLoss has loss.
    */
@@ -208,8 +208,6 @@ class BbrCongestionController : public CongestionController {
   uint64_t initialCwnd_;
   // Congestion window when the connection is in recovery
   uint64_t recoveryWindow_;
-  // inflight bytes
-  uint64_t inflightBytes_{0};
   // Number of bytes we expect to send over one RTT when paced write.
   uint64_t pacingWindow_{0};
 

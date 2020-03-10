@@ -43,7 +43,6 @@ class NewReno : public CongestionController {
 
  private:
   QuicConnectionStateBase& conn_;
-  uint64_t bytesInFlight_{0};
   uint64_t ssthresh_;
   uint64_t cwndBytes_;
   folly::Optional<TimePoint> endOfRecovery_;

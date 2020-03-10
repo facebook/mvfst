@@ -73,7 +73,7 @@ void BbrCongestionController::onPacketLoss(
 
   if (!inRecovery()) {
     recoveryState_ = BbrCongestionController::RecoveryState::CONSERVATIVE;
-    recoveryWindow_ = inflightBytes_ + ackedBytes;
+    recoveryWindow_ = conn_.lossState.inflightBytes + ackedBytes;
     recoveryWindow_ = boundedCwnd(
         recoveryWindow_,
         conn_.udpSendPacketLen,
@@ -96,7 +96,7 @@ void BbrCongestionController::onPacketLoss(
     recoveryWindow_ = conn_.udpSendPacketLen * kMinCwndInMssForBbr;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
-          inflightBytes_,
+          conn_.lossState.inflightBytes,
           getCongestionWindow(),
           kPersistentCongestion,
           bbrStateToString(state_),
@@ -108,15 +108,15 @@ void BbrCongestionController::onPacketLoss(
         bbrStateToString(state_),
         bbrRecoveryStateToString(recoveryState_),
         recoveryWindow_,
-        inflightBytes_);
+        conn_.lossState.inflightBytes);
   }
 }
 
 void BbrCongestionController::onPacketSent(const OutstandingPacket& packet) {
-  if (!inflightBytes_ && isAppLimited()) {
+  if (!conn_.lossState.inflightBytes && isAppLimited()) {
     exitingQuiescene_ = true;
   }
-  addAndCheckOverflow(inflightBytes_, packet.encodedSize);
+  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.encodedSize);
   if (!ackAggregationStartTime_) {
     ackAggregationStartTime_ = packet.time;
   }
@@ -151,12 +151,14 @@ uint64_t BbrCongestionController::updateAckAggregation(const AckEvent& ack) {
 void BbrCongestionController::onPacketAckOrLoss(
     folly::Optional<AckEvent> ackEvent,
     folly::Optional<LossEvent> lossEvent) {
-  auto prevInflightBytes = inflightBytes_;
+  auto prevInflightBytes = conn_.lossState.inflightBytes;
   if (ackEvent) {
-    subtractAndCheckUnderflow(inflightBytes_, ackEvent->ackedBytes);
+    subtractAndCheckUnderflow(
+        conn_.lossState.inflightBytes, ackEvent->ackedBytes);
   }
   if (lossEvent) {
-    subtractAndCheckUnderflow(inflightBytes_, lossEvent->lostBytes);
+    subtractAndCheckUnderflow(
+        conn_.lossState.inflightBytes, lossEvent->lostBytes);
   }
   if (lossEvent) {
     onPacketLoss(*lossEvent, ackEvent ? ackEvent->ackedBytes : 0);
@@ -244,7 +246,7 @@ void BbrCongestionController::onPacketAcked(
   updatePacing();
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        inflightBytes_,
+        conn_.lossState.inflightBytes,
         getCongestionWindow(),
         kCongestionPacketAck,
         bbrStateToString(state_),
@@ -258,7 +260,7 @@ void BbrCongestionController::onPacketAcked(
       getCongestionWindow(),
       cwnd_,
       sendQuantum_,
-      inflightBytes_);
+      conn_.lossState.inflightBytes);
 }
 
 // TODO: We used to check if there is available bandwidth and rtt samples in
@@ -295,7 +297,7 @@ void BbrCongestionController::handleAckInProbeBw(
   if (pacingGain_ > 1.0 && !hasLoss &&
       prevInflightBytes < calculateTargetCwnd(pacingGain_)) {
     // pacingGain_ > 1.0 means BBR is probeing bandwidth. So we should let
-    // inflightBytes_ reach the target.
+    // inflight bytes reach the target.
     shouldAdvancePacingGainCycle = false;
   }
 
@@ -303,9 +305,9 @@ void BbrCongestionController::handleAckInProbeBw(
   folly::Optional<uint64_t> targetCwndCache;
   if (pacingGain_ < 1.0) {
     targetCwndCache = calculateTargetCwnd(1.0);
-    if (inflightBytes_ <= *targetCwndCache) {
+    if (conn_.lossState.inflightBytes <= *targetCwndCache) {
       // pacingGain_ < 1.0 means BBR is draining the network queue. If
-      // inflightBytes_ is below the target, then it's done.
+      // inflight bytes is below the target, then it's done.
       shouldAdvancePacingGainCycle = true;
     }
   }
@@ -317,7 +319,7 @@ void BbrCongestionController::handleAckInProbeBw(
         kPacingGainCycles[pacingCycleIndex_] == 1.0) {
       auto drainTarget =
           targetCwndCache ? *targetCwndCache : calculateTargetCwnd(1.0);
-      if (inflightBytes_ > drainTarget) {
+      if (conn_.lossState.inflightBytes > drainTarget) {
         // Interestingly Chromium doesn't rollback pacingCycleIndex_ in this
         // case.
         // TODO: isn't this a bug? But we don't do drainToTarget today.
@@ -334,7 +336,7 @@ bool BbrCongestionController::shouldExitStartup() noexcept {
 
 bool BbrCongestionController::shouldExitDrain() noexcept {
   return state_ == BbrState::Drain &&
-      inflightBytes_ <= calculateTargetCwnd(1.0);
+      conn_.lossState.inflightBytes <= calculateTargetCwnd(1.0);
 }
 
 bool BbrCongestionController::shouldProbeRtt(TimePoint ackTime) noexcept {
@@ -364,7 +366,8 @@ void BbrCongestionController::handleAckInProbeRtt(
     bandwidthSampler_->onAppLimited();
   }
   if (!earliestTimeToExitProbeRtt_ &&
-      inflightBytes_ < getCongestionWindow() + conn_.udpSendPacketLen) {
+      conn_.lossState.inflightBytes <
+          getCongestionWindow() + conn_.udpSendPacketLen) {
     earliestTimeToExitProbeRtt_ = ackTime + kProbeRttDuration;
     probeRttRound_ = folly::none;
     return;
@@ -436,8 +439,8 @@ void BbrCongestionController::updateRecoveryWindowWithAck(
       conn_.transportSettings.bbrConfig.conservativeRecovery
       ? conn_.udpSendPacketLen
       : bytesAcked;
-  recoveryWindow_ =
-      std::max(recoveryWindow_, inflightBytes_ + recoveryIncrease);
+  recoveryWindow_ = std::max(
+      recoveryWindow_, conn_.lossState.inflightBytes + recoveryIncrease);
   recoveryWindow_ = boundedCwnd(
       recoveryWindow_,
       conn_.udpSendPacketLen,
@@ -455,8 +458,8 @@ BbrCongestionController::BbrState BbrCongestionController::state() const
 }
 
 uint64_t BbrCongestionController::getWritableBytes() const noexcept {
-  return getCongestionWindow() > inflightBytes_
-      ? getCongestionWindow() - inflightBytes_
+  return getCongestionWindow() > conn_.lossState.inflightBytes
+      ? getCongestionWindow() - conn_.lossState.inflightBytes
       : 0;
 }
 
@@ -532,7 +535,7 @@ void BbrCongestionController::setAppIdle(
 }
 
 void BbrCongestionController::setAppLimited() {
-  if (inflightBytes_ > getCongestionWindow()) {
+  if (conn_.lossState.inflightBytes > getCongestionWindow()) {
     return;
   }
   appLimitedSinceProbeRtt_ = true;
@@ -594,7 +597,7 @@ void BbrCongestionController::detectBottleneckBandwidth(bool appLimitedSample) {
 
 void BbrCongestionController::onRemoveBytesFromInflight(
     uint64_t bytesToRemove) {
-  subtractAndCheckUnderflow(inflightBytes_, bytesToRemove);
+  subtractAndCheckUnderflow(conn_.lossState.inflightBytes, bytesToRemove);
 }
 
 std::string bbrStateToString(BbrCongestionController::BbrState state) {

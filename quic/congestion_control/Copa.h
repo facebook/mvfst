@@ -69,7 +69,6 @@ class Copa : public CongestionController {
       VelocityState::Direction newDirection,
       const TimePoint ackTime);
   QuicConnectionStateBase& conn_;
-  uint64_t bytesInFlight_{0};
   uint64_t cwndBytes_;
 
   bool isSlowStart_;
