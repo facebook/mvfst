@@ -1014,8 +1014,7 @@ void QuicClientTransport::errMessage(
     auto errStr = folly::errnoStr(serr->ee_errno);
     runOnEvbAsync([errString = std::move(errStr)](auto self) {
       auto quicError = std::make_pair(
-          QuicErrorCode(LocalErrorCode::CONNECT_FAILED),
-          errString.toStdString());
+          QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
       clientPtr->closeImpl(std::move(quicError), false, false);
     });
