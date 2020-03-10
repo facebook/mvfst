@@ -45,6 +45,8 @@ void FizzClientHandshake::connect(
       std::move(hostname),
       std::move(cachedPsk),
       std::make_shared<FizzClientExtensions>(std::move(transportParams))));
+
+  throwOnError();
 }
 
 const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {

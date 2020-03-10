@@ -889,15 +889,11 @@ void QuicClientTransport::startCryptoHandshake() {
   handshakeLayer->connect(
       hostname_, std::move(cachedPsk), std::move(paramsExtension), this);
 
-  auto zeroRttWriteCipher = handshakeLayer->getZeroRttWriteCipher();
-  auto zeroRttWriteHeaderCipher = handshakeLayer->getZeroRttWriteHeaderCipher();
-  if (zeroRttWriteCipher) {
+  if (clientConn_->zeroRttWriteCipher) {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
     }
     QUIC_TRACE(zero_rtt, *conn_, "attempted");
-    clientConn_->zeroRttWriteCipher = std::move(zeroRttWriteCipher);
-    clientConn_->zeroRttWriteHeaderCipher = std::move(zeroRttWriteHeaderCipher);
 
     // If zero rtt write cipher is derived, it means the cached psk was valid
     DCHECK(quicCachedPsk);
