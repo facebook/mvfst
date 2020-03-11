@@ -1146,7 +1146,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   }
 
   void setHandshakeWriteCipher(std::unique_ptr<Aead> handshakeWriteCipher) {
-    handshakeWriteCipher_ = std::move(handshakeWriteCipher);
+    conn_->handshakeWriteCipher = std::move(handshakeWriteCipher);
   }
 
   void setZeroRttWriteCipher(std::unique_ptr<Aead> zeroRttWriteCipher) {
@@ -1165,7 +1165,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
   void setHandshakeWriteHeaderCipher(
       std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher) {
-    handshakeWriteHeaderCipher_ = std::move(handshakeWriteHeaderCipher);
+    conn_->handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
   }
 
   void setOneRttWriteHeaderCipher(
