@@ -208,10 +208,6 @@ class QuicClientTransport
   folly::Optional<std::string> hostname_;
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
   bool serverInitialParamsSet_{false};
-  uint64_t peerAdvertisedInitialMaxData_{0};
-  uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal_{0};
-  uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote_{0};
-  uint64_t peerAdvertisedInitialMaxStreamDataUni_{0};
 
  private:
   void cacheServerInitialParams(
