@@ -8,6 +8,7 @@
 
 #include <quic/logging/QLogger.h>
 
+#include <boost/filesystem.hpp>
 #include <folly/json.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
@@ -1177,6 +1178,202 @@ TEST_F(QLoggerTest, PathValidation) {
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];
   EXPECT_EQ(expected, gotEvents);
+}
+
+TEST_F(QLoggerTest, PrettyStream) {
+  folly::dynamic expected = folly::parseJson(
+      R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "title": "mvfst qlog",
+   "traces": [
+     {
+       "common_fields": {
+         "dcid": "0101",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
+       "event_fields": [
+         "relative_time",
+         "CATEGORY",
+         "EVENT_TYPE",
+         "TRIGGER",
+         "DATA"
+       ],
+       "events": [
+         [
+           "31",
+           "TRANSPORT",
+           "PACKET_RECEIVED",
+           "DEFAULT",
+           {
+             "frames": [
+               {
+                 "fin": true,
+                 "frame_type": "STREAM",
+                 "stream_id": "10",
+                 "length": 0,
+                 "offset": 0
+               }
+             ],
+             "header": {
+               "packet_number": 1,
+               "packet_size": 10
+             },
+             "packet_type": "1RTT"
+           }
+         ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "server",
+         "type": "server"
+       }
+     }
+   ],
+   "summary": {
+     "max_duration": 0,
+     "max_outgoing_loss_rate": "",
+     "total_event_count": 1,
+     "trace_count": 1
+   }
+ })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = boost::filesystem::temp_directory_path().string();
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      true /* prettyJson */,
+      true /* streaming */);
+  q->setDcid(ConnectionId(std::vector<uint8_t>{1, 1}));
+  q->addPacket(regularQuicPacket, 10);
+  EXPECT_EQ(q->logs.size(), 0);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+  std::cout << outputPath;
+  delete q;
+
+  std::ifstream file(outputPath, std::ifstream::in);
+  std::string str(
+      (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  EXPECT_EQ(expected, parsed);
+}
+
+TEST_F(QLoggerTest, NonPrettyStream) {
+  folly::dynamic expected = folly::parseJson(
+      R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "summary": {
+     "max_duration": 0,
+     "max_outgoing_loss_rate": "",
+     "total_event_count": 1,
+     "trace_count": 1
+   },
+   "title": "mvfst qlog",
+   "traces": [
+     {
+       "common_fields": {
+         "dcid": "0202",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
+       "event_fields": [
+         "relative_time",
+         "CATEGORY",
+         "EVENT_TYPE",
+         "TRIGGER",
+         "DATA"
+       ],
+       "events": [
+         [
+           "31",
+           "TRANSPORT",
+           "PACKET_RECEIVED",
+           "DEFAULT",
+           {
+             "frames": [
+               {
+                 "fin": true,
+                 "frame_type": "STREAM",
+                 "stream_id": "10",
+                 "length": 0,
+                 "offset": 0
+               }
+             ],
+             "header": {
+               "packet_number": 1,
+               "packet_size": 10
+             },
+             "packet_type": "1RTT"
+           }
+         ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "server",
+         "type": "server"
+       }
+     }
+   ]
+ })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = boost::filesystem::temp_directory_path().string();
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      false /* prettyJson */,
+      true /* streaming */);
+  q->setDcid(ConnectionId(std::vector<uint8_t>{2, 2}));
+  q->addPacket(regularQuicPacket, 10);
+  EXPECT_EQ(q->logs.size(), 0);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+  delete q;
+
+  std::ifstream file(outputPath, std::ifstream::in);
+  std::string str(
+      (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  EXPECT_EQ(expected["summary"], parsed["summary"]);
+  EXPECT_EQ(expected["traces"], parsed["traces"]);
+  std::string s;
+  EXPECT_EQ((bool)getline(file, s), false);
 }
 
 } // namespace quic::test

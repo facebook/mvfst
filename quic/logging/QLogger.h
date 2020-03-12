@@ -108,6 +108,8 @@ class QLogger {
       folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) = 0;
   virtual void addConnectionMigrationUpdate(bool intentionalMigration) = 0;
   virtual void addPathValidationEvent(bool success) = 0;
+  virtual void setDcid(folly::Optional<ConnectionId> connID) = 0;
+  virtual void setScid(folly::Optional<ConnectionId> connID) = 0;
 };
 
 std::string getFlowControlEvent(int offset);

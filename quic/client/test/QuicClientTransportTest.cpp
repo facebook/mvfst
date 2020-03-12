@@ -1975,8 +1975,9 @@ TEST_F(QuicClientTransportTest, IdleTimerResetOnWritingFirstData) {
 TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   client->setQLogger(nullptr);
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
+
+  EXPECT_CALL(*mockQLogger, setDcid(client->getConn().clientConnectionId));
   client->setQLogger(mockQLogger);
-  EXPECT_EQ(client->getConn().clientConnectionId, mockQLogger->dcid);
   client->closeNow(folly::none);
 }
 

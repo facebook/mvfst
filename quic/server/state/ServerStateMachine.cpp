@@ -599,8 +599,8 @@ void onServerReadDataFromOpen(
     conn.readCodec->setClientConnectionId(clientConnectionId);
     conn.readCodec->setServerConnectionId(*conn.serverConnectionId);
     if (conn.qLogger) {
-      conn.qLogger->scid = conn.serverConnectionId;
-      conn.qLogger->dcid = clientConnectionId;
+      conn.qLogger->setScid(conn.serverConnectionId);
+      conn.qLogger->setDcid(clientConnectionId);
     }
     conn.readCodec->setCodecParameters(
         CodecParameters(conn.peerAckDelayExponent, version));
@@ -706,8 +706,8 @@ void onServerReadDataFromOpen(
     CHECK(conn.clientConnectionId);
     if (conn.qLogger) {
       conn.qLogger->addPacket(regularPacket, packetSize);
-      conn.qLogger->dcid = conn.clientConnectionId;
-      conn.qLogger->scid = conn.serverConnectionId;
+      conn.qLogger->setDcid(conn.clientConnectionId);
+      conn.qLogger->setScid(conn.serverConnectionId);
     }
     // We assume that the higher layer takes care of validating that the version
     // is supported.

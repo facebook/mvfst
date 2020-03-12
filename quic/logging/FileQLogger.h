@@ -7,8 +7,10 @@
  */
 
 #pragma once
+#include <fstream>
 
 #include <folly/dynamic.h>
+#include <folly/logging/AsyncFileWriter.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/BaseQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -21,10 +23,20 @@ class FileQLogger : public BaseQLogger {
   std::vector<std::unique_ptr<QLogEvent>> logs;
   FileQLogger(
       VantagePoint vantagePointIn,
-      std::string protocolTypeIn = kHTTP3ProtocolType)
-      : BaseQLogger(vantagePointIn, std::move(protocolTypeIn)) {}
+      std::string protocolTypeIn = kHTTP3ProtocolType,
+      std::string path = "",
+      bool prettyJson = true,
+      bool streaming = false)
+      : BaseQLogger(vantagePointIn, std::move(protocolTypeIn)),
+        path_(std::move(path)),
+        prettyJson_(prettyJson),
+        streaming_(streaming) {}
 
-  ~FileQLogger() override = default;
+  ~FileQLogger() override {
+    if (streaming_ && dcid.hasValue()) {
+      finishStream();
+    }
+  }
   void addPacket(const RegularQuicPacket& regularPacket, uint64_t packetSize)
       override;
   void addPacket(
@@ -98,5 +110,36 @@ class FileQLogger : public BaseQLogger {
 
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;
+  folly::dynamic toDynamicBase() const;
+  folly::dynamic generateSummary(
+      size_t numEvents,
+      std::chrono::microseconds startTime,
+      std::chrono::microseconds endTime) const;
+
+  void setDcid(folly::Optional<ConnectionId> connID) override;
+  void setScid(folly::Optional<ConnectionId> connID) override;
+
+ private:
+  void setupStream();
+  void finishStream();
+  void handleEvent(std::unique_ptr<QLogEvent> event);
+
+  std::unique_ptr<folly::AsyncFileWriter> writer_;
+
+  std::string path_;
+  std::string basePadding_ = "  ";
+  std::string eventsPadding_ = "";
+  std::string eventLine_;
+  std::string token_;
+  std::string endLine_;
+  std::stringstream baseJson_;
+
+  bool prettyJson_;
+  bool streaming_;
+  int numEvents_ = 0;
+  std::chrono::microseconds startTime_ = std::chrono::microseconds::zero();
+  std::chrono::microseconds endTime_;
+
+  size_t pos_;
 };
 } // namespace quic

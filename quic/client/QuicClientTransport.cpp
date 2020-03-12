@@ -1414,7 +1414,7 @@ void QuicClientTransport::setQLogger(std::shared_ptr<QLogger> qLogger) {
   if (!qLogger) {
     return;
   }
-  qLogger->dcid = conn_->clientConnectionId;
+  qLogger->setDcid(conn_->clientConnectionId);
   QuicTransportBase::setQLogger(std::move(qLogger));
 }
 
