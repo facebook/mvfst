@@ -9,11 +9,13 @@
 #include <quic/logging/QLogger.h>
 
 #include <boost/filesystem.hpp>
+#include <folly/Random.h>
 #include <folly/json.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/logging/FileQLogger.h>
+#include <chrono>
 
 using namespace testing;
 
@@ -1259,13 +1261,26 @@ TEST_F(QLoggerTest, PrettyStream) {
       dir,
       true /* prettyJson */,
       true /* streaming */);
-  q->setDcid(ConnectionId(std::vector<uint8_t>{1, 1}));
+
+  folly::Random::DefaultGenerator rng;
+  rng.seed(
+      std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+  q->setDcid(ConnectionId(std::vector<uint8_t>{
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+  }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 
   std::string outputPath =
       folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
-  std::cout << outputPath;
   delete q;
 
   std::ifstream file(outputPath, std::ifstream::in);
@@ -1274,6 +1289,8 @@ TEST_F(QLoggerTest, PrettyStream) {
   folly::dynamic parsed = folly::parseJson(str);
 
   parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0101";
+
   EXPECT_EQ(expected, parsed);
 }
 
@@ -1356,7 +1373,21 @@ TEST_F(QLoggerTest, NonPrettyStream) {
       dir,
       false /* prettyJson */,
       true /* streaming */);
-  q->setDcid(ConnectionId(std::vector<uint8_t>{2, 2}));
+
+  folly::Random::DefaultGenerator rng;
+  rng.seed(
+      std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+  q->setDcid(ConnectionId(std::vector<uint8_t>{
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+  }));
   q->addPacket(regularQuicPacket, 10);
   EXPECT_EQ(q->logs.size(), 0);
 
@@ -1370,6 +1401,8 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   folly::dynamic parsed = folly::parseJson(str);
 
   parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0202";
+
   EXPECT_EQ(expected["summary"], parsed["summary"]);
   EXPECT_EQ(expected["traces"], parsed["traces"]);
   std::string s;
