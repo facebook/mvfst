@@ -651,14 +651,10 @@ void onServerReadDataFromOpen(
 
     RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
     if (!regularOptional) {
-      // We were unable to parse the packet, drop for now.
+      // We were unable to parse the packet, drop for now. All the drop reasons
+      // should have already been logged into QLogger and QuicTrace inside the
+      // previous switch-case block. We just need to update QUIC_STATS here.
       VLOG(10) << "Not able to parse QUIC packet " << conn;
-      if (conn.qLogger) {
-        conn.qLogger->addPacketDrop(
-            packetSize,
-            QuicTransportStatsCallback::toString(
-                PacketDropReason::PARSE_ERROR));
-      }
       QUIC_STATS(
           conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;

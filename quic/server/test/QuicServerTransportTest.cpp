@@ -3298,26 +3298,12 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   EXPECT_NO_THROW(deliverData(std::move(packet)));
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
-  EXPECT_EQ(indices.size(), 3);
+  EXPECT_EQ(indices.size(), 1);
 
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 45);
   EXPECT_EQ(event->dropReason, kCipherUnavailable);
-
-  auto tmp2 = std::move(qLogger->logs[indices[1]]);
-  auto event2 = dynamic_cast<QLogPacketDropEvent*>(tmp2.get());
-  EXPECT_EQ(event2->packetSize, 45);
-  EXPECT_EQ(
-      event2->dropReason,
-      QuicTransportStatsCallback::toString(PacketDropReason::PARSE_ERROR));
-
-  auto tmp3 = std::move(qLogger->logs[indices[2]]);
-  auto event3 = dynamic_cast<QLogPacketDropEvent*>(tmp3.get());
-  EXPECT_EQ(event3->packetSize, 16);
-  EXPECT_EQ(
-      event3->dropReason,
-      QuicTransportStatsCallback::toString(PacketDropReason::PARSE_ERROR));
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {
