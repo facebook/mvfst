@@ -224,6 +224,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     auto fizzClientContext = FizzClientQuicHandshakeContext::Builder()
                                  .setFizzClientContext(clientCtx)
                                  .setCertificateVerifier(verifier)
+                                 .setPskCache(pskCache_)
                                  .build();
     client = std::make_shared<TestingQuicClientTransport>(
         &eventbase_,
@@ -1271,17 +1272,29 @@ class QuicClientTransportTest : public Test {
   QuicClientTransportTest()
       : eventbase_(std::make_unique<folly::EventBase>()) {}
 
+  std::shared_ptr<FizzClientQuicHandshakeContext> getFizzClientContext() {
+    if (!fizzClientContext) {
+      fizzClientContext =
+          FizzClientQuicHandshakeContext::Builder()
+              .setCertificateVerifier(createTestCertificateVerifier())
+              .setPskCache(getPskCache())
+              .build();
+    }
+
+    return fizzClientContext;
+  }
+
+  virtual std::shared_ptr<QuicPskCache> getPskCache() {
+    return nullptr;
+  }
+
   void SetUp() override final {
     auto socket = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
         eventbase_.get());
     sock = socket.get();
 
-    auto fizzClientContext =
-        FizzClientQuicHandshakeContext::Builder()
-            .setCertificateVerifier(createTestCertificateVerifier())
-            .build();
     client = TestingQuicClientTransport::newClient<TestingQuicClientTransport>(
-        eventbase_.get(), std::move(socket), std::move(fizzClientContext));
+        eventbase_.get(), std::move(socket), getFizzClientContext());
     destructionCallback = std::make_shared<DestructionCallback>();
     client->setDestructionCallback(destructionCallback);
     client->setSupportedVersions(
@@ -1327,8 +1340,8 @@ class QuicClientTransportTest : public Test {
 
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
-    mockClientHandshake =
-        new FakeOneRttHandshakeLayer(&client->getNonConstConn());
+    mockClientHandshake = new FakeOneRttHandshakeLayer(
+        &client->getNonConstConn());
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;
     client->getNonConstConn().handshakeLayer.reset(mockClientHandshake);
     setFakeHandshakeCiphers();
@@ -1666,6 +1679,7 @@ class QuicClientTransportTest : public Test {
   SocketAddress serverAddr{"127.0.0.1", 443};
   AsyncUDPSocket::ReadCallback* networkReadCallback{nullptr};
   FakeOneRttHandshakeLayer* mockClientHandshake;
+  std::shared_ptr<FizzClientQuicHandshakeContext> fizzClientContext;
   std::shared_ptr<TestingQuicClientTransport> client;
   PacketNum initialPacketNum{0}, handshakePacketNum{0}, appDataPacketNum{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
@@ -5074,9 +5088,13 @@ class QuicClientTransportPskCacheTest
     : public QuicClientTransportAfterStartTestBase {
  public:
   void SetUpChild() override {
-    mockPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockPskCache_);
     QuicClientTransportAfterStartTestBase::SetUpChild();
+  }
+
+  std::shared_ptr<QuicPskCache> getPskCache() override {
+    mockPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
+    return mockPskCache_;
   }
 
  protected:
@@ -5167,12 +5185,16 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
         test::createNoOpHeaderCipher());
   }
 
+  std::shared_ptr<QuicPskCache> getPskCache() override {
+    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    return mockQuicPskCache_;
+  }
+
   void start() override {
     TransportSettings clientSettings;
     // Ignore path mtu to test negotiation.
     clientSettings.canIgnorePathMTU = true;
     client->setTransportSettings(clientSettings);
-    mockQuicPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockQuicPskCache_);
   }
 
@@ -5436,7 +5458,6 @@ class QuicZeroRttHappyEyeballsClientTransportTest
  public:
   void SetUpChild() override {
     client->setHostname(hostname_);
-    mockQuicPskCache_ = std::make_shared<NiceMock<MockQuicPskCache>>();
     client->setPskCache(mockQuicPskCache_);
 
     auto secondSocket =
@@ -5454,6 +5475,11 @@ class QuicZeroRttHappyEyeballsClientTransportTest
         client->getConn().happyEyeballsState.v4PeerAddress, secondAddress);
 
     setupCryptoLayer();
+  }
+
+  std::shared_ptr<QuicPskCache> getPskCache() override {
+    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    return mockQuicPskCache_;
   }
 
  protected:

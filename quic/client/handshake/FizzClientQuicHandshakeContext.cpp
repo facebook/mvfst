@@ -14,13 +14,32 @@ namespace quic {
 
 FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
     std::shared_ptr<const fizz::client::FizzClientContext> context,
-    std::shared_ptr<const fizz::CertificateVerifier> verifier)
-    : context_(std::move(context)), verifier_(std::move(verifier)) {}
+    std::shared_ptr<const fizz::CertificateVerifier> verifier,
+    std::shared_ptr<QuicPskCache> pskCache)
+    : context_(std::move(context)),
+      verifier_(std::move(verifier)),
+      pskCache_(std::move(pskCache)) {}
 
 std::unique_ptr<ClientHandshake>
 FizzClientQuicHandshakeContext::makeClientHandshake(
     QuicClientConnectionState* conn) {
   return std::make_unique<FizzClientHandshake>(conn, shared_from_this());
+}
+
+folly::Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
+    const folly::Optional<std::string>& hostname) {
+  if (!hostname || !pskCache_) {
+    return folly::none;
+  }
+
+  return pskCache_->getPsk(*hostname);
+}
+
+void FizzClientQuicHandshakeContext::removePsk(
+    const folly::Optional<std::string>& hostname) {
+  if (hostname && pskCache_) {
+    pskCache_->removePsk(*hostname);
+  }
 }
 
 std::shared_ptr<FizzClientQuicHandshakeContext>
@@ -35,7 +54,7 @@ FizzClientQuicHandshakeContext::Builder::build() {
 
   return std::shared_ptr<FizzClientQuicHandshakeContext>(
       new FizzClientQuicHandshakeContext(
-          std::move(context_), std::move(verifier_)));
+          std::move(context_), std::move(verifier_), std::move(pskCache_)));
 }
 
 } // namespace quic
