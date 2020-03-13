@@ -1002,7 +1002,9 @@ void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
 void QuicClientTransport::onDataAvailable(
     const folly::SocketAddress& server,
     size_t len,
-    bool truncated) noexcept {
+    bool truncated,
+    folly::AsyncUDPSocket::ReadCallback::
+        OnDataAvailableParams /*params*/) noexcept {
   VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
   auto packetReceiveTime = Clock::now();
   Buf data = std::move(readBuffer_);

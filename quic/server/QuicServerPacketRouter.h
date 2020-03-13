@@ -143,7 +143,9 @@ class TakeoverHandlerCallback : public folly::AsyncUDPSocket::ReadCallback,
   void onDataAvailable(
       const folly::SocketAddress& client,
       size_t len,
-      bool truncated) noexcept override;
+      bool truncated,
+      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams
+          params) noexcept override;
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override;
 

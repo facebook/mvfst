@@ -169,7 +169,11 @@ class TestingQuicClientTransport : public QuicClientTransport {
       const folly::SocketAddress& addr,
       size_t len,
       bool truncated) {
-    onDataAvailable(addr, len, truncated);
+    onDataAvailable(
+        addr,
+        len,
+        truncated,
+        folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
   }
 
   void invokeOnNotifyDataAvailable(folly::AsyncUDPSocket& sock) {
@@ -1176,8 +1180,7 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
 
   void setOneRttReadHeaderCipher(
       std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher) {
-    conn_->readCodec->setOneRttHeaderCipher(
-          std::move(oneRttReadHeaderCipher));
+    conn_->readCodec->setOneRttHeaderCipher(std::move(oneRttReadHeaderCipher));
   }
 
   void setZeroRttRejected() {
@@ -5645,7 +5648,9 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
     void onDataAvailable(
         const folly::SocketAddress&,
         size_t,
-        bool) noexcept override {}
+        bool,
+        folly::AsyncUDPSocket::ReadCallback::
+            OnDataAvailableParams) noexcept override {}
     void onReadError(const AsyncSocketException&) noexcept override {}
     void onReadClosed() noexcept override {}
   };
