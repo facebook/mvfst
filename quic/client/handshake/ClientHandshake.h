@@ -57,18 +57,6 @@ class ClientHandshake : public Handshake {
       EncryptionLevel encryptionLevel);
 
   /**
-   * An edge triggered API to get the oneRttWriteCipher. Once you receive the
-   * write cipher subsequent calls will return null.
-   */
-  std::unique_ptr<Aead> getOneRttWriteCipher();
-
-  /**
-   * An edge triggered API to get the one rtt write header cpher. Once you
-   * receive the header cipher subsequent calls will return null.
-   */
-  std::unique_ptr<PacketNumberCipher> getOneRttWriteHeaderCipher();
-
-  /**
    * Returns a reference to the CryptoFactory used internaly.
    */
   virtual const CryptoFactory& getCryptoFactory() const = 0;
@@ -112,10 +100,6 @@ class ClientHandshake : public Handshake {
     OneRttRead,
     ZeroRttWrite,
   };
-
-  std::unique_ptr<Aead> oneRttWriteCipher_;
-
-  std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
 
   void computeCiphers(CipherKind kind, folly::ByteRange secret);
 

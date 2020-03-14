@@ -65,17 +65,6 @@ void ClientHandshake::doHandshake(
   }
 }
 
-std::unique_ptr<Aead> ClientHandshake::getOneRttWriteCipher() {
-  throwOnError();
-  return std::move(oneRttWriteCipher_);
-}
-
-std::unique_ptr<PacketNumberCipher>
-ClientHandshake::getOneRttWriteHeaderCipher() {
-  throwOnError();
-  return std::move(oneRttWriteHeaderCipher_);
-}
-
 /**
  * Notify the crypto layer that we received one rtt protected data.
  * This allows us to know that the peer has implicitly acked the 1-rtt keys.
@@ -113,8 +102,8 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->readCodec->setHandshakeHeaderCipher(std::move(packetNumberCipher));
       break;
     case CipherKind::OneRttWrite:
-      oneRttWriteCipher_ = std::move(aead);
-      oneRttWriteHeaderCipher_ = std::move(packetNumberCipher);
+      conn_->oneRttWriteCipher = std::move(aead);
+      conn_->oneRttWriteHeaderCipher = std::move(packetNumberCipher);
       break;
     case CipherKind::OneRttRead:
       conn_->readCodec->setOneRttReadCipher(std::move(aead));
