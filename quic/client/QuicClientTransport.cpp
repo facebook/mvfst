@@ -527,7 +527,7 @@ void QuicClientTransport::processPacketData(
         conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
       }
       QUIC_TRACE(zero_rtt, *conn_, "rejected");
-      removePsk();
+      handshakeLayer->removePsk(hostname_);
     } else if (conn_->zeroRttWriteCipher) {
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
@@ -779,11 +779,7 @@ void QuicClientTransport::writeData() {
 }
 
 folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
-  if (!hostname_ || !pskCache_) {
-    return folly::none;
-  }
-
-  auto quicCachedPsk = pskCache_->getPsk(*hostname_);
+  auto quicCachedPsk = clientConn_->clientHandshakeLayer->getPsk(hostname_);
   if (!quicCachedPsk) {
     return folly::none;
   }
@@ -889,20 +885,10 @@ void QuicClientTransport::startCryptoHandshake() {
   }
 }
 
-void QuicClientTransport::removePsk() {
-  if (pskCache_ && hostname_) {
-    pskCache_->removePsk(*hostname_);
-  }
-}
-
 void QuicClientTransport::onNewCachedPsk(
     fizz::client::NewCachedPsk& newCachedPsk) noexcept {
   DCHECK(conn_->version.has_value());
   DCHECK(clientConn_->serverInitialParamsSet_);
-
-  if (!pskCache_ || !hostname_) {
-    return;
-  }
 
   QuicCachedPsk quicCachedPsk;
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
@@ -916,7 +902,8 @@ void QuicClientTransport::onNewCachedPsk(
     }
   }
 
-  pskCache_->putPsk(*hostname_, std::move(quicCachedPsk));
+  clientConn_->clientHandshakeLayer->putPsk(
+      *hostname_, std::move(quicCachedPsk));
 }
 
 bool QuicClientTransport::hasWriteCipher() const {
@@ -1287,10 +1274,6 @@ void QuicClientTransport::addNewSocket(
 
 void QuicClientTransport::setHostname(const std::string& hostname) {
   hostname_ = hostname;
-}
-
-void QuicClientTransport::setPskCache(std::shared_ptr<QuicPskCache> pskCache) {
-  pskCache_ = std::move(pskCache);
 }
 
 void QuicClientTransport::setSelfOwning() {

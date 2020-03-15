@@ -42,6 +42,22 @@ void FizzClientHandshake::connectImpl(
       std::make_shared<FizzClientExtensions>(transportParams_)));
 }
 
+folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
+    const folly::Optional<std::string>& hostname) const {
+  return fizzContext_->getPsk(hostname);
+}
+
+void FizzClientHandshake::putPsk(
+    const folly::Optional<std::string>& hostname,
+    QuicCachedPsk quicCachedPsk) {
+  fizzContext_->putPsk(hostname, std::move(quicCachedPsk));
+}
+
+void FizzClientHandshake::removePsk(
+    const folly::Optional<std::string>& hostname) {
+  fizzContext_->removePsk(hostname);
+}
+
 const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
   return cryptoFactory_;
 }

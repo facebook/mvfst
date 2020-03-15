@@ -16,6 +16,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
+#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
 
@@ -56,6 +57,19 @@ class ClientHandshake : public Handshake {
   virtual void doHandshake(
       std::unique_ptr<folly::IOBuf> data,
       EncryptionLevel encryptionLevel);
+
+  /**
+   * Provides facilities to get, put and remove a PSK from the cache in case the
+   * handshake supports a PSK cache.
+   */
+  virtual folly::Optional<QuicCachedPsk> getPsk(
+      const folly::Optional<std::string>& /* hostname */) const {
+    return folly::none;
+  }
+  virtual void putPsk(
+      const folly::Optional<std::string>& /* hostname */,
+      QuicCachedPsk /* quicCachedPsk */) {}
+  virtual void removePsk(const folly::Optional<std::string>& /* hostname */) {}
 
   /**
    * Returns a reference to the CryptoFactory used internaly.
