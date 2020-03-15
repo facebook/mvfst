@@ -1088,16 +1088,13 @@ class FakeOneRttHandshakeLayer : public ClientHandshake {
   explicit FakeOneRttHandshakeLayer(QuicClientConnectionState* conn)
       : ClientHandshake(conn) {}
 
-  void connect(
+  void connectImpl(
       folly::Optional<std::string>,
-      folly::Optional<fizz::client::CachedPsk>,
-      std::shared_ptr<ClientTransportParametersExtension>,
-      HandshakeCallback* callback) override {
+      folly::Optional<fizz::client::CachedPsk>) override {
     connected_ = true;
     writeDataToQuicStream(
         conn_->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
     createServerTransportParameters();
-    callback_ = callback;
   }
 
   void createServerTransportParameters() {

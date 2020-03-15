@@ -22,14 +22,9 @@ FizzClientHandshake::FizzClientHandshake(
     std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
     : ClientHandshake(conn), fizzContext_(std::move(fizzContext)) {}
 
-void FizzClientHandshake::connect(
+void FizzClientHandshake::connectImpl(
     folly::Optional<std::string> hostname,
-    folly::Optional<fizz::client::CachedPsk> cachedPsk,
-    std::shared_ptr<ClientTransportParametersExtension> transportParams,
-    HandshakeCallback* callback) {
-  transportParams_ = transportParams;
-  callback_ = callback;
-
+    folly::Optional<fizz::client::CachedPsk> cachedPsk) {
   // Setup context for this handshake.
   auto context = std::make_shared<fizz::client::FizzClientContext>(
       *fizzContext_->getContext());
@@ -44,9 +39,7 @@ void FizzClientHandshake::connect(
       fizzContext_->getCertificateVerifier(),
       std::move(hostname),
       std::move(cachedPsk),
-      std::make_shared<FizzClientExtensions>(std::move(transportParams))));
-
-  throwOnError();
+      std::make_shared<FizzClientExtensions>(transportParams_)));
 }
 
 const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {

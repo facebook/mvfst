@@ -17,6 +17,19 @@ namespace quic {
 ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
     : conn_(conn) {}
 
+void ClientHandshake::connect(
+    folly::Optional<std::string> hostname,
+    folly::Optional<fizz::client::CachedPsk> cachedPsk,
+    std::shared_ptr<ClientTransportParametersExtension> transportParams,
+    HandshakeCallback* callback) {
+  transportParams_ = std::move(transportParams);
+  callback_ = callback;
+
+  connectImpl(std::move(hostname), std::move(cachedPsk));
+
+  throwOnError();
+}
+
 void ClientHandshake::doHandshake(
     std::unique_ptr<folly::IOBuf> data,
     EncryptionLevel encryptionLevel) {
