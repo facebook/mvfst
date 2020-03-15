@@ -25,6 +25,7 @@
 
 #include <quic/client/handshake/FizzClientHandshake.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>

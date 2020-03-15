@@ -16,14 +16,15 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
-#include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {
 
 class CryptoFactory;
+struct ClientTransportParametersExtension;
 struct QuicClientConnectionState;
+struct ServerTransportParameters;
 
 class ClientHandshake : public Handshake {
  public:
