@@ -568,6 +568,7 @@ void QuicClientTransport::processPacketData(
           *clientConn_, std::move(*serverParams), packetNum);
 
       cacheServerInitialParams(
+          *clientConn_,
           conn_->flowControlState.peerAdvertisedMaxOffset,
           conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal,
           conn_->flowControlState
@@ -867,6 +868,7 @@ void QuicClientTransport::startCryptoHandshake() {
 
     auto& transportParams = quicCachedPsk->transportParams;
     cacheServerInitialParams(
+        *clientConn_,
         transportParams.initialMaxData,
         transportParams.initialMaxStreamDataBidiLocal,
         transportParams.initialMaxStreamDataBidiRemote,
@@ -887,27 +889,6 @@ void QuicClientTransport::startCryptoHandshake() {
   }
 }
 
-void QuicClientTransport::cacheServerInitialParams(
-    uint64_t peerAdvertisedInitialMaxData,
-    uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal,
-    uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
-    uint64_t peerAdvertisedInitialMaxStreamDataUni,
-    uint64_t peerAdvertisedInitialMaxStreamsBidi,
-    uint64_t peerAdvertisedInitialMaxStreamUni) {
-  serverInitialParamsSet_ = true;
-  clientConn_->peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
-  clientConn_->peerAdvertisedInitialMaxStreamDataBidiLocal =
-      peerAdvertisedInitialMaxStreamDataBidiLocal;
-  clientConn_->peerAdvertisedInitialMaxStreamDataBidiRemote =
-      peerAdvertisedInitialMaxStreamDataBidiRemote;
-  clientConn_->peerAdvertisedInitialMaxStreamDataUni =
-      peerAdvertisedInitialMaxStreamDataUni;
-  clientConn_->peerAdvertisedInitialMaxStreamsBidi =
-      peerAdvertisedInitialMaxStreamsBidi;
-  clientConn_->peerAdvertisedInitialMaxStreamsUni =
-      peerAdvertisedInitialMaxStreamUni;
-}
-
 void QuicClientTransport::removePsk() {
   if (pskCache_ && hostname_) {
     pskCache_->removePsk(*hostname_);
@@ -917,7 +898,7 @@ void QuicClientTransport::removePsk() {
 void QuicClientTransport::onNewCachedPsk(
     fizz::client::NewCachedPsk& newCachedPsk) noexcept {
   DCHECK(conn_->version.has_value());
-  DCHECK(serverInitialParamsSet_);
+  DCHECK(clientConn_->serverInitialParamsSet_);
 
   if (!pskCache_ || !hostname_) {
     return;
@@ -925,21 +906,7 @@ void QuicClientTransport::onNewCachedPsk(
 
   QuicCachedPsk quicCachedPsk;
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
-
-  quicCachedPsk.transportParams.idleTimeout = conn_->peerIdleTimeout.count();
-  quicCachedPsk.transportParams.maxRecvPacketSize = conn_->udpSendPacketLen;
-  quicCachedPsk.transportParams.initialMaxData =
-      clientConn_->peerAdvertisedInitialMaxData;
-  quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-      clientConn_->peerAdvertisedInitialMaxStreamDataBidiLocal;
-  quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-      clientConn_->peerAdvertisedInitialMaxStreamDataBidiRemote;
-  quicCachedPsk.transportParams.initialMaxStreamDataUni =
-      clientConn_->peerAdvertisedInitialMaxStreamDataUni;
-  quicCachedPsk.transportParams.initialMaxStreamsBidi =
-      clientConn_->peerAdvertisedInitialMaxStreamsBidi;
-  quicCachedPsk.transportParams.initialMaxStreamsUni =
-      clientConn_->peerAdvertisedInitialMaxStreamsUni;
+  quicCachedPsk.transportParams = getServerCachedTransportParameters(*clientConn_);
 
   if (earlyDataAppParamsGetter_) {
     auto appParams = earlyDataAppParamsGetter_();

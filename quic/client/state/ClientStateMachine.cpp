@@ -9,6 +9,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 
 #include <folly/io/async/AsyncSocketException.h>
+#include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -164,6 +165,50 @@ void processServerInitialParams(
                   .advertisedInitialBidiRemoteStreamWindowSize;
     handleStreamWindowUpdate(s, windowSize, packetNum);
   });
+}
+
+void cacheServerInitialParams(
+    QuicClientConnectionState& conn,
+    uint64_t peerAdvertisedInitialMaxData,
+    uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal,
+    uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
+    uint64_t peerAdvertisedInitialMaxStreamDataUni,
+    uint64_t peerAdvertisedInitialMaxStreamsBidi,
+    uint64_t peerAdvertisedInitialMaxStreamUni) {
+  conn.serverInitialParamsSet_ = true;
+  conn.peerAdvertisedInitialMaxData = peerAdvertisedInitialMaxData;
+  conn.peerAdvertisedInitialMaxStreamDataBidiLocal =
+      peerAdvertisedInitialMaxStreamDataBidiLocal;
+  conn.peerAdvertisedInitialMaxStreamDataBidiRemote =
+      peerAdvertisedInitialMaxStreamDataBidiRemote;
+  conn.peerAdvertisedInitialMaxStreamDataUni =
+      peerAdvertisedInitialMaxStreamDataUni;
+  conn.peerAdvertisedInitialMaxStreamsBidi =
+      peerAdvertisedInitialMaxStreamsBidi;
+  conn.peerAdvertisedInitialMaxStreamsUni = peerAdvertisedInitialMaxStreamUni;
+}
+
+CachedServerTransportParameters getServerCachedTransportParameters(
+    const QuicClientConnectionState& conn) {
+  DCHECK(conn.serverInitialParamsSet_);
+
+  CachedServerTransportParameters transportParams;
+
+  transportParams.idleTimeout = conn.peerIdleTimeout.count();
+  transportParams.maxRecvPacketSize = conn.udpSendPacketLen;
+  transportParams.initialMaxData = conn.peerAdvertisedInitialMaxData;
+  transportParams.initialMaxStreamDataBidiLocal =
+      conn.peerAdvertisedInitialMaxStreamDataBidiLocal;
+  transportParams.initialMaxStreamDataBidiRemote =
+      conn.peerAdvertisedInitialMaxStreamDataBidiRemote;
+  transportParams.initialMaxStreamDataUni =
+      conn.peerAdvertisedInitialMaxStreamDataUni;
+  transportParams.initialMaxStreamsBidi =
+      conn.peerAdvertisedInitialMaxStreamsBidi;
+  transportParams.initialMaxStreamsUni =
+      conn.peerAdvertisedInitialMaxStreamsUni;
+
+  return transportParams;
 }
 
 void updateTransportParamsFromCachedEarlyParams(

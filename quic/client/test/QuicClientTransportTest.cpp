@@ -141,7 +141,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
   }
 
   auto& serverInitialParamsSet() {
-    return serverInitialParamsSet_;
+    return getNonConstConn().serverInitialParamsSet_;
   }
 
   auto& peerAdvertisedInitialMaxData() {
