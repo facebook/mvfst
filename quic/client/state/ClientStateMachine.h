@@ -79,9 +79,6 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
 /**
  * Undos the clients state to be the original state of the client.
  */
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
-    std::unique_ptr<QuicClientConnectionState> conn);
-
 std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     std::unique_ptr<QuicClientConnectionState> conn);
 
