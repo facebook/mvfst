@@ -140,8 +140,7 @@ void QuicServerTransport::accept() {
       evb_,
       ctx_,
       this,
-      std::make_unique<DefaultAppTokenValidator>(
-          serverConn_, std::move(earlyDataAppParamsValidator_)));
+      std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
 void QuicServerTransport::writeData() {
@@ -414,8 +413,8 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
     if (appToken.sourceAddresses.empty()) {
       appToken.sourceAddresses.push_back(conn_->peerAddress.getIPAddress());
     }
-    if (earlyDataAppParamsGetter_) {
-      appToken.appParams = earlyDataAppParamsGetter_();
+    if (conn_->earlyDataAppParamsGetter) {
+      appToken.appParams = conn_->earlyDataAppParamsGetter();
     }
     serverConn_->serverHandshakeLayer->writeNewSessionTicket(appToken);
   }

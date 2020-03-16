@@ -792,8 +792,8 @@ folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
   if (!conn_->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
   } else if (
-      earlyDataAppParamsValidator_ &&
-      !earlyDataAppParamsValidator_(
+      conn_->earlyDataAppParamsValidator &&
+      !conn_->earlyDataAppParamsValidator(
           quicCachedPsk->cachedPsk.alpn,
           folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
@@ -909,8 +909,8 @@ void QuicClientTransport::onNewCachedPsk(
   quicCachedPsk.transportParams =
       getServerCachedTransportParameters(*clientConn_);
 
-  if (earlyDataAppParamsGetter_) {
-    auto appParams = earlyDataAppParamsGetter_();
+  if (conn_->earlyDataAppParamsGetter) {
+    auto appParams = conn_->earlyDataAppParamsGetter();
     if (appParams) {
       quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
     }
