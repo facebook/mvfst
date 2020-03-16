@@ -360,7 +360,6 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
     serverCtx->setSupportedVersions({fizz::ProtocolVersion::tls_1_3});
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     setupZeroRttOnServerCtx(*serverCtx, psk_);
-    conn_.version = getVersion();
   }
 
   void connect() override {
@@ -383,7 +382,6 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
 
  protected:
   QuicCachedPsk psk_;
-  QuicConnectionStateBase conn_{QuicNodeType::Client};
   MockClientHandshakeCallback mockClientHandshakeCallback_;
 };
 
