@@ -69,7 +69,9 @@ class EchoServer {
         server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(prEnabled_));
-    server_->setFizzContext(quic::test::createServerCtx());
+    auto serverCtx = quic::test::createServerCtx();
+    serverCtx->setClock(std::make_shared<fizz::SystemClock>());
+    server_->setFizzContext(serverCtx);
     if (prEnabled_) {
       TransportSettings settings;
       settings.partialReliabilityEnabled = true;
