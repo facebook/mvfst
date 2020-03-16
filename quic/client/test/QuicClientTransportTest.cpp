@@ -141,7 +141,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
   }
 
   auto& serverInitialParamsSet() {
-    return serverInitialParamsSet_;
+    return getNonConstConn().serverInitialParamsSet_;
   }
 
   auto& peerAdvertisedInitialMaxData() {
@@ -1344,8 +1344,8 @@ class QuicClientTransportTest : public Test {
 
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
-    mockClientHandshake = new FakeOneRttHandshakeLayer(
-        &client->getNonConstConn());
+    mockClientHandshake =
+        new FakeOneRttHandshakeLayer(&client->getNonConstConn());
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;
     client->getNonConstConn().handshakeLayer.reset(mockClientHandshake);
     setFakeHandshakeCiphers();

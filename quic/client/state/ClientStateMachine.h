@@ -9,7 +9,6 @@
 #pragma once
 
 #include <folly/io/async/AsyncSocketException.h>
-#include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
@@ -19,6 +18,8 @@
 #include <quic/state/StateData.h>
 
 namespace quic {
+
+struct CachedServerTransportParameters;
 
 struct QuicClientConnectionState : public QuicConnectionStateBase {
   ~QuicClientConnectionState() override = default;
@@ -38,6 +39,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // Save the server transport params here so that client can access the value
   // when it wants to write the values to psk cache
   // TODO Save TicketTransportParams here instead of in QuicClientTransport
+  bool serverInitialParamsSet_{false};
   uint64_t peerAdvertisedInitialMaxData{0};
   uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal{0};
   uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote{0};
@@ -87,6 +89,18 @@ void processServerInitialParams(
     QuicClientConnectionState& conn,
     ServerTransportParameters serverParams,
     PacketNum packetNum);
+
+void cacheServerInitialParams(
+    QuicClientConnectionState& conn,
+    uint64_t peerAdvertisedInitialMaxData,
+    uint64_t peerAdvertisedInitialMaxStreamDataBidiLocal,
+    uint64_t peerAdvertisedInitialMaxStreamDataBidiRemote,
+    uint64_t peerAdvertisedInitialMaxStreamDataUni,
+    uint64_t peerAdvertisedInitialMaxStreamsBidi,
+    uint64_t peerAdvertisedInitialMaxStreamUni);
+
+CachedServerTransportParameters getServerCachedTransportParameters(
+    const QuicClientConnectionState& conn);
 
 void updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
