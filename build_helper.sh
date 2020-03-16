@@ -25,11 +25,12 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -i INSTALL_PREFIX                      (optional): install prefix path
   -m                                     (optional): Build folly without jemalloc
   -s                                     (optional): Skip installing system package dependencies
+  -c                                     (optional): Use ccache
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:ms" arg; do
+while getopts ":hp:i:msc" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
@@ -42,6 +43,9 @@ while getopts ":hp:i:ms" arg; do
       ;;
     s)
       MVFST_SKIP_SYSTEM_DEPENDENCIES=true
+      ;;
+    c)
+      MVFST_USE_CCACHE=true
       ;;
     h | *) # Display help.
       usage
@@ -81,6 +85,17 @@ else
   FOLLY_INSTALL_DIR=$INSTALL_PREFIX
   FIZZ_INSTALL_DIR=$INSTALL_PREFIX
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
+fi
+
+CMAKE_EXTRA_ARGS=(${CMAKE_EXTRA_ARGS-})
+if [[ ! -z "${MVFST_USE_CCACHE-}" ]]; then
+  CCACHE=$(which ccache)
+  CMAKE_EXTRA_ARGS+=(-DCMAKE_C_COMPILER_LAUNCHER="${CCACHE}")
+  CMAKE_EXTRA_ARGS+=(-DCMAKE_CXX_COMPILER_LAUNCHER="${CCACHE}")
+fi
+
+if [[ ! -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
+  CMAKE_EXTRA_ARGS+=(-DFOLLY_USE_JEMALLOC=0)
 fi
 
 # Default to parallel build width of 4.
@@ -165,6 +180,7 @@ function setup_fmt() {
     -DCMAKE_BUILD_TYPE=RelWithDebInfo             \
     -DFMT_DOC=OFF                                 \
     -DFMT_TEST=OFF                                \
+    "${CMAKE_EXTRA_ARGS[@]}"                      \
     ..
   make -j "$nproc"
   make install
@@ -224,18 +240,11 @@ function setup_folly() {
   cd "$FOLLY_BUILD_DIR" || exit
 
   # check for environment variable. If
-  if [[ -z "${MVFST_FOLLY_USE_JEMALLOC-}" ]]; then
-    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
-      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
-      ..
-  else
-    cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-      -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
-      -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
-      -DFOLLY_USE_JEMALLOC=0                        \
-      ..
-  fi
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
+    -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
+    -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
+    "${CMAKE_EXTRA_ARGS[@]}"                      \
+    ..
   make -j "$nproc"
   make install
   echo -e "${COLOR_GREEN}Folly is installed ${COLOR_OFF}"
@@ -259,6 +268,7 @@ function setup_fizz() {
     -DBUILD_TESTS=ON                            \
     -DCMAKE_PREFIX_PATH="$FIZZ_INSTALL_DIR"     \
     -DCMAKE_INSTALL_PREFIX="$FIZZ_INSTALL_DIR"  \
+    "${CMAKE_EXTRA_ARGS[@]}"                    \
     "$FIZZ_DIR/fizz"
   make -j "$nproc"
   make install
@@ -284,9 +294,10 @@ setup_fizz
 # build mvfst:
 cd "$MVFST_BUILD_DIR" || exit
 cmake -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
- -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR"      \
- -DCMAKE_BUILD_TYPE=RelWithDebInfo                \
- -DBUILD_TESTS=On                                 \
+  -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR"     \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo               \
+  -DBUILD_TESTS=On                                \
+  "${CMAKE_EXTRA_ARGS[@]}"                        \
   ../..
 make -j "$nproc"
 echo -e "${COLOR_GREEN}MVFST build is complete. To run unit test: \
