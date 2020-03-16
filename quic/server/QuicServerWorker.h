@@ -232,8 +232,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       const folly::SocketAddress& client,
       size_t len,
       bool truncated,
-      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams
-          params) noexcept override;
+      OnDataAvailableParams params) noexcept override;
 
   // Routing callback
   /**

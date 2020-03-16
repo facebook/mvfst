@@ -169,11 +169,7 @@ class TestingQuicClientTransport : public QuicClientTransport {
       const folly::SocketAddress& addr,
       size_t len,
       bool truncated) {
-    onDataAvailable(
-        addr,
-        len,
-        truncated,
-        folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
+    onDataAvailable(addr, len, truncated, OnDataAvailableParams());
   }
 
   void invokeOnNotifyDataAvailable(folly::AsyncUDPSocket& sock) {
@@ -5679,8 +5675,7 @@ TEST(AsyncUDPSocketTest, CloseMultipleTimes) {
         const folly::SocketAddress&,
         size_t,
         bool,
-        folly::AsyncUDPSocket::ReadCallback::
-            OnDataAvailableParams) noexcept override {}
+        OnDataAvailableParams) noexcept override {}
     void onReadError(const AsyncSocketException&) noexcept override {}
     void onReadClosed() noexcept override {}
   };

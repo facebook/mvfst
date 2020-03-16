@@ -25,6 +25,9 @@
 using namespace testing;
 using namespace folly;
 
+using OnDataAvailableParams =
+    folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams;
+
 const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
 
 namespace quic {
@@ -1063,10 +1066,7 @@ void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
   EXPECT_CALL(*transportInfoCb_, onRead(len));
   EXPECT_CALL(*transportInfoCb_, onPacketForwarded()).Times(0);
   takeoverWorker_->onDataAvailable(
-      clientAddr,
-      len,
-      false,
-      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
+      clientAddr, len, false, OnDataAvailableParams());
 }
 
 TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverForwarding) {
@@ -1177,10 +1177,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
   EXPECT_CALL(*transportInfoCb_, onRead(len));
   EXPECT_CALL(*transportInfoCb_, onPacketForwarded()).Times(1);
   takeoverWorker_->onDataAvailable(
-      clientAddr,
-      len,
-      false,
-      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
+      clientAddr, len, false, OnDataAvailableParams());
   takeoverWorker_->stopPacketForwarding();
   // release this resource since MockQuicUDPSocketFactory::_make() hands its
   // ownership to it's caller (i.e. QuicServerWorker)
@@ -1245,10 +1242,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
             .WillOnce(Invoke(cb));
 
         takeoverCb->onDataAvailable(
-            client,
-            bufLen,
-            false,
-            folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
+            client, bufLen, false, OnDataAvailableParams());
         return bufLen;
       }));
   auto workerCb = [&](const folly::SocketAddress& client,
@@ -1269,10 +1263,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
   EXPECT_CALL(*transportInfoCb_, onForwardedPacketReceived()).Times(1);
   EXPECT_CALL(*transportInfoCb_, onForwardedPacketProcessed()).Times(1);
   takeoverWorker_->onDataAvailable(
-      clientAddr,
-      len,
-      false,
-      folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams());
+      clientAddr, len, false, OnDataAvailableParams());
   // release this resource since MockQuicUDPSocketFactory::_make() hands its
   // ownership to it's caller (i.e. QuicServerWorker)
   writeSock.release();
@@ -1894,8 +1885,7 @@ struct UDPReader : public folly::AsyncUDPSocket::ReadCallback {
       const folly::SocketAddress&,
       size_t len,
       bool truncated,
-      folly::AsyncUDPSocket::ReadCallback::
-          OnDataAvailableParams /*params*/) noexcept override {
+      OnDataAvailableParams /*params*/) noexcept override {
     std::lock_guard<std::mutex> guard(bufLock_);
     if (truncated) {
       bufPromise_->setException(std::runtime_error("truncated buf"));

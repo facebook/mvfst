@@ -181,8 +181,7 @@ void QuicServerWorker::onDataAvailable(
     const folly::SocketAddress& client,
     size_t len,
     bool truncated,
-    folly::AsyncUDPSocket::ReadCallback::
-        OnDataAvailableParams /*params*/) noexcept {
+    OnDataAvailableParams /*params*/) noexcept {
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();

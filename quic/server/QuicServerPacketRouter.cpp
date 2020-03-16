@@ -86,8 +86,7 @@ void TakeoverHandlerCallback::onDataAvailable(
     const folly::SocketAddress& client,
     size_t len,
     bool truncated,
-    folly::AsyncUDPSocket::ReadCallback::
-        OnDataAvailableParams /*params*/) noexcept {
+    OnDataAvailableParams /*params*/) noexcept {
   VLOG(10) << "Worker=" << this << " Received (takeover) data on thread="
            << folly::getCurrentThreadID()
            << ", workerId=" << static_cast<uint32_t>(worker_->getWorkerId())
