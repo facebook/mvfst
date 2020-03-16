@@ -1964,6 +1964,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
          pendingResetIt++) {
       cancelDeliveryCallbacksForStream(pendingResetIt->first);
     }
+    pendingWriteCallbacks_.erase(id);
     QUIC_STATS(conn_->infoCallback, onQuicStreamReset);
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "

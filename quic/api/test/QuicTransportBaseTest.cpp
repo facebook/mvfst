@@ -1451,6 +1451,17 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   evb->loopOnce();
 }
 
+TEST_F(QuicTransportImplTest, ResetStreamUnsetWriteCallback) {
+  auto stream = transport->createBidirectionalStream().value();
+  NiceMock<MockWriteCallback> wcb;
+  EXPECT_CALL(wcb, onStreamWriteError(stream, _)).Times(0);
+  transport->notifyPendingWriteOnStream(stream, &wcb);
+  EXPECT_FALSE(
+      transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
+          .hasError());
+  evb->loopOnce();
+}
+
 TEST_F(QuicTransportImplTest, DestroyWithoutClosing) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
