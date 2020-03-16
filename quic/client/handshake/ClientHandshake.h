@@ -42,11 +42,11 @@ class ClientHandshake : public Handshake {
   /**
    * Initiate the handshake with the supplied parameters.
    */
-  virtual void connect(
+  void connect(
       folly::Optional<std::string> hostname,
       folly::Optional<fizz::client::CachedPsk> cachedPsk,
       std::shared_ptr<ClientTransportParametersExtension> transportParams,
-      HandshakeCallback* callback) = 0;
+      HandshakeCallback* callback);
 
   /**
    * Takes input bytes from the network and processes then in the handshake.
@@ -119,6 +119,10 @@ class ClientHandshake : public Handshake {
   void computeOneRttCipher(bool earlyDataAccepted);
 
  private:
+  virtual void connectImpl(
+      folly::Optional<std::string> hostname,
+      folly::Optional<fizz::client::CachedPsk> cachedPsk) = 0;
+
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual bool matchEarlyParameters() = 0;
