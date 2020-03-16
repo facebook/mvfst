@@ -1086,13 +1086,21 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
       : FizzClientHandshake(conn, std::move(fizzContext)) {}
 
-  void connectImpl(
-      folly::Optional<std::string>,
-      folly::Optional<fizz::client::CachedPsk>) override {
+  folly::Optional<CachedServerTransportParameters> connectImpl(
+      folly::Optional<std::string> hostname) override {
+    // Look up psk
+    folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+
+    folly::Optional<CachedServerTransportParameters> transportParams;
+    if (quicCachedPsk) {
+      transportParams = std::move(quicCachedPsk->transportParams);
+    }
+
     connected_ = true;
     writeDataToQuicStream(
         conn_->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
     createServerTransportParameters();
+    return transportParams;
   }
 
   void createServerTransportParameters() {

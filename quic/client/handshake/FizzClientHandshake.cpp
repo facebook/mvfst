@@ -23,9 +23,18 @@ FizzClientHandshake::FizzClientHandshake(
     std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
     : ClientHandshake(conn), fizzContext_(std::move(fizzContext)) {}
 
-void FizzClientHandshake::connectImpl(
-    folly::Optional<std::string> hostname,
-    folly::Optional<fizz::client::CachedPsk> cachedPsk) {
+folly::Optional<CachedServerTransportParameters>
+FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
+  // Look up psk
+  folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk(hostname);
+
+  folly::Optional<fizz::client::CachedPsk> cachedPsk;
+  folly::Optional<CachedServerTransportParameters> transportParams;
+  if (quicCachedPsk) {
+    cachedPsk = std::move(quicCachedPsk->cachedPsk);
+    transportParams = std::move(quicCachedPsk->transportParams);
+  }
+
   // Setup context for this handshake.
   auto context = std::make_shared<fizz::client::FizzClientContext>(
       *fizzContext_->getContext());
@@ -41,11 +50,30 @@ void FizzClientHandshake::connectImpl(
       std::move(hostname),
       std::move(cachedPsk),
       std::make_shared<FizzClientExtensions>(transportParams_)));
+
+  return transportParams;
 }
 
 folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
     const folly::Optional<std::string>& hostname) const {
-  return fizzContext_->getPsk(hostname);
+  auto quicCachedPsk = fizzContext_->getPsk(hostname);
+  if (!quicCachedPsk) {
+    return folly::none;
+  }
+
+  // TODO T32658838 better API to disable early data for current connection
+  if (!conn_->transportSettings.attemptEarlyData) {
+    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
+  } else if (
+      conn_->earlyDataAppParamsValidator &&
+      !conn_->earlyDataAppParamsValidator(
+          quicCachedPsk->cachedPsk.alpn,
+          folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
+    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
+    // Do not remove psk here, will let application decide
+  }
+
+  return quicCachedPsk;
 }
 
 void FizzClientHandshake::putPsk(

@@ -204,7 +204,6 @@ class QuicClientTransport
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
  private:
-  folly::Optional<QuicCachedPsk> getPsk();
   void setPartialReliabilityTransportParameter();
 
   bool replaySafeNotified_{false};

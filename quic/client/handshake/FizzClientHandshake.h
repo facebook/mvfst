@@ -22,8 +22,6 @@ class FizzClientHandshake : public ClientHandshake {
       QuicClientConnectionState* conn,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
 
-  folly::Optional<QuicCachedPsk> getPsk(
-      const folly::Optional<std::string>& hostname) const override;
   void putPsk(
       const folly::Optional<std::string>& hostname,
       QuicCachedPsk quicCachedPsk) override;
@@ -35,10 +33,13 @@ class FizzClientHandshake : public ClientHandshake {
 
   bool isTLSResumed() const override;
 
+ protected:
+  folly::Optional<QuicCachedPsk> getPsk(
+      const folly::Optional<std::string>& hostname) const;
+
  private:
-  void connectImpl(
-      folly::Optional<std::string> hostname,
-      folly::Optional<fizz::client::CachedPsk> cachedPsk) override;
+  folly::Optional<CachedServerTransportParameters> connectImpl(
+      folly::Optional<std::string> hostname) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
   void processSocketData(folly::IOBufQueue& queue) override;
