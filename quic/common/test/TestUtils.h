@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
+#include <quic/fizz/client/handshake/QuicPskCache.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>

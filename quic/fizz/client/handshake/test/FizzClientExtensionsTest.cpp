@@ -8,8 +8,8 @@
 
 #include <gtest/gtest.h>
 
-#include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/client/handshake/FizzClientExtensions.h>
 
 #include <fizz/protocol/test/TestMessages.h>
 

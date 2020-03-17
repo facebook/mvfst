@@ -4,48 +4,35 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_client STATIC
-  QuicClientTransport.cpp
-  handshake/ClientHandshake.cpp
-  state/ClientStateMachine.cpp
+  mvfst_fizz_client STATIC
+  handshake/FizzClientQuicHandshakeContext.cpp
+  handshake/FizzClientHandshake.cpp
 )
 
 target_include_directories(
-  mvfst_client PUBLIC
+  mvfst_fizz_client PUBLIC
   $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
   $<INSTALL_INTERFACE:include/>
 )
 
 target_compile_options(
-  mvfst_client
+  mvfst_fizz_client
   PRIVATE
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
 add_dependencies(
+  mvfst_fizz_client
   mvfst_client
-  mvfst_bufutil
-  mvfst_flowcontrol
-  mvfst_happyeyeballs
-  mvfst_loss
-  mvfst_qlogger
-  mvfst_socketutil
-  mvfst_state_ack_handler
-  mvfst_state_pacing_functions
-  mvfst_transport
+  mvfst_fizz_handshake
+  mvfst_codec_packet_number_cipher
 )
 
 target_link_libraries(
-  mvfst_client PUBLIC
-  Folly::folly
-  mvfst_flowcontrol
-  mvfst_happyeyeballs
-  mvfst_loss
-  mvfst_qlogger
-  mvfst_socketutil
-  mvfst_state_ack_handler
-  mvfst_state_pacing_functions
-  mvfst_transport
+  mvfst_fizz_client PUBLIC
+  mvfst_client
+  mvfst_fizz_handshake
+  mvfst_codec_packet_number_cipher
 )
 
 file(
@@ -60,7 +47,10 @@ foreach(header ${QUIC_API_HEADERS_TOINSTALL})
 endforeach()
 
 install(
-  TARGETS mvfst_client
+  TARGETS mvfst_fizz_client
   EXPORT mvfst-exports
   DESTINATION lib
 )
+
+add_subdirectory(test)
+add_subdirectory(handshake/test)

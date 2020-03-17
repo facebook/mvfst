@@ -24,8 +24,8 @@
 #include <folly/ssl/Init.h>
 
 #include <quic/QuicConstants.h>
-#include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/client/handshake/FizzClientExtensions.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/handshake/HandshakeLayer.h>

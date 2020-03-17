@@ -9,8 +9,8 @@
 #include <quic/api/IoBufQuicBatch.h>
 
 #include <gtest/gtest.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/state/StateData.h>
 
 constexpr const auto kNumLoops = 64;

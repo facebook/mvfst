@@ -9,16 +9,12 @@ endif()
 
 quic_add_test(TARGET ClientHandshakeTest
   SOURCES
-  ClientHandshakeTest.cpp
+  FizzClientHandshakeTest.cpp
   FizzClientExtensionsTest.cpp
   DEPENDS
-  Folly::folly
-  ${LIBFIZZ_LIBRARY}
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_types
   mvfst_constants
-  mvfst_fizz_handshake
   mvfst_server
-  mvfst_state_machine
   mvfst_test_utils
 )

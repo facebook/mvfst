@@ -50,7 +50,7 @@ quic_add_test(TARGET QuicPacketSchedulerTest
   QuicPacketSchedulerTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_transport
   mvfst_test_utils
@@ -62,7 +62,7 @@ quic_add_test(TARGET IoBufQuicBatchTest
   IoBufQuicBatchTest.cpp
   DEPENDS
   Folly::folly
-  mvfst_client
+  mvfst_fizz_client
   mvfst_transport
   mvfst_state_machine
 )

@@ -12,10 +12,10 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/io/async/test/MockTimeoutManager.h>
 #include <quic/api/QuicTransportFunctions.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/state/ServerStateMachine.h>
