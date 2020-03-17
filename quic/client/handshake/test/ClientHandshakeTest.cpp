@@ -70,8 +70,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit),
-        nullptr);
+            kDefaultActiveConnectionIdLimit));
   }
 
   void SetUp() override {
@@ -342,16 +341,6 @@ TEST_F(ClientHandshakeTest, TestAppBytesInterpretedAsHandshake) {
   EXPECT_TRUE(handshakeSuccess);
 }
 
-class MockClientHandshakeCallback : public ClientHandshake::HandshakeCallback {
- public:
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      onNewCachedPsk,
-      void(fizz::client::NewCachedPsk&));
-};
-
 class ClientHandshakeCallbackTest : public ClientHandshakeTest {
  public:
   void setupClientAndServerContext() override {
@@ -376,13 +365,11 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit),
-        &mockClientHandshakeCallback_);
+            kDefaultActiveConnectionIdLimit));
   }
 
  protected:
   QuicCachedPsk psk_;
-  MockClientHandshakeCallback mockClientHandshakeCallback_;
 };
 
 TEST_F(ClientHandshakeCallbackTest, TestHandshakeSuccess) {
@@ -390,8 +377,14 @@ TEST_F(ClientHandshakeCallbackTest, TestHandshakeSuccess) {
   serverClientRound();
   clientServerRound();
 
-  EXPECT_CALL(mockClientHandshakeCallback_, onNewCachedPsk(_));
+  bool gotEarlyDataParams = false;
+  conn->earlyDataAppParamsGetter = [&]() -> Buf {
+    gotEarlyDataParams = true;
+    return {};
+  };
+
   serverClientRound();
+  EXPECT_TRUE(gotEarlyDataParams);
 }
 
 class ClientHandshakeHRRTest : public ClientHandshakeTest {
@@ -483,8 +476,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit),
-        nullptr);
+            kDefaultActiveConnectionIdLimit));
   }
 
   virtual void setupZeroRttServer() {

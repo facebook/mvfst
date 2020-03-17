@@ -26,8 +26,7 @@ class QuicClientTransport
     : public QuicTransportBase,
       public folly::AsyncUDPSocket::ReadCallback,
       public folly::AsyncUDPSocket::ErrMessageCallback,
-      public std::enable_shared_from_this<QuicClientTransport>,
-      private ClientHandshake::HandshakeCallback {
+      public std::enable_shared_from_this<QuicClientTransport> {
  public:
   QuicClientTransport(
       folly::EventBase* evb,
@@ -194,10 +193,6 @@ class QuicClientTransport
       const OutstandingPacket& outstandingPacket,
       const QuicWriteFrame& packetFrame,
       const ReadAckFrame&);
-
-  // From ClientHandshake::HandshakeCallback
-  void onNewCachedPsk(
-      fizz::client::NewCachedPsk& newCachedPsk) noexcept override;
 
   Buf readBuffer_;
   folly::Optional<std::string> hostname_;

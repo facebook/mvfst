@@ -822,7 +822,7 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.selfActiveConnectionIdLimit,
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
-  handshakeLayer->connect(hostname_, std::move(paramsExtension), this);
+  handshakeLayer->connect(hostname_, std::move(paramsExtension));
 
   writeSocketData();
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
@@ -834,27 +834,6 @@ void QuicClientTransport::startCryptoHandshake() {
       }
     });
   }
-}
-
-void QuicClientTransport::onNewCachedPsk(
-    fizz::client::NewCachedPsk& newCachedPsk) noexcept {
-  DCHECK(conn_->version.has_value());
-  DCHECK(clientConn_->serverInitialParamsSet_);
-
-  QuicCachedPsk quicCachedPsk;
-  quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
-  quicCachedPsk.transportParams =
-      getServerCachedTransportParameters(*clientConn_);
-
-  if (conn_->earlyDataAppParamsGetter) {
-    auto appParams = conn_->earlyDataAppParamsGetter();
-    if (appParams) {
-      quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
-    }
-  }
-
-  clientConn_->clientHandshakeLayer->putPsk(
-      *hostname_, std::move(quicCachedPsk));
 }
 
 bool QuicClientTransport::hasWriteCipher() const {

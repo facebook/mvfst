@@ -8,35 +8,25 @@
 
 #pragma once
 
-#include <fizz/client/ClientProtocol.h>
-
 #include <folly/ExceptionWrapper.h>
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
 
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
-#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/handshake/Aead.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 namespace quic {
 
 class CryptoFactory;
+struct CachedServerTransportParameters;
 struct ClientTransportParametersExtension;
-struct QuicCachedPsk;
 struct QuicClientConnectionState;
 struct ServerTransportParameters;
 
 class ClientHandshake : public Handshake {
  public:
-  class HandshakeCallback {
-   public:
-    virtual ~HandshakeCallback() = default;
-
-    virtual void onNewCachedPsk(fizz::client::NewCachedPsk&) noexcept = 0;
-  };
-
   enum class Phase { Initial, Handshake, OneRttKeysDerived, Established };
 
   explicit ClientHandshake(QuicClientConnectionState* conn);
@@ -46,8 +36,7 @@ class ClientHandshake : public Handshake {
    */
   void connect(
       folly::Optional<std::string> hostname,
-      std::shared_ptr<ClientTransportParametersExtension> transportParams,
-      HandshakeCallback* callback);
+      std::shared_ptr<ClientTransportParametersExtension> transportParams);
 
   /**
    * Takes input bytes from the network and processes then in the handshake.
@@ -62,9 +51,6 @@ class ClientHandshake : public Handshake {
    * Provides facilities to get, put and remove a PSK from the cache in case the
    * handshake supports a PSK cache.
    */
-  virtual void putPsk(
-      const folly::Optional<std::string>& /* hostname */,
-      QuicCachedPsk /* quicCachedPsk */) {}
   virtual void removePsk(const folly::Optional<std::string>& /* hostname */) {}
 
   /**
@@ -115,7 +101,6 @@ class ClientHandshake : public Handshake {
   void computeCiphers(CipherKind kind, folly::ByteRange secret);
 
   folly::Optional<bool> zeroRttRejected_;
-  HandshakeCallback* callback_{nullptr};
   QuicClientConnectionState* conn_;
 
   /**

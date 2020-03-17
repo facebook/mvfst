@@ -11,9 +11,12 @@
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 
+#include <fizz/client/ClientProtocol.h>
+
 namespace quic {
 
 class FizzClientQuicHandshakeContext;
+struct QuicCachedPsk;
 struct QuicClientConnectionState;
 
 class FizzClientHandshake : public ClientHandshake {
@@ -22,9 +25,6 @@ class FizzClientHandshake : public ClientHandshake {
       QuicClientConnectionState* conn,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
 
-  void putPsk(
-      const folly::Optional<std::string>& hostname,
-      QuicCachedPsk quicCachedPsk) override;
   void removePsk(const folly::Optional<std::string>& hostname) override;
 
   const CryptoFactory& getCryptoFactory() const override;
@@ -36,6 +36,13 @@ class FizzClientHandshake : public ClientHandshake {
  protected:
   folly::Optional<QuicCachedPsk> getPsk(
       const folly::Optional<std::string>& hostname) const;
+
+  void onNewCachedPsk(fizz::client::NewCachedPsk& newCachedPsk) noexcept;
+
+  // For tests.
+  fizz::client::State& getFizzState() {
+    return state_;
+  }
 
  private:
   folly::Optional<CachedServerTransportParameters> connectImpl(

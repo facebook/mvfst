@@ -20,10 +20,8 @@ ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
 
 void ClientHandshake::connect(
     folly::Optional<std::string> hostname,
-    std::shared_ptr<ClientTransportParametersExtension> transportParams,
-    HandshakeCallback* callback) {
+    std::shared_ptr<ClientTransportParametersExtension> transportParams) {
   transportParams_ = std::move(transportParams);
-  callback_ = callback;
 
   folly::Optional<CachedServerTransportParameters> cachedServerTransportParams =
       connectImpl(std::move(hostname));
