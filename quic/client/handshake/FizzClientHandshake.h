@@ -22,6 +22,13 @@ class FizzClientHandshake : public ClientHandshake {
       QuicClientConnectionState* conn,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
 
+  folly::Optional<QuicCachedPsk> getPsk(
+      const folly::Optional<std::string>& hostname) const override;
+  void putPsk(
+      const folly::Optional<std::string>& hostname,
+      QuicCachedPsk quicCachedPsk) override;
+  void removePsk(const folly::Optional<std::string>& hostname) override;
+
   const CryptoFactory& getCryptoFactory() const override;
 
   const folly::Optional<std::string>& getApplicationProtocol() const override;

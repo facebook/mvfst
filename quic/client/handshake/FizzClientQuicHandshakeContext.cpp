@@ -35,6 +35,14 @@ folly::Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
   return pskCache_->getPsk(*hostname);
 }
 
+void FizzClientQuicHandshakeContext::putPsk(
+    const folly::Optional<std::string>& hostname,
+    QuicCachedPsk quicCachedPsk) {
+  if (hostname && pskCache_) {
+    pskCache_->putPsk(*hostname, std::move(quicCachedPsk));
+  }
+}
+
 void FizzClientQuicHandshakeContext::removePsk(
     const folly::Optional<std::string>& hostname) {
   if (hostname && pskCache_) {

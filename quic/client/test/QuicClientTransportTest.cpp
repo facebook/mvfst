@@ -20,6 +20,7 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/client/handshake/FizzClientHandshake.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
@@ -232,7 +233,6 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
         std::make_shared<DefaultCongestionControllerFactory>());
     client->setHostname(hostname);
     client->addNewPeerAddress(serverAddr);
-    client->setPskCache(pskCache_);
     return client;
   }
 
@@ -1079,10 +1079,12 @@ INSTANTIATE_TEST_CASE_P(
 
 // Simulates a simple 1rtt handshake without needing to get any handshake bytes
 // from the server.
-class FakeOneRttHandshakeLayer : public ClientHandshake {
+class FakeOneRttHandshakeLayer : public FizzClientHandshake {
  public:
-  explicit FakeOneRttHandshakeLayer(QuicClientConnectionState* conn)
-      : ClientHandshake(conn) {}
+  explicit FakeOneRttHandshakeLayer(
+      QuicClientConnectionState* conn,
+      std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
+      : FizzClientHandshake(conn, std::move(fizzContext)) {}
 
   void connectImpl(
       folly::Optional<std::string>,
@@ -1340,8 +1342,8 @@ class QuicClientTransportTest : public Test {
 
   virtual void setupCryptoLayer() {
     // Fake that the handshake has already occured and fix the keys.
-    mockClientHandshake =
-        new FakeOneRttHandshakeLayer(&client->getNonConstConn());
+    mockClientHandshake = new FakeOneRttHandshakeLayer(
+        &client->getNonConstConn(), getFizzClientContext());
     client->getNonConstConn().clientHandshakeLayer = mockClientHandshake;
     client->getNonConstConn().handshakeLayer.reset(mockClientHandshake);
     setFakeHandshakeCiphers();
@@ -5088,7 +5090,6 @@ class QuicClientTransportPskCacheTest
     : public QuicClientTransportAfterStartTestBase {
  public:
   void SetUpChild() override {
-    client->setPskCache(mockPskCache_);
     QuicClientTransportAfterStartTestBase::SetUpChild();
   }
 
@@ -5186,7 +5187,9 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
   }
 
   std::shared_ptr<QuicPskCache> getPskCache() override {
-    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    if (!mockQuicPskCache_) {
+      mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    }
     return mockQuicPskCache_;
   }
 
@@ -5195,7 +5198,6 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
     // Ignore path mtu to test negotiation.
     clientSettings.canIgnorePathMTU = true;
     client->setTransportSettings(clientSettings);
-    client->setPskCache(mockQuicPskCache_);
   }
 
   void startClient() {
@@ -5458,7 +5460,6 @@ class QuicZeroRttHappyEyeballsClientTransportTest
  public:
   void SetUpChild() override {
     client->setHostname(hostname_);
-    client->setPskCache(mockQuicPskCache_);
 
     auto secondSocket =
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
@@ -5478,7 +5479,9 @@ class QuicZeroRttHappyEyeballsClientTransportTest
   }
 
   std::shared_ptr<QuicPskCache> getPskCache() override {
-    mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    if (!mockQuicPskCache_) {
+      mockQuicPskCache_ = std::make_shared<MockQuicPskCache>();
+    }
     return mockQuicPskCache_;
   }
 

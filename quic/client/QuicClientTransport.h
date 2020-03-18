@@ -80,12 +80,6 @@ class QuicClientTransport
   virtual void setHappyEyeballsCachedFamily(sa_family_t cachedFamily);
 
   /**
-   * Set the cache that remembers psk and server transport parameters from
-   * last connection. This is useful for session resumption and 0-rtt.
-   */
-  void setPskCache(std::shared_ptr<QuicPskCache> pskCache);
-
-  /**
    * Starts the connection.
    */
   virtual void start(ConnectionCallback* cb);
@@ -211,7 +205,6 @@ class QuicClientTransport
 
  private:
   folly::Optional<QuicCachedPsk> getPsk();
-  void removePsk();
   void setPartialReliabilityTransportParameter();
 
   bool replaySafeNotified_{false};
@@ -220,7 +213,6 @@ class QuicClientTransport
   std::shared_ptr<QuicClientTransport> selfOwning_;
   bool happyEyeballsEnabled_{false};
   sa_family_t happyEyeballsCachedFamily_{AF_UNSPEC};
-  std::shared_ptr<QuicPskCache> pskCache_;
   QuicClientConnectionState* clientConn_;
   std::vector<TransportParameter> customTransportParameters_;
   folly::SocketOptionMap socketOptions_;
