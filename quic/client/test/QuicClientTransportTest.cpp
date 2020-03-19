@@ -1862,7 +1862,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
   setupCryptoLayer();
   client->start(&callback);
   setConnectionIds();
-  recvServerHello();
+  EXPECT_THROW(recvServerHello(), std::runtime_error);
 }
 
 TEST_F(QuicClientTransportTest, NetworkUnreachableIsFatalToConn) {
@@ -3597,10 +3597,8 @@ TEST_P(
     EXPECT_EQ(indices.size(), 1);
     auto tmp = std::move(qLogger->logs[indices[0]]);
     auto event = dynamic_cast<QLogConnectionCloseEvent*>(tmp.get());
-    EXPECT_EQ(event->error, kNoError);
-    auto reason = folly::to<std::string>(
-        "Server: ", kNoError, ", Peer: isReset: ", 0, ", Peer: isAbandon: ", 0);
-    EXPECT_EQ(event->reason, reason);
+    EXPECT_EQ(event->error, "No Error");
+    EXPECT_EQ(event->reason, "No Error");
     EXPECT_TRUE(event->drainConnection);
     EXPECT_TRUE(event->sendCloseImmediately);
   }

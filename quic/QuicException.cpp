@@ -178,6 +178,10 @@ std::string cryptoErrorToString(TransportErrorCode code) {
 std::string toString(QuicErrorCode code) {
   switch (code.type()) {
     case QuicErrorCode::Type::ApplicationErrorCode_E:
+      if (*code.asApplicationErrorCode() ==
+          GenericApplicationErrorCode::NO_ERROR) {
+        return "No Error";
+      }
       return folly::to<std::string>(*code.asApplicationErrorCode());
     case QuicErrorCode::Type::LocalErrorCode_E:
       return toString(*code.asLocalErrorCode()).str();

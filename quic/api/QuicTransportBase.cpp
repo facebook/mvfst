@@ -147,6 +147,13 @@ void QuicTransportBase::close(
   // explicitly called close.
   connCallback_ = nullptr;
 
+  // If we were called with no error code, ensure that we are going to write
+  // an application close, so the peer knows it didn't come from the transport.
+  if (!errorCode) {
+    errorCode = std::make_pair(
+        GenericApplicationErrorCode::NO_ERROR,
+        toString(GenericApplicationErrorCode::NO_ERROR));
+  }
   closeImpl(std::move(errorCode), true);
   conn_->logger.reset();
 }
@@ -156,6 +163,11 @@ void QuicTransportBase::closeNow(
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   VLOG(4) << __func__ << " " << *this;
+  if (!errorCode) {
+    errorCode = std::make_pair(
+        GenericApplicationErrorCode::NO_ERROR,
+        toString(GenericApplicationErrorCode::NO_ERROR));
+  }
   closeImpl(std::move(errorCode), false);
   // the drain timeout may have been scheduled by a previous close, in which
   // case, our close would not take effect. This cancels the drain timeout in

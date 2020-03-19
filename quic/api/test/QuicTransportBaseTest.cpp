@@ -1243,7 +1243,9 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpectedClose) {
 
 TEST_F(QuicTransportImplTest, TestNotifyPendingConnWriteOnCloseWithoutError) {
   NiceMock<MockWriteCallback> wcb;
-  EXPECT_CALL(wcb, onConnectionWriteError(IsError(LocalErrorCode::NO_ERROR)));
+  EXPECT_CALL(
+      wcb,
+      onConnectionWriteError(IsError(GenericApplicationErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnConnection(&wcb);
   transport->close(folly::none);
   evb->loopOnce();
@@ -1281,7 +1283,9 @@ TEST_F(QuicTransportImplTest, TestNotifyPendingWriteOnCloseWithoutError) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(
-      wcb, onStreamWriteError(stream, IsError(LocalErrorCode::NO_ERROR)));
+      wcb,
+      onStreamWriteError(
+          stream, IsError(GenericApplicationErrorCode::NO_ERROR)));
   transport->notifyPendingWriteOnStream(stream, &wcb);
   transport->close(folly::none);
   evb->loopOnce();
@@ -1369,7 +1373,8 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
   NiceMock<MockDeliveryCallback> deliveryCb;
-  EXPECT_CALL(rcb, readError(stream, IsError(LocalErrorCode::NO_ERROR)));
+  EXPECT_CALL(
+      rcb, readError(stream, IsError(GenericApplicationErrorCode::NO_ERROR)));
   EXPECT_CALL(deliveryCb, onDeliveryAck(stream, _, _));
 
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);

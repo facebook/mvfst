@@ -1669,7 +1669,7 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterReset) {
       .WillOnce(Invoke([&](StreamId /*sid*/, ApplicationErrorCode /*e*/) {
         server->close(folly::none);
       }));
-  deliverData(packetToBuf(packet));
+  EXPECT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
 }
 
 TEST_F(QuicServerTransportTest, StopSendingLoss) {
