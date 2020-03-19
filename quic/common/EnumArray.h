@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <folly/Portability.h>
 #include <array>
 #include <utility>
 
@@ -31,7 +32,7 @@ class EnumArray : public std::array<V, size_t(K::MAX) + 1> {
     return this->std::array<V, size_t(K::MAX) + 1>::operator[](ik);
   }
   // Returns all valid values for the enum
-  [[nodiscard]] constexpr std::array<K, ArraySize> keys() const {
+  FOLLY_NODISCARD constexpr std::array<K, ArraySize> keys() const {
     return keyArrayHelper(std::make_integer_sequence<IntType, ArraySize>{});
   }
 
