@@ -183,6 +183,9 @@ class QuicTransportBase : public QuicSocket {
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnConnection(
       WriteCallback* wcb) override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> unregisterStreamWriteCallback(
+      StreamId id) override;
+
   WriteResult writeChain(
       StreamId id,
       Buf data,

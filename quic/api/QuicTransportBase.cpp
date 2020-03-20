@@ -1747,6 +1747,18 @@ QuicTransportBase::notifyPendingWriteOnConnection(WriteCallback* wcb) {
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::unregisterStreamWriteCallback(StreamId id) {
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  if (pendingWriteCallbacks_.find(id) == pendingWriteCallbacks_.end()) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  pendingWriteCallbacks_.erase(id);
+  return folly::unit;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);

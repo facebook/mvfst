@@ -137,6 +137,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD2(
       notifyPendingWriteOnStream,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, WriteCallback*));
+  MOCK_METHOD1(
+      unregisterStreamWriteCallback,
+      folly::Expected<folly::Unit, LocalErrorCode>(StreamId));
   folly::Expected<Buf, LocalErrorCode> writeChain(
       StreamId id,
       Buf data,

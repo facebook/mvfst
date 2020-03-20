@@ -2517,5 +2517,39 @@ TEST_F(QuicTransportImplTest, FailedPing) {
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
 
+TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
+  auto stream = transport->createBidirectionalStream().value();
+  // Unset before set
+  EXPECT_FALSE(transport->unregisterStreamWriteCallback(stream));
+
+  // Set
+  auto wcb = std::make_unique<MockWriteCallback>();
+  EXPECT_CALL(*wcb, onStreamWriteReady(stream, _)).Times(1);
+  auto result = transport->notifyPendingWriteOnStream(stream, wcb.get());
+  EXPECT_TRUE(result);
+  evb->loopOnce();
+
+  // Set then unset
+  EXPECT_CALL(*wcb, onStreamWriteReady(stream, _)).Times(0);
+  result = transport->notifyPendingWriteOnStream(stream, wcb.get());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(transport->unregisterStreamWriteCallback(stream));
+  evb->loopOnce();
+
+  // Set, close, unset
+  result = transport->notifyPendingWriteOnStream(stream, wcb.get());
+  EXPECT_TRUE(result);
+  MockReadCallback rcb;
+  transport->setReadCallback(stream, &rcb);
+  // ReadCallback kills WriteCallback
+  EXPECT_CALL(rcb, readError(stream, _))
+      .WillOnce(Invoke([&](StreamId stream, auto) {
+        EXPECT_TRUE(transport->unregisterStreamWriteCallback(stream));
+        wcb.reset();
+      }));
+  transport->close(folly::none);
+  evb->loopOnce();
+}
+
 } // namespace test
 } // namespace quic

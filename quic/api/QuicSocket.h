@@ -764,6 +764,9 @@ class QuicSocket {
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) = 0;
 
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+      unregisterStreamWriteCallback(StreamId) = 0;
+
   /**
    * Callback class for receiving ack notifications
    */
