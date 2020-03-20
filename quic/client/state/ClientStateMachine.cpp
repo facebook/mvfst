@@ -19,7 +19,7 @@
 
 namespace quic {
 
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
+std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
     std::unique_ptr<QuicClientConnectionState> conn) {
   // Create a new connection state and copy over properties that don't change
   // across stateless retry.
@@ -50,11 +50,6 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateCommon(
   newConn->readCodec->setCodecParameters(CodecParameters(
       conn->peerAckDelayExponent, conn->originalVersion.value()));
   return newConn;
-}
-
-std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
-    std::unique_ptr<QuicClientConnectionState> conn) {
-  return undoAllClientStateCommon(std::move(conn));
 }
 
 void processServerInitialParams(
