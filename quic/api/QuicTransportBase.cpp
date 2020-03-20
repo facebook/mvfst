@@ -384,7 +384,8 @@ void QuicTransportBase::closeImpl(
         break;
       }
       case QuicErrorCode::Type::ApplicationErrorCode_E:
-        noError = false;
+        auto appErrorCode = *cancelCode.first.asApplicationErrorCode();
+        noError = appErrorCode == GenericApplicationErrorCode::NO_ERROR;
     }
     if (noError) {
       connCallback_->onConnectionEnd();

@@ -4933,6 +4933,32 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
           "Client closed by peer reason=Stand clear of the closing doors, please"));
 }
 
+TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen, std::move(header), 0);
+  ConnectionCloseFrame appClose(
+      QuicErrorCode(GenericApplicationErrorCode::NO_ERROR), "No Error");
+  writeFrame(std::move(appClose), builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  EXPECT_FALSE(client->isClosed());
+  socketWrites.clear();
+
+  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
+  EXPECT_CALL(clientConnCallback, onConnectionEnd());
+  deliverDataWithoutErrorCheck(packet->coalesce());
+  // Now the transport should be closed
+  EXPECT_EQ(
+      QuicErrorCode(GenericApplicationErrorCode::NO_ERROR),
+      client->getConn().localConnectionError->first);
+  EXPECT_TRUE(client->isClosed());
+  EXPECT_TRUE(verifyFramePresent(
+      socketWrites,
+      *makeHandshakeCodec(),
+      QuicFrame::Type::ConnectionCloseFrame_E));
+}
+
 TEST_F(QuicClientTransportAfterStartTest, DestroyWithoutClosing) {
   StreamId streamId = client->createBidirectionalStream().value();
 
