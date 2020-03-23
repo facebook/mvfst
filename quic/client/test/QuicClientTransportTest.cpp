@@ -4950,7 +4950,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {
   deliverDataWithoutErrorCheck(packet->coalesce());
   // Now the transport should be closed
   EXPECT_EQ(
-      QuicErrorCode(GenericApplicationErrorCode::NO_ERROR),
+      QuicErrorCode(TransportErrorCode::NO_ERROR),
       client->getConn().localConnectionError->first);
   EXPECT_TRUE(client->isClosed());
   EXPECT_TRUE(verifyFramePresent(
