@@ -28,21 +28,12 @@ struct QuicServerConnectionState;
 
 class DefaultAppTokenValidator : public fizz::server::AppTokenValidator {
  public:
-  explicit DefaultAppTokenValidator(
-      QuicServerConnectionState* conn,
-      folly::Function<bool(
-          const folly::Optional<std::string>& alpn,
-          const std::unique_ptr<folly::IOBuf>& appParams) const>
-          earlyDataAppParamsValidator);
+  explicit DefaultAppTokenValidator(QuicServerConnectionState* conn);
 
   bool validate(const fizz::server::ResumptionState&) const override;
 
  private:
   QuicServerConnectionState* conn_;
-  folly::Function<bool(
-      const folly::Optional<std::string>& alpn,
-      const std::unique_ptr<folly::IOBuf>& appParams) const>
-      earlyDataAppParamsValidator_;
 };
 
 } // namespace quic

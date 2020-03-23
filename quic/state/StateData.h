@@ -811,6 +811,13 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   TimePoint pathChallengeStartTime;
 
   /**
+   * Eary data app params functions.
+   */
+  folly::Function<bool(const folly::Optional<std::string>&, const Buf&) const>
+      earlyDataAppParamsValidator;
+  folly::Function<Buf()> earlyDataAppParamsGetter;
+
+  /**
    * Selects a previously unused peer-issued connection id to use.
    * If there are no available ids return false and don't change anything.
    * Return true if replacement succeeds.

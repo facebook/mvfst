@@ -28,13 +28,8 @@
 namespace quic {
 
 DefaultAppTokenValidator::DefaultAppTokenValidator(
-    QuicServerConnectionState* conn,
-    folly::Function<bool(
-        const folly::Optional<std::string>& alpn,
-        const std::unique_ptr<folly::IOBuf>& appParams) const>
-        earlyDataAppParamsValidator)
-    : conn_(conn),
-      earlyDataAppParamsValidator_(std::move(earlyDataAppParamsValidator)) {}
+    QuicServerConnectionState* conn)
+    : conn_(conn) {}
 
 bool DefaultAppTokenValidator::validate(
     const fizz::server::ResumptionState& resumptionState) const {
@@ -139,8 +134,8 @@ bool DefaultAppTokenValidator::validate(
 
   // If application has set validator and the token is invalid, reject 0-RTT.
   // If application did not set validator, it's valid.
-  if (earlyDataAppParamsValidator_ &&
-      !earlyDataAppParamsValidator_(
+  if (conn_->earlyDataAppParamsValidator &&
+      !conn_->earlyDataAppParamsValidator(
           resumptionState.alpn, appToken->appParams)) {
     VLOG(10) << "Invalid app params";
     return false;
