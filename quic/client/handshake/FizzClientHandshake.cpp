@@ -10,6 +10,7 @@
 
 #include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 
 #include <fizz/client/EarlyDataRejectionPolicy.h>

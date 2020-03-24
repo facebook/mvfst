@@ -814,10 +814,6 @@ void QuicClientTransport::startCryptoHandshake() {
 
   // Look up psk and supply to handshake layer
   folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk();
-  folly::Optional<fizz::client::CachedPsk> cachedPsk;
-  if (quicCachedPsk) {
-    cachedPsk = std::move(quicCachedPsk->cachedPsk);
-  }
 
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   auto& cryptoFactory = handshakeLayer->getCryptoFactory();
@@ -851,28 +847,8 @@ void QuicClientTransport::startCryptoHandshake() {
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
   handshakeLayer->connect(
-      hostname_, std::move(cachedPsk), std::move(paramsExtension), this);
+      hostname_, std::move(quicCachedPsk), std::move(paramsExtension), this);
 
-  if (clientConn_->zeroRttWriteCipher) {
-    if (conn_->qLogger) {
-      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
-    }
-    QUIC_TRACE(zero_rtt, *conn_, "attempted");
-
-    // If zero rtt write cipher is derived, it means the cached psk was valid
-    DCHECK(quicCachedPsk);
-
-    auto& transportParams = quicCachedPsk->transportParams;
-    cacheServerInitialParams(
-        *clientConn_,
-        transportParams.initialMaxData,
-        transportParams.initialMaxStreamDataBidiLocal,
-        transportParams.initialMaxStreamDataBidiRemote,
-        transportParams.initialMaxStreamDataUni,
-        transportParams.initialMaxStreamsBidi,
-        transportParams.initialMaxStreamsUni);
-    updateTransportParamsFromCachedEarlyParams(*clientConn_, transportParams);
-  }
   writeSocketData();
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
     transportReadyNotified_ = true;

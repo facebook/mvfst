@@ -476,7 +476,7 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   void connect() override {
     handshake->connect(
         hostname,
-        psk.cachedPsk,
+        psk,
         std::make_shared<ClientTransportParametersExtension>(
             QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),

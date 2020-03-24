@@ -9,6 +9,7 @@
 #include <quic/client/handshake/ClientHandshake.h>
 
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
+#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 
@@ -19,15 +20,42 @@ ClientHandshake::ClientHandshake(QuicClientConnectionState* conn)
 
 void ClientHandshake::connect(
     folly::Optional<std::string> hostname,
-    folly::Optional<fizz::client::CachedPsk> cachedPsk,
+    folly::Optional<QuicCachedPsk> quicCachedPsk,
     std::shared_ptr<ClientTransportParametersExtension> transportParams,
     HandshakeCallback* callback) {
   transportParams_ = std::move(transportParams);
   callback_ = callback;
 
+  folly::Optional<fizz::client::CachedPsk> cachedPsk;
+  if (quicCachedPsk) {
+    cachedPsk = std::move(quicCachedPsk->cachedPsk);
+  }
+
   connectImpl(std::move(hostname), std::move(cachedPsk));
 
   throwOnError();
+
+  if (conn_->zeroRttWriteCipher) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
+    }
+    QUIC_TRACE(zero_rtt, *conn_, "attempted");
+
+    // If zero rtt write cipher is derived, it means the cached psk was valid
+    DCHECK(quicCachedPsk);
+
+    auto& cachedServerTransportParams = quicCachedPsk->transportParams;
+    cacheServerInitialParams(
+        *conn_,
+        cachedServerTransportParams.initialMaxData,
+        cachedServerTransportParams.initialMaxStreamDataBidiLocal,
+        cachedServerTransportParams.initialMaxStreamDataBidiRemote,
+        cachedServerTransportParams.initialMaxStreamDataUni,
+        cachedServerTransportParams.initialMaxStreamsBidi,
+        cachedServerTransportParams.initialMaxStreamsUni);
+    updateTransportParamsFromCachedEarlyParams(
+        *conn_, cachedServerTransportParams);
+  }
 }
 
 void ClientHandshake::doHandshake(

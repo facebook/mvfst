@@ -24,6 +24,7 @@ namespace quic {
 
 class CryptoFactory;
 struct ClientTransportParametersExtension;
+struct QuicCachedPsk;
 struct QuicClientConnectionState;
 struct ServerTransportParameters;
 
@@ -45,7 +46,7 @@ class ClientHandshake : public Handshake {
    */
   void connect(
       folly::Optional<std::string> hostname,
-      folly::Optional<fizz::client::CachedPsk> cachedPsk,
+      folly::Optional<QuicCachedPsk> quicCachedPsk,
       std::shared_ptr<ClientTransportParametersExtension> transportParams,
       HandshakeCallback* callback);
 
