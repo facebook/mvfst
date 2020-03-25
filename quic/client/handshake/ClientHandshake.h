@@ -46,7 +46,6 @@ class ClientHandshake : public Handshake {
    */
   void connect(
       folly::Optional<std::string> hostname,
-      folly::Optional<QuicCachedPsk> quicCachedPsk,
       std::shared_ptr<ClientTransportParametersExtension> transportParams,
       HandshakeCallback* callback);
 
@@ -63,10 +62,6 @@ class ClientHandshake : public Handshake {
    * Provides facilities to get, put and remove a PSK from the cache in case the
    * handshake supports a PSK cache.
    */
-  virtual folly::Optional<QuicCachedPsk> getPsk(
-      const folly::Optional<std::string>& /* hostname */) const {
-    return folly::none;
-  }
   virtual void putPsk(
       const folly::Optional<std::string>& /* hostname */,
       QuicCachedPsk /* quicCachedPsk */) {}
@@ -134,9 +129,8 @@ class ClientHandshake : public Handshake {
   void computeOneRttCipher(bool earlyDataAccepted);
 
  private:
-  virtual void connectImpl(
-      folly::Optional<std::string> hostname,
-      folly::Optional<fizz::client::CachedPsk> cachedPsk) = 0;
+  virtual folly::Optional<CachedServerTransportParameters> connectImpl(
+      folly::Optional<std::string> hostname) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;

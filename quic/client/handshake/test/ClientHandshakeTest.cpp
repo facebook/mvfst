@@ -23,9 +23,9 @@
 #include <folly/io/async/test/MockAsyncTransport.h>
 #include <folly/ssl/Init.h>
 
+#include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/handshake/FizzClientHandshake.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/client/handshake/ClientTransportParametersExtension.h>
 #include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
@@ -59,7 +59,6 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
   virtual void connect() {
     handshake->connect(
         hostname,
-        folly::none,
         std::make_shared<ClientTransportParametersExtension>(
             QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
@@ -367,7 +366,6 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
   void connect() override {
     handshake->connect(
         hostname,
-        folly::none,
         std::make_shared<ClientTransportParametersExtension>(
             QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),
@@ -476,7 +474,6 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
   void connect() override {
     handshake->connect(
         hostname,
-        psk,
         std::make_shared<ClientTransportParametersExtension>(
             QuicVersion::MVFST,
             folly::to<uint32_t>(kDefaultConnectionWindowSize),

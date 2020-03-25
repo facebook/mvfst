@@ -778,27 +778,6 @@ void QuicClientTransport::writeData() {
   }
 }
 
-folly::Optional<QuicCachedPsk> QuicClientTransport::getPsk() {
-  auto quicCachedPsk = clientConn_->clientHandshakeLayer->getPsk(hostname_);
-  if (!quicCachedPsk) {
-    return folly::none;
-  }
-
-  // TODO T32658838 better API to disable early data for current connection
-  if (!conn_->transportSettings.attemptEarlyData) {
-    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-  } else if (
-      conn_->earlyDataAppParamsValidator &&
-      !conn_->earlyDataAppParamsValidator(
-          quicCachedPsk->cachedPsk.alpn,
-          folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
-    quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
-    // Do not remove psk here, will let application decide
-  }
-
-  return quicCachedPsk;
-}
-
 void QuicClientTransport::startCryptoHandshake() {
   auto self = this->shared_from_this();
   // Set idle timer whenever crypto starts so that we can restart the idle timer
@@ -811,9 +790,6 @@ void QuicClientTransport::startCryptoHandshake() {
   // we go through version negotiation as well.
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
-
-  // Look up psk and supply to handshake layer
-  folly::Optional<QuicCachedPsk> quicCachedPsk = getPsk();
 
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   auto& cryptoFactory = handshakeLayer->getCryptoFactory();
@@ -846,8 +822,7 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.selfActiveConnectionIdLimit,
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
-  handshakeLayer->connect(
-      hostname_, std::move(quicCachedPsk), std::move(paramsExtension), this);
+  handshakeLayer->connect(hostname_, std::move(paramsExtension), this);
 
   writeSocketData();
   if (!transportReadyNotified_ && clientConn_->zeroRttWriteCipher) {
