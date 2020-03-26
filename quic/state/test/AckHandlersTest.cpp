@@ -19,7 +19,6 @@
 
 #include <numeric>
 
-using namespace folly;
 using namespace testing;
 
 namespace quic {

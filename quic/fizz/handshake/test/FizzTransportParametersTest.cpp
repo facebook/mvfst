@@ -14,7 +14,6 @@
 #include <quic/fizz/handshake/FizzTransportParameters.h>
 
 using namespace fizz;
-using namespace fizz::test;
 using namespace folly;
 
 namespace quic {
