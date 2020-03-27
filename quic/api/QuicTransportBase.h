@@ -627,6 +627,8 @@ class QuicTransportBase : public QuicSocket {
   folly::SocketAddress localFallbackAddress;
   // CongestionController factory
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
+
+  folly::Optional<std::string> exceptionCloseWhat_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

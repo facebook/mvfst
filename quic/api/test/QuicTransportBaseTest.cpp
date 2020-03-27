@@ -1030,6 +1030,30 @@ TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
       QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED));
 }
 
+TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+  auto stream = transport->createBidirectionalStream().value();
+  EXPECT_CALL(
+      connCallback,
+      onConnectionError(std::make_pair(
+          QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+          std::string("Well there's your problem"))));
+  EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
+    throw std::runtime_error("Well there's your problem");
+    return 0;
+  }));
+  QuicSocket::WriteResult result = transport->writeChain(
+      stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
+  transport->addDataToStream(
+      stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
+  evb->loopOnce();
+
+  EXPECT_TRUE(transport->isClosed());
+  EXPECT_EQ(
+      transport->getConnectionError(),
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR));
+}
+
 TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
   auto tickInterval = evb->timer().getTickInterval();
   transport->scheduleLossTimeout(tickInterval - 1ms);
