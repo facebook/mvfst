@@ -68,9 +68,6 @@ TEST(ServerStateMachineTest, TestAddConnId) {
   assertServerConnIdParamsEq(params1, params2);
   assertServerConnIdParamsEq(params2, params3);
 
-  auto newConnId4 = serverState.createAndAddNewSelfConnId();
-  EXPECT_EQ(folly::none, newConnId4);
-
   EXPECT_EQ(serverState.selfConnectionIds.size(), 3);
   EXPECT_EQ(serverState.nextSelfConnectionIdSequence, 3);
 }

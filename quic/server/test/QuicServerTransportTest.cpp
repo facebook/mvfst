@@ -523,8 +523,9 @@ class QuicServerTransportTest : public Test {
       }
     }
     uint64_t connIdsToIssue = std::min(
-        server->getConn().peerActiveConnectionIdLimit,
-        kDefaultActiveConnectionIdLimit);
+                                  server->getConn().peerActiveConnectionIdLimit,
+                                  kDefaultActiveConnectionIdLimit) -
+        1;
 
     if (server->getConn().transportSettings.disableMigration ||
         (connIdsToIssue == 0)) {
@@ -2136,7 +2137,7 @@ INSTANTIATE_TEST_CASE_P(
     QuicServerTransportAllowMigrationTest,
     Values(
         MigrationParam{folly::none},
-        MigrationParam{0},
+        MigrationParam{2},
         MigrationParam{4},
         MigrationParam{9},
         MigrationParam{50}));

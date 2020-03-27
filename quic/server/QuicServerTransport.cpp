@@ -440,7 +440,10 @@ void QuicServerTransport::maybeIssueConnectionIds() {
     // needs to be able to search through all issued ids for routing.
     const uint64_t maximumIdsToIssue = std::min(
         conn_->peerActiveConnectionIdLimit, kDefaultActiveConnectionIdLimit);
-    for (size_t i = 0; i < maximumIdsToIssue; i++) {
+
+    // Make sure size of selfConnectionIds is not larger than maximumIdsToIssue
+    for (size_t i = conn_->selfConnectionIds.size(); i < maximumIdsToIssue;
+         ++i) {
       auto newConnIdData = serverConn_->createAndAddNewSelfConnId();
       if (!newConnIdData.has_value()) {
         return;

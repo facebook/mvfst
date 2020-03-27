@@ -1185,10 +1185,6 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   CHECK(connIdAlgo);
   CHECK(serverConnIdParams);
 
-  if (selfConnectionIds.size() == peerActiveConnectionIdLimit + 1) {
-    return folly::none;
-  };
-
   CHECK(transportSettings.statelessResetTokenSecret);
 
   StatelessResetGenerator generator(
