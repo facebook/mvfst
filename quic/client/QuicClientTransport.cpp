@@ -892,6 +892,22 @@ void QuicClientTransport::errMessage(
 #endif
 }
 
+void QuicClientTransport::onReadError(
+    const folly::AsyncSocketException& ex) noexcept {
+  if (conn_->transportSettings.closeClientOnReadError &&
+      closeState_ == CloseState::OPEN) {
+    // closeNow will skip draining the socket. onReadError doesn't gets
+    // triggered by retriable errors. If we are here, there is no point of
+    // draining the socket.
+    runOnEvbAsync([ex](auto self) {
+      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
+      clientPtr->closeNow(std::make_pair(
+          QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
+          std::string(ex.what())));
+    });
+  }
+}
+
 void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;

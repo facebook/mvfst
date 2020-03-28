@@ -1698,6 +1698,19 @@ class QuicClientTransportTest : public Test {
   QuicVersion version{QuicVersion::QUIC_DRAFT};
 };
 
+TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
+  client->onReadError(folly::AsyncSocketException(
+      folly::AsyncSocketException::INTERNAL_ERROR, "Where you wanna go", -1));
+  EXPECT_FALSE(client->isClosed());
+  client->getNonConstConn().transportSettings.closeClientOnReadError = true;
+  client->onReadError(folly::AsyncSocketException(
+      folly::AsyncSocketException::INTERNAL_ERROR,
+      "He never saw it coming at all",
+      -1));
+  eventbase_->loopOnce();
+  EXPECT_TRUE(client->isClosed());
+}
+
 TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   client->addNewPeerAddress(serverAddr);
   client->start(&clientConnCallback);

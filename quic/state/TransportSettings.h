@@ -163,6 +163,8 @@ struct TransportSettings {
   DurationRep timeReorderingThreshDividend{
       kDefaultTimeReorderingThreshDividend};
   DurationRep timeReorderingThreshDivisor{kDefaultTimeReorderingThreshDivisor};
+  // Whether to close client transport on read error from socket
+  bool closeClientOnReadError{false};
 };
 
 } // namespace quic

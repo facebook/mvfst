@@ -101,7 +101,7 @@ class QuicClientTransport
 
   // folly::AsyncUDPSocket::ReadCallback
   void onReadClosed() noexcept override {}
-  void onReadError(const folly::AsyncSocketException&) noexcept override {}
+  void onReadError(const folly::AsyncSocketException&) noexcept override;
 
   // folly::AsyncUDPSocket::ErrMessageCallback
   void errMessage(const cmsghdr& cmsg) noexcept override;
