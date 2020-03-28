@@ -125,7 +125,7 @@ void processClientInitialParams(
   // TODO Validate active_connection_id_limit
 
   if (!packetSize || *packetSize == 0) {
-    packetSize = kDefaultMaxUDPPayload;
+    packetSize = kDefaultUDPSendPacketLen;
   }
   if (*packetSize < kMinMaxUDPPayload) {
     throw QuicTransportException(
@@ -165,8 +165,10 @@ void processClientInitialParams(
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
   // TODO: udpSendPacketLen should also be limited by PMTU
   if (conn.transportSettings.canIgnorePathMTU) {
-    conn.udpSendPacketLen =
-        std::min<uint64_t>(*packetSize, kDefaultMaxUDPPayload);
+    if (*packetSize > kDefaultMaxUDPPayload) {
+      *packetSize = kDefaultUDPSendPacketLen;
+    }
+    conn.udpSendPacketLen = *packetSize;
   }
 
   conn.peerActiveConnectionIdLimit =

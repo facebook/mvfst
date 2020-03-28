@@ -30,9 +30,8 @@ constexpr uint16_t kDefaultUDPSendPacketLen =
     (kDefaultV4UDPSendPacketLen < kDefaultV6UDPSendPacketLen
          ? kDefaultV4UDPSendPacketLen
          : kDefaultV6UDPSendPacketLen);
-// This is the default if the transport parameter for max packet size is missing
-// or zero.
-constexpr uint16_t kDefaultMaxUDPPayload = 4096;
+// The max we will tolerate a peer's max_packet_size to be.
+constexpr uint16_t kDefaultMaxUDPPayload = 1452;
 
 // This is the minimum the max_packet_size transport parameter is allowed to be,
 // per the spec. Note this actually refers to the max UDP payload size, not the

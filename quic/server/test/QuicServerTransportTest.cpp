@@ -181,7 +181,7 @@ class FakeServerHandshake : public ServerHandshake {
   QuicServerConnectionState& conn_;
   bool chloSync_{false};
   bool cfinSync_{false};
-  uint64_t maxRecvPacketSize{2 * 1024};
+  uint64_t maxRecvPacketSize{kDefaultMaxUDPPayload};
   bool allowZeroRttKeys_{false};
   std::vector<folly::IPAddress> sourceAddrs_;
   folly::Optional<uint64_t> clientActiveConnectionIdLimit_;
@@ -3645,6 +3645,7 @@ TEST_F(
       server->getConn().transportSettings.limitedCwndInMss * originalUdpSize +
       server->getConn().transportSettings.limitedCwndInMss *
           server->getConn().udpSendPacketLen;
+  EXPECT_NE(originalUdpSize, server->getConn().udpSendPacketLen);
   EXPECT_EQ(*server->getNonConstConn().writableBytesLimit, expectedLen);
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
@@ -3656,6 +3657,16 @@ TEST_F(
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
     EXPECT_EQ(event->update, updateArray[i]);
   }
+}
+
+TEST_F(QuicUnencryptedServerTransportTest, MaxReceivePacketSizeTooLarge) {
+  getFakeHandshakeLayer()->allowZeroRttKeys();
+  auto originalUdpSize = server->getConn().udpSendPacketLen;
+  fakeHandshake->maxRecvPacketSize = 4096;
+  setupClientReadCodec();
+  recvClientHello();
+  EXPECT_NE(originalUdpSize, server->getConn().udpSendPacketLen);
+  EXPECT_EQ(server->getConn().udpSendPacketLen, kDefaultUDPSendPacketLen);
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {

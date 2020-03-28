@@ -1228,7 +1228,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   bool connected_{false};
   QuicVersion negotiatedVersion{QuicVersion::MVFST};
-  uint64_t maxRecvPacketSize{2 * 1024};
+  uint64_t maxRecvPacketSize{kDefaultMaxUDPPayload};
   uint64_t maxInitialStreamData{kDefaultStreamWindowSize};
   uint64_t connWindowSize{kDefaultConnectionWindowSize};
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
