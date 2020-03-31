@@ -626,6 +626,9 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
 
 TEST_F(QuicServerWorkerTest, QuicShedTest) {
   auto connId = getTestConnectionId(hostId_);
+  EXPECT_CALL(
+      *transportInfoCb_,
+      onPacketDropped(PacketDropReason::CANNOT_MAKE_TRANSPORT));
   createQuicConnectionDuringShedding(kClientAddr, connId);
 }
 

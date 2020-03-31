@@ -39,6 +39,7 @@ class QuicTransportStatsCallback {
     WORKER_NOT_INITIALIZED,
     SERVER_SHUTDOWN,
     INITIAL_CONNID_SMALL,
+    CANNOT_MAKE_TRANSPORT,
     // NOTE: MAX should always be at the end
     MAX
   };
@@ -165,6 +166,8 @@ class QuicTransportStatsCallback {
         return "SERVER_SHUTDOWN";
       case PacketDropReason::INITIAL_CONNID_SMALL:
         return "INITIAL_CONNID_SMALL";
+      case PacketDropReason::CANNOT_MAKE_TRANSPORT:
+        return "CANNOT_MAKE_TRANSPORT";
       case PacketDropReason::MAX:
         return "MAX";
       default:

@@ -387,6 +387,7 @@ void QuicServerWorker::dispatchPacketData(
     dropPacket = true;
   }
 
+  bool cannotMakeTransport = false;
   if (!dropPacket && !transport) {
     // For LongHeader packets without existing associated connection, try to
     // route with destinationConnId chosen by the peer and IP address of the
@@ -423,8 +424,8 @@ void QuicServerWorker::dispatchPacketData(
         auto trans = transportFactory_->make(
             getEventBase(), std::move(sock), client, ctx_);
         if (!trans) {
-          LOG(ERROR) << "Transport factory failed to make new transport";
           dropPacket = true;
+          cannotMakeTransport = true;
         } else {
           CHECK(trans);
           trans->setPacingTimer(pacingTimer_);
@@ -477,6 +478,15 @@ void QuicServerWorker::dispatchPacketData(
   if (!dropPacket) {
     DCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(client, std::move(networkData));
+    return;
+  }
+  if (cannotMakeTransport) {
+    VLOG(3)
+        << "Dropping packet due to transport factory did not make transport";
+    QUIC_STATS(
+        infoCallback_,
+        onPacketDropped,
+        PacketDropReason::CANNOT_MAKE_TRANSPORT);
     return;
   }
   if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
