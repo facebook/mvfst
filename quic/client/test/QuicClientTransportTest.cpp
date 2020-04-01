@@ -1096,6 +1096,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       transportParams = std::move(quicCachedPsk->transportParams);
     }
 
+    getFizzState().sni() = hostname;
+
     connected_ = true;
     writeDataToQuicStream(
         conn_->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
@@ -1221,7 +1223,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   void triggerOnNewCachedPsk() {
     fizz::client::NewCachedPsk psk;
-    callback_->onNewCachedPsk(psk);
+    onNewCachedPsk(psk);
   }
 
   std::unique_ptr<folly::IOBuf> writeBuf;

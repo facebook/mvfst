@@ -10,6 +10,7 @@
 
 #include <quic/client/handshake/FizzClientExtensions.h>
 #include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 
@@ -76,12 +77,6 @@ folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
   return quicCachedPsk;
 }
 
-void FizzClientHandshake::putPsk(
-    const folly::Optional<std::string>& hostname,
-    QuicCachedPsk quicCachedPsk) {
-  fizzContext_->putPsk(hostname, std::move(quicCachedPsk));
-}
-
 void FizzClientHandshake::removePsk(
     const folly::Optional<std::string>& hostname) {
   fizzContext_->removePsk(hostname);
@@ -141,6 +136,25 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
   auto packetNumberCipher = cryptoFactory_.makePacketNumberCipher(secret);
 
   return {std::move(aead), std::move(packetNumberCipher)};
+}
+
+void FizzClientHandshake::onNewCachedPsk(
+    fizz::client::NewCachedPsk& newCachedPsk) noexcept {
+  DCHECK(conn_->version.has_value());
+  DCHECK(conn_->serverInitialParamsSet_);
+
+  QuicCachedPsk quicCachedPsk;
+  quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
+  quicCachedPsk.transportParams = getServerCachedTransportParameters(*conn_);
+
+  if (conn_->earlyDataAppParamsGetter) {
+    auto appParams = conn_->earlyDataAppParamsGetter();
+    if (appParams) {
+      quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
+    }
+  }
+
+  fizzContext_->putPsk(state_.sni(), std::move(quicCachedPsk));
 }
 
 class FizzClientHandshake::ActionMoveVisitor {
@@ -206,9 +220,7 @@ class FizzClientHandshake::ActionMoveVisitor {
   }
 
   void operator()(fizz::client::NewCachedPsk& newCachedPsk) {
-    if (client_.callback_) {
-      client_.callback_->onNewCachedPsk(newCachedPsk);
-    }
+    client_.onNewCachedPsk(newCachedPsk);
   }
 
   void operator()(fizz::EndOfData&) {
