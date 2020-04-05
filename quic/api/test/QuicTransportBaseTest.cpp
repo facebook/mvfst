@@ -1030,6 +1030,36 @@ TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
       QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED));
 }
 
+TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
+  transport->setServerConnectionId();
+  transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
+  auto stream = transport->createBidirectionalStream().value();
+  MockReadCallback rcb;
+  transport->setReadCallback(stream, &rcb);
+  EXPECT_CALL(rcb, readError(stream, _))
+      .Times(1)
+      .WillOnce(Invoke(
+          [](StreamId,
+             std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
+                 error) {
+            EXPECT_EQ("You need to calm down.", *error.second);
+          }));
+
+  EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
+    throw std::runtime_error("You need to calm down.");
+    return 0;
+  }));
+  QuicSocket::WriteResult result = transport->writeChain(
+      stream,
+      folly::IOBuf::copyBuffer("You are being too loud."),
+      true,
+      false,
+      nullptr);
+  evb->loopOnce();
+
+  EXPECT_TRUE(transport->isClosed());
+}
+
 TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();

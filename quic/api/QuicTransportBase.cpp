@@ -213,6 +213,8 @@ void QuicTransportBase::closeGracefully() {
   }
 }
 
+// TODO: t64691045 change the closeImpl API to include both the sanitized and
+// unsanited error message, remove exceptionCloseWhat_.
 void QuicTransportBase::closeImpl(
     folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode,
     bool drainConnection,
@@ -279,6 +281,13 @@ void QuicTransportBase::closeImpl(
   } else if (errorCode) {
     cancelCode = *errorCode;
   }
+  // cancelCode is used for communicating error message to local app layer.
+  // errorCode will be used for localConnectionError, and sent in close frames.
+  // It's safe to include the unsanitized error message in cancelCode
+  if (exceptionCloseWhat_) {
+    cancelCode.second = exceptionCloseWhat_.value();
+  }
+
   bool isReset = false;
   bool isAbandon = false;
   LocalErrorCode* localError = cancelCode.first.asLocalErrorCode();
@@ -390,11 +399,8 @@ void QuicTransportBase::closeImpl(
     if (noError) {
       connCallback_->onConnectionEnd();
     } else {
-      std::string closeStr = exceptionCloseWhat_
-          ? std::move(exceptionCloseWhat_.value())
-          : cancelCode.second.str();
       connCallback_->onConnectionError(
-          std::make_pair(cancelCode.first, closeStr));
+          std::make_pair(cancelCode.first, cancelCode.second.str()));
     }
   }
 
