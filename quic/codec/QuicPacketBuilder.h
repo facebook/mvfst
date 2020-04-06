@@ -42,6 +42,20 @@ class PacketBuilderInterface {
  public:
   virtual ~PacketBuilderInterface() = default;
 
+  // TODO: Temporarly let this interface be reusable across different concrete
+  // builder types. But this isn't optimized for builder that writes both header
+  // and body into a continuous memory.
+  struct Packet {
+    RegularQuicWritePacket packet;
+    Buf header;
+    Buf body;
+
+    Packet(RegularQuicWritePacket packetIn, Buf headerIn, Buf bodyIn)
+        : packet(std::move(packetIn)),
+          header(std::move(headerIn)),
+          body(std::move(bodyIn)) {}
+  };
+
   virtual uint32_t remainingSpaceInPkt() const = 0;
 
   // Functions to write bytes to the packet
@@ -68,16 +82,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
 
   RegularQuicPacketBuilder(RegularQuicPacketBuilder&&) = default;
 
-  struct Packet {
-    RegularQuicWritePacket packet;
-    Buf header;
-    Buf body;
-
-    Packet(RegularQuicWritePacket packetIn, Buf headerIn, Buf bodyIn)
-        : packet(std::move(packetIn)),
-          header(std::move(headerIn)),
-          body(std::move(bodyIn)) {}
-  };
+  using Packet = PacketBuilderInterface::Packet;
 
   RegularQuicPacketBuilder(
       uint32_t remainingBytes,
