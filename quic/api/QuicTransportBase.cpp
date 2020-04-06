@@ -2084,8 +2084,12 @@ void QuicTransportBase::checkForClosedStream() {
         stream->holbCount);
     conn_->streamManager->removeClosedStream(*itr);
     maybeSendStreamLimitUpdates(*conn_);
-    readCallbacks_.erase(*itr);
-    peekCallbacks_.erase(*itr);
+    if (readCbIt != readCallbacks_.end()) {
+      readCallbacks_.erase(readCbIt);
+    }
+    if (peekCbIt != peekCallbacks_.end()) {
+      peekCallbacks_.erase(peekCbIt);
+    }
     itr = conn_->streamManager->closedStreams().erase(itr);
   } // while
 
