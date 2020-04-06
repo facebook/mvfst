@@ -823,6 +823,10 @@ parseLongHeaderInvariant(uint8_t initialByte, folly::io::Cursor& cursor) {
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   uint8_t destConnIdLen = cursor.readBE<uint8_t>();
+  if (destConnIdLen > kMaxConnectionIdSize) {
+    VLOG(5) << "destConnIdLen > kMaxConnectionIdSize: " << destConnIdLen;
+    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+  }
   if (!cursor.canAdvance(destConnIdLen)) {
     VLOG(5) << "Not enough input bytes to read Dest. ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -833,6 +837,10 @@ parseLongHeaderInvariant(uint8_t initialByte, folly::io::Cursor& cursor) {
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   uint8_t srcConnIdLen = cursor.readBE<uint8_t>();
+  if (srcConnIdLen > kMaxConnectionIdSize) {
+    VLOG(5) << "srcConnIdLen > kMaxConnectionIdSize: " << srcConnIdLen;
+    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+  }
   if (!cursor.canAdvance(srcConnIdLen)) {
     VLOG(5) << "Not enough input bytes to read Source ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -927,6 +935,11 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
     uint8_t originalDstConnIdLen = cursor.readBE<uint8_t>();
+    if (originalDstConnIdLen > kMaxConnectionIdSize) {
+      VLOG(5) << "originalDstConnIdLen > kMaxConnectionIdSize: "
+              << originalDstConnIdLen;
+      return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+    }
     if (!cursor.canAdvance(originalDstConnIdLen)) {
       VLOG(5) << "Not enough bytes for ODCID";
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
@@ -1015,6 +1028,10 @@ parseShortHeaderInvariants(
   }
   // TODO(t39154014, yangchi): read the length from the connection state in
   // draft-17
+  if (dstConnIdSize > kMaxConnectionIdSize) {
+    VLOG(5) << "dstConnIdSize > kMaxConnectionIdSize: " << dstConnIdSize;
+    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+  }
   if (!cursor.canAdvance(dstConnIdSize)) {
     VLOG(5) << "Not enough input bytes for ConnectionId";
     return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);

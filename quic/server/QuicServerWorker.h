@@ -309,7 +309,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   /**
    * Try handling the data as a health check.
    */
-  void tryHandlingAsHealthCheck(
+  bool tryHandlingAsHealthCheck(
       const folly::SocketAddress& client,
       const folly::IOBuf& data);
 

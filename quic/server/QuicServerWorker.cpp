@@ -237,7 +237,12 @@ void QuicServerWorker::handleNetworkData(
       folly::Expected<ShortHeaderInvariant, TransportErrorCode>
           parsedShortHeader = parseShortHeaderInvariants(initialByte, cursor);
       if (!parsedShortHeader) {
-        return tryHandlingAsHealthCheck(client, *data);
+        if (!tryHandlingAsHealthCheck(client, *data)) {
+          QUIC_STATS(
+              infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+          VLOG(6) << "Failed to parse short header";
+        }
+        return;
       }
       RoutingData routingData(
           headerForm,
@@ -255,7 +260,12 @@ void QuicServerWorker::handleNetworkData(
     folly::Expected<ParsedLongHeaderInvariant, TransportErrorCode>
         parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
     if (!parsedLongHeader) {
-      return tryHandlingAsHealthCheck(client, *data);
+      if (!tryHandlingAsHealthCheck(client, *data)) {
+        QUIC_STATS(
+            infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+        VLOG(6) << "Failed to parse long header";
+      }
+      return;
     }
 
     // TODO: check version before looking at type
@@ -301,17 +311,14 @@ void QuicServerWorker::handleNetworkData(
   }
 }
 
-void QuicServerWorker::tryHandlingAsHealthCheck(
+bool QuicServerWorker::tryHandlingAsHealthCheck(
     const folly::SocketAddress& client,
     const folly::IOBuf& data) {
   // If we cannot parse the long header then it is not a QUIC invariant
   // packet, so just drop it after checking whether it could be a health
   // check.
   if (!healthCheckToken_) {
-    VLOG(4) << "Dropping packet, cannot parse header client=" << client;
-    QUIC_STATS(
-        infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
-    return;
+    return false;
   }
 
   folly::IOBufEqualTo eq;
@@ -323,7 +330,9 @@ void QuicServerWorker::tryHandlingAsHealthCheck(
     // ignore the error code.
     VLOG(4) << "Health check request, response=OK";
     socket_->write(client, folly::IOBuf::copyBuffer("OK"));
+    return true;
   }
+  return false;
 }
 
 void QuicServerWorker::forwardNetworkData(
