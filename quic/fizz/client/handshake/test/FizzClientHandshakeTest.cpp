@@ -24,11 +24,11 @@
 #include <folly/ssl/Init.h>
 
 #include <quic/client/handshake/ClientTransportParametersExtension.h>
-#include <quic/client/handshake/FizzClientHandshake.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/client/handshake/FizzClientHandshake.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/state/QuicStreamFunctions.h>

@@ -6,9 +6,9 @@
  *
  */
 
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
-#include <quic/client/handshake/FizzClientHandshake.h>
+#include <quic/fizz/client/handshake/FizzClientHandshake.h>
 
 namespace quic {
 

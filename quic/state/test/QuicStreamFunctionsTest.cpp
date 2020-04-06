@@ -12,9 +12,9 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
 
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
 using namespace folly;

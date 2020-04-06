@@ -20,12 +20,12 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
-#include <quic/client/handshake/FizzClientHandshake.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/client/handshake/test/MockQuicPskCache.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/client/handshake/FizzClientHandshake.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/client/handshake/test/MockQuicPskCache.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/handshake/test/Mocks.h>

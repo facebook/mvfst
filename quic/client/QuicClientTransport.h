@@ -14,7 +14,6 @@
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/net/NetOps.h>
 #include <quic/api/QuicTransportBase.h>
-#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/BufUtil.h>
 

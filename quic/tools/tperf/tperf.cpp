@@ -15,9 +15,9 @@
 #include <folly/stats/Histogram.h>
 
 #include <quic/client/QuicClientTransport.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>

@@ -13,11 +13,8 @@ quic_add_test(TARGET QuicClientTransportTest
   DEPENDS
   Folly::folly
   ${LIBGMOCK_LIBRARIES}
-  mvfst_bufutil
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_types
-  mvfst_fizz_handshake
   mvfst_server
   mvfst_test_utils
-  mvfst_transport
 )

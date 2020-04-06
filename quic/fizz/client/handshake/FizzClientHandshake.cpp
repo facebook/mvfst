@@ -6,12 +6,12 @@
  *
  */
 
-#include <quic/client/handshake/FizzClientHandshake.h>
+#include <quic/fizz/client/handshake/FizzClientHandshake.h>
 
-#include <quic/client/handshake/FizzClientExtensions.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
-#include <quic/client/handshake/QuicPskCache.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/fizz/client/handshake/FizzClientExtensions.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/client/handshake/QuicPskCache.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 
 #include <fizz/client/EarlyDataRejectionPolicy.h>

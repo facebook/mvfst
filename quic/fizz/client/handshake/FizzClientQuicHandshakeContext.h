@@ -10,7 +10,7 @@
 
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 
-#include <quic/client/handshake/QuicPskCache.h>
+#include <quic/fizz/client/handshake/QuicPskCache.h>
 
 #include <fizz/client/FizzClientContext.h>
 #include <fizz/protocol/DefaultCertificateVerifier.h>

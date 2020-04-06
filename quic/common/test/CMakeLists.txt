@@ -17,7 +17,6 @@ add_library(
 target_include_directories(
   mvfst_test_utils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
   ${LIBGMOCK_INCLUDE_DIR}
   ${LIBGTEST_INCLUDE_DIR}
 )
@@ -30,10 +29,9 @@ target_compile_options(
 
 add_dependencies(
   mvfst_test_utils
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_machine
   mvfst_transport
@@ -42,13 +40,11 @@ add_dependencies(
 target_link_libraries(
   mvfst_test_utils PUBLIC
   Folly::folly
-  ${LIBFIZZ_LIBRARY}
   ${LIBGMOCK_LIBRARIES}
   ${LIBGTEST_LIBRARIES}
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_machine
   mvfst_transport
@@ -64,12 +60,10 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   BufUtilTest.cpp
   DEPENDS
   Folly::folly
-  ${LIBFIZZ_LIBRARY}
   mvfst_bufutil
-  mvfst_client
+  mvfst_fizz_client
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_fizz_handshake
   mvfst_looper
   mvfst_transport
   mvfst_server

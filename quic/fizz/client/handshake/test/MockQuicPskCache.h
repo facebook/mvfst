@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <quic/client/handshake/QuicPskCache.h>
+#include <quic/fizz/client/handshake/QuicPskCache.h>
 
 #include <folly/Optional.h>
 #include <folly/portability/GMock.h>
