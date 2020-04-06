@@ -101,6 +101,31 @@ TEST_P(QuicIntegerEncodeTest, GetSize) {
   EXPECT_EQ(*size, GetParam().hexEncoded.size() / 2);
 }
 
+TEST_F(QuicIntegerEncodeTest, ForceFourBytes) {
+  auto queue = folly::IOBuf::create(0);
+  BufAppender appender(queue.get(), 10);
+  auto appendOp = [&](auto val) { appender.writeBE(val); };
+  EXPECT_EQ(4, *encodeQuicInteger(37, appendOp, 4));
+  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
+  EXPECT_EQ("80000025", encodedValue);
+}
+
+TEST_F(QuicIntegerEncodeTest, ForceEightBytes) {
+  auto queue = folly::IOBuf::create(0);
+  BufAppender appender(queue.get(), 10);
+  auto appendOp = [&](auto val) { appender.writeBE(val); };
+  EXPECT_EQ(8, *encodeQuicInteger(37, appendOp, 8));
+  auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
+  EXPECT_EQ("c000000000000025", encodedValue);
+}
+
+TEST_F(QuicIntegerEncodeTest, ForceWrongBytes) {
+  auto queue = folly::IOBuf::create(0);
+  BufAppender appender(queue.get(), 10);
+  auto appendOp = [&](auto val) { appender.writeBE(val); };
+  EXPECT_DEATH(encodeQuicInteger(15293, appendOp, 1), "");
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicIntegerTests,
     QuicIntegerDecodeTest,
