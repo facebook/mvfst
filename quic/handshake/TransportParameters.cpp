@@ -53,7 +53,10 @@ TransportParameter encodeIntegerParameter(
     uint64_t value) {
   std::unique_ptr<folly::IOBuf> data = folly::IOBuf::create(8);
   BufAppender appender(data.get(), 8);
-  auto encoded = encodeQuicInteger(value, appender);
+  auto encoded = encodeQuicInteger(
+      value, [appender = std::move(appender)](auto val) mutable {
+        appender.writeBE(val);
+      });
   if (!encoded) {
     throw QuicTransportException(
         "Invalid integer parameter",

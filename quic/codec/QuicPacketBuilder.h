@@ -62,7 +62,7 @@ class PacketBuilderInterface {
   virtual const PacketHeader& getPacketHeader() const = 0;
 };
 
-class RegularQuicPacketBuilder : public PacketBuilderInterface {
+class RegularQuicPacketBuilder final : public PacketBuilderInterface {
  public:
   ~RegularQuicPacketBuilder() override = default;
 

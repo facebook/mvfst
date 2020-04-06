@@ -75,13 +75,14 @@ TEST_P(QuicIntegerDecodeTest, DecodeAtMost) {
 TEST_P(QuicIntegerEncodeTest, Encode) {
   auto queue = folly::IOBuf::create(0);
   BufAppender appender(queue.get(), 10);
+  auto appendOp = [&](auto val) { appender.writeBE(val); };
   if (GetParam().error) {
-    auto size = encodeQuicInteger(GetParam().decoded, appender);
+    auto size = encodeQuicInteger(GetParam().decoded, appendOp);
     EXPECT_TRUE(size.hasError());
     EXPECT_EQ(size.error(), TransportErrorCode::INTERNAL_ERROR);
     return;
   }
-  auto written = encodeQuicInteger(GetParam().decoded, appender);
+  auto written = encodeQuicInteger(GetParam().decoded, appendOp);
   auto encodedValue = folly::hexlify(queue->moveToFbString().toStdString());
   LOG(INFO) << "encoded=" << encodedValue;
   LOG(INFO) << "expected=" << GetParam().hexEncoded;

@@ -43,56 +43,6 @@ uint8_t decodeQuicIntegerLength(uint8_t firstByte) {
   return (1 << ((firstByte >> 6) & 0x03));
 }
 
-folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
-    uint64_t value,
-    BufAppender& appender) {
-  if (value <= kOneByteLimit) {
-    uint8_t modified = static_cast<uint8_t>(value);
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kTwoByteLimit) {
-    uint16_t reduced = static_cast<uint16_t>(value);
-    uint16_t modified = reduced | 0x4000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kFourByteLimit) {
-    uint32_t reduced = static_cast<uint32_t>(value);
-    uint32_t modified = reduced | 0x80000000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kEightByteLimit) {
-    uint64_t modified = value | 0xC000000000000000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  }
-  return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
-}
-
-folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
-    uint64_t value,
-    folly::io::QueueAppender& appender) {
-  if (value <= kOneByteLimit) {
-    uint8_t modified = static_cast<uint8_t>(value);
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kTwoByteLimit) {
-    uint16_t reduced = static_cast<uint16_t>(value);
-    uint16_t modified = reduced | 0x4000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kFourByteLimit) {
-    uint32_t reduced = static_cast<uint32_t>(value);
-    uint32_t modified = reduced | 0x80000000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  } else if (value <= kEightByteLimit) {
-    uint64_t modified = value | 0xC000000000000000;
-    appender.writeBE(modified);
-    return sizeof(modified);
-  }
-  return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
-}
-
 folly::Optional<std::pair<uint64_t, size_t>> decodeQuicInteger(
     folly::io::Cursor& cursor,
     uint64_t atMost) {
@@ -147,16 +97,6 @@ QuicInteger::QuicInteger(uint64_t value) : value_(value) {}
 
 size_t QuicInteger::getSize() const {
   auto size = getQuicIntegerSize(value_);
-  if (size.hasError()) {
-    LOG(ERROR) << "Value too large value=" << value_;
-    throw QuicTransportException(
-        folly::to<std::string>("Value too large ", value_), size.error());
-  }
-  return size.value();
-}
-
-size_t QuicInteger::encode(BufAppender& appender) const {
-  auto size = encodeQuicInteger(value_, appender);
   if (size.hasError()) {
     LOG(ERROR) << "Value too large value=" << value_;
     throw QuicTransportException(

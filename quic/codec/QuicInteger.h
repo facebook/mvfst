@@ -26,13 +26,31 @@ constexpr uint64_t kEightByteLimit = 0x3FFFFFFFFFFFFFFF;
  * bytes written, or an error if value is too large to be represented with the
  * variable length encoding.
  */
+template <typename BufOp>
 folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
     uint64_t value,
-    BufAppender& appender);
-
-folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
-    uint64_t value,
-    folly::io::QueueAppender& appender);
+    BufOp appender) {
+  if (value <= kOneByteLimit) {
+    auto modified = static_cast<uint8_t>(value);
+    appender(modified);
+    return sizeof(modified);
+  } else if (value <= kTwoByteLimit) {
+    auto reduced = static_cast<uint16_t>(value);
+    uint16_t modified = reduced | 0x4000;
+    appender(modified);
+    return sizeof(modified);
+  } else if (value <= kFourByteLimit) {
+    auto reduced = static_cast<uint32_t>(value);
+    uint32_t modified = reduced | 0x80000000;
+    appender(modified);
+    return sizeof(modified);
+  } else if (value <= kEightByteLimit) {
+    uint64_t modified = value | 0xC000000000000000;
+    appender(modified);
+    return sizeof(modified);
+  }
+  return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
+};
 
 /**
  * Reads an integer out of the cursor and returns a pair with the integer and
@@ -72,7 +90,16 @@ class QuicInteger {
   /**
    * Encodes a QUIC integer to the appender.
    */
-  size_t encode(BufAppender& appender) const;
+  template <typename BufOp>
+  size_t encode(BufOp appender) const {
+    auto size = encodeQuicInteger(value_, std::move(appender));
+    if (size.hasError()) {
+      LOG(ERROR) << "Value too large value=" << value_;
+      throw QuicTransportException(
+          folly::to<std::string>("Value too large ", value_), size.error());
+    }
+    return size.value();
+  };
 
   /**
    * Returns the number of bytes needed to represent the QUIC integer in

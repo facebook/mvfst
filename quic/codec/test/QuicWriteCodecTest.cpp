@@ -93,7 +93,8 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
 
   EXPECT_CALL(pktBuilder, write(_))
       .WillRepeatedly(Invoke([&](const QuicInteger& quicInteger) {
-        quicInteger.encode(pktBuilder.appender_);
+        quicInteger.encode(
+            [&](auto val) { pktBuilder.appender_.writeBE(val); });
         pktBuilder.remaining_ -= quicInteger.getSize();
       }));
 }

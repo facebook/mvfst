@@ -18,10 +18,11 @@ namespace quic {
 inline void encodeVarintParams(
     const std::vector<TransportParameter>& parameters,
     BufAppender& appender) {
+  auto appenderOp = [&](auto val) { appender.writeBE(val); };
   for (auto& param : parameters) {
-    encodeQuicInteger(static_cast<uint64_t>(param.parameter), appender);
+    encodeQuicInteger(static_cast<uint64_t>(param.parameter), appenderOp);
     size_t len = param.value->computeChainDataLength();
-    encodeQuicInteger(len, appender);
+    encodeQuicInteger(len, appenderOp);
     appender.insert(param.value->clone());
   }
 }

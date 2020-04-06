@@ -13,15 +13,10 @@
 
 namespace quic {
 
+template <typename BufOp = BufAppender>
 PacketNumEncodingResult encodeLongHeaderHelper(
     const LongHeader& longHeader,
-    BufAppender& appender,
-    uint32_t& spaceCounter,
-    PacketNum largestAckedPacketNum);
-
-PacketNumEncodingResult encodeLongHeaderHelper(
-    const LongHeader& longHeader,
-    BufAppender& appender,
+    BufOp& bufop,
     uint32_t& spaceCounter,
     PacketNum largestAckedPacketNum) {
   uint8_t initialByte = kHeaderFormMask | LongHeader::kFixedBitMask |
@@ -38,7 +33,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     initialByte |= (odcidSize == 0 ? 0 : odcidSize - 3);
   }
 
-  appender.writeBE<uint8_t>(initialByte);
+  bufop.template writeBE<uint8_t>(initialByte);
   bool isInitial = longHeader.getHeaderType() == LongHeader::Types::Initial;
   uint64_t tokenHeaderLength = 0;
   const std::string& token = longHeader.getToken();
@@ -57,35 +52,65 @@ PacketNumEncodingResult encodeLongHeaderHelper(
   } else {
     spaceCounter -= longHeaderSize;
   }
-  appender.writeBE<uint32_t>(folly::to<uint32_t>(longHeader.getVersion()));
-  appender.writeBE<uint8_t>(longHeader.getDestinationConnId().size());
-  appender.push(
+  bufop.template writeBE<uint32_t>(
+      folly::to<uint32_t>(longHeader.getVersion()));
+  bufop.template writeBE<uint8_t>(longHeader.getDestinationConnId().size());
+  bufop.push(
       longHeader.getDestinationConnId().data(),
       longHeader.getDestinationConnId().size());
-  appender.writeBE<uint8_t>(longHeader.getSourceConnId().size());
-  appender.push(
+  bufop.template writeBE<uint8_t>(longHeader.getSourceConnId().size());
+  bufop.push(
       longHeader.getSourceConnId().data(), longHeader.getSourceConnId().size());
 
   if (isInitial) {
     uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
-    tokenLengthInt.encode(appender);
+    tokenLengthInt.encode([&](auto val) { bufop.writeBE(val); });
     if (tokenLength > 0) {
-      appender.push((const uint8_t*)token.data(), token.size());
+      bufop.push((const uint8_t*)token.data(), token.size());
     }
   }
 
   if (longHeader.getHeaderType() == LongHeader::Types::Retry) {
     auto& originalDstConnId = longHeader.getOriginalDstConnId();
-    appender.writeBE<uint8_t>(longHeader.getOriginalDstConnId()->size());
-    appender.push(originalDstConnId->data(), originalDstConnId->size());
+    bufop.template writeBE<uint8_t>(longHeader.getOriginalDstConnId()->size());
+    bufop.push(originalDstConnId->data(), originalDstConnId->size());
 
     // Write the retry token
     CHECK(!token.empty()) << "Retry packet must contain a token";
-    appender.push((const uint8_t*)token.data(), token.size());
+    bufop.push((const uint8_t*)token.data(), token.size());
   }
   // defer write of the packet num and length till payload has been computed
   return encodedPacketNum;
+}
+
+template <typename BufOp = BufAppender>
+folly::Optional<PacketNumEncodingResult> encodeShortHeaderHelper(
+    const ShortHeader& shortHeader,
+    BufOp& bufop,
+    uint32_t& spaceCounter,
+    PacketNum largestAckedPacketNum) {
+  auto packetNumberEncoding = encodePacketNumber(
+      shortHeader.getPacketSequenceNum(), largestAckedPacketNum);
+  if (spaceCounter <
+      1U + packetNumberEncoding.length + shortHeader.getConnectionId().size()) {
+    spaceCounter = 0;
+    return folly::none;
+  }
+  uint8_t initialByte =
+      ShortHeader::kFixedBitMask | (packetNumberEncoding.length - 1);
+  initialByte &= ~ShortHeader::kReservedBitsMask;
+  if (shortHeader.getProtectionType() == ProtectionType::KeyPhaseOne) {
+    initialByte |= ShortHeader::kKeyPhaseMask;
+  }
+  bufop.template writeBE<uint8_t>(initialByte);
+  --spaceCounter;
+
+  bufop.push(
+      shortHeader.getConnectionId().data(),
+      shortHeader.getConnectionId().size());
+  spaceCounter -= shortHeader.getConnectionId().size();
+  return packetNumberEncoding;
 }
 
 RegularQuicPacketBuilder::RegularQuicPacketBuilder(
@@ -129,7 +154,8 @@ void RegularQuicPacketBuilder::writeBE(uint64_t data) {
 }
 
 void RegularQuicPacketBuilder::write(const QuicInteger& quicInteger) {
-  remainingBytes_ -= quicInteger.encode(bodyAppender_);
+  remainingBytes_ -=
+      quicInteger.encode([&](auto val) { bodyAppender_.writeBE(val); });
 }
 
 void RegularQuicPacketBuilder::appendBytes(
@@ -175,7 +201,7 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
     QuicInteger pktLen(
         packetNumberEncoding_->length + body_->computeChainDataLength() +
         cipherOverhead_);
-    pktLen.encode(headerAppender_);
+    pktLen.encode([&](auto val) { headerAppender_.writeBE(val); });
     appendBytes(
         headerAppender_,
         packetNumberEncoding_->result,
@@ -205,30 +231,14 @@ void RegularQuicPacketBuilder::encodeLongHeader(
 void RegularQuicPacketBuilder::encodeShortHeader(
     const ShortHeader& shortHeader,
     PacketNum largestAckedPacketNum) {
-  packetNumberEncoding_ = encodePacketNumber(
-      shortHeader.getPacketSequenceNum(), largestAckedPacketNum);
-  if (remainingBytes_ < 1U + packetNumberEncoding_->length +
-          shortHeader.getConnectionId().size()) {
-    remainingBytes_ = 0;
-    return;
+  packetNumberEncoding_ = encodeShortHeaderHelper(
+      shortHeader, headerAppender_, remainingBytes_, largestAckedPacketNum);
+  if (packetNumberEncoding_) {
+    RegularQuicPacketBuilder::appendBytes(
+        headerAppender_,
+        packetNumberEncoding_->result,
+        packetNumberEncoding_->length);
   }
-  uint8_t initialByte =
-      ShortHeader::kFixedBitMask | (packetNumberEncoding_->length - 1);
-  initialByte &= ~ShortHeader::kReservedBitsMask;
-  if (shortHeader.getProtectionType() == ProtectionType::KeyPhaseOne) {
-    initialByte |= ShortHeader::kKeyPhaseMask;
-  }
-  headerAppender_.writeBE<uint8_t>(initialByte);
-  --remainingBytes_;
-
-  headerAppender_.push(
-      shortHeader.getConnectionId().data(),
-      shortHeader.getConnectionId().size());
-  remainingBytes_ -= shortHeader.getConnectionId().size();
-  appendBytes(
-      headerAppender_,
-      packetNumberEncoding_->result,
-      packetNumberEncoding_->length);
 }
 
 void RegularQuicPacketBuilder::push(const uint8_t* data, size_t len) {
