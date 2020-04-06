@@ -149,4 +149,47 @@ void BufAppender::insert(std::unique_ptr<folly::IOBuf> data) {
   crtBuf_ = dataPtr;
 }
 
+BufWriter::BufWriter(folly::IOBuf& iobuf, size_t most)
+    : iobuf_(iobuf), most_(most) {
+  CHECK(iobuf_.tailroom() >= most_)
+      << "Buffer room=" << iobuf_.tailroom() << " limit=" << most_;
+}
+
+void BufWriter::push(const uint8_t* data, size_t len) {
+  sizeCheck(len);
+  memcpy(iobuf_.writableTail(), data, len);
+  iobuf_.append(len);
+  written_ += len;
+}
+
+void BufWriter::insert(std::unique_ptr<folly::IOBuf> data) {
+  copy(std::move(data));
+}
+
+void BufWriter::append(size_t len) {
+  iobuf_.append(len);
+  written_ += len;
+  appendCount_ += len;
+}
+
+void BufWriter::copy(std::unique_ptr<folly::IOBuf> data) {
+  sizeCheck(data->computeChainDataLength());
+  size_t totalInserted = 0;
+  folly::IOBuf* curBuf = data.get();
+  while (curBuf != data->prev()) {
+    push(curBuf->data(), curBuf->length());
+    totalInserted += curBuf->length();
+    curBuf = curBuf->next();
+  }
+  push(curBuf->data(), curBuf->length());
+  totalInserted += curBuf->length();
+  CHECK_EQ(data->computeChainDataLength(), totalInserted);
+}
+
+void BufWriter::backFill(const uint8_t* data, size_t len, size_t destOffset) {
+  CHECK_GE(appendCount_, len);
+  appendCount_ -= len;
+  CHECK_LE(destOffset + len, iobuf_.length());
+  memcpy(iobuf_.writableData() + destOffset, data, len);
+}
 } // namespace quic

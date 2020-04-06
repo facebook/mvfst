@@ -85,4 +85,52 @@ class BufAppender {
   bool lastBufShared_{false};
 };
 
+class BufWriter {
+ public:
+  explicit BufWriter(folly::IOBuf& iobuf, size_t most);
+
+  template <class T>
+  void writeBE(T data) {
+    auto dataSize = sizeof(T);
+    sizeCheck(dataSize);
+    auto bigEndian = folly::Endian::big(data);
+    push((uint8_t*)&bigEndian, dataSize);
+  }
+
+  void push(const uint8_t* data, size_t len);
+
+  /**
+   * Push len amound from data into the IOBuf, starting at IOBuf's destOffset
+   * position. Given this is a back fill, we don't increase the written bytes
+   * count for this API, since they should be already counted in a previous
+   * append() call.
+   */
+  void backFill(const uint8_t* data, size_t len, size_t destOffset);
+
+  // TODO: OK, "insert" is a lie. Inside, we copy. But I'd like the BufWriter
+  // to have the same interface as BufAppender during the transition period.
+  void insert(std::unique_ptr<folly::IOBuf> data);
+
+  void append(size_t len);
+
+ private:
+  // TODO: This is caller responsibility for now so the BufWriter conform with
+  // BufAppender interface. But once BufAppender is replaced by BufWriter, we
+  // should let BufWriter check the size and return error code if it fails to
+  // write.
+  void sizeCheck(size_t dataSize) {
+    CHECK(iobuf_.tailroom() >= dataSize && written_ + dataSize <= most_)
+        << "Buffer room=" << iobuf_.tailroom() << " inputSize=" << dataSize
+        << " written=" << written_ << " limit=" << most_;
+  }
+
+  void copy(std::unique_ptr<folly::IOBuf> data);
+
+ private:
+  folly::IOBuf& iobuf_;
+  size_t most_;
+  size_t written_{0};
+  size_t appendCount_{0};
+};
+
 } // namespace quic
