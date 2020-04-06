@@ -829,6 +829,25 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamCallback) {
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, onNewStreamCallbackDoesNotRemove) {
+  auto readData = folly::IOBuf::copyBuffer("actual stream data");
+  StreamId uniStream1 = 2;
+  StreamId uniStream2 = uniStream1 + kStreamIncrement;
+  EXPECT_CALL(connCallback, onNewUnidirectionalStream(uniStream1))
+      .WillOnce(Invoke([&](StreamId id) {
+        ASSERT_FALSE(transport->read(id, 100).hasError());
+      }));
+  EXPECT_CALL(connCallback, onNewUnidirectionalStream(uniStream2))
+      .WillOnce(Invoke([&](StreamId id) {
+        ASSERT_FALSE(transport->read(id, 100).hasError());
+      }));
+  transport->addDataToStream(
+      uniStream1, StreamBuffer(readData->clone(), 0, true));
+  transport->addDataToStream(
+      uniStream2, StreamBuffer(readData->clone(), 0, true));
+  transport.reset();
+}
+
 TEST_F(QuicTransportImplTest, onNewBidirectionalStreamStreamOutOfOrder) {
   InSequence dummy;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");

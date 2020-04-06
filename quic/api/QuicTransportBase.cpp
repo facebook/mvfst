@@ -1255,7 +1255,6 @@ folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
   }
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   SCOPE_EXIT {
-    checkForClosedStream();
     updateReadLooper();
     updatePeekLooper(); // read can affect "peek" API
     updateWriteLooper(true);
@@ -1317,7 +1316,6 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
   }
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   SCOPE_EXIT {
-    checkForClosedStream();
     updatePeekLooper();
     updateWriteLooper(true);
   };
@@ -1375,7 +1373,6 @@ folly::
   }
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   SCOPE_EXIT {
-    checkForClosedStream();
     updatePeekLooper();
     updateReadLooper(); // consume may affect "read" API
     updateWriteLooper(true);
