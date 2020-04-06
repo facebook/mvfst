@@ -46,6 +46,7 @@ struct Nothing {};
 struct CodecResult {
   enum class Type {
     REGULAR_PACKET,
+    RETRY,
     CIPHER_UNAVAILABLE,
     STATELESS_RESET,
     NOTHING
@@ -59,12 +60,14 @@ struct CodecResult {
   /* implicit */ CodecResult(RegularQuicPacket&& regularPacketIn);
   /* implicit */ CodecResult(CipherUnavailable&& cipherUnavailableIn);
   /* implicit */ CodecResult(StatelessReset&& statelessReset);
+  /* implicit */ CodecResult(RetryPacket&& retryPacket);
   /* implicit */ CodecResult(Nothing&& nothing);
 
   Type type();
   RegularQuicPacket* regularPacket();
   CipherUnavailable* cipherUnavailable();
   StatelessReset* statelessReset();
+  RetryPacket* retryPacket();
   Nothing* nothing();
 
  private:
@@ -72,6 +75,7 @@ struct CodecResult {
 
   union {
     RegularQuicPacket packet;
+    RetryPacket retry;
     CipherUnavailable cipher;
     StatelessReset reset;
     Nothing none;

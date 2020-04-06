@@ -48,6 +48,7 @@ constexpr auto kNoData = "no data";
 constexpr auto kUnexpectedProtectionLevel = "unexpected protection level";
 constexpr auto kBufferUnavailable = "buffer unavailable";
 constexpr auto kReset = "reset";
+constexpr auto kRetry = "retry";
 constexpr auto kPtoAlarm = "pto alarm";
 constexpr auto kHandshakeAlarm = "handshake alarm";
 constexpr auto kLossTimeoutExpired = "loss timeout expired";

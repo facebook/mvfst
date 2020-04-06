@@ -631,6 +631,15 @@ void onServerReadDataFromOpen(
             parsedPacket.cipherUnavailable(), conn, packetSize, readData);
         break;
       }
+      case CodecResult::Type::RETRY: {
+        VLOG(10) << "drop because the server is not supposed to "
+                 << "receive a retry " << conn;
+        if (conn.qLogger) {
+          conn.qLogger->addPacketDrop(packetSize, kRetry);
+        }
+        QUIC_TRACE(packet_drop, conn, "retry");
+        break;
+      }
       case CodecResult::Type::STATELESS_RESET: {
         VLOG(10) << "drop because reset " << conn;
         if (conn.qLogger) {
@@ -1094,6 +1103,15 @@ void onServerReadDataFromClosed(
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
       QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
+      break;
+    }
+    case CodecResult::Type::RETRY: {
+      VLOG(10) << "drop because the server is not supposed to "
+               << "receive a retry " << conn;
+      if (conn.qLogger) {
+        conn.qLogger->addPacketDrop(packetSize, kRetry);
+      }
+      QUIC_TRACE(packet_drop, conn, "retry");
       break;
     }
     case CodecResult::Type::STATELESS_RESET: {

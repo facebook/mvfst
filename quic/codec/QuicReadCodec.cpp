@@ -480,6 +480,11 @@ CodecResult::CodecResult(StatelessReset&& statelessResetIn)
   new (&reset) StatelessReset(std::move(statelessResetIn));
 }
 
+CodecResult::CodecResult(RetryPacket&& retryPacketIn)
+    : type_(CodecResult::Type::RETRY) {
+  new (&retry) RetryPacket(std::move(retryPacketIn));
+}
+
 CodecResult::CodecResult(Nothing&&) : type_(CodecResult::Type::NOTHING) {
   new (&none) Nothing();
 }
@@ -488,6 +493,9 @@ void CodecResult::destroyCodecResult() {
   switch (type_) {
     case CodecResult::Type::REGULAR_PACKET:
       packet.~RegularQuicPacket();
+      break;
+    case CodecResult::Type::RETRY:
+      retry.~RetryPacket();
       break;
     case CodecResult::Type::CIPHER_UNAVAILABLE:
       cipher.~CipherUnavailable();
@@ -510,6 +518,9 @@ CodecResult::CodecResult(CodecResult&& other) noexcept {
     case CodecResult::Type::REGULAR_PACKET:
       new (&packet) RegularQuicPacket(std::move(other.packet));
       break;
+    case CodecResult::Type::RETRY:
+      new (&retry) RetryPacket(std::move(other.retry));
+      break;
     case CodecResult::Type::CIPHER_UNAVAILABLE:
       new (&cipher) CipherUnavailable(std::move(other.cipher));
       break;
@@ -528,6 +539,9 @@ CodecResult& CodecResult::operator=(CodecResult&& other) noexcept {
   switch (other.type_) {
     case CodecResult::Type::REGULAR_PACKET:
       new (&packet) RegularQuicPacket(std::move(other.packet));
+      break;
+    case CodecResult::Type::RETRY:
+      new (&retry) RetryPacket(std::move(other.retry));
       break;
     case CodecResult::Type::CIPHER_UNAVAILABLE:
       new (&cipher) CipherUnavailable(std::move(other.cipher));
@@ -564,6 +578,13 @@ CipherUnavailable* CodecResult::cipherUnavailable() {
 StatelessReset* CodecResult::statelessReset() {
   if (type_ == CodecResult::Type::STATELESS_RESET) {
     return &reset;
+  }
+  return nullptr;
+}
+
+RetryPacket* CodecResult::retryPacket() {
+  if (type_ == CodecResult::Type::RETRY) {
+    return &retry;
   }
   return nullptr;
 }

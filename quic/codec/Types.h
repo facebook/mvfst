@@ -886,6 +886,20 @@ struct RegularPacket {
       : header(std::move(headerIn)) {}
 };
 
+struct RetryPacket {
+  RetryPacket(
+      LongHeader&& longHeaderIn,
+      Buf integrityTagIn,
+      uint8_t initialByteIn)
+      : header(std::move(longHeaderIn)),
+        integrityTag(std::move(integrityTagIn)),
+        initialByte(initialByteIn) {}
+
+  LongHeader header;
+  Buf integrityTag;
+  uint8_t initialByte;
+};
+
 /**
  * A representation of a regular packet that is read from the network.
  * This could be either Cleartext or Encrypted packets in long or short form.
