@@ -84,6 +84,25 @@ void setupCommonExpects(MockQuicPacketBuilder& pktBuilder) {
         pktBuilder.appender_.insert(std::move(buf));
       })));
 
+  EXPECT_CALL(pktBuilder, _insert(_, _))
+      .WillRepeatedly(WithArgs<0, 1>(Invoke([&](Buf& buf, size_t limit) {
+        pktBuilder.remaining_ -= limit;
+        std::unique_ptr<folly::IOBuf> cloneBuf;
+        folly::io::Cursor cursor(buf.get());
+        cursor.clone(cloneBuf, limit);
+        pktBuilder.appender_.insert(std::move(cloneBuf));
+      })));
+
+  EXPECT_CALL(pktBuilder, insert(_, _))
+      .WillRepeatedly(
+          WithArgs<0, 1>(Invoke([&](const BufQueue& buf, size_t limit) {
+            pktBuilder.remaining_ -= limit;
+            std::unique_ptr<folly::IOBuf> cloneBuf;
+            folly::io::Cursor cursor(buf.front());
+            cursor.clone(cloneBuf, limit);
+            pktBuilder.appender_.insert(std::move(cloneBuf));
+          })));
+
   EXPECT_CALL(pktBuilder, push(_, _))
       .WillRepeatedly(
           WithArgs<0, 1>(Invoke([&](const uint8_t* data, size_t len) {

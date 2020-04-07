@@ -162,8 +162,13 @@ void BufWriter::push(const uint8_t* data, size_t len) {
   written_ += len;
 }
 
-void BufWriter::insert(std::unique_ptr<folly::IOBuf> data) {
-  copy(std::move(data));
+void BufWriter::insert(const folly::IOBuf* data) {
+  auto totalLength = data->computeChainDataLength();
+  insert(data, totalLength);
+}
+
+void BufWriter::insert(const folly::IOBuf* data, size_t limit) {
+  copy(data, limit);
 }
 
 void BufWriter::append(size_t len) {
@@ -172,18 +177,25 @@ void BufWriter::append(size_t len) {
   appendCount_ += len;
 }
 
-void BufWriter::copy(std::unique_ptr<folly::IOBuf> data) {
-  sizeCheck(data->computeChainDataLength());
-  size_t totalInserted = 0;
-  folly::IOBuf* curBuf = data.get();
-  while (curBuf != data->prev()) {
-    push(curBuf->data(), curBuf->length());
-    totalInserted += curBuf->length();
-    curBuf = curBuf->next();
+void BufWriter::copy(const folly::IOBuf* data, size_t limit) {
+  if (!limit) {
+    return;
   }
-  push(curBuf->data(), curBuf->length());
-  totalInserted += curBuf->length();
-  CHECK_EQ(data->computeChainDataLength(), totalInserted);
+  sizeCheck(limit);
+  size_t totalInserted = 0;
+  const folly::IOBuf* curBuf = data;
+  auto remaining = limit;
+  do {
+    auto lenToCopy = std::min(curBuf->length(), remaining);
+    push(curBuf->data(), lenToCopy);
+    totalInserted += lenToCopy;
+    remaining -= lenToCopy;
+    if (lenToCopy < curBuf->length()) {
+      break;
+    }
+    curBuf = curBuf->next();
+  } while (remaining && curBuf != data);
+  CHECK_GE(limit, totalInserted);
 }
 
 void BufWriter::backFill(const uint8_t* data, size_t len, size_t destOffset) {

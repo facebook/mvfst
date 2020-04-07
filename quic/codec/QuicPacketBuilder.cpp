@@ -179,6 +179,24 @@ void RegularQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
   bodyAppender_.insert(std::move(buf));
 }
 
+void RegularQuicPacketBuilder::insert(
+    std::unique_ptr<folly::IOBuf> buf,
+    size_t limit) {
+  std::unique_ptr<folly::IOBuf> streamData;
+  folly::io::Cursor cursor(buf.get());
+  cursor.clone(streamData, limit);
+  // reminaingBytes_ update is taken care of inside this insert call:
+  insert(std::move(streamData));
+}
+
+void RegularQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
+  std::unique_ptr<folly::IOBuf> streamData;
+  folly::io::Cursor cursor(buf.front());
+  cursor.clone(streamData, limit);
+  // reminaingBytes_ update is taken care of inside this insert call:
+  insert(std::move(streamData));
+}
+
 void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
   packet_.frames.push_back(std::move(frame));
 }
@@ -422,7 +440,19 @@ void InplaceQuicPacketBuilder::appendBytes(
 
 void InplaceQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
   remainingBytes_ -= buf->computeChainDataLength();
-  bufWriter_.insert(std::move(buf));
+  bufWriter_.insert(buf.get());
+}
+
+void InplaceQuicPacketBuilder::insert(
+    std::unique_ptr<folly::IOBuf> buf,
+    size_t limit) {
+  remainingBytes_ -= limit;
+  bufWriter_.insert(buf.get(), limit);
+}
+
+void InplaceQuicPacketBuilder::insert(const BufQueue& buf, size_t limit) {
+  remainingBytes_ -= limit;
+  bufWriter_.insert(buf.front(), limit);
 }
 
 void InplaceQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {

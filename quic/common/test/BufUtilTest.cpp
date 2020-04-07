@@ -355,9 +355,9 @@ TEST(BufWriterTest, InsertSingle) {
   auto inputBuffer =
       folly::IOBuf::copyBuffer("Steady on dreaming, I sleepwalk");
   auto len = inputBuffer->computeChainDataLength();
-  writer.insert(std::move(inputBuffer));
+  writer.insert(inputBuffer.get());
   folly::io::Cursor reader(testBuffer.get());
-  EXPECT_EQ("Steady on dreaming, I sleepwalk", reader.readFixedString(len));
+  EXPECT_EQ(inputBuffer->coalesce().str(), reader.readFixedString(len));
 }
 
 TEST(BufWriterTest, InsertChain) {
@@ -368,14 +368,14 @@ TEST(BufWriterTest, InsertChain) {
   inputBuffer->prependChain(
       folly::IOBuf::copyBuffer(" Can't believe that we are through."));
   inputBuffer->prependChain(
-      folly::IOBuf::copyBuffer(" While the memor of you linger like a song."));
+      folly::IOBuf::copyBuffer(" While the memory of you linger like a song."));
   auto len = inputBuffer->computeChainDataLength();
-  writer.insert(std::move(inputBuffer));
+  writer.insert(inputBuffer.get());
   folly::io::Cursor reader(testBuffer.get());
   EXPECT_EQ(
       "Cause I lost you and now what am i to do?"
       " Can't believe that we are through."
-      " While the memor of you linger like a song.",
+      " While the memory of you linger like a song.",
       reader.readFixedString(len));
 }
 
@@ -395,4 +395,95 @@ TEST(BufWriterTest, BackFill) {
       "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15",
       reader.readFixedString(
           testInput1.size() + testInput2.size() + testInput3.size()));
+}
+
+TEST(BufWriterTest, BufQueueCopy) {
+  BufQueue queue;
+  queue.append(folly::IOBuf::copyBuffer("I feel like I'm drowning"));
+  auto outputBuffer = folly::IOBuf::create(200);
+  BufWriter bufWriter(*outputBuffer, 200);
+  bufWriter.insert(queue.front(), queue.chainLength());
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      "I feel like I'm drowning", reader.readFixedString(queue.chainLength()));
+}
+
+TEST(BufWriterTest, BufQueueCopyPartial) {
+  BufQueue queue;
+  queue.append(folly::IOBuf::copyBuffer("I feel like I'm drowning"));
+  auto outputBuffer = folly::IOBuf::create(200);
+  BufWriter bufWriter(*outputBuffer, 200);
+  bufWriter.insert(queue.front(), 6);
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      "I feel", reader.readFixedString(outputBuffer->computeChainDataLength()));
+}
+
+TEST(BufWriterTest, BufQueueChainCopy) {
+  BufQueue queue;
+  queue.append(folly::IOBuf::copyBuffer("I'm a hotpot. "));
+  queue.append(folly::IOBuf::copyBuffer("You mere are hotpot soup base."));
+  auto outputBuffer = folly::IOBuf::create(1000);
+  BufWriter bufWriter(*outputBuffer, 1000);
+  bufWriter.insert(queue.front(), queue.chainLength());
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      "I'm a hotpot. You mere are hotpot soup base.",
+      reader.readFixedString(queue.chainLength()));
+}
+
+TEST(BufWriterTest, BufQueueChainCopyPartial) {
+  BufQueue queue;
+  std::string testStr1("I remember when I first noticed. ");
+  std::string testStr2("That you liked me back.");
+  queue.append(folly::IOBuf::copyBuffer(testStr1));
+  queue.append(folly::IOBuf::copyBuffer(testStr2));
+  auto outputBuffer = folly::IOBuf::create(1000);
+  BufWriter bufWriter(*outputBuffer, 1000);
+  bufWriter.insert(queue.front(), testStr1.size() + 10);
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      folly::to<std::string>(testStr1, "That you l"),
+      reader.readFixedString(testStr1.size() + 10));
+}
+
+TEST(BufWriterTest, IOBufChainCopyTooLargeLimit) {
+  auto outputBuffer = folly::IOBuf::create(1000);
+  BufWriter bufWriter(*outputBuffer, 1000);
+  auto inputBuffer =
+      folly::IOBuf::copyBuffer("Tired of seeing adventures on a cafe wall. ");
+  inputBuffer->prependChain(
+      folly::IOBuf::copyBuffer("Think I'll take a turn from the known road. "));
+  inputBuffer->prependChain(
+      folly::IOBuf::copyBuffer("Think I'll write a tale of my own."));
+  // Use a limit thats larger than input size
+  bufWriter.insert(
+      inputBuffer.get(), inputBuffer->computeChainDataLength() * 3);
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      "Tired of seeing adventures on a cafe wall. "
+      "Think I'll take a turn from the known road. "
+      "Think I'll write a tale of my own.",
+      reader.readFixedString(outputBuffer->computeChainDataLength()));
+}
+
+TEST(BufWriterTest, BufQueueChainCopyTooLargeLimit) {
+  BufQueue queue;
+  std::string testStr1("I see trees of green. ");
+  std::string testStr2("Red rose too. ");
+  std::string testStr3("I see them bloom.");
+  queue.append(folly::IOBuf::copyBuffer(testStr1));
+  queue.append(folly::IOBuf::copyBuffer(testStr2));
+  queue.append(folly::IOBuf::copyBuffer(testStr3));
+  auto outputBuffer = folly::IOBuf::create(1000);
+  BufWriter bufWriter(*outputBuffer, 1000);
+  bufWriter.insert(
+      queue.front(), (testStr1.size() + testStr2.size() + testStr3.size()) * 5);
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(
+      "I see trees of green. "
+      "Red rose too. "
+      "I see them bloom.",
+      reader.readFixedString(
+          testStr1.size() + testStr2.size() + testStr3.size()));
 }

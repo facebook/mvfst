@@ -69,6 +69,8 @@ class PacketBuilderInterface {
   virtual void
   appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber) = 0;
   virtual void insert(std::unique_ptr<folly::IOBuf> buf) = 0;
+  virtual void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) = 0;
+  virtual void insert(const BufQueue& buf, size_t limit) = 0;
   virtual void push(const uint8_t* data, size_t len) = 0;
 
   // Append a frame to the packet.
@@ -126,6 +128,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
       override;
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
+  void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override;
+  void insert(const BufQueue& buf, size_t limit) override;
   void push(const uint8_t* data, size_t len) override;
 
   void appendFrame(QuicWriteFrame frame) override;
@@ -186,6 +190,9 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
     CHECK(false) << "Invalid BufWriter";
   }
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
+  void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override;
+  void insert(const BufQueue& buf, size_t limit) override;
+
   void push(const uint8_t* data, size_t len) override;
 
   void appendFrame(QuicWriteFrame frame) override;
@@ -317,6 +324,14 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   void insert(std::unique_ptr<folly::IOBuf> buf) override {
     builder.insert(std::move(buf));
+  }
+
+  void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override {
+    builder.insert(std::move(buf), limit);
+  }
+
+  void insert(const BufQueue& buf, size_t limit) override {
+    builder.insert(buf, limit);
   }
 
   void appendFrame(QuicWriteFrame frame) override {

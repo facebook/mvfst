@@ -140,10 +140,7 @@ void writeStreamFrameData(
     const BufQueue& writeBuffer,
     uint64_t dataLen) {
   if (dataLen > 0) {
-    Buf streamData;
-    folly::io::Cursor cursor(writeBuffer.front());
-    cursor.clone(streamData, dataLen);
-    builder.insert(std::move(streamData));
+    builder.insert(writeBuffer, dataLen);
   }
 }
 
@@ -152,10 +149,7 @@ void writeStreamFrameData(
     Buf writeBuffer,
     uint64_t dataLen) {
   if (dataLen > 0) {
-    Buf streamData;
-    folly::io::Cursor cursor(writeBuffer.get());
-    cursor.clone(streamData, dataLen);
-    builder.insert(std::move(streamData));
+    builder.insert(std::move(writeBuffer), dataLen);
   }
 }
 

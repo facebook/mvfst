@@ -109,7 +109,8 @@ class BufWriter {
 
   // TODO: OK, "insert" is a lie. Inside, we copy. But I'd like the BufWriter
   // to have the same interface as BufAppender during the transition period.
-  void insert(std::unique_ptr<folly::IOBuf> data);
+  void insert(const folly::IOBuf* data);
+  void insert(const folly::IOBuf* data, size_t limit);
 
   void append(size_t len);
 
@@ -124,7 +125,7 @@ class BufWriter {
         << " written=" << written_ << " limit=" << most_;
   }
 
-  void copy(std::unique_ptr<folly::IOBuf> data);
+  void copy(const folly::IOBuf* data, size_t limit);
 
  private:
   folly::IOBuf& iobuf_;
