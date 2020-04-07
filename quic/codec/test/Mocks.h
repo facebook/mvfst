@@ -65,7 +65,29 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD1(writeBEUint64, void(uint16_t));
 
   MOCK_METHOD2(appendBytes, void(PacketNum, uint8_t));
-  MOCK_METHOD3(appendBytes, void(BufAppender&, PacketNum, uint8_t));
+  MOCK_METHOD3(appendBytesWithAppender, void(BufAppender&, PacketNum, uint8_t));
+  MOCK_METHOD3(appendBytesWithBufWriter, void(BufWriter&, PacketNum, uint8_t));
+  GMOCK_METHOD1_(, noexcept, , setCipherOverhead, void(uint8_t));
+  GMOCK_METHOD0_(, noexcept, , canBuildPacketNonConst, bool());
+  GMOCK_METHOD0_(, const, , getHeaderBytes, uint32_t());
+
+  bool canBuildPacket() const noexcept override {
+    return const_cast<MockQuicPacketBuilder&>(*this).canBuildPacketNonConst();
+  }
+
+  void appendBytes(
+      BufAppender& appender,
+      PacketNum packetNum,
+      uint8_t byteNumber) override {
+    appendBytesWithAppender(appender, packetNum, byteNumber);
+  }
+
+  void appendBytes(
+      BufWriter& bufWriter,
+      PacketNum packetNum,
+      uint8_t byteNumber) override {
+    appendBytesWithBufWriter(bufWriter, packetNum, byteNumber);
+  }
 
   void writeBE(uint8_t value) override {
     writeBEUint8(value);
@@ -79,7 +101,11 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
     writeBEUint64(value);
   }
 
-  std::pair<RegularQuicWritePacket, Buf> buildPacket() && {
+  PacketBuilderInterface::Packet buildPacket() && override {
+    CHECK(false) << "Use buildTestPacket()";
+  }
+
+  std::pair<RegularQuicWritePacket, Buf> buildTestPacket() && {
     ShortHeader header(
         ProtectionType::KeyPhaseZero, getTestConnectionId(), 0x01);
     RegularQuicWritePacket regularPacket(std::move(header));

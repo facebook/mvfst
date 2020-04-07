@@ -342,4 +342,163 @@ uint8_t VersionNegotiationPacketBuilder::generateRandomPacketType() const {
 bool VersionNegotiationPacketBuilder::canBuildPacket() const noexcept {
   return remainingBytes_ != 0;
 }
+
+InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
+    folly::IOBuf& iobuf,
+    uint32_t remainingBytes,
+    PacketHeader header,
+    PacketNum largestAckedPacketNum)
+    : iobuf_(iobuf),
+      bufWriter_(iobuf, remainingBytes),
+      remainingBytes_(remainingBytes),
+      packet_(std::move(header)) {
+  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
+    LongHeader& longHeader = *packet_.header.asLong();
+    packetNumberEncoding_ = encodeLongHeaderHelper(
+        longHeader, bufWriter_, remainingBytes, largestAckedPacketNum);
+    if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
+      // Remember the position to write packet number and packet length.
+      packetLenOffset_ = iobuf_.length();
+      // With this builder, we will have to always use kMaxPacketLenSize to
+      // write packet length.
+      packetNumOffset_ = packetLenOffset_ + kMaxPacketLenSize;
+      // Inside BufWriter, we already countde the packet len and packet number
+      // bytes as written. Note that remainingBytes_ also already counted them.
+      bufWriter_.append(packetNumberEncoding_->length + kMaxPacketLenSize);
+    }
+  } else {
+    ShortHeader& shortHeader = *packet_.header.asShort();
+    packetNumberEncoding_ = encodeShortHeaderHelper(
+        shortHeader, bufWriter_, remainingBytes_, largestAckedPacketNum);
+    if (packetNumberEncoding_) {
+      appendBytes(
+          bufWriter_,
+          packetNumberEncoding_->result,
+          packetNumberEncoding_->length);
+    }
+  }
+  bodyStart_ = iobuf_.writableTail();
+}
+
+uint32_t InplaceQuicPacketBuilder::remainingSpaceInPkt() const {
+  return remainingBytes_;
+}
+
+void InplaceQuicPacketBuilder::writeBE(uint8_t data) {
+  bufWriter_.writeBE<uint8_t>(data);
+  remainingBytes_ -= sizeof(data);
+}
+
+void InplaceQuicPacketBuilder::writeBE(uint16_t data) {
+  bufWriter_.writeBE<uint16_t>(data);
+  remainingBytes_ -= sizeof(data);
+}
+
+void InplaceQuicPacketBuilder::writeBE(uint64_t data) {
+  bufWriter_.writeBE<uint64_t>(data);
+  remainingBytes_ -= sizeof(data);
+}
+
+void InplaceQuicPacketBuilder::write(const QuicInteger& quicInteger) {
+  remainingBytes_ -=
+      quicInteger.encode([&](auto val) { bufWriter_.writeBE(val); });
+}
+
+void InplaceQuicPacketBuilder::appendBytes(
+    PacketNum value,
+    uint8_t byteNumber) {
+  appendBytes(bufWriter_, value, byteNumber);
+}
+
+void InplaceQuicPacketBuilder::appendBytes(
+    BufWriter& bufWriter,
+    PacketNum value,
+    uint8_t byteNumber) {
+  auto bigValue = folly::Endian::big(value);
+  bufWriter.push(
+      (uint8_t*)&bigValue + sizeof(bigValue) - byteNumber, byteNumber);
+  remainingBytes_ -= byteNumber;
+}
+
+void InplaceQuicPacketBuilder::insert(std::unique_ptr<folly::IOBuf> buf) {
+  remainingBytes_ -= buf->computeChainDataLength();
+  bufWriter_.insert(std::move(buf));
+}
+
+void InplaceQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
+  packet_.frames.push_back(std::move(frame));
+}
+
+const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {
+  return packet_.header;
+}
+
+PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
+  LongHeader* longHeader = packet_.header.asLong();
+  size_t minBodySize = kMaxPacketNumEncodingSize -
+      packetNumberEncoding_->length + sizeof(Sample);
+  size_t extraDataWritten = 0;
+  size_t bodyLength = iobuf_.writableTail() - bodyStart_;
+  while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
+         !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
+    // We can add padding frames, but we don't need to store them.
+    QuicInteger paddingType(static_cast<uint8_t>(FrameType::PADDING));
+    write(paddingType);
+    extraDataWritten++;
+  }
+  if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
+    QuicInteger pktLen(
+        packetNumberEncoding_->length + bodyLength + cipherOverhead_);
+    pktLen.encode(
+        [&](auto val) {
+          auto bigEndian = folly::Endian::big(val);
+          CHECK_EQ(sizeof(bigEndian), kMaxPacketLenSize);
+          bufWriter_.backFill(
+              (uint8_t*)&bigEndian, kMaxPacketLenSize, packetLenOffset_);
+        },
+        kMaxPacketLenSize);
+    auto bigPacketNum = folly::Endian::big(packetNumberEncoding_->result);
+    CHECK_GE(sizeof(bigPacketNum), packetNumberEncoding_->length);
+    bufWriter_.backFill(
+        (uint8_t*)&bigPacketNum + sizeof(bigPacketNum) -
+            packetNumberEncoding_->length,
+        packetNumberEncoding_->length,
+        packetNumOffset_);
+  }
+  CHECK(
+      !bodyStart_ ||
+      (bodyStart_ >= iobuf_.data() && bodyStart_ <= iobuf_.tail()));
+  // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
+  // for encryption.
+  return PacketBuilderInterface::Packet(
+      std::move(packet_),
+      (bodyStart_ ? folly::IOBuf::wrapBuffer(
+                        iobuf_.data(), (bodyStart_ - iobuf_.data()))
+                  : nullptr),
+      (bodyStart_
+           ? folly::IOBuf::wrapBuffer(bodyStart_, iobuf_.tail() - bodyStart_)
+           : nullptr));
+}
+
+void InplaceQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
+  cipherOverhead_ = overhead;
+}
+
+void InplaceQuicPacketBuilder::push(const uint8_t* data, size_t len) {
+  bufWriter_.push(data, len);
+  remainingBytes_ -= len;
+}
+
+bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
+  return remainingBytes_ != 0;
+}
+
+uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
+  bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
+  CHECK(packetNumberEncoding_)
+      << "packetNumberEncoding_ should be valid after ctor";
+  return folly::to<uint32_t>(bodyStart_ - iobuf_.data()) +
+      (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
+}
+
 } // namespace quic

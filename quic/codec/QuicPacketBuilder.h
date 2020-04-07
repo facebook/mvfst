@@ -56,7 +56,7 @@ class PacketBuilderInterface {
           body(std::move(bodyIn)) {}
   };
 
-  virtual uint32_t remainingSpaceInPkt() const = 0;
+  [[nodiscard]] virtual uint32_t remainingSpaceInPkt() const = 0;
 
   // Functions to write bytes to the packet
   virtual void writeBE(uint8_t data) = 0;
@@ -66,6 +66,8 @@ class PacketBuilderInterface {
   virtual void appendBytes(PacketNum value, uint8_t byteNumber) = 0;
   virtual void
   appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber) = 0;
+  virtual void
+  appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber) = 0;
   virtual void insert(std::unique_ptr<folly::IOBuf> buf) = 0;
   virtual void push(const uint8_t* data, size_t len) = 0;
 
@@ -73,9 +75,88 @@ class PacketBuilderInterface {
   virtual void appendFrame(QuicWriteFrame frame) = 0;
 
   // Returns the packet header for the current packet.
-  virtual const PacketHeader& getPacketHeader() const = 0;
+  [[nodiscard]] virtual const PacketHeader& getPacketHeader() const = 0;
+
+  virtual void setCipherOverhead(uint8_t overhead) = 0;
+
+  /**
+   * Whether the packet builder is able to build a packet. This should be
+   * checked right after the creation of a packet builder object.
+   */
+  [[nodiscard]] virtual bool canBuildPacket() const noexcept = 0;
+
+  /**
+   * Return an estimated header bytes count.
+   *
+   * For short header, this is the exact header bytes. For long header, since
+   * the writing of packet length and packet number field are deferred to the
+   * buildPacket() call, this is an estimate header bytes count that's the sum
+   * of header bytes already written, the maximum possible packet length field
+   * bytes count and packet number field bytes count.
+   */
+  [[nodiscard]] virtual uint32_t getHeaderBytes() const = 0;
+
+  virtual Packet buildPacket() && = 0;
 };
 
+/**
+ * Build packet into user provided IOBuf
+ */
+class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
+ public:
+  ~InplaceQuicPacketBuilder() override = default;
+
+  explicit InplaceQuicPacketBuilder(
+      folly::IOBuf& iobuf,
+      uint32_t remainingBytes,
+      PacketHeader header,
+      PacketNum largestAckedPacketNum);
+
+  // PacketBuilderInterface
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
+
+  void writeBE(uint8_t data) override;
+  void writeBE(uint16_t data) override;
+  void writeBE(uint64_t data) override;
+  void write(const QuicInteger& quicInteger) override;
+  void appendBytes(PacketNum value, uint8_t byteNumber) override;
+  void appendBytes(BufAppender&, PacketNum, uint8_t) override {
+    CHECK(false) << "Invalid appender";
+  }
+  void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
+      override;
+  void insert(std::unique_ptr<folly::IOBuf> buf) override;
+  void push(const uint8_t* data, size_t len) override;
+
+  void appendFrame(QuicWriteFrame frame) override;
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override;
+
+  PacketBuilderInterface::Packet buildPacket() && override;
+
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
+
+  void setCipherOverhead(uint8_t overhead) noexcept override;
+
+  [[nodiscard]] uint32_t getHeaderBytes() const override;
+
+ private:
+  folly::IOBuf& iobuf_;
+  BufWriter bufWriter_;
+  uint32_t remainingBytes_;
+  RegularQuicWritePacket packet_;
+  uint32_t cipherOverhead_{0};
+  folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
+  // The offset in the IOBuf writable area to write Packet Length.
+  size_t packetLenOffset_{0};
+  // The offset in the IOBuf writable area to write Packet Number.
+  size_t packetNumOffset_{0};
+  // The position to write body. This is only for byte counting purpose.
+  uint8_t* bodyStart_{nullptr};
+};
+
+/**
+ * Build packet into IOBufs created by Builder
+ */
 class RegularQuicPacketBuilder final : public PacketBuilderInterface {
  public:
   ~RegularQuicPacketBuilder() override = default;
@@ -89,19 +170,10 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
       PacketHeader header,
       PacketNum largestAckedPacketNum);
 
-  /**
-   * Return an estimated header bytes count.
-   *
-   * For short header, this is the exact header bytes. For long header, since
-   * the writing of packet length and packet number field are deferred to the
-   * buildPacket() call, this is an estimate header bytes count that's the sum
-   * of header bytes already written, the maximum possible packet length field
-   * bytes count and packet number field bytes count.
-   */
-  uint32_t getHeaderBytes() const;
+  [[nodiscard]] uint32_t getHeaderBytes() const override;
 
   // PacketBuilderInterface
-  uint32_t remainingSpaceInPkt() const override;
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override;
 
   void writeBE(uint8_t data) override;
   void writeBE(uint16_t data) override;
@@ -110,20 +182,23 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void appendBytes(PacketNum value, uint8_t byteNumber) override;
   void appendBytes(BufAppender& appender, PacketNum value, uint8_t byteNumber)
       override;
+  void appendBytes(BufWriter&, PacketNum, uint8_t) override {
+    CHECK(false) << "Invalid BufWriter";
+  }
   void insert(std::unique_ptr<folly::IOBuf> buf) override;
   void push(const uint8_t* data, size_t len) override;
 
   void appendFrame(QuicWriteFrame frame) override;
-  const PacketHeader& getPacketHeader() const override;
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override;
 
-  Packet buildPacket() &&;
+  Packet buildPacket() && override;
   /**
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
    */
-  bool canBuildPacket() const noexcept;
+  [[nodiscard]] bool canBuildPacket() const noexcept override;
 
-  void setCipherOverhead(uint8_t overhead) noexcept;
+  void setCipherOverhead(uint8_t overhead) noexcept override;
 
  private:
   void writeHeaderBytes(PacketNum largestAckedPacketNum);
@@ -204,7 +279,7 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
                 ? 0
                 : builder.remainingSpaceInPkt() - writableBytes) {}
 
-  uint32_t remainingSpaceInPkt() const override {
+  [[nodiscard]] uint32_t remainingSpaceInPkt() const override {
     return builder.remainingSpaceInPkt() > diff
         ? builder.remainingSpaceInPkt() - diff
         : 0;
@@ -235,6 +310,11 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.appendBytes(appender, value, byteNumber);
   }
 
+  void appendBytes(BufWriter& writer, PacketNum value, uint8_t byteNumber)
+      override {
+    builder.appendBytes(writer, value, byteNumber);
+  }
+
   void insert(std::unique_ptr<folly::IOBuf> buf) override {
     builder.insert(std::move(buf));
   }
@@ -247,8 +327,24 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     builder.push(data, len);
   }
 
-  const PacketHeader& getPacketHeader() const override {
+  [[nodiscard]] const PacketHeader& getPacketHeader() const override {
     return builder.getPacketHeader();
+  }
+
+  PacketBuilderInterface::Packet buildPacket() && override {
+    return std::move(builder).buildPacket();
+  }
+
+  void setCipherOverhead(uint8_t overhead) noexcept override {
+    builder.setCipherOverhead(overhead);
+  }
+
+  [[nodiscard]] bool canBuildPacket() const noexcept override {
+    return builder.canBuildPacket();
+  };
+
+  [[nodiscard]] uint32_t getHeaderBytes() const override {
+    return builder.getHeaderBytes();
   }
 
  private:

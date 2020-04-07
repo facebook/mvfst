@@ -83,6 +83,9 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     uint64_t offset = 0,
     uint64_t packetSizeLimit = kDefaultUDPSendPacketLen);
 
+using BuilderProvider =
+    std::function<PacketBuilderInterface*(PacketHeader, PacketNum)>;
+
 RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     ConnectionId srcConnId,
     ConnectionId dstConnId,
@@ -91,7 +94,8 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     folly::IOBuf& data,
     const Aead& aead,
     PacketNum largestAcked,
-    uint64_t offset = 0);
+    uint64_t offset = 0,
+    const BuilderProvider& builderProvider = nullptr);
 
 RegularQuicPacketBuilder::Packet createCryptoPacket(
     ConnectionId srcConnId,

@@ -21,6 +21,45 @@ using namespace quic;
 using namespace quic::test;
 using namespace testing;
 
+enum TestFlavor { Regular, Inplace };
+
+struct BuilderWithBuffer {
+  std::unique_ptr<PacketBuilderInterface> builder;
+  Buf buf;
+
+  BuilderWithBuffer() = default;
+  explicit BuilderWithBuffer(
+      std::unique_ptr<PacketBuilderInterface> builderIn,
+      Buf bufIn)
+      : builder(std::move(builderIn)), buf(std::move(bufIn)) {}
+};
+
+BuilderWithBuffer testBuilderProvider(
+    TestFlavor flavor,
+    uint32_t pktSizeLimit,
+    PacketHeader header,
+    PacketNum largestAckedPacketNum,
+    folly::Optional<size_t> outputBufSize) {
+  switch (flavor) {
+    case TestFlavor::Regular:
+      return BuilderWithBuffer(
+          std::make_unique<RegularQuicPacketBuilder>(
+              pktSizeLimit, std::move(header), largestAckedPacketNum),
+          nullptr);
+
+    case TestFlavor::Inplace:
+      auto outputBuf = folly::IOBuf::create(*outputBufSize);
+      return BuilderWithBuffer(
+          std::make_unique<InplaceQuicPacketBuilder>(
+              *outputBuf,
+              pktSizeLimit,
+              std::move(header),
+              largestAckedPacketNum),
+          std::move(outputBuf));
+  }
+  folly::assume_unreachable();
+}
+
 Buf packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
     Aead* aead = nullptr) {
@@ -82,7 +121,7 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   return codec;
 }
 
-class QuicPacketBuilderTest : public Test {};
+class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {};
 
 TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   auto versions = versionList({1, 2, 3, 4, 5, 6, 7});
@@ -110,7 +149,7 @@ TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   EXPECT_EQ(decodedVersionNegotiationPacket->versions, versions);
 }
 
-TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
+TEST_P(QuicPacketBuilderTest, SimpleRetryPacket) {
   LongHeader headerIn(
       LongHeader::Types::Retry,
       getTestConnectionId(0),
@@ -120,10 +159,13 @@ TEST_F(QuicPacketBuilderTest, SimpleRetryPacket) {
       std::string("454358"),
       getTestConnectionId(2));
 
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
-
-  auto packet = packetToBuf(std::move(builder).buildPacket());
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
+      kDefaultUDPSendPacketLen,
+      std::move(headerIn),
+      0 /* largestAcked */,
+      2000);
+  auto packet = packetToBuf(std::move(*(builderAndBuf.builder)).buildPacket());
   auto packetQueue = bufToQueue(std::move(packet));
 
   // Verify the returned buf from packet builder can be decoded by read codec:
@@ -180,7 +222,7 @@ TEST_F(QuicPacketBuilderTest, TooManyVersions) {
   EXPECT_EQ(decodedPacket->versions, expectedWrittenVersions);
 }
 
-TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
+TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   ConnectionId clientConnId = getTestConnectionId(),
                serverConnId = ConnectionId({1, 3, 5, 7});
   PacketNum pktNum = 444;
@@ -191,6 +233,23 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(serverConnId, ver);
 
+  // To make sure they live long enough
+  // TODO: remove this ownership and builder provider theater once we are ready
+  // to land the GSO optimization.
+  BuilderWithBuffer pinnedBuilderAndBuf;
+  auto builderProvider = [&](PacketHeader header, PacketNum largestAcked) {
+    auto builderAndBuf = testBuilderProvider(
+        GetParam(),
+        kDefaultUDPSendPacketLen,
+        std::move(header),
+        largestAcked,
+        kDefaultUDPSendPacketLen * 2);
+    PacketBuilderInterface* builder = builderAndBuf.builder.get();
+    pinnedBuilderAndBuf.builder = std::move(builderAndBuf.builder);
+    pinnedBuilderAndBuf.buf = std::move(builderAndBuf.buf);
+    return builder;
+  };
+
   auto resultRegularPacket = createInitialCryptoPacket(
       serverConnId,
       clientConnId,
@@ -198,7 +257,9 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
       ver,
       *folly::IOBuf::copyBuffer("CHLO"),
       *cleartextAead,
-      0);
+      0 /* largestAcked */,
+      0 /* offset */,
+      builderProvider);
   auto resultBuf = packetToBufCleartext(
       resultRegularPacket, *cleartextAead, *headerCipher, pktNum);
   auto& resultHeader = resultRegularPacket.packet.header;
@@ -222,21 +283,24 @@ TEST_F(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   EXPECT_EQ(ver, decodedHeader.getVersion());
 }
 
-TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
+TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   auto connId = getTestConnectionId();
   PacketNum pktNum = 222;
 
   PacketNum largestAckedPacketNum = 0;
   auto encodedPacketNum = encodePacketNumber(pktNum, largestAckedPacketNum);
-  RegularQuicPacketBuilder builder(
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
-      largestAckedPacketNum);
+      largestAckedPacketNum,
+      2000);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
 
   // write out at least one frame
-  writeFrame(PaddingFrame(), builder);
-  EXPECT_TRUE(builder.canBuildPacket());
-  auto builtOut = std::move(builder).buildPacket();
+  writeFrame(PaddingFrame(), *builder);
+  EXPECT_TRUE(builder->canBuildPacket());
+  auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
 
   size_t expectedOutputSize =
@@ -265,18 +329,22 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   EXPECT_EQ(pktNum, decodedHeader.getPacketSequenceNum());
 }
 
-TEST_F(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
+TEST_P(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
   auto connId = getTestConnectionId();
   PacketNum pktNum = 222;
 
   // We expect that the builder will not add new frames to a packet which has no
   // frames already and will be too small to parse.
-  RegularQuicPacketBuilder builder(
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
-      0 /* largestAcked */);
-  EXPECT_TRUE(builder.canBuildPacket());
-  auto builtOut = std::move(builder).buildPacket();
+      0 /*largestAckedPacketNum*/,
+      kDefaultUDPSendPacketLen);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
+
+  EXPECT_TRUE(builder->canBuildPacket());
+  auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
   auto resultBuf = packetToBuf(builtOut);
 
@@ -291,7 +359,7 @@ TEST_F(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
   EXPECT_EQ(decodedPacket, nullptr);
 }
 
-TEST_F(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
+TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
   auto connId = getTestConnectionId();
   PacketNum pktNum = 222;
   PacketNum largestAckedPacketNum = 0;
@@ -299,14 +367,17 @@ TEST_F(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
   auto encodedPacketNum = encodePacketNumber(pktNum, largestAckedPacketNum);
 
   size_t cipherOverhead = 2;
-  RegularQuicPacketBuilder builder(
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
-      largestAckedPacketNum);
-  builder.setCipherOverhead(cipherOverhead);
-  EXPECT_TRUE(builder.canBuildPacket());
-  writeFrame(PaddingFrame(), builder);
-  auto builtOut = std::move(builder).buildPacket();
+      largestAckedPacketNum,
+      kDefaultUDPSendPacketLen);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
+  builder->setCipherOverhead(cipherOverhead);
+  EXPECT_TRUE(builder->canBuildPacket());
+  writeFrame(PaddingFrame(), *builder);
+  auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
   // We should have padded the remaining bytes with Padding frames.
   size_t expectedOutputSize =
@@ -317,19 +388,22 @@ TEST_F(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
       expectedOutputSize - cipherOverhead);
 }
 
-TEST_F(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
+TEST_P(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
   auto connId = getTestConnectionId();
   PacketNum pktNum = 222;
   PacketNum largestAckedPacketNum = 0;
 
   size_t totalPacketSize = 20;
-  RegularQuicPacketBuilder builder(
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
       totalPacketSize,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
-      largestAckedPacketNum);
-  EXPECT_TRUE(builder.canBuildPacket());
-  writeFrame(PaddingFrame(), builder);
-  auto builtOut = std::move(builder).buildPacket();
+      largestAckedPacketNum,
+      2000);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
+  EXPECT_TRUE(builder->canBuildPacket());
+  writeFrame(PaddingFrame(), *builder);
+  auto builtOut = std::move(*builder).buildPacket();
   auto resultRegularPacket = builtOut.packet;
 
   size_t headerSize = 13;
@@ -350,7 +424,7 @@ TEST_F(QuicPacketBuilderTest, PacketBuilderWrapper) {
   EXPECT_EQ(0, wrapper.remainingSpaceInPkt());
 }
 
-TEST_F(QuicPacketBuilderTest, LongHeaderBytesCounting) {
+TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
   ConnectionId clientCid = getTestConnectionId(0);
   ConnectionId serverCid = getTestConnectionId(1);
   PacketNum pktNum = 8 * 24;
@@ -361,31 +435,44 @@ TEST_F(QuicPacketBuilderTest, LongHeaderBytesCounting) {
       serverCid,
       pktNum,
       QuicVersion::MVFST);
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(header), largestAcked);
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
+      kDefaultUDPSendPacketLen,
+      std::move(header),
+      largestAcked,
+      kDefaultUDPSendPacketLen);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
   auto expectedWrittenHeaderFieldLen = sizeof(uint8_t) +
       sizeof(QuicVersionType) + sizeof(uint8_t) + clientCid.size() +
       sizeof(uint8_t) + serverCid.size();
-  auto estimatedHeaderBytes = builder.getHeaderBytes();
+  auto estimatedHeaderBytes = builder->getHeaderBytes();
   EXPECT_GT(
       estimatedHeaderBytes, expectedWrittenHeaderFieldLen + kMaxPacketLenSize);
-  writeFrame(PaddingFrame(), builder);
+  writeFrame(PaddingFrame(), *builder);
   EXPECT_LE(
-      std::move(builder).buildPacket().header->computeChainDataLength(),
+      std::move(*builder).buildPacket().header->computeChainDataLength(),
       estimatedHeaderBytes);
 }
 
-TEST_F(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
+TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
   PacketNum pktNum = 8 * 24;
   ConnectionId cid = getTestConnectionId();
   PacketNum largestAcked = 8 + 24;
-  RegularQuicPacketBuilder builder(
+  auto builderAndBuf = testBuilderProvider(
+      GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, cid, pktNum),
-      largestAcked);
-  auto headerBytes = builder.getHeaderBytes();
-  writeFrame(PaddingFrame(), builder);
+      largestAcked,
+      2000);
+  PacketBuilderInterface* builder = builderAndBuf.builder.get();
+  auto headerBytes = builder->getHeaderBytes();
+  writeFrame(PaddingFrame(), *builder);
   EXPECT_EQ(
-      std::move(builder).buildPacket().header->computeChainDataLength(),
+      std::move(*builder).buildPacket().header->computeChainDataLength(),
       headerBytes);
 }
+
+INSTANTIATE_TEST_CASE_P(
+    QuicPacketBuilderTests,
+    QuicPacketBuilderTest,
+    Values(TestFlavor::Regular, TestFlavor::Inplace));

@@ -348,14 +348,23 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     folly::IOBuf& data,
     const Aead& aead,
     PacketNum largestAcked,
-    uint64_t offset) {
+    uint64_t offset,
+    const BuilderProvider& builderProvider) {
   LongHeader header(
       LongHeader::Types::Initial, srcConnId, dstConnId, packetNum, version);
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(header), largestAcked);
-  builder.setCipherOverhead(aead.getCipherOverhead());
-  writeCryptoFrame(offset, data.clone(), builder);
-  return std::move(builder).buildPacket();
+  LongHeader copyHeader(header);
+  PacketBuilderInterface* builder = nullptr;
+  if (builderProvider) {
+    builder = builderProvider(std::move(header), largestAcked);
+  }
+  RegularQuicPacketBuilder fallbackBuilder(
+      kDefaultUDPSendPacketLen, std::move(copyHeader), largestAcked);
+  if (!builder) {
+    builder = &fallbackBuilder;
+  }
+  builder->setCipherOverhead(aead.getCipherOverhead());
+  writeCryptoFrame(offset, data.clone(), *builder);
+  return std::move(*builder).buildPacket();
 }
 
 RegularQuicPacketBuilder::Packet createCryptoPacket(
