@@ -96,11 +96,13 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(buf->clone(), 0, true));
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
   conn.cryptoState->oneRttStream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(cryptoBuf->clone(), 0, true));
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(cryptoBuf->clone(), 0, true)));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -240,7 +242,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(nullptr, 0, true));
+      std::forward_as_tuple(std::make_unique<StreamBuffer>(nullptr, 0, true)));
 
   // rebuild a packet from the built out packet
   ShortHeader shortHeader2(
@@ -296,7 +298,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(buf->clone(), 0, true));
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
   // Do not add the buf to crypto stream's retransmission buffer,
   // imagine it was cleared
 
@@ -394,7 +397,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(0),
-      std::forward_as_tuple(buf->clone(), 0, true));
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(buf->clone(), 0, true)));
 
   // new builder has a much smaller writable bytes limit
   ShortHeader shortHeader2(

@@ -33,7 +33,9 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
   writeDataToQuicStream(
       stream, folly::IOBuf::copyBuffer("What is it then?"), false);
   stream.retransmissionBuffer.emplace(
-      34, StreamBuffer(folly::IOBuf::copyBuffer("How would I know?"), 34));
+      34,
+      std::make_unique<StreamBuffer>(
+          folly::IOBuf::copyBuffer("How would I know?"), 34));
   auto currentWriteOffset = stream.currentWriteOffset;
   auto currentReadOffset = stream.currentReadOffset;
   EXPECT_TRUE(stream.writable());

@@ -229,7 +229,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_TRUE(conn->outstandingPackets.back().isAppLimited);
 
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
-  auto& rt1 = stream1->retransmissionBuffer.at(0);
+  auto& rt1 = *stream1->retransmissionBuffer.at(0);
 
   EXPECT_EQ(stream1->currentWriteOffset, 5);
   EXPECT_EQ(stream2->currentWriteOffset, 13);
@@ -239,7 +239,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey w"), *rt1.data.front()));
 
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 1);
-  auto& rt2 = stream2->retransmissionBuffer.at(0);
+  auto& rt2 = *stream2->retransmissionBuffer.at(0);
 
   EXPECT_EQ(rt2.offset, 0);
   EXPECT_TRUE(eq(*buf, *rt2.data.front()));
@@ -290,17 +290,17 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
 
   EXPECT_EQ(stream1->lossBuffer.size(), 0);
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 2);
-  auto& rt3 = stream1->retransmissionBuffer.at(5);
+  auto& rt3 = *stream1->retransmissionBuffer.at(5);
   EXPECT_TRUE(eq(IOBuf::copyBuffer("hats up"), rt3.data.move()));
 
-  auto& rt4 = stream1->retransmissionBuffer.at(0);
+  auto& rt4 = *stream1->retransmissionBuffer.at(0);
   EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey w"), *rt4.data.front()));
 
   // loss buffer should be split into 2. Part in retransmission buffer and
   // part remains in loss buffer.
   EXPECT_EQ(stream2->lossBuffer.size(), 1);
   EXPECT_EQ(stream2->retransmissionBuffer.size(), 1);
-  auto& rt5 = stream2->retransmissionBuffer.at(0);
+  auto& rt5 = *stream2->retransmissionBuffer.at(0);
   EXPECT_TRUE(eq(*IOBuf::copyBuffer("hey wh"), *rt5.data.front()));
   EXPECT_EQ(rt5.offset, 0);
   EXPECT_EQ(rt5.eof, 0);
@@ -449,7 +449,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   EXPECT_TRUE(frame->fin);
 
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
-  auto& rt1 = stream1->retransmissionBuffer.at(0);
+  auto& rt1 = *stream1->retransmissionBuffer.at(0);
 
   EXPECT_EQ(stream1->currentWriteOffset, 1);
   EXPECT_EQ(rt1.offset, 0);
@@ -496,7 +496,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   EXPECT_EQ(stream1->currentWriteOffset, buf->computeChainDataLength());
 
   EXPECT_EQ(stream1->retransmissionBuffer.size(), 1);
-  auto& rt1 = stream1->retransmissionBuffer.at(0);
+  auto& rt1 = *stream1->retransmissionBuffer.at(0);
   EXPECT_EQ(rt1.offset, 0);
   EXPECT_EQ(
       rt1.data.front()->computeChainDataLength(),

@@ -94,22 +94,22 @@ void sendAckSMHandler(
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
         if (streamFrameMatchesRetransmitBuffer(
-                stream, ackedFrame, ackedBuffer->second)) {
+                stream, ackedFrame, *ackedBuffer->second)) {
           VLOG(10) << "Open: acked stream data stream=" << stream.id
-                   << " offset=" << ackedBuffer->second.offset
-                   << " len=" << ackedBuffer->second.data.chainLength()
-                   << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
+                   << " offset=" << ackedBuffer->second->offset
+                   << " len=" << ackedBuffer->second->data.chainLength()
+                   << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
           stream.ackedIntervals.insert(
-              ackedBuffer->second.offset,
-              ackedBuffer->second.offset +
-                  ackedBuffer->second.data.chainLength());
+              ackedBuffer->second->offset,
+              ackedBuffer->second->offset +
+                  ackedBuffer->second->data.chainLength());
           stream.retransmissionBuffer.erase(ackedBuffer);
         } else {
           VLOG(10)
               << "Open: received an ack for already discarded buffer; stream="
-              << stream.id << " offset=" << ackedBuffer->second.offset
-              << " len=" << ackedBuffer->second.data.chainLength()
-              << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
+              << stream.id << " offset=" << ackedBuffer->second->offset
+              << " len=" << ackedBuffer->second->data.chainLength()
+              << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
         }
       }
 

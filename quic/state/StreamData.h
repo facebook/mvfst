@@ -49,7 +49,8 @@ struct QuicStreamLike {
   // it is keyed due to partial reliability - when data is skipped the offset
   // in the StreamBuffer may be incremented, but the keyed offset must remain
   // the same so it can be removed from the buffer on ACK.
-  folly::F14FastMap<uint64_t, StreamBuffer> retransmissionBuffer;
+  folly::F14FastMap<uint64_t, std::unique_ptr<StreamBuffer>>
+      retransmissionBuffer;
 
   // Tracks intervals which we have received ACKs for. E.g. in the case of all
   // data being acked this would contain one internval from 0 -> the largest
@@ -95,21 +96,21 @@ struct QuicStreamLike {
    * Either insert a new entry into the loss buffer, or merge the buffer with
    * an existing entry.
    */
-  void insertIntoLossBuffer(StreamBuffer buf) {
+  void insertIntoLossBuffer(std::unique_ptr<StreamBuffer> buf) {
     // We assume here that we won't try to insert an overlapping buffer, as
     // that should never happen in the loss buffer.
     auto lossItr = std::upper_bound(
         lossBuffer.begin(),
         lossBuffer.end(),
-        buf.offset,
+        buf->offset,
         [](auto offset, const auto& buffer) { return offset < buffer.offset; });
     if (!lossBuffer.empty() && lossItr != lossBuffer.begin() &&
         std::prev(lossItr)->offset + std::prev(lossItr)->data.chainLength() ==
-            buf.offset) {
-      std::prev(lossItr)->data.append(buf.data.move());
-      std::prev(lossItr)->eof = buf.eof;
+            buf->offset) {
+      std::prev(lossItr)->data.append(buf->data.move());
+      std::prev(lossItr)->eof = buf->eof;
     } else {
-      lossBuffer.insert(lossItr, std::move(buf));
+      lossBuffer.insert(lossItr, std::move(*buf));
     }
   }
 };

@@ -209,11 +209,11 @@ Buf PacketRebuilder::cloneCryptoRetransmissionBuffer(
   if (iter == stream.retransmissionBuffer.end()) {
     return nullptr;
   }
-  DCHECK(iter->second.offset == frame.offset)
+  DCHECK(iter->second->offset == frame.offset)
       << "WriteCryptoFrame cloning: offset mismatch. " << conn_;
-  DCHECK(iter->second.data.chainLength() == frame.len)
+  DCHECK(iter->second->data.chainLength() == frame.len)
       << "WriteCryptoFrame cloning: Len mismatch. " << conn_;
-  return iter->second.data.front()->clone();
+  return iter->second->data.front()->clone();
 }
 
 Buf PacketRebuilder::cloneRetransmissionBuffer(
@@ -235,11 +235,11 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
   DCHECK(retransmittable(*stream));
   auto iter = stream->retransmissionBuffer.find(frame.offset);
   if (iter != stream->retransmissionBuffer.end()) {
-    if (streamFrameMatchesRetransmitBuffer(*stream, frame, iter->second)) {
-      DCHECK(!frame.len || !iter->second.data.empty())
+    if (streamFrameMatchesRetransmitBuffer(*stream, frame, *iter->second)) {
+      DCHECK(!frame.len || !iter->second->data.empty())
           << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
           << " empty data. " << conn_;
-      return (frame.len ? iter->second.data.front()->clone() : nullptr);
+      return (frame.len ? iter->second->data.front()->clone() : nullptr);
     }
   }
   return nullptr;

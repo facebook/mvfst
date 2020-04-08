@@ -187,8 +187,8 @@ void handleNewStreamDataWritten(
             .emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(originalOffset),
-                std::forward_as_tuple(
-                    std::move(bufWritten), originalOffset, frameFin))
+                std::forward_as_tuple(std::make_unique<StreamBuffer>(
+                    std::move(bufWritten), originalOffset, frameFin)))
             .second);
 }
 
@@ -217,8 +217,8 @@ void handleRetransmissionWritten(
             .emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(frameOffset),
-                std::forward_as_tuple(
-                    std::move(bufWritten), frameOffset, frameFin))
+                std::forward_as_tuple(std::make_unique<StreamBuffer>(
+                    std::move(bufWritten), frameOffset, frameFin)))
             .second);
 }
 

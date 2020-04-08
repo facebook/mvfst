@@ -432,8 +432,8 @@ void processCryptoStreamAck(
     uint64_t len) {
   auto ackedBuffer = cryptoStream.retransmissionBuffer.find(offset);
   if (ackedBuffer == cryptoStream.retransmissionBuffer.end() ||
-      ackedBuffer->second.offset != offset ||
-      ackedBuffer->second.data.chainLength() != len) {
+      ackedBuffer->second->offset != offset ||
+      ackedBuffer->second->data.chainLength() != len) {
     // It's possible retransmissions of crypto data were canceled.
     return;
   }

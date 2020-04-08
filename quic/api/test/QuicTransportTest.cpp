@@ -249,11 +249,11 @@ void dropPackets(QuicServerConnectionState& conn) {
           std::upper_bound(
               stream->lossBuffer.begin(),
               stream->lossBuffer.end(),
-              itr->second.offset,
+              itr->second->offset,
               [](const auto& offset, const auto& buffer) {
                 return offset < buffer.offset;
               }),
-          std::move(itr->second));
+          std::move(*itr->second));
       stream->retransmissionBuffer.erase(itr);
       if (std::find(
               conn.streamManager->lossStreams().begin(),
@@ -312,7 +312,9 @@ void verifyCorrectness(
   std::vector<StreamBuffer> rtxCopy;
   for (auto& itr : stream->retransmissionBuffer) {
     rtxCopy.push_back(StreamBuffer(
-        itr.second.data.front()->clone(), itr.second.offset, itr.second.eof));
+        itr.second->data.front()->clone(),
+        itr.second->offset,
+        itr.second->eof));
   }
   std::sort(rtxCopy.begin(), rtxCopy.end(), [](auto& s1, auto& s2) {
     return s1.offset < s2.offset;
@@ -321,10 +323,10 @@ void verifyCorrectness(
     retxBufCombined.append(s.data.move());
   }
   EXPECT_TRUE(IOBufEqualTo()(expected, *retxBufCombined.move()));
-  EXPECT_EQ(finExpected, stream->retransmissionBuffer.at(offsets.back()).eof);
+  EXPECT_EQ(finExpected, stream->retransmissionBuffer.at(offsets.back())->eof);
   std::vector<uint64_t> retxBufOffsets;
   for (const auto& b : stream->retransmissionBuffer) {
-    retxBufOffsets.push_back(b.second.offset);
+    retxBufOffsets.push_back(b.second->offset);
   }
   std::sort(retxBufOffsets.begin(), retxBufOffsets.end());
   EXPECT_EQ(offsets, retxBufOffsets);
@@ -1177,8 +1179,8 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   EXPECT_EQ(1, conn.outstandingPackets.size());
   auto stream = conn.streamManager->getStream(streamId);
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
-  EXPECT_EQ(0, stream->retransmissionBuffer.at(0).data.chainLength());
-  EXPECT_TRUE(stream->retransmissionBuffer.at(0).eof);
+  EXPECT_EQ(0, stream->retransmissionBuffer.at(0)->data.chainLength());
+  EXPECT_TRUE(stream->retransmissionBuffer.at(0)->eof);
   EXPECT_TRUE(stream->lossBuffer.empty());
   EXPECT_EQ(0, stream->writeBuffer.chainLength());
   EXPECT_EQ(1, stream->currentWriteOffset);
@@ -1911,8 +1913,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(
-          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false));
+      std::forward_as_tuple(std::make_unique<StreamBuffer>(
+          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false)));
 
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -1957,8 +1959,8 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   streamState->retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(51),
-      std::forward_as_tuple(
-          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false));
+      std::forward_as_tuple(std::make_unique<StreamBuffer>(
+          folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false)));
   streamState->lossBuffer.emplace_back(
       folly::IOBuf::copyBuffer("And I'm lost"), 31, false);
 

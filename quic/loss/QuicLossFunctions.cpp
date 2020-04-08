@@ -109,7 +109,7 @@ void markPacketLoss(
         // The original rxmt offset might have been bumped up after it was
         // shrunk due to egress partially reliable skip.
         if (!streamFrameMatchesRetransmitBuffer(
-                *stream, frame, bufferItr->second)) {
+                *stream, frame, *bufferItr->second)) {
           break;
         }
         stream->insertIntoLossBuffer(std::move(bufferItr->second));
@@ -132,7 +132,7 @@ void markPacketLoss(
           // it's packet was lost so we might not have the offset.
           break;
         }
-        DCHECK_EQ(bufferItr->second.offset, frame.offset);
+        DCHECK_EQ(bufferItr->second->offset, frame.offset);
         cryptoStream->insertIntoLossBuffer(std::move(bufferItr->second));
         cryptoStream->retransmissionBuffer.erase(bufferItr);
         break;

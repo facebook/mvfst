@@ -1811,7 +1811,7 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmitting) {
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 12;
   stream.retransmissionBuffer.emplace(
-      0, StreamBuffer(IOBuf::create(10), 10, false));
+      0, std::make_unique<StreamBuffer>(IOBuf::create(10), 10, false));
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
@@ -1884,7 +1884,7 @@ TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverRetxBuffer) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
   stream.retransmissionBuffer.emplace(
-      50, StreamBuffer(buildRandomInputData(10), 50));
+      50, std::make_unique<StreamBuffer>(buildRandomInputData(10), 50));
   stream.ackedIntervals.insert(0, 49);
   EXPECT_EQ(49, getStreamNextOffsetToDeliver(stream));
 }
@@ -1894,7 +1894,7 @@ TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverRetxAndLossBuffer) {
   stream.currentWriteOffset = 100;
   stream.lossBuffer.emplace_back(buildRandomInputData(10), 30);
   stream.retransmissionBuffer.emplace(
-      50, StreamBuffer(buildRandomInputData(10), 50));
+      50, std::make_unique<StreamBuffer>(buildRandomInputData(10), 50));
   EXPECT_EQ(30, getStreamNextOffsetToDeliver(stream));
 }
 
@@ -1967,7 +1967,7 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
 TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   conn.cryptoState->handshakeStream.retransmissionBuffer.emplace(
-      0, StreamBuffer(chlo->clone(), 0));
+      0, std::make_unique<StreamBuffer>(chlo->clone(), 0));
   processCryptoStreamAck(conn.cryptoState->handshakeStream, 0, chlo->length());
   EXPECT_EQ(conn.cryptoState->handshakeStream.retransmissionBuffer.size(), 0);
 }
@@ -1975,7 +1975,8 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {
 TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
   auto chlo = IOBuf::copyBuffer("CHLO");
   auto& cryptoStream = conn.cryptoState->handshakeStream;
-  cryptoStream.retransmissionBuffer.emplace(0, StreamBuffer(chlo->clone(), 0));
+  cryptoStream.retransmissionBuffer.emplace(
+      0, std::make_unique<StreamBuffer>(chlo->clone(), 0));
   processCryptoStreamAck(cryptoStream, 1, chlo->length());
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 

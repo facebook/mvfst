@@ -92,7 +92,8 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
   auto buf = folly::IOBuf::copyBuffer("aaaaaaaaaa");
   // case2. has no unacked data below 139
   stream->currentWriteOffset = 150;
-  stream->retransmissionBuffer.emplace(140, StreamBuffer(buf->clone(), 140));
+  stream->retransmissionBuffer.emplace(
+      140, std::make_unique<StreamBuffer>(buf->clone(), 140));
   result = advanceMinimumRetransmittableOffset(stream, 139);
   EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 139);
@@ -101,7 +102,8 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
 
   // case3. ExpiredStreamDataFrame is wired
   stream->minimumRetransmittableOffset = 139;
-  stream->retransmissionBuffer.emplace(140, StreamBuffer(buf->clone(), 140));
+  stream->retransmissionBuffer.emplace(
+      140, std::make_unique<StreamBuffer>(buf->clone(), 140));
   result = advanceMinimumRetransmittableOffset(stream, 150);
   EXPECT_TRUE(result.has_value());
   EXPECT_EQ(*result, 150);
@@ -117,7 +119,8 @@ TEST_F(QPRFunctionsTest, AdvanceMinimumRetransmittableOffset) {
 
   // case4. update existing pending event.
   stream->minimumRetransmittableOffset = 150;
-  stream->retransmissionBuffer.emplace(150, StreamBuffer(buf->clone(), 150));
+  stream->retransmissionBuffer.emplace(
+      150, std::make_unique<StreamBuffer>(buf->clone(), 150));
   stream->conn.pendingEvents.frames.clear();
   stream->conn.pendingEvents.frames.emplace_back(
       ExpiredStreamDataFrame(stream->id, 160));
@@ -172,7 +175,7 @@ TEST_F(QPRFunctionsTest, RecvMinStreamDataFrameShrinkBuffer) {
   stream->conn.flowControlState.sumCurStreamBufferLen = 20;
   auto writtenBuffer = folly::IOBuf::copyBuffer("cccccccccc");
   stream->retransmissionBuffer.emplace(
-      90, StreamBuffer(std::move(writtenBuffer), 90, false));
+      90, std::make_unique<StreamBuffer>(std::move(writtenBuffer), 90, false));
   MinStreamDataFrame shrinkMinStreamDataFrame(
       stream->id, stream->flowControlState.peerAdvertisedMaxOffset, 110);
   onRecvMinStreamDataFrame(stream, shrinkMinStreamDataFrame, packetNum);

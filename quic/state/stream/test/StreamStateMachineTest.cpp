@@ -994,7 +994,8 @@ TEST_F(QuicUnidirectionalStreamTest, OpenFinalAckStreamFrame) {
   stream.retransmissionBuffer.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(1),
-      std::forward_as_tuple(std::move(buf), 1, false));
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(std::move(buf), 1, false)));
   sendAckSMHandler(stream, streamFrame);
   EXPECT_EQ(stream.sendState, StreamSendState::Closed_E);
   EXPECT_EQ(stream.recvState, StreamRecvState::Invalid_E);
