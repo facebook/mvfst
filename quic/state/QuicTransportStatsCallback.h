@@ -224,8 +224,7 @@ class QuicTransportStatsCallbackFactory {
  public:
   virtual ~QuicTransportStatsCallbackFactory() = default;
 
-  virtual std::unique_ptr<QuicTransportStatsCallback> make(
-      folly::EventBase* evb) = 0;
+  virtual std::unique_ptr<QuicTransportStatsCallback> make() = 0;
 };
 
 #define QUIC_STATS(infoCallback, method, ...)                              \

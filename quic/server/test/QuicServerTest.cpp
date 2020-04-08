@@ -1333,16 +1333,15 @@ class QuicServerTest : public Test {
 
     if (stats) {
       CHECK_EQ(evbs.size(), 1);
-      EXPECT_CALL(*transportStatsFactory_, make(_))
-          .WillRepeatedly(Invoke([stats = std::move(stats)](folly::EventBase*) {
+      EXPECT_CALL(*transportStatsFactory_, make())
+          .WillRepeatedly(Invoke([stats]() {
             return std::unique_ptr<MockQuicStats>(stats);
           }));
     } else {
-      EXPECT_CALL(*transportStatsFactory_, make(_))
-          .WillRepeatedly(Invoke([&](folly::EventBase* /* unused */) {
-            auto mockInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
-            return mockInfoCb;
-          }));
+      EXPECT_CALL(*transportStatsFactory_, make()).WillRepeatedly(Invoke([&]() {
+        auto mockInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
+        return mockInfoCb;
+      }));
     }
     if (evbs.empty()) {
       server_->start(addr, 2);
@@ -1694,13 +1693,13 @@ class QuicServerTakeoverTest : public Test {
     folly::SocketAddress addr("::1", 0);
     // setup mock transport stats factory
     auto transportStatsFactory = std::make_unique<MockQuicStatsFactory>();
-    auto makeCbForOldServer = [&](folly::EventBase* /* unused */) {
+    auto makeCbForOldServer = [&]() {
       oldTransInfoCb_ = new NiceMock<MockQuicStats>();
       std::unique_ptr<MockQuicStats> transportInfoCb;
       transportInfoCb.reset(oldTransInfoCb_);
       return transportInfoCb;
     };
-    EXPECT_CALL(*transportStatsFactory, make(_))
+    EXPECT_CALL(*transportStatsFactory, make())
         .WillOnce(Invoke(makeCbForOldServer));
     oldServer_->setTransportStatsCallbackFactory(
         std::move(transportStatsFactory));
@@ -1735,13 +1734,13 @@ class QuicServerTakeoverTest : public Test {
     folly::SocketAddress newAddr("::1", 0);
     // setup mock transport stats factory
     transportStatsFactory = std::make_unique<MockQuicStatsFactory>();
-    auto makeCbForNewServer = [&](folly::EventBase* /* unused */) {
+    auto makeCbForNewServer = [&]() {
       newTransInfoCb_ = new NiceMock<MockQuicStats>();
       std::unique_ptr<MockQuicStats> transportInfoCb;
       transportInfoCb.reset(newTransInfoCb_);
       return transportInfoCb;
     };
-    EXPECT_CALL(*transportStatsFactory, make(_))
+    EXPECT_CALL(*transportStatsFactory, make())
         .WillOnce(Invoke(makeCbForNewServer));
     newServer_->setTransportStatsCallbackFactory(
         std::move(transportStatsFactory));

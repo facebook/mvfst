@@ -49,8 +49,6 @@ class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {
  public:
   ~MockQuicStatsFactory() override = default;
 
-  MOCK_METHOD1(
-      make,
-      std::unique_ptr<QuicTransportStatsCallback>(folly::EventBase*));
+  MOCK_METHOD0(make, std::unique_ptr<QuicTransportStatsCallback>());
 };
 } // namespace quic

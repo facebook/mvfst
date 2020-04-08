@@ -155,7 +155,7 @@ void QuicServer::initializeWorkers(
             if (self->shutdown_) {
               return;
             }
-            auto statsCallback = transportStatsFactory->make(workerEvb);
+            auto statsCallback = transportStatsFactory->make();
             CHECK(statsCallback);
             workerPtr->setTransportInfoCallback(std::move(statsCallback));
           });
