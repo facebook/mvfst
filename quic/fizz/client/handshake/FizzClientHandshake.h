@@ -31,6 +31,8 @@ class FizzClientHandshake : public ClientHandshake {
 
   const folly::Optional<std::string>& getApplicationProtocol() const override;
 
+  std::unique_ptr<Aead> getRetryPacketCipher() override;
+
   bool isTLSResumed() const override;
 
  protected:

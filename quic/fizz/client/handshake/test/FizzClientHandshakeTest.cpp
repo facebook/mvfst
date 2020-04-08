@@ -308,6 +308,36 @@ TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
   EXPECT_TRUE(handshakeSuccess);
 }
 
+TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
+  // Example obtained from https://github.com/quicwg/base-drafts/pull/3394
+
+  auto version = static_cast<QuicVersion>(0xFF000019);
+  uint8_t initialByte = 0xff;
+
+  std::vector<uint8_t> dcidVec = {};
+  ConnectionId dcid(dcidVec);
+
+  std::vector<uint8_t> scidVec = {
+      0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
+  ConnectionId scid(scidVec);
+
+  std::string retryToken = R"(token)";
+  LongHeader header(
+      LongHeader::Types::Retry, scid, dcid, 0, version, retryToken);
+
+  std::string integrityTag =
+      "\x1e\x5e\xc5\xb0\x14\xcb\xb1\xf0\xfd\x93\xdf\x40\x48\xc4\x46\xa6";
+
+  RetryPacket retryPacket(
+      std::move(header), folly::IOBuf::copyBuffer(integrityTag), initialByte);
+
+  std::vector<uint8_t> odcidVec = {
+      0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
+  ConnectionId odcid(odcidVec);
+
+  EXPECT_TRUE(handshake->verifyRetryIntegrityTag(odcid, retryPacket));
+}
+
 TEST_F(ClientHandshakeTest, TestNoErrorAfterAppClose) {
   EXPECT_CALL(*verifier, verify(_));
 

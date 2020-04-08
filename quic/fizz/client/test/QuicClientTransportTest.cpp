@@ -1256,6 +1256,9 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   const folly::Optional<std::string>& getApplicationProtocol() const override {
     throw std::runtime_error("getApplicationProtocol not implemented");
   }
+  std::unique_ptr<Aead> getRetryPacketCipher() override {
+    throw std::runtime_error("getRetryPacketCipher not implemented");
+  }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }

@@ -17,7 +17,14 @@
 #include <fizz/client/EarlyDataRejectionPolicy.h>
 #include <fizz/protocol/Protocol.h>
 
+#include <fizz/crypto/aead/AESGCM128.h>
+
 namespace quic {
+
+constexpr folly::StringPiece retryPacketKey =
+    "\x4d\x32\xec\xdb\x2a\x21\x33\xc8\x41\xe4\x04\x3d\xf2\x7d\x44\x30";
+constexpr folly::StringPiece retryPacketNonce =
+    "\x4d\x16\x11\xd0\x55\x13\xa5\x52\xc5\x87\xd5\x75";
 
 FizzClientHandshake::FizzClientHandshake(
     QuicClientConnectionState* conn,
@@ -94,6 +101,16 @@ FizzClientHandshake::getApplicationProtocol() const {
   } else {
     return state_.alpn();
   }
+}
+
+std::unique_ptr<Aead> FizzClientHandshake::getRetryPacketCipher() {
+  std::unique_ptr<fizz::Aead> aead =
+      fizz::OpenSSLEVPCipher::makeCipher<fizz::AESGCM128>();
+  fizz::TrafficKey trafficKey;
+  trafficKey.key = folly::IOBuf::copyBuffer(retryPacketKey);
+  trafficKey.iv = folly::IOBuf::copyBuffer(retryPacketNonce);
+  aead->setKey(std::move(trafficKey));
+  return FizzAead::wrap(std::move(aead));
 }
 
 bool FizzClientHandshake::isTLSResumed() const {
