@@ -51,6 +51,9 @@ constexpr uint16_t kMaxNumCoalescedPackets = 5;
 // have ids with first byte being 0xff.
 constexpr uint16_t kCustomTransportParameterThreshold = 0xff00;
 
+// The length of the integrity tag present in a retry packet.
+constexpr uint32_t kRetryIntegrityTagLen = 16;
+
 // If the amount of data in the buffer of a QuicSocket equals or exceeds this
 // threshold, then the callback registered through
 // notifyPendingWriteOnConnection() will not be called

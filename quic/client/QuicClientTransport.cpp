@@ -156,6 +156,45 @@ void QuicClientTransport::processPacketData(
     VLOG(4) << "Drop StatelessReset for bad connId or token " << *this;
   }
 
+  RetryPacket* retryPacket = parsedPacket.retryPacket();
+  if (retryPacket) {
+    if (!clientConn_->retryToken.empty()) {
+      VLOG(4) << "Server sent more than one retry packet";
+      return;
+    }
+
+    const ConnectionId* originalDstConnId =
+        &(*clientConn_->initialDestinationConnectionId);
+
+    if (!clientConn_->clientHandshakeLayer->verifyRetryIntegrityTag(
+            *originalDstConnId, *retryPacket)) {
+      VLOG(4) << "The integrity tag in the retry packet was invalid. "
+              << "Dropping bad retry packet.";
+      return;
+    }
+
+    // Set the destination connection ID to be the value from the source
+    // connection id of the retry packet
+    clientConn_->initialDestinationConnectionId =
+        retryPacket->header.getSourceConnId();
+
+    auto released = static_cast<QuicClientConnectionState*>(conn_.release());
+    std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
+    auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
+
+    clientConn_ = tempConn.get();
+    conn_.reset(tempConn.release());
+
+    clientConn_->retryToken = retryPacket->header.getToken();
+
+    // TODO (amsharma): add a "RetryPacket" QLog event, and log it here.
+    // TODO (amsharma): verify the "original_connection_id" parameter
+    // upon receiving a subsequent initial from the server.
+
+    startCryptoHandshake();
+    return;
+  }
+
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
     if (conn_->qLogger) {
@@ -171,55 +210,6 @@ void QuicClientTransport::processPacketData(
 
   LongHeader* longHeader = regularOptional->header.asLong();
   ShortHeader* shortHeader = regularOptional->header.asShort();
-
-  if (longHeader && longHeader->getHeaderType() == LongHeader::Types::Retry) {
-    if (!clientConn_->retryToken.empty()) {
-      VLOG(4) << "Server sent more than one retry packet";
-      return;
-    }
-
-    // TODO (amsharma): Check if we have already received an initial packet
-    // from the server. If so, discard it. Here are some ways in which I
-    // could do this:
-    // 1. Have a boolean flag initialPacketReceived_ that we set to true when
-    //   we get an initial packet from the server. This seems a bit messy.
-    // 2. Check for the presence of the oneRttWriteCipher and/or the
-    //   oneRttReadCipher in the handshake layer. I think this might be a
-    //   better approach, but I don't know if it is a good indicator that we've
-    //   received an initial packet from the server.
-
-    const ConnectionId* dstConnId =
-        &(*clientConn_->initialDestinationConnectionId);
-    if (conn_->serverConnectionId) {
-      dstConnId = &(*conn_->serverConnectionId);
-    }
-    if (*longHeader->getOriginalDstConnId() != *dstConnId) {
-      VLOG(4) << "Original destination connection id field in the retry "
-              << "packet doesn't match the destination connection id from the "
-              << "client's initial packet";
-      return;
-    }
-
-    // Set the destination connection ID to be the value from the source
-    // connection id of the retry packet
-    clientConn_->initialDestinationConnectionId = longHeader->getSourceConnId();
-
-    auto released = static_cast<QuicClientConnectionState*>(conn_.release());
-    std::unique_ptr<QuicClientConnectionState> uniqueClient(released);
-    auto tempConn = undoAllClientStateForRetry(std::move(uniqueClient));
-
-    clientConn_ = tempConn.get();
-    conn_.reset(tempConn.release());
-
-    clientConn_->retryToken = longHeader->getToken();
-
-    if (conn_->qLogger) {
-      conn_->qLogger->addPacket(*regularOptional, packetSize);
-    }
-
-    startCryptoHandshake();
-    return;
-  }
 
   auto protectionLevel = regularOptional->header.getProtectionType();
   auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);

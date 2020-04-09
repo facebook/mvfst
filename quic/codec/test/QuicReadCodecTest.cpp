@@ -95,33 +95,40 @@ TEST_F(QuicReadCodecTest, VersionNegotiationPacketTest) {
 }
 
 TEST_F(QuicReadCodecTest, RetryPacketTest) {
-  LongHeader headerIn(
-      LongHeader::Types::Retry,
-      getTestConnectionId(70),
-      getTestConnectionId(90),
-      321,
-      static_cast<QuicVersion>(0xffff),
-      std::string("fluffydog"),
-      getTestConnectionId(110));
+  uint8_t initialByte = 0xFF;
+  ConnectionId srcConnId = getTestConnectionId(70);
+  ConnectionId dstConnId = getTestConnectionId(90);
+  auto quicVersion = static_cast<QuicVersion>(0xffff);
+  std::string token = "fluffydog";
+  std::string integrityTag = "MustBe16CharLong";
 
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-  auto packetQueue = bufToQueue(std::move(packet));
+  Buf retryPacketEncoded = std::make_unique<folly::IOBuf>();
+  BufAppender appender(retryPacketEncoded.get(), 100);
+
+  appender.writeBE<uint8_t>(initialByte);
+  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(quicVersion));
+
+  appender.writeBE<uint8_t>(dstConnId.size());
+  appender.push(dstConnId.data(), dstConnId.size());
+  appender.writeBE<uint8_t>(srcConnId.size());
+  appender.push(srcConnId.data(), srcConnId.size());
+
+  appender.push((const uint8_t*)token.data(), token.size());
+  appender.push((const uint8_t*)integrityTag.data(), integrityTag.size());
+
+  auto packetQueue = bufToQueue(std::move(retryPacketEncoded));
 
   AckStates ackStates;
   auto result = makeUnencryptedCodec()->parsePacket(packetQueue, ackStates);
-  auto& retryPacket = *result.regularPacket();
+  auto retryPacket = result.retryPacket();
+  EXPECT_TRUE(retryPacket);
 
-  auto headerOut = *retryPacket.header.asLong();
+  auto headerOut = retryPacket->header;
 
-  EXPECT_EQ(*headerOut.getOriginalDstConnId(), getTestConnectionId(110));
   EXPECT_EQ(headerOut.getVersion(), static_cast<QuicVersion>(0xffff));
-  EXPECT_EQ(headerOut.getSourceConnId(), getTestConnectionId(70));
-  EXPECT_EQ(headerOut.getDestinationConnId(), getTestConnectionId(90));
-
-  auto expected = std::string("fluffydog");
-  EXPECT_EQ(headerOut.getToken(), expected);
+  EXPECT_EQ(headerOut.getSourceConnId(), srcConnId);
+  EXPECT_EQ(headerOut.getDestinationConnId(), dstConnId);
+  EXPECT_EQ(headerOut.getToken(), token);
 }
 
 TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {

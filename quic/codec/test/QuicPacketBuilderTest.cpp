@@ -149,44 +149,6 @@ TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   EXPECT_EQ(decodedVersionNegotiationPacket->versions, versions);
 }
 
-TEST_P(QuicPacketBuilderTest, SimpleRetryPacket) {
-  LongHeader headerIn(
-      LongHeader::Types::Retry,
-      getTestConnectionId(0),
-      getTestConnectionId(1),
-      321,
-      QuicVersion::MVFST,
-      std::string("454358"),
-      getTestConnectionId(2));
-
-  auto builderAndBuf = testBuilderProvider(
-      GetParam(),
-      kDefaultUDPSendPacketLen,
-      std::move(headerIn),
-      0 /* largestAcked */,
-      2000);
-  auto packet = packetToBuf(std::move(*(builderAndBuf.builder)).buildPacket());
-  auto packetQueue = bufToQueue(std::move(packet));
-
-  // Verify the returned buf from packet builder can be decoded by read codec:
-  AckStates ackStates;
-  auto optionalDecodedPacket =
-      makeCodec(getTestConnectionId(1), QuicNodeType::Client)
-          ->parsePacket(packetQueue, ackStates);
-  ASSERT_NE(optionalDecodedPacket.regularPacket(), nullptr);
-  auto& retryPacket = *optionalDecodedPacket.regularPacket();
-
-  auto& headerOut = *retryPacket.header.asLong();
-
-  EXPECT_EQ(*headerOut.getOriginalDstConnId(), getTestConnectionId(2));
-  EXPECT_EQ(headerOut.getVersion(), QuicVersion::MVFST);
-  EXPECT_EQ(headerOut.getSourceConnId(), getTestConnectionId(0));
-  EXPECT_EQ(headerOut.getDestinationConnId(), getTestConnectionId(1));
-
-  auto expected = std::string("454358");
-  EXPECT_EQ(headerOut.getToken(), expected);
-}
-
 TEST_F(QuicPacketBuilderTest, TooManyVersions) {
   std::vector<QuicVersion> versions;
   for (size_t i = 0; i < 1000; i++) {

@@ -1257,7 +1257,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     throw std::runtime_error("getApplicationProtocol not implemented");
   }
   std::unique_ptr<Aead> getRetryPacketCipher() override {
-    throw std::runtime_error("getRetryPacketCipher not implemented");
+    FizzClientHandshake fizzClientHandshake(nullptr, nullptr);
+    return fizzClientHandshake.getRetryPacketCipher();
   }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
@@ -4389,9 +4390,18 @@ TEST_F(QuicClientTransportAfterStartTest, BadStatelessResetWontCloseTransport) {
 }
 
 TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
+  std::vector<uint8_t> clientConnIdVec = {};
+  ConnectionId clientConnId(clientConnIdVec);
+
+  std::vector<uint8_t> initialDstConnIdVec = {
+      0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
+  ConnectionId initialDstConnId(initialDstConnIdVec);
+
   // Create a stream and attempt to send some data to the server
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
+  client->getNonConstConn().readCodec->setClientConnectionId(clientConnId);
+  client->getNonConstConn().initialDestinationConnectionId = initialDstConnId;
 
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");
@@ -4409,22 +4419,24 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   // Make the server send a retry packet to the client. The server chooses a
   // connection id that the client must use in all future initial packets.
-  auto serverChosenConnId = getTestConnectionId();
+  std::vector<uint8_t> serverConnIdVec = {
+      0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
+  ConnectionId serverChosenConnId(serverConnIdVec);
 
-  LongHeader headerIn(
-      LongHeader::Types::Retry,
-      serverChosenConnId,
-      *originalConnId,
-      321,
-      QuicVersion::MVFST,
-      std::string("this is a retry token :)"),
-      *client->getConn().initialDestinationConnectionId);
+  std::string retryToken = "token";
+  std::string integrityTag =
+      "\x1e\x5e\xc5\xb0\x14\xcb\xb1\xf0\xfd\x93\xdf\x40\x48\xc4\x46\xa6";
 
-  RegularQuicPacketBuilder builder(
-      kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
-  auto packet = packetToBuf(std::move(builder).buildPacket());
-
-  deliverData(packet->coalesce());
+  folly::IOBuf retryPacketBuf;
+  BufAppender appender(&retryPacketBuf, 100);
+  appender.writeBE<uint8_t>(0xFF);
+  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF000019));
+  appender.writeBE<uint8_t>(clientConnId.size());
+  appender.writeBE<uint8_t>(serverConnIdVec.size());
+  appender.push(serverConnIdVec.data(), serverConnIdVec.size());
+  appender.push((const uint8_t*)retryToken.data(), retryToken.size());
+  appender.push((const uint8_t*)integrityTag.data(), integrityTag.size());
+  deliverData(retryPacketBuf.coalesce());
 
   ASSERT_TRUE(bytesWrittenToNetwork);
 
@@ -4442,16 +4454,9 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   auto& regularQuicPacket = *codecResult.regularPacket();
   auto& header = *regularQuicPacket.header.asLong();
 
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::PacketReceived, qLogger);
-  EXPECT_EQ(indices.size(), 1);
-  auto tmp = std::move(qLogger->logs[indices[0]]);
-  auto event = dynamic_cast<QLogPacketEvent*>(tmp.get());
-  EXPECT_EQ(event->packetType, toString(LongHeader::Types::Retry));
-
   EXPECT_EQ(header.getHeaderType(), LongHeader::Types::Initial);
   EXPECT_TRUE(header.hasToken());
-  EXPECT_EQ(header.getToken(), std::string("this is a retry token :)"));
+  EXPECT_EQ(header.getToken(), std::string("token"));
   EXPECT_EQ(header.getDestinationConnId(), serverChosenConnId);
 
   eventbase_->loopOnce();

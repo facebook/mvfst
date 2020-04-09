@@ -930,36 +930,22 @@ folly::Expected<ParsedLongHeader, TransportErrorCode> parseLongHeaderVariants(
     folly::io::Cursor& cursor,
     QuicNodeType nodeType) {
   if (type == LongHeader::Types::Retry) {
-    if (!cursor.canAdvance(sizeof(uint8_t))) {
-      VLOG(5) << "Not enough bytes for ODCID length";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    uint8_t originalDstConnIdLen = cursor.readBE<uint8_t>();
-    if (originalDstConnIdLen > kMaxConnectionIdSize) {
-      VLOG(5) << "originalDstConnIdLen > kMaxConnectionIdSize: "
-              << originalDstConnIdLen;
-      return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
-    }
-    if (!cursor.canAdvance(originalDstConnIdLen)) {
-      VLOG(5) << "Not enough bytes for ODCID";
-      return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
-    }
-    ConnectionId originalDstConnId(cursor, originalDstConnIdLen);
-
-    if (cursor.totalLength() == 0) {
+    // The integrity tag is kRetryIntegrityTagLen bytes in length, and the
+    // token must be at least one byte, so the remaining length must
+    // be > kRetryIntegrityTagLen.
+    if (cursor.totalLength() <= kRetryIntegrityTagLen) {
       VLOG(5) << "Not enough bytes for retry token";
       return folly::makeUnexpected(TransportErrorCode::FRAME_ENCODING_ERROR);
     }
 
     Buf token;
-    cursor.clone(token, cursor.totalLength());
+    cursor.clone(token, cursor.totalLength() - kRetryIntegrityTagLen);
 
     return ParsedLongHeader(
         LongHeader(
             type,
             std::move(parsedLongHeaderInvariant.invariant),
-            token ? token->moveToFbString().toStdString() : std::string(),
-            std::move(originalDstConnId)),
+            token ? token->moveToFbString().toStdString() : std::string()),
         PacketLength(0, 0));
   }
 
