@@ -487,3 +487,18 @@ TEST(BufWriterTest, BufQueueChainCopyTooLargeLimit) {
       reader.readFixedString(
           testStr1.size() + testStr2.size() + testStr3.size()));
 }
+
+TEST(BufWriterTest, TwoWriters) {
+  auto outputBuffer = folly::IOBuf::create(1000);
+  auto inputBuffer = folly::IOBuf::copyBuffer("Destroyer");
+  BufWriter bufWriter(*outputBuffer, 1000);
+  bufWriter.insert(inputBuffer.get());
+  EXPECT_EQ(9, outputBuffer->length());
+
+  BufWriter bufWriter2(*outputBuffer, outputBuffer->length());
+  auto inputBuffer2 = folly::IOBuf::copyBuffer(" Saint");
+  bufWriter2.insert(inputBuffer2.get());
+  folly::io::Cursor reader(outputBuffer.get());
+  EXPECT_EQ(15, outputBuffer->length());
+  EXPECT_EQ("Destroyer Saint", reader.readFixedString(outputBuffer->length()));
+}
