@@ -275,5 +275,8 @@ auto findFrameInPacketFunc() {
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacket outstandingPacket);
 
+// A Buf based overload of writeCryptoFrame for test only
+folly::Optional<WriteCryptoFrame>
+writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder);
 } // namespace test
 } // namespace quic

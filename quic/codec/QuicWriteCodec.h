@@ -107,8 +107,10 @@ void writeStreamFrameData(
  * written. The caller should check the structure to confirm how many bytes were
  * written.
  */
-folly::Optional<WriteCryptoFrame>
-writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder);
+folly::Optional<WriteCryptoFrame> writeCryptoFrame(
+    uint64_t offsetIn,
+    const BufQueue& data,
+    PacketBuilderInterface& builder);
 
 /**
  * Write a AckFrame into builder

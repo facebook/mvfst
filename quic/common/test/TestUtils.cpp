@@ -725,5 +725,11 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
       .setAppLimited(outstandingPacket.isAppLimited)
       .build();
 }
+
+folly::Optional<WriteCryptoFrame>
+writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
+  BufQueue bufQueue(std::move(data));
+  return writeCryptoFrame(offsetIn, bufQueue, builder);
+}
 } // namespace test
 } // namespace quic

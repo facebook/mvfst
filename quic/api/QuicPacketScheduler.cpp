@@ -449,8 +449,7 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
   // crypto streams so that we know that retransmissions of the crypto data
   // will always take precedence over the crypto data.
   for (const auto& buffer : cryptoStream_.lossBuffer) {
-    auto res =
-        writeCryptoFrame(buffer.offset, buffer.data.front()->clone(), builder);
+    auto res = writeCryptoFrame(buffer.offset, buffer.data, builder);
     if (!res) {
       return cryptoDataWritten;
     }
@@ -461,11 +460,8 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
   }
 
   if (writableData != 0) {
-    Buf data;
-    folly::io::Cursor cursor(cryptoStream_.writeBuffer.front());
-    cursor.cloneAtMost(data, writableData);
     auto res = writeCryptoFrame(
-        cryptoStream_.currentWriteOffset, std::move(data), builder);
+        cryptoStream_.currentWriteOffset, cryptoStream_.writeBuffer, builder);
     if (res) {
       VLOG(4) << "Wrote crypto frame"
               << " offset=" << cryptoStream_.currentWriteOffset

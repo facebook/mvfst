@@ -153,8 +153,10 @@ void writeStreamFrameData(
   }
 }
 
-folly::Optional<WriteCryptoFrame>
-writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
+folly::Optional<WriteCryptoFrame> writeCryptoFrame(
+    uint64_t offsetIn,
+    const BufQueue& data,
+    PacketBuilderInterface& builder) {
   uint64_t spaceLeftInPkt = builder.remainingSpaceInPkt();
   QuicInteger intFrameType(static_cast<uint8_t>(FrameType::CRYPTO_FRAME));
   QuicInteger offsetInteger(offsetIn);
@@ -169,22 +171,19 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
     return folly::none;
   }
   size_t spaceRemaining = spaceLeftInPkt - cryptoFrameHeaderSize;
-  size_t dataLength = data->computeChainDataLength();
-  size_t writeableData = std::min(dataLength, spaceRemaining);
-  QuicInteger lengthVarInt(writeableData);
+  size_t dataLength = data.chainLength();
+  size_t writableData = std::min(dataLength, spaceRemaining);
+  QuicInteger lengthVarInt(writableData);
 
   if (lengthVarInt.getSize() > lengthBytes) {
     throw QuicInternalException(
         std::string("Length bytes representation"),
         LocalErrorCode::CODEC_ERROR);
   }
-  data->coalesce();
-  data->trimEnd(dataLength - writeableData);
-
   builder.write(intFrameType);
   builder.write(offsetInteger);
   builder.write(lengthVarInt);
-  builder.insert(std::move(data));
+  builder.insert(data, writableData);
   builder.appendFrame(WriteCryptoFrame(offsetIn, lengthVarInt.getValue()));
   return WriteCryptoFrame(offsetIn, lengthVarInt.getValue());
 }

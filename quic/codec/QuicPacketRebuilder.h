@@ -46,7 +46,7 @@ class PacketRebuilder {
     return stream.sendState == StreamSendState::Open_E;
   }
 
-  Buf cloneCryptoRetransmissionBuffer(
+  const BufQueue* cloneCryptoRetransmissionBuffer(
       const WriteCryptoFrame& frame,
       const QuicCryptoStream& stream);
 

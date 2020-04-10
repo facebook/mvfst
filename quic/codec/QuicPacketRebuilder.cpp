@@ -123,7 +123,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
           break;
         }
         auto cryptoWriteResult =
-            writeCryptoFrame(cryptoFrame.offset, std::move(buf), builder_);
+            writeCryptoFrame(cryptoFrame.offset, *buf, builder_);
         bool ret = cryptoWriteResult.has_value() &&
             cryptoWriteResult->offset == cryptoFrame.offset &&
             cryptoWriteResult->len == cryptoFrame.len;
@@ -196,7 +196,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   return cloneOutstandingPacket(packet);
 }
 
-Buf PacketRebuilder::cloneCryptoRetransmissionBuffer(
+const BufQueue* PacketRebuilder::cloneCryptoRetransmissionBuffer(
     const WriteCryptoFrame& frame,
     const QuicCryptoStream& stream) {
   /**
@@ -217,7 +217,7 @@ Buf PacketRebuilder::cloneCryptoRetransmissionBuffer(
       << "WriteCryptoFrame cloning: offset mismatch. " << conn_;
   DCHECK(iter->second->data.chainLength() == frame.len)
       << "WriteCryptoFrame cloning: Len mismatch. " << conn_;
-  return iter->second->data.front()->clone();
+  return &(iter->second->data);
 }
 
 const BufQueue* PacketRebuilder::cloneRetransmissionBuffer(
