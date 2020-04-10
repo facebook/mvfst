@@ -494,21 +494,6 @@ bool CryptoStreamScheduler::hasData() const {
       !cryptoStream_.lossBuffer.empty();
 }
 
-SchedulingResult CryptoStreamScheduler::scheduleFramesForPacket(
-    PacketBuilderInterface&& builder,
-    uint32_t writableBytes) {
-  // We need to keep track of writable bytes after writing header.
-  writableBytes = writableBytes > builder.getHeaderBytes()
-      ? writableBytes - builder.getHeaderBytes()
-      : 0;
-  if (!writableBytes) {
-    return SchedulingResult(folly::none, folly::none);
-  }
-  PacketBuilderWrapper wrapper(builder, writableBytes);
-  writeCryptoData(wrapper);
-  return SchedulingResult(folly::none, std::move(builder).buildPacket());
-}
-
 CloningScheduler::CloningScheduler(
     FrameScheduler& scheduler,
     QuicConnectionStateBase& conn,

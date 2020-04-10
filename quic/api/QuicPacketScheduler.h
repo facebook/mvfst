@@ -292,15 +292,6 @@ class CryptoStreamScheduler {
    */
   bool writeCryptoData(PacketBuilderInterface& builder);
 
-  /**
-   * Returns a optional PacketEvent which indicates if the built out packet is a
-   * clone and the associated PacketEvent for both origin and clone. In the case
-   * of CryptoStreamScheduler, this will always return folly::none.
-   */
-  SchedulingResult scheduleFramesForPacket(
-      PacketBuilderInterface&& builder,
-      uint32_t writableBytes);
-
   bool hasData() const;
 
   std::string name() const {
