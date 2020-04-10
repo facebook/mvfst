@@ -29,17 +29,15 @@ class MockFrameScheduler : public FrameScheduler {
 
   // override methods accepting rvalue ref since gmock doesn't support it
   SchedulingResult scheduleFramesForPacket(
-      RegularQuicPacketBuilder&& builderIn,
+      PacketBuilderInterface&& builderIn,
       uint32_t writableBytes) override {
-    auto builder =
-        std::make_unique<RegularQuicPacketBuilder>(std::move(builderIn));
-    return _scheduleFramesForPacket(builder, writableBytes);
+    return _scheduleFramesForPacket(&builderIn, writableBytes);
   }
 
   GMOCK_METHOD0_(, const, , hasData, bool());
   MOCK_METHOD2(
       _scheduleFramesForPacket,
-      SchedulingResult(std::unique_ptr<RegularQuicPacketBuilder>&, uint32_t));
+      SchedulingResult(PacketBuilderInterface*, uint32_t));
 };
 
 class MockReadCallback : public QuicSocket::ReadCallback {

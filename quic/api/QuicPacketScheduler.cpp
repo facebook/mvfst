@@ -115,7 +115,7 @@ FrameScheduler FrameScheduler::Builder::build() && {
 FrameScheduler::FrameScheduler(std::string name) : name_(std::move(name)) {}
 
 SchedulingResult FrameScheduler::scheduleFramesForPacket(
-    RegularQuicPacketBuilder&& builder,
+    PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   // We need to keep track of writable bytes after writing header.
   writableBytes = writableBytes > builder.getHeaderBytes()
@@ -495,7 +495,7 @@ bool CryptoStreamScheduler::hasData() const {
 }
 
 SchedulingResult CryptoStreamScheduler::scheduleFramesForPacket(
-    RegularQuicPacketBuilder&& builder,
+    PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   // We need to keep track of writable bytes after writing header.
   writableBytes = writableBytes > builder.getHeaderBytes()
@@ -527,7 +527,7 @@ bool CloningScheduler::hasData() const {
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
-    RegularQuicPacketBuilder&& builder,
+    PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
   // The writableBytes in this function shouldn't be limited by cwnd, since
   // we only use CloningScheduler for the cases that we want to bypass cwnd for
@@ -554,6 +554,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // independent header builder.
     auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
     CHECK_EQ(builderPnSpace, PacketNumberSpace::AppData);
+    // TODO: This needs to be provided from outside now
     RegularQuicPacketBuilder regularBuilder(
         conn_.udpSendPacketLen,
         builder.getPacketHeader(),

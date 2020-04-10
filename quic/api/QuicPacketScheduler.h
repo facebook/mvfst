@@ -46,7 +46,7 @@ class QuicPacketScheduler {
    * a clone and the associated PacketEvent for both origin and clone.
    */
   virtual SchedulingResult scheduleFramesForPacket(
-      RegularQuicPacketBuilder&& builder,
+      PacketBuilderInterface&& builder,
       uint32_t writableBytes) = 0;
 
   /**
@@ -298,7 +298,7 @@ class CryptoStreamScheduler {
    * of CryptoStreamScheduler, this will always return folly::none.
    */
   SchedulingResult scheduleFramesForPacket(
-      RegularQuicPacketBuilder&& builder,
+      PacketBuilderInterface&& builder,
       uint32_t writableBytes);
 
   bool hasData() const;
@@ -355,7 +355,7 @@ class FrameScheduler : public QuicPacketScheduler {
   explicit FrameScheduler(std::string name);
 
   SchedulingResult scheduleFramesForPacket(
-      RegularQuicPacketBuilder&& builder,
+      PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
   // If any scheduler, including AckScheduler, has pending data to send
@@ -406,7 +406,7 @@ class CloningScheduler : public QuicPacketScheduler {
    * clone and the associated PacketEvent for both origin and clone.
    */
   SchedulingResult scheduleFramesForPacket(
-      RegularQuicPacketBuilder&& builder,
+      PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
   std::string name() const override;

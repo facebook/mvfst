@@ -500,8 +500,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   EXPECT_CALL(mockScheduler, _scheduleFramesForPacket(_, _))
       .Times(1)
       .WillOnce(Invoke(
-          [&, headerCopy = header](
-              std::unique_ptr<RegularQuicPacketBuilder>&, uint32_t) mutable {
+          [&, headerCopy = header](PacketBuilderInterface*, uint32_t) mutable {
             RegularQuicWritePacket packet(std::move(headerCopy));
             packet.frames.push_back(MaxDataFrame(2832));
             RegularQuicPacketBuilder::Packet builtPacket(
