@@ -75,8 +75,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         auto stream = conn_.streamManager->getStream(streamFrame.streamId);
         if (stream && retransmittable(*stream)) {
           auto streamData = cloneRetransmissionBuffer(streamFrame, stream);
-          auto bufferLen =
-              streamData ? streamData->computeChainDataLength() : 0;
+          auto bufferLen = streamData ? streamData->chainLength() : 0;
           auto dataLen = writeStreamFrameHeader(
               builder_,
               streamFrame.streamId,
@@ -86,7 +85,12 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
               streamFrame.fin);
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
-            writeStreamFrameData(builder_, std::move(streamData), *dataLen);
+            // Writing 0 byte for stream data is legit if the stream frame has
+            // FIN. That's checked in writeStreamFrameHeader.
+            CHECK(streamData || streamFrame.fin);
+            if (streamData) {
+              writeStreamFrameData(builder_, *streamData, *dataLen);
+            }
             notPureAck = true;
             writeSuccess = true;
             break;
@@ -216,7 +220,7 @@ Buf PacketRebuilder::cloneCryptoRetransmissionBuffer(
   return iter->second->data.front()->clone();
 }
 
-Buf PacketRebuilder::cloneRetransmissionBuffer(
+const BufQueue* PacketRebuilder::cloneRetransmissionBuffer(
     const WriteStreamFrame& frame,
     const QuicStreamState* stream) {
   /**
@@ -239,7 +243,7 @@ Buf PacketRebuilder::cloneRetransmissionBuffer(
       DCHECK(!frame.len || !iter->second->data.empty())
           << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
           << " empty data. " << conn_;
-      return (frame.len ? iter->second->data.front()->clone() : nullptr);
+      return frame.len ? &(iter->second->data) : nullptr;
     }
   }
   return nullptr;

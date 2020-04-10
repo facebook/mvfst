@@ -50,7 +50,7 @@ class PacketRebuilder {
       const WriteCryptoFrame& frame,
       const QuicCryptoStream& stream);
 
-  Buf cloneRetransmissionBuffer(
+  const BufQueue* cloneRetransmissionBuffer(
       const WriteStreamFrame& frame,
       const QuicStreamState* stream);
 

@@ -90,8 +90,6 @@ void writeStreamFrameData(
  * This writes dataLen worth of bytes from the parameter writeBuffer into the
  * parameter builder. This should only be called after a complete stream header
  * has been written by writeStreamFrameHeader.
- *
- * TODO: we can let the Buf be a ref and stop the cloning in PacketRebuilder.
  */
 void writeStreamFrameData(
     PacketBuilderInterface& builder,

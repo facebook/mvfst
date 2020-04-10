@@ -40,11 +40,10 @@ struct QuicStreamLike {
   // List of bytes that have been written to the QUIC layer.
   BufQueue writeBuffer{};
 
-  // Stores a map of buffers which have been written to the socket and are
-  // currently un-acked. Each one represents one StreamFrame that was written.
-  // We need to buffer these because these might be retransmitted
-  // in the future.
-  // These are associated with the starting offset of the buffer.
+  // Stores a map of offset:buffers which have been written to the socket and
+  // are currently un-acked. Each one represents one StreamFrame that was
+  // written. We need to buffer these because these might be retransmitted in
+  // the future. These are associated with the starting offset of the buffer.
   // Note: the offset in the StreamBuffer itself can be >= the offset on which
   // it is keyed due to partial reliability - when data is skipped the offset
   // in the StreamBuffer may be incremented, but the keyed offset must remain
