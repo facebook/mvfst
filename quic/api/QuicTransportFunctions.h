@@ -12,6 +12,7 @@
 #include <folly/io/async/AsyncUDPSocket.h>
 
 #include <quic/QuicException.h>
+#include <quic/api/IoBufQuicBatch.h>
 #include <quic/api/QuicPacketScheduler.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/state/StateData.h>
@@ -19,6 +20,48 @@
 // Function to schedule writing data to socket. Return number of packets
 // successfully scheduled
 namespace quic {
+
+struct DataPathResult {
+  bool buildSuccess{false};
+  bool writeSuccess{false};
+  folly::Optional<SchedulingResult> result;
+  uint64_t encodedSize{0};
+
+  static DataPathResult makeBuildFailure() {
+    return DataPathResult();
+  }
+
+  static DataPathResult makeWriteResult(
+      bool writeSuc,
+      SchedulingResult&& res,
+      uint64_t encodedSizeIn) {
+    return DataPathResult(writeSuc, std::move(res), encodedSizeIn);
+  }
+
+ private:
+  explicit DataPathResult() = default;
+
+  explicit DataPathResult(
+      bool writeSuc,
+      SchedulingResult&& res,
+      uint64_t encodedSizeIn)
+      : buildSuccess(true),
+        writeSuccess(writeSuc),
+        result(std::move(res)),
+        encodedSize(encodedSizeIn) {}
+};
+
+using DataPathFunc = std::function<DataPathResult(
+    QuicConnectionStateBase&,
+    PacketHeader,
+    PacketNumberSpace,
+    PacketNum,
+    uint64_t,
+    QuicPacketScheduler&,
+    uint64_t,
+    IOBufQuicBatch&,
+    const Aead&,
+    const PacketNumberCipher&)>;
 
 using HeaderBuilder = std::function<PacketHeader(
     const ConnectionId& srcConnId,

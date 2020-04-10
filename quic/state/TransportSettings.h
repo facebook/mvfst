@@ -165,6 +165,9 @@ struct TransportSettings {
   DurationRep timeReorderingThreshDivisor{kDefaultTimeReorderingThreshDivisor};
   // Whether to close client transport on read error from socket
   bool closeClientOnReadError{false};
+  // A temporary type to control DataPath write style. Will be gone after we
+  // are done with experiment.
+  DataPathType dataPathType{DataPathType::ChainedMemory};
 };
 
 } // namespace quic

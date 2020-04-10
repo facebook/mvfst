@@ -11,7 +11,6 @@
 #include <folly/Overload.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
-#include <quic/api/IoBufQuicBatch.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
@@ -160,6 +159,75 @@ uint64_t writeQuicDataToSocketImpl(
                            << connection;
   DCHECK_GE(packetLimit, written);
   return written;
+}
+
+DataPathResult iobufChainBasedBuildScheduleEncrypt(
+    QuicConnectionStateBase& connection,
+    PacketHeader header,
+    PacketNumberSpace pnSpace,
+    PacketNum packetNum,
+    uint64_t cipherOverhead,
+    QuicPacketScheduler& scheduler,
+    uint64_t writableBytes,
+    IOBufQuicBatch& ioBufBatch,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher) {
+  RegularQuicPacketBuilder pktBuilder(
+      connection.udpSendPacketLen,
+      std::move(header),
+      getAckState(connection, pnSpace).largestAckedByPeer);
+  pktBuilder.setCipherOverhead(cipherOverhead);
+  auto result =
+      scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
+  auto& packet = result.packet;
+  if (!packet || packet->packet.frames.empty()) {
+    ioBufBatch.flush();
+    if (connection.loopDetectorCallback) {
+      connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
+    }
+    return DataPathResult::makeBuildFailure();
+  }
+  if (!packet->body) {
+    // No more space remaining.
+    ioBufBatch.flush();
+    if (connection.loopDetectorCallback) {
+      connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
+    }
+    return DataPathResult::makeBuildFailure();
+  }
+  packet->header->coalesce();
+  auto headerLen = packet->header->length();
+  auto bodyLen = packet->body->computeChainDataLength();
+  auto unencrypted =
+      folly::IOBuf::create(headerLen + bodyLen + aead.getCipherOverhead());
+  auto bodyCursor = folly::io::Cursor(packet->body.get());
+  bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
+  unencrypted->advance(headerLen);
+  unencrypted->append(bodyLen);
+  auto packetBuf =
+      aead.encrypt(std::move(unencrypted), packet->header.get(), packetNum);
+  DCHECK(packetBuf->headroom() == headerLen);
+  packetBuf->clear();
+  auto headerCursor = folly::io::Cursor(packet->header.get());
+  headerCursor.pull(packetBuf->writableData(), headerLen);
+  packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
+
+  HeaderForm headerForm = packet->packet.header.getHeaderForm();
+  encryptPacketHeader(
+      headerForm,
+      packetBuf->writableData(),
+      headerLen,
+      packetBuf->data() + headerLen,
+      packetBuf->length() - headerLen,
+      headerCipher);
+  auto encodedSize = packetBuf->computeChainDataLength();
+  bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
+  if (ret) {
+    // update stats and connection
+    QUIC_STATS(connection.infoCallback, onWrite, encodedSize);
+    QUIC_STATS(connection.infoCallback, onPacketSent);
+  }
+  return DataPathResult::makeWriteResult(ret, std::move(result), encodedSize);
 }
 
 } // namespace
@@ -950,73 +1018,40 @@ uint64_t writeConnectionDataToSocket(
     } else {
       writableBytes -= cipherOverhead;
     }
-    RegularQuicPacketBuilder pktBuilder(
-        connection.udpSendPacketLen,
+
+    // TODO: Select a different DataPathFunc based on TransportSettings
+    const auto& dataPlainFunc = iobufChainBasedBuildScheduleEncrypt;
+    auto ret = dataPlainFunc(
+        connection,
         std::move(header),
-        getAckState(connection, pnSpace).largestAckedByPeer);
-    pktBuilder.setCipherOverhead(cipherOverhead);
-    auto result =
-        scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
-    auto& packet = result.second;
-    if (!packet || packet->packet.frames.empty()) {
-      ioBufBatch.flush();
-      if (connection.loopDetectorCallback) {
-        connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
-      }
-      return ioBufBatch.getPktSent();
-    }
-    if (!packet->body) {
-      // No more space remaining.
-      ioBufBatch.flush();
-      if (connection.loopDetectorCallback) {
-        connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
-      }
-      return ioBufBatch.getPktSent();
-    }
-    packet->header->coalesce();
-    auto headerLen = packet->header->length();
-    auto bodyLen = packet->body->computeChainDataLength();
-    auto unencrypted =
-        folly::IOBuf::create(headerLen + bodyLen + aead.getCipherOverhead());
-    auto bodyCursor = folly::io::Cursor(packet->body.get());
-    bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
-    unencrypted->advance(headerLen);
-    unencrypted->append(bodyLen);
-    auto packetBuf =
-        aead.encrypt(std::move(unencrypted), packet->header.get(), packetNum);
-    DCHECK(packetBuf->headroom() == headerLen);
-    packetBuf->clear();
-    auto headerCursor = folly::io::Cursor(packet->header.get());
-    headerCursor.pull(packetBuf->writableData(), headerLen);
-    packetBuf->append(headerLen + bodyLen + aead.getCipherOverhead());
-
-    HeaderForm headerForm = packet->packet.header.getHeaderForm();
-    encryptPacketHeader(
-        headerForm,
-        packetBuf->writableData(),
-        headerLen,
-        packetBuf->data() + headerLen,
-        packetBuf->length() - headerLen,
+        pnSpace,
+        packetNum,
+        cipherOverhead,
+        scheduler,
+        writableBytes,
+        ioBufBatch,
+        aead,
         headerCipher);
-    auto encodedSize = packetBuf->computeChainDataLength();
-    bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
 
-    if (ret) {
-      // update stats and connection
-      QUIC_STATS(connection.infoCallback, onWrite, encodedSize);
-      QUIC_STATS(connection.infoCallback, onPacketSent);
+    if (!ret.buildSuccess) {
+      return ioBufBatch.getPktSent();
     }
-
+    // If we build a packet, we updateConnection(), even if write might have
+    // been failed. Because if it builds, a lot of states need to be updated no
+    // matter the write result. We are basically treating this case as if we
+    // pretend write was also successful but packet is lost somewhere in the
+    // network.
+    auto& result = ret.result;
     updateConnection(
         connection,
-        std::move(result.first),
-        std::move(result.second->packet),
+        std::move(result->packetEvent),
+        std::move(result->packet->packet),
         Clock::now(),
-        folly::to<uint32_t>(encodedSize));
+        folly::to<uint32_t>(ret.encodedSize));
 
     // if ioBufBatch.write returns false
     // it is because a flush() call failed
-    if (!ret) {
+    if (!ret.writeSuccess) {
       if (connection.loopDetectorCallback) {
         connection.writeDebugState.noWriteReason =
             NoWriteReason::SOCKET_FAILURE;

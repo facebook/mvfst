@@ -28,10 +28,7 @@ class MockFrameScheduler : public FrameScheduler {
   MockFrameScheduler() : FrameScheduler("mock") {}
 
   // override methods accepting rvalue ref since gmock doesn't support it
-  std::pair<
-      folly::Optional<PacketEvent>,
-      folly::Optional<RegularQuicPacketBuilder::Packet>>
-  scheduleFramesForPacket(
+  SchedulingResult scheduleFramesForPacket(
       RegularQuicPacketBuilder&& builderIn,
       uint32_t writableBytes) override {
     auto builder =
@@ -42,11 +39,7 @@ class MockFrameScheduler : public FrameScheduler {
   GMOCK_METHOD0_(, const, , hasData, bool());
   MOCK_METHOD2(
       _scheduleFramesForPacket,
-      std::pair<
-          folly::Optional<PacketEvent>,
-          folly::Optional<RegularQuicPacketBuilder::Packet>>(
-          std::unique_ptr<RegularQuicPacketBuilder>&,
-          uint32_t));
+      SchedulingResult(std::unique_ptr<RegularQuicPacketBuilder>&, uint32_t));
 };
 
 class MockReadCallback : public QuicSocket::ReadCallback {

@@ -487,4 +487,13 @@ enum class EncryptionLevel : uint8_t {
   AppData,
 };
 
+/**
+ * This is a temporary type used during our data path experiment. It  may not
+ * exist for long time.
+ */
+enum class DataPathType : uint8_t {
+  ChainedMemory,
+  ContinuousMemory,
+};
+
 } // namespace quic

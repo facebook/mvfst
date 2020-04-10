@@ -114,10 +114,7 @@ FrameScheduler FrameScheduler::Builder::build() && {
 
 FrameScheduler::FrameScheduler(std::string name) : name_(std::move(name)) {}
 
-std::pair<
-    folly::Optional<PacketEvent>,
-    folly::Optional<RegularQuicPacketBuilder::Packet>>
-FrameScheduler::scheduleFramesForPacket(
+SchedulingResult FrameScheduler::scheduleFramesForPacket(
     RegularQuicPacketBuilder&& builder,
     uint32_t writableBytes) {
   // We need to keep track of writable bytes after writing header.
@@ -173,7 +170,7 @@ FrameScheduler::scheduleFramesForPacket(
     streamFrameScheduler_->writeStreams(wrapper);
   }
 
-  return std::make_pair(folly::none, std::move(builder).buildPacket());
+  return SchedulingResult(folly::none, std::move(builder).buildPacket());
 }
 
 bool FrameScheduler::hasData() const {
@@ -497,10 +494,7 @@ bool CryptoStreamScheduler::hasData() const {
       !cryptoStream_.lossBuffer.empty();
 }
 
-std::pair<
-    folly::Optional<PacketEvent>,
-    folly::Optional<RegularQuicPacketBuilder::Packet>>
-CryptoStreamScheduler::scheduleFramesForPacket(
+SchedulingResult CryptoStreamScheduler::scheduleFramesForPacket(
     RegularQuicPacketBuilder&& builder,
     uint32_t writableBytes) {
   // We need to keep track of writable bytes after writing header.
@@ -508,11 +502,11 @@ CryptoStreamScheduler::scheduleFramesForPacket(
       ? writableBytes - builder.getHeaderBytes()
       : 0;
   if (!writableBytes) {
-    return std::make_pair(folly::none, folly::none);
+    return SchedulingResult(folly::none, folly::none);
   }
   PacketBuilderWrapper wrapper(builder, writableBytes);
   writeCryptoData(wrapper);
-  return std::make_pair(folly::none, std::move(builder).buildPacket());
+  return SchedulingResult(folly::none, std::move(builder).buildPacket());
 }
 
 CloningScheduler::CloningScheduler(
@@ -532,10 +526,7 @@ bool CloningScheduler::hasData() const {
            conn_.outstandingHandshakePacketsCount);
 }
 
-std::pair<
-    folly::Optional<PacketEvent>,
-    folly::Optional<RegularQuicPacketBuilder::Packet>>
-CloningScheduler::scheduleFramesForPacket(
+SchedulingResult CloningScheduler::scheduleFramesForPacket(
     RegularQuicPacketBuilder&& builder,
     uint32_t writableBytes) {
   // The writableBytes in this function shouldn't be limited by cwnd, since
@@ -589,11 +580,11 @@ CloningScheduler::scheduleFramesForPacket(
     // Rebuilder will write the rest of frames
     auto rebuildResult = rebuilder.rebuildFromPacket(*iter);
     if (rebuildResult) {
-      return std::make_pair(
+      return SchedulingResult(
           std::move(rebuildResult), std::move(regularBuilder).buildPacket());
     }
   }
-  return std::make_pair(folly::none, folly::none);
+  return SchedulingResult(folly::none, folly::none);
 }
 
 std::string CloningScheduler::name() const {

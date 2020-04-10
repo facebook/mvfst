@@ -20,6 +20,16 @@
 
 namespace quic {
 
+struct SchedulingResult {
+  folly::Optional<PacketEvent> packetEvent;
+  folly::Optional<PacketBuilderInterface::Packet> packet;
+
+  explicit SchedulingResult(
+      folly::Optional<PacketEvent> packetEventIn,
+      folly::Optional<PacketBuilderInterface::Packet> packetIn)
+      : packetEvent(std::move(packetEventIn)), packet(std::move(packetIn)) {}
+};
+
 /**
  * Common interface for Quic packet schedulers
  * used at the top level.
@@ -35,10 +45,7 @@ class QuicPacketScheduler {
    * Returns an optional PacketEvent which indicates if the built out packet is
    * a clone and the associated PacketEvent for both origin and clone.
    */
-  virtual std::pair<
-      folly::Optional<PacketEvent>,
-      folly::Optional<RegularQuicPacketBuilder::Packet>>
-  scheduleFramesForPacket(
+  virtual SchedulingResult scheduleFramesForPacket(
       RegularQuicPacketBuilder&& builder,
       uint32_t writableBytes) = 0;
 
@@ -290,10 +297,7 @@ class CryptoStreamScheduler {
    * clone and the associated PacketEvent for both origin and clone. In the case
    * of CryptoStreamScheduler, this will always return folly::none.
    */
-  std::pair<
-      folly::Optional<PacketEvent>,
-      folly::Optional<RegularQuicPacketBuilder::Packet>>
-  scheduleFramesForPacket(
+  SchedulingResult scheduleFramesForPacket(
       RegularQuicPacketBuilder&& builder,
       uint32_t writableBytes);
 
@@ -350,10 +354,7 @@ class FrameScheduler : public QuicPacketScheduler {
 
   explicit FrameScheduler(std::string name);
 
-  virtual std::pair<
-      folly::Optional<PacketEvent>,
-      folly::Optional<RegularQuicPacketBuilder::Packet>>
-  scheduleFramesForPacket(
+  SchedulingResult scheduleFramesForPacket(
       RegularQuicPacketBuilder&& builder,
       uint32_t writableBytes) override;
 
@@ -404,10 +405,7 @@ class CloningScheduler : public QuicPacketScheduler {
    * Returns a optional PacketEvent which indicates if the built out packet is a
    * clone and the associated PacketEvent for both origin and clone.
    */
-  std::pair<
-      folly::Optional<PacketEvent>,
-      folly::Optional<RegularQuicPacketBuilder::Packet>>
-  scheduleFramesForPacket(
+  SchedulingResult scheduleFramesForPacket(
       RegularQuicPacketBuilder&& builder,
       uint32_t writableBytes) override;
 

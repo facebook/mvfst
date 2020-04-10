@@ -337,8 +337,8 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
-  EXPECT_EQ(packetNum, *result.first);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(packetNum, *result.packetEvent);
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
@@ -383,10 +383,10 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(regularBuilder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
-  EXPECT_EQ(packetNum, *result.first);
-  // written packet (result.second) should not have any frame in the builder
-  auto& writtenPacket = *result.second;
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(packetNum, *result.packetEvent);
+  // written packet (result.packet) should not have any frame in the builder
+  auto& writtenPacket = *result.packet;
   auto shortHeader = writtenPacket.packet.header.asShort();
   CHECK(shortHeader);
   EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader->getProtectionType());
@@ -437,8 +437,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
       conn.ackStates.initialAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
-  EXPECT_EQ(expected, *result.first);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(expected, *result.packetEvent);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasDataIgnoresNonAppData) {
@@ -482,8 +482,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.first.has_value() && result.second.has_value());
-  EXPECT_EQ(expected, *result.first);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(expected, *result.packetEvent);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
@@ -508,7 +508,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
                 std::move(packet),
                 folly::IOBuf::copyBuffer("if you are the dealer"),
                 folly::IOBuf::copyBuffer("I'm out of the game"));
-            return std::make_pair(folly::none, std::move(builtPacket));
+            return SchedulingResult(folly::none, std::move(builtPacket));
           }));
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
@@ -516,23 +516,23 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
-  EXPECT_EQ(folly::none, result.first);
-  EXPECT_EQ(result.second->packet.header.getHeaderForm(), HeaderForm::Short);
-  ShortHeader& shortHeader = *result.second->packet.header.asShort();
+  EXPECT_EQ(folly::none, result.packetEvent);
+  EXPECT_EQ(result.packet->packet.header.getHeaderForm(), HeaderForm::Short);
+  ShortHeader& shortHeader = *result.packet->packet.header.asShort();
   EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader.getProtectionType());
   EXPECT_EQ(
       conn.ackStates.appDataAckState.nextPacketNum,
       shortHeader.getPacketSequenceNum());
-  EXPECT_EQ(1, result.second->packet.frames.size());
+  EXPECT_EQ(1, result.packet->packet.frames.size());
   MaxDataFrame* maxDataFrame =
-      result.second->packet.frames.front().asMaxDataFrame();
+      result.packet->packet.frames.front().asMaxDataFrame();
   ASSERT_NE(maxDataFrame, nullptr);
   EXPECT_EQ(2832, maxDataFrame->maximumData);
   EXPECT_TRUE(folly::IOBufEqualTo{}(
       *folly::IOBuf::copyBuffer("if you are the dealer"),
-      *result.second->header));
+      *result.packet->header));
   EXPECT_TRUE(folly::IOBufEqualTo{}(
-      *folly::IOBuf::copyBuffer("I'm out of the game"), *result.second->body));
+      *folly::IOBuf::copyBuffer("I'm out of the game"), *result.packet->body));
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
@@ -565,9 +565,9 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
       conn.ackStates.appDataAckState.largestAckedByPeer);
   auto packetResult = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
-  EXPECT_EQ(expectedPacketEvent, *packetResult.first);
+  EXPECT_EQ(expectedPacketEvent, *packetResult.packetEvent);
   int32_t verifyConnWindowUpdate = 1, verifyStreamWindowUpdate = 1;
-  for (const auto& frame : packetResult.second->packet.frames) {
+  for (const auto& frame : packetResult.packet->packet.frames) {
     switch (frame.type()) {
       case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
         const MaxStreamDataFrame& maxStreamDataFrame =
@@ -592,10 +592,10 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   EXPECT_EQ(0, verifyConnWindowUpdate);
 
   // Verify the built out packet has refreshed window update values
-  EXPECT_GE(packetResult.second->packet.frames.size(), 2);
+  EXPECT_GE(packetResult.packet->packet.frames.size(), 2);
   uint32_t streamWindowUpdateCounter = 0;
   uint32_t connWindowUpdateCounter = 0;
-  for (auto& frame : packetResult.second->packet.frames) {
+  for (auto& frame : packetResult.packet->packet.frames) {
     auto streamFlowControl = frame.asMaxStreamDataFrame();
     if (!streamFlowControl) {
       continue;
@@ -603,7 +603,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
     streamWindowUpdateCounter++;
     EXPECT_EQ(1700, streamFlowControl->maximumData);
   }
-  for (auto& frame : packetResult.second->packet.frames) {
+  for (auto& frame : packetResult.packet->packet.frames) {
     auto connFlowControl = frame.asMaxDataFrame();
     if (!connFlowControl) {
       continue;
