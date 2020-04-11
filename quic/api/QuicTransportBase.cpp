@@ -1112,7 +1112,7 @@ QuicTransportBase::sendDataRejected(StreamId id, uint64_t offset) {
 }
 
 void QuicTransportBase::updatePeekLooper() {
-  if (closeState_ != CloseState::OPEN) {
+  if (peekCallbacks_.empty() || closeState_ != CloseState::OPEN) {
     VLOG(10) << "Stopping peek looper " << *this;
     peekLooper_->stop();
     return;
