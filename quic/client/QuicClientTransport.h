@@ -133,6 +133,14 @@ class QuicClientTransport
 
   void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket> newSock) override;
 
+  /**
+   * Set callback for various transport stats (such as packet received, dropped
+   * etc). Since the callback is invoked very frequently, it is
+   * important that the implementation is efficient.
+   */
+  void setTransportStatsCallback(
+      std::shared_ptr<QuicTransportStatsCallback> statsCallback) noexcept;
+
   class HappyEyeballsConnAttemptDelayTimeout
       : public folly::HHWheelTimer::Callback {
    public:
@@ -209,5 +217,6 @@ class QuicClientTransport
   QuicClientConnectionState* clientConn_;
   std::vector<TransportParameter> customTransportParameters_;
   folly::SocketOptionMap socketOptions_;
+  std::shared_ptr<QuicTransportStatsCallback> statsCallback_;
 };
 } // namespace quic

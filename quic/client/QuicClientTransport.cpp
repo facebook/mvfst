@@ -1309,4 +1309,16 @@ void QuicClientTransport::onNetworkSwitch(
     }
   }
 }
+
+void QuicClientTransport::setTransportStatsCallback(
+    std::shared_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
+  CHECK(conn_);
+  statsCallback_ = std::move(statsCallback);
+  if (statsCallback_) {
+    conn_->statsCallback = statsCallback_.get();
+  } else {
+    conn_->statsCallback = nullptr;
+  }
+}
+
 } // namespace quic
