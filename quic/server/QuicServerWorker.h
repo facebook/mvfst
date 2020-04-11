@@ -202,13 +202,13 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * important that the implementation is efficient.
    * NOTE: Quic does not synchronize across threads before calling it.
    */
-  void setTransportInfoCallback(
-      std::unique_ptr<QuicTransportStatsCallback> infoCallback) noexcept;
+  void setTransportStatsCallback(
+      std::unique_ptr<QuicTransportStatsCallback> statsCallback) noexcept;
 
   /**
    * Return callback for recording various transport stats info.
    */
-  QuicTransportStatsCallback* getTransportInfoCallback() const noexcept;
+  QuicTransportStatsCallback* getTransportStatsCallback() const noexcept;
 
   /**
    * Set ConnectionIdAlgo implementation to encode and decode ConnectionId with
@@ -328,8 +328,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * per thread, it is important that the implementation is efficient.
    * NOTE: QuicServer does not synchronize across threads before calling it
    */
-  QuicTransportStatsCallback* getInfoCallback() {
-    return infoCallback_.get();
+  QuicTransportStatsCallback* getStatsCallback() {
+    return statsCallback_.get();
   }
 
  private:
@@ -390,7 +390,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   uint16_t hostId_{0};
   // QuicServerWorker maintains ownership of the info stats callback
-  std::unique_ptr<QuicTransportStatsCallback> infoCallback_;
+  std::unique_ptr<QuicTransportStatsCallback> statsCallback_;
 
   // Handle takeover between processes
   std::unique_ptr<TakeoverHandlerCallback> takeoverCB_;

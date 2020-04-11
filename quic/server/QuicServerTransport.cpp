@@ -71,10 +71,10 @@ void QuicServerTransport::setServerConnectionIdParams(
   serverConn_->serverConnIdParams.assign(std::move(params));
 }
 
-void QuicServerTransport::setTransportInfoCallback(
-    QuicTransportStatsCallback* infoCallback) noexcept {
+void QuicServerTransport::setTransportStatsCallback(
+    QuicTransportStatsCallback* statsCallback) noexcept {
   if (conn_) {
-    conn_->infoCallback = infoCallback;
+    conn_->statsCallback = statsCallback;
   }
 }
 

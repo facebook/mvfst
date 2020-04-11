@@ -124,7 +124,7 @@ bool IOBufQuicBatch::flushInternal() {
   if (!written) {
     errnoCopy = errno;
     QUIC_STATS(
-        conn_.infoCallback,
+        conn_.statsCallback,
         onUDPSocketWriteError,
         QuicTransportStatsCallback::errnoToSocketErrorType(errnoCopy));
   }

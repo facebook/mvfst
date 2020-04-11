@@ -72,8 +72,8 @@ class QuicServerTransport
    * Set callback for various transport stats (such as packet received, dropped
    * etc).
    */
-  virtual void setTransportInfoCallback(
-      QuicTransportStatsCallback* infoCallback) noexcept;
+  virtual void setTransportStatsCallback(
+      QuicTransportStatsCallback* statsCallback) noexcept;
 
   /**
    * Set ConnectionIdAlgo implementation to encode and decode ConnectionId with

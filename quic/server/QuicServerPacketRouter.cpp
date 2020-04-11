@@ -95,7 +95,7 @@ void TakeoverHandlerCallback::onDataAvailable(
   // of it immediately so that if we return early,
   // we've flushed it.
   Buf data = std::move(readBuffer_);
-  QUIC_STATS(worker_->getInfoCallback(), onForwardedPacketReceived);
+  QUIC_STATS(worker_->getStatsCallback(), onForwardedPacketReceived);
   if (truncated) {
     // This is an error, drop the packet.
     return;
@@ -241,7 +241,7 @@ void TakeoverPacketHandler::processForwardedPacket(
   Clock::duration tick(pktReceiveEpoch);
   TimePoint clientPacketReceiveTime(tick);
   data->trimStart(cursor - data.get());
-  QUIC_STATS(worker_->getInfoCallback(), onForwardedPacketProcessed);
+  QUIC_STATS(worker_->getStatsCallback(), onForwardedPacketProcessed);
   worker_->handleNetworkData(
       peerAddress,
       std::move(data),

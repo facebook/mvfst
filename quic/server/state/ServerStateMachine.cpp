@@ -365,7 +365,7 @@ void onConnectionMigration(
               PacketDropReason::PEER_ADDRESS_CHANGE));
     }
     QUIC_STATS(
-        conn.infoCallback,
+        conn.statsCallback,
         onPacketDropped,
         PacketDropReason::PEER_ADDRESS_CHANGE);
     throw QuicTransportException(
@@ -533,7 +533,7 @@ void onServerReadDataFromOpen(
                 PacketDropReason::PARSE_ERROR));
       }
       QUIC_STATS(
-          conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
+          conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       return;
     }
     QuicVersion version = parsedLongHeader->invariant.version;
@@ -546,7 +546,9 @@ void onServerReadDataFromOpen(
                 PacketDropReason::INVALID_PACKET));
       }
       QUIC_STATS(
-          conn.infoCallback, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::INVALID_PACKET);
       return;
     }
 
@@ -563,7 +565,7 @@ void onServerReadDataFromOpen(
                 PacketDropReason::INITIAL_CONNID_SMALL));
       }
       QUIC_STATS(
-          conn.infoCallback,
+          conn.statsCallback,
           onPacketDropped,
           PacketDropReason::INITIAL_CONNID_SMALL);
       return;
@@ -578,7 +580,7 @@ void onServerReadDataFromOpen(
     CHECK(newServerConnIdData.has_value());
     conn.serverConnectionId = newServerConnIdData->connId;
 
-    QUIC_STATS(conn.infoCallback, onStatelessReset);
+    QUIC_STATS(conn.statsCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
             version,
@@ -667,7 +669,7 @@ void onServerReadDataFromOpen(
       // previous switch-case block. We just need to update QUIC_STATS here.
       VLOG(10) << "Not able to parse QUIC packet " << conn;
       QUIC_STATS(
-          conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
+          conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;
     }
 
@@ -695,7 +697,7 @@ void onServerReadDataFromOpen(
         // TODO: add path challenge and response
         if (!isPadding && !isAck && !isClose && !isCrypto && !isPing) {
           QUIC_STATS(
-              conn.infoCallback,
+              conn.statsCallback,
               onPacketDropped,
               PacketDropReason::PROTOCOL_VIOLATION);
           if (conn.qLogger) {
@@ -736,7 +738,7 @@ void onServerReadDataFromOpen(
                   PacketDropReason::PEER_ADDRESS_CHANGE));
         }
         QUIC_STATS(
-            conn.infoCallback,
+            conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
         throw QuicTransportException(
@@ -752,7 +754,7 @@ void onServerReadDataFromOpen(
                   PacketDropReason::PEER_ADDRESS_CHANGE));
         }
         QUIC_STATS(
-            conn.infoCallback,
+            conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
         throw QuicTransportException(
@@ -1012,7 +1014,7 @@ void onServerReadDataFromOpen(
                   PacketDropReason::PEER_ADDRESS_CHANGE));
         }
         QUIC_STATS(
-            conn.infoCallback,
+            conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
         throw QuicTransportException(
@@ -1036,7 +1038,7 @@ void onServerReadDataFromOpen(
                   PacketDropReason::TRANSPORT_PARAMETER_ERROR));
         }
         QUIC_STATS(
-            conn.infoCallback,
+            conn.statsCallback,
             onPacketDropped,
             QuicTransportStatsCallback::PacketDropReason::
                 TRANSPORT_PARAMETER_ERROR);
@@ -1049,7 +1051,7 @@ void onServerReadDataFromOpen(
         outOfOrder,
         pktHasRetransmittableData,
         pktHasCryptoData);
-    QUIC_STATS(conn.infoCallback, onPacketProcessed);
+    QUIC_STATS(conn.statsCallback, onPacketProcessed);
   }
   VLOG_IF(4, !udpData.empty())
       << "Leaving " << udpData.chainLength()
@@ -1074,7 +1076,7 @@ void onServerReadDataFromClosed(
               PacketDropReason::SERVER_STATE_CLOSED));
     }
     QUIC_STATS(
-        conn.infoCallback,
+        conn.statsCallback,
         onPacketDropped,
         PacketDropReason::SERVER_STATE_CLOSED);
     return;
@@ -1090,7 +1092,7 @@ void onServerReadDataFromClosed(
     }
     QUIC_TRACE(packet_drop, conn, "ignoring peer close");
     QUIC_STATS(
-        conn.infoCallback,
+        conn.statsCallback,
         onPacketDropped,
         PacketDropReason::SERVER_STATE_CLOSED);
     return;
@@ -1143,7 +1145,7 @@ void onServerReadDataFromClosed(
           QuicTransportStatsCallback::toString(PacketDropReason::PARSE_ERROR));
     }
     QUIC_STATS(
-        conn.infoCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
+        conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
     return;
   }
 

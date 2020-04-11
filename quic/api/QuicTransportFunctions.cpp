@@ -224,8 +224,8 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (ret) {
     // update stats and connection
-    QUIC_STATS(connection.infoCallback, onWrite, encodedSize);
-    QUIC_STATS(connection.infoCallback, onPacketSent);
+    QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
+    QUIC_STATS(connection.statsCallback, onPacketSent);
   }
   return DataPathResult::makeWriteResult(ret, std::move(result), encodedSize);
 }
@@ -326,7 +326,7 @@ bool handleStreamWritten(
         frameFin,
         packetNum,
         lossBufferIter);
-    QUIC_STATS(conn.infoCallback, onPacketRetransmission);
+    QUIC_STATS(conn.statsCallback, onPacketRetransmission);
     return false;
   }
 
@@ -869,7 +869,7 @@ void writeCloseCommon(
     VLOG(4) << "Error writing connection close " << folly::errnoStr(errno)
             << " " << connection;
   } else {
-    QUIC_STATS(connection.infoCallback, onWrite, ret);
+    QUIC_STATS(connection.statsCallback, onWrite, ret);
   }
 }
 
@@ -1036,6 +1036,7 @@ uint64_t writeConnectionDataToSocket(
     if (!ret.buildSuccess) {
       return ioBufBatch.getPktSent();
     }
+
     // If we build a packet, we updateConnection(), even if write might have
     // been failed. Because if it builds, a lot of states need to be updated no
     // matter the write result. We are basically treating this case as if we
@@ -1110,7 +1111,7 @@ WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
   }
 
   if (!congestionControlWritableBytes(conn)) {
-    QUIC_STATS(conn.infoCallback, onCwndBlocked);
+    QUIC_STATS(conn.statsCallback, onCwndBlocked);
     return WriteDataReason::NO_WRITE;
   }
   return hasNonAckDataToWrite(conn);

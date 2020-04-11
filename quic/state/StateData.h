@@ -747,7 +747,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   std::shared_ptr<QLogger> qLogger;
 
   // Track stats for various server events
-  QuicTransportStatsCallback* infoCallback{nullptr};
+  QuicTransportStatsCallback* statsCallback{nullptr};
 
   struct HappyEyeballsState {
     // Delay timer

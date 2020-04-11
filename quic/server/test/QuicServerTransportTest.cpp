@@ -311,7 +311,7 @@ class QuicServerTransportTest : public Test {
     server->getNonConstConn().transportSettings.statelessResetTokenSecret =
         getRandSecret();
     transportInfoCb_ = std::make_unique<NiceMock<MockQuicStats>>();
-    server->setTransportInfoCallback(transportInfoCb_.get());
+    server->setTransportStatsCallback(transportInfoCb_.get());
     initializeServerHandshake();
     server->getNonConstConn().handshakeLayer.reset(fakeHandshake);
     server->getNonConstConn().serverHandshakeLayer = fakeHandshake;
@@ -457,7 +457,7 @@ class QuicServerTransportTest : public Test {
 
   virtual void setupConnection() {
     EXPECT_EQ(server->getConn().readCodec, nullptr);
-    EXPECT_EQ(server->getConn().infoCallback, transportInfoCb_.get());
+    EXPECT_EQ(server->getConn().statsCallback, transportInfoCb_.get());
     setupClientReadCodec();
     recvClientHello();
 

@@ -148,11 +148,11 @@ class QuicServerWorkerTest : public Test {
     worker_->setWorkerId(42);
     worker_->setProcessId(ProcessId::ONE);
     worker_->setHostId(hostId_);
-    worker_->setTransportInfoCallback(std::move(transportInfoCb));
+    worker_->setTransportStatsCallback(std::move(transportInfoCb));
     worker_->setConnectionIdAlgo(std::make_unique<DefaultConnectionIdAlgo>());
     worker_->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
-    transportInfoCb_ = (MockQuicStats*)worker_->getTransportInfoCallback();
+    transportInfoCb_ = (MockQuicStats*)worker_->getTransportStatsCallback();
 
     auto cb = [&](const folly::SocketAddress& addr,
                   std::unique_ptr<RoutingData>& routingData,
@@ -245,7 +245,7 @@ void QuicServerWorkerTest::expectConnectionCreation(
       }));
   EXPECT_CALL(*transport, setTransportSettings(_));
   EXPECT_CALL(*transport, accept());
-  EXPECT_CALL(*transport, setTransportInfoCallback(transportInfoCb_));
+  EXPECT_CALL(*transport, setTransportStatsCallback(transportInfoCb_));
 }
 
 void QuicServerWorkerTest::expectConnCreateRefused() {
@@ -258,7 +258,7 @@ void QuicServerWorkerTest::expectConnCreateRefused() {
   EXPECT_CALL(*transport, setServerConnectionIdParams(_)).Times(0);
   EXPECT_CALL(*transport, setTransportSettings(_)).Times(0);
   EXPECT_CALL(*transport, accept()).Times(0);
-  EXPECT_CALL(*transport, setTransportInfoCallback(transportInfoCb_)).Times(0);
+  EXPECT_CALL(*transport, setTransportStatsCallback(transportInfoCb_)).Times(0);
   EXPECT_CALL(*transport, onNetworkData(_, _)).Times(0);
 }
 
@@ -807,7 +807,7 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setTransportInfoCallback(nullptr)).Times(2);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
     hasShutdown_ = true;
   }));
@@ -846,7 +846,7 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
-  EXPECT_CALL(*transport_, setTransportInfoCallback(nullptr)).Times(2);
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
     hasShutdown_ = true;
   }));
@@ -953,9 +953,9 @@ class QuicServerWorkerTakeoverTest : public Test {
     auto transportInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
     takeoverWorker_->setConnectionIdAlgo(
         std::make_unique<DefaultConnectionIdAlgo>());
-    takeoverWorker_->setTransportInfoCallback(std::move(transportInfoCb));
+    takeoverWorker_->setTransportStatsCallback(std::move(transportInfoCb));
     transportInfoCb_ =
-        (MockQuicStats*)takeoverWorker_->getTransportInfoCallback();
+        (MockQuicStats*)takeoverWorker_->getTransportStatsCallback();
 
     auto takeoverSock =
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb_);
@@ -1390,9 +1390,9 @@ class QuicServerTest : public Test {
         std::shared_ptr<const fizz::server::FizzServerContext>) noexcept {
       // set proper expectations for the transport after its creation
       EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(evb));
-      EXPECT_CALL(*transport, setTransportInfoCallback(_))
-          .WillOnce(Invoke([&](QuicTransportStatsCallback* infoCallback) {
-            CHECK(infoCallback);
+      EXPECT_CALL(*transport, setTransportStatsCallback(_))
+          .WillOnce(Invoke([&](QuicTransportStatsCallback* statsCallback) {
+            CHECK(statsCallback);
           }));
       EXPECT_CALL(*transport, setTransportSettings(_))
           .WillRepeatedly(Invoke([&](auto transportSettings) {
@@ -1459,7 +1459,7 @@ class QuicServerTest : public Test {
     auto client = makeUdpClient();
     folly::EventBase* evb = server_->getWorkerEvbs().back();
     auto transport = createNewTransport(evb, *client, serverAddr);
-    EXPECT_CALL(*transport, setTransportInfoCallback(nullptr));
+    EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
     EXPECT_CALL(*transport, setRoutingCallback(nullptr));
     EXPECT_CALL(*transport, closeNow(_));
     mockStats_.reset();
@@ -1502,7 +1502,7 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
   auto client = makeUdpClient();
   auto transport =
       createNewTransport(evbThread.getEventBase(), *client, serverAddr);
-  EXPECT_CALL(*transport, setTransportInfoCallback(nullptr));
+  EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
 
   EXPECT_CALL(*transport, closeNow(_)).WillOnce(InvokeWithoutArgs([&] {
     PacketNum packetNum = 1;
@@ -1544,7 +1544,7 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   auto client = makeUdpClient();
   auto transport =
       createNewTransport(evbThread.getEventBase(), *client, serverAddr);
-  EXPECT_CALL(*transport, setTransportInfoCallback(nullptr));
+  EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
   EXPECT_CALL(*stats, onPacketDropped(PacketDropReason::SERVER_SHUTDOWN))
       .Times(0);
   auto clientConnId = getTestConnectionId(clientHostId_),
@@ -1656,7 +1656,7 @@ class QuicServerTakeoverTest : public Test {
       EXPECT_CALL(*transport, setSupportedVersions(_));
       EXPECT_CALL(*transport, setRoutingCallback(_));
       EXPECT_CALL(*transport, setOriginalPeerAddress(_));
-      EXPECT_CALL(*transport, setTransportInfoCallback(_));
+      EXPECT_CALL(*transport, setTransportStatsCallback(_));
       EXPECT_CALL(*transport, setServerConnectionIdParams(_))
           .WillOnce(Invoke([&](ServerConnectionIdParams params) {
             EXPECT_EQ(params.processId, 0);
@@ -1819,7 +1819,7 @@ class QuicServerTakeoverTest : public Test {
 
     b1.wait();
 
-    EXPECT_CALL(*transportCbForOldServer, setTransportInfoCallback(nullptr));
+    EXPECT_CALL(*transportCbForOldServer, setTransportStatsCallback(nullptr));
     oldServer_->shutdown();
     // 'transport' never gets created for the newServer_
     // so no callback on closeNow()

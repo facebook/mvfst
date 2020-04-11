@@ -157,7 +157,7 @@ void QuicServer::initializeWorkers(
             }
             auto statsCallback = transportStatsFactory->make();
             CHECK(statsCallback);
-            workerPtr->setTransportInfoCallback(std::move(statsCallback));
+            workerPtr->setTransportStatsCallback(std::move(statsCallback));
           });
     }
     worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
@@ -331,7 +331,7 @@ void QuicServer::routeDataToWorker(
     VLOG(4) << "Dropping data since quic-server is not initialized";
     if (workerPtr_) {
       QUIC_STATS(
-          workerPtr_->getTransportInfoCallback(),
+          workerPtr_->getTransportStatsCallback(),
           onPacketDropped,
           QuicTransportStatsCallback::PacketDropReason::WORKER_NOT_INITIALIZED);
     }
@@ -342,7 +342,7 @@ void QuicServer::routeDataToWorker(
     VLOG(4) << "Dropping data since quic server is shutdown";
     if (workerPtr_) {
       QUIC_STATS(
-          workerPtr_->getTransportInfoCallback(),
+          workerPtr_->getTransportStatsCallback(),
           onPacketDropped,
           QuicTransportStatsCallback::PacketDropReason::SERVER_SHUTDOWN);
     }

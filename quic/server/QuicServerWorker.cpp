@@ -74,15 +74,15 @@ void QuicServerWorker::setTransportSettingsOverrideFn(
   transportSettingsOverrideFn_ = std::move(fn);
 }
 
-void QuicServerWorker::setTransportInfoCallback(
-    std::unique_ptr<QuicTransportStatsCallback> infoCallback) noexcept {
-  CHECK(infoCallback);
-  infoCallback_ = std::move(infoCallback);
+void QuicServerWorker::setTransportStatsCallback(
+    std::unique_ptr<QuicTransportStatsCallback> statsCallback) noexcept {
+  CHECK(statsCallback);
+  statsCallback_ = std::move(statsCallback);
 }
 
-QuicTransportStatsCallback* QuicServerWorker::getTransportInfoCallback() const
+QuicTransportStatsCallback* QuicServerWorker::getTransportStatsCallback() const
     noexcept {
-  return infoCallback_.get();
+  return statsCallback_.get();
 }
 
 void QuicServerWorker::setConnectionIdAlgo(
@@ -155,7 +155,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     if (negotiationNeeded && !isInitial) {
       VLOG(3) << "Dropping non-initial packet due to invalid version";
       QUIC_STATS(
-          infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
       return true;
     }
     if (negotiationNeeded) {
@@ -168,9 +168,9 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   if (versionNegotiationPacket) {
     VLOG(4) << "Version negotiation sent to client=" << client;
     auto len = versionNegotiationPacket->second->computeChainDataLength();
-    QUIC_STATS(infoCallback_, onWrite, len);
-    QUIC_STATS(infoCallback_, onPacketProcessed);
-    QUIC_STATS(infoCallback_, onPacketSent);
+    QUIC_STATS(statsCallback_, onWrite, len);
+    QUIC_STATS(statsCallback_, onPacketProcessed);
+    QUIC_STATS(statsCallback_, onPacketSent);
     socket_->write(client, versionNegotiationPacket->second);
     return true;
   }
@@ -197,8 +197,8 @@ void QuicServerWorker::onDataAvailable(
     return;
   }
   data->append(len);
-  QUIC_STATS(infoCallback_, onPacketReceived);
-  QUIC_STATS(infoCallback_, onRead, len);
+  QUIC_STATS(statsCallback_, onPacketReceived);
+  QUIC_STATS(statsCallback_, onRead, len);
   handleNetworkData(client, std::move(data), packetReceiveTime);
 }
 
@@ -211,14 +211,14 @@ void QuicServerWorker::handleNetworkData(
     if (shutdown_) {
       VLOG(4) << "Packet received after shutdown, dropping";
       QUIC_STATS(
-          infoCallback_, onPacketDropped, PacketDropReason::SERVER_SHUTDOWN);
+          statsCallback_, onPacketDropped, PacketDropReason::SERVER_SHUTDOWN);
       return;
     }
 
     if (!callback_) {
       VLOG(0) << "Worker callback is null.  Dropping packet.";
       QUIC_STATS(
-          infoCallback_,
+          statsCallback_,
           onPacketDropped,
           PacketDropReason::WORKER_NOT_INITIALIZED);
       return;
@@ -227,7 +227,7 @@ void QuicServerWorker::handleNetworkData(
     if (!cursor.canAdvance(sizeof(uint8_t))) {
       VLOG(4) << "Dropping packet too small";
       QUIC_STATS(
-          infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
       return;
     }
     uint8_t initialByte = cursor.readBE<uint8_t>();
@@ -239,7 +239,7 @@ void QuicServerWorker::handleNetworkData(
       if (!parsedShortHeader) {
         if (!tryHandlingAsHealthCheck(client, *data)) {
           QUIC_STATS(
-              infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+              statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
           VLOG(6) << "Failed to parse short header";
         }
         return;
@@ -262,7 +262,7 @@ void QuicServerWorker::handleNetworkData(
     if (!parsedLongHeader) {
       if (!tryHandlingAsHealthCheck(client, *data)) {
         QUIC_STATS(
-            infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+            statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
         VLOG(6) << "Failed to parse long header";
       }
       return;
@@ -276,7 +276,7 @@ void QuicServerWorker::handleNetworkData(
 
     if (isInitial) {
       // This stats gets updated even if the client initial will be dropped.
-      QUIC_STATS(infoCallback_, onClientInitialReceived);
+      QUIC_STATS(statsCallback_, onClientInitialReceived);
     }
 
     if (maybeSendVersionNegotiationPacketOrDrop(
@@ -290,7 +290,7 @@ void QuicServerWorker::handleNetworkData(
       // drop packet if connId is present but is not valid.
       VLOG(3) << "Dropping packet due to invalid connectionId";
       QUIC_STATS(
-          infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
       return;
     }
     RoutingData routingData(
@@ -306,7 +306,7 @@ void QuicServerWorker::handleNetworkData(
         isForwardedData);
   } catch (const std::exception& ex) {
     // Drop the packet.
-    QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     VLOG(6) << "Failed to parse packet header " << ex.what();
   }
 }
@@ -350,13 +350,13 @@ void QuicServerWorker::forwardNetworkData(
       auto recvTime = networkData.receiveTimePoint;
       takeoverPktHandler_.forwardPacketToAnotherServer(
           client, std::move(networkData).moveAllData(), recvTime);
-      QUIC_STATS(infoCallback_, onPacketForwarded);
+      QUIC_STATS(statsCallback_, onPacketForwarded);
       return;
     } else {
       VLOG(3) << "Dropping packet due to unknown connectionId version connId="
               << routingData.destinationConnId.hex();
       QUIC_STATS(
-          infoCallback_,
+          statsCallback_,
           onPacketDropped,
           PacketDropReason::CONNECTION_NOT_FOUND);
     }
@@ -425,7 +425,9 @@ void QuicServerWorker::dispatchPacketData(
           // Don't even attempt to forward the packet, just drop it.
           VLOG(3) << "Dropping small initial packet from client=" << client;
           QUIC_STATS(
-              infoCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+              statsCallback_,
+              onPacketDropped,
+              PacketDropReason::INVALID_PACKET);
           return;
         }
         // create 'accepting' transport
@@ -464,8 +466,8 @@ void QuicServerWorker::dispatchPacketData(
           ServerConnectionIdParams serverConnIdParams(
               hostId_, static_cast<uint8_t>(processId_), workerId_);
           trans->setServerConnectionIdParams(std::move(serverConnIdParams));
-          if (infoCallback_) {
-            trans->setTransportInfoCallback(infoCallback_.get());
+          if (statsCallback_) {
+            trans->setTransportStatsCallback(statsCallback_.get());
           }
           trans->accept();
           auto result = sourceAddressMap_.emplace(std::make_pair(
@@ -493,7 +495,7 @@ void QuicServerWorker::dispatchPacketData(
     VLOG(3)
         << "Dropping packet due to transport factory did not make transport";
     QUIC_STATS(
-        infoCallback_,
+        statsCallback_,
         onPacketDropped,
         PacketDropReason::CANNOT_MAKE_TRANSPORT);
     return;
@@ -503,7 +505,7 @@ void QuicServerWorker::dispatchPacketData(
             << routingData.destinationConnId.hex()
             << ", workerId=" << (uint32_t)workerId_
             << ", hostId=" << (uint32_t)hostId_;
-    QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     // TODO do we need to reset?
     return;
   }
@@ -516,7 +518,7 @@ void QuicServerWorker::dispatchPacketData(
             << ", DCID=" << routingData.destinationConnId.hex()
             << ", workerId=" << (uint32_t)workerId_
             << ", hostId=" << (uint32_t)hostId_;
-    QUIC_STATS(infoCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     // TODO do we need to reset?
     return;
   }
@@ -527,7 +529,7 @@ void QuicServerWorker::dispatchPacketData(
             << ", hostId=" << (uint32_t)hostId_
             << ", received hostId=" << (uint32_t)connIdParam->hostId;
     QUIC_STATS(
-        infoCallback_,
+        statsCallback_,
         onPacketDropped,
         PacketDropReason::ROUTING_ERROR_WRONG_HOST);
     return sendResetPacket(
@@ -539,7 +541,9 @@ void QuicServerWorker::dispatchPacketData(
 
   if (!packetForwardingEnabled_ || isForwardedData) {
     QUIC_STATS(
-        infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
+        statsCallback_,
+        onPacketDropped,
+        PacketDropReason::CONNECTION_NOT_FOUND);
     return sendResetPacket(
         routingData.headerForm,
         client,
@@ -551,7 +555,9 @@ void QuicServerWorker::dispatchPacketData(
   // addr, and doesn't belong to the old server. Send a Reset.
   if (connIdParam->processId == static_cast<uint8_t>(processId_)) {
     QUIC_STATS(
-        infoCallback_, onPacketDropped, PacketDropReason::CONNECTION_NOT_FOUND);
+        statsCallback_,
+        onPacketDropped,
+        PacketDropReason::CONNECTION_NOT_FOUND);
     return sendResetPacket(
         routingData.headerForm,
         client,
@@ -568,7 +574,7 @@ void QuicServerWorker::dispatchPacketData(
   auto recvTime = networkData.receiveTimePoint;
   takeoverPktHandler_.forwardPacketToAnotherServer(
       client, std::move(networkData).moveAllData(), recvTime);
-  QUIC_STATS(infoCallback_, onPacketForwarded);
+  QUIC_STATS(statsCallback_, onPacketForwarded);
 }
 
 void QuicServerWorker::sendResetPacket(
@@ -591,10 +597,11 @@ void QuicServerWorker::sendResetPacket(
   StatelessResetToken token = generator.generateToken(connId);
   StatelessResetPacketBuilder builder(maxResetPacketSize, token);
   auto resetData = std::move(builder).buildPacket();
+  auto resetDataLen = resetData->computeChainDataLength();
   socket_->write(client, std::move(resetData));
-  QUIC_STATS(infoCallback_, onWrite, resetData->computeChainDataLength());
-  QUIC_STATS(infoCallback_, onPacketSent);
-  QUIC_STATS(infoCallback_, onStatelessReset);
+  QUIC_STATS(statsCallback_, onWrite, resetDataLen);
+  QUIC_STATS(statsCallback_, onPacketSent);
+  QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
 void QuicServerWorker::allowBeingTakenOver(
@@ -750,7 +757,7 @@ void QuicServerWorker::onConnectionIdAvailable(
                << (existingTransportPtr == transportPtr);
   } else if (boundServerTransports_.emplace(transportPtr, weakTransport)
                  .second) {
-    QUIC_STATS(infoCallback_, onNewConnection);
+    QUIC_STATS(statsCallback_, onNewConnection);
   }
 }
 
@@ -779,7 +786,7 @@ void QuicServerWorker::onConnectionUnbound(
   boundServerTransports_.erase(transport);
 
   if (connectionIdData.size()) {
-    QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
+    QUIC_STATS(statsCallback_, onConnectionClose, folly::none);
   }
 
   for (auto& connId : connectionIdData) {
@@ -836,7 +843,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   for (auto& it : sourceAddressMap_) {
     auto transport = it.second;
     transport->setRoutingCallback(nullptr);
-    transport->setTransportInfoCallback(nullptr);
+    transport->setTransportStatsCallback(nullptr);
     transport->closeNow(
         std::make_pair(QuicErrorCode(error), std::string("shutting down")));
   }
@@ -845,17 +852,17 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   for (auto transport : boundServerTransports_) {
     if (auto t = transport.second.lock()) {
       t->setRoutingCallback(nullptr);
-      t->setTransportInfoCallback(nullptr);
+      t->setTransportStatsCallback(nullptr);
       t->closeNow(
           std::make_pair(QuicErrorCode(error), std::string("shutting down")));
-      QUIC_STATS(infoCallback_, onConnectionClose, folly::none);
+      QUIC_STATS(statsCallback_, onConnectionClose, folly::none);
     }
   }
   sourceAddressMap_.clear();
   connectionIdMap_.clear();
   takeoverPktHandler_.stop();
-  if (infoCallback_) {
-    infoCallback_.reset();
+  if (statsCallback_) {
+    statsCallback_.reset();
   }
   socket_.reset();
   takeoverCB_.reset();

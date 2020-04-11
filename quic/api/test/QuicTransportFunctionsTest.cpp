@@ -158,7 +158,7 @@ class QuicTransportFunctionsTest : public Test {
         kDefaultStreamWindowSize;
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionWindowSize;
-    conn->infoCallback = transportInfoCb_.get();
+    conn->statsCallback = transportInfoCb_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
     conn->streamManager->setMaxLocalBidirectionalStreams(

@@ -227,17 +227,17 @@ class QuicTransportStatsCallbackFactory {
   virtual std::unique_ptr<QuicTransportStatsCallback> make() = 0;
 };
 
-#define QUIC_STATS(infoCallback, method, ...)                              \
-  if (infoCallback) {                                                      \
-    folly::invoke(                                                         \
-        &QuicTransportStatsCallback::method, infoCallback, ##__VA_ARGS__); \
+#define QUIC_STATS(statsCallback, method, ...)                              \
+  if (statsCallback) {                                                      \
+    folly::invoke(                                                          \
+        &QuicTransportStatsCallback::method, statsCallback, ##__VA_ARGS__); \
   }
 
-#define QUIC_STATS_FOR_EACH(iterBegin, iterEnd, infoCallback, method, ...)   \
-  if (infoCallback) {                                                        \
-    std::for_each(iterBegin, iterEnd, [&](const auto&) {                     \
-      folly::invoke(                                                         \
-          &QuicTransportStatsCallback::method, infoCallback, ##__VA_ARGS__); \
-    });                                                                      \
+#define QUIC_STATS_FOR_EACH(iterBegin, iterEnd, statsCallback, method, ...)   \
+  if (statsCallback) {                                                        \
+    std::for_each(iterBegin, iterEnd, [&](const auto&) {                      \
+      folly::invoke(                                                          \
+          &QuicTransportStatsCallback::method, statsCallback, ##__VA_ARGS__); \
+    });                                                                       \
   }
 } // namespace quic

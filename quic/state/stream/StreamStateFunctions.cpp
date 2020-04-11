@@ -58,7 +58,7 @@ void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame) {
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
   stream.conn.streamManager->updateLossStreams(stream);
-  QUIC_STATS(stream.conn.infoCallback, onQuicStreamReset);
+  QUIC_STATS(stream.conn.statsCallback, onQuicStreamReset);
 }
 
 bool isAllDataReceived(const QuicStreamState& stream) {

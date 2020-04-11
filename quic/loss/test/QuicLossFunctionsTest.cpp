@@ -77,7 +77,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         kDefaultMaxStreamsBidirectional);
     conn->streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
-    conn->infoCallback = transportInfoCb_.get();
+    conn->statsCallback = transportInfoCb_.get();
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0
     ServerConnectionIdParams params(0, 0, 0);
@@ -104,7 +104,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         kDefaultStreamWindowSize;
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionWindowSize;
-    conn->infoCallback = transportInfoCb_.get();
+    conn->statsCallback = transportInfoCb_.get();
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0
     ServerConnectionIdParams params(0, 0, 0);

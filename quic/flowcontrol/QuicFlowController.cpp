@@ -79,7 +79,7 @@ bool maybeSendConnWindowUpdate(
       updateTime);
   if (newAdvertisedOffset) {
     conn.pendingEvents.connWindowUpdate = true;
-    QUIC_STATS(conn.infoCallback, onConnFlowControlUpdate);
+    QUIC_STATS(conn.statsCallback, onConnFlowControlUpdate);
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(newAdvertisedOffset.value()));
@@ -112,7 +112,7 @@ bool maybeSendStreamWindowUpdate(
     VLOG(10) << "Queued flow control update for stream=" << stream.id
              << " offset=" << *newAdvertisedOffset;
     stream.conn.streamManager->queueWindowUpdate(stream.id);
-    QUIC_STATS(stream.conn.infoCallback, onStreamFlowControlUpdate);
+    QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlUpdate);
     return true;
   }
   return false;
@@ -185,7 +185,7 @@ void updateFlowControlOnWriteToSocket(
         "conn_blocked",
         stream.id,
         stream.conn.flowControlState.sumCurWriteOffset);
-    QUIC_STATS(stream.conn.infoCallback, onConnFlowControlBlocked);
+    QUIC_STATS(stream.conn.statsCallback, onConnFlowControlBlocked);
   }
 }
 
@@ -212,7 +212,7 @@ void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
         "stream_blocked",
         stream.id,
         stream.flowControlState.peerAdvertisedMaxOffset);
-    QUIC_STATS(stream.conn.infoCallback, onStreamFlowControlBlocked);
+    QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
 
@@ -237,7 +237,7 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
         "stream_blocked",
         stream.id,
         stream.flowControlState.peerAdvertisedMaxOffset);
-    QUIC_STATS(stream.conn.infoCallback, onStreamFlowControlBlocked);
+    QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
 

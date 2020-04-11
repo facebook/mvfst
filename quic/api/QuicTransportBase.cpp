@@ -363,7 +363,7 @@ void QuicTransportBase::closeImpl(
   QUIC_STATS_FOR_EACH(
       conn_->streamManager->streams().cbegin(),
       conn_->streamManager->streams().cend(),
-      conn_->infoCallback,
+      conn_->statsCallback,
       onQuicStreamClosed);
   conn_->streamManager->clearOpenStreams();
 
@@ -2009,7 +2009,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
       cancelDeliveryCallbacksForStream(pendingResetIt->first);
     }
     pendingWriteCallbacks_.erase(id);
-    QUIC_STATS(conn_->infoCallback, onQuicStreamReset);
+    QUIC_STATS(conn_->statsCallback, onQuicStreamReset);
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;

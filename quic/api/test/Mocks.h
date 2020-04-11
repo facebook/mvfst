@@ -257,7 +257,7 @@ class MockQuicTransport : public QuicServerTransport {
       ,
       noexcept,
       ,
-      setTransportInfoCallback,
+      setTransportStatsCallback,
       void(QuicTransportStatsCallback*));
 
   GMOCK_METHOD1_(, noexcept, , setConnectionIdAlgo, void(ConnectionIdAlgo*));

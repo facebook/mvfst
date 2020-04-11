@@ -26,7 +26,7 @@ class QuicFlowControlTest : public Test {
     transportInfoCb_ = std::make_unique<MockQuicStats>();
     conn_.streamManager = std::make_unique<QuicStreamManager>(
         conn_, conn_.nodeType, conn_.transportSettings);
-    conn_.infoCallback = transportInfoCb_.get();
+    conn_.statsCallback = transportInfoCb_.get();
   }
   std::unique_ptr<MockQuicStats> transportInfoCb_;
   QuicConnectionStateBase conn_{QuicNodeType::Client};

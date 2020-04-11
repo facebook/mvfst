@@ -235,7 +235,7 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
         std::piecewise_construct,
         std::forward_as_tuple(streamId),
         std::forward_as_tuple(streamId, conn_));
-    QUIC_STATS(conn_.infoCallback, onNewQuicStream);
+    QUIC_STATS(conn_.statsCallback, onNewQuicStream);
     return &it.first->second;
   }
   return nullptr;
@@ -321,7 +321,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
         std::piecewise_construct,
         std::forward_as_tuple(streamId),
         std::forward_as_tuple(streamId, conn_));
-    QUIC_STATS(conn_.infoCallback, onNewQuicStream);
+    QUIC_STATS(conn_.statsCallback, onNewQuicStream);
     return &it.first->second;
   }
 
@@ -349,7 +349,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       std::piecewise_construct,
       std::forward_as_tuple(streamId),
       std::forward_as_tuple(streamId, conn_));
-  QUIC_STATS(conn_.infoCallback, onNewQuicStream);
+  QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   return &it.first->second;
 }
 
@@ -391,7 +391,7 @@ QuicStreamManager::createStream(StreamId streamId) {
       std::piecewise_construct,
       std::forward_as_tuple(streamId),
       std::forward_as_tuple(streamId, conn_));
-  QUIC_STATS(conn_.infoCallback, onNewQuicStream);
+  QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   updateAppIdleState();
   return &it.first->second;
 }
@@ -418,7 +418,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     numControlStreams_--;
   }
   streams_.erase(it);
-  QUIC_STATS(conn_.infoCallback, onQuicStreamClosed);
+  QUIC_STATS(conn_.statsCallback, onQuicStreamClosed);
   if (isRemoteStream(nodeType_, streamId)) {
     auto& openPeerStreams = isUnidirectionalStream(streamId)
         ? openUnidirectionalPeerStreams_
