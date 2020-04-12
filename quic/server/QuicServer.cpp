@@ -136,7 +136,9 @@ void QuicServer::initializeWorkers(
     const std::vector<folly::EventBase*>& evbs,
     bool useDefaultTransport) {
   CHECK(workers_.empty());
-  for (auto& workerEvb : evbs) {
+  // iterate in the order of insertion in vector
+  for (size_t i = 0; i < evbs.size(); ++i) {
+    auto workerEvb = evbs[i];
     auto worker = newWorkerWithoutSocket();
     if (useDefaultTransport) {
       CHECK(transportFactory_) << "Transport factory is not set";
@@ -162,7 +164,7 @@ void QuicServer::initializeWorkers(
     }
     worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
     worker->setCongestionControllerFactory(ccFactory_);
-    worker->setWorkerId(workers_.size());
+    worker->setWorkerId(i);
     worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
     workers_.push_back(std::move(worker));
     evbToWorkers_.emplace(workerEvb, workers_.back().get());
@@ -639,10 +641,11 @@ int QuicServer::getListeningSocketFD() const {
 std::vector<int> QuicServer::getAllListeningSocketFDs() const noexcept {
   CHECK(initialized_) << "Quic server is not initialized. "
                       << "Consider calling waitUntilInitialized() before this ";
-  std::vector<int> sockets;
+  std::vector<int> sockets(workers_.size());
   for (const auto& worker : workers_) {
     if (worker->getFD() != -1) {
-      sockets.push_back(worker->getFD());
+      CHECK_LT(worker->getWorkerId(), workers_.size());
+      sockets.at(worker->getWorkerId()) = worker->getFD();
     }
   }
   return sockets;
