@@ -1002,8 +1002,7 @@ void QuicClientTransport::recvMmsg(
   auto& readBuffers = networkData.recvmmsgStorage.readBuffers;
   auto& iovecs = networkData.recvmmsgStorage.iovecs;
 
-  int i = 0;
-  for (; i < numPackets; ++i) {
+  for (int i = 0; i < numPackets; ++i) {
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
@@ -1045,8 +1044,13 @@ void QuicClientTransport::recvMmsg(
   }
 
   CHECK_LE(numMsgsRecvd, numPackets);
-  for (i = 0; i < numMsgsRecvd; ++i) {
+  for (int i = 0; i < numMsgsRecvd; ++i) {
     size_t bytesRead = msgs[i].msg_len;
+    if (bytesRead == 0) {
+      // Empty datagram, this is probably garbage matching our tuple, we should
+      // ignore such datagrams.
+      continue;
+    }
     totalData += bytesRead;
 
     if (!server) {
