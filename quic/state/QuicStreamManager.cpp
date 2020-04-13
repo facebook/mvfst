@@ -81,7 +81,7 @@ static LocalErrorCode openPeerStreamIfNotClosed(
   openStreams.reserve(openStreams.size() + numNewStreams);
   newStreams.reserve(newStreams.size() + numNewStreams);
   while (start <= streamId) {
-    openStreams.insert(start);
+    openStreams.emplace(start);
     newStreams.push_back(start);
     start += detail::kStreamIncrement;
   }
@@ -108,7 +108,7 @@ static LocalErrorCode openLocalStreamIfNotClosed(
   auto numNewStreams = (streamId - start) / detail::kStreamIncrement;
   openStreams.reserve(openStreams.size() + numNewStreams);
   while (start <= streamId) {
-    openStreams.insert(start);
+    openStreams.emplace(start);
     start += detail::kStreamIncrement;
   }
 
@@ -228,14 +228,17 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
   auto& openLocalStreams = isUnidirectionalStream(streamId)
       ? openUnidirectionalLocalStreams_
       : openBidirectionalLocalStreams_;
-  auto streamItr = openLocalStreams.find(streamId);
-  if (streamItr != openLocalStreams.end()) {
+  if (openLocalStreams.count(streamId)) {
     // Open a lazily created stream.
     auto it = streams_.emplace(
         std::piecewise_construct,
         std::forward_as_tuple(streamId),
         std::forward_as_tuple(streamId, conn_));
     QUIC_STATS(conn_.statsCallback, onNewQuicStream);
+    if (!it.second) {
+      throw QuicTransportException(
+          "Creating an active stream", TransportErrorCode::STREAM_STATE_ERROR);
+    }
     return &it.first->second;
   }
   return nullptr;
@@ -307,6 +310,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
         "Invalid stream", TransportErrorCode::STREAM_STATE_ERROR);
   }
 
+  // TODO when we can rely on C++17, this is a good candidate for try_emplace.
   auto peerStream = streams_.find(streamId);
   if (peerStream != streams_.end()) {
     return &peerStream->second;
@@ -314,8 +318,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
   auto& openPeerStreams = isUnidirectionalStream(streamId)
       ? openUnidirectionalPeerStreams_
       : openBidirectionalPeerStreams_;
-  auto streamItr = openPeerStreams.find(streamId);
-  if (streamItr != openPeerStreams.end()) {
+  if (openPeerStreams.count(streamId)) {
     // Stream was already open, create the state for it lazily.
     auto it = streams_.emplace(
         std::piecewise_construct,
@@ -363,10 +366,6 @@ QuicStreamManager::createStream(StreamId streamId) {
     throw QuicTransportException(
         "Attempted creating non-server stream on server",
         TransportErrorCode::STREAM_STATE_ERROR);
-  }
-  if (streams_.count(streamId) > 0) {
-    throw QuicTransportException(
-        "Creating an active stream", TransportErrorCode::STREAM_STATE_ERROR);
   }
   auto existingStream = getOrCreateOpenedLocalStream(streamId);
   if (existingStream) {
@@ -463,33 +462,19 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
 }
 
 void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
-  auto it = lossStreams_.find(stream.id);
-  if (!stream.lossBuffer.empty()) {
-    if (it == lossStreams_.end()) {
-      lossStreams_.insert(stream.id);
-    }
-  } else if (it != lossStreams_.end()) {
-    lossStreams_.erase(it);
+  if (stream.lossBuffer.empty()) {
+    lossStreams_.erase(stream.id);
+  } else {
+    lossStreams_.emplace(stream.id);
   }
 }
 
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   updateHolBlockedTime(stream);
-  auto itr = readableStreams_.find(stream.id);
-  if (!stream.hasReadableData() && !stream.streamReadError.has_value()) {
-    if (itr != readableStreams_.end()) {
-      VLOG(10) << __func__ << " remove stream=" << stream.id << " "
-               << stream.conn;
-      readableStreams_.erase(itr);
-    }
-    return;
-  }
-  if (itr == readableStreams_.end()) {
-    VLOG(10) << __func__ << " add stream=" << stream.id << " " << stream.conn;
-    readableStreams_.insert(stream.id);
+  if (stream.hasReadableData() || stream.streamReadError.has_value()) {
+    readableStreams_.emplace(stream.id);
   } else {
-    VLOG(10) << __func__ << " exists stream=" << stream.id << " "
-             << stream.conn;
+    readableStreams_.erase(stream.id);
   }
 }
 
@@ -502,21 +487,10 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updatePeekableStreams(QuicStreamState& stream) {
-  auto itr = peekableStreams_.find(stream.id);
-  if (!stream.hasPeekableData() || stream.streamReadError.has_value()) {
-    if (itr != peekableStreams_.end()) {
-      VLOG(10) << __func__ << " remove stream=" << stream.id << " "
-               << stream.conn;
-      peekableStreams_.erase(itr);
-    }
-    return;
-  }
-  if (itr == peekableStreams_.end()) {
-    VLOG(10) << __func__ << " add stream=" << stream.id << " " << stream.conn;
-    peekableStreams_.insert(stream.id);
+  if (stream.hasPeekableData() && !stream.streamReadError.has_value()) {
+    peekableStreams_.emplace(stream.id);
   } else {
-    VLOG(10) << __func__ << " exists stream=" << stream.id << " "
-             << stream.conn;
+    peekableStreams_.erase(stream.id);
   }
 }
 

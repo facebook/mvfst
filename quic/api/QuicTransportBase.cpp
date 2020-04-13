@@ -463,9 +463,6 @@ folly::Expected<size_t, LocalErrorCode> QuicTransportBase::getStreamWriteOffset(
   }
   try {
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-    }
     return stream->currentWriteOffset;
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -489,9 +486,6 @@ QuicTransportBase::getStreamWriteBufferedBytes(StreamId id) const {
   }
   try {
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream) {
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-    }
     return stream->writeBuffer.chainLength();
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -626,7 +620,7 @@ QuicTransportBase::setStreamFlowControlWindow(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
   if (!stream->writable()) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
   }
@@ -756,24 +750,27 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
     self->updateReadLooper();
     self->updateWriteLooper(true);
   };
-  auto readableListCopy = self->conn_->streamManager->readableStreams();
-  for (const auto& streamId : readableListCopy) {
+  // Need a copy since the set can change during callbacks.
+  std::vector<StreamId> readableStreamsCopy;
+  const auto& readableStreams = self->conn_->streamManager->readableStreams();
+  readableStreamsCopy.reserve(readableStreams.size());
+  std::copy(
+      readableStreams.begin(),
+      readableStreams.end(),
+      std::back_inserter(readableStreamsCopy));
+  for (StreamId streamId : readableStreamsCopy) {
     auto callback = self->readCallbacks_.find(streamId);
     if (callback == self->readCallbacks_.end()) {
       self->conn_->streamManager->readableStreams().erase(streamId);
       continue;
     }
     auto readCb = callback->second.readCb;
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
-    if (!stream) {
-      continue;
-    }
+    auto stream = conn_->streamManager->getStream(streamId);
     if (readCb && stream->streamReadError) {
       self->conn_->streamManager->readableStreams().erase(streamId);
-      readCallbacks_.erase(streamId);
+      readCallbacks_.erase(callback);
       // if there is an error on the stream - it's not readable anymore, so
       // we cannot peek into it as well.
-      VLOG(10) << "Erasing peek callback for stream=" << streamId;
       self->conn_->streamManager->peekableStreams().erase(streamId);
       peekCallbacks_.erase(streamId);
       VLOG(10) << "invoking read error callbacks on stream=" << streamId << " "
@@ -895,10 +892,16 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
   // is called and decremented when peek is done. once counter transitions
   // to 0 we can execute "consume" calls that were done during "peek", for that,
   // we would need to keep stack of them.
-  auto peekableListCopy = self->conn_->streamManager->peekableStreams();
+  std::vector<StreamId> peekableStreamsCopy;
+  const auto& peekableStreams = self->conn_->streamManager->peekableStreams();
+  peekableStreamsCopy.reserve(peekableStreams.size());
+  std::copy(
+      peekableStreams.begin(),
+      peekableStreams.end(),
+      std::back_inserter(peekableStreamsCopy));
   VLOG(10) << __func__
-           << " peekableListCopy.size()=" << peekableListCopy.size();
-  for (const auto& streamId : peekableListCopy) {
+           << " peekableListCopy.size()=" << peekableStreamsCopy.size();
+  for (StreamId streamId : peekableStreamsCopy) {
     auto callback = self->peekCallbacks_.find(streamId);
     // This is a likely bug. Need to think more on whether events can
     // be dropped
@@ -911,10 +914,7 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
       continue;
     }
     auto peekCb = callback->second.peekCb;
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
-    if (!stream) {
-      continue;
-    }
+    auto stream = conn_->streamManager->getStream(streamId);
     if (peekCb && !stream->streamReadError && stream->hasPeekableData()) {
       VLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
                << *this;
@@ -983,7 +983,7 @@ void QuicTransportBase::invokeDataExpiredCallbacks() {
     }
 
     auto dataExpiredCb = callbackData->second.dataExpiredCb;
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
+    auto stream = conn_->streamManager->getStream(streamId);
 
     if (dataExpiredCb && !stream->streamReadError) {
       // If new offset is before current read offset, skip.
@@ -1006,10 +1006,10 @@ QuicTransportBase::sendDataExpired(StreamId id, uint64_t offset) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  auto stream = conn_->streamManager->getStream(id);
-  if (!stream) {
+  if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
+  auto stream = conn_->streamManager->getStream(id);
   auto newOffset = advanceMinimumRetransmittableOffset(stream, offset);
 
   // Invoke any delivery callbacks that are set for any offset below newOffset.
@@ -1075,7 +1075,7 @@ void QuicTransportBase::invokeDataRejectedCallbacks() {
     }
 
     auto dataRejectedCb = callbackData->second.dataRejectedCb;
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(streamId));
+    auto stream = conn_->streamManager->getStream(streamId);
 
     // Invoke any delivery callbacks that are set for any offset below newly set
     // minimumRetransmittableOffset.
@@ -1102,10 +1102,10 @@ QuicTransportBase::sendDataRejected(StreamId id, uint64_t offset) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
-  auto stream = conn_->streamManager->getStream(id);
-  if (!stream) {
+  if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
+  auto stream = conn_->streamManager->getStream(id);
   auto newOffset = advanceCurrentReceiveOffset(stream, offset);
   updateWriteLooper(true);
   return folly::makeExpected<LocalErrorCode>(newOffset);
@@ -1260,18 +1260,10 @@ folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
     updateWriteLooper(true);
   };
   try {
-    // Need to check that the stream exists first so that we don't
-    // accidentally let the API create a peer stream that was not
-    // sent by the peer.
     if (!conn_->streamManager->streamExists(id)) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream) {
-      // This is not really possible since this should be covered
-      // by the stream existence check, but might as well check this.
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-    }
     auto result = readDataFromQuicStream(*stream, maxLen);
     if (result.second) {
       VLOG(10) << "Delivered eof to app for stream=" << stream->id << " "
@@ -1324,11 +1316,6 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id);
-  if (!stream) {
-    // This is not really possible since this should be covered
-    // by the stream existence check, but might as well check this.
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-  }
 
   if (stream->streamReadError) {
     switch (stream->streamReadError->type()) {
@@ -1351,11 +1338,6 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::consume(
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id);
-  if (!stream) {
-    // This is not really possible since this should be covered
-    // by the stream existence check, but might as well check this.
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-  }
   auto result = consume(id, stream->currentReadOffset, amount);
   if (result.hasError()) {
     return folly::makeUnexpected(result.error().first);
@@ -1387,12 +1369,6 @@ folly::
           ConsumeError{LocalErrorCode::STREAM_NOT_EXISTS, readOffset});
     }
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream) {
-      // This is not really possible since this should be covered
-      // by the stream existence check, but might as well check this.
-      return folly::makeUnexpected(
-          ConsumeError{LocalErrorCode::STREAM_CLOSED, readOffset});
-    }
     readOffset = stream->currentReadOffset;
     if (stream->currentReadOffset != offset) {
       return folly::makeUnexpected(
@@ -1485,8 +1461,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   while (closeState_ == CloseState::OPEN && deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
     auto stream = conn_->streamManager->getStream(streamId);
-    // stream shouldn't be cleaned as long as it's still on deliveryList
-    DCHECK(stream);
+    auto minOffsetToDeliver = getStreamNextOffsetToDeliver(*stream);
 
     while (closeState_ == CloseState::OPEN) {
       auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
@@ -1494,7 +1469,6 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
           deliveryCallbacksForAckedStream->second.empty()) {
         break;
       }
-      auto minOffsetToDeliver = getStreamNextOffsetToDeliver(*stream);
       if (deliveryCallbacksForAckedStream->second.front().first >
           minOffsetToDeliver) {
         break;
@@ -1505,7 +1479,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.first;
       auto deliveryCallback = deliveryCallbackAndOffset.second;
       deliveryCallback->onDeliveryAck(
-          stream->id, currentDeliveryCallbackOffset, conn_->lossState.srtt);
+          streamId, currentDeliveryCallbackOffset, conn_->lossState.srtt);
     }
     if (closeState_ != CloseState::OPEN) {
       break;
@@ -1513,7 +1487,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
     if (deliveryCallbacksForAckedStream != deliveryCallbacks_.end() &&
         deliveryCallbacksForAckedStream->second.empty()) {
-      deliveryCallbacks_.erase(streamId);
+      deliveryCallbacks_.erase(deliveryCallbacksForAckedStream);
     }
     deliverableStreamId = conn_->streamManager->popDeliverable();
   }
@@ -1526,7 +1500,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   // We don't really need flow control notifications when we are closed.
   for (auto streamId : conn_->streamManager->flowControlUpdated()) {
     auto stream = conn_->streamManager->getStream(streamId);
-    if (!stream || !stream->writable()) {
+    if (!stream->writable()) {
       pendingWriteCallbacks_.erase(streamId);
       continue;
     }
@@ -1549,12 +1523,9 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (closeState_ == CloseState::OPEN) {
     for (auto itr : conn_->streamManager->stopSendingStreams()) {
       auto streamId = itr.first;
-      auto stream = conn_->streamManager->getStream(streamId);
-      if (stream) {
-        CHECK_NOTNULL(connCallback_)->onStopSending(streamId, itr.second);
-        if (closeState_ != CloseState::OPEN) {
-          return;
-        }
+      CHECK_NOTNULL(connCallback_)->onStopSending(streamId, itr.second);
+      if (closeState_ != CloseState::OPEN) {
+        return;
       }
     }
     conn_->streamManager->clearStopSending();
@@ -1585,7 +1556,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       auto wcb = writeCallbackIt->second;
       ++writeCallbackIt;
       auto stream = conn_->streamManager->getStream(streamId);
-      if (!stream || !stream->writable()) {
+      if (!stream->writable()) {
         pendingWriteCallbacks_.erase(streamId);
         continue;
       }
@@ -1785,8 +1756,8 @@ QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  auto qStream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-  if (!qStream->writable()) {
+  auto stream = conn_->streamManager->getStream(id);
+  if (!stream->writable()) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
   }
 
@@ -1816,7 +1787,7 @@ QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
           id, std::make_pair(LocalErrorCode::STREAM_NOT_EXISTS, folly::none));
       return;
     }
-    auto stream = CHECK_NOTNULL(self->conn_->streamManager->getStream(id));
+    auto stream = self->conn_->streamManager->getStream(id);
     if (!stream->writable()) {
       self->pendingWriteCallbacks_.erase(wcbIt);
       writeCallback->onStreamWriteError(
@@ -1866,7 +1837,7 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream || !stream->writable()) {
+    if (!stream->writable()) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
     // Register DeliveryCallback for the data + eof offset.
@@ -1923,20 +1894,24 @@ QuicTransportBase::registerDeliveryCallback(
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   if (cb) {
-    if (deliveryCallbacks_.find(id) == deliveryCallbacks_.end()) {
-      deliveryCallbacks_[id].emplace_back(offset, cb);
+    auto deliveryCallbackIt = deliveryCallbacks_.find(id);
+    if (deliveryCallbackIt == deliveryCallbacks_.end()) {
+      deliveryCallbacks_.emplace(
+          id,
+          std::initializer_list<decltype(
+              deliveryCallbacks_)::mapped_type::value_type>({{offset, cb}}));
     } else {
       // Keep DeliveryCallbacks for the same stream sorted by offsets:
       auto pos = std::upper_bound(
-          deliveryCallbacks_[id].begin(),
-          deliveryCallbacks_[id].end(),
+          deliveryCallbackIt->second.begin(),
+          deliveryCallbackIt->second.end(),
           offset,
           [&](uint64_t o, const std::pair<uint64_t, DeliveryCallback*>& p) {
             return o < p.first;
           });
-      deliveryCallbacks_[id].emplace(pos, offset, cb);
+      deliveryCallbackIt->second.emplace(pos, offset, cb);
     }
-    auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+    auto stream = conn_->streamManager->getStream(id);
     auto minOffsetToDelivery = getStreamNextOffsetToDeliver(*stream);
     if (offset < minOffsetToDelivery) {
       // This offset is already delivered
@@ -1994,11 +1969,6 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
       return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
     }
     auto stream = conn_->streamManager->getStream(id);
-    if (!stream) {
-      // Should not happen, due to the streamExists() check above, but might
-      // as well check to keep nullability checkers happy.
-      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-    }
     // Invoke state machine
     sendRstSMHandler(*stream, errorCode);
 
@@ -2071,17 +2041,10 @@ void QuicTransportBase::checkForClosedStream() {
     }
 
     VLOG(10) << "Closing stream=" << *itr;
-    auto stream = conn_->streamManager->findStream(*itr);
-    if (conn_->qLogger && stream) {
+    if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(
-          getClosingStream(folly::to<std::string>(stream->id)));
+          getClosingStream(folly::to<std::string>(*itr)));
     }
-    QUIC_TRACE(
-        holb_time,
-        *conn_,
-        stream->id,
-        stream->totalHolbTime.count(),
-        stream->holbCount);
     conn_->streamManager->removeClosedStream(*itr);
     maybeSendStreamLimitUpdates(*conn_);
     if (readCbIt != readCallbacks_.end()) {
@@ -2544,7 +2507,7 @@ folly::Optional<LocalErrorCode> QuicTransportBase::setControlStream(
   if (!conn_->streamManager->streamExists(id)) {
     return LocalErrorCode::STREAM_NOT_EXISTS;
   }
-  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  auto stream = conn_->streamManager->getStream(id);
   conn_->streamManager->setStreamAsControl(*stream);
   return folly::none;
 }
@@ -2595,11 +2558,6 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id);
-  if (!stream) {
-    // This is not really possible since this should be covered
-    // by the stream existence check, but might as well check this.
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-  }
   return StreamTransportInfo{
       stream->totalHolbTime, stream->holbCount, bool(stream->lastHolbTime)};
 }
