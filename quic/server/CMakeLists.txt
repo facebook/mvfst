@@ -9,6 +9,7 @@ add_library(
   QuicServerPacketRouter.cpp
   QuicServerTransport.cpp
   QuicServerWorker.cpp
+  SlidingWindowRateLimiter.cpp
   handshake/ServerHandshake.cpp
   handshake/AppToken.cpp
   handshake/DefaultAppTokenValidator.cpp

@@ -42,3 +42,11 @@ quic_add_test(TARGET ServerStateMachineTest
   mvfst_server
   mvfst_test_utils
 )
+
+quic_add_test(TARGET SlidingWindowRateLimiterTest
+  SOURCES
+  SlidingWindowRateLimiterTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_server
+)
