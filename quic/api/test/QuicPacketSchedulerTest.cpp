@@ -174,7 +174,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
   scheduler.writeCryptoData(builder2);
-  EXPECT_GT(builder2.remainingSpaceInPkt(), 0);
+  EXPECT_EQ(builder2.remainingSpaceInPkt(), 0);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {

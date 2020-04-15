@@ -473,9 +473,7 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
     const LongHeader* longHeader = builder.getPacketHeader().asLong();
     bool initialPacket =
         longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
-    if (initialPacket &&
-        (conn_.nodeType == QuicNodeType::Client ||
-         longHeader->getPacketSequenceNum() == 0)) {
+    if (initialPacket) {
       // This is the initial packet, we need to fill er up.
       while (builder.remainingSpaceInPkt() > 0) {
         writeFrame(PaddingFrame(), builder);
