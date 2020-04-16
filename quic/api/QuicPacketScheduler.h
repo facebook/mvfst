@@ -170,7 +170,8 @@ class StreamFrameScheduler {
       PacketBuilderInterface& builder,
       const std::set<StreamId>& writableStreams,
       StreamId nextScheduledStream,
-      uint64_t& connWritableBytes);
+      uint64_t& connWritableBytes,
+      bool streamPerPacket);
 
   using WritableStreamItr =
       MiddleStartingIterationWrapper::MiddleStartingIterator;

@@ -168,6 +168,9 @@ struct TransportSettings {
   // A temporary type to control DataPath write style. Will be gone after we
   // are done with experiment.
   DataPathType dataPathType{DataPathType::ChainedMemory};
+  // Whether or not we should stop writing a packet after writing a single
+  // stream frame to it.
+  bool streamFramePerPacket{false};
 };
 
 } // namespace quic

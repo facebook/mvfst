@@ -239,7 +239,8 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
     PacketBuilderInterface& builder,
     const std::set<StreamId>& writableStreams,
     StreamId nextScheduledStream,
-    uint64_t& connWritableBytes) {
+    uint64_t& connWritableBytes,
+    bool streamPerPacket) {
   MiddleStartingIterationWrapper wrapper(writableStreams, nextScheduledStream);
   auto writableStreamItr = wrapper.cbegin();
   // This will write the stream frames in a round robin fashion ordered by
@@ -250,6 +251,9 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
   while (writableStreamItr != wrapper.cend() && connWritableBytes > 0) {
     if (writeNextStreamFrame(builder, *writableStreamItr, connWritableBytes)) {
       writableStreamItr++;
+      if (streamPerPacket) {
+        break;
+      }
     } else {
       break;
     }
@@ -271,7 +275,8 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
         builder,
         writableControlStreams,
         conn_.schedulingState.nextScheduledControlStream,
-        connWritableBytes);
+        connWritableBytes,
+        conn_.transportSettings.streamFramePerPacket);
   }
   if (connWritableBytes == 0) {
     return;
@@ -282,7 +287,8 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
         builder,
         writableStreams,
         conn_.schedulingState.nextScheduledStream,
-        connWritableBytes);
+        connWritableBytes,
+        conn_.transportSettings.streamFramePerPacket);
   }
 } // namespace quic
 
