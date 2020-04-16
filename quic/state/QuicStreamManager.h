@@ -80,7 +80,7 @@ class QuicStreamManager {
    * Return the stream state or create it if the state has not yet been created.
    * Note that this is only valid for streams that are currently open.
    */
-  QuicStreamState* FOLLY_NONNULL getStream(StreamId streamId);
+  QuicStreamState* getStream(StreamId streamId);
 
   /*
    * Remove all the state for a stream that is being closed.

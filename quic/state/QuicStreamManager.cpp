@@ -412,6 +412,9 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   windowUpdates_.erase(streamId);
   lossStreams_.erase(streamId);
   stopSendingStreams_.erase(streamId);
+  flowControlUpdated_.erase(streamId);
+  dataRejectedStreams_.erase(streamId);
+  dataExpiredStreams_.erase(streamId);
   if (it->second.isControl) {
     DCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;

@@ -1537,6 +1537,9 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   conn.streamManager->queueWindowUpdate(streamId);
   conn.streamManager->addStopSending(
       streamId, GenericApplicationErrorCode::UNKNOWN);
+  conn.streamManager->queueFlowControlUpdated(streamId);
+  conn.streamManager->addDataRejected(streamId);
+  conn.streamManager->addDataExpired(streamId);
   stream->sendState = StreamSendState::Closed_E;
   stream->recvState = StreamRecvState::Closed_E;
   conn.streamManager->removeClosedStream(streamId);
@@ -1549,6 +1552,9 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   EXPECT_FALSE(conn.streamManager->hasLoss());
   EXPECT_FALSE(conn.streamManager->pendingWindowUpdate(streamId));
   EXPECT_TRUE(conn.streamManager->stopSendingStreams().empty());
+  EXPECT_FALSE(conn.streamManager->flowControlUpdatedContains(streamId));
+  EXPECT_TRUE(conn.streamManager->dataRejectedStreams().empty());
+  EXPECT_TRUE(conn.streamManager->dataExpiredStreams().empty());
 }
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
