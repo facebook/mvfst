@@ -106,38 +106,100 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
-  LongHeader longHeader1(
+  LongHeader longHeader(
       LongHeader::Types::Initial,
       getTestConnectionId(1),
       connId,
       getNextPacketNum(conn, PacketNumberSpace::Initial),
       QuicVersion::MVFST);
   increaseNextPacketNum(conn, PacketNumberSpace::Initial);
-  RegularQuicPacketBuilder builder1(
+  RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
-      std::move(longHeader1),
+      std::move(longHeader),
       conn.ackStates.initialAckState.largestAckedByPeer);
-  CryptoStreamScheduler scheduler(
-      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
+  FrameScheduler cryptoOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "CryptoOnlyScheduler")
+              .cryptoFrames())
+          .build();
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("chlo"));
-  scheduler.writeCryptoData(builder1);
-  EXPECT_EQ(builder1.remainingSpaceInPkt(), 0);
+  auto result = cryptoOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
+}
 
-  LongHeader longHeader2(
-      LongHeader::Types::Handshake,
+TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto connId = getTestConnectionId();
+  LongHeader longHeader(
+      LongHeader::Types::Initial,
       connId,
       connId,
-      getNextPacketNum(conn, PacketNumberSpace::Handshake),
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
       QuicVersion::MVFST);
-  RegularQuicPacketBuilder builder2(
+  RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
-      std::move(longHeader2),
+      std::move(longHeader),
       conn.ackStates.handshakeAckState.largestAckedByPeer);
-  writeDataToQuicStream(
-      conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("finished"));
-  scheduler.writeCryptoData(builder2);
-  EXPECT_GT(builder2.remainingSpaceInPkt(), 0);
+  conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
+  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
+  conn.ackStates.initialAckState.acks.insert(10);
+  FrameScheduler acksOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "AcksOnlyScheduler")
+              .ackFrames())
+          .build();
+  auto result = acksOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
+}
+
+TEST_F(QuicPacketSchedulerTest, PaddingUpToWrapperSize) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  auto connId = getTestConnectionId();
+  size_t cipherOverhead = 30;
+  LongHeader longHeader(
+      LongHeader::Types::Initial,
+      connId,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(longHeader),
+      conn.ackStates.handshakeAckState.largestAckedByPeer);
+  conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
+  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
+  conn.ackStates.initialAckState.acks.insert(10);
+  FrameScheduler acksOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "AcksOnlyScheduler")
+              .ackFrames())
+          .build();
+  auto result = acksOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen - cipherOverhead);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen - cipherOverhead, packetLength);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
@@ -154,13 +216,56 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
       conn.udpSendPacketLen,
       std::move(longHeader1),
       conn.ackStates.initialAckState.largestAckedByPeer);
-  CryptoStreamScheduler scheduler(
-      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
+  FrameScheduler scheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "CryptoOnlyScheduler")
+              .cryptoFrames())
+          .build();
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
-  scheduler.writeCryptoData(builder1);
-  EXPECT_EQ(builder1.remainingSpaceInPkt(), 0);
-  nextPacketNum++;
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder1), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
+}
+
+TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
+  QuicServerConnectionState conn;
+  auto connId = getTestConnectionId();
+  PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
+  LongHeader longHeader1(
+      LongHeader::Types::Initial,
+      getTestConnectionId(1),
+      connId,
+      nextPacketNum,
+      QuicVersion::MVFST);
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(longHeader1),
+      conn.ackStates.initialAckState.largestAckedByPeer);
+  FrameScheduler scheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "CryptoOnlyScheduler")
+              .cryptoFrames())
+          .build();
+  writeDataToQuicStream(
+      conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder1), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
+
+  increaseNextPacketNum(conn, PacketNumberSpace::Initial);
   LongHeader longHeader2(
       LongHeader::Types::Initial,
       getTestConnectionId(1),
@@ -172,9 +277,12 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
       std::move(longHeader2),
       conn.ackStates.initialAckState.largestAckedByPeer);
   writeDataToQuicStream(
-      conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo"));
-  scheduler.writeCryptoData(builder2);
-  EXPECT_EQ(builder2.remainingSpaceInPkt(), 0);
+      conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo again"));
+  auto result2 = scheduler.scheduleFramesForPacket(
+      std::move(builder2), conn.udpSendPacketLen);
+  packetLength = result2.packet->header->computeChainDataLength() +
+      result2.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
@@ -191,12 +299,22 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
       conn.udpSendPacketLen,
       std::move(longHeader),
       conn.ackStates.initialAckState.largestAckedByPeer);
-  CryptoStreamScheduler scheduler(
-      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
+  FrameScheduler scheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "CryptoOnlyScheduler")
+              .cryptoFrames())
+          .build();
   conn.cryptoState->initialStream.lossBuffer.push_back(
       StreamBuffer{folly::IOBuf::copyBuffer("chlo"), 0, false});
-  scheduler.writeCryptoData(builder);
-  EXPECT_EQ(builder.remainingSpaceInPkt(), 0);
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
 }
 
 TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
@@ -239,14 +357,25 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
       25,
       std::move(longHeader),
       conn.ackStates.initialAckState.largestAckedByPeer);
-  CryptoStreamScheduler scheduler(
-      conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Initial));
+  FrameScheduler cryptoOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "CryptoOnlyScheduler")
+              .cryptoFrames())
+          .build();
   conn.cryptoState->initialStream.lossBuffer.push_back(StreamBuffer{
       folly::IOBuf::copyBuffer("return the special duration value max"),
       0,
       false});
-  EXPECT_TRUE(scheduler.writeCryptoData(builder));
-  EXPECT_EQ(builder.remainingSpaceInPkt(), 0);
+  auto result = cryptoOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_LE(packetLength, 25);
+  EXPECT_TRUE(result.packet->packet.frames[0].asWriteCryptoFrame() != nullptr);
   EXPECT_FALSE(conn.cryptoState->initialStream.lossBuffer.empty());
 }
 

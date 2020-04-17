@@ -98,6 +98,8 @@ class PacketBuilderInterface {
    */
   [[nodiscard]] virtual uint32_t getHeaderBytes() const = 0;
 
+  [[nodiscard]] virtual bool hasFramesPending() const = 0;
+
   virtual Packet buildPacket() && = 0;
 };
 
@@ -142,6 +144,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   void setCipherOverhead(uint8_t overhead) noexcept override;
 
   [[nodiscard]] uint32_t getHeaderBytes() const override;
+
+  [[nodiscard]] bool hasFramesPending() const override;
 
  private:
   folly::IOBuf& iobuf_;
@@ -206,6 +210,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   [[nodiscard]] bool canBuildPacket() const noexcept override;
 
   void setCipherOverhead(uint8_t overhead) noexcept override;
+
+  [[nodiscard]] bool hasFramesPending() const override;
 
  private:
   void writeHeaderBytes(PacketNum largestAckedPacketNum);
@@ -360,6 +366,10 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   [[nodiscard]] uint32_t getHeaderBytes() const override {
     return builder.getHeaderBytes();
+  }
+
+  [[nodiscard]] bool hasFramesPending() const override {
+    return builder.hasFramesPending();
   }
 
  private:

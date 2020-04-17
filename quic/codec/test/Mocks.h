@@ -76,6 +76,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   GMOCK_METHOD1_(, noexcept, , setCipherOverhead, void(uint8_t));
   GMOCK_METHOD0_(, noexcept, , canBuildPacketNonConst, bool());
   GMOCK_METHOD0_(, const, , getHeaderBytes, uint32_t());
+  GMOCK_METHOD0_(, const, , hasFramesPending, bool());
 
   bool canBuildPacket() const noexcept override {
     return const_cast<MockQuicPacketBuilder&>(*this).canBuildPacketNonConst();

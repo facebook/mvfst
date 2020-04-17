@@ -170,6 +170,18 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
     streamFrameScheduler_->writeStreams(wrapper);
   }
 
+  if (builder.hasFramesPending()) {
+    const LongHeader* longHeader = builder.getPacketHeader().asLong();
+    bool initialPacket =
+        longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
+    if (initialPacket) {
+      // This is the initial packet, we need to fill er up.
+      while (wrapper.remainingSpaceInPkt() > 0) {
+        writeFrame(PaddingFrame(), builder);
+      }
+    }
+  }
+
   return SchedulingResult(folly::none, std::move(builder).buildPacket());
 }
 
@@ -473,17 +485,6 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
               << " offset=" << cryptoStream_.currentWriteOffset
               << " bytesWritten=" << res->len << " " << conn_;
       cryptoDataWritten = true;
-    }
-  }
-  if (cryptoDataWritten) {
-    const LongHeader* longHeader = builder.getPacketHeader().asLong();
-    bool initialPacket =
-        longHeader && longHeader->getHeaderType() == LongHeader::Types::Initial;
-    if (initialPacket) {
-      // This is the initial packet, we need to fill er up.
-      while (builder.remainingSpaceInPkt() > 0) {
-        writeFrame(PaddingFrame(), builder);
-      }
     }
   }
   return cryptoDataWritten;

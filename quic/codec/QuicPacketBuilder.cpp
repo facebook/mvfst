@@ -531,4 +531,12 @@ uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
       (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
 
+bool RegularQuicPacketBuilder::hasFramesPending() const {
+  return !packet_.frames.empty();
+}
+
+bool InplaceQuicPacketBuilder::hasFramesPending() const {
+  return !packet_.frames.empty();
+}
+
 } // namespace quic
