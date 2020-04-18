@@ -2420,6 +2420,17 @@ void QuicTransportBase::setTransportSettings(
   }
   conn_->transportSettings = std::move(transportSettings);
   conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
+  // A few values cannot be overridden to be lower than default:
+  if (conn_->transportSettings.defaultCongestionController !=
+      CongestionControlType::None) {
+    conn_->transportSettings.initCwndInMss =
+        std::max(conn_->transportSettings.initCwndInMss, kInitCwndInMss);
+    conn_->transportSettings.minCwndInMss =
+        std::max(conn_->transportSettings.initCwndInMss, kMinCwndInMss);
+    conn_->transportSettings.initCwndInMss = std::max(
+        conn_->transportSettings.minCwndInMss,
+        conn_->transportSettings.initCwndInMss);
+  }
   setCongestionControl(transportSettings.defaultCongestionController);
   if (conn_->transportSettings.pacingEnabled) {
     conn_->pacer = std::make_unique<DefaultPacer>(

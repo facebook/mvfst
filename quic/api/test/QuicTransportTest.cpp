@@ -2567,5 +2567,19 @@ TEST_F(QuicTransportTest, NoScheduleIfNoNewData) {
   EXPECT_FALSE(transport_->isPacingScheduled());
 }
 
+TEST_F(QuicTransportTest, SaneCwndSettings) {
+  TransportSettings transportSettings;
+  transportSettings.minCwndInMss = 1;
+  transportSettings.initCwndInMss = 0;
+  transportSettings.defaultCongestionController = CongestionControlType::BBR;
+  auto ccFactory = std::make_shared<DefaultCongestionControllerFactory>();
+  transport_->setCongestionControllerFactory(ccFactory);
+  transport_->setTransportSettings(transportSettings);
+  auto& conn = transport_->getConnectionState();
+  EXPECT_EQ(
+      conn.udpSendPacketLen * kInitCwndInMss,
+      conn.congestionController->getCongestionWindow());
+}
+
 } // namespace test
 } // namespace quic
