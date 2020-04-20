@@ -51,6 +51,15 @@ void QuicServerWorker::bind(const folly::SocketAddress& address) {
         folly::SocketOptionKey::ApplyPos::POST_BIND);
   }
   socket_->setDFAndTurnOffPMTU();
+  if (transportSettings_.numGROBuffers_ > kDefaultNumGROBuffers) {
+    socket_->setGRO(true);
+    auto ret = socket_->getGRO();
+    if (ret > 0) {
+      numGROBuffers_ = (transportSettings_.numGROBuffers_ < kMaxNumGROBuffers)
+          ? transportSettings_.numGROBuffers_
+          : kMaxNumGROBuffers;
+    }
+  }
 }
 
 void QuicServerWorker::applyAllSocketOptions() {
@@ -125,7 +134,8 @@ const folly::SocketAddress& QuicServerWorker::getAddress() const {
 }
 
 void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
-  readBuffer_ = folly::IOBuf::create(transportSettings_.maxRecvPacketSize);
+  readBuffer_ = folly::IOBuf::create(
+      transportSettings_.maxRecvPacketSize * numGROBuffers_);
   *buf = readBuffer_->writableData();
   *len = transportSettings_.maxRecvPacketSize;
 }
@@ -181,7 +191,7 @@ void QuicServerWorker::onDataAvailable(
     const folly::SocketAddress& client,
     size_t len,
     bool truncated,
-    OnDataAvailableParams /*params*/) noexcept {
+    OnDataAvailableParams params) noexcept {
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
@@ -192,14 +202,54 @@ void QuicServerWorker::onDataAvailable(
   // of it immediately so that if we return early,
   // we've flushed it.
   Buf data = std::move(readBuffer_);
-  if (truncated) {
-    // This is an error, drop the packet.
-    return;
+
+  if (params.gro_ <= 0) {
+    if (truncated) {
+      // This is an error, drop the packet.
+      return;
+    }
+    data->append(len);
+    QUIC_STATS(statsCallback_, onPacketReceived);
+    QUIC_STATS(statsCallback_, onRead, len);
+    handleNetworkData(client, std::move(data), packetReceiveTime);
+  } else {
+    // if we receive a truncated packet
+    // we still need to consider the prev valid ones
+    // AsyncUDPSocket::handleRead() sets the len to be the
+    // buffer size in case the data is truncated
+    if (truncated) {
+      len -= len % params.gro_;
+    }
+
+    data->append(len);
+    QUIC_STATS(statsCallback_, onPacketReceived);
+    QUIC_STATS(statsCallback_, onRead, len);
+
+    size_t remaining = len;
+    size_t offset = 0;
+    while (remaining) {
+      if (static_cast<int>(remaining) > params.gro_) {
+        auto tmp = data->cloneOne();
+        // start at offset
+        tmp->trimStart(offset);
+        // the actual len is len - offset now
+        // leave params.gro_ bytes
+        tmp->trimEnd(len - offset - params.gro_);
+        DCHECK_EQ(tmp->length(), params.gro_);
+
+        offset += params.gro_;
+        remaining -= params.gro_;
+        handleNetworkData(client, std::move(tmp), packetReceiveTime);
+      } else {
+        // do not clone the last packet
+        // start at offset, use all the remaining data
+        data->trimStart(offset);
+        DCHECK_EQ(data->length(), remaining);
+        remaining = 0;
+        handleNetworkData(client, std::move(data), packetReceiveTime);
+      }
+    }
   }
-  data->append(len);
-  QUIC_STATS(statsCallback_, onPacketReceived);
-  QUIC_STATS(statsCallback_, onRead, len);
-  handleNetworkData(client, std::move(data), packetReceiveTime);
 }
 
 void QuicServerWorker::handleNetworkData(

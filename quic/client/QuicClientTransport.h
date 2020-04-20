@@ -207,6 +207,7 @@ class QuicClientTransport
 
  private:
   void setPartialReliabilityTransportParameter();
+  void adjustGROBuffers();
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned
@@ -218,5 +219,8 @@ class QuicClientTransport
   std::vector<TransportParameter> customTransportParameters_;
   folly::SocketOptionMap socketOptions_;
   std::shared_ptr<QuicTransportStatsCallback> statsCallback_;
+  // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
+  // supports GRO. otherwise kDefaultNumGROBuffers
+  uint32_t numGROBuffers_{kDefaultNumGROBuffers};
 };
 } // namespace quic

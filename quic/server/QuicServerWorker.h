@@ -384,6 +384,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   std::vector<QuicVersion> supportedVersions_;
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   TransportSettings transportSettings_;
+  // Same value as transportSettings_.numGROBuffers_ if the kernel
+  // supports GRO. otherwise 1
+  uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   folly::Optional<Buf> healthCheckToken_;
   bool rejectNewConnections_{false};
   uint8_t workerId_{0};

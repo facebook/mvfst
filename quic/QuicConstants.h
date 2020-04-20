@@ -46,6 +46,13 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 // larger than this, unless configured otherwise.
 constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
+// Number of GRO buffers to use
+// 1 means GRO is not enabled
+// 64 is the max possible value
+constexpr uint16_t kMinNumGROBuffers = 1;
+constexpr uint16_t kMaxNumGROBuffers = 16;
+constexpr uint16_t kDefaultNumGROBuffers = kMinNumGROBuffers;
+
 constexpr uint16_t kMaxNumCoalescedPackets = 5;
 // As per version 20 of the spec, transport parameters for private use must
 // have ids with first byte being 0xff.

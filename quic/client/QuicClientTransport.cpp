@@ -879,7 +879,8 @@ void QuicClientTransport::onReadError(
 
 void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
+  auto readBufferSize =
+      conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
   readBuffer_ = folly::IOBuf::create(readBufferSize);
   *buf = readBuffer_->writableData();
   *len = readBufferSize;
@@ -889,31 +890,82 @@ void QuicClientTransport::onDataAvailable(
     const folly::SocketAddress& server,
     size_t len,
     bool truncated,
-    OnDataAvailableParams /*params*/) noexcept {
+    OnDataAvailableParams params) noexcept {
   VLOG(10) << "Got data from socket peer=" << server << " len=" << len;
   auto packetReceiveTime = Clock::now();
   Buf data = std::move(readBuffer_);
 
-  if (truncated) {
-    // This is an error, drop the packet.
+  if (params.gro_ <= 0) {
+    if (truncated) {
+      // This is an error, drop the packet.
+      if (conn_->qLogger) {
+        conn_->qLogger->addPacketDrop(len, kUdpTruncated);
+      }
+      QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::TRUNCATED;
+        conn_->loopDetectorCallback->onSuspiciousReadLoops(
+            ++conn_->readDebugState.loopCount,
+            conn_->readDebugState.noReadReason);
+      }
+      return;
+    }
+    data->append(len);
     if (conn_->qLogger) {
-      conn_->qLogger->addPacketDrop(len, kUdpTruncated);
+      conn_->qLogger->addDatagramReceived(len);
     }
-    QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
-    if (conn_->loopDetectorCallback) {
-      conn_->readDebugState.noReadReason = NoReadReason::TRUNCATED;
-      conn_->loopDetectorCallback->onSuspiciousReadLoops(
-          ++conn_->readDebugState.loopCount,
-          conn_->readDebugState.noReadReason);
+    NetworkData networkData(std::move(data), packetReceiveTime);
+    onNetworkData(server, std::move(networkData));
+  } else {
+    // if we receive a truncated packet
+    // we still need to consider the prev valid ones
+    // AsyncUDPSocket::handleRead() sets the len to be the
+    // buffer size in case the data is truncated
+    if (truncated) {
+      auto delta = len % params.gro_;
+      len -= delta;
+
+      if (conn_->qLogger) {
+        conn_->qLogger->addPacketDrop(delta, kUdpTruncated);
+      }
+      QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
     }
-    return;
+
+    data->append(len);
+    if (conn_->qLogger) {
+      conn_->qLogger->addDatagramReceived(len);
+    }
+
+    NetworkData networkData;
+    networkData.receiveTimePoint = packetReceiveTime;
+    networkData.packets.reserve((len + params.gro_ - 1) / params.gro_);
+    size_t remaining = len;
+    size_t offset = 0;
+    while (remaining) {
+      if (static_cast<int>(remaining) > params.gro_) {
+        auto tmp = data->cloneOne();
+        // start at offset
+        tmp->trimStart(offset);
+        // the actual len is len - offset now
+        // leave params.gro_ bytes
+        tmp->trimEnd(len - offset - params.gro_);
+        DCHECK_EQ(tmp->length(), params.gro_);
+
+        offset += params.gro_;
+        remaining -= params.gro_;
+        networkData.packets.emplace_back(std::move(tmp));
+      } else {
+        // do not clone the last packet
+        // start at offset, use all the remaining data
+        data->trimStart(offset);
+        DCHECK_EQ(data->length(), remaining);
+        remaining = 0;
+        networkData.packets.emplace_back(std::move(data));
+      }
+    }
+
+    onNetworkData(server, std::move(networkData));
   }
-  data->append(len);
-  if (conn_->qLogger) {
-    conn_->qLogger->addDatagramReceived(len);
-  }
-  NetworkData networkData(std::move(data), packetReceiveTime);
-  onNetworkData(server, std::move(networkData));
 }
 
 bool QuicClientTransport::shouldOnlyNotify() {
@@ -944,13 +996,27 @@ void QuicClientTransport::recvMsg(
       rawAddr->sa_family = sock.address().getFamily();
     }
 
+    int flags = 0;
+    int gro = -1;
     struct msghdr msg {};
     msg.msg_name = rawAddr;
     msg.msg_namelen = size_t(addrLen);
     msg.msg_iov = &vec;
     msg.msg_iovlen = 1;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    char control[CMSG_SPACE(sizeof(uint16_t))] = {};
+    bool useGRO = sock.getGRO() > 0;
 
-    ssize_t ret = sock.recvmsg(&msg, 0);
+    if (useGRO) {
+      msg.msg_control = control;
+      msg.msg_controllen = sizeof(control);
+
+      // we need to consider MSG_TRUNC too
+      flags |= MSG_TRUNC;
+    }
+#endif
+
+    ssize_t ret = sock.recvmsg(&msg, flags);
     if (ret < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         // If we got a retriable error, let us continue.
@@ -972,6 +1038,25 @@ void QuicClientTransport::recvMsg(
     } else if (ret == 0) {
       break;
     }
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (useGRO) {
+      for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;
+           cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+        if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+          gro = *((uint16_t*)CMSG_DATA(cmsg));
+          break;
+        }
+      }
+
+      // truncated
+      if ((size_t)ret > readBufferSize) {
+        ret = readBufferSize;
+        if (gro > 0) {
+          ret = ret - ret % gro;
+        }
+      }
+    }
+#endif
     size_t bytesRead = size_t(ret);
     totalData += bytesRead;
     if (!server) {
@@ -980,7 +1065,38 @@ void QuicClientTransport::recvMsg(
     }
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
     readBuffer->append(bytesRead);
-    networkData.packets.emplace_back(std::move(readBuffer));
+    if (gro > 0) {
+      size_t len = bytesRead;
+      size_t remaining = len;
+      size_t offset = 0;
+      size_t totalNumPackets =
+          networkData.packets.size() + ((len + gro - 1) / gro);
+      networkData.packets.reserve(totalNumPackets);
+      while (remaining) {
+        if (static_cast<int>(remaining) > gro) {
+          auto tmp = readBuffer->cloneOne();
+          // start at offset
+          tmp->trimStart(offset);
+          // the actual len is len - offset now
+          // leave gro bytes
+          tmp->trimEnd(len - offset - gro);
+          DCHECK_EQ(tmp->length(), gro);
+
+          offset += gro;
+          remaining -= gro;
+          networkData.packets.emplace_back(std::move(tmp));
+        } else {
+          // do not clone the last packet
+          // start at offset, use all the remaining data
+          readBuffer->trimStart(offset);
+          DCHECK_EQ(readBuffer->length(), remaining);
+          remaining = 0;
+          networkData.packets.emplace_back(std::move(readBuffer));
+        }
+      }
+    } else {
+      networkData.packets.emplace_back(std::move(readBuffer));
+    }
     if (conn_->qLogger) {
       conn_->qLogger->addDatagramReceived(bytesRead);
     }
@@ -1001,6 +1117,17 @@ void QuicClientTransport::recvMmsg(
   auto& addrs = networkData.recvmmsgStorage.addrs;
   auto& readBuffers = networkData.recvmmsgStorage.readBuffers;
   auto& iovecs = networkData.recvmmsgStorage.iovecs;
+  int flags = 0;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+  bool useGRO = sock.getGRO() > 0;
+  std::vector<std::array<char, CMSG_SPACE(sizeof(uint16_t))>> controlVec(
+      useGRO ? numPackets : 0);
+
+  // we need to consider MSG_TRUNC too
+  if (useGRO) {
+    flags |= MSG_TRUNC;
+  }
+#endif
 
   for (int i = 0; i < numPackets; ++i) {
     // We create 1 buffer per packet so that it is not shared, this enables
@@ -1019,10 +1146,16 @@ void QuicClientTransport::recvMmsg(
     msg->msg_namelen = addrLen;
     msg->msg_iov = &iovecs[i];
     msg->msg_iovlen = 1;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (useGRO) {
+      msg->msg_control = controlVec[i].data();
+      msg->msg_controllen = controlVec[i].size();
+    }
+#endif
   }
 
   int numMsgsRecvd =
-      sock.recvmmsg(msgs.data(), numPackets, RECVMMSG_FLAGS, nullptr);
+      sock.recvmmsg(msgs.data(), numPackets, RECVMMSG_FLAGS | flags, nullptr);
   if (numMsgsRecvd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       // Exit, socket will notify us again when socket is readable.
@@ -1051,6 +1184,27 @@ void QuicClientTransport::recvMmsg(
       // ignore such datagrams.
       continue;
     }
+    int gro = -1;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (useGRO) {
+      for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msgs[i].msg_hdr);
+           cmsg != nullptr;
+           cmsg = CMSG_NXTHDR(&msgs[i].msg_hdr, cmsg)) {
+        if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+          gro = *((uint16_t*)CMSG_DATA(cmsg));
+          break;
+        }
+      }
+
+      // truncated
+      if (bytesRead > readBufferSize) {
+        bytesRead = readBufferSize;
+        if (gro > 0) {
+          bytesRead = bytesRead - bytesRead % gro;
+        }
+      }
+    }
+#endif
     totalData += bytesRead;
 
     if (!server) {
@@ -1061,7 +1215,39 @@ void QuicClientTransport::recvMmsg(
 
     VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
     readBuffers[i]->append(bytesRead);
-    networkData.packets.emplace_back(std::move(readBuffers[i]));
+    if (gro > 0) {
+      size_t len = bytesRead;
+      size_t remaining = len;
+      size_t offset = 0;
+      size_t totalNumPackets =
+          networkData.packets.size() + ((len + gro - 1) / gro);
+      networkData.packets.reserve(totalNumPackets);
+      while (remaining) {
+        if (static_cast<int>(remaining) > gro) {
+          auto tmp = readBuffers[i]->cloneOne();
+          // start at offset
+          tmp->trimStart(offset);
+          // the actual len is len - offset now
+          // leave gro bytes
+          tmp->trimEnd(len - offset - gro);
+          DCHECK_EQ(tmp->length(), gro);
+
+          offset += gro;
+          remaining -= gro;
+          networkData.packets.emplace_back(std::move(tmp));
+        } else {
+          // do not clone the last packet
+          // start at offset, use all the remaining data
+          readBuffers[i]->trimStart(offset);
+          DCHECK_EQ(readBuffers[i]->length(), remaining);
+          remaining = 0;
+          networkData.packets.emplace_back(std::move(readBuffers[i]));
+        }
+      }
+    } else {
+      networkData.packets.emplace_back(std::move(readBuffers[i]));
+    }
+
     QUIC_TRACE(udp_recvd, *conn_, bytesRead);
     if (conn_->qLogger) {
       conn_->qLogger->addDatagramReceived(bytesRead);
@@ -1072,7 +1258,8 @@ void QuicClientTransport::recvMmsg(
 void QuicClientTransport::onNotifyDataAvailable(
     folly::AsyncUDPSocket& sock) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
-  auto readBufferSize = conn_->transportSettings.maxRecvPacketSize;
+  auto readBufferSize =
+      conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
   const int numPackets = conn_->transportSettings.maxRecvBatchSize;
 
   NetworkData networkData;
@@ -1150,6 +1337,8 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
         this,
         this,
         socketOptions_);
+    // adjust the GRO buffers
+    adjustGROBuffers();
     startCryptoHandshake();
   } catch (const QuicTransportException& ex) {
     runOnEvbAsync([ex](auto self) {
@@ -1261,6 +1450,22 @@ void QuicClientTransport::setPartialReliabilityTransportParameter() {
   }
 }
 
+void QuicClientTransport::adjustGROBuffers() {
+  if (socket_ && conn_) {
+    if (conn_->transportSettings.numGROBuffers_ > kDefaultNumGROBuffers) {
+      socket_->setGRO(true);
+      auto ret = socket_->getGRO();
+
+      if (ret > 0) {
+        numGROBuffers_ =
+            (conn_->transportSettings.numGROBuffers_ < kMaxNumGROBuffers)
+            ? conn_->transportSettings.numGROBuffers_
+            : kMaxNumGROBuffers;
+      }
+    }
+  }
+}
+
 void QuicClientTransport::closeTransport() {
   happyEyeballsConnAttemptDelayTimeout_.cancelTimeout();
 }
@@ -1311,6 +1516,9 @@ void QuicClientTransport::onNetworkSwitch(
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionMigrationUpdate(true);
     }
+
+    // adjust the GRO buffers
+    adjustGROBuffers();
   }
 }
 

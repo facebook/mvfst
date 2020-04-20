@@ -63,6 +63,8 @@ struct TransportSettings {
   folly::Optional<double> latencyFactor;
   // The max UDP packet size we are willing to receive.
   uint64_t maxRecvPacketSize{kDefaultUDPReadBufferSize};
+  // Number of buffers to allocate for GRO
+  uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   // Can we ignore the path mtu when sending a packet. This is useful for
   // testing.
   bool canIgnorePathMTU{false};
