@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/Conv.h>
+#include <folly/IPAddress.h>
 #include <folly/Optional.h>
 #include <folly/io/Cursor.h>
 #include <folly/small_vector.h>
@@ -567,6 +568,25 @@ struct StatelessReset {
 
   explicit StatelessReset(StatelessResetToken tokenIn)
       : token(std::move(tokenIn)) {}
+};
+
+struct RetryToken {
+  RetryToken(
+      ConnectionId originalDstConnIdIn,
+      folly::IPAddress clientIpIn,
+      uint16_t clientPortIn)
+      : originalDstConnId(originalDstConnIdIn),
+        clientIp(clientIpIn),
+        clientPort(clientPortIn) {}
+
+  // We serialize the members to obtain a plaintext token.
+  // This token is encrypted before it's placed in the outgoing
+  // Retry packet.
+  Buf getPlaintextToken();
+
+  ConnectionId originalDstConnId;
+  folly::IPAddress clientIp;
+  uint16_t clientPort;
 };
 
 #define QUIC_SIMPLE_FRAME(F, ...)         \

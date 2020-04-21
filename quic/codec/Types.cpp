@@ -307,6 +307,33 @@ StreamTypeField StreamTypeField::Builder::build() {
   return StreamTypeField(field_);
 }
 
+Buf RetryToken::getPlaintextToken() {
+  // The plaintext token consists of the following:
+  // len(odcid) || odcid || port || ipaddr_len || ipaddr
+  auto buf = std::make_unique<folly::IOBuf>();
+  folly::io::Appender appender(buf.get(), 20);
+
+  // Write the odcid length
+  uint8_t odcidLen = originalDstConnId.size();
+  appender.writeBE<uint8_t>(odcidLen);
+
+  // Write the odcid
+  appender.push(originalDstConnId.data(), odcidLen);
+
+  // Write the port
+  appender.writeBE<uint16_t>(clientPort);
+
+  std::string clientIpStr = clientIp.str();
+
+  // Write the ipaddr len
+  appender.writeBE<uint8_t>(clientIpStr.size());
+
+  // Write the ipaddr
+  appender.push((const uint8_t*)clientIpStr.data(), clientIpStr.size());
+
+  return buf;
+}
+
 std::string toString(PacketNumberSpace pnSpace) {
   switch (pnSpace) {
     case PacketNumberSpace::Initial:
