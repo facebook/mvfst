@@ -650,6 +650,7 @@ class QuicStreamManager {
     deliverableStreams_.clear();
     readableStreams_.clear();
     peekableStreams_.clear();
+    flowControlUpdated_.clear();
     dataExpiredStreams_.clear();
     dataRejectedStreams_.clear();
   }
