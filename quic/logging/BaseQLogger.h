@@ -34,5 +34,10 @@ class BaseQLogger : public QLogger {
       const VersionNegotiationPacket& versionPacket,
       uint64_t packetSize,
       bool isPacketRecvd);
+
+  std::unique_ptr<QLogRetryEvent> createPacketEvent(
+      const RetryPacket& retryPacket,
+      uint64_t packetSize,
+      bool isPacketRecvd);
 };
 } // namespace quic

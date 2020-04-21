@@ -158,6 +158,10 @@ void QuicClientTransport::processPacketData(
 
   RetryPacket* retryPacket = parsedPacket.retryPacket();
   if (retryPacket) {
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacket(*retryPacket, packetSize, true);
+    }
+
     if (!clientConn_->retryToken.empty()) {
       VLOG(4) << "Server sent more than one retry packet";
       return;

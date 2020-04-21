@@ -280,6 +280,22 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
   return d;
 }
 
+folly::dynamic QLogRetryEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()),
+      "TRANSPORT",
+      toString(eventType),
+      "DEFAULT");
+  folly::dynamic data = folly::dynamic::object();
+
+  data["header"] = folly::dynamic::object("packet_size", packetSize);
+  data["packet_type"] = packetType;
+  data["token_size"] = tokenSize;
+
+  d.push_back(std::move(data));
+  return d;
+}
+
 QLogConnectionCloseEvent::QLogConnectionCloseEvent(
     std::string errorIn,
     std::string reasonIn,

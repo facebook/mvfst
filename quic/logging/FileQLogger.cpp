@@ -154,6 +154,13 @@ void FileQLogger::addPacket(
   handleEvent(createPacketEvent(versionPacket, packetSize, isPacketRecvd));
 }
 
+void FileQLogger::addPacket(
+    const RetryPacket& retryPacket,
+    uint64_t packetSize,
+    bool isPacketRecvd) {
+  logs.push_back(createPacketEvent(retryPacket, packetSize, isPacketRecvd));
+}
+
 void FileQLogger::addConnectionClose(
     std::string error,
     std::string reason,

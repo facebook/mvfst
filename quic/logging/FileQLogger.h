@@ -45,6 +45,10 @@ class FileQLogger : public BaseQLogger {
       bool isPacketRecvd) override;
   void addPacket(const RegularQuicWritePacket& writePacket, uint64_t packetSize)
       override;
+  void addPacket(
+      const RetryPacket& retryPacket,
+      uint64_t packetSize,
+      bool isPacketRecvd) override;
   void addConnectionClose(
       std::string error,
       std::string reason,

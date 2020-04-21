@@ -355,6 +355,18 @@ class QLogVersionNegotiationEvent : public QLogEvent {
   folly::dynamic toDynamic() const override;
 };
 
+class QLogRetryEvent : public QLogEvent {
+ public:
+  QLogRetryEvent() = default;
+  ~QLogRetryEvent() override = default;
+
+  std::string packetType;
+  uint64_t packetSize{0};
+  uint64_t tokenSize{0};
+
+  folly::dynamic toDynamic() const override;
+};
+
 class QLogConnectionCloseEvent : public QLogEvent {
  public:
   QLogConnectionCloseEvent(

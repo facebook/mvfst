@@ -300,4 +300,19 @@ std::unique_ptr<QLogVersionNegotiationEvent> BaseQLogger::createPacketEvent(
   return event;
 }
 
+std::unique_ptr<QLogRetryEvent> BaseQLogger::createPacketEvent(
+    const RetryPacket& retryPacket,
+    uint64_t packetSize,
+    bool isPacketRecvd) {
+  auto event = std::make_unique<QLogRetryEvent>();
+  event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now() - refTimePoint);
+  event->packetSize = packetSize;
+  event->tokenSize = retryPacket.header.getToken().size();
+  event->eventType =
+      isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
+  event->packetType = toString(retryPacket.header.getHeaderType());
+  return event;
+}
+
 } // namespace quic

@@ -46,6 +46,10 @@ class QLogger {
   virtual void addPacket(
       const RegularQuicWritePacket& writePacket,
       uint64_t packetSize) = 0;
+  virtual void addPacket(
+      const RetryPacket& retryPacket,
+      uint64_t packetSize,
+      bool isPacketRecvd) = 0;
   virtual void addConnectionClose(
       std::string error,
       std::string reason,
