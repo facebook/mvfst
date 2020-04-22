@@ -128,6 +128,7 @@ enum class TransportErrorCode : uint16_t {
   INVALID_MIGRATION = 0x000C,
   CRYPTO_ERROR = 0x100,
   CRYPTO_ERROR_MAX = 0x1ff,
+  INVALID_TOKEN = 0xb,
 };
 
 /**

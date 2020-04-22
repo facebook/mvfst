@@ -649,6 +649,46 @@ HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& /*cursor*/) {
   return HandshakeDoneFrame();
 }
 
+folly::Expected<RetryToken, TransportErrorCode> parsePlaintextRetryToken(
+    folly::io::Cursor& cursor) {
+  // Read in the length of the odcid.
+  if (!cursor.canAdvance(sizeof(uint8_t))) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+  auto odcidLen = cursor.readBE<uint8_t>();
+
+  // Read in the odcid.
+  if (!cursor.canAdvance(odcidLen)) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+  ConnectionId connId(cursor, odcidLen);
+
+  // Read in the port.
+  if (!cursor.canAdvance(sizeof(uint16_t))) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+  auto clientPort = cursor.readBE<uint16_t>();
+
+  // Read in the length of the client ip address.
+  if (!cursor.canAdvance(sizeof(uint8_t))) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+  uint16_t ipAddrLen = cursor.readBE<uint8_t>();
+
+  if (!cursor.canAdvance(ipAddrLen)) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+
+  // Read in the ip address.
+  std::string ipAddressStr = cursor.readFixedString(ipAddrLen);
+  auto ipAddress = folly::IPAddress::tryFromString(ipAddressStr);
+  if (!ipAddress.hasValue()) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+
+  return RetryToken(connId, *ipAddress, clientPort);
+}
+
 QuicFrame parseFrame(
     BufQueue& queue,
     const PacketHeader& header,

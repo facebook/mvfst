@@ -147,6 +147,8 @@ std::string toString(TransportErrorCode code) {
       return "Invalid migration";
     case TransportErrorCode::SERVER_BUSY:
       return "Server busy";
+    case TransportErrorCode::INVALID_TOKEN:
+      return "Invalid token";
     case TransportErrorCode::CRYPTO_ERROR:
       return cryptoErrorToString(code);
     case TransportErrorCode::CRYPTO_ERROR_MAX:

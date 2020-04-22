@@ -737,5 +737,31 @@ TEST_F(DecodeTest, DecodeExpiredStreamDataFrame) {
   EXPECT_EQ(result.minimumStreamOffset, 100);
 }
 
+TEST_F(DecodeTest, ParsePlaintextRetryToken) {
+  ConnectionId odcid = getTestConnectionId();
+  folly::IPAddress clientIp("109.115.3.49");
+  uint16_t clientPort = 42069;
+  RetryToken retryToken(odcid, clientIp, clientPort);
+  Buf plaintextRetryToken = retryToken.getPlaintextToken();
+
+  folly::io::Cursor cursor(plaintextRetryToken.get());
+  auto parseResult = parsePlaintextRetryToken(cursor);
+
+  EXPECT_TRUE(parseResult.hasValue());
+  EXPECT_EQ(parseResult->originalDstConnId, odcid);
+  EXPECT_EQ(parseResult->clientIp, clientIp);
+  EXPECT_EQ(parseResult->clientPort, clientPort);
+}
+
+TEST_F(DecodeTest, ParsePlaintextRetryTokenMalformed) {
+  Buf plaintextRetryToken = folly::IOBuf::copyBuffer("This is some garbage");
+
+  folly::io::Cursor cursor(plaintextRetryToken.get());
+  auto parseResult = parsePlaintextRetryToken(cursor);
+
+  EXPECT_TRUE(parseResult.hasError());
+  EXPECT_EQ(parseResult.error(), TransportErrorCode::INVALID_TOKEN);
+}
+
 } // namespace test
 } // namespace quic
