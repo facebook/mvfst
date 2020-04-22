@@ -26,9 +26,9 @@ class Aead {
   virtual ~Aead() = default;
 
   /**
-   * Encrypts plaintext. Will throw on error.
+   * Encrypts plaintext inplace. Will throw on error.
    */
-  virtual std::unique_ptr<folly::IOBuf> encrypt(
+  virtual std::unique_ptr<folly::IOBuf> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const = 0;

@@ -204,8 +204,8 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
   unencrypted->advance(headerLen);
   unencrypted->append(bodyLen);
-  auto packetBuf =
-      aead.encrypt(std::move(unencrypted), packet->header.get(), packetNum);
+  auto packetBuf = aead.inplaceEncrypt(
+      std::move(unencrypted), packet->header.get(), packetNum);
   DCHECK(packetBuf->headroom() == headerLen);
   packetBuf->clear();
   auto headerCursor = folly::io::Cursor(packet->header.get());
@@ -832,8 +832,8 @@ void writeCloseCommon(
   }
   auto packet = std::move(packetBuilder).buildPacket();
   packet.header->coalesce();
-  auto body =
-      aead.encrypt(std::move(packet.body), packet.header.get(), packetNum);
+  auto body = aead.inplaceEncrypt(
+      std::move(packet.body), packet.header.get(), packetNum);
   body->coalesce();
   encryptPacketHeader(
       headerForm,

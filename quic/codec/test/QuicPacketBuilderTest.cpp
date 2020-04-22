@@ -75,7 +75,7 @@ Buf packetToBuf(
   }
   if (aead && packet.header) {
     auto bodySize = body->computeChainDataLength();
-    body = aead->encrypt(std::move(body), packet.header.get(), num);
+    body = aead->inplaceEncrypt(std::move(body), packet.header.get(), num);
     EXPECT_GT(body->computeChainDataLength(), bodySize);
   }
   if (body) {

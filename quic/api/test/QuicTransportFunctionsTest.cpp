@@ -1402,7 +1402,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   writeDataToQuicStream(*stream, buf->clone(), true);
 
   folly::IOBuf pktBodyCaptured;
-  EXPECT_CALL(*capturingAead, _encrypt(_, _, _))
+  EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
           pktBodyCaptured.prependChain(buf->clone());
@@ -1418,7 +1418,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
   // Now we have no new data, let's probe again, and verify the same old data is
   // sent.
   folly::IOBuf secondBodyCaptured;
-  EXPECT_CALL(*capturingAead, _encrypt(_, _, _))
+  EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
           secondBodyCaptured.prependChain(buf->clone());

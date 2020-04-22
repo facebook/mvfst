@@ -265,10 +265,10 @@ template <class T>
 std::unique_ptr<T> createNoOpAeadImpl() {
   // Fake that the handshake has already occured
   auto aead = std::make_unique<NiceMock<T>>();
-  ON_CALL(*aead, _encrypt(_, _, _))
+  ON_CALL(*aead, _inplaceEncrypt(_, _, _))
       .WillByDefault(Invoke([&](auto& buf, auto, auto) {
         if (buf) {
-          return buf->clone();
+          return std::move(buf);
         } else {
           return folly::IOBuf::create(0);
         }
@@ -426,12 +426,20 @@ Buf packetToBufCleartext(
   auto packetBuf = packet.header->clone();
   Buf body;
   if (packet.body) {
+    packet.body->coalesce();
     body = packet.body->clone();
+  } else {
+    body = folly::IOBuf::create(0);
   }
   auto headerForm = packet.packet.header.getHeaderForm();
   packet.header->coalesce();
-  auto encryptedBody =
-      cleartextCipher.encrypt(std::move(body), packet.header.get(), packetNum);
+  auto tagLen = cleartextCipher.getCipherOverhead();
+  if (body->tailroom() < tagLen) {
+    body->prependChain(folly::IOBuf::create(tagLen));
+  }
+  body->coalesce();
+  auto encryptedBody = cleartextCipher.inplaceEncrypt(
+      std::move(body), packet.header.get(), packetNum);
   encryptedBody->coalesce();
   encryptPacketHeader(
       headerForm,

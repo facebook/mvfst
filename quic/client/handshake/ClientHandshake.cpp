@@ -163,12 +163,11 @@ bool ClientHandshake::verifyRetryIntegrityTag(
       retryPacket.header.getToken().size());
 
   pseudoRetryPacket.coalesce();
-  std::unique_ptr<folly::IOBuf> emptyPlaintext =
-      std::make_unique<folly::IOBuf>();
 
   auto retryCipher = getRetryPacketCipher();
-  auto expectedIntegrityTag =
-      retryCipher->encrypt(std::move(emptyPlaintext), &pseudoRetryPacket, 0);
+  auto emptyPlaintext = folly::IOBuf::create(retryCipher->getCipherOverhead());
+  auto expectedIntegrityTag = retryCipher->inplaceEncrypt(
+      std::move(emptyPlaintext), &pseudoRetryPacket, 0);
 
   return folly::IOBufEqualTo()(
       *expectedIntegrityTag, *retryPacket.integrityTag);

@@ -32,11 +32,12 @@ class FizzAead final : public Aead {
   /**
    * Simply forward all calls to fizz::Aead.
    */
-  std::unique_ptr<folly::IOBuf> encrypt(
+  std::unique_ptr<folly::IOBuf> inplaceEncrypt(
       std::unique_ptr<folly::IOBuf>&& plaintext,
       const folly::IOBuf* associatedData,
       uint64_t seqNum) const override {
-    return fizzAead->encrypt(std::move(plaintext), associatedData, seqNum);
+    return fizzAead->inplaceEncrypt(
+        std::move(plaintext), associatedData, seqNum);
   }
   std::unique_ptr<folly::IOBuf> decrypt(
       std::unique_ptr<folly::IOBuf>&& ciphertext,

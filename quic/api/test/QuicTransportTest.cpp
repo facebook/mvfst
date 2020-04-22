@@ -186,7 +186,7 @@ class QuicTransportTest : public Test {
     // a cipher.
     auto aead = std::make_unique<NiceMock<MockAead>>();
     aead_ = aead.get();
-    EXPECT_CALL(*aead_, _encrypt(_, _, _))
+    EXPECT_CALL(*aead_, _inplaceEncrypt(_, _, _))
         .WillRepeatedly(
             Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
     EXPECT_CALL(*aead_, _decrypt(_, _, _))
