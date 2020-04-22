@@ -222,5 +222,6 @@ class QuicClientTransport
   // Same value as conn_->transportSettings.numGROBuffers_ if the kernel
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
+  RecvmmsgStorage recvmmsgStorage_;
 };
 } // namespace quic
