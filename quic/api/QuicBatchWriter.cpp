@@ -134,7 +134,8 @@ ssize_t SendmmsgPacketBatchWriter::write(
     return sock.write(address, bufs_[0]);
   }
 
-  int ret = sock.writem(address, bufs_.data(), bufs_.size());
+  int ret = sock.writem(
+      folly::range(&address, &address + 1), bufs_.data(), bufs_.size());
 
   if (ret <= 0) {
     return ret;
@@ -219,7 +220,11 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
                            : sock.write(address, bufs_[0]);
   }
 
-  int ret = sock.writemGSO(address, bufs_.data(), bufs_.size(), gso_.data());
+  int ret = sock.writemGSO(
+      folly::range(&address, &address + 1),
+      bufs_.data(),
+      bufs_.size(),
+      gso_.data());
 
   if (ret <= 0) {
     return ret;
