@@ -8,6 +8,129 @@
 
 #include <quic/api/QuicBatchWriter.h>
 
+#if !FOLLY_MOBILE
+#define USE_THREAD_LOCAL_BATCH_WRITER 1
+#else
+#define USE_THREAD_LOCAL_BATCH_WRITER 0
+#endif
+
+#if USE_THREAD_LOCAL_BATCH_WRITER
+namespace {
+class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
+ private:
+  ThreadLocalBatchWriterCache() = default;
+
+  // we need to handle the case where the thread is being destroyed
+  // while the EventBase has an outstanding timer
+  struct Holder {
+    Holder() = default;
+
+    ~Holder() {
+      if (ptr_) {
+        ptr_->decRef();
+      }
+    }
+    ThreadLocalBatchWriterCache* ptr_{nullptr};
+  };
+
+  void addRef() {
+    ++count_;
+  }
+
+  void decRef() {
+    if (--count_ == 0) {
+      delete this;
+    }
+  }
+
+ public:
+  static ThreadLocalBatchWriterCache& getThreadLocalInstance() {
+    static thread_local Holder sCache;
+    if (!sCache.ptr_) {
+      sCache.ptr_ = new ThreadLocalBatchWriterCache();
+    }
+
+    return *sCache.ptr_;
+  }
+
+  void timeoutExpired() noexcept override {
+    timerActive_ = false;
+    auto& instance = getThreadLocalInstance();
+    if (instance.socket_ && instance.batchWriter_ &&
+        !instance.batchWriter_->empty()) {
+      // pass a default address - it is not being used by the writer
+      instance.batchWriter_->write(*socket_.get(), folly::SocketAddress());
+      instance.batchWriter_->reset();
+    }
+    decRef();
+  }
+
+  void enable(bool val) {
+    if (enabled_ != val) {
+      enabled_ = val;
+      batchingMode_ = quic::QuicBatchingMode::BATCHING_MODE_NONE;
+      batchWriter_.reset();
+    }
+  }
+
+  quic::BatchWriter* FOLLY_NULLABLE getCachedWriter(
+      quic::QuicBatchingMode mode,
+      const std::chrono::microseconds& threadLocalDelay) {
+    enabled_ = true;
+    threadLocalDelay_ = threadLocalDelay;
+
+    if (mode == batchingMode_) {
+      return batchWriter_.release();
+    }
+
+    batchingMode_ = mode;
+    batchWriter_.reset();
+
+    return nullptr;
+  }
+
+  void setCachedWriter(quic::BatchWriter* writer) {
+    if (enabled_) {
+      auto* evb = writer->evb();
+
+      if (evb && !socket_) {
+        auto fd = writer->getAndResetFd();
+        if (fd >= 0) {
+          socket_ = std::make_unique<folly::AsyncUDPSocket>(evb);
+          socket_->setFD(
+              folly::NetworkSocket(fd),
+              folly::AsyncUDPSocket::FDOwnership::OWNS);
+        }
+        attachTimeoutManager(evb);
+      }
+
+      batchWriter_.reset(writer);
+
+      // start the timer if not active
+      if (evb && socket_ && !timerActive_) {
+        addRef();
+        timerActive_ = true;
+        evb->scheduleTimeoutHighRes(this, threadLocalDelay_);
+      }
+    } else {
+      delete writer;
+    }
+  }
+
+ private:
+  std::atomic<uint32_t> count_{1};
+  bool enabled_{false};
+  bool timerActive_{false};
+  std::chrono::microseconds threadLocalDelay_{1000};
+  quic::QuicBatchingMode batchingMode_{
+      quic::QuicBatchingMode::BATCHING_MODE_NONE};
+  // this is just an  std::unique_ptr
+  std::unique_ptr<quic::BatchWriter> batchWriter_;
+  std::unique_ptr<folly::AsyncUDPSocket> socket_;
+};
+} // namespace
+#endif
+
 namespace quic {
 // BatchWriter
 bool BatchWriter::needsFlush(size_t /*unused*/) {
@@ -21,7 +144,9 @@ void SinglePacketBatchWriter::reset() {
 
 bool SinglePacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
-    size_t /*unused*/) {
+    size_t /*unused*/,
+    const folly::SocketAddress& /*unused*/,
+    folly::AsyncUDPSocket* /*unused*/) {
   buf_ = std::move(buf);
 
   // needs to be flushed
@@ -52,7 +177,9 @@ bool GSOPacketBatchWriter::needsFlush(size_t size) {
 
 bool GSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
-    size_t size) {
+    size_t size,
+    const folly::SocketAddress& /*unused*/,
+    folly::AsyncUDPSocket* /*unused*/) {
   // first buffer
   if (!buf_) {
     DCHECK_EQ(currBufs_, 0);
@@ -112,7 +239,9 @@ void SendmmsgPacketBatchWriter::reset() {
 
 bool SendmmsgPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
-    size_t size) {
+    size_t size,
+    const folly::SocketAddress& /*unused*/,
+    folly::AsyncUDPSocket* /*unused*/) {
   CHECK_LT(bufs_.size(), maxBufs_);
   bufs_.emplace_back(std::move(buf));
   currSize_ += size;
@@ -167,6 +296,7 @@ size_t SendmmsgGSOPacketBatchWriter::size() const {
 void SendmmsgGSOPacketBatchWriter::reset() {
   bufs_.clear();
   gso_.clear();
+  addrs_.clear();
   currBufs_ = 0;
   currSize_ = 0;
   prevSize_ = 0;
@@ -174,14 +304,19 @@ void SendmmsgGSOPacketBatchWriter::reset() {
 
 bool SendmmsgGSOPacketBatchWriter::append(
     std::unique_ptr<folly::IOBuf>&& buf,
-    size_t size) {
+    size_t size,
+    const folly::SocketAddress& addr,
+    folly::AsyncUDPSocket* sock) {
+  setSock(sock);
   currSize_ += size;
   // see if we need to start a new chain
-  if (size > prevSize_) {
+  if (size > prevSize_ ||
+      (!addrs_.empty() && (addr != addrs_[addrs_.size() - 1]))) {
     bufs_.emplace_back(std::move(buf));
     // set the gso_ value to 0 for now
     // this will change if we append to this chain
     gso_.emplace_back(0);
+    addrs_.emplace_back(addr);
     prevSize_ = size;
     currBufs_++;
 
@@ -213,15 +348,15 @@ bool SendmmsgGSOPacketBatchWriter::append(
 
 ssize_t SendmmsgGSOPacketBatchWriter::write(
     folly::AsyncUDPSocket& sock,
-    const folly::SocketAddress& address) {
+    const folly::SocketAddress& /*unused*/) {
   CHECK_GT(bufs_.size(), 0);
   if (bufs_.size() == 1) {
-    return (currBufs_ > 1) ? sock.writeGSO(address, bufs_[0], gso_[0])
-                           : sock.write(address, bufs_[0]);
+    return (currBufs_ > 1) ? sock.writeGSO(addrs_[0], bufs_[0], gso_[0])
+                           : sock.write(addrs_[0], bufs_[0]);
   }
 
   int ret = sock.writemGSO(
-      folly::range(&address, &address + 1),
+      folly::range(addrs_.data(), addrs_.data() + addrs_.size()),
       bufs_.data(),
       bufs_.size(),
       gso_.data());
@@ -239,29 +374,59 @@ ssize_t SendmmsgGSOPacketBatchWriter::write(
   return 0;
 }
 
+// BatchWriterDeleter
+void BatchWriterDeleter::operator()(BatchWriter* batchWriter) {
+#if USE_THREAD_LOCAL_BATCH_WRITER
+  ThreadLocalBatchWriterCache::getThreadLocalInstance().setCachedWriter(
+      batchWriter);
+#else
+  delete batchWriter;
+#endif
+}
+
 // BatchWriterFactory
-std::unique_ptr<BatchWriter> BatchWriterFactory::makeBatchWriter(
+BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     folly::AsyncUDPSocket& sock,
     const quic::QuicBatchingMode& batchingMode,
-    uint32_t batchSize) {
+    uint32_t batchSize,
+    bool useThreadLocal,
+    const std::chrono::microseconds& threadLocalDelay) {
+#if USE_THREAD_LOCAL_BATCH_WRITER
+  if (useThreadLocal &&
+      (batchingMode == quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO) &&
+      sock.getGSO() >= 0) {
+    BatchWriterPtr ret(
+        ThreadLocalBatchWriterCache::getThreadLocalInstance().getCachedWriter(
+            batchingMode, threadLocalDelay));
+
+    if (ret) {
+      return ret;
+    }
+  } else {
+    ThreadLocalBatchWriterCache::getThreadLocalInstance().enable(false);
+  }
+#else
+  (void)useThreadLocal;
+#endif
+
   switch (batchingMode) {
     case quic::QuicBatchingMode::BATCHING_MODE_NONE:
-      return std::make_unique<SinglePacketBatchWriter>();
+      return BatchWriterPtr(new SinglePacketBatchWriter());
     case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
       if (sock.getGSO() >= 0) {
-        return std::make_unique<GSOPacketBatchWriter>(batchSize);
+        return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
       }
 
-      return std::make_unique<SinglePacketBatchWriter>();
+      return BatchWriterPtr(new SinglePacketBatchWriter());
     }
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG:
-      return std::make_unique<SendmmsgPacketBatchWriter>(batchSize);
+      return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
     case quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO: {
       if (sock.getGSO() >= 0) {
-        return std::make_unique<SendmmsgGSOPacketBatchWriter>(batchSize);
+        return BatchWriterPtr(new SendmmsgGSOPacketBatchWriter(batchSize));
       }
 
-      return std::make_unique<SendmmsgPacketBatchWriter>(batchSize);
+      return BatchWriterPtr(new SendmmsgPacketBatchWriter(batchSize));
     }
       // no default so we can catch missing case at compile time
   }

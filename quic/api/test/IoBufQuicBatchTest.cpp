@@ -31,8 +31,11 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
     bufSize_ = 0;
   }
 
-  bool append(std::unique_ptr<folly::IOBuf>&& /*unused*/, size_t size)
-      override {
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& /*unused*/,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      folly::AsyncUDPSocket* /*unused*/) override {
     bufNum_++;
     bufSize_ += size;
     return ((maxBufs_ < 0) || (bufNum_ >= maxBufs_));
@@ -53,14 +56,19 @@ void RunTest(int numBatch) {
   folly::EventBase evb;
   folly::AsyncUDPSocket sock(&evb);
 
-  auto batchWriter = std::make_unique<TestPacketBatchWriter>(numBatch);
+  auto batchWriter = BatchWriterPtr(new TestPacketBatchWriter(numBatch));
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
 
   IOBufQuicBatch ioBufBatch(
-      std::move(batchWriter), sock, peerAddress, conn, happyEyeballsState);
+      std::move(batchWriter),
+      false,
+      sock,
+      peerAddress,
+      conn,
+      happyEyeballsState);
 
   std::string strTest("Test");
 

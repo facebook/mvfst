@@ -974,10 +974,13 @@ uint64_t writeConnectionDataToSocket(
   auto batchWriter = BatchWriterFactory::makeBatchWriter(
       sock,
       connection.transportSettings.batchingMode,
-      connection.transportSettings.maxBatchSize);
+      connection.transportSettings.maxBatchSize,
+      connection.transportSettings.useThreadLocalBatching,
+      connection.transportSettings.threadLocalDelay);
 
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
+      connection.transportSettings.useThreadLocalBatching,
       sock,
       connection.peerAddress,
       connection,

@@ -16,7 +16,29 @@ namespace quic {
 class BatchWriter {
  public:
   BatchWriter() = default;
-  virtual ~BatchWriter() = default;
+  virtual ~BatchWriter() {
+    if (fd_ >= 0) {
+      ::close(fd_);
+    }
+  }
+
+  void setSock(folly::AsyncUDPSocket* sock) {
+    if (sock && !evb_) {
+      fd_ = ::dup(sock->getNetworkSocket().toFd());
+      evb_ = sock->getEventBase();
+    }
+  }
+
+  [[nodiscard]] folly::EventBase* evb() const {
+    return evb_;
+  }
+
+  int getAndResetFd() {
+    auto ret = fd_;
+    fd_ = -1;
+
+    return ret;
+  }
 
   // returns true if the batch does not contain any buffers
   virtual bool empty() const = 0;
@@ -31,12 +53,20 @@ class BatchWriter {
   virtual bool needsFlush(size_t /*unused*/);
 
   /* append returns true if the
-   * writer need to be flushed
+   * writer needs to be flushed
    */
-  virtual bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t bufSize) = 0;
+  virtual bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t bufSize,
+      const folly::SocketAddress& addr,
+      folly::AsyncUDPSocket* sock) = 0;
   virtual ssize_t write(
       folly::AsyncUDPSocket& sock,
       const folly::SocketAddress& address) = 0;
+
+ protected:
+  folly::EventBase* evb_{nullptr};
+  int fd_{-1};
 };
 
 class IOBufBatchWriter : public BatchWriter {
@@ -62,7 +92,11 @@ class SinglePacketBatchWriter : public IOBufBatchWriter {
   ~SinglePacketBatchWriter() override = default;
 
   void reset() override;
-  bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t /*unused*/) override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t /*unused*/,
+      const folly::SocketAddress& /*unused*/,
+      folly::AsyncUDPSocket* /*unused*/) override;
   ssize_t write(
       folly::AsyncUDPSocket& sock,
       const folly::SocketAddress& address) override;
@@ -75,7 +109,11 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
 
   void reset() override;
   bool needsFlush(size_t size) override;
-  bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t size) override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      folly::AsyncUDPSocket* /*unused*/) override;
   ssize_t write(
       folly::AsyncUDPSocket& sock,
       const folly::SocketAddress& address) override;
@@ -99,7 +137,11 @@ class SendmmsgPacketBatchWriter : public BatchWriter {
   size_t size() const override;
 
   void reset() override;
-  bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t size) override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      folly::AsyncUDPSocket* /*unused*/) override;
   ssize_t write(
       folly::AsyncUDPSocket& sock,
       const folly::SocketAddress& address) override;
@@ -123,7 +165,11 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   size_t size() const override;
 
   void reset() override;
-  bool append(std::unique_ptr<folly::IOBuf>&& buf, size_t size) override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t size,
+      const folly::SocketAddress& address,
+      folly::AsyncUDPSocket* sock) override;
   ssize_t write(
       folly::AsyncUDPSocket& sock,
       const folly::SocketAddress& address) override;
@@ -140,14 +186,23 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   // array of IOBufs
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
   std::vector<int> gso_;
+  std::vector<folly::SocketAddress> addrs_;
 };
+
+struct BatchWriterDeleter {
+  void operator()(BatchWriter* batchWriter);
+};
+
+using BatchWriterPtr = std::unique_ptr<BatchWriter, BatchWriterDeleter>;
 
 class BatchWriterFactory {
  public:
-  static std::unique_ptr<BatchWriter> makeBatchWriter(
+  static BatchWriterPtr makeBatchWriter(
       folly::AsyncUDPSocket& sock,
       const quic::QuicBatchingMode& batchingMode,
-      uint32_t batchSize);
+      uint32_t batchSize,
+      bool useThreadLocal,
+      const std::chrono::microseconds& threadLocalDelay);
 };
 
 } // namespace quic

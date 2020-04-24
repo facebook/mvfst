@@ -12,12 +12,14 @@
 
 namespace quic {
 IOBufQuicBatch::IOBufQuicBatch(
-    std::unique_ptr<BatchWriter>&& batchWriter,
+    BatchWriterPtr&& batchWriter,
+    bool threadLocal,
     folly::AsyncUDPSocket& sock,
     folly::SocketAddress& peerAddress,
     QuicConnectionStateBase& conn,
     QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState)
     : batchWriter_(std::move(batchWriter)),
+      threadLocal_(threadLocal),
       sock_(sock),
       peerAddress_(peerAddress),
       conn_(conn),
@@ -31,19 +33,27 @@ bool IOBufQuicBatch::write(
   // see if we need to flush the prev buffer(s)
   if (batchWriter_->needsFlush(encodedSize)) {
     // continue even if we get an error here
-    flush();
+    flush(FlushType::FLUSH_TYPE_ALWAYS);
   }
 
   // try to append the new buffers
-  if (batchWriter_->append(std::move(buf), encodedSize)) {
+  if (batchWriter_->append(
+          std::move(buf),
+          encodedSize,
+          peerAddress_,
+          threadLocal_ ? &sock_ : nullptr)) {
     // return if we get an error here
-    return flush();
+    return flush(FlushType::FLUSH_TYPE_ALWAYS);
   }
 
   return true;
 }
 
-bool IOBufQuicBatch::flush() {
+bool IOBufQuicBatch::flush(FlushType flushType) {
+  if (threadLocal_ &&
+      (flushType == FlushType::FLUSH_TYPE_ALLOW_THREAD_LOCAL_DELAY)) {
+    return true;
+  }
   bool ret = flushInternal();
   reset();
 
