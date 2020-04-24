@@ -6,6 +6,7 @@
  *
  */
 
+#include <folly/Format.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/system/ThreadId.h>
@@ -113,9 +114,11 @@ void QuicServerWorker::start() {
         evb_, transportSettings_.pacingTimerTickInterval);
   }
   socket_->resumeRead(this);
-  VLOG(10) << "Registered read on worker=" << this
-           << " thread=" << folly::getCurrentThreadID()
-           << " processId=" << (int)processId_;
+  VLOG(10) << folly::format(
+      "Registered read on worker={}, thread={}, processId={}",
+      this,
+      folly::getCurrentThreadID(),
+      (int)processId_);
 }
 
 void QuicServerWorker::pauseRead() {
@@ -195,9 +198,11 @@ void QuicServerWorker::onDataAvailable(
   // TODO: we can get better receive time accuracy than this, with
   // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
-  VLOG(10) << "Worker=" << this
-           << " Received data on thread=" << folly::getCurrentThreadID()
-           << " processId=" << (int)processId_;
+  VLOG(10) << folly::format(
+      "Worker={}, Received data on thread={}, processId={}",
+      this,
+      folly::getCurrentThreadID(),
+      (int)processId_);
   // Move readBuffer_ first so that we can get rid
   // of it immediately so that if we return early,
   // we've flushed it.
@@ -395,16 +400,19 @@ void QuicServerWorker::forwardNetworkData(
   if (!routingData.isUsingClientConnId &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
     if (packetForwardingEnabled_ && !isForwardedData) {
-      VLOG(3) << "Forwarding packet with unknown connId version from client="
-              << client << " to another process";
+      VLOG(3) << folly::format(
+          "Forwarding packet with unknown connId version from client={} to another process, routingInfo={}",
+          client.describe(),
+          logRoutingInfo(routingData.destinationConnId));
       auto recvTime = networkData.receiveTimePoint;
       takeoverPktHandler_.forwardPacketToAnotherServer(
           client, std::move(networkData).moveAllData(), recvTime);
       QUIC_STATS(statsCallback_, onPacketForwarded);
       return;
     } else {
-      VLOG(3) << "Dropping packet due to unknown connectionId version connId="
-              << routingData.destinationConnId.hex();
+      VLOG(3) << folly::format(
+          "Dropping packet due to unknown connectionId version, routingInfo={}",
+          logRoutingInfo(routingData.destinationConnId));
       QUIC_STATS(
           statsCallback_,
           onPacketDropped,
@@ -436,12 +444,12 @@ void QuicServerWorker::dispatchPacketData(
              << routingData.destinationConnId.hex() << " " << *transport;
   } else if (routingData.headerForm != HeaderForm::Long) {
     // Drop the packet if the header form is not long
-    VLOG(3) << "Dropping non-long header packet with no connid match CID="
-            << routingData.destinationConnId << " headerForm="
-            << static_cast<typename std::underlying_type<HeaderForm>::type>(
-                   routingData.headerForm)
-            << ", workerId=" << (uint32_t)workerId_
-            << ", thread=" << folly::getCurrentThreadID();
+    VLOG(3) << folly::format(
+        "Dropping non-long header packet with no connid match"
+        " headerForm={}, routingInfo={}",
+        static_cast<typename std::underlying_type<HeaderForm>::type>(
+            routingData.headerForm),
+        logRoutingInfo(routingData.destinationConnId));
     // Try forwarding the packet to the old server (if it is enabled)
     dropPacket = true;
   }
@@ -459,14 +467,16 @@ void QuicServerWorker::dispatchPacketData(
       // the case, where the new server gets packets sent to the old one due
       // to network reordering
       if (!routingData.isInitial) {
-        VLOG(3) << "Dropping packet from client=" << client
-                << ", workerId=" << (uint32_t)workerId_
-                << ", thread=" << folly::getCurrentThreadID();
+        VLOG(3) << folly::format(
+            "Dropping packet from client={}, routingInfo={}",
+            client.describe(),
+            logRoutingInfo(routingData.destinationConnId));
         dropPacket = true;
       } else {
-        VLOG(4) << "Creating new connection for client=" << client
-                << ", workerId=" << (uint32_t)workerId_
-                << ", thread=" << folly::getCurrentThreadID();
+        VLOG(4) << folly::format(
+            "Creating new connection for client={}, routingInfo={}",
+            client.describe(),
+            logRoutingInfo(routingData.destinationConnId));
 
         // This could be a new connection, add it in the map
         // verify that the initial packet is at least min initial bytes
@@ -523,8 +533,10 @@ void QuicServerWorker::dispatchPacketData(
           auto result = sourceAddressMap_.emplace(std::make_pair(
               std::make_pair(client, routingData.destinationConnId), trans));
           if (!result.second) {
-            LOG(ERROR) << "Routing entry already exists for client=" << client
-                       << ", dest CID=" << routingData.destinationConnId.hex();
+            LOG(ERROR) << folly::format(
+                "Routing entry already exists for client={}, routingInfo={}",
+                client.describe(),
+                logRoutingInfo(routingData.destinationConnId));
             dropPacket = true;
           }
           transport = trans;
@@ -551,10 +563,8 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
-    VLOG(3) << "Dropping packet with bad DCID, CID="
-            << routingData.destinationConnId.hex()
-            << ", workerId=" << (uint32_t)workerId_
-            << ", hostId=" << (uint32_t)hostId_;
+    VLOG(3) << "Dropping packet with bad DCID, routingInfo="
+            << logRoutingInfo(routingData.destinationConnId);
     QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     // TODO do we need to reset?
     return;
@@ -562,22 +572,18 @@ void QuicServerWorker::dispatchPacketData(
   auto connIdParam =
       connIdAlgo_->parseConnectionId(routingData.destinationConnId);
   if (connIdParam.hasError()) {
-    VLOG(3) << "Dropping packet due to DCID parsing error="
-            << connIdParam.error().what()
-            << ", errorCode=" << connIdParam.error().errorCode()
-            << ", DCID=" << routingData.destinationConnId.hex()
-            << ", workerId=" << (uint32_t)workerId_
-            << ", hostId=" << (uint32_t)hostId_;
+    VLOG(3) << folly::format(
+        "Dropping packet due to DCID parsing error={}, , errorCode={}, routingInfo={}",
+        connIdParam.error().what(),
+        folly::to<std::string>(connIdParam.error().errorCode()),
+        logRoutingInfo(routingData.destinationConnId));
     QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     // TODO do we need to reset?
     return;
   }
   if (connIdParam->hostId != hostId_) {
-    VLOG(3) << "Dropping packet routed to wrong host, CID="
-            << routingData.destinationConnId.hex()
-            << ", workerId=" << (uint32_t)workerId_
-            << ", hostId=" << (uint32_t)hostId_
-            << ", received hostId=" << (uint32_t)connIdParam->hostId;
+    VLOG(3) << "Dropping packet routed to wrong host, routingInfo="
+            << logRoutingInfo(routingData.destinationConnId);
     QUIC_STATS(
         statsCallback_,
         onPacketDropped,
@@ -618,9 +624,10 @@ void QuicServerWorker::dispatchPacketData(
   // Optimistically route to another server
   // if the packet type is not Initial and if there is not any connection
   // associated with the given packet
-  VLOG(4) << "Forwarding packet from client=" << client
-          << " to another process, workerId=" << (uint32_t)workerId_
-          << ", processId_=" << (uint32_t) static_cast<uint8_t>(processId_);
+  VLOG(4) << folly::format(
+      "Forwarding packet from client={} to another process, routingInfo={}",
+      client.describe(),
+      logRoutingInfo(routingData.destinationConnId));
   auto recvTime = networkData.receiveTimePoint;
   takeoverPktHandler_.forwardPacketToAnotherServer(
       client, std::move(networkData).moveAllData(), recvTime);
@@ -840,8 +847,9 @@ void QuicServerWorker::onConnectionUnbound(
   }
 
   for (auto& connId : connectionIdData) {
-    VLOG(4) << "Removing from connectionIdMap_ for CID=" << connId.connId
-            << ", workerId=" << (uint32_t)workerId_;
+    VLOG(4) << folly::format(
+        "Removing CID from connectionIdMap_, routingInfo={}",
+        logRoutingInfo(connId.connId));
     auto it = connectionIdMap_.find(connId.connId);
     // This should be nullptr in most cases. In order to investigate if
     // an incorrect server transport is removed, this will be set to the value
@@ -925,5 +933,44 @@ QuicServerWorker::~QuicServerWorker() {
 bool QuicServerWorker::rejectConnectionId(const ConnectionId& candidate) const
     noexcept {
   return connectionIdMap_.find(candidate) != connectionIdMap_.end();
+}
+
+std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
+  folly::StringPiece base =
+      "CID={}, workerId={}, processId={}, hostId={}, threadId={}, ";
+  if (!connIdAlgo_->canParse(connId)) {
+    return folly::format(
+               base,
+               connId.hex(),
+               (uint32_t)workerId_,
+               (uint32_t)processId_,
+               (uint32_t)hostId_,
+               folly::getCurrentThreadID())
+        .str();
+  }
+  auto connIdParam = connIdAlgo_->parseConnectionId(connId);
+  if (connIdParam.hasError()) {
+    return folly::format(
+               base,
+               connId.hex(),
+               (uint32_t)workerId_,
+               (uint32_t)processId_,
+               (uint32_t)hostId_,
+               folly::getCurrentThreadID())
+        .str();
+  }
+  std::string extended = base.toString() +
+      "workerId in packet={}, processId in packet={}, hostId in packet={}, ";
+  return folly::format(
+             extended,
+             connId.hex(),
+             (uint32_t)workerId_,
+             (uint32_t)processId_,
+             (uint32_t)hostId_,
+             folly::getCurrentThreadID(),
+             (uint32_t)connIdParam->workerId,
+             (uint32_t)connIdParam->processId,
+             (uint32_t)connIdParam->hostId)
+      .str();
 }
 } // namespace quic

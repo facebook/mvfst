@@ -361,6 +361,11 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       bool isInitial,
       LongHeaderInvariant& invariant);
 
+  /**
+   * Helper method to extract and log routing info from the given (dest) connId
+   */
+  std::string logRoutingInfo(const ConnectionId& connId) const;
+
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
