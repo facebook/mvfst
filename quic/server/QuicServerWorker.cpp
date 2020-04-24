@@ -420,8 +420,49 @@ void QuicServerWorker::forwardNetworkData(
     }
     return;
   }
-  callback_->routeDataToWorker(
-      client, std::move(routingData), std::move(networkData), isForwardedData);
+
+  bool userSpacePktRoute;
+  if (routingData.isUsingClientConnId) {
+    // no need to route further if it's an initial packet or zero-rtt packet
+    userSpacePktRoute = false;
+  } else {
+    // try matching the workerId in the destination Connection Id
+    auto connIdParam =
+        connIdAlgo_->parseConnectionId(routingData.destinationConnId);
+    if (UNLIKELY(connIdParam.hasError())) {
+      // not enough information to keep this packet
+      VLOG(3) << folly::format(
+          "Dropping packet due to DCID parsing error={}, , errorCode={}, routingInfo={}",
+          connIdParam.error().what(),
+          folly::to<std::string>(connIdParam.error().errorCode()),
+          logRoutingInfo(routingData.destinationConnId));
+      QUIC_STATS(
+          statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+      return;
+    }
+    if (LIKELY(connIdParam->workerId == workerId_)) {
+      userSpacePktRoute = false;
+    } else {
+      VLOG(3) << folly::format(
+          "worker-id mismatch in received packet, routingInfo={}",
+          logRoutingInfo(routingData.destinationConnId));
+      userSpacePktRoute = true;
+    }
+  }
+
+  if (userSpacePktRoute) {
+    callback_->routeDataToWorker(
+        client,
+        std::move(routingData),
+        std::move(networkData),
+        isForwardedData);
+  } else {
+    dispatchPacketData(
+        client,
+        std::move(routingData),
+        std::move(networkData),
+        isForwardedData);
+  }
 }
 
 void QuicServerWorker::setPacingTimer(
