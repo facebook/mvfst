@@ -1319,41 +1319,30 @@ class QuicClientTransportTest : public Test {
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));
     ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
-    ON_CALL(*sock, recvmmsg(_, _, _, _))
-        .WillByDefault(Invoke(
-            [&](struct mmsghdr* mmsg, auto numPackets, auto, auto) -> ssize_t {
-              VLOG(4) << "socketreads size " << socketReads.size();
-              struct msghdr* msg;
-              if (socketReads.empty()) {
-                errno = EAGAIN;
-                return -1;
-              }
-              auto len = std::min<ssize_t>(socketReads.size(), numPackets);
-              ssize_t i;
-              auto srItr = socketReads.begin();
-              for (i = 0; i < len; i++, mmsg++) {
-                if (srItr->err) {
-                  errno = *srItr->err;
-                  socketReads.pop_front();
-                  break;
-                }
-                msg = &mmsg->msg_hdr;
-                auto testData = std::move(srItr->data);
-                testData->coalesce();
-                size_t testDataLen = testData->length();
-                CHECK_EQ(msg->msg_iovlen, 1);
-                CHECK(msg->msg_iov[0].iov_base != nullptr);
-                memcpy(msg->msg_iov[0].iov_base, testData->data(), testDataLen);
-                mmsg->msg_len = testDataLen;
-                if (msg->msg_name) {
-                  socklen_t msg_len = srItr->addr.getAddress(
-                      static_cast<sockaddr_storage*>(msg->msg_name));
-                  msg->msg_namelen = msg_len;
-                }
-                srItr = socketReads.erase(srItr);
-              }
-              return i == 0 ? -1 : i;
-            }));
+    ON_CALL(*sock, recvmsg(_, _))
+        .WillByDefault(Invoke([&](struct msghdr* msg, int) -> ssize_t {
+          DCHECK_GT(msg->msg_iovlen, 0);
+          if (socketReads.empty()) {
+            errno = EAGAIN;
+            return -1;
+          }
+          if (socketReads[0].err) {
+            errno = *socketReads[0].err;
+            return -1;
+          }
+          auto testData = std::move(socketReads[0].data);
+          testData->coalesce();
+          size_t testDataLen = testData->length();
+          memcpy(
+              msg->msg_iov[0].iov_base, testData->data(), testData->length());
+          if (msg->msg_name) {
+            socklen_t msg_len = socketReads[0].addr.getAddress(
+                static_cast<sockaddr_storage*>(msg->msg_name));
+            msg->msg_namelen = msg_len;
+          }
+          socketReads.pop_front();
+          return testDataLen;
+        }));
     EXPECT_EQ(client->getConn().selfConnectionIds.size(), 1);
     EXPECT_EQ(
         client->getConn().selfConnectionIds[0].connId,
@@ -2968,8 +2957,9 @@ TEST_F(QuicClientTransportAfterStartTest, ReadLoopCountingRecvmmsg) {
   auto mockLoopDetectorCallback = std::make_unique<MockLoopDetectorCallback>();
   auto rawLoopDetectorCallback = mockLoopDetectorCallback.get();
   conn.loopDetectorCallback = std::move(mockLoopDetectorCallback);
-  conn.transportSettings.maxRecvBatchSize = 1;
 
+  conn.transportSettings.shouldUseRecvmmsgForBatchRecv = true;
+  conn.transportSettings.maxRecvBatchSize = 1;
   EXPECT_CALL(*sock, recvmmsg(_, 1, _, nullptr))
       .WillOnce(Invoke(
           [](struct mmsghdr*, unsigned int, unsigned int, struct timespec*) {
@@ -3099,76 +3089,6 @@ TEST_F(
     eventbase_->loopForever();
   }
   EXPECT_TRUE(dataDelivered);
-  client->close(folly::none);
-}
-
-TEST_F(
-    QuicClientTransportAfterStartTest,
-    ReadStreamMultiplePacketsGreaterThanBatch) {
-  StreamId streamId = client->createBidirectionalStream().value();
-
-  uint32_t batchSize = 2;
-  client->getNonConstConn().transportSettings.maxRecvBatchSize = batchSize;
-  client->setReadCallback(streamId, &readCb);
-
-  auto data = IOBuf::copyBuffer("hello");
-  auto expected = data->clone();
-  expected->prependChain(data->clone());
-  expected->prependChain(data->clone());
-  IOBuf result;
-  InSequence s;
-  EXPECT_CALL(readCb, readAvailable(streamId)).WillOnce(Invoke([&](auto) {
-    auto readData = client->read(streamId, 1000);
-    result.prependChain(readData->first->clone());
-  }));
-  EXPECT_CALL(readCb, readAvailable(streamId)).WillRepeatedly(Invoke([&](auto) {
-    auto readData = client->read(streamId, 1000);
-    result.prependChain(readData->first->clone());
-    eventbase_->terminateLoopSoon();
-  }));
-  auto packet1 = packetToBuf(createStreamPacket(
-      *serverChosenConnId /* src */,
-      *originalConnId /* dest */,
-      appDataPacketNum++,
-      streamId,
-      *data,
-      0 /* cipherOverhead */,
-      0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
-      false /* eof */));
-  auto packet2 = packetToBuf(createStreamPacket(
-      *serverChosenConnId /* src */,
-      *originalConnId /* dest */,
-      appDataPacketNum++,
-      streamId,
-      *data,
-      0 /* cipherOverhead */,
-      0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
-      false /* eof */,
-      folly::none /* shortHeaderOverride */,
-      data->length() /* offset */));
-  auto packet3 = packetToBuf(createStreamPacket(
-      *serverChosenConnId /* src */,
-      *originalConnId /* dest */,
-      appDataPacketNum++,
-      streamId,
-      *data,
-      0 /* cipherOverhead */,
-      0 /* largestAcked */,
-      folly::none /* longHeaderOverride */,
-      true /* eof */,
-      folly::none /* shortHeaderOverride */,
-      data->length() * 2 /* offset */));
-
-  socketReads.emplace_back(TestReadData(packet1->coalesce(), serverAddr));
-  socketReads.emplace_back(TestReadData(packet2->coalesce(), serverAddr));
-  deliverData(packet3->coalesce());
-  EXPECT_EQ(socketReads.size(), 1);
-  client->invokeOnNotifyDataAvailable(*sock);
-  EXPECT_EQ(socketReads.size(), 0);
-  eventbase_->loopForever();
-  EXPECT_TRUE(IOBufEqualTo()(expected.get(), &result));
   client->close(folly::none);
 }
 

@@ -28,6 +28,12 @@
 
 namespace fsp = folly::portability::sockets;
 
+#ifndef MSG_WAITFORONE
+#define RECVMMSG_FLAGS 0
+#else
+#define RECVMMSG_FLAGS MSG_WAITFORONE
+#endif
+
 namespace quic {
 
 QuicClientTransport::QuicClientTransport(
@@ -970,6 +976,137 @@ bool QuicClientTransport::shouldOnlyNotify() {
   return conn_->transportSettings.shouldRecvBatch;
 }
 
+void QuicClientTransport::recvMsg(
+    folly::AsyncUDPSocket& sock,
+    uint64_t readBufferSize,
+    int numPackets,
+    NetworkData& networkData,
+    folly::Optional<folly::SocketAddress>& server,
+    size_t& totalData) {
+  for (int packetNum = 0; packetNum < numPackets; ++packetNum) {
+    // We create 1 buffer per packet so that it is not shared, this enables
+    // us to decrypt in place. If the fizz decrypt api could decrypt in-place
+    // even if shared, then we could allocate one giant IOBuf here.
+    Buf readBuffer = folly::IOBuf::create(readBufferSize);
+    struct iovec vec {};
+    vec.iov_base = readBuffer->writableData();
+    vec.iov_len = readBufferSize;
+
+    sockaddr* rawAddr{nullptr};
+    struct sockaddr_storage addrStorage {};
+    socklen_t addrLen{sizeof(addrStorage)};
+    if (!server) {
+      rawAddr = reinterpret_cast<sockaddr*>(&addrStorage);
+      rawAddr->sa_family = sock.address().getFamily();
+    }
+
+    int flags = 0;
+    int gro = -1;
+    struct msghdr msg {};
+    msg.msg_name = rawAddr;
+    msg.msg_namelen = size_t(addrLen);
+    msg.msg_iov = &vec;
+    msg.msg_iovlen = 1;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    char control[CMSG_SPACE(sizeof(uint16_t))] = {};
+    bool useGRO = sock.getGRO() > 0;
+
+    if (useGRO) {
+      msg.msg_control = control;
+      msg.msg_controllen = sizeof(control);
+
+      // we need to consider MSG_TRUNC too
+      flags |= MSG_TRUNC;
+    }
+#endif
+
+    ssize_t ret = sock.recvmsg(&msg, flags);
+    if (ret < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        // If we got a retriable error, let us continue.
+        if (conn_->loopDetectorCallback) {
+          conn_->readDebugState.noReadReason = NoReadReason::RETRIABLE_ERROR;
+        }
+        break;
+      }
+      // If we got a non-retriable error, we might have received
+      // a packet that we could process, however let's just quit early.
+      sock.pauseRead();
+      if (conn_->loopDetectorCallback) {
+        conn_->readDebugState.noReadReason = NoReadReason::NONRETRIABLE_ERROR;
+      }
+      return onReadError(folly::AsyncSocketException(
+          folly::AsyncSocketException::INTERNAL_ERROR,
+          "::recvmsg() failed",
+          errno));
+    } else if (ret == 0) {
+      break;
+    }
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (useGRO) {
+      for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;
+           cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+        if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+          gro = *((uint16_t*)CMSG_DATA(cmsg));
+          break;
+        }
+      }
+
+      // truncated
+      if ((size_t)ret > readBufferSize) {
+        ret = readBufferSize;
+        if (gro > 0) {
+          ret = ret - ret % gro;
+        }
+      }
+    }
+#endif
+    size_t bytesRead = size_t(ret);
+    totalData += bytesRead;
+    if (!server) {
+      server = folly::SocketAddress();
+      server->setFromSockaddr(rawAddr, addrLen);
+    }
+    VLOG(10) << "Got data from socket peer=" << *server << " len=" << bytesRead;
+    readBuffer->append(bytesRead);
+    if (gro > 0) {
+      size_t len = bytesRead;
+      size_t remaining = len;
+      size_t offset = 0;
+      size_t totalNumPackets =
+          networkData.packets.size() + ((len + gro - 1) / gro);
+      networkData.packets.reserve(totalNumPackets);
+      while (remaining) {
+        if (static_cast<int>(remaining) > gro) {
+          auto tmp = readBuffer->cloneOne();
+          // start at offset
+          tmp->trimStart(offset);
+          // the actual len is len - offset now
+          // leave gro bytes
+          tmp->trimEnd(len - offset - gro);
+          DCHECK_EQ(tmp->length(), gro);
+
+          offset += gro;
+          remaining -= gro;
+          networkData.packets.emplace_back(std::move(tmp));
+        } else {
+          // do not clone the last packet
+          // start at offset, use all the remaining data
+          readBuffer->trimStart(offset);
+          DCHECK_EQ(readBuffer->length(), remaining);
+          remaining = 0;
+          networkData.packets.emplace_back(std::move(readBuffer));
+        }
+      }
+    } else {
+      networkData.packets.emplace_back(std::move(readBuffer));
+    }
+    if (conn_->qLogger) {
+      conn_->qLogger->addDatagramReceived(bytesRead);
+    }
+  }
+}
+
 void QuicClientTransport::recvMmsg(
     folly::AsyncUDPSocket& sock,
     uint64_t readBufferSize,
@@ -1025,7 +1162,8 @@ void QuicClientTransport::recvMmsg(
 #endif
   }
 
-  int numMsgsRecvd = sock.recvmmsg(msgs.data(), numPackets, flags, nullptr);
+  int numMsgsRecvd =
+      sock.recvmmsg(msgs.data(), numPackets, RECVMMSG_FLAGS | flags, nullptr);
   if (numMsgsRecvd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       // Exit, socket will notify us again when socket is readable.
@@ -1144,8 +1282,12 @@ void QuicClientTransport::onNotifyDataAvailable(
   size_t totalData = 0;
   folly::Optional<folly::SocketAddress> server;
 
-  recvmmsgStorage_.resize(numPackets);
-  recvMmsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  if (conn_->transportSettings.shouldUseRecvmmsgForBatchRecv) {
+    recvmmsgStorage_.resize(numPackets);
+    recvMmsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  } else {
+    recvMsg(sock, readBufferSize, numPackets, networkData, server, totalData);
+  }
 
   if (networkData.packets.empty()) {
     // recvMmsg and recvMsg might have already set the reason and counter
