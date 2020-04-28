@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <folly/Portability.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/QuicConstants.h>
@@ -29,7 +30,7 @@ class BatchWriter {
     }
   }
 
-  [[nodiscard]] folly::EventBase* evb() const {
+  FOLLY_NODISCARD folly::EventBase* evb() const {
     return evb_;
   }
 
