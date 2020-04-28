@@ -694,14 +694,9 @@ QuicFrame parseFrame(
     const PacketHeader& header,
     const CodecParameters& params) {
   folly::io::Cursor cursor(queue.front());
-  if (!cursor.canAdvance(sizeof(FrameType))) {
-    throw QuicTransportException(
-        "Quic frame parsing: cursor cannot advance",
-        TransportErrorCode::FRAME_ENCODING_ERROR);
-  }
-  auto initialByte = decodeQuicInteger(cursor);
+  auto frameTypeInt = decodeQuicInteger(cursor);
   // TODO add an new api to determine whether the frametype is encoded minimally
-  if (!initialByte) {
+  if (!frameTypeInt) {
     throw QuicTransportException(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
   }
@@ -715,7 +710,7 @@ QuicFrame parseFrame(
     queue.trimStart(cursor - queue.front());
   };
   cursor.reset(queue.front());
-  FrameType frameType = static_cast<FrameType>(initialByte->first);
+  FrameType frameType = static_cast<FrameType>(frameTypeInt->first);
   try {
     switch (frameType) {
       case FrameType::PADDING:
@@ -744,7 +739,7 @@ QuicFrame parseFrame(
       case FrameType::STREAM_OFF_LEN_FIN:
         isStream = true;
         return QuicFrame(
-            decodeStreamFrame(queue, StreamTypeField(initialByte->first)));
+            decodeStreamFrame(queue, StreamTypeField(frameTypeInt->first)));
       case FrameType::MAX_DATA:
         return QuicFrame(decodeMaxDataFrame(cursor));
       case FrameType::MAX_STREAM_DATA:
@@ -784,13 +779,13 @@ QuicFrame parseFrame(
     error = true;
     throw QuicTransportException(
         folly::to<std::string>(
-            "Frame format invalid, type=", initialByte->first),
+            "Frame format invalid, type=", frameTypeInt->first),
         TransportErrorCode::FRAME_ENCODING_ERROR,
         frameType);
   }
   error = true;
   throw QuicTransportException(
-      folly::to<std::string>("Unknown frame, type=", initialByte->first),
+      folly::to<std::string>("Unknown frame, type=", frameTypeInt->first),
       TransportErrorCode::FRAME_ENCODING_ERROR,
       frameType);
 }

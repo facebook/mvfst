@@ -71,7 +71,7 @@ constexpr uint64_t kDefaultBufferSpaceAvailable =
 constexpr std::chrono::microseconds kDefaultMinRtt =
     std::chrono::microseconds::max();
 
-enum class FrameType : uint8_t {
+enum class FrameType : uint64_t {
   PADDING = 0x00,
   PING = 0x01,
   ACK = 0x02,

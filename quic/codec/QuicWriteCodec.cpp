@@ -49,7 +49,7 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   QuicInteger offsetInt(offset);
   // First account for the things that are non-optional: frame type and stream
   // id.
-  uint64_t headerSize = sizeof(FrameType::STREAM) + idInt.getSize();
+  uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
   if (offset != 0) {
     streamTypeBuilder.setOffset();
     headerSize += offsetInt.getSize();

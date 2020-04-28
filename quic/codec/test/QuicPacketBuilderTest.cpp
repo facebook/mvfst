@@ -88,7 +88,7 @@ size_t longHeaderLength = sizeof(uint32_t) + sizeof(uint32_t) +
     kDefaultConnectionIdSize + sizeof(uint8_t);
 
 constexpr size_t kVersionNegotiationHeaderSize =
-    sizeof(FrameType) + kDefaultConnectionIdSize * 2 + sizeof(QuicVersion);
+    sizeof(uint8_t) + kDefaultConnectionIdSize * 2 + sizeof(QuicVersion);
 
 std::unique_ptr<QuicReadCodec> makeCodec(
     ConnectionId clientConnId,
