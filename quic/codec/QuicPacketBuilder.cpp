@@ -495,11 +495,9 @@ bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
 }
 
 uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
-  bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
   CHECK(packetNumberEncoding_)
       << "packetNumberEncoding_ should be valid after ctor";
-  return folly::to<uint32_t>(bodyStart_ - headerStart_) +
-      (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
+  return folly::to<uint32_t>(bodyStart_ - headerStart_);
 }
 
 bool RegularQuicPacketBuilder::hasFramesPending() const {

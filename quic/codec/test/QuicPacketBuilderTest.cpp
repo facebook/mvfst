@@ -448,7 +448,7 @@ TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
   EXPECT_TRUE(bufAccessor.ownsBuffer());
 }
 
-TEST_P(QuicPacketBuilderTest, BuildTwoInplaces) {
+TEST_F(QuicPacketBuilderTest, BuildTwoInplaces) {
   SimpleBufAccessor bufAccessor(2000);
   EXPECT_TRUE(bufAccessor.ownsBuffer());
   auto builder1 = std::make_unique<InplaceQuicPacketBuilder>(
@@ -485,6 +485,43 @@ TEST_P(QuicPacketBuilderTest, BuildTwoInplaces) {
   }
   EXPECT_EQ(builtOut2.header->length(), builtOut1.header->length());
   EXPECT_EQ(20, builtOut2.body->length() - builtOut1.body->length());
+}
+
+TEST_F(QuicPacketBuilderTest, InplaceBuilderShorterHeaderBytes) {
+  auto connId = getTestConnectionId();
+  PacketNum packetNum = 0;
+  PacketNum largestAckedPacketNum = 0;
+  auto inplaceBuilder = testBuilderProvider(
+      TestFlavor::Inplace,
+      kDefaultUDPSendPacketLen,
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum),
+      largestAckedPacketNum,
+      kDefaultUDPSendPacketLen);
+  inplaceBuilder->encodePacketHeader();
+  EXPECT_EQ(2 + connId.size(), inplaceBuilder->getHeaderBytes());
+}
+
+TEST_F(QuicPacketBuilderTest, InplaceBuilderLongHeaderBytes) {
+  auto srcConnId = getTestConnectionId(0);
+  auto destConnId = getTestConnectionId(1);
+  PacketNum packetNum = 0;
+  PacketNum largestAckedPacketNum = 0;
+  auto inplaceBuilder = testBuilderProvider(
+      TestFlavor::Inplace,
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Initial,
+          srcConnId,
+          destConnId,
+          packetNum,
+          QuicVersion::MVFST),
+      largestAckedPacketNum,
+      kDefaultUDPSendPacketLen);
+  inplaceBuilder->encodePacketHeader();
+  EXPECT_EQ(
+      9 /* initial + version + cid + cid + token length */ + srcConnId.size() +
+          destConnId.size() + kMaxPacketLenSize,
+      inplaceBuilder->getHeaderBytes());
 }
 
 INSTANTIATE_TEST_CASE_P(
