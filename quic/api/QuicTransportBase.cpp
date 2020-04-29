@@ -2075,7 +2075,9 @@ void QuicTransportBase::sendPing(
   updateWriteLooper(true);
 
   // Step 2: Schedule the timeout on event base
-  schedulePingTimeout(callback, pingTimeout);
+  if (callback && pingTimeout != 0ms) {
+    schedulePingTimeout(callback, pingTimeout);
+  }
 }
 
 void QuicTransportBase::lossTimeoutExpired() noexcept {

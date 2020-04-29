@@ -865,8 +865,9 @@ class QuicSocket {
 
   /**
    * Send a ping to the peer.  When the ping is acknowledged by the peer or
-   * times out, the transport will invoke the callback.  The callback may be
-   * nullptr.
+   * times out, the transport will invoke the callback.
+   *
+   * If 'callback' is nullptr, or pingTimeout is 0, no callback is scheduled.
    */
   virtual void sendPing(
       PingCallback* callback,
