@@ -25,6 +25,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_state_machine
+  mvfst_buf_accessor
   mvfst_bufutil
   mvfst_constants
   mvfst_codec

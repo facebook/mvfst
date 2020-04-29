@@ -14,6 +14,7 @@
 #include <folly/io/async/AsyncUDPSocket.h>
 
 #include <quic/codec/ConnectionIdAlgo.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/server/QuicServerPacketRouter.h>
@@ -410,6 +411,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   // Used to override certain transport parameters, given the client address
   TransportSettingsOverrideFn transportSettingsOverrideFn_;
+
+  // Output buffer to be used for continuous memory GSO write
+  std::unique_ptr<BufAccessor> bufAccessor_;
 };
 
 } // namespace quic

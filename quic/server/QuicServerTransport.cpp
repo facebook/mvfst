@@ -474,4 +474,9 @@ void QuicServerTransport::maybeNotifyTransportReady() {
   }
 }
 
+void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
+  CHECK(bufAccessor);
+  conn_->bufAccessor = bufAccessor;
+}
+
 } // namespace quic

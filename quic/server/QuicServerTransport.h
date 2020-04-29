@@ -112,6 +112,8 @@ class QuicServerTransport
 
   virtual void accept();
 
+  virtual void setBufAccessor(BufAccessor* bufAccessor);
+
  protected:
   // From ServerHandshake::HandshakeCallback
   virtual void onCryptoEventAvailable() noexcept override;

@@ -261,6 +261,8 @@ class MockQuicTransport : public QuicServerTransport {
       void(QuicTransportStatsCallback*));
 
   GMOCK_METHOD1_(, noexcept, , setConnectionIdAlgo, void(ConnectionIdAlgo*));
+
+  MOCK_METHOD1(setBufAccessor, void(BufAccessor*));
 };
 
 class MockLoopDetectorCallback : public LoopDetectorCallback {

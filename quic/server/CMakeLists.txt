@@ -32,6 +32,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_server
+  mvfst_buf_accessor
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
@@ -45,6 +46,7 @@ target_link_libraries(
   mvfst_server PUBLIC
   Folly::folly
   ${LIBFIZZ_LIBRARY}
+  mvfst_buf_accessor
   mvfst_constants
   mvfst_codec
   mvfst_codec_types

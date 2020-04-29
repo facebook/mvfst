@@ -4,6 +4,28 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
+  mvfst_buf_accessor STATIC
+  BufAccessor.cpp
+)
+
+target_include_directories(
+  mvfst_buf_accessor PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_buf_accessor
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+target_link_libraries(
+  mvfst_buf_accessor PUBLIC
+  Folly::folly
+)
+
+add_library(
   mvfst_looper STATIC
   FunctionLooper.cpp
   Timers.cpp
@@ -83,6 +105,12 @@ endforeach()
 
 install(
   TARGETS mvfst_looper
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_buf_accessor
   EXPORT mvfst-exports
   DESTINATION lib
 )

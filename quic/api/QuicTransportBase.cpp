@@ -2420,6 +2420,11 @@ void QuicTransportBase::setTransportSettings(
   if (conn_->transportParametersEncoded) {
     return;
   }
+  // TODO: We should let chain based GSO to use bufAccessor in the future as
+  // well.
+  CHECK(
+      conn_->bufAccessor ||
+      transportSettings.dataPathType != DataPathType::ContinuousMemory);
   conn_->transportSettings = std::move(transportSettings);
   conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
   // A few values cannot be overridden to be lower than default:

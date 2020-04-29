@@ -546,6 +546,11 @@ void QuicServerWorker::dispatchPacketData(
           cannotMakeTransport = true;
         } else {
           CHECK(trans);
+          if (transportSettings_.dataPathType ==
+                  DataPathType::ContinuousMemory &&
+              bufAccessor_) {
+            trans->setBufAccessor(bufAccessor_.get());
+          }
           trans->setPacingTimer(pacingTimer_);
           trans->setRoutingCallback(this);
           trans->setSupportedVersions(supportedVersions_);
@@ -556,6 +561,16 @@ void QuicServerWorker::dispatchPacketData(
                 transportSettingsOverrideFn_(
                     transportSettings_, client.getIPAddress());
             if (overridenTransportSettings) {
+              if (overridenTransportSettings->dataPathType !=
+                  transportSettings_.dataPathType) {
+                // It's too complex to support that.
+                LOG(ERROR)
+                    << "Overriding DataPathType isn't supported. Requested daapath="
+                    << (overridenTransportSettings->dataPathType ==
+                                DataPathType::ContinuousMemory
+                            ? "ContinuousMemory"
+                            : "ChainedMemory");
+              }
               trans->setTransportSettings(*overridenTransportSettings);
             } else {
               trans->setTransportSettings(transportSettings_);
@@ -815,6 +830,14 @@ void QuicServerWorker::setFizzContext(
 void QuicServerWorker::setTransportSettings(
     TransportSettings transportSettings) {
   transportSettings_ = transportSettings;
+  if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
+    // TODO: maxBatchSize is only a good start value when each transport does
+    // its own socket writing. If we experiment with multiple transports GSO
+    // together, we will need a better value.
+    bufAccessor_ = std::make_unique<SimpleBufAccessor>(
+        kDefaultMaxUDPPayload * transportSettings_.maxBatchSize);
+    VLOG(10) << "GSO write buf accessor created for ContinuousMemory data path";
+  }
 }
 
 void QuicServerWorker::rejectNewConnections(bool rejectNewConnections) {

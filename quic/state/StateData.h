@@ -13,6 +13,7 @@
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/EnumArray.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
@@ -508,6 +509,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Type of node owning this connection (client or server).
   QuicNodeType nodeType;
+
+  // Accessor to output buffer for continuous memory GSO writes
+  BufAccessor* bufAccessor{nullptr};
 
   std::unique_ptr<Handshake> handshakeLayer;
 
