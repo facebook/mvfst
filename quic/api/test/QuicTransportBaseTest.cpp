@@ -122,6 +122,12 @@ MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
   return frame;
 }
 
+class TestPingCallback : public QuicSocket::PingCallback {
+ public:
+  void pingAcknowledged() noexcept override {}
+  void pingTimeout() noexcept override {}
+};
+
 class TestQuicTransport
     : public QuicTransportBase,
       public std::enable_shared_from_this<TestQuicTransport> {
@@ -2569,11 +2575,13 @@ TEST_F(QuicTransportImplTest, CloseFromCancelDeliveryCallbacksForStream) {
 TEST_F(QuicTransportImplTest, SuccessfulPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
-  transport->invokeSendPing(nullptr, interval);
+  TestPingCallback pingCallback;
+  transport->invokeSendPing(&pingCallback, interval);
   EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
   conn->pendingEvents.cancelPingTimeout = true;
   transport->invokeHandlePingCallback();
+  evb->loopOnce();
   EXPECT_EQ(transport->isPingTimeoutScheduled(), false);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
@@ -2581,7 +2589,8 @@ TEST_F(QuicTransportImplTest, SuccessfulPing) {
 TEST_F(QuicTransportImplTest, FailedPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
-  transport->invokeSendPing(nullptr, interval);
+  TestPingCallback pingCallback;
+  transport->invokeSendPing(&pingCallback, interval);
   EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
   conn->pendingEvents.cancelPingTimeout = true;
