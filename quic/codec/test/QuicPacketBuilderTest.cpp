@@ -23,43 +23,6 @@ using namespace testing;
 
 enum TestFlavor { Regular, Inplace };
 
-struct BuilderWithBuffer {
-  std::unique_ptr<PacketBuilderInterface> builder;
-  Buf buf;
-
-  BuilderWithBuffer() = default;
-  explicit BuilderWithBuffer(
-      std::unique_ptr<PacketBuilderInterface> builderIn,
-      Buf bufIn)
-      : builder(std::move(builderIn)), buf(std::move(bufIn)) {}
-};
-
-BuilderWithBuffer testBuilderProvider(
-    TestFlavor flavor,
-    uint32_t pktSizeLimit,
-    PacketHeader header,
-    PacketNum largestAckedPacketNum,
-    folly::Optional<size_t> outputBufSize) {
-  switch (flavor) {
-    case TestFlavor::Regular:
-      return BuilderWithBuffer(
-          std::make_unique<RegularQuicPacketBuilder>(
-              pktSizeLimit, std::move(header), largestAckedPacketNum),
-          nullptr);
-
-    case TestFlavor::Inplace:
-      auto outputBuf = folly::IOBuf::create(*outputBufSize);
-      return BuilderWithBuffer(
-          std::make_unique<InplaceQuicPacketBuilder>(
-              *outputBuf,
-              pktSizeLimit,
-              std::move(header),
-              largestAckedPacketNum),
-          std::move(outputBuf));
-  }
-  folly::assume_unreachable();
-}
-
 Buf packetToBuf(
     RegularQuicPacketBuilder::Packet& packet,
     Aead* aead = nullptr) {
@@ -121,7 +84,34 @@ std::unique_ptr<QuicReadCodec> makeCodec(
   return codec;
 }
 
-class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {};
+class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {
+ protected:
+  std::unique_ptr<PacketBuilderInterface> testBuilderProvider(
+      TestFlavor flavor,
+      uint32_t pktSizeLimit,
+      PacketHeader header,
+      PacketNum largestAckedPacketNum,
+      folly::Optional<size_t> outputBufSize) {
+    switch (flavor) {
+      case TestFlavor::Regular:
+        return std::make_unique<RegularQuicPacketBuilder>(
+            pktSizeLimit, std::move(header), largestAckedPacketNum);
+      case TestFlavor::Inplace:
+        CHECK(outputBufSize);
+        simpleBufAccessor_ =
+            std::make_unique<SimpleBufAccessor>(*outputBufSize);
+        return std::make_unique<InplaceQuicPacketBuilder>(
+            *simpleBufAccessor_,
+            pktSizeLimit,
+            std::move(header),
+            largestAckedPacketNum);
+    }
+    folly::assume_unreachable();
+  }
+
+ private:
+  std::unique_ptr<BufAccessor> simpleBufAccessor_;
+};
 
 TEST_F(QuicPacketBuilderTest, SimpleVersionNegotiationPacket) {
   auto versions = versionList({1, 2, 3, 4, 5, 6, 7});
@@ -195,21 +185,17 @@ TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
   auto headerCipher =
       cryptoFactory.makeClientInitialHeaderCipher(serverConnId, ver);
 
-  // To make sure they live long enough
-  // TODO: remove this ownership and builder provider theater once we are ready
-  // to land the GSO optimization.
-  BuilderWithBuffer pinnedBuilderAndBuf;
+  std::unique_ptr<PacketBuilderInterface> builderOwner;
   auto builderProvider = [&](PacketHeader header, PacketNum largestAcked) {
-    auto builderAndBuf = testBuilderProvider(
+    auto builder = testBuilderProvider(
         GetParam(),
         kDefaultUDPSendPacketLen,
         std::move(header),
         largestAcked,
         kDefaultUDPSendPacketLen * 2);
-    PacketBuilderInterface* builder = builderAndBuf.builder.get();
-    pinnedBuilderAndBuf.builder = std::move(builderAndBuf.builder);
-    pinnedBuilderAndBuf.buf = std::move(builderAndBuf.buf);
-    return builder;
+    auto rawBuilder = builder.get();
+    builderOwner = std::move(builder);
+    return rawBuilder;
   };
 
   auto resultRegularPacket = createInitialCryptoPacket(
@@ -251,13 +237,12 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
 
   PacketNum largestAckedPacketNum = 0;
   auto encodedPacketNum = encodePacketNumber(pktNum, largestAckedPacketNum);
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
 
   // write out at least one frame
   writeFrame(PaddingFrame(), *builder);
@@ -297,13 +282,12 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
 
   // We expect that the builder will not add new frames to a packet which has no
   // frames already and will be too small to parse.
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       0 /*largestAckedPacketNum*/,
       kDefaultUDPSendPacketLen);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
 
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
@@ -329,13 +313,12 @@ TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
   auto encodedPacketNum = encodePacketNumber(pktNum, largestAckedPacketNum);
 
   size_t cipherOverhead = 2;
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
   builder->setCipherOverhead(cipherOverhead);
   EXPECT_TRUE(builder->canBuildPacket());
   writeFrame(PaddingFrame(), *builder);
@@ -356,13 +339,12 @@ TEST_P(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
   PacketNum largestAckedPacketNum = 0;
 
   size_t totalPacketSize = 20;
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       totalPacketSize,
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
   EXPECT_TRUE(builder->canBuildPacket());
   writeFrame(PaddingFrame(), *builder);
   auto builtOut = std::move(*builder).buildPacket();
@@ -397,13 +379,12 @@ TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
       serverCid,
       pktNum,
       QuicVersion::MVFST);
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       kDefaultUDPSendPacketLen,
       std::move(header),
       largestAcked,
       kDefaultUDPSendPacketLen);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
   auto expectedWrittenHeaderFieldLen = sizeof(uint8_t) +
       sizeof(QuicVersionType) + sizeof(uint8_t) + clientCid.size() +
       sizeof(uint8_t) + serverCid.size();
@@ -420,18 +401,81 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
   PacketNum pktNum = 8 * 24;
   ConnectionId cid = getTestConnectionId();
   PacketNum largestAcked = 8 + 24;
-  auto builderAndBuf = testBuilderProvider(
+  auto builder = testBuilderProvider(
       GetParam(),
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, cid, pktNum),
       largestAcked,
       2000);
-  PacketBuilderInterface* builder = builderAndBuf.builder.get();
   auto headerBytes = builder->getHeaderBytes();
   writeFrame(PaddingFrame(), *builder);
   EXPECT_EQ(
       std::move(*builder).buildPacket().header->computeChainDataLength(),
       headerBytes);
+}
+
+TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInDtor) {
+  SimpleBufAccessor bufAccessor(2000);
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  auto builder = std::make_unique<InplaceQuicPacketBuilder>(
+      bufAccessor,
+      1000,
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
+      0);
+  EXPECT_FALSE(bufAccessor.ownsBuffer());
+  builder.reset();
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+}
+
+TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
+  SimpleBufAccessor bufAccessor(2000);
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  auto builder = std::make_unique<InplaceQuicPacketBuilder>(
+      bufAccessor,
+      1000,
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
+      0);
+  EXPECT_FALSE(bufAccessor.ownsBuffer());
+  writeFrame(PaddingFrame(), *builder);
+  std::move(*builder).buildPacket();
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+}
+
+TEST_P(QuicPacketBuilderTest, BuildTwoInplaces) {
+  SimpleBufAccessor bufAccessor(2000);
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  auto builder1 = std::make_unique<InplaceQuicPacketBuilder>(
+      bufAccessor,
+      1000,
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
+      0);
+  auto headerBytes = builder1->getHeaderBytes();
+  for (size_t i = 0; i < 20; i++) {
+    writeFrame(PaddingFrame(), *builder1);
+  }
+  EXPECT_EQ(headerBytes, builder1->getHeaderBytes());
+  auto builtOut1 = std::move(*builder1).buildPacket();
+  EXPECT_EQ(20, builtOut1.packet.frames.size());
+  for (size_t i = 0; i < 20; i++) {
+    EXPECT_TRUE(builtOut1.packet.frames[i].asPaddingFrame() != nullptr);
+  }
+
+  auto builder2 = std::make_unique<InplaceQuicPacketBuilder>(
+      bufAccessor,
+      1000,
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
+      0);
+  EXPECT_EQ(headerBytes, builder2->getHeaderBytes());
+  for (size_t i = 0; i < 40; i++) {
+    writeFrame(PaddingFrame(), *builder2);
+  }
+  auto builtOut2 = std::move(*builder2).buildPacket();
+  EXPECT_EQ(40, builtOut2.packet.frames.size());
+  for (size_t i = 0; i < 40; i++) {
+    EXPECT_TRUE(builtOut2.packet.frames[i].asPaddingFrame() != nullptr);
+  }
+  EXPECT_EQ(builtOut2.header->length(), builtOut1.header->length());
+  EXPECT_EQ(20, builtOut2.body->length() - builtOut1.body->length());
 }
 
 INSTANTIATE_TEST_CASE_P(

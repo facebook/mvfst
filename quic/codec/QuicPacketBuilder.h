@@ -12,6 +12,7 @@
 #include <quic/codec/PacketNumber.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/codec/Types.h>
+#include <quic/common/BufAccessor.h>
 #include <quic/common/BufUtil.h>
 #include <quic/handshake/HandshakeLayer.h>
 
@@ -102,6 +103,8 @@ class PacketBuilderInterface {
   FOLLY_NODISCARD virtual bool hasFramesPending() const = 0;
 
   virtual Packet buildPacket() && = 0;
+
+  virtual void releaseOutputBuffer() && = 0;
 };
 
 /**
@@ -109,10 +112,10 @@ class PacketBuilderInterface {
  */
 class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
  public:
-  ~InplaceQuicPacketBuilder() override = default;
+  ~InplaceQuicPacketBuilder() override;
 
   explicit InplaceQuicPacketBuilder(
-      folly::IOBuf& iobuf,
+      BufAccessor& bufAccessor,
       uint32_t remainingBytes,
       PacketHeader header,
       PacketNum largestAckedPacketNum);
@@ -148,8 +151,14 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
   FOLLY_NODISCARD bool hasFramesPending() const override;
 
+  void releaseOutputBuffer() && override;
+
  private:
-  folly::IOBuf& iobuf_;
+  void releaseOutputBufferInternal();
+
+ private:
+  BufAccessor& bufAccessor_;
+  Buf iobuf_;
   BufWriter bufWriter_;
   uint32_t remainingBytes_;
   RegularQuicWritePacket packet_;
@@ -159,8 +168,10 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   size_t packetLenOffset_{0};
   // The offset in the IOBuf writable area to write Packet Number.
   size_t packetNumOffset_{0};
-  // The position to write body. This is only for byte counting purpose.
+  // The position to write body.
   uint8_t* bodyStart_{nullptr};
+  // The position to write header.
+  const uint8_t* headerStart_{nullptr};
 };
 
 /**
@@ -213,6 +224,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void setCipherOverhead(uint8_t overhead) noexcept override;
 
   FOLLY_NODISCARD bool hasFramesPending() const override;
+
+  void releaseOutputBuffer() && override;
 
  private:
   void writeHeaderBytes(PacketNum largestAckedPacketNum);
@@ -371,6 +384,10 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   FOLLY_NODISCARD bool hasFramesPending() const override {
     return builder.hasFramesPending();
+  }
+
+  void releaseOutputBuffer() && override {
+    std::move(builder).releaseOutputBuffer();
   }
 
  private:

@@ -362,21 +362,23 @@ bool VersionNegotiationPacketBuilder::canBuildPacket() const noexcept {
 }
 
 InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
-    folly::IOBuf& iobuf,
+    BufAccessor& bufAccessor,
     uint32_t remainingBytes,
     PacketHeader header,
     PacketNum largestAckedPacketNum)
-    : iobuf_(iobuf),
-      bufWriter_(iobuf, remainingBytes),
+    : bufAccessor_(bufAccessor),
+      iobuf_(bufAccessor_.obtain()),
+      bufWriter_(*iobuf_, remainingBytes),
       remainingBytes_(remainingBytes),
-      packet_(std::move(header)) {
+      packet_(std::move(header)),
+      headerStart_(iobuf_->tail()) {
   if (packet_.header.getHeaderForm() == HeaderForm::Long) {
     LongHeader& longHeader = *packet_.header.asLong();
     packetNumberEncoding_ = encodeLongHeaderHelper(
         longHeader, bufWriter_, remainingBytes, largestAckedPacketNum);
     if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
       // Remember the position to write packet number and packet length.
-      packetLenOffset_ = iobuf_.length();
+      packetLenOffset_ = iobuf_->length();
       // With this builder, we will have to always use kMaxPacketLenSize to
       // write packet length.
       packetNumOffset_ = packetLenOffset_ + kMaxPacketLenSize;
@@ -395,7 +397,7 @@ InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
           packetNumberEncoding_->length);
     }
   }
-  bodyStart_ = iobuf_.writableTail();
+  bodyStart_ = iobuf_->writableTail();
 }
 
 uint32_t InplaceQuicPacketBuilder::remainingSpaceInPkt() const {
@@ -468,7 +470,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
   size_t extraDataWritten = 0;
-  size_t bodyLength = iobuf_.writableTail() - bodyStart_;
+  size_t bodyLength = iobuf_->writableTail() - bodyStart_;
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
@@ -496,18 +498,23 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
         packetNumOffset_);
   }
   CHECK(
+      headerStart_ && headerStart_ >= iobuf_->data() &&
+      headerStart_ < iobuf_->tail());
+  CHECK(
       !bodyStart_ ||
-      (bodyStart_ >= iobuf_.data() && bodyStart_ <= iobuf_.tail()));
+      (bodyStart_ > headerStart_ && bodyStart_ <= iobuf_->tail()));
   // TODO: Get rid of these two wrapBuffer when Fizz::AEAD has a new interface
   // for encryption.
-  return PacketBuilderInterface::Packet(
+  PacketBuilderInterface::Packet builtPacket(
       std::move(packet_),
-      (bodyStart_ ? folly::IOBuf::wrapBuffer(
-                        iobuf_.data(), (bodyStart_ - iobuf_.data()))
-                  : nullptr),
       (bodyStart_
-           ? folly::IOBuf::wrapBuffer(bodyStart_, iobuf_.tail() - bodyStart_)
+           ? folly::IOBuf::wrapBuffer(headerStart_, (bodyStart_ - headerStart_))
+           : nullptr),
+      (bodyStart_
+           ? folly::IOBuf::wrapBuffer(bodyStart_, iobuf_->tail() - bodyStart_)
            : nullptr));
+  releaseOutputBufferInternal();
+  return builtPacket;
 }
 
 void InplaceQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
@@ -527,7 +534,7 @@ uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
   CHECK(packetNumberEncoding_)
       << "packetNumberEncoding_ should be valid after ctor";
-  return folly::to<uint32_t>(bodyStart_ - iobuf_.data()) +
+  return folly::to<uint32_t>(bodyStart_ - headerStart_) +
       (isLongHeader ? packetNumberEncoding_->length + kMaxPacketLenSize : 0);
 }
 
@@ -537,6 +544,24 @@ bool RegularQuicPacketBuilder::hasFramesPending() const {
 
 bool InplaceQuicPacketBuilder::hasFramesPending() const {
   return !packet_.frames.empty();
+}
+
+void RegularQuicPacketBuilder::releaseOutputBuffer() && {
+  ; // no-op
+}
+
+void InplaceQuicPacketBuilder::releaseOutputBuffer() && {
+  releaseOutputBufferInternal();
+}
+
+void InplaceQuicPacketBuilder::releaseOutputBufferInternal() {
+  if (iobuf_) {
+    bufAccessor_.release(std::move(iobuf_));
+  }
+}
+
+InplaceQuicPacketBuilder::~InplaceQuicPacketBuilder() {
+  releaseOutputBufferInternal();
 }
 
 } // namespace quic
