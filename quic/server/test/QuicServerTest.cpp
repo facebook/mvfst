@@ -627,6 +627,7 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -641,6 +642,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Initial, srcConnId, destConnId, num, version);
   RegularQuicPacketBuilder initialBuilder(
       kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
+  initialBuilder.encodePacketHeader();
   auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
   EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
   worker_->handleNetworkData(
@@ -653,6 +655,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Initial, srcConnId, destConnId, bignum, version);
   RegularQuicPacketBuilder initialBuilderBigNum(
       kDefaultUDPSendPacketLen, std::move(initialHeaderBigNum), 0);
+  initialBuilderBigNum.encodePacketHeader();
   auto initialPacketBigNum =
       packetToBuf(std::move(initialBuilderBigNum).buildPacket());
   EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
@@ -664,6 +667,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       LongHeader::Types::Handshake, srcConnId, destConnId, num, version);
   RegularQuicPacketBuilder handshakeBuilder(
       kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
+  handshakeBuilder.encodePacketHeader();
   auto handshakePacket = packetToBuf(std::move(handshakeBuilder).buildPacket());
   EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(0);
   worker_->handleNetworkData(
@@ -684,6 +688,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -703,6 +708,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
@@ -744,6 +750,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
@@ -770,6 +777,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   while (builder.remainingSpaceInPkt() > 0) {
     writeFrame(PaddingFrame(), builder);
   }
@@ -814,6 +822,7 @@ TEST_F(QuicServerWorkerTest, PacketAfterShutdown) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.terminateLoopSoon();
@@ -880,6 +889,7 @@ auto createInitialStream(
       pktHeaderType == LongHeader::Types::Retry ? std::move(headerRetry)
                                                 : std::move(header),
       0 /* largestAcked */);
+  builder.encodePacketHeader();
   auto streamData = data.clone();
   auto dataLen = writeStreamFrameHeader(
       builder,

@@ -117,6 +117,7 @@ FrameScheduler::FrameScheduler(std::string name) : name_(std::move(name)) {}
 SchedulingResult FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
     uint32_t writableBytes) {
+  builder.encodePacketHeader();
   // We need to keep track of writable bytes after writing header.
   writableBytes = writableBytes > builder.getHeaderBytes()
       ? writableBytes - builder.getHeaderBytes()
@@ -545,6 +546,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
         conn_.udpSendPacketLen,
         builder.getPacketHeader(),
         getAckState(conn_, builderPnSpace).largestAckedByPeer);
+    regularBuilder.encodePacketHeader();
     PacketRebuilder rebuilder(regularBuilder, conn_);
     // We shouldn't clone Handshake packet.
     if (iter->isHandshake) {

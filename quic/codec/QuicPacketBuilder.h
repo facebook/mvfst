@@ -60,6 +60,8 @@ class PacketBuilderInterface {
 
   FOLLY_NODISCARD virtual uint32_t remainingSpaceInPkt() const = 0;
 
+  virtual void encodePacketHeader() = 0;
+
   // Functions to write bytes to the packet
   virtual void writeBE(uint8_t data) = 0;
   virtual void writeBE(uint16_t data) = 0;
@@ -123,6 +125,8 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   // PacketBuilderInterface
   FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override;
 
+  void encodePacketHeader() override;
+
   void writeBE(uint8_t data) override;
   void writeBE(uint16_t data) override;
   void writeBE(uint64_t data) override;
@@ -161,6 +165,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   Buf iobuf_;
   BufWriter bufWriter_;
   uint32_t remainingBytes_;
+  PacketNum largestAckedPacketNum_;
   RegularQuicWritePacket packet_;
   uint32_t cipherOverhead_{0};
   folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
@@ -191,6 +196,8 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
       PacketNum largestAckedPacketNum);
 
   FOLLY_NODISCARD uint32_t getHeaderBytes() const override;
+
+  void encodePacketHeader() override;
 
   // PacketBuilderInterface
   FOLLY_NODISCARD uint32_t remainingSpaceInPkt() const override;
@@ -228,7 +235,6 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   void releaseOutputBuffer() && override;
 
  private:
-  void writeHeaderBytes(PacketNum largestAckedPacketNum);
   void encodeLongHeader(
       const LongHeader& longHeader,
       PacketNum largestAckedPacketNum);
@@ -238,6 +244,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
 
  private:
   uint32_t remainingBytes_;
+  PacketNum largestAckedPacketNum_;
   RegularQuicWritePacket packet_;
   std::unique_ptr<folly::IOBuf> header_;
   std::unique_ptr<folly::IOBuf> body_;
@@ -310,6 +317,11 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     return builder.remainingSpaceInPkt() > diff
         ? builder.remainingSpaceInPkt() - diff
         : 0;
+  }
+
+  void encodePacketHeader() override {
+    CHECK(false)
+        << "We only support wrapping builder that has already encoded header";
   }
 
   void write(const QuicInteger& quicInteger) override {

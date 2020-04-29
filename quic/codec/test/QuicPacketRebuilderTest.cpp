@@ -38,6 +38,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildEmpty) {
       kDefaultUDPSendPacketLen,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0 /* largestAcked */);
+  regularBuilder.encodePacketHeader();
   QuicConnectionStateBase conn(QuicNodeType::Client);
   PacketRebuilder rebuilder(regularBuilder, conn);
   auto packet = std::move(regularBuilder).buildPacket();
@@ -51,7 +52,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-
+  regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
       QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
@@ -109,6 +110,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -198,6 +200,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
+  regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn;
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -221,6 +224,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -231,6 +235,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
+  regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn;
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -249,6 +254,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 2000);
   EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -271,7 +277,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-
+  regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   QuicServerConnectionState conn;
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
@@ -308,6 +314,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   EXPECT_TRUE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -332,7 +339,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-
+  regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   QuicServerConnectionState conn;
   uint64_t cryptoOffset = 0;
@@ -350,6 +357,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -360,7 +368,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder1(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
-
+  regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   ConnectionCloseFrame connCloseFrame(
       QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
@@ -409,6 +417,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
           2,
       std::move(shortHeader2),
       0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   auto outstanding = makeDummyOutstandingPacket(packet1.packet, 1000);
   EXPECT_FALSE(rebuilder.rebuildFromPacket(outstanding).has_value());
@@ -419,6 +428,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
+  regularBuilder.encodePacketHeader();
   PingFrame pingFrame;
   writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
   auto packet = std::move(regularBuilder).buildPacket();
@@ -428,6 +438,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
       kDefaultUDPSendPacketLen, std::move(shortHeader2), 0 /* largestAcked */);
+  regularBuilder2.encodePacketHeader();
   PacketRebuilder rebuilder(regularBuilder2, conn);
   rebuilder.rebuildFromPacket(outstandingPacket);
   EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());

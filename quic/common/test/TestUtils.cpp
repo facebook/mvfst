@@ -120,6 +120,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
       dstConn.udpSendPacketLen,
       std::move(*header),
       getAckState(dstConn, pnSpace).largestAckedByPeer);
+  builder.encodePacketHeader();
   if (aead) {
     builder.setCipherOverhead(aead->getCipherOverhead());
   }
@@ -328,6 +329,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
     builder.reset(new RegularQuicPacketBuilder(
         packetSizeLimit, std::move(header), largestAcked));
   }
+  builder->encodePacketHeader();
   builder->setCipherOverhead(cipherOverhead);
   writeStreamFrameHeader(
       *builder,
@@ -362,6 +364,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
   if (!builder) {
     builder = &fallbackBuilder;
   }
+  builder->encodePacketHeader();
   builder->setCipherOverhead(aead.getCipherOverhead());
   writeCryptoFrame(offset, data.clone(), *builder);
   return std::move(*builder).buildPacket();
@@ -403,6 +406,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   }
   RegularQuicPacketBuilder builder(
       packetSizeLimit, std::move(*header), largestAcked);
+  builder.encodePacketHeader();
   builder.setCipherOverhead(aead.getCipherOverhead());
   writeCryptoFrame(offset, data.clone(), builder);
   return std::move(builder).buildPacket();

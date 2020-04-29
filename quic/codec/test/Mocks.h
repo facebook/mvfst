@@ -78,6 +78,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   GMOCK_METHOD0_(, const, , getHeaderBytes, uint32_t());
   GMOCK_METHOD0_(, const, , hasFramesPending, bool());
   MOCK_METHOD0(releaseOutputBufferMock, void());
+  MOCK_METHOD0(encodePacketHeader, void());
 
   void releaseOutputBuffer() && override {
     releaseOutputBufferMock();

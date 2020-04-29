@@ -243,6 +243,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
+  builder->encodePacketHeader();
 
   // write out at least one frame
   writeFrame(PaddingFrame(), *builder);
@@ -288,6 +289,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       0 /*largestAckedPacketNum*/,
       kDefaultUDPSendPacketLen);
+  builder->encodePacketHeader();
 
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
@@ -319,6 +321,7 @@ TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
+  builder->encodePacketHeader();
   builder->setCipherOverhead(cipherOverhead);
   EXPECT_TRUE(builder->canBuildPacket());
   writeFrame(PaddingFrame(), *builder);
@@ -345,6 +348,7 @@ TEST_P(QuicPacketBuilderTest, TestPaddingRespectsRemainingBytes) {
       ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
       largestAckedPacketNum,
       2000);
+  builder->encodePacketHeader();
   EXPECT_TRUE(builder->canBuildPacket());
   writeFrame(PaddingFrame(), *builder);
   auto builtOut = std::move(*builder).buildPacket();
@@ -385,6 +389,7 @@ TEST_P(QuicPacketBuilderTest, LongHeaderBytesCounting) {
       std::move(header),
       largestAcked,
       kDefaultUDPSendPacketLen);
+  builder->encodePacketHeader();
   auto expectedWrittenHeaderFieldLen = sizeof(uint8_t) +
       sizeof(QuicVersionType) + sizeof(uint8_t) + clientCid.size() +
       sizeof(uint8_t) + serverCid.size();
@@ -407,6 +412,7 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderBytesCounting) {
       ShortHeader(ProtectionType::KeyPhaseZero, cid, pktNum),
       largestAcked,
       2000);
+  builder->encodePacketHeader();
   auto headerBytes = builder->getHeaderBytes();
   writeFrame(PaddingFrame(), *builder);
   EXPECT_EQ(
@@ -435,6 +441,7 @@ TEST_P(QuicPacketBuilderTest, InplaceBuilderReleaseBufferInBuild) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
+  builder->encodePacketHeader();
   EXPECT_FALSE(bufAccessor.ownsBuffer());
   writeFrame(PaddingFrame(), *builder);
   std::move(*builder).buildPacket();
@@ -449,6 +456,7 @@ TEST_P(QuicPacketBuilderTest, BuildTwoInplaces) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
+  builder1->encodePacketHeader();
   auto headerBytes = builder1->getHeaderBytes();
   for (size_t i = 0; i < 20; i++) {
     writeFrame(PaddingFrame(), *builder1);
@@ -465,6 +473,7 @@ TEST_P(QuicPacketBuilderTest, BuildTwoInplaces) {
       1000,
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(), 0),
       0);
+  builder2->encodePacketHeader();
   EXPECT_EQ(headerBytes, builder2->getHeaderBytes());
   for (size_t i = 0; i < 40; i++) {
     writeFrame(PaddingFrame(), *builder2);

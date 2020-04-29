@@ -176,6 +176,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
       connection.udpSendPacketLen,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer);
+  // It's the scheduler's job to invoke encode header
   pktBuilder.setCipherOverhead(cipherOverhead);
   auto result =
       scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
@@ -790,6 +791,7 @@ void writeCloseCommon(
       connection.udpSendPacketLen,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer);
+  packetBuilder.encodePacketHeader();
   packetBuilder.setCipherOverhead(aead.getCipherOverhead());
   size_t written = 0;
   if (!closeDetails) {

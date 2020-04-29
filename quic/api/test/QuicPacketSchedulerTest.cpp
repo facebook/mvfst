@@ -82,26 +82,6 @@ class QuicPacketSchedulerTest : public Test {
   QuicVersion version{QuicVersion::MVFST};
 };
 
-TEST_F(QuicPacketSchedulerTest, NoopScheduler) {
-  QuicConnectionStateBase conn(QuicNodeType::Client);
-  FrameScheduler scheduler("frame");
-  EXPECT_FALSE(scheduler.hasData());
-
-  LongHeader header(
-      LongHeader::Types::Initial,
-      getTestConnectionId(1),
-      getTestConnectionId(),
-      0x1356,
-      version);
-  RegularQuicPacketBuilder builder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.initialAckState.largestAckedByPeer);
-
-  auto builtPacket = std::move(builder).buildPacket();
-  EXPECT_TRUE(builtPacket.packet.frames.empty());
-}
-
 TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -330,6 +310,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
       conn.udpSendPacketLen,
       std::move(longHeader),
       conn.ackStates.handshakeAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   PacketBuilderWrapper builderWrapper(builder, 13);
   CryptoStreamScheduler scheduler(
       conn, *getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake));
@@ -394,6 +375,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
       conn.udpSendPacketLen,
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(stream->id);
   scheduler.writeWindowUpdates(builder);
@@ -415,6 +397,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
       conn.udpSendPacketLen,
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   PacketBuilderWrapper builderWrapper(builder, 2);
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(stream->id);
@@ -436,6 +419,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
       conn.udpSendPacketLen,
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(nonExistentStream);
   scheduler.writeWindowUpdates(builder);
@@ -468,75 +452,6 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
   EXPECT_EQ(packetNum, *result.packetEvent);
-}
-
-TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
-  QuicClientConnectionState conn(
-      FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
-  ASSERT_FALSE(noopScheduler.hasData());
-  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
-  EXPECT_FALSE(cloningScheduler.hasData());
-  auto packetNum = addOutstandingPacket(conn);
-  // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
-      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
-  EXPECT_TRUE(cloningScheduler.hasData());
-
-  ASSERT_FALSE(noopScheduler.hasData());
-  ShortHeader header(
-      ProtectionType::KeyPhaseOne,
-      conn.clientConnectionId.value_or(getTestConnectionId()),
-      getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder regularBuilder(
-      conn.udpSendPacketLen,
-      std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
-
-  // Create few frames
-  ConnectionCloseFrame connCloseFrame(
-      QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
-      "The sun is in the sky.");
-  MaxStreamsFrame maxStreamFrame(999, true);
-  PingFrame pingFrame;
-  AckBlocks ackBlocks;
-  ackBlocks.insert(10, 100);
-  ackBlocks.insert(200, 1000);
-  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
-
-  // Write those framses with a regular builder
-  writeFrame(connCloseFrame, regularBuilder);
-  writeFrame(QuicSimpleFrame(maxStreamFrame), regularBuilder);
-  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
-  writeAckFrame(ackMeta, regularBuilder);
-
-  auto result = cloningScheduler.scheduleFramesForPacket(
-      std::move(regularBuilder), kDefaultUDPSendPacketLen);
-  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
-  EXPECT_EQ(packetNum, *result.packetEvent);
-  // written packet (result.packet) should not have any frame in the builder
-  auto& writtenPacket = *result.packet;
-  auto shortHeader = writtenPacket.packet.header.asShort();
-  CHECK(shortHeader);
-  EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader->getProtectionType());
-  EXPECT_EQ(
-      conn.ackStates.appDataAckState.nextPacketNum,
-      shortHeader->getPacketSequenceNum());
-
-  // Test that the only frame that's written is maxdataframe
-  EXPECT_GE(writtenPacket.packet.frames.size(), 1);
-  auto& writtenFrame = writtenPacket.packet.frames.at(0);
-  auto maxDataFrame = writtenFrame.asMaxDataFrame();
-  CHECK(maxDataFrame);
-  for (auto& frame : writtenPacket.packet.frames) {
-    bool present = false;
-    /* the next four frames should not be written */
-    present |= frame.asConnectionCloseFrame() ? true : false;
-    present |= frame.asQuicSimpleFrame() ? true : false;
-    present |= frame.asQuicSimpleFrame() ? true : false;
-    present |= frame.asWriteAckFrame() ? true : false;
-    ASSERT_FALSE(present);
-  }
 }
 
 TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
@@ -819,6 +734,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
       conn.udpSendPacketLen,
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   auto stream2 =
@@ -853,10 +769,11 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
       ProtectionType::KeyPhaseZero,
       connId,
       getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
+  RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   auto stream2 =
@@ -882,7 +799,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
       false);
   // Force the wraparound initially.
   conn.schedulingState.nextScheduledStream = stream3 + 8;
-  scheduler.writeStreams(builder1);
+  scheduler.writeStreams(builder);
   EXPECT_EQ(conn.schedulingState.nextScheduledStream, 4);
 
   // Should write frames for stream2, stream3, followed by stream1 again.
@@ -986,10 +903,11 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
       ProtectionType::KeyPhaseZero,
       connId,
       getNextPacketNum(conn, PacketNumberSpace::AppData));
-  RegularQuicPacketBuilder builder1(
+  RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader1),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   auto stream2 =
@@ -1025,7 +943,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
       false);
   // Force the wraparound initially.
   conn.schedulingState.nextScheduledStream = stream4 + 8;
-  scheduler.writeStreams(builder1);
+  scheduler.writeStreams(builder);
   EXPECT_EQ(conn.schedulingState.nextScheduledStream, stream3);
   EXPECT_EQ(conn.schedulingState.nextScheduledControlStream, stream2);
 
@@ -1071,6 +989,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
       conn.udpSendPacketLen,
       std::move(shortHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer);
+  builder.encodePacketHeader();
   auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
   scheduler.writeStreams(builder);

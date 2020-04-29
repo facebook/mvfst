@@ -3127,6 +3127,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
 
   auto token = StatelessResetToken{1, 9, 2, 0};
@@ -3153,6 +3154,7 @@ TEST_F(
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
@@ -3173,6 +3175,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdInvalidRetire) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 3, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
@@ -3196,6 +3199,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdUsing0LenCid) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(
       1, 0, ConnectionId({2, 4, 2, 3}), StatelessResetToken());
@@ -3226,6 +3230,7 @@ TEST_F(
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(1, 0, connId2, StatelessResetToken());
   writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
@@ -3250,6 +3255,7 @@ TEST_F(
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   NewConnectionIdFrame newConnId(2, 0, connId2, StatelessResetToken());
   writeSimpleFrame(QuicSimpleFrame(newConnId), builder);
@@ -3377,6 +3383,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeNoAvailablePeerIds) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   PathChallengeFrame pathChallenge(123);
   ASSERT_TRUE(builder.canBuildPacket());
   writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder);
@@ -3403,6 +3410,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvPathChallengeAvailablePeerId) {
   ShortHeader header(ProtectionType::KeyPhaseZero, *conn.clientConnectionId, 1);
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   PathChallengeFrame pathChallenge(123);
   ASSERT_TRUE(builder.canBuildPacket());
   writeSimpleFrame(QuicSimpleFrame(pathChallenge), builder);
@@ -4048,6 +4056,7 @@ TEST_F(
       client->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(rstFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
@@ -4068,6 +4077,7 @@ TEST_F(
       client->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
+  builder.encodePacketHeader();
   writeFrame(rstFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(packet->coalesce());
@@ -4081,6 +4091,7 @@ TEST_F(
       client->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
+  builder2.encodePacketHeader();
   writeFrame(rstFrame, builder2);
 
   auto data = folly::IOBuf::copyBuffer("hello");
@@ -4133,6 +4144,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveRstStreamAfterEom) {
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen, std::move(header), 0);
+  builder.encodePacketHeader();
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(rstFrame, builder);
   auto packet2 = packetToBuf(std::move(builder).buildPacket());
@@ -4542,6 +4554,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedAckData) {
       version);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   DCHECK(builder.canBuildPacket());
   AckFrameMetaData ackData(acks, 0us, 0);
   writeAckFrame(ackData, builder);
@@ -4563,6 +4576,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedPing) {
       version);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   DCHECK(builder.canBuildPacket());
   writeFrame(QuicWriteFrame(PingFrame()), builder);
   auto packet = packetToBufCleartext(
@@ -4590,6 +4604,7 @@ Buf getHandshakePacketWithFrame(
       kDefaultUDPSendPacketLen,
       std::move(header),
       packetNum / 2 /* largestAcked */);
+  builder.encodePacketHeader();
   builder.setCipherOverhead(serverWriteCipher.getCipherOverhead());
   writeFrame(std::move(frame), builder);
   return packetToBufCleartext(
@@ -4905,6 +4920,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen, std::move(header), 0);
+  builder.encodePacketHeader();
   ConnectionCloseFrame connClose(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
       "Stand clear of the closing doors, please");
@@ -4931,6 +4947,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen, std::move(header), 0);
+  builder.encodePacketHeader();
   ConnectionCloseFrame appClose(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       "Stand clear of the closing doors, please");
@@ -4969,6 +4986,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
   RegularQuicPacketBuilder builder(
       client->getConn().udpSendPacketLen, std::move(header), 0);
+  builder.encodePacketHeader();
   ConnectionCloseFrame appClose(
       QuicErrorCode(GenericApplicationErrorCode::NO_ERROR), "No Error");
   writeFrame(std::move(appClose), builder);
@@ -5129,6 +5147,7 @@ TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
       client->getConn().udpSendPacketLen,
       std::move(header),
       0 /* largestAcked */);
+  builder.encodePacketHeader();
   writeFrame(QuicSimpleFrame(pingFrame), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(packet->coalesce());

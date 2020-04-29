@@ -173,6 +173,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       conn.udpSendPacketLen,
       std::move(*header),
       getAckState(conn, packetNumberSpace).largestAckedByPeer);
+  builder.encodePacketHeader();
   EXPECT_TRUE(builder.canBuildPacket());
   auto packet = std::move(builder).buildPacket();
   uint32_t encodedSize = 0;

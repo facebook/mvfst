@@ -118,13 +118,12 @@ RegularQuicPacketBuilder::RegularQuicPacketBuilder(
     PacketHeader header,
     PacketNum largestAckedPacketNum)
     : remainingBytes_(remainingBytes),
+      largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
       header_(folly::IOBuf::create(kLongHeaderHeaderSize)),
       body_(folly::IOBuf::create(kAppenderGrowthSize)),
       headerAppender_(header_.get(), kLongHeaderHeaderSize),
-      bodyAppender_(body_.get(), kAppenderGrowthSize) {
-  writeHeaderBytes(largestAckedPacketNum);
-}
+      bodyAppender_(body_.get(), kAppenderGrowthSize) {}
 
 uint32_t RegularQuicPacketBuilder::getHeaderBytes() const {
   bool isLongHeader = packet_.header.getHeaderForm() == HeaderForm::Long;
@@ -202,6 +201,7 @@ void RegularQuicPacketBuilder::appendFrame(QuicWriteFrame frame) {
 }
 
 RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
+  CHECK(packetNumberEncoding_.hasValue());
   // at this point everything should been set in the packet_
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
@@ -226,17 +226,6 @@ RegularQuicPacketBuilder::Packet RegularQuicPacketBuilder::buildPacket() && {
         packetNumberEncoding_->length);
   }
   return Packet(std::move(packet_), std::move(header_), std::move(body_));
-}
-
-void RegularQuicPacketBuilder::writeHeaderBytes(
-    PacketNum largestAckedPacketNum) {
-  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
-    LongHeader& longHeader = *packet_.header.asLong();
-    encodeLongHeader(longHeader, largestAckedPacketNum);
-  } else {
-    ShortHeader& shortHeader = *packet_.header.asShort();
-    encodeShortHeader(shortHeader, largestAckedPacketNum);
-  }
 }
 
 void RegularQuicPacketBuilder::encodeLongHeader(
@@ -265,7 +254,7 @@ void RegularQuicPacketBuilder::push(const uint8_t* data, size_t len) {
 }
 
 bool RegularQuicPacketBuilder::canBuildPacket() const noexcept {
-  return remainingBytes_ != 0;
+  return remainingBytes_ != 0 && packetNumberEncoding_.hasValue();
 }
 
 const PacketHeader& RegularQuicPacketBuilder::getPacketHeader() const {
@@ -370,35 +359,9 @@ InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(
       iobuf_(bufAccessor_.obtain()),
       bufWriter_(*iobuf_, remainingBytes),
       remainingBytes_(remainingBytes),
+      largestAckedPacketNum_(largestAckedPacketNum),
       packet_(std::move(header)),
-      headerStart_(iobuf_->tail()) {
-  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
-    LongHeader& longHeader = *packet_.header.asLong();
-    packetNumberEncoding_ = encodeLongHeaderHelper(
-        longHeader, bufWriter_, remainingBytes, largestAckedPacketNum);
-    if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
-      // Remember the position to write packet number and packet length.
-      packetLenOffset_ = iobuf_->length();
-      // With this builder, we will have to always use kMaxPacketLenSize to
-      // write packet length.
-      packetNumOffset_ = packetLenOffset_ + kMaxPacketLenSize;
-      // Inside BufWriter, we already countde the packet len and packet number
-      // bytes as written. Note that remainingBytes_ also already counted them.
-      bufWriter_.append(packetNumberEncoding_->length + kMaxPacketLenSize);
-    }
-  } else {
-    ShortHeader& shortHeader = *packet_.header.asShort();
-    packetNumberEncoding_ = encodeShortHeaderHelper(
-        shortHeader, bufWriter_, remainingBytes_, largestAckedPacketNum);
-    if (packetNumberEncoding_) {
-      appendBytes(
-          bufWriter_,
-          packetNumberEncoding_->result,
-          packetNumberEncoding_->length);
-    }
-  }
-  bodyStart_ = iobuf_->writableTail();
-}
+      headerStart_(iobuf_->tail()) {}
 
 uint32_t InplaceQuicPacketBuilder::remainingSpaceInPkt() const {
   return remainingBytes_;
@@ -466,6 +429,7 @@ const PacketHeader& InplaceQuicPacketBuilder::getPacketHeader() const {
 }
 
 PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
+  CHECK(packetNumberEncoding_.hasValue());
   LongHeader* longHeader = packet_.header.asLong();
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
@@ -527,7 +491,7 @@ void InplaceQuicPacketBuilder::push(const uint8_t* data, size_t len) {
 }
 
 bool InplaceQuicPacketBuilder::canBuildPacket() const noexcept {
-  return remainingBytes_ != 0;
+  return remainingBytes_ != 0 && packetNumberEncoding_.hasValue();
 }
 
 uint32_t InplaceQuicPacketBuilder::getHeaderBytes() const {
@@ -562,6 +526,47 @@ void InplaceQuicPacketBuilder::releaseOutputBufferInternal() {
 
 InplaceQuicPacketBuilder::~InplaceQuicPacketBuilder() {
   releaseOutputBufferInternal();
+}
+
+void RegularQuicPacketBuilder::encodePacketHeader() {
+  CHECK(!packetNumberEncoding_.hasValue());
+  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
+    LongHeader& longHeader = *packet_.header.asLong();
+    encodeLongHeader(longHeader, largestAckedPacketNum_);
+  } else {
+    ShortHeader& shortHeader = *packet_.header.asShort();
+    encodeShortHeader(shortHeader, largestAckedPacketNum_);
+  }
+}
+
+void InplaceQuicPacketBuilder::encodePacketHeader() {
+  CHECK(!packetNumberEncoding_.hasValue());
+  if (packet_.header.getHeaderForm() == HeaderForm::Long) {
+    LongHeader& longHeader = *packet_.header.asLong();
+    packetNumberEncoding_ = encodeLongHeaderHelper(
+        longHeader, bufWriter_, remainingBytes_, largestAckedPacketNum_);
+    if (longHeader.getHeaderType() != LongHeader::Types::Retry) {
+      // Remember the position to write packet number and packet length.
+      packetLenOffset_ = iobuf_->length();
+      // With this builder, we will have to always use kMaxPacketLenSize to
+      // write packet length.
+      packetNumOffset_ = packetLenOffset_ + kMaxPacketLenSize;
+      // Inside BufWriter, we already countde the packet len and packet number
+      // bytes as written. Note that remainingBytes_ also already counted them.
+      bufWriter_.append(packetNumberEncoding_->length + kMaxPacketLenSize);
+    }
+  } else {
+    ShortHeader& shortHeader = *packet_.header.asShort();
+    packetNumberEncoding_ = encodeShortHeaderHelper(
+        shortHeader, bufWriter_, remainingBytes_, largestAckedPacketNum_);
+    if (packetNumberEncoding_) {
+      appendBytes(
+          bufWriter_,
+          packetNumberEncoding_->result,
+          packetNumberEncoding_->length);
+    }
+  }
+  bodyStart_ = iobuf_->writableTail();
 }
 
 } // namespace quic

@@ -121,6 +121,7 @@ auto buildEmptyPacket(
       conn.udpSendPacketLen,
       std::move(*header),
       getAckState(conn, pnSpace).largestAckedByPeer);
+  builder.encodePacketHeader();
   DCHECK(builder.canBuildPacket());
   return std::move(builder).buildPacket();
 }

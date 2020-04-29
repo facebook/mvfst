@@ -143,6 +143,7 @@ TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   builder.setCipherOverhead(0);
   writeCryptoFrame(0, folly::IOBuf::copyBuffer("CHLO"), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
@@ -222,6 +223,7 @@ TEST_F(QuicReadCodecTest, StreamWithShortHeaderOnlyHeader) {
   ShortHeader header(ProtectionType::KeyPhaseZero, connId, packetNum);
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
   auto packetBuf = packetToBuf(std::move(builder).buildPacket());
 
   auto aead = std::make_unique<MockAead>();
