@@ -14,7 +14,7 @@ TEST(SimpleBufAccessor, BasicAccess) {
   SimpleBufAccessor accessor(1000);
   EXPECT_TRUE(accessor.ownsBuffer());
   auto buf = accessor.obtain();
-  EXPECT_EQ(1000, buf->capacity());
+  EXPECT_LE(1000, buf->capacity());
   EXPECT_FALSE(accessor.ownsBuffer());
   auto empty = accessor.obtain();
   EXPECT_EQ(nullptr, empty);
