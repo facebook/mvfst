@@ -988,8 +988,6 @@ uint64_t writeConnectionDataToSocket(
       connection.peerAddress,
       connection,
       connection.happyEyeballsState);
-  ioBufBatch.setContinueOnNetworkUnreachable(
-      connection.transportSettings.continueOnNetworkUnreachable);
 
   if (connection.loopDetectorCallback) {
     connection.writeDebugState.schedulerName = scheduler.name();

@@ -60,11 +60,6 @@ bool IOBufQuicBatch::flush(FlushType flushType) {
   return ret;
 }
 
-void IOBufQuicBatch::setContinueOnNetworkUnreachable(
-    bool continueOnNetworkUnreachable) {
-  continueOnNetworkUnreachable_ = continueOnNetworkUnreachable;
-}
-
 void IOBufQuicBatch::reset() {
   batchWriter_->reset();
 }
@@ -79,7 +74,8 @@ bool IOBufQuicBatch::isRetriableError(int err) {
     return true;
   }
   auto now = Clock::now();
-  if (continueOnNetworkUnreachable_ && isNetworkUnreachable(err)) {
+  if (conn_.transportSettings.continueOnNetworkUnreachable &&
+      isNetworkUnreachable(err)) {
     if (!conn_.continueOnNetworkUnreachableDeadline) {
       conn_.continueOnNetworkUnreachableDeadline =
           now + conn_.transportSettings.continueOnNetworkUnreachableDuration;

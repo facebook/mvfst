@@ -39,8 +39,6 @@ class IOBufQuicBatch {
     return pktSent_;
   }
 
-  void setContinueOnNetworkUnreachable(bool continueOnNetworkUnreachable);
-
  private:
   void reset();
 
@@ -61,7 +59,6 @@ class IOBufQuicBatch {
   QuicConnectionStateBase& conn_;
   QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState_;
   uint64_t pktSent_{0};
-  bool continueOnNetworkUnreachable_{false};
 };
 
 } // namespace quic
