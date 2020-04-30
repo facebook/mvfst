@@ -88,7 +88,7 @@ jobs:
     - name: Build mvfst
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
     - name: Copy artifacts
-      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fixup-dyn-deps --src-dir=. mvfst _artifacts/linux  --project-install-prefix mvfst:/usr/local --final-install-prefix /usr/local
+      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fixup-dyn-deps --strip --src-dir=. mvfst _artifacts/linux  --project-install-prefix mvfst:/usr/local --final-install-prefix /usr/local
     - uses: actions/upload-artifact@master
       with:
         name: mvfst
