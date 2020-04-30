@@ -526,7 +526,12 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     return frameScheduler_.scheduleFramesForPacket(
         std::move(builder), writableBytes);
   }
+  // TODO: We can avoid the copy & rebuild of the header by creating an
+  // independent header builder.
+  auto header = builder.getPacketHeader();
+  std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
+  // This is a loop, but it builds at most one packet.
   for (auto iter = conn_.outstandingPackets.rbegin();
        iter != conn_.outstandingPackets.rend();
        ++iter) {
@@ -534,20 +539,27 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     if (opPnSpace != PacketNumberSpace::AppData) {
       continue;
     }
-    // Reusing the RegularQuicPacketBuilder throughout loop bodies will lead to
-    // frames belong to different original packets being written into the same
-    // clone packet. So re-create a RegularQuicPacketBuilder every time.
-    // TODO: We can avoid the copy & rebuild of the header by creating an
-    // independent header builder.
-    auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
+    // Reusing the same builder throughout loop bodies will lead to frames
+    // belong to different original packets being written into the same clone
+    // packet. So re-create a builder every time.
+    auto builderPnSpace = header.getPacketNumberSpace();
     CHECK_EQ(builderPnSpace, PacketNumberSpace::AppData);
-    // TODO: This needs to be provided from outside now
-    RegularQuicPacketBuilder regularBuilder(
-        conn_.udpSendPacketLen,
-        builder.getPacketHeader(),
-        getAckState(conn_, builderPnSpace).largestAckedByPeer);
-    regularBuilder.encodePacketHeader();
-    PacketRebuilder rebuilder(regularBuilder, conn_);
+    std::unique_ptr<PacketBuilderInterface> internalBuilder;
+    if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
+      internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
+          conn_.udpSendPacketLen,
+          header,
+          getAckState(conn_, builderPnSpace).largestAckedByPeer);
+    } else {
+      CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
+      internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
+          *conn_.bufAccessor,
+          conn_.udpSendPacketLen,
+          header,
+          getAckState(conn_, builderPnSpace).largestAckedByPeer);
+    }
+    internalBuilder->encodePacketHeader();
+    PacketRebuilder rebuilder(*internalBuilder, conn_);
     // We shouldn't clone Handshake packet.
     if (iter->isHandshake) {
       continue;
@@ -570,7 +582,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     auto rebuildResult = rebuilder.rebuildFromPacket(*iter);
     if (rebuildResult) {
       return SchedulingResult(
-          std::move(rebuildResult), std::move(regularBuilder).buildPacket());
+          std::move(rebuildResult), std::move(*internalBuilder).buildPacket());
     }
   }
   return SchedulingResult(folly::none, folly::none);

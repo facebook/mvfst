@@ -10,6 +10,7 @@
 
 #include <folly/portability/GTest.h>
 
+#include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
@@ -656,6 +657,119 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   }
   EXPECT_EQ(1, connWindowUpdateCounter);
   EXPECT_EQ(1, streamWindowUpdateCounter);
+}
+
+TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  SimpleBufAccessor bufAccessor(2000);
+  auto buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+  bufAccessor.release(std::move(buf));
+  conn.bufAccessor = &bufAccessor;
+
+  FrameScheduler noopScheduler("frame");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "93MillionMiles", 0);
+  auto packetNum = addOutstandingPacket(conn);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandingPackets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  EXPECT_TRUE(cloningScheduler.hasData());
+
+  ASSERT_FALSE(noopScheduler.hasData());
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  InplaceQuicPacketBuilder builder(
+      bufAccessor,
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
+  EXPECT_EQ(packetNum, *result.packetEvent);
+
+  // Something was written into the buffer:
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  buf = bufAccessor.obtain();
+  EXPECT_GT(buf->length(), 10);
+}
+
+TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  SimpleBufAccessor bufAccessor(2000);
+  auto buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+  bufAccessor.release(std::move(buf));
+  conn.bufAccessor = &bufAccessor;
+  auto stream = *conn.streamManager->createNextBidirectionalStream();
+  auto inBuf = buildRandomInputData(conn.udpSendPacketLen * 10);
+  writeDataToQuicStream(*stream, inBuf->clone(), false);
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+  auto packetNum = getNextPacketNum(conn, PacketNumberSpace::AppData);
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  InplaceQuicPacketBuilder builder(
+      bufAccessor,
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  ASSERT_TRUE(scheduler.hasData());
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto bufferLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, bufferLength);
+  updateConnection(
+      conn, folly::none, result.packet->packet, Clock::now(), bufferLength);
+  buf = bufAccessor.obtain();
+  ASSERT_EQ(conn.udpSendPacketLen, buf->length());
+  buf->clear();
+  bufAccessor.release(std::move(buf));
+
+  FrameScheduler noopScheduler("noopScheduler");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "93MillionMiles", 0);
+  EXPECT_TRUE(cloningScheduler.hasData());
+  ASSERT_FALSE(noopScheduler.hasData());
+  // Exact same header, so header encoding should be the same
+  ShortHeader dupHeader(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  InplaceQuicPacketBuilder internalBuilder(
+      bufAccessor,
+      conn.udpSendPacketLen,
+      std::move(dupHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto cloneResult = cloningScheduler.scheduleFramesForPacket(
+      std::move(internalBuilder), conn.udpSendPacketLen);
+  EXPECT_TRUE(
+      cloneResult.packetEvent.has_value() && cloneResult.packet.has_value());
+  EXPECT_EQ(packetNum, *cloneResult.packetEvent);
+
+  // Something was written into the buffer:
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), conn.udpSendPacketLen);
 }
 
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};

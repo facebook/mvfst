@@ -787,6 +787,7 @@ void writeCloseCommon(
   PacketNumberSpace pnSpace = header.getPacketNumberSpace();
   HeaderForm headerForm = header.getHeaderForm();
   PacketNum packetNum = header.getPacketSequenceNum();
+  // TODO: This too needs to be switchable between regular and inplace builder.
   RegularQuicPacketBuilder packetBuilder(
       connection.udpSendPacketLen,
       std::move(header),

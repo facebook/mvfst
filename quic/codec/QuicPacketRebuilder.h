@@ -25,7 +25,7 @@ namespace quic {
 class PacketRebuilder {
  public:
   PacketRebuilder(
-      RegularQuicPacketBuilder& regularBuilder,
+      PacketBuilderInterface& regularBuilder,
       QuicConnectionStateBase& conn);
 
   folly::Optional<PacketEvent> rebuildFromPacket(OutstandingPacket& packet);
@@ -55,7 +55,7 @@ class PacketRebuilder {
       const QuicStreamState* stream);
 
  private:
-  RegularQuicPacketBuilder& builder_;
+  PacketBuilderInterface& builder_;
   QuicConnectionStateBase& conn_;
 };
 } // namespace quic

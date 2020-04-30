@@ -15,7 +15,7 @@
 namespace quic {
 
 PacketRebuilder::PacketRebuilder(
-    RegularQuicPacketBuilder& regularBuilder,
+    PacketBuilderInterface& regularBuilder,
     QuicConnectionStateBase& conn)
     : builder_(regularBuilder), conn_(conn) {}
 
