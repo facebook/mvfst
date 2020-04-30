@@ -12,6 +12,10 @@ using folly::AsyncUDPSocket;
 
 namespace quic {
 
+bool isNetworkUnreachable(int err) {
+  return err == EHOSTUNREACH || err == ENETUNREACH;
+}
+
 void applySocketOptions(
     AsyncUDPSocket& sock,
     const folly::SocketOptionMap& options,

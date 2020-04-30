@@ -8,6 +8,7 @@
 
 #include <quic/api/IoBufQuicBatch.h>
 
+#include <quic/common/SocketUtil.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
 namespace quic {
@@ -62,10 +63,6 @@ bool IOBufQuicBatch::flush(FlushType flushType) {
 
 void IOBufQuicBatch::reset() {
   batchWriter_->reset();
-}
-
-bool IOBufQuicBatch::isNetworkUnreachable(int err) {
-  return err == EHOSTUNREACH || err == ENETUNREACH;
 }
 
 bool IOBufQuicBatch::isRetriableError(int err) {

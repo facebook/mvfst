@@ -45,8 +45,6 @@ class IOBufQuicBatch {
   // flushes the internal buffers
   bool flushInternal();
 
-  bool isNetworkUnreachable(int err);
-
   /**
    * Returns whether or not the errno can be retried later.
    */
