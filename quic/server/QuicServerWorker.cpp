@@ -414,13 +414,11 @@ void QuicServerWorker::forwardNetworkData(
           "Dropping packet due to unknown connectionId version, routingInfo={}",
           logRoutingInfo(routingData.destinationConnId));
       QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
-      return sendResetPacket(
-          routingData.headerForm,
-          client,
-          networkData,
-          routingData.destinationConnId);
+          statsCallback_,
+          onPacketDropped,
+          PacketDropReason::CONNECTION_NOT_FOUND);
     }
+    return;
   }
 
   bool userSpacePktRoute;
@@ -440,11 +438,7 @@ void QuicServerWorker::forwardNetworkData(
           logRoutingInfo(routingData.destinationConnId));
       QUIC_STATS(
           statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
-      return sendResetPacket(
-          routingData.headerForm,
-          client,
-          networkData,
-          routingData.destinationConnId);
+      return;
     }
     if (LIKELY(connIdParam->workerId == workerId_)) {
       userSpacePktRoute = false;
@@ -622,20 +616,14 @@ void QuicServerWorker::dispatchPacketData(
         statsCallback_,
         onPacketDropped,
         PacketDropReason::CANNOT_MAKE_TRANSPORT);
-    // TODO reevaluate sending stateless reset here. At this state, the peer
-    // will not have received the token yet. So these reset packets will just
-    // be dropped by the peer.
     return;
   }
   if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
     VLOG(3) << "Dropping packet with bad DCID, routingInfo="
             << logRoutingInfo(routingData.destinationConnId);
     QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
-    return sendResetPacket(
-        routingData.headerForm,
-        client,
-        networkData,
-        routingData.destinationConnId);
+    // TODO do we need to reset?
+    return;
   }
   auto connIdParam =
       connIdAlgo_->parseConnectionId(routingData.destinationConnId);
@@ -646,11 +634,8 @@ void QuicServerWorker::dispatchPacketData(
         folly::to<std::string>(connIdParam.error().errorCode()),
         logRoutingInfo(routingData.destinationConnId));
     QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
-    return sendResetPacket(
-        routingData.headerForm,
-        client,
-        networkData,
-        routingData.destinationConnId);
+    // TODO do we need to reset?
+    return;
   }
   if (connIdParam->hostId != hostId_) {
     VLOG(3) << "Dropping packet routed to wrong host, routingInfo="
