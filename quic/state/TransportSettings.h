@@ -86,8 +86,8 @@ struct TransportSettings {
   std::chrono::microseconds pacingTimerTickInterval{
       kDefaultPacingTimerTickInterval};
   ZeroRttSourceTokenMatchingPolicy zeroRttSourceTokenMatchingPolicy{
-      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH};
-  bool attemptEarlyData{true};
+      ZeroRttSourceTokenMatchingPolicy::REJECT_IF_NO_EXACT_MATCH};
+  bool attemptEarlyData{false};
   // Maximum number of packets the connection will write in
   // writeConnectionDataToSocket.
   uint64_t writeConnectionDataPacketsLimit{

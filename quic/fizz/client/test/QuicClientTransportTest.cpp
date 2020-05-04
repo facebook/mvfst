@@ -233,11 +233,18 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
         std::make_shared<DefaultCongestionControllerFactory>());
     client->setHostname(hostname);
     client->addNewPeerAddress(serverAddr);
+    auto transportSettings = client->getTransportSettings();
+    transportSettings.attemptEarlyData = true;
+    client->setTransportSettings(transportSettings);
     return client;
   }
 
   std::shared_ptr<QuicServer> createServer(ProcessId processId) {
     auto server = QuicServer::createQuicServer();
+    auto transportSettings = server->getTransportSettings();
+    transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+    server->setTransportSettings(transportSettings);
     server->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>());
     server->setQuicUDPSocketFactory(
@@ -5271,6 +5278,7 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
     TransportSettings clientSettings;
     // Ignore path mtu to test negotiation.
     clientSettings.canIgnorePathMTU = true;
+    clientSettings.attemptEarlyData = true;
     client->setTransportSettings(clientSettings);
   }
 

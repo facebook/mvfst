@@ -94,6 +94,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
 
     cryptoState = conn->cryptoState.get();
     handshake = conn->clientHandshakeLayer;
+    conn->transportSettings.attemptEarlyData = true;
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto serverTransportParameters =
         std::make_shared<ServerTransportParametersExtension>(

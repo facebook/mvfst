@@ -3614,6 +3614,8 @@ TEST_F(
     TestClearInFlightBytesLimitationAfterCFIN) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
+  server->getNonConstConn().transportSettings.zeroRttSourceTokenMatchingPolicy =
+      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
   getFakeHandshakeLayer()->allowZeroRttKeys();
   auto originalUdpSize = server->getConn().udpSendPacketLen;
 
@@ -3670,6 +3672,8 @@ TEST_F(
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   getFakeHandshakeLayer()->allowZeroRttKeys();
+  server->getNonConstConn().transportSettings.zeroRttSourceTokenMatchingPolicy =
+      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
 
   auto originalUdpSize = server->getConn().udpSendPacketLen;
   setupClientReadCodec();

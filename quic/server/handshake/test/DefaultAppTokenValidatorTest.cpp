@@ -28,6 +28,8 @@ TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
+  conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
+      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(
@@ -54,6 +56,8 @@ TEST(
   QuicServerConnectionState conn;
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
+  conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
+      ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
 
   auto initialMaxData =
       conn.transportSettings.advertisedInitialConnectionWindowSize;
@@ -291,6 +295,8 @@ class SourceAddressTokenTest : public Test {
   void SetUp() override {
     conn_.peerAddress = folly::SocketAddress("1.2.3.4", 443);
     conn_.version = QuicVersion::MVFST;
+    conn_.transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
 
     appToken_.transportParams = createTicketTransportParameters(
         conn_.transportSettings.idleTimeout.count(),
