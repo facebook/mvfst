@@ -174,7 +174,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
   // The offset in the IOBuf writable area to write Packet Number.
   size_t packetNumOffset_{0};
   // The position to write body.
-  uint8_t* bodyStart_{nullptr};
+  const uint8_t* bodyStart_{nullptr};
   // The position to write header.
   const uint8_t* headerStart_{nullptr};
 };

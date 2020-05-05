@@ -434,7 +434,7 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   size_t minBodySize = kMaxPacketNumEncodingSize -
       packetNumberEncoding_->length + sizeof(Sample);
   size_t extraDataWritten = 0;
-  size_t bodyLength = iobuf_->writableTail() - bodyStart_;
+  size_t bodyLength = iobuf_->tail() - bodyStart_;
   while (bodyLength + extraDataWritten + cipherOverhead_ < minBodySize &&
          !packet_.frames.empty() && remainingBytes_ > kMaxPacketLenSize) {
     // We can add padding frames, but we don't need to store them.
@@ -444,7 +444,8 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   }
   if (longHeader && longHeader->getHeaderType() != LongHeader::Types::Retry) {
     QuicInteger pktLen(
-        packetNumberEncoding_->length + bodyLength + cipherOverhead_);
+        packetNumberEncoding_->length + (iobuf_->tail() - bodyStart_) +
+        cipherOverhead_);
     pktLen.encode(
         [&](auto val) {
           auto bigEndian = folly::Endian::big(val);
@@ -564,7 +565,7 @@ void InplaceQuicPacketBuilder::encodePacketHeader() {
           packetNumberEncoding_->length);
     }
   }
-  bodyStart_ = iobuf_->writableTail();
+  bodyStart_ = iobuf_->tail();
 }
 
 } // namespace quic

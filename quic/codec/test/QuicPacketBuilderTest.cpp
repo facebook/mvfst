@@ -524,6 +524,38 @@ TEST_F(QuicPacketBuilderTest, InplaceBuilderLongHeaderBytes) {
       inplaceBuilder->getHeaderBytes());
 }
 
+TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
+  ConnectionId emptyCID(std::vector<uint8_t>(0));
+  PacketNum packetNum = 0;
+  PacketNum largestAcked = 0;
+  auto builder = testBuilderProvider(
+      GetParam(),
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Handshake,
+          emptyCID,
+          emptyCID,
+          packetNum,
+          QuicVersion::MVFST),
+      largestAcked,
+      kDefaultUDPSendPacketLen);
+  builder->encodePacketHeader();
+  writeFrame(QuicSimpleFrame(PingFrame()), *builder);
+  EXPECT_TRUE(builder->canBuildPacket());
+  auto builtOut = std::move(*builder).buildPacket();
+  auto resultPacket = builtOut.packet;
+  auto resultBuf = packetToBuf(builtOut);
+  auto packetQueue = bufToQueue(std::move(resultBuf));
+  AckStates ackStates;
+  auto parsedPacket =
+      makeCodec(
+          emptyCID, QuicNodeType::Client, nullptr, quic::test::createNoOpAead())
+          ->parsePacket(packetQueue, ackStates);
+  auto& decodedRegularPacket = *parsedPacket.regularPacket();
+  EXPECT_NE(nullptr, decodedRegularPacket.header.asLong());
+  EXPECT_GT(decodedRegularPacket.frames.size(), 1);
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicPacketBuilderTests,
     QuicPacketBuilderTest,
