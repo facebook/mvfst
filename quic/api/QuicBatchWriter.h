@@ -12,6 +12,7 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/QuicConstants.h>
+#include <quic/state/StateData.h>
 
 namespace quic {
 class BatchWriter {
@@ -128,6 +129,54 @@ class GSOPacketBatchWriter : public IOBufBatchWriter {
   size_t prevSize_{0};
 };
 
+class GSOInplacePacketBatchWriter : public BatchWriter {
+ public:
+  explicit GSOInplacePacketBatchWriter(
+      QuicConnectionStateBase& conn,
+      size_t maxPackets);
+  ~GSOInplacePacketBatchWriter() override = default;
+
+  struct ScopedBufAccessor {
+   public:
+    explicit ScopedBufAccessor(BufAccessor* accessor) : bufAccessor_(accessor) {
+      CHECK(bufAccessor_->ownsBuffer());
+      buf_ = bufAccessor_->obtain();
+    }
+
+    ~ScopedBufAccessor() {
+      bufAccessor_->release(std::move(buf_));
+    }
+
+    std::unique_ptr<folly::IOBuf>& buf() {
+      return buf_;
+    }
+
+   private:
+    BufAccessor* bufAccessor_;
+    std::unique_ptr<folly::IOBuf> buf_;
+  };
+
+  void reset() override;
+  bool needsFlush(size_t size) override;
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& buf,
+      size_t size,
+      const folly::SocketAddress& addr,
+      folly::AsyncUDPSocket* sock) override;
+  ssize_t write(
+      folly::AsyncUDPSocket& sock,
+      const folly::SocketAddress& address) override;
+  bool empty() const override;
+  size_t size() const override;
+
+ private:
+  QuicConnectionStateBase& conn_;
+  size_t maxPackets_;
+  const uint8_t* lastPacketEnd_{nullptr};
+  size_t prevSize_{0};
+  size_t numPackets_{0};
+};
+
 class SendmmsgPacketBatchWriter : public BatchWriter {
  public:
   explicit SendmmsgPacketBatchWriter(size_t maxBufs);
@@ -203,7 +252,9 @@ class BatchWriterFactory {
       const quic::QuicBatchingMode& batchingMode,
       uint32_t batchSize,
       bool useThreadLocal,
-      const std::chrono::microseconds& threadLocalDelay);
+      const std::chrono::microseconds& threadLocalDelay,
+      DataPathType dataPathType,
+      QuicConnectionStateBase& conn);
 };
 
 } // namespace quic

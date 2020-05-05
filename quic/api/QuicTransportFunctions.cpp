@@ -979,7 +979,9 @@ uint64_t writeConnectionDataToSocket(
       connection.transportSettings.batchingMode,
       connection.transportSettings.maxBatchSize,
       connection.transportSettings.useThreadLocalBatching,
-      connection.transportSettings.threadLocalDelay);
+      connection.transportSettings.threadLocalDelay,
+      connection.transportSettings.dataPathType,
+      connection);
 
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),

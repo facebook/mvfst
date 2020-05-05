@@ -218,6 +218,109 @@ ssize_t GSOPacketBatchWriter::write(
       : sock.write(address, buf_);
 }
 
+GSOInplacePacketBatchWriter::GSOInplacePacketBatchWriter(
+    QuicConnectionStateBase& conn,
+    size_t maxPackets)
+    : conn_(conn), maxPackets_(maxPackets) {}
+
+void GSOInplacePacketBatchWriter::reset() {
+  lastPacketEnd_ = nullptr;
+  prevSize_ = 0;
+  numPackets_ = 0;
+}
+
+bool GSOInplacePacketBatchWriter::needsFlush(size_t size) {
+  return prevSize_ && size > prevSize_;
+}
+
+bool GSOInplacePacketBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& /*buf*/,
+    size_t size,
+    const folly::SocketAddress& /* addr */,
+    folly::AsyncUDPSocket* /* sock */) {
+  CHECK(!needsFlush(size));
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  auto& buf = scopedBufAccessor.buf();
+  if (!lastPacketEnd_) {
+    CHECK(prevSize_ == 0 && numPackets_ == 0);
+    prevSize_ = size;
+    lastPacketEnd_ = buf->tail();
+    numPackets_ = 1;
+    return false;
+  }
+
+  CHECK(prevSize_ && prevSize_ >= size);
+  ++numPackets_;
+  lastPacketEnd_ = buf->tail();
+  if (prevSize_ > size || numPackets_ == maxPackets_) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Write the buffer owned by conn_.bufAccessor to the sock, until
+ * lastPacketEnd_. After write, everything in the buffer after lastPacketEnd_
+ * will be moved to the beginning of the buffer, and buffer will be returned to
+ * conn_.bufAccessor.
+ */
+ssize_t GSOInplacePacketBatchWriter::write(
+    folly::AsyncUDPSocket& sock,
+    const folly::SocketAddress& address) {
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  CHECK(lastPacketEnd_);
+  auto& buf = scopedBufAccessor.buf();
+  CHECK(!buf->isChained());
+  CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
+      << "lastPacketEnd_=" << (long)lastPacketEnd_
+      << " data=" << (long)buf->data() << " tail=" << (long)buf->tail();
+  auto diffToEnd = buf->tail() - lastPacketEnd_;
+  CHECK(
+      diffToEnd >= 0 &&
+      static_cast<uint64_t>(diffToEnd) <= conn_.udpSendPacketLen);
+  auto diffToStart = lastPacketEnd_ - buf->data();
+  buf->trimEnd(diffToEnd);
+  auto bytesWritten = (numPackets_ > 1)
+      ? sock.writeGSO(address, buf, static_cast<int>(prevSize_))
+      : sock.write(address, buf);
+  /**
+   * If there is one more bytes after lastPacketEnd_, that means there is a
+   * packet we choose not to write in this batch (e.g., it has a size larger
+   * than all existing packets in this batch). So after the socket write, we
+   * need to move that packet from the middle of the buffer to the beginning of
+   * the buffer so make sure we maximize the buffer space. An alternative here
+   * is to writem to write everything out in the previous sock write call. But
+   * that needs a much bigger change in the IoBufQuicBatch API.
+   */
+  if (diffToEnd) {
+    buf->trimStart(diffToStart);
+    buf->append(diffToEnd);
+    buf->retreat(diffToStart);
+    CHECK(buf->length() <= conn_.udpSendPacketLen);
+    CHECK(0 == buf->headroom());
+  } else {
+    buf->clear();
+  }
+  reset();
+  return bytesWritten;
+}
+
+bool GSOInplacePacketBatchWriter::empty() const {
+  return numPackets_ == 0;
+}
+
+size_t GSOInplacePacketBatchWriter::size() const {
+  if (empty()) {
+    return 0;
+  }
+  ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+  CHECK(lastPacketEnd_);
+  auto& buf = scopedBufAccessor.buf();
+  CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail());
+  size_t ret = lastPacketEnd_ - buf->data();
+  return ret;
+}
+
 // SendmmsgPacketBatchWriter
 SendmmsgPacketBatchWriter::SendmmsgPacketBatchWriter(size_t maxBufs)
     : maxBufs_(maxBufs) {
@@ -390,7 +493,9 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
     const quic::QuicBatchingMode& batchingMode,
     uint32_t batchSize,
     bool useThreadLocal,
-    const std::chrono::microseconds& threadLocalDelay) {
+    const std::chrono::microseconds& threadLocalDelay,
+    DataPathType dataPathType,
+    QuicConnectionStateBase& conn) {
 #if USE_THREAD_LOCAL_BATCH_WRITER
   if (useThreadLocal &&
       (batchingMode == quic::QuicBatchingMode::BATCHING_MODE_SENDMMSG_GSO) &&
@@ -414,7 +519,10 @@ BatchWriterPtr BatchWriterFactory::makeBatchWriter(
       return BatchWriterPtr(new SinglePacketBatchWriter());
     case quic::QuicBatchingMode::BATCHING_MODE_GSO: {
       if (sock.getGSO() >= 0) {
-        return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
+        if (dataPathType == DataPathType::ChainedMemory) {
+          return BatchWriterPtr(new GSOPacketBatchWriter(batchSize));
+        }
+        return BatchWriterPtr(new GSOInplacePacketBatchWriter(conn, batchSize));
       }
 
       return BatchWriterPtr(new SinglePacketBatchWriter());
