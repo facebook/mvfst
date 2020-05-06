@@ -285,4 +285,9 @@ HeaderBuilder ShortHeaderBuilder();
 
 void maybeSendStreamLimitUpdates(QuicConnectionStateBase& conn);
 
+void implicitAckCryptoStream(
+    QuicConnectionStateBase& conn,
+    EncryptionLevel encryptionLevel);
+void handshakeConfirmed(QuicConnectionStateBase& conn);
+
 } // namespace quic

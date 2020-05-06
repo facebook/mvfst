@@ -142,10 +142,13 @@ void updateSimpleFrameOnPacketLoss(
       // Do not retransmit PATH_RESPONSE to avoid buffering
       break;
     }
+    case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
+      const auto& handshakeDoneFrame = *frame.asHandshakeDoneFrame();
+      conn.pendingEvents.frames.push_back(handshakeDoneFrame);
+    }
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
     case QuicSimpleFrame::Type::MaxStreamsFrame_E:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -298,7 +301,10 @@ bool updateSimpleFrameOnPacketReceived(
             TransportErrorCode::PROTOCOL_VIOLATION,
             FrameType::HANDSHAKE_DONE);
       }
-      // TODO cipher dropping
+      // Mark the handshake confirmed in the handshake layer before doing
+      // any dropping, as this gives us a chance to process ACKs in this
+      // packet.
+      conn.handshakeLayer->handshakeConfirmed();
       return true;
     }
   }

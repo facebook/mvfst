@@ -18,6 +18,7 @@
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 #include <quic/logging/QuicLogger.h>
+#include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
@@ -1192,4 +1193,77 @@ void maybeSendStreamLimitUpdates(QuicConnectionStateBase& conn) {
     sendSimpleFrame(conn, (MaxStreamsFrame(*update, false)));
   }
 }
+
+void implicitAckCryptoStream(
+    QuicConnectionStateBase& conn,
+    EncryptionLevel encryptionLevel) {
+  auto implicitAckTime = Clock::now();
+  auto packetNumSpace = encryptionLevel == EncryptionLevel::Handshake
+      ? PacketNumberSpace::Handshake
+      : PacketNumberSpace::Initial;
+  auto& ackState = getAckState(conn, packetNumSpace);
+  AckBlocks ackBlocks;
+  ReadAckFrame implicitAck;
+  implicitAck.ackDelay = 0ms;
+  for (const auto& op : conn.outstandingPackets) {
+    if (op.packet.header.getPacketNumberSpace() == packetNumSpace) {
+      ackBlocks.insert(op.packet.header.getPacketSequenceNum());
+    }
+  }
+  if (ackBlocks.empty()) {
+    return;
+  }
+  // Construct an implicit ack covering the entire range of packets.
+  // If some of these have already been ACK'd then processAckFrame
+  // should simply ignore them.
+  implicitAck.largestAcked = ackBlocks.back().end;
+  implicitAck.ackBlocks.emplace_back(
+      ackBlocks.front().start, implicitAck.largestAcked);
+  processAckFrame(
+      conn,
+      packetNumSpace,
+      implicitAck,
+      [&](auto&, auto& packetFrame, auto&) {
+        switch (packetFrame.type()) {
+          case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+            const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
+            auto cryptoStream =
+                getCryptoStream(*conn.cryptoState, encryptionLevel);
+            processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
+            DCHECK(cryptoStream->retransmissionBuffer.empty());
+            DCHECK(cryptoStream->writeBuffer.empty());
+            DCHECK(cryptoStream->lossBuffer.empty());
+            break;
+          }
+          case QuicWriteFrame::Type::WriteAckFrame_E: {
+            const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
+            commonAckVisitorForAckFrame(ackState, frame);
+            break;
+          }
+          default: {
+            // We don't bother checking for valid packets, since these are
+            // our outstanding packets.
+          }
+        }
+      },
+      // Can't do anything with loss at this point.
+      [](auto&, auto&, auto, auto) {},
+      implicitAckTime);
+}
+
+void handshakeConfirmed(QuicConnectionStateBase& conn) {
+  CHECK(conn.oneRttWriteCipher);
+  conn.readCodec->onHandshakeDone(Clock::now());
+  conn.initialWriteCipher.reset();
+  conn.initialHeaderCipher.reset();
+  conn.readCodec->setInitialReadCipher(nullptr);
+  conn.readCodec->setInitialHeaderCipher(nullptr);
+  implicitAckCryptoStream(conn, EncryptionLevel::Initial);
+  conn.handshakeWriteCipher.reset();
+  conn.handshakeWriteHeaderCipher.reset();
+  conn.readCodec->setHandshakeReadCipher(nullptr);
+  conn.readCodec->setHandshakeHeaderCipher(nullptr);
+  implicitAckCryptoStream(conn, EncryptionLevel::Handshake);
+}
+
 } // namespace quic

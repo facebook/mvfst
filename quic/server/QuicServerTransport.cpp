@@ -164,27 +164,37 @@ void QuicServerTransport::writeData() {
       return;
     }
     updateLargestReceivedPacketsAtLastCloseSent(*conn_);
-    if (conn_->oneRttWriteCipher && conn_->readCodec->getOneRttReadCipher()) {
+    if (conn_->oneRttWriteCipher) {
       CHECK(conn_->oneRttWriteHeaderCipher);
-      // We do not process handshake data after we are closed. It is
-      // possible that we closed the transport while handshake data was
-      // pending in which case we would not derive the 1-RTT keys. We
-      // shouldn't send a long header at this point, because the client may
-      // have already dropped its handshake keys.
       writeShortClose(
           *socket_,
           *conn_,
-          destConnId /* dst */,
+          destConnId,
           conn_->localConnectionError,
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
-    } else if (conn_->initialWriteCipher) {
+    }
+    if (conn_->handshakeWriteCipher &&
+        *conn_->version != QuicVersion::MVFST_D24) {
+      CHECK(conn_->handshakeWriteHeaderCipher);
+      writeLongClose(
+          *socket_,
+          *conn_,
+          srcConnId,
+          destConnId,
+          LongHeader::Types::Handshake,
+          conn_->localConnectionError,
+          *conn_->handshakeWriteCipher,
+          *conn_->handshakeWriteHeaderCipher,
+          version);
+    }
+    if (conn_->initialWriteCipher) {
       CHECK(conn_->initialHeaderCipher);
       writeLongClose(
           *socket_,
           *conn_,
-          srcConnId /* src */,
-          destConnId /* dst */,
+          srcConnId,
+          destConnId,
           LongHeader::Types::Initial,
           conn_->localConnectionError,
           *conn_->initialWriteCipher,
@@ -193,59 +203,57 @@ void QuicServerTransport::writeData() {
     }
     return;
   }
-
-  if (!conn_->initialWriteCipher) {
-    // This would be possible if we read a packet from the network which
-    // could not be parsed later.
-    return;
-  }
-
   uint64_t packetLimit =
       (isConnectionPaced(*conn_)
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
-  CryptoStreamScheduler initialScheduler(
-      *conn_, *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
-  CryptoStreamScheduler handshakeScheduler(
-      *conn_,
-      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
-  if (initialScheduler.hasData() ||
-      (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
-       hasAcksToSchedule(conn_->ackStates.initialAckState))) {
-    CHECK(conn_->initialWriteCipher);
-    CHECK(conn_->initialHeaderCipher);
-    packetLimit -= writeCryptoAndAckDataToSocket(
-        *socket_,
+  if (conn_->initialWriteCipher) {
+    CryptoStreamScheduler initialScheduler(
         *conn_,
-        srcConnId /* src */,
-        destConnId /* dst */,
-        LongHeader::Types::Initial,
-        *conn_->initialWriteCipher,
-        *conn_->initialHeaderCipher,
-        version,
-        packetLimit);
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
+    if (initialScheduler.hasData() ||
+        (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
+         hasAcksToSchedule(conn_->ackStates.initialAckState))) {
+      CHECK(conn_->initialWriteCipher);
+      CHECK(conn_->initialHeaderCipher);
+      packetLimit -= writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          LongHeader::Types::Initial,
+          *conn_->initialWriteCipher,
+          *conn_->initialHeaderCipher,
+          version,
+          packetLimit);
+    }
+    if (!packetLimit) {
+      return;
+    }
   }
-  if (!packetLimit) {
-    return;
-  }
-  if (handshakeScheduler.hasData() ||
-      (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
-       hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
-    CHECK(conn_->handshakeWriteCipher);
-    CHECK(conn_->handshakeWriteHeaderCipher);
-    packetLimit -= writeCryptoAndAckDataToSocket(
-        *socket_,
+  if (conn_->handshakeWriteCipher) {
+    CryptoStreamScheduler handshakeScheduler(
         *conn_,
-        srcConnId /* src */,
-        destConnId /* dst */,
-        LongHeader::Types::Handshake,
-        *conn_->handshakeWriteCipher,
-        *conn_->handshakeWriteHeaderCipher,
-        version,
-        packetLimit);
-  }
-  if (!packetLimit) {
-    return;
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
+    if (handshakeScheduler.hasData() ||
+        (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
+         hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
+      CHECK(conn_->handshakeWriteCipher);
+      CHECK(conn_->handshakeWriteHeaderCipher);
+      packetLimit -= writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          LongHeader::Types::Handshake,
+          *conn_->handshakeWriteCipher,
+          *conn_->handshakeWriteHeaderCipher,
+          version,
+          packetLimit);
+    }
+    if (!packetLimit) {
+      return;
+    }
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
@@ -435,8 +443,8 @@ void QuicServerTransport::maybeIssueConnectionIds() {
     connectionIdsIssued_ = true;
     CHECK(conn_->transportSettings.statelessResetTokenSecret.has_value());
 
-    // If the peer specifies that they have a limit of 1,000,000 connection ids
-    // then only issue a small number at first, since the server still
+    // If the peer specifies that they have a limit of 1,000,000 connection
+    // ids then only issue a small number at first, since the server still
     // needs to be able to search through all issued ids for routing.
     const uint64_t maximumIdsToIssue = std::min(
         conn_->peerActiveConnectionIdLimit, kDefaultActiveConnectionIdLimit);

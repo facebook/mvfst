@@ -122,6 +122,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // Server address of VIP. Currently used as input for stateless reset token.
   folly::SocketAddress serverAddr;
 
+  // Whether we've sent the handshake done signal yet.
+  bool sentHandshakeDone{false};
+
   folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 
   QuicServerConnectionState() : QuicConnectionStateBase(QuicNodeType::Server) {

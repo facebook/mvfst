@@ -301,13 +301,21 @@ void QuicClientTransport::processPacketData(
                 // If we received an ack for data that we sent in 1-rtt from
                 // the server, we can assume that the server had successfully
                 // derived the 1-rtt keys and hence received the client
-                // finished message. Thus we don't need to retransmit any of
-                // the crypto data any longer.
-                //
-                // This will not cancel oneRttStream.
-                //
-                // TODO: replace this with a better solution later.
-                cancelHandshakeCryptoStreamRetransmissions(*conn_->cryptoState);
+                // finished message. We can mark the handshake as confirmed and
+                // drop the handshake cipher and outstanding packets after the
+                // processing loop.
+                if (conn_->handshakeWriteCipher) {
+                  CHECK(conn_->oneRttWriteCipher);
+                  CHECK(conn_->oneRttWriteHeaderCipher);
+                  CHECK(conn_->readCodec->getOneRttReadCipher());
+                  CHECK(conn_->readCodec->getOneRttHeaderCipher());
+                  conn_->handshakeLayer->handshakeConfirmed();
+                }
+                // TODO reap
+                if (*conn_->version == QuicVersion::MVFST_D24) {
+                  cancelHandshakeCryptoStreamRetransmissions(
+                      *conn_->cryptoState);
+                }
               }
               switch (packetFrame.type()) {
                 case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -503,10 +511,15 @@ void QuicClientTransport::processPacketData(
     }
   }
 
+  auto handshakeLayer = clientConn_->clientHandshakeLayer;
+  if (handshakeLayer->getPhase() == ClientHandshake::Phase::Established &&
+      *conn_->version != QuicVersion::MVFST_D24) {
+    handshakeConfirmed(*conn_);
+  }
+
   // Try reading bytes off of crypto, and performing a handshake.
   auto cryptoData = readDataFromCryptoStream(
       *getCryptoStream(*conn_->cryptoState, encryptionLevel));
-  auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (cryptoData) {
     bool hadOneRttKey = conn_->oneRttWriteCipher != nullptr;
     handshakeLayer->doHandshake(std::move(cryptoData), encryptionLevel);
@@ -515,27 +528,30 @@ void QuicClientTransport::processPacketData(
       oneRttKeyDerivationTriggered = true;
       updatePacingOnKeyEstablished(*conn_);
     }
-    bool zeroRttRejected = handshakeLayer->getZeroRttRejected().value_or(false);
-    if (zeroRttRejected) {
+    if (conn_->oneRttWriteCipher && conn_->readCodec->getOneRttReadCipher() &&
+        conn_->version != QuicVersion::MVFST_D24) {
+      conn_->zeroRttWriteCipher.reset();
+      conn_->zeroRttWriteHeaderCipher.reset();
+    }
+    auto zeroRttRejected = handshakeLayer->getZeroRttRejected();
+    if (zeroRttRejected.has_value() && *zeroRttRejected) {
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
       }
       QUIC_TRACE(zero_rtt, *conn_, "rejected");
       handshakeLayer->removePsk(hostname_);
-    } else if (conn_->zeroRttWriteCipher) {
+    } else if (zeroRttRejected.has_value()) {
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
       }
       QUIC_TRACE(zero_rtt, *conn_, "accepted");
     }
-    bool shouldNegotiateParameters = false;
-    if (clientConn_->zeroRttWriteCipher) {
-      shouldNegotiateParameters =
-          zeroRttRejected && (conn_->oneRttWriteCipher != nullptr);
-    } else {
-      shouldNegotiateParameters = oneRttKeyDerivationTriggered;
-    }
-    if (shouldNegotiateParameters) {
+    // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
+    // was rejected, or we have derived 1-rtt keys and 0-rtt was never
+    // attempted.
+    if ((oneRttKeyDerivationTriggered &&
+         ((zeroRttRejected.has_value() && *zeroRttRejected) ||
+          !zeroRttRejected.has_value()))) {
       auto originalPeerMaxOffset =
           conn_->flowControlState.peerAdvertisedMaxOffset;
       auto originalPeerInitialStreamOffsetBidiLocal =
@@ -575,7 +591,7 @@ void QuicClientTransport::processPacketData(
       if (statelessResetToken) {
         conn_->readCodec->setStatelessResetToken(*statelessResetToken);
       }
-      if (zeroRttRejected) {
+      if (zeroRttRejected.has_value() && *zeroRttRejected) {
         // verify that the new flow control parameters are >= the original
         // transport parameters that were use. This is the easy case. If the
         // flow control decreases then we are just screwed and we need to have
@@ -599,17 +615,20 @@ void QuicClientTransport::processPacketData(
         }
       }
     }
-    if (zeroRttRejected) {
+    if (zeroRttRejected.has_value() && *zeroRttRejected) {
       // TODO: Make sure the alpn is the same, if not then do a full undo of the
       // state.
-      clientConn_->zeroRttWriteCipher = nullptr;
+      clientConn_->zeroRttWriteCipher.reset();
+      clientConn_->zeroRttWriteHeaderCipher.reset();
       markZeroRttPacketsLost(*conn_, markPacketLoss);
     }
   }
-  if (protectionLevel == ProtectionType::KeyPhaseZero ||
-      protectionLevel == ProtectionType::KeyPhaseOne) {
+  // TODO this is incorrect and needs to be removed post MVFST_D24
+  if (conn_->version == QuicVersion::MVFST_D24 &&
+      (protectionLevel == ProtectionType::KeyPhaseZero ||
+       protectionLevel == ProtectionType::KeyPhaseOne)) {
     DCHECK(conn_->oneRttWriteCipher);
-    clientConn_->clientHandshakeLayer->onRecvOneRttProtectedData();
+    clientConn_->clientHandshakeLayer->handshakeConfirmed();
     conn_->readCodec->onHandshakeDone(receiveTimePoint);
   }
   updateAckSendStateOnRecvPacket(
@@ -659,7 +678,6 @@ void QuicClientTransport::writeData() {
   // TODO: replace with write in state machine.
   // TODO: change to draining when we move the client to have a draining state
   // as well.
-  auto phase = clientConn_->clientHandshakeLayer->getPhase();
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
   const ConnectionId* destConnId =
@@ -668,24 +686,39 @@ void QuicClientTransport::writeData() {
     destConnId = &(*conn_->serverConnectionId);
   }
   if (closeState_ == CloseState::CLOSED) {
-    // TODO: get rid of phase
-    if (phase == ClientHandshake::Phase::Established &&
+    if (clientConn_->clientHandshakeLayer->getPhase() ==
+            ClientHandshake::Phase::Established &&
         conn_->oneRttWriteCipher) {
       CHECK(conn_->oneRttWriteHeaderCipher);
       writeShortClose(
           *socket_,
           *conn_,
-          *destConnId /* dst */,
+          *destConnId,
           conn_->localConnectionError,
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
-    } else if (conn_->initialWriteCipher) {
+    }
+    if (conn_->handshakeWriteCipher &&
+        *conn_->version != QuicVersion::MVFST_D24) {
+      CHECK(conn_->handshakeWriteHeaderCipher);
+      writeLongClose(
+          *socket_,
+          *conn_,
+          srcConnId,
+          *destConnId,
+          LongHeader::Types::Handshake,
+          conn_->localConnectionError,
+          *conn_->handshakeWriteCipher,
+          *conn_->handshakeWriteHeaderCipher,
+          version);
+    }
+    if (conn_->initialWriteCipher) {
       CHECK(conn_->initialHeaderCipher);
       writeLongClose(
           *socket_,
           *conn_,
-          srcConnId /* src */,
-          *destConnId /* dst */,
+          srcConnId,
+          *destConnId,
           LongHeader::Types::Initial,
           conn_->localConnectionError,
           *conn_->initialWriteCipher,
@@ -699,49 +732,53 @@ void QuicClientTransport::writeData() {
       (isConnectionPaced(*conn_)
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
-  CryptoStreamScheduler initialScheduler(
-      *conn_, *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
-  CryptoStreamScheduler handshakeScheduler(
-      *conn_,
-      *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
-  if (initialScheduler.hasData() ||
-      (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
-       hasAcksToSchedule(conn_->ackStates.initialAckState))) {
-    CHECK(conn_->initialWriteCipher);
-    CHECK(conn_->initialHeaderCipher);
-    packetLimit -= writeCryptoAndAckDataToSocket(
-        *socket_,
+  if (conn_->initialWriteCipher) {
+    CryptoStreamScheduler initialScheduler(
         *conn_,
-        srcConnId /* src */,
-        *destConnId /* dst */,
-        LongHeader::Types::Initial,
-        *conn_->initialWriteCipher,
-        *conn_->initialHeaderCipher,
-        version,
-        packetLimit,
-        clientConn_->retryToken);
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
+
+    if (initialScheduler.hasData() ||
+        (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
+         hasAcksToSchedule(conn_->ackStates.initialAckState))) {
+      CHECK(conn_->initialHeaderCipher);
+      packetLimit -= writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          *destConnId /* dst */,
+          LongHeader::Types::Initial,
+          *conn_->initialWriteCipher,
+          *conn_->initialHeaderCipher,
+          version,
+          packetLimit,
+          clientConn_->retryToken);
+    }
+    if (!packetLimit) {
+      return;
+    }
   }
-  if (!packetLimit) {
-    return;
-  }
-  if (handshakeScheduler.hasData() ||
-      (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
-       hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
-    CHECK(conn_->handshakeWriteCipher);
-    CHECK(conn_->handshakeWriteHeaderCipher);
-    packetLimit -= writeCryptoAndAckDataToSocket(
-        *socket_,
+  if (conn_->handshakeWriteCipher) {
+    CryptoStreamScheduler handshakeScheduler(
         *conn_,
-        srcConnId /* src */,
-        *destConnId /* dst */,
-        LongHeader::Types::Handshake,
-        *conn_->handshakeWriteCipher,
-        *conn_->handshakeWriteHeaderCipher,
-        version,
-        packetLimit);
-  }
-  if (!packetLimit) {
-    return;
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
+    if (handshakeScheduler.hasData() ||
+        (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
+         hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
+      CHECK(conn_->handshakeWriteHeaderCipher);
+      packetLimit -= writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          *destConnId /* dst */,
+          LongHeader::Types::Handshake,
+          *conn_->handshakeWriteCipher,
+          *conn_->handshakeWriteHeaderCipher,
+          version,
+          packetLimit);
+    }
+    if (!packetLimit) {
+      return;
+    }
   }
   if (clientConn_->zeroRttWriteCipher && !conn_->oneRttWriteCipher) {
     CHECK(clientConn_->zeroRttWriteHeaderCipher);

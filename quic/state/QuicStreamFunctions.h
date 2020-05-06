@@ -117,11 +117,7 @@ std::pair<Buf, bool> readDataInOrderFromReadBuffer(
     uint64_t amount,
     bool sinkData = false);
 
-/**
- * Cancel the retransmissions of the crypto stream data.
- * TODO: remove this when we can deal with cleartext data after handshake done
- * correctly.
- */
+// TODO reap
 void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoStream);
 
 /**

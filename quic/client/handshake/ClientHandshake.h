@@ -65,10 +65,9 @@ class ClientHandshake : public Handshake {
   virtual const CryptoFactory& getCryptoFactory() const = 0;
 
   /**
-   * Notify the crypto layer that we received one rtt protected data.
-   * This allows us to know that the peer has implicitly acked the 1-rtt keys.
+   * Triggered when we have received a handshake done frame from the server.
    */
-  void onRecvOneRttProtectedData();
+  void handshakeConfirmed() override;
 
   Phase getPhase() const;
 

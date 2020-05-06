@@ -391,22 +391,18 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
   auto streamData = new StreamData(streamId);
   auto dataCopy = std::shared_ptr<folly::IOBuf>(std::move(data));
   EXPECT_CALL(*readCallback, readAvailable(streamId))
-      .WillRepeatedly(Invoke([c = client.get(),
-                              id = streamId,
-                              streamData,
-                              dataCopy](auto) mutable {
-        EXPECT_EQ(
-            dynamic_cast<ClientHandshake*>(c->getConn().handshakeLayer.get())
-                ->getPhase(),
-            ClientHandshake::Phase::Established);
-        auto readData = c->read(id, 1000);
-        auto copy = readData->first->clone();
-        LOG(INFO) << "Client received data="
-                  << copy->moveToFbString().toStdString() << " on stream=" << id
-                  << " read=" << readData->first->computeChainDataLength()
-                  << " sent=" << dataCopy->computeChainDataLength();
-        streamData->append(std::move(readData->first), readData->second);
-      }));
+      .WillRepeatedly(
+          Invoke([c = client.get(), id = streamId, streamData, dataCopy](
+                     auto) mutable {
+            auto readData = c->read(id, 1000);
+            auto copy = readData->first->clone();
+            LOG(INFO) << "Client received data="
+                      << copy->moveToFbString().toStdString()
+                      << " on stream=" << id
+                      << " read=" << readData->first->computeChainDataLength()
+                      << " sent=" << dataCopy->computeChainDataLength();
+            streamData->append(std::move(readData->first), readData->second);
+          }));
   ON_CALL(*readCallback, readError(streamId, _))
       .WillByDefault(Invoke([streamData](auto, auto err) mutable {
         streamData->setException(err);
@@ -615,7 +611,11 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   expected->prependChain(data->clone());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  if (GetParam().version == QuicVersion::MVFST_D24) {
+    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  } else {
+    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
@@ -680,23 +680,6 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 6);
-
-  std::array<std::string, 6> stateUpdates = {
-      kStart,
-      kZeroRttAttempted,
-      kZeroRttAccepted,
-      kZeroRttRejected,
-      getRxStreamWU(0, 0, kDefaultStreamWindowSize),
-      getClosingStream("0")};
-  for (int i = 0; i < 6; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    LOG(INFO) << event->update;
-    EXPECT_EQ(event->update, stateUpdates[i]);
-  }
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
@@ -1196,9 +1179,11 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     conn_->readCodec->setOneRttHeaderCipher(std::move(oneRttReadHeaderCipher));
   }
 
-  void setZeroRttRejected() {
-    zeroRttRejected_ = true;
-    createServerTransportParameters();
+  void setZeroRttRejected(bool rejected) {
+    zeroRttRejected_ = rejected;
+    if (rejected) {
+      createServerTransportParameters();
+    }
   }
 
   void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
@@ -1208,6 +1193,11 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
       conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher_);
     }
     if (getPhase() == Phase::Initial) {
+      conn_->handshakeWriteCipher = test::createNoOpAead();
+      conn_->handshakeWriteHeaderCipher = test::createNoOpHeaderCipher();
+      conn_->readCodec->setHandshakeReadCipher(test::createNoOpAead());
+      conn_->readCodec->setHandshakeHeaderCipher(
+          test::createNoOpHeaderCipher());
       writeDataToQuicStream(
           conn_->cryptoState->handshakeStream,
           IOBuf::copyBuffer("ClientFinished"));
@@ -3780,20 +3770,33 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
-        *makeEncryptedCodec(),
+        *makeHandshakeCodec(),
         QuicFrame::Type::ConnectionCloseFrame_E));
   } else {
     client->close(folly::none);
     EXPECT_TRUE(verifyFramePresent(
         socketWrites,
-        *makeEncryptedCodec(),
+        *makeHandshakeCodec(),
         QuicFrame::Type::ConnectionCloseFrame_E));
   }
 }
 
-TEST_F(
-    QuicClientTransportAfterStartTest,
+class QuicClientTransportAfterStartTestTimeout
+    : public QuicClientTransportAfterStartTestBase,
+      public testing::WithParamInterface<QuicVersion> {};
+
+INSTANTIATE_TEST_CASE_P(
+    QuicClientTransportAfterStartTestTimeouts,
+    QuicClientTransportAfterStartTestTimeout,
+    Values(
+        QuicVersion::MVFST,
+        QuicVersion::MVFST_D24,
+        QuicVersion::QUIC_DRAFT));
+
+TEST_P(
+    QuicClientTransportAfterStartTestTimeout,
     HandshakeCipherTimeoutAfterFirstData) {
+  client->getNonConstConn().version = GetParam();
   StreamId streamId = client->createBidirectionalStream().value();
 
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
@@ -3810,7 +3813,13 @@ TEST_F(
       true));
   deliverData(packet->coalesce());
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
-  EXPECT_TRUE(client->getConn().readCodec->getHandshakeDoneTime().has_value());
+  if (GetParam() == QuicVersion::MVFST_D24) {
+    EXPECT_TRUE(
+        client->getConn().readCodec->getHandshakeDoneTime().has_value());
+  } else {
+    EXPECT_FALSE(
+        client->getConn().readCodec->getHandshakeDoneTime().has_value());
+  }
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
@@ -5346,9 +5355,10 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
   EXPECT_CALL(clientConnCallback, onReplaySafe());
+  mockClientHandshake->setZeroRttRejected(false);
   recvServerHello();
 
-  EXPECT_NE(client->getConn().zeroRttWriteCipher, nullptr);
+  EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
 
   // All the data is still there.
   EXPECT_TRUE(zeroRttPacketsOutstanding());
@@ -5414,7 +5424,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
-  mockClientHandshake->setZeroRttRejected();
+  mockClientHandshake->setZeroRttRejected(true);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   recvServerHello();
   verifyTransportParameters(
@@ -5465,7 +5475,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
-  mockClientHandshake->setZeroRttRejected();
+  mockClientHandshake->setZeroRttRejected(true);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   EXPECT_THROW(recvServerHello(), std::runtime_error);
 }
@@ -5520,11 +5530,10 @@ TEST_F(
   EXPECT_GE(timeRemaining1.count() - timeRemaining2.count(), sleepAmountMillis);
 
   EXPECT_TRUE(zeroRttPacketsOutstanding());
+  mockClientHandshake->setZeroRttRejected(false);
   assertWritten(false, LongHeader::Types::ZeroRtt);
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   recvServerHello();
-
-  EXPECT_NE(client->getConn().zeroRttWriteCipher, nullptr);
 
   // All the data is still there.
   EXPECT_TRUE(zeroRttPacketsOutstanding());

@@ -8,6 +8,7 @@
 
 #include <quic/server/state/ServerStateMachine.h>
 
+#include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
@@ -247,30 +248,25 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   }
   auto handshakeWriteCipher = handshakeLayer->getHandshakeWriteCipher();
   auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-  if (handshakeWriteCipher) {
-    conn.handshakeWriteCipher = std::move(handshakeWriteCipher);
-  }
-  if (handshakeReadCipher) {
-    conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
-  }
   auto handshakeWriteHeaderCipher =
       handshakeLayer->getHandshakeWriteHeaderCipher();
   auto handshakeReadHeaderCipher =
       handshakeLayer->getHandshakeReadHeaderCipher();
-  if (handshakeWriteHeaderCipher) {
+  if (handshakeWriteCipher) {
+    CHECK(
+        handshakeReadCipher && handshakeWriteHeaderCipher &&
+        handshakeReadHeaderCipher);
+    conn.handshakeWriteCipher = std::move(handshakeWriteCipher);
     conn.handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
-  }
-  if (handshakeReadHeaderCipher) {
+    conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
     conn.readCodec->setHandshakeHeaderCipher(
         std::move(handshakeReadHeaderCipher));
   }
   if (handshakeLayer->isHandshakeDone()) {
-    auto doneTime = conn.readCodec->getHandshakeDoneTime();
-    if (!doneTime) {
-      conn.readCodec->onHandshakeDone(Clock::now());
-      if (conn.version != QuicVersion::MVFST_D24) {
-        sendSimpleFrame(conn, HandshakeDoneFrame());
-      }
+    CHECK(conn.oneRttWriteCipher);
+    if (conn.version != QuicVersion::MVFST_D24 && !conn.sentHandshakeDone) {
+      sendSimpleFrame(conn, HandshakeDoneFrame());
+      conn.sentHandshakeDone = true;
     }
   }
 }
@@ -770,6 +766,7 @@ void onServerReadDataFromOpen(
     bool pktHasRetransmittableData = false;
     bool pktHasCryptoData = false;
     bool isNonProbingPacket = false;
+    bool handshakeConfirmedThisLoop = false;
 
     // TODO: possibly drop the packet here, but rolling back state of
     // what we've already processed is difficult.
@@ -833,7 +830,15 @@ void onServerReadDataFromOpen(
                   case QuicWriteFrame::Type::QuicSimpleFrame_E: {
                     const QuicSimpleFrame& frame =
                         *packetFrame.asQuicSimpleFrame();
-                    updateSimpleFrameOnAck(conn, frame);
+                    // ACK of HandshakeDone is a server-specific behavior.
+                    if (frame.asHandshakeDoneFrame() &&
+                        conn.version != QuicVersion::MVFST_D24) {
+                      // Call handshakeConfirmed outside of the packet
+                      // processing loop to avoid a re-entrancy.
+                      handshakeConfirmedThisLoop = true;
+                    } else {
+                      updateSimpleFrameOnAck(conn, frame);
+                    }
                     break;
                   }
                   default: {
@@ -985,6 +990,10 @@ void onServerReadDataFromOpen(
           break;
         }
       }
+    }
+
+    if (handshakeConfirmedThisLoop) {
+      handshakeConfirmed(conn);
     }
 
     // Update writable limit before processing the handshake data. This is so

@@ -98,14 +98,8 @@ void ClientHandshake::doHandshake(
   }
 }
 
-/**
- * Notify the crypto layer that we received one rtt protected data.
- * This allows us to know that the peer has implicitly acked the 1-rtt keys.
- */
-void ClientHandshake::onRecvOneRttProtectedData() {
-  if (phase_ != Phase::Established) {
-    phase_ = Phase::Established;
-  }
+void ClientHandshake::handshakeConfirmed() {
+  phase_ = Phase::Established;
 }
 
 ClientHandshake::Phase ClientHandshake::getPhase() const {
@@ -118,7 +112,7 @@ ClientHandshake::getServerTransportParams() {
 }
 
 folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
-  return std::move(zeroRttRejected_);
+  return zeroRttRejected_;
 }
 
 bool ClientHandshake::verifyRetryIntegrityTag(
@@ -249,6 +243,8 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
           LocalErrorCode::EARLY_DATA_REJECTED);
       return;
     }
+  } else if (earlyDataAttempted_ && earlyDataAccepted) {
+    zeroRttRejected_ = false;
   }
   // After a successful handshake we should send packets with the type of
   // ClientCleartext. We assume that by the time we get the data for the QUIC
