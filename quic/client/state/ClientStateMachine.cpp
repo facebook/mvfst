@@ -10,6 +10,7 @@
 
 #include <folly/io/async/AsyncSocketException.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
+#include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -125,6 +126,7 @@ void processServerInitialParams(
       maxStreamsUni.value_or(0));
   conn.peerAdvertisedInitialMaxStreamsUni = maxStreamsUni.value_or(0);
   conn.peerIdleTimeout = std::chrono::milliseconds(idleTimeout.value_or(0));
+  conn.peerIdleTimeout = timeMin(conn.peerIdleTimeout, kMaxIdleTimeout);
   if (ackDelayExponent && *ackDelayExponent > kMaxAckDelayExponent) {
     throw QuicTransportException(
         "ack_delay_exponent too large",

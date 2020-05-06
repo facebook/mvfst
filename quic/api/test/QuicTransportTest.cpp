@@ -128,6 +128,10 @@ class TestQuicTransport
     return lossTimeout_;
   }
 
+  auto& idleTimeout() {
+    return idleTimeout_;
+  }
+
   CloseState closeState() {
     return closeState_;
   }
@@ -138,6 +142,10 @@ class TestQuicTransport
 
   void drainImmediately() {
     drainTimeoutExpired();
+  }
+
+  void setIdleTimerNow() {
+    setIdleTimer();
   }
 
   std::unique_ptr<Aead> aead;
@@ -2471,6 +2479,30 @@ TEST_F(QuicTransportTest, CloseWithDrainWillKeepSocketAround) {
   EXPECT_CALL(*socket_, pauseRead()).Times(1);
   EXPECT_CALL(*socket_, close()).Times(1);
   transport_->drainImmediately();
+}
+
+TEST_F(QuicTransportTest, IdleTimeoutMin) {
+  transport_->getConnectionState().transportSettings.idleTimeout = 60s;
+  transport_->getConnectionState().peerIdleTimeout = 15s;
+  transport_->setIdleTimerNow();
+  EXPECT_NEAR(
+      transport_->idleTimeout().getTimeRemaining().count(), 15000, 1000);
+}
+
+TEST_F(QuicTransportTest, IdleTimeoutLocalDisabled) {
+  transport_->getConnectionState().transportSettings.idleTimeout = 0s;
+  transport_->getConnectionState().peerIdleTimeout = 15s;
+  transport_->setIdleTimerNow();
+  EXPECT_FALSE(transport_->idleTimeout().isScheduled());
+}
+
+TEST_F(QuicTransportTest, IdleTimeoutPeerDisabled) {
+  transport_->getConnectionState().transportSettings.idleTimeout = 60s;
+  transport_->getConnectionState().peerIdleTimeout = 0s;
+  transport_->setIdleTimerNow();
+  ASSERT_TRUE(transport_->idleTimeout().isScheduled());
+  EXPECT_NEAR(
+      transport_->idleTimeout().getTimeRemaining().count(), 60000, 1000);
 }
 
 TEST_F(QuicTransportTest, PacedWriteNoDataToWrite) {

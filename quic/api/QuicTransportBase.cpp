@@ -1647,11 +1647,15 @@ void QuicTransportBase::setIdleTimer() {
   if (idleTimeout_.isScheduled()) {
     idleTimeout_.cancelTimeout();
   }
-  if (conn_->transportSettings.idleTimeout >
-      std::chrono::milliseconds::zero()) {
-    getEventBase()->timer().scheduleTimeout(
-        &idleTimeout_, conn_->transportSettings.idleTimeout);
+  auto localIdleTimeout = conn_->transportSettings.idleTimeout;
+  // The local idle timeout being zero means it is disabled.
+  if (localIdleTimeout == 0ms) {
+    return;
   }
+  auto peerIdleTimeout =
+      conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
+  auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
+  getEventBase()->timer().scheduleTimeout(&idleTimeout_, idleTimeout);
 }
 
 uint64_t QuicTransportBase::getNumOpenableBidirectionalStreams() const {
