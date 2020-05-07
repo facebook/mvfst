@@ -772,6 +772,64 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   EXPECT_EQ(buf->length(), conn.udpSendPacketLen);
 }
 
+TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.udpSendPacketLen = 1000;
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto inputData = buildRandomInputData(conn.udpSendPacketLen * 10);
+  writeDataToQuicStream(*stream, inputData->clone(), false);
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+  auto cipherOverhead = 16;
+  PacketNum packetNum = 0;
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto packetResult = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen - cipherOverhead);
+  auto encodedSize = packetResult.packet->body->computeChainDataLength() +
+      packetResult.packet->header->computeChainDataLength() + cipherOverhead;
+  EXPECT_EQ(encodedSize, conn.udpSendPacketLen);
+  updateConnection(
+      conn,
+      folly::none,
+      packetResult.packet->packet,
+      Clock::now(),
+      encodedSize);
+
+  // make packetNum too larger to be encoded into the same size:
+  packetNum += 0xFF;
+  ShortHeader cloneHeader(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  RegularQuicPacketBuilder throwawayBuilder(
+      conn.udpSendPacketLen,
+      std::move(cloneHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  FrameScheduler noopScheduler("noopScheduler");
+  CloningScheduler cloningScheduler(
+      noopScheduler, conn, "CopyCat", cipherOverhead);
+  auto cloneResult = cloningScheduler.scheduleFramesForPacket(
+      std::move(throwawayBuilder), kDefaultUDPSendPacketLen);
+  EXPECT_FALSE(cloneResult.packet.hasValue());
+  EXPECT_FALSE(cloneResult.packetEvent.hasValue());
+}
+
 class AckSchedulingTest : public TestWithParam<PacketNumberSpace> {};
 
 TEST_F(QuicPacketSchedulerTest, AckStateHasAcksToSchedule) {

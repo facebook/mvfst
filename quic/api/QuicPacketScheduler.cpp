@@ -549,17 +549,18 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     std::unique_ptr<PacketBuilderInterface> internalBuilder;
     if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
       internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
-          conn_.udpSendPacketLen,
+          conn_.udpSendPacketLen - cipherOverhead_,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer);
     } else {
       CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
       internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
           *conn_.bufAccessor,
-          conn_.udpSendPacketLen,
+          conn_.udpSendPacketLen - cipherOverhead_,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer);
     }
+    internalBuilder->setCipherOverhead(cipherOverhead_);
     internalBuilder->encodePacketHeader();
     PacketRebuilder rebuilder(*internalBuilder, conn_);
     // We shouldn't clone Handshake packet.
@@ -575,10 +576,17 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
 
     // The writableBytes here is an optimization. If the writableBytes is too
     // small for this packet. rebuildFromPacket should fail anyway.
-    // TODO: This isn't the ideal way to solve the wrong writableBytes problem.
     if (iter->encodedSize > writableBytes + cipherOverhead_) {
       continue;
     }
+
+    // TODO: It's possible we write out a packet that's larger than the packet
+    // size limit. For example, when the packet sequence number has advanced to
+    // a point where we need more bytes to encoded it than that of the original
+    // packet. In that case, if the original packet is already at the packet
+    // size limit, we will generate a packet larger than the limit. We can
+    // either ignore the problem, hoping the packet will be able to travel the
+    // network just fine; Or we can throw away the built packet and send a ping.
 
     // Rebuilder will write the rest of frames
     auto rebuildResult = rebuilder.rebuildFromPacket(*iter);
