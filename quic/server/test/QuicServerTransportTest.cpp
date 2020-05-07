@@ -696,7 +696,8 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       0,
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf1->clone(), buf1->computeChainDataLength());
@@ -707,7 +708,8 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
       0,
       buf1->computeChainDataLength(),
       buf1->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   ASSERT_TRUE(dataLen);
   ASSERT_EQ(*dataLen, buf1->computeChainDataLength());
   writeStreamFrameData(builder, buf2->clone(), buf2->computeChainDataLength());
@@ -1105,7 +1107,8 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
       0,
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(builder, buf->clone(), buf->computeChainDataLength());
   std::string errMsg = "Mind the gap";
   ConnectionCloseFrame connClose(
@@ -1317,7 +1320,8 @@ TEST_F(QuicServerTransportTest, ReceiveRstStreamNonExistentAndOtherFrame) {
       0,
       data->computeChainDataLength(),
       data->computeChainDataLength(),
-      false);
+      false,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));
@@ -1575,7 +1579,13 @@ TEST_F(QuicServerTransportTest, RecvStopSendingFrameAfterHalfCloseRemote) {
       streamId, GenericApplicationErrorCode::UNKNOWN);
   ASSERT_TRUE(builder.canBuildPacket());
   auto dataLen = writeStreamFrameHeader(
-      builder, 0x00, stream->currentReadOffset, 0, 10, true);
+      builder,
+      0x00,
+      stream->currentReadOffset,
+      0,
+      10,
+      true,
+      folly::none /* skipLenHint */);
   ASSERT_TRUE(dataLen.has_value());
   ASSERT_EQ(*dataLen, 0);
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);

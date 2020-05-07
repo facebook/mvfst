@@ -35,7 +35,8 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     uint64_t offset,
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
-    bool fin) {
+    bool fin,
+    folly::Optional<bool> skipLenHint) {
   if (builder.remainingSpaceInPkt() == 0) {
     return folly::none;
   }
@@ -70,10 +71,18 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   // a zero length fin-only stream frame and omitting the length field.
   uint64_t dataLen = std::min(writeBufferLen, flowControlLen);
   uint64_t dataLenLen = 0;
-  if (dataLen > 0 && dataLen >= builder.remainingSpaceInPkt() - headerSize) {
-    // We can fill this entire packet with the rest of this stream frame.
-    dataLen = builder.remainingSpaceInPkt() - headerSize;
+  bool shouldSkipLengthField;
+  if (skipLenHint) {
+    shouldSkipLengthField = *skipLenHint;
   } else {
+    // Check if we can fill the entire packet with the rest of this stream frame
+    shouldSkipLengthField =
+        dataLen > 0 && dataLen >= builder.remainingSpaceInPkt() - headerSize;
+  }
+  // At most we can write the minimal between data length and what the packet
+  // builder allows us to write.
+  dataLen = std::min(dataLen, builder.remainingSpaceInPkt() - headerSize);
+  if (!shouldSkipLengthField) {
     if (dataLen <= kOneByteLimit - 1) {
       dataLenLen = 1;
     } else if (dataLen <= kTwoByteLimit - 2) {

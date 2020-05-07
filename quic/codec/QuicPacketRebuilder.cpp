@@ -52,6 +52,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   for (auto iter = packet.packet.frames.cbegin();
        iter != packet.packet.frames.cend();
        iter++) {
+    bool lastFrame = iter == packet.packet.frames.cend() - 1;
     const QuicWriteFrame& frame = *iter;
     switch (frame.type()) {
       case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -82,7 +83,8 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
               streamFrame.offset,
               bufferLen,
               bufferLen,
-              streamFrame.fin);
+              streamFrame.fin,
+              lastFrame && bufferLen);
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has

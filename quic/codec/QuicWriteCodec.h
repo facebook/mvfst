@@ -65,6 +65,11 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder);
  * the bytes of data that can be written following the header. The number of
  * bytes are communicated by an optional that can be >= 0. It is expected that
  * the call is followed by writeStreamFrameData.
+ *
+ * skipLenHint: When this value is present, caller will decide if the stream
+ *   length field should be skipped. Otherwise, the function has its own logic
+ *   to decide it. When skipLenHint is true, the field is skipped. When it's
+ *   false, it will be encoded into the header.
  */
 folly::Optional<uint64_t> writeStreamFrameHeader(
     PacketBuilderInterface& builder,
@@ -72,7 +77,8 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     uint64_t offset,
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
-    bool fin);
+    bool fin,
+    folly::Optional<bool> skipLenHint);
 
 /**
  * Write stream frama data into builder

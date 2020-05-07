@@ -337,7 +337,8 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       offset,
       data.computeChainDataLength(),
       data.computeChainDataLength(),
-      eof);
+      eof,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(*builder, data.clone(), data.computeChainDataLength());
   return std::move(*builder).buildPacket();
 }

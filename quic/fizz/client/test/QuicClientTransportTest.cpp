@@ -4117,7 +4117,8 @@ TEST_F(
       0,
       data->computeChainDataLength(),
       data->computeChainDataLength(),
-      false);
+      false,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(builder2, data->clone(), data->computeChainDataLength());
   auto packetObject = std::move(builder2).buildPacket();
   auto packet2 = packetToBuf(std::move(packetObject));

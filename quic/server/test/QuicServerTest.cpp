@@ -912,7 +912,8 @@ auto createInitialStream(
       0,
       streamData->computeChainDataLength(),
       streamData->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   EXPECT_TRUE(dataLen);
   writeStreamFrameData(builder, std::move(streamData), *dataLen);
   return packetToBuf(std::move(builder).buildPacket());
@@ -1361,9 +1362,8 @@ class QuicServerTest : public Test {
     if (stats) {
       CHECK_EQ(evbs.size(), 1);
       EXPECT_CALL(*transportStatsFactory_, make())
-          .WillRepeatedly(Invoke([stats]() {
-            return std::unique_ptr<MockQuicStats>(stats);
-          }));
+          .WillRepeatedly(Invoke(
+              [stats]() { return std::unique_ptr<MockQuicStats>(stats); }));
     } else {
       EXPECT_CALL(*transportStatsFactory_, make()).WillRepeatedly(Invoke([&]() {
         auto mockInfoCb = std::make_unique<NiceMock<MockQuicStats>>();

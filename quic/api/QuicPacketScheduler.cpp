@@ -227,7 +227,8 @@ void RetransmissionScheduler::writeRetransmissionStreams(
           buffer->offset,
           bufferLen, // writeBufferLen -- only the len of the single buffer.
           bufferLen, // flowControlLen -- not relevant, already flow controlled.
-          buffer->eof);
+          buffer->eof,
+          folly::none /* skipLenHint */);
       if (dataLen) {
         writeStreamFrameData(builder, buffer->data, *dataLen);
         VLOG(4) << "Wrote retransmitted stream=" << stream->id
@@ -335,7 +336,8 @@ bool StreamFrameScheduler::writeNextStreamFrame(
       stream->currentWriteOffset,
       bufferLen,
       flowControlLen,
-      canWriteFin);
+      canWriteFin,
+      folly::none /* skipLenHint */);
   if (!dataLen) {
     return false;
   }

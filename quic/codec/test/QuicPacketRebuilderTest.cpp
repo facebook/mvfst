@@ -10,6 +10,7 @@
 
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicPacketRebuilder.h>
+#include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStateFunctions.h>
@@ -86,7 +87,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       0,
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeFrame(maxDataFrame, regularBuilder1);
@@ -212,7 +214,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       0,
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -242,7 +245,8 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
   auto streamId = stream->id;
 
   // Write them with a regular builder
-  writeStreamFrameHeader(regularBuilder1, streamId, 0, 0, 0, true);
+  writeStreamFrameHeader(
+      regularBuilder1, streamId, 0, 0, 0, true, folly::none /* skipLenHint */);
   auto packet1 = std::move(regularBuilder1).buildPacket();
   stream->retransmissionBuffer.emplace(
       std::piecewise_construct,
@@ -295,7 +299,8 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
       0,
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   writeCryptoFrame(cryptoOffset, cryptoBuf->clone(), regularBuilder1);
@@ -397,7 +402,8 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
       0,
       buf->computeChainDataLength(),
       buf->computeChainDataLength(),
-      true);
+      true,
+      folly::none /* skipLenHint */);
   writeStreamFrameData(
       regularBuilder1, buf->clone(), buf->computeChainDataLength());
   auto packet1 = std::move(regularBuilder1).buildPacket();
@@ -445,5 +451,150 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   EXPECT_EQ(1, conn.outstandingClonedPacketsCount);
 }
 
+TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
+  QuicServerConnectionState conn;
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto streamId = stream->id;
+  auto buf1 =
+      folly::IOBuf::copyBuffer("Remember your days are fully numbered.");
+  auto buf2 = folly::IOBuf::copyBuffer("Just march on");
+
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
+  RegularQuicPacketBuilder regularBuilder(
+      kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
+  regularBuilder.encodePacketHeader();
+  writeStreamFrameHeader(
+      regularBuilder,
+      streamId,
+      0,
+      buf1->computeChainDataLength(),
+      buf1->computeChainDataLength(),
+      false,
+      folly::none);
+  writeStreamFrameData(
+      regularBuilder, buf1->clone(), buf1->computeChainDataLength());
+  writeStreamFrameHeader(
+      regularBuilder,
+      streamId,
+      buf1->computeChainDataLength(),
+      buf2->computeChainDataLength(),
+      buf2->computeChainDataLength(),
+      true,
+      folly::none);
+  writeStreamFrameData(
+      regularBuilder, buf2->clone(), buf2->computeChainDataLength());
+  auto packet = std::move(regularBuilder).buildPacket();
+  auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1200);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(buf1->clone(), 0, false)));
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(buf1->computeChainDataLength()),
+      std::forward_as_tuple(std::make_unique<StreamBuffer>(
+          buf2->clone(), buf1->computeChainDataLength(), true)));
+
+  MockQuicPacketBuilder mockBuilder;
+  size_t packetLimit = 1200;
+  EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
+    return packetLimit;
+  }));
+  // write data twice
+  EXPECT_CALL(mockBuilder, insert(_, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](const BufQueue&, size_t limit) { packetLimit -= limit; }));
+  // Append frame twice
+  EXPECT_CALL(mockBuilder, appendFrame(_)).Times(2);
+  // initial byte:
+  EXPECT_CALL(mockBuilder, writeBEUint8(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](uint8_t) { packetLimit--; }));
+  // Write streamId twice, offset once, then data len only once:
+  EXPECT_CALL(mockBuilder, write(_))
+      .Times(4)
+      .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
+        packetLimit -= quicInt.getSize();
+      }));
+
+  PacketRebuilder rebuilder(mockBuilder, conn);
+  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
+}
+
+TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlyNotSkipLen) {
+  QuicServerConnectionState conn;
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  auto stream = conn.streamManager->createNextBidirectionalStream().value();
+  auto streamId = stream->id;
+  auto buf1 =
+      folly::IOBuf::copyBuffer("Remember your days are fully numbered.");
+
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
+  RegularQuicPacketBuilder regularBuilder(
+      kDefaultUDPSendPacketLen, std::move(shortHeader), 0);
+  regularBuilder.encodePacketHeader();
+  writeStreamFrameHeader(
+      regularBuilder,
+      streamId,
+      0,
+      buf1->computeChainDataLength(),
+      buf1->computeChainDataLength(),
+      false,
+      folly::none);
+  writeStreamFrameData(
+      regularBuilder, buf1->clone(), buf1->computeChainDataLength());
+  writeStreamFrameHeader(
+      regularBuilder,
+      streamId,
+      buf1->computeChainDataLength(),
+      0,
+      0,
+      true,
+      folly::none);
+  writeStreamFrameData(regularBuilder, nullptr, 0);
+  auto packet = std::move(regularBuilder).buildPacket();
+  auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1200);
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(0),
+      std::forward_as_tuple(
+          std::make_unique<StreamBuffer>(buf1->clone(), 0, false)));
+  stream->retransmissionBuffer.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(buf1->computeChainDataLength()),
+      std::forward_as_tuple(std::make_unique<StreamBuffer>(
+          nullptr, buf1->computeChainDataLength(), true)));
+
+  MockQuicPacketBuilder mockBuilder;
+  size_t packetLimit = 1200;
+  EXPECT_CALL(mockBuilder, remainingSpaceInPkt()).WillRepeatedly(Invoke([&]() {
+    return packetLimit;
+  }));
+  // write data only
+  EXPECT_CALL(mockBuilder, insert(_, _))
+      .Times(1)
+      .WillOnce(
+          Invoke([&](const BufQueue&, size_t limit) { packetLimit -= limit; }));
+  // Append frame twice
+  EXPECT_CALL(mockBuilder, appendFrame(_)).Times(2);
+  // initial byte:
+  EXPECT_CALL(mockBuilder, writeBEUint8(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](uint8_t) { packetLimit--; }));
+  // Write streamId twice, offset once, then data len twice:
+  EXPECT_CALL(mockBuilder, write(_))
+      .Times(5)
+      .WillRepeatedly(Invoke([&](const QuicInteger& quicInt) {
+        packetLimit -= quicInt.getSize();
+      }));
+
+  PacketRebuilder rebuilder(mockBuilder, conn);
+  EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
+}
 } // namespace test
 } // namespace quic
