@@ -870,6 +870,7 @@ TEST_F(QuicServerWorkerTest, AssignBufAccessor) {
   auto connId = getTestConnectionId(hostId_);
   TransportSettings transportSettings;
   transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
   worker_->setTransportSettings(transportSettings);
   EXPECT_CALL(*transport_, setBufAccessor(_))
       .Times(1)

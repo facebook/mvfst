@@ -774,6 +774,12 @@ void QuicServerWorker::setFizzContext(
 void QuicServerWorker::setTransportSettings(
     TransportSettings transportSettings) {
   transportSettings_ = transportSettings;
+  if (transportSettings_.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO) {
+    if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
+      LOG(ERROR) << "Unsupported data path type and batching mode combinartoin";
+    }
+    transportSettings_.dataPathType = DataPathType::ChainedMemory;
+  }
   if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
     // TODO: maxBatchSize is only a good start value when each transport does
     // its own socket writing. If we experiment with multiple transports GSO
