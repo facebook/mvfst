@@ -415,8 +415,8 @@ constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
 
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
-  REJECT_IF_NO_EXACT_MATCH,
-  LIMIT_IF_NO_EXACT_MATCH,
+  REJECT_IF_NO_EXACT_MATCH = 0,
+  LIMIT_IF_NO_EXACT_MATCH = 1,
   // T33014230 Subnet matching
   // REJECT_IF_NO_SUBNECT_MATCH,
   // LIMIT_IF_NO_EXACT_MATCH
