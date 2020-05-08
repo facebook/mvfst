@@ -1384,6 +1384,9 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingNewData) {
       *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn));
   EXPECT_LT(currentPacketSeqNum, conn->ackStates.appDataAckState.nextPacketNum);
   EXPECT_FALSE(conn->outstandingPackets.empty());
+  EXPECT_EQ(
+      conn->outstandingPackets.back().packet.header.getPacketSequenceNum(),
+      currentPacketSeqNum + 1);
   EXPECT_TRUE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_GT(stream1->currentWriteOffset, currentStreamWriteOffset);
   EXPECT_FALSE(stream1->retransmissionBuffer.empty());
@@ -1505,7 +1508,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbesNoNewDataNoCryptoDataNoOldData) {
           *headerCipher,
           getVersion(*conn)));
   EXPECT_EQ(1, probesToSend);
-  EXPECT_EQ(currentPacketSeqNum, conn->ackStates.appDataAckState.nextPacketNum);
+  EXPECT_EQ(
+      currentPacketSeqNum + 1, conn->ackStates.appDataAckState.nextPacketNum);
   EXPECT_TRUE(conn->outstandingPackets.empty());
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(stream1->currentWriteOffset, currentStreamWriteOffset);
@@ -1546,7 +1550,8 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotWriteOtherFrames) {
           *headerCipher,
           getVersion(*conn)));
   EXPECT_EQ(1, probesToSend);
-  EXPECT_EQ(currentPacketSeqNum, conn->ackStates.appDataAckState.nextPacketNum);
+  EXPECT_EQ(
+      currentPacketSeqNum + 1, conn->ackStates.appDataAckState.nextPacketNum);
   EXPECT_TRUE(conn->outstandingPackets.empty());
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(stream1->currentWriteOffset, currentStreamWriteOffset);

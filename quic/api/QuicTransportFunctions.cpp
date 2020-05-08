@@ -1084,6 +1084,8 @@ uint64_t writeProbingDataToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
+  // Skip a packet number for probing packets to elicit acks
+  increaseNextPacketNum(connection, pnSpace);
   CloningScheduler cloningScheduler(
       scheduler, connection, "CloningScheduler", aead.getCipherOverhead());
   auto written = writeConnectionDataToSocket(
