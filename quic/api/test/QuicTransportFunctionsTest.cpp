@@ -1856,6 +1856,8 @@ TEST_F(QuicTransportFunctionsTest, HasCryptoDataToWrite) {
   conn->cryptoState->initialStream.lossBuffer.emplace_back(
       folly::IOBuf::copyBuffer("Grab your coat and get your hat"), 0, false);
   EXPECT_EQ(WriteDataReason::CRYPTO_STREAM, hasNonAckDataToWrite(*conn));
+  conn->initialWriteCipher.reset();
+  EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasControlFramesToWrite) {

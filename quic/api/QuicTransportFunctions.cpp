@@ -25,6 +25,21 @@
 
 namespace {
 
+/*
+ *  Check whether crypto has pending data.
+ */
+bool cryptoHasWritableData(const quic::QuicConnectionStateBase& conn) {
+  return (conn.initialWriteCipher &&
+          (!conn.cryptoState->initialStream.writeBuffer.empty() ||
+           !conn.cryptoState->initialStream.lossBuffer.empty())) ||
+      (conn.handshakeWriteCipher &&
+       (!conn.cryptoState->handshakeStream.writeBuffer.empty() ||
+        !conn.cryptoState->handshakeStream.lossBuffer.empty())) ||
+      (conn.oneRttWriteCipher &&
+       (!conn.cryptoState->oneRttStream.writeBuffer.empty() ||
+        !conn.cryptoState->oneRttStream.lossBuffer.empty()));
+}
+
 std::string optionalToString(
     const folly::Optional<quic::PacketNum>& packetNum) {
   if (!packetNum) {

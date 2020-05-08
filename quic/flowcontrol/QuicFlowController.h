@@ -74,11 +74,6 @@ void onConnWindowUpdateLost(QuicConnectionStateBase& conn);
 
 void onBlockedLost(QuicStreamState& stream);
 
-/*
- *  Check whether crypto has pending data.
- */
-bool cryptoHasWritableData(const QuicConnectionStateBase& conn);
-
 /**
  * Returns the number of bytes that the peer is willing to receive from
  * us at this point on the stream.

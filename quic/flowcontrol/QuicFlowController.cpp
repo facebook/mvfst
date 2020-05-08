@@ -295,15 +295,6 @@ void handleStreamBlocked(QuicStreamState& stream) {
   VLOG(4) << "Blocked triggered stream window update stream=" << stream.id;
 }
 
-bool cryptoHasWritableData(const QuicConnectionStateBase& conn) {
-  return !conn.cryptoState->initialStream.writeBuffer.empty() ||
-      !conn.cryptoState->initialStream.lossBuffer.empty() ||
-      !conn.cryptoState->handshakeStream.writeBuffer.empty() ||
-      !conn.cryptoState->handshakeStream.lossBuffer.empty() ||
-      !conn.cryptoState->oneRttStream.writeBuffer.empty() ||
-      !conn.cryptoState->oneRttStream.lossBuffer.empty();
-}
-
 uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
   DCHECK_GE(
       stream.flowControlState.peerAdvertisedMaxOffset,
