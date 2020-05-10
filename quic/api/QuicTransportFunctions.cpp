@@ -1247,9 +1247,7 @@ void implicitAckCryptoStream(
             auto cryptoStream =
                 getCryptoStream(*conn.cryptoState, encryptionLevel);
             processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-            DCHECK(cryptoStream->retransmissionBuffer.empty());
-            DCHECK(cryptoStream->writeBuffer.empty());
-            DCHECK(cryptoStream->lossBuffer.empty());
+            CHECK(cryptoStream->retransmissionBuffer.empty());
             break;
           }
           case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -1266,6 +1264,12 @@ void implicitAckCryptoStream(
       // Can't do anything with loss at this point.
       [](auto&, auto&, auto, auto) {},
       implicitAckTime);
+  // Clear our the loss buffer explicity. The implicit ACK itself will not
+  // remove data already in the loss buffer.
+  auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
+  cryptoStream->lossBuffer.clear();
+  // The write buffer should be empty, there's no optional crypto data.
+  CHECK(cryptoStream->writeBuffer.empty());
 }
 
 void handshakeConfirmed(QuicConnectionStateBase& conn) {

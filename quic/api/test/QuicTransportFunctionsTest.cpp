@@ -614,6 +614,98 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   EXPECT_EQ(event->frames.size(), 2);
 }
 
+TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
+  auto conn = createConn();
+  auto data = IOBuf::copyBuffer("totally real crypto data");
+  data->coalesce();
+
+  auto initialStream =
+      getCryptoStream(*conn->cryptoState, EncryptionLevel::Initial);
+  ASSERT_TRUE(initialStream->writeBuffer.empty());
+  ASSERT_TRUE(initialStream->retransmissionBuffer.empty());
+  ASSERT_TRUE(initialStream->lossBuffer.empty());
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
+  packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
+  initialStream->writeBuffer.append(data->clone());
+  updateConnection(
+      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+  EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, initialStream->retransmissionBuffer.size());
+
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
+  packet.packet.frames.push_back(
+      WriteCryptoFrame(data->length(), data->length()));
+  initialStream->writeBuffer.append(data->clone());
+  updateConnection(
+      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+  EXPECT_EQ(2, conn->outstandingHandshakePacketsCount);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+  EXPECT_EQ(2, initialStream->retransmissionBuffer.size());
+  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->lossBuffer.empty());
+
+  // Fake loss.
+  Buf firstBuf =
+      initialStream->retransmissionBuffer.find(0)->second->data.move();
+  initialStream->retransmissionBuffer.erase(0);
+  initialStream->lossBuffer.emplace_back(std::move(firstBuf), 0, false);
+  conn->outstandingPackets.pop_front();
+  conn->outstandingHandshakePacketsCount--;
+
+  auto handshakeStream =
+      getCryptoStream(*conn->cryptoState, EncryptionLevel::Handshake);
+  ASSERT_TRUE(handshakeStream->writeBuffer.empty());
+  ASSERT_TRUE(handshakeStream->retransmissionBuffer.empty());
+  ASSERT_TRUE(handshakeStream->lossBuffer.empty());
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
+  handshakeStream->writeBuffer.append(data->clone());
+  updateConnection(
+      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+  EXPECT_EQ(2, conn->outstandingHandshakePacketsCount);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+  EXPECT_EQ(1, handshakeStream->retransmissionBuffer.size());
+
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  packet.packet.frames.push_back(
+      WriteCryptoFrame(data->length(), data->length()));
+  handshakeStream->writeBuffer.append(data->clone());
+  updateConnection(
+      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+  EXPECT_EQ(3, conn->outstandingHandshakePacketsCount);
+  EXPECT_EQ(3, conn->outstandingPackets.size());
+  EXPECT_EQ(2, handshakeStream->retransmissionBuffer.size());
+  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->lossBuffer.empty());
+
+  // Fake loss.
+  firstBuf = handshakeStream->retransmissionBuffer.find(0)->second->data.move();
+  handshakeStream->retransmissionBuffer.erase(0);
+  handshakeStream->lossBuffer.emplace_back(std::move(firstBuf), 0, false);
+  auto& op = conn->outstandingPackets.front();
+  ASSERT_EQ(
+      op.packet.header.getPacketNumberSpace(), PacketNumberSpace::Handshake);
+  auto frame = op.packet.frames[0].asWriteCryptoFrame();
+  EXPECT_EQ(frame->offset, 0);
+  conn->outstandingPackets.pop_front();
+  conn->outstandingHandshakePacketsCount--;
+
+  implicitAckCryptoStream(*conn, EncryptionLevel::Initial);
+  EXPECT_EQ(1, conn->outstandingHandshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
+  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->lossBuffer.empty());
+
+  implicitAckCryptoStream(*conn, EncryptionLevel::Handshake);
+  EXPECT_EQ(0, conn->outstandingHandshakePacketsCount);
+  EXPECT_TRUE(conn->outstandingPackets.empty());
+  EXPECT_TRUE(handshakeStream->retransmissionBuffer.empty());
+  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->lossBuffer.empty());
+}
+
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
@@ -2073,6 +2165,69 @@ TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillOnce(Return(2001));
   EXPECT_EQ(conn->udpSendPacketLen * 2, congestionControlWritableBytes(*conn));
+}
+
+TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
+  auto conn = createConn();
+  conn->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto initialStream =
+      getCryptoStream(*conn->cryptoState, EncryptionLevel::Initial);
+  auto handshakeStream =
+      getCryptoStream(*conn->cryptoState, EncryptionLevel::Handshake);
+  writeDataToQuicStream(
+      *initialStream, folly::IOBuf::copyBuffer("LittleRemedies"));
+  writeDataToQuicStream(
+      *handshakeStream,
+      folly::IOBuf::copyBuffer("Where should I join the meeting"));
+  ASSERT_NE(nullptr, conn->initialWriteCipher);
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->readCodec->setInitialReadCipher(createNoOpAead());
+  conn->readCodec->setInitialHeaderCipher(createNoOpHeaderCipher());
+  conn->readCodec->setHandshakeReadCipher(createNoOpAead());
+  conn->readCodec->setHandshakeHeaderCipher(createNoOpHeaderCipher());
+  conn->oneRttWriteCipher = createNoOpAead();
+  writeCryptoDataProbesToSocketForTest(
+      *socket,
+      *conn,
+      1,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      LongHeader::Types::Initial);
+  writeCryptoDataProbesToSocketForTest(
+      *socket,
+      *conn,
+      1,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      LongHeader::Types::Handshake);
+  ASSERT_FALSE(initialStream->retransmissionBuffer.empty());
+  ASSERT_FALSE(handshakeStream->retransmissionBuffer.empty());
+  initialStream->insertIntoLossBuffer(std::make_unique<StreamBuffer>(
+      folly::IOBuf::copyBuffer(
+          "I don't see the dialup info in the meeting invite"),
+      0,
+      false));
+  handshakeStream->insertIntoLossBuffer(std::make_unique<StreamBuffer>(
+      folly::IOBuf::copyBuffer("Traffic Protocol Weekly Sync"), 0, false));
+
+  handshakeConfirmed(*conn);
+  EXPECT_TRUE(initialStream->writeBuffer.empty());
+  EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
+  EXPECT_TRUE(initialStream->lossBuffer.empty());
+  EXPECT_TRUE(handshakeStream->writeBuffer.empty());
+  EXPECT_TRUE(handshakeStream->retransmissionBuffer.empty());
+  EXPECT_TRUE(handshakeStream->lossBuffer.empty());
+  EXPECT_EQ(nullptr, conn->initialWriteCipher);
+  EXPECT_EQ(nullptr, conn->handshakeWriteCipher);
+  EXPECT_EQ(nullptr, conn->readCodec->getInitialCipher());
+  EXPECT_EQ(nullptr, conn->readCodec->getInitialHeaderCipher());
+  EXPECT_EQ(nullptr, conn->readCodec->getHandshakeReadCipher());
+  EXPECT_EQ(nullptr, conn->readCodec->getHandshakeHeaderCipher());
 }
 
 } // namespace test
