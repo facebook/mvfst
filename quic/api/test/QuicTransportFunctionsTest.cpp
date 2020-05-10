@@ -1572,11 +1572,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   EXPECT_FALSE(cryptoStream->retransmissionBuffer.empty());
 }
 
-TEST_F(QuicTransportFunctionsTest, WriteProbesNoNewDataNoCryptoDataNoOldData) {
+TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   auto conn = createConn();
-  // writeProbingDataToSocketForTest uses ShortHeader, thus it writes at
-  // AppTraffic level
-  auto currentPacketSeqNum = conn->ackStates.appDataAckState.nextPacketNum;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -1585,16 +1582,16 @@ TEST_F(QuicTransportFunctionsTest, WriteProbesNoNewDataNoCryptoDataNoOldData) {
   auto socket =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  auto buf = buildRandomInputData(0);
-  writeDataToQuicStream(*stream1, buf->clone(), false /* eof */);
-
-  auto currentStreamWriteOffset = stream1->currentWriteOffset;
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
+  EXPECT_CALL(*rawSocket, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const SocketAddress&,
+                           const std::unique_ptr<folly::IOBuf>& iobuf) {
+        return iobuf->computeChainDataLength();
+      }));
   uint8_t probesToSend = 1;
   EXPECT_EQ(
-      0,
+      1,
       writeProbingDataToSocketForTest(
           *rawSocket,
           *conn,
@@ -1602,70 +1599,14 @@ TEST_F(QuicTransportFunctionsTest, WriteProbesNoNewDataNoCryptoDataNoOldData) {
           *aead,
           *headerCipher,
           getVersion(*conn)));
-  EXPECT_EQ(1, probesToSend);
+  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandingPackets[0].packet.frames.size());
   EXPECT_EQ(
-      currentPacketSeqNum + 1, conn->ackStates.appDataAckState.nextPacketNum);
-  EXPECT_TRUE(conn->outstandingPackets.empty());
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-  EXPECT_EQ(stream1->currentWriteOffset, currentStreamWriteOffset);
-  EXPECT_TRUE(stream1->retransmissionBuffer.empty());
-}
-
-TEST_F(QuicTransportFunctionsTest, ProbingNotWriteOtherFrames) {
-  auto conn = createConn();
-  // writeProbingDataToSocketForTest uses ShortHeader, thus it writes at
-  // AppTraffic level
-  auto currentPacketSeqNum = conn->ackStates.appDataAckState.nextPacketNum;
-  auto mockCongestionController =
-      std::make_unique<NiceMock<MockCongestionController>>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
-  EventBase evb;
-  auto socket =
-      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
-  auto rawSocket = socket.get();
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  RstStreamFrame rstFrame(stream1->id, GenericApplicationErrorCode::UNKNOWN, 0);
-  conn->pendingEvents.resets.emplace(stream1->id, rstFrame);
-  conn->pendingEvents.connWindowUpdate = true;
-  conn->streamManager->queueWindowUpdate(stream1->id);
-
-  auto currentStreamWriteOffset = stream1->currentWriteOffset;
-  auto currentStreamWindow = stream1->flowControlState.advertisedMaxOffset;
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
-  uint8_t probesToSend = 1;
+      QuicWriteFrame::Type::QuicSimpleFrame_E,
+      conn->outstandingPackets[0].packet.frames[0].type());
   EXPECT_EQ(
-      0,
-      writeProbingDataToSocketForTest(
-          *rawSocket,
-          *conn,
-          probesToSend,
-          *aead,
-          *headerCipher,
-          getVersion(*conn)));
-  EXPECT_EQ(1, probesToSend);
-  EXPECT_EQ(
-      currentPacketSeqNum + 1, conn->ackStates.appDataAckState.nextPacketNum);
-  EXPECT_TRUE(conn->outstandingPackets.empty());
-  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
-  EXPECT_EQ(stream1->currentWriteOffset, currentStreamWriteOffset);
-  EXPECT_TRUE(stream1->retransmissionBuffer.empty());
-  // No Ack scheduled:
-  EXPECT_FALSE(conn->ackStates.initialAckState.largestAckScheduled.has_value());
-  EXPECT_FALSE(
-      conn->ackStates.handshakeAckState.largestAckScheduled.has_value());
-  EXPECT_FALSE(conn->ackStates.appDataAckState.largestAckScheduled.has_value());
-  // Pending resets are still here:
-  EXPECT_NE(
-      conn->pendingEvents.resets.end(),
-      conn->pendingEvents.resets.find(stream1->id));
-  // Pending connWindowUpdate is still here:
-  EXPECT_TRUE(conn->pendingEvents.connWindowUpdate);
-  // Stream window update ain't changed:
-  EXPECT_EQ(currentStreamWindow, stream1->flowControlState.advertisedMaxOffset);
-  // Pending streamWindowUpdates are still here:
-  EXPECT_TRUE(conn->streamManager->pendingWindowUpdate(stream1->id));
+      QuicSimpleFrame::Type::PingFrame_E,
+      conn->outstandingPackets[0].packet.frames[0].asQuicSimpleFrame()->type());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {

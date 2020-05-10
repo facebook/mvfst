@@ -1120,6 +1120,30 @@ uint64_t writeProbingDataToSocket(
       aead,
       headerCipher,
       version);
+  if (written < probesToSend) {
+    // Fall back to send a ping:
+    sendSimpleFrame(connection, PingFrame());
+    auto pingScheduler = std::move(FrameScheduler::Builder(
+                                       connection,
+                                       EncryptionLevel::AppData,
+                                       PacketNumberSpace::AppData,
+                                       "PingScheduler")
+                                       .simpleFrames())
+                             .build();
+    written += writeConnectionDataToSocket(
+        sock,
+        connection,
+        srcConnId,
+        dstConnId,
+        builder,
+        pnSpace,
+        pingScheduler,
+        unlimitedWritableBytes,
+        probesToSend - written,
+        aead,
+        headerCipher,
+        version);
+  }
   VLOG_IF(10, written > 0)
       << nodeToString(connection.nodeType)
       << " writing probes using scheduler=CloningScheduler " << connection;
