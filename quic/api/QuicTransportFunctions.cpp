@@ -1247,7 +1247,6 @@ void implicitAckCryptoStream(
             auto cryptoStream =
                 getCryptoStream(*conn.cryptoState, encryptionLevel);
             processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
-            CHECK(cryptoStream->retransmissionBuffer.empty());
             break;
           }
           case QuicWriteFrame::Type::WriteAckFrame_E: {
@@ -1268,6 +1267,7 @@ void implicitAckCryptoStream(
   // remove data already in the loss buffer.
   auto cryptoStream = getCryptoStream(*conn.cryptoState, encryptionLevel);
   cryptoStream->lossBuffer.clear();
+  CHECK(cryptoStream->retransmissionBuffer.empty());
   // The write buffer should be empty, there's no optional crypto data.
   CHECK(cryptoStream->writeBuffer.empty());
 }

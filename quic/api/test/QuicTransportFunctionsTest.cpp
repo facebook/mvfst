@@ -636,12 +636,15 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
   packet.packet.frames.push_back(
       WriteCryptoFrame(data->length(), data->length()));
+  packet.packet.frames.push_back(
+      WriteCryptoFrame(data->length() * 2, data->length()));
+  initialStream->writeBuffer.append(data->clone());
   initialStream->writeBuffer.append(data->clone());
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
   EXPECT_EQ(2, conn->outstandingHandshakePacketsCount);
   EXPECT_EQ(2, conn->outstandingPackets.size());
-  EXPECT_EQ(2, initialStream->retransmissionBuffer.size());
+  EXPECT_EQ(3, initialStream->retransmissionBuffer.size());
   EXPECT_TRUE(initialStream->writeBuffer.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
 
