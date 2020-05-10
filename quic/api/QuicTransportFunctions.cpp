@@ -117,6 +117,10 @@ uint64_t writeQuicDataToSocketImpl(
             EncryptionLevel::AppData,
             PacketNumberSpace::AppData,
             exceptCryptoStream ? "ProbeWithoutCrypto" : "ProbeScheduler")
+            .blockedFrames()
+            .windowUpdateFrames()
+            .simpleFrames()
+            .resetFrames()
             .streamFrames()
             .streamRetransmissions();
     if (!exceptCryptoStream) {

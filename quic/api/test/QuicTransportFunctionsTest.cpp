@@ -2233,5 +2233,52 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
   EXPECT_EQ(nullptr, conn->readCodec->getHandshakeHeaderCipher());
 }
 
+TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
+  auto conn = createConn();
+  conn->udpSendPacketLen = 1200;
+  EventBase evb;
+  auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = sock.get();
+
+  EXPECT_CALL(*rawSocket, write(_, _))
+      .WillRepeatedly(Invoke([&](const SocketAddress&,
+                                 const std::unique_ptr<folly::IOBuf>& iobuf) {
+        return iobuf->computeChainDataLength();
+      }));
+
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = folly::IOBuf::copyBuffer("Drug facts");
+  writeDataToQuicStream(*stream, buf->clone(), true);
+  writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      conn->transportSettings.writeConnectionDataPacketsLimit);
+  ASSERT_EQ(1, stream->retransmissionBuffer.size());
+
+  conn->pendingEvents.numProbePackets = 1;
+  conn->flowControlState.windowSize *= 2;
+  conn->flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 20s;
+  maybeSendConnWindowUpdate(*conn, Clock::now());
+  writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      1 /* limit to 1 packet */);
+  EXPECT_EQ(2, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandingPackets[1].packet.frames.size());
+  EXPECT_EQ(
+      QuicWriteFrame::Type::MaxDataFrame_E,
+      conn->outstandingPackets[1].packet.frames[0].type());
+}
+
 } // namespace test
 } // namespace quic
