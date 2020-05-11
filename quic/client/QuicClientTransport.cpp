@@ -28,12 +28,6 @@
 
 namespace fsp = folly::portability::sockets;
 
-#ifndef MSG_WAITFORONE
-#define RECVMMSG_FLAGS 0
-#else
-#define RECVMMSG_FLAGS MSG_WAITFORONE
-#endif
-
 namespace quic {
 
 QuicClientTransport::QuicClientTransport(
@@ -1199,8 +1193,7 @@ void QuicClientTransport::recvMmsg(
 #endif
   }
 
-  int numMsgsRecvd =
-      sock.recvmmsg(msgs.data(), numPackets, RECVMMSG_FLAGS | flags, nullptr);
+  int numMsgsRecvd = sock.recvmmsg(msgs.data(), numPackets, flags, nullptr);
   if (numMsgsRecvd < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       // Exit, socket will notify us again when socket is readable.
