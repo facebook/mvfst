@@ -181,6 +181,98 @@ uint64_t writeQuicDataToSocketImpl(
   return written;
 }
 
+DataPathResult continuousMemoryBuildScheduleEncrypt(
+    QuicConnectionStateBase& connection,
+    PacketHeader header,
+    PacketNumberSpace pnSpace,
+    PacketNum packetNum,
+    uint64_t cipherOverhead,
+    QuicPacketScheduler& scheduler,
+    uint64_t writableBytes,
+    IOBufQuicBatch& ioBufBatch,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher) {
+  auto buf = connection.bufAccessor->obtain();
+  auto prevSize = buf->length();
+  connection.bufAccessor->release(std::move(buf));
+
+  auto rollbackBuf = [&]() {
+    auto buf = connection.bufAccessor->obtain();
+    buf->trimEnd(buf->length() - prevSize);
+    connection.bufAccessor->release(std::move(buf));
+  };
+
+  // It's the scheduler's job to invoke encode header
+  InplaceQuicPacketBuilder pktBuilder(
+      *connection.bufAccessor,
+      connection.udpSendPacketLen,
+      std::move(header),
+      getAckState(connection, pnSpace).largestAckedByPeer);
+  pktBuilder.setCipherOverhead(cipherOverhead);
+  CHECK(scheduler.hasData());
+  auto result =
+      scheduler.scheduleFramesForPacket(std::move(pktBuilder), writableBytes);
+  CHECK(connection.bufAccessor->ownsBuffer());
+  auto& packet = result.packet;
+  if (!packet || packet->packet.frames.empty()) {
+    rollbackBuf();
+    ioBufBatch.flush();
+    if (connection.loopDetectorCallback) {
+      connection.writeDebugState.noWriteReason = NoWriteReason::NO_FRAME;
+    }
+    return DataPathResult::makeBuildFailure();
+  }
+  if (!packet->body) {
+    // No more space remaining.
+    rollbackBuf();
+    ioBufBatch.flush();
+    if (connection.loopDetectorCallback) {
+      connection.writeDebugState.noWriteReason = NoWriteReason::NO_BODY;
+    }
+    return DataPathResult::makeBuildFailure();
+  }
+  CHECK(!packet->header->isChained());
+  auto headerLen = packet->header->length();
+  buf = connection.bufAccessor->obtain();
+  CHECK(
+      packet->body->data() > buf->data() &&
+      packet->body->tail() <= buf->tail());
+  CHECK(
+      packet->header->data() >= buf->data() &&
+      packet->header->tail() < buf->tail());
+  // Trim off everything before the current packet, and the header length, so
+  // buf's data starts from the body part of buf.
+  buf->trimStart(prevSize + headerLen);
+  // buf and packetBuf is actually the same.
+  auto packetBuf =
+      aead.inplaceEncrypt(std::move(buf), packet->header.get(), packetNum);
+  CHECK(packetBuf->headroom() == headerLen + prevSize);
+  // Include header back.
+  packetBuf->prepend(headerLen);
+
+  HeaderForm headerForm = packet->packet.header.getHeaderForm();
+  encryptPacketHeader(
+      headerForm,
+      packetBuf->writableData(),
+      headerLen,
+      packetBuf->data() + headerLen,
+      packetBuf->length() - headerLen,
+      headerCipher);
+  CHECK(!packetBuf->isChained());
+  auto encodedSize = packetBuf->length();
+  // Include previous packets back.
+  packetBuf->prepend(prevSize);
+  connection.bufAccessor->release(std::move(packetBuf));
+  // TODO: I think we should add an API that doesn't need a buffer.
+  bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
+  // update stats and connection
+  if (ret) {
+    QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
+    QUIC_STATS(connection.statsCallback, onPacketSent);
+  }
+  return DataPathResult::makeWriteResult(ret, std::move(result), encodedSize);
+}
+
 DataPathResult iobufChainBasedBuildScheduleEncrypt(
     QuicConnectionStateBase& connection,
     PacketHeader header,
@@ -1046,7 +1138,10 @@ uint64_t writeConnectionDataToSocket(
     }
 
     // TODO: Select a different DataPathFunc based on TransportSettings
-    const auto& dataPlainFunc = iobufChainBasedBuildScheduleEncrypt;
+    const auto& dataPlainFunc =
+        connection.transportSettings.dataPathType == DataPathType::ChainedMemory
+        ? iobufChainBasedBuildScheduleEncrypt
+        : continuousMemoryBuildScheduleEncrypt;
     auto ret = dataPlainFunc(
         connection,
         std::move(header),
@@ -1088,6 +1183,13 @@ uint64_t writeConnectionDataToSocket(
   }
 
   ioBufBatch.flush();
+  if (connection.transportSettings.dataPathType ==
+      DataPathType::ContinuousMemory) {
+    CHECK(connection.bufAccessor->ownsBuffer());
+    auto buf = connection.bufAccessor->obtain();
+    CHECK(buf->length() == 0 && buf->headroom() == 0);
+    connection.bufAccessor->release(std::move(buf));
+  }
   return ioBufBatch.getPktSent();
 }
 
