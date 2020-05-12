@@ -66,6 +66,7 @@ DEFINE_uint32(
         quic::kDefaultV4UDPSendPacketLen,
         quic::kDefaultV6UDPSendPacketLen),
     "Maximum packet size to advertise to the peer.");
+DEFINE_bool(use_inplace_write, false, "Data path type");
 
 namespace quic {
 namespace tperf {
@@ -111,7 +112,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
 
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "Socket error=" << toString(error.first);
+    LOG(ERROR) << "Conn errorCoded=" << toString(error.first)
+               << ", errorMsg=" << error.second;
   }
 
   void onTransportReady() noexcept override {
@@ -282,7 +284,8 @@ class TPerfServer {
       bool pacing,
       uint32_t numStreams,
       uint64_t maxBytesPerStream,
-      uint32_t maxReceivePacketSize)
+      uint32_t maxReceivePacketSize,
+      bool useInplaceWrite)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     eventBase_.setName("tperf_server");
     server_->setQuicServerTransportFactory(
@@ -292,6 +295,11 @@ class TPerfServer {
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
     quic::TransportSettings settings;
+    if (useInplaceWrite) {
+      settings.dataPathType = DataPathType::ContinuousMemory;
+    } else {
+      settings.dataPathType = DataPathType::ChainedMemory;
+    }
     settings.maxCwndInMss = maxCwndInMss;
     settings.writeConnectionDataPacketsLimit = writesPerLoop;
     settings.defaultCongestionController = congestionControlType;
@@ -562,7 +570,8 @@ int main(int argc, char* argv[]) {
         FLAGS_pacing,
         FLAGS_num_streams,
         FLAGS_bytes_per_stream,
-        FLAGS_max_receive_packet_size);
+        FLAGS_max_receive_packet_size,
+        FLAGS_use_inplace_write);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_num_streams != 1) {
