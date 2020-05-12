@@ -227,10 +227,15 @@ void GSOInplacePacketBatchWriter::reset() {
   lastPacketEnd_ = nullptr;
   prevSize_ = 0;
   numPackets_ = 0;
+  nextPacketSize_ = 0;
 }
 
 bool GSOInplacePacketBatchWriter::needsFlush(size_t size) {
-  return prevSize_ && size > prevSize_;
+  auto shouldFlush = prevSize_ && size > prevSize_;
+  if (shouldFlush) {
+    nextPacketSize_ = size;
+  }
+  return shouldFlush;
 }
 
 bool GSOInplacePacketBatchWriter::append(
@@ -274,11 +279,13 @@ ssize_t GSOInplacePacketBatchWriter::write(
   CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
       << "lastPacketEnd_=" << (long)lastPacketEnd_
       << " data=" << (long)buf->data() << " tail=" << (long)buf->tail();
-  auto diffToEnd = buf->tail() - lastPacketEnd_;
+  uint64_t diffToEnd = buf->tail() - lastPacketEnd_;
   CHECK(
-      diffToEnd >= 0 &&
-      static_cast<uint64_t>(diffToEnd) <= conn_.udpSendPacketLen);
-  auto diffToStart = lastPacketEnd_ - buf->data();
+      diffToEnd <= conn_.udpSendPacketLen ||
+      (nextPacketSize_ && diffToEnd == nextPacketSize_))
+      << "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
+      << ", nextPacketSize_=" << nextPacketSize_;
+  uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);
   auto bytesWritten = (numPackets_ > 1)
       ? sock.writeGSO(address, buf, static_cast<int>(prevSize_))
@@ -296,8 +303,15 @@ ssize_t GSOInplacePacketBatchWriter::write(
     buf->trimStart(diffToStart);
     buf->append(diffToEnd);
     buf->retreat(diffToStart);
-    CHECK(buf->length() <= conn_.udpSendPacketLen);
-    CHECK(0 == buf->headroom());
+    auto bufLength = buf->length();
+    CHECK_EQ(diffToEnd, bufLength)
+        << "diffToEnd=" << diffToEnd << ", bufLength=" << bufLength;
+    CHECK(
+        bufLength <= conn_.udpSendPacketLen ||
+        (nextPacketSize_ && bufLength == nextPacketSize_))
+        << "bufLength=" << bufLength << ", pktLimit=" << conn_.udpSendPacketLen
+        << ", nextPacketSize_=" << nextPacketSize_;
+    CHECK(0 == buf->headroom()) << "headroom=" << buf->headroom();
   } else {
     buf->clear();
   }

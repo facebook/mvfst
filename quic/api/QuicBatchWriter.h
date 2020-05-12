@@ -175,6 +175,15 @@ class GSOInplacePacketBatchWriter : public BatchWriter {
   const uint8_t* lastPacketEnd_{nullptr};
   size_t prevSize_{0};
   size_t numPackets_{0};
+
+  /**
+   * If we flush the batch due to the next packet being larger than current GSO
+   * size, we use the following value to keep track of that next packet, and
+   * checks against buffer residue after writes. The reason we cannot just check
+   * the buffer residue against the Quic packet limit is that there may be some
+   * retranmission packets slightly larger than the limit.
+   */
+  size_t nextPacketSize_{0};
 };
 
 class SendmmsgPacketBatchWriter : public BatchWriter {
