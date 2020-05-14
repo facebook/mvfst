@@ -69,7 +69,9 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     auto dataLen = (data ? data->computeChainDataLength() : 0);
     LOG(INFO) << "Got len=" << dataLen << " eof=" << uint32_t(eof)
               << " total=" << input_[id].first.chainLength() + dataLen
-              << " data=" << data->clone()->moveToFbString().toStdString();
+              << " data="
+              << ((data) ? data->clone()->moveToFbString().toStdString()
+                         : std::string());
     input_[id].first.append(std::move(data));
     input_[id].second = eof;
     if (eof) {
