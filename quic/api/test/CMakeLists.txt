@@ -73,5 +73,6 @@ quic_add_test(TARGET QuicBatchWriterTest
   DEPENDS
   Folly::folly
   mvfst_buf_accessor
+  mvfst_server
   mvfst_transport
 )
