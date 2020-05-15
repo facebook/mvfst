@@ -53,7 +53,7 @@ class QuicExtensionsTest : public testing::Test {
 StringPiece clientParamsD24{"ffa5000a0008000400049d7f3e7d"};
 StringPiece clientParamsD27{"ffa5000604049d7f3e7d"};
 StringPiece serverParamsD24{"ffa5000a0008000400049d7f3e7d"};
-StringPiece serverParamsD27{"ffa5000604049d7f3e7d"};
+StringPiece serverParamsD27{"ffa5001004049d7f3e7d00081212547612561469"};
 StringPiece ticketParamsD24{"ffa5000a0008000400049d7f3e7d"};
 StringPiece ticketParamsD27{"ffa5000604049d7f3e7d"};
 
@@ -103,9 +103,15 @@ TEST_F(QuicExtensionsTest, TestServerParamsD27) {
   EXPECT_EQ(
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
   EXPECT_EQ(
+      ext->parameters[1].parameter,
+      TransportParameterId::original_connection_id);
+  EXPECT_EQ(
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
+  ConnectionId connId(
+      {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
+  EXPECT_EQ(*getOriginalConnIdParameter(ext->parameters), connId);
   checkEncode(std::move(*ext), serverParamsD27, QuicVersion::QUIC_DRAFT);
 }
 

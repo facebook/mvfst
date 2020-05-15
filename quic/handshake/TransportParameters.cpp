@@ -29,6 +29,21 @@ folly::Optional<uint64_t> getIntegerParameter(
   return parameter->first;
 }
 
+folly::Optional<ConnectionId> getOriginalConnIdParameter(
+    const std::vector<TransportParameter>& parameters) {
+  auto it =
+      findParameter(parameters, TransportParameterId::original_connection_id);
+  if (it == parameters.end()) {
+    return folly::none;
+  }
+
+  auto value = it->value->clone();
+  folly::io::Cursor cursor(value.get());
+
+  // Constructor may throw an exception if the input is invalid.
+  return ConnectionId(cursor, value->length());
+}
+
 folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters) {
   auto it =

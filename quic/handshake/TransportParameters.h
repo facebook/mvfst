@@ -116,6 +116,9 @@ folly::Optional<uint64_t> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
+folly::Optional<ConnectionId> getOriginalConnIdParameter(
+    const std::vector<TransportParameter>& parameters);
+
 folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
     const std::vector<TransportParameter>& parameters);
 
@@ -127,6 +130,15 @@ inline TransportParameter encodeEmptyParameter(TransportParameterId id) {
   TransportParameter param;
   param.parameter = id;
   param.value = folly::IOBuf::create(0);
+  return param;
+}
+
+inline TransportParameter encodeOriginalConnIdParameter(
+    const ConnectionId& originalConnId) {
+  TransportParameter param;
+  param.parameter = TransportParameterId::original_connection_id;
+  param.value =
+      folly::IOBuf::copyBuffer(originalConnId.data(), originalConnId.size());
   return param;
 }
 
