@@ -26,6 +26,7 @@ target_compile_options(
 
 add_dependencies(
   mvfst_transport
+  mvfst_buf_accessor
   mvfst_bufutil
   mvfst_cc_algo
   mvfst_codec
@@ -51,6 +52,7 @@ add_dependencies(
 target_link_libraries(
   mvfst_transport PUBLIC
   Folly::folly
+  mvfst_buf_accessor
   mvfst_bufutil
   mvfst_cc_algo
   mvfst_codec
