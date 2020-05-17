@@ -351,9 +351,8 @@ TEST_P(QuicBatchWriterTest, TestBatchingSendmmsgGSOBatcBigSmallPacket) {
 TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::AsyncUDPSocket sock(&evb);
-  sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  folly::test::MockAsyncUDPSocket sock(&evb);
+  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -379,9 +378,8 @@ TEST_P(QuicBatchWriterTest, InplaceWriterNeedsFlush) {
 TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::AsyncUDPSocket sock(&evb);
-  sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  folly::test::MockAsyncUDPSocket sock(&evb);
+  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
@@ -415,9 +413,8 @@ TEST_P(QuicBatchWriterTest, InplaceWriterAppendLimit) {
 TEST_P(QuicBatchWriterTest, InplaceWriterAppendSmaller) {
   bool useThreadLocal = GetParam();
   folly::EventBase evb;
-  folly::AsyncUDPSocket sock(&evb);
-  sock.setReuseAddr(false);
-  sock.bind(folly::SocketAddress("127.0.0.1", 0));
+  folly::test::MockAsyncUDPSocket sock(&evb);
+  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
   uint32_t batchSize = 20;
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
