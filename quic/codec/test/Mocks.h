@@ -14,13 +14,6 @@
 #include <quic/common/test/TestUtils.h>
 
 namespace quic {
-// Otherwise you won't be able to mock QuicPacketBuidlerBase::appendFrame()
-std::ostream& operator<<(std::ostream& out, const QuicWriteFrame& /*rhs*/) {
-  return out;
-}
-} // namespace quic
-
-namespace quic {
 namespace test {
 
 class MockConnectionIdAlgo : public ConnectionIdAlgo {
