@@ -27,7 +27,7 @@ class SlidingWindowRateLimiter : public RateLimiter {
 
  private:
   const uint64_t count_;
-  const std::chrono::seconds window_;
+  const std::chrono::microseconds window_;
   folly::Optional<TimePoint> currentWindowStartPoint_{folly::none};
   uint64_t countInPrevWindow_{0};
   uint64_t countInCurWindow_{0};

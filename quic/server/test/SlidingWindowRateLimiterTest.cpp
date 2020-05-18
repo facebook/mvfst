@@ -42,6 +42,10 @@ TEST(SlidingWindowRateLimiterTest, SlidingExceedsCount) {
   // 10/60 * 53 = 8.83
   // 8.83 + 1 !> 10
   EXPECT_FALSE(limiter.check(prevStart + 67s));
+  EXPECT_FALSE(limiter.check(prevStart + 68s));
+  for (int i = 0; i < 8; i++) {
+    EXPECT_FALSE(limiter.check(prevStart + 119s));
+  }
 }
 
 TEST(SlidingWindowRateLimiterTest, QuiescentWindowNoExceeds) {
