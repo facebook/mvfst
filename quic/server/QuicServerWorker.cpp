@@ -107,6 +107,11 @@ void QuicServerWorker::setCongestionControllerFactory(
   ccFactory_ = ccFactory;
 }
 
+void QuicServerWorker::setRateLimiter(
+    std::unique_ptr<RateLimiter> rateLimiter) {
+  newConnRateLimiter_ = std::move(rateLimiter);
+}
+
 void QuicServerWorker::start() {
   CHECK(socket_);
   if (!pacingTimer_) {
@@ -488,6 +493,19 @@ void QuicServerWorker::dispatchPacketData(
               statsCallback_,
               onPacketDropped,
               PacketDropReason::INVALID_PACKET);
+          return;
+        }
+        if (newConnRateLimiter_ &&
+            newConnRateLimiter_->check(networkData.receiveTimePoint)) {
+          // TODO RETRY
+          VersionNegotiationPacketBuilder builder(
+              routingData.destinationConnId,
+              routingData.sourceConnId.value_or(
+                  ConnectionId(std::vector<uint8_t>())),
+              std::vector<QuicVersion>{QuicVersion::MVFST_INVALID});
+          auto versionNegotiationPacket = std::move(builder).buildPacket();
+          socket_->write(client, versionNegotiationPacket.second);
+          QUIC_STATS(statsCallback_, onConnectionRateLimited);
           return;
         }
         // create 'accepting' transport

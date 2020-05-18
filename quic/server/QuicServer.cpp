@@ -15,6 +15,7 @@
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
+#include <quic/server/SlidingWindowRateLimiter.h>
 
 namespace quic {
 
@@ -58,6 +59,10 @@ void QuicServer::setCongestionControllerFactory(
       << "initialized.";
   CHECK(ccFactory);
   ccFactory_ = std::move(ccFactory);
+}
+
+void QuicServer::setRateLimit(uint64_t count, std::chrono::seconds window) {
+  rateLimit_ = folly::make_optional<RateLimit>(count, window);
 }
 
 void QuicServer::setSupportedVersion(const std::vector<QuicVersion>& versions) {
@@ -164,6 +169,10 @@ void QuicServer::initializeWorkers(
     }
     worker->setConnectionIdAlgo(connIdAlgoFactory_->make());
     worker->setCongestionControllerFactory(ccFactory_);
+    if (rateLimit_) {
+      worker->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(
+          rateLimit_->count, rateLimit_->window));
+    }
     worker->setWorkerId(i);
     worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
     workers_.push_back(std::move(worker));

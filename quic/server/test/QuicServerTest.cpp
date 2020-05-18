@@ -18,6 +18,7 @@
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/server/SlidingWindowRateLimiter.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
@@ -376,6 +377,86 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       getTestConnectionId(hostId_),
       std::move(shortHeaderConnId),
       QuicTransportStatsCallback::PacketDropReason::CONNECTION_NOT_FOUND);
+}
+
+TEST_F(QuicServerWorkerTest, RateLimit) {
+  worker_->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(2, 60s));
+  EXPECT_CALL(*transportInfoCb_, onConnectionRateLimited()).Times(1);
+
+  NiceMock<MockConnectionCallback> connCb1;
+  auto mockSock1 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  EXPECT_CALL(*mockSock1, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  MockQuicTransport::Ptr testTransport1 = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock1), connCb1, nullptr);
+  EXPECT_CALL(*testTransport1, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+  EXPECT_CALL(*testTransport1, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(kClientAddr));
+  auto connId1 = getTestConnectionId(hostId_);
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  RoutingData routingData(HeaderForm::Long, true, true, connId1, connId1);
+
+  auto data = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(
+      *testTransport1, onNetworkData(kClientAddr, NetworkDataMatches(*data)));
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(testTransport1));
+
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()));
+
+  const auto& addrMap = worker_->getSrcToTransportMap();
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
+  eventbase_.loop();
+
+  auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
+  NiceMock<MockConnectionCallback> connCb2;
+  auto mockSock2 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  EXPECT_CALL(*mockSock2, address()).WillRepeatedly(ReturnRef(caddr2));
+  MockQuicTransport::Ptr testTransport2 = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock2), connCb2, nullptr);
+  EXPECT_CALL(*testTransport2, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+  EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(caddr2));
+  ConnectionId connId2({2, 4, 5, 6});
+  num = 1;
+  version = QuicVersion::MVFST;
+  RoutingData routingData2(HeaderForm::Long, true, true, connId2, connId2);
+
+  auto data2 = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(
+      *testTransport2, onNetworkData(caddr2, NetworkDataMatches(*data2)));
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(testTransport2));
+  worker_->dispatchPacketData(
+      caddr2,
+      std::move(routingData2),
+      NetworkData(data2->clone(), Clock::now()));
+
+  EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
+  eventbase_.loop();
+
+  auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
+  auto mockSock3 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  ConnectionId connId3({8, 4, 5, 6});
+  num = 1;
+  version = QuicVersion::MVFST;
+  RoutingData routingData3(HeaderForm::Long, true, true, connId3, connId3);
+  auto data3 = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
+  worker_->dispatchPacketData(
+      caddr3,
+      std::move(routingData3),
+      NetworkData(data2->clone(), Clock::now()));
+
+  EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
+  EXPECT_EQ(addrMap.size(), 2);
+  eventbase_.loop();
 }
 
 TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {

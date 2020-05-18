@@ -20,6 +20,7 @@
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicUDPSocketFactory.h>
+#include <quic/server/RateLimiter.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
@@ -226,6 +227,11 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
 
+  /**
+   * Set the rate limiter which will be used to rate limit new connections.
+   */
+  void setRateLimiter(std::unique_ptr<RateLimiter> rateLimiter);
+
   // Read callback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
 
@@ -414,6 +420,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   // Output buffer to be used for continuous memory GSO write
   std::unique_ptr<BufAccessor> bufAccessor_;
+
+  // Rate limits the creation of new connections for this worker.
+  std::unique_ptr<RateLimiter> newConnRateLimiter_;
 };
 
 } // namespace quic
