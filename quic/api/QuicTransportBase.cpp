@@ -290,11 +290,15 @@ void QuicTransportBase::closeImpl(
 
   bool isReset = false;
   bool isAbandon = false;
+  bool isInvalidMigration = false;
   LocalErrorCode* localError = cancelCode.first.asLocalErrorCode();
+  TransportErrorCode* transportError = cancelCode.first.asTransportErrorCode();
   if (localError) {
     isReset = *localError == LocalErrorCode::CONNECTION_RESET;
     isAbandon = *localError == LocalErrorCode::CONNECTION_ABANDONED;
   }
+  isInvalidMigration = transportError &&
+      *transportError == TransportErrorCode::INVALID_MIGRATION;
   VLOG_IF(4, isReset) << "Closing transport due to stateless reset " << *this;
   VLOG_IF(4, isAbandon) << "Closing transport due to abandoned connection "
                         << *this;
@@ -425,7 +429,8 @@ void QuicTransportBase::closeImpl(
       LOG(ERROR) << "close threw exception " << ex.what() << " " << *this;
     }
   }
-  drainConnection = drainConnection && !isReset && !isAbandon;
+  drainConnection =
+      drainConnection && !isReset && !isAbandon && !isInvalidMigration;
   if (drainConnection) {
     // We ever drain once, and the object ever gets created once.
     DCHECK(!drainTimeout_.isScheduled());
