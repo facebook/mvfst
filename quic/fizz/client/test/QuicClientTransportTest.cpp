@@ -5173,6 +5173,56 @@ TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
                    .needsToSendAckImmediately);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
+  auto streamId = client->createBidirectionalStream().value();
+  auto& conn = client->getNonConstConn();
+  conn.lossState.srtt = 10s;
+  EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(Return(100));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(sock);
+
+  // Close the client transport. There could be multiple writes given how many
+  // ciphers we have.
+  EXPECT_CALL(*sock, write(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(10));
+  client->close(std::make_pair<QuicErrorCode, std::string>(
+      QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
+      toString(LocalErrorCode::INTERNAL_ERROR).str()));
+  EXPECT_TRUE(conn.lastCloseSentTime.hasValue());
+  Mock::VerifyAndClearExpectations(sock);
+
+  // Then received some server packet, which won't trigger another close
+  EXPECT_CALL(*sock, write(_, _)).Times(0);
+  auto firstData = folly::IOBuf::copyBuffer(
+      "I got a room full of your posters and your pictures, man");
+  deliverDataWithoutErrorCheck(packetToBuf(createStreamPacket(
+                                               *serverChosenConnId,
+                                               *originalConnId,
+                                               appDataPacketNum++,
+                                               streamId,
+                                               *firstData,
+                                               0 /* cipherOverhead */,
+                                               0 /* largestAcked */))
+                                   ->coalesce());
+  Mock::VerifyAndClearExpectations(sock);
+
+  // force the clock:
+  conn.lastCloseSentTime = Clock::now() - 10s;
+  conn.lossState.srtt = 1us;
+  // Receive another server packet
+  EXPECT_CALL(*sock, write(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(10));
+  auto secondData = folly::IOBuf::copyBuffer(
+      "Dear Slim, I wrote to you but you still ain't callin'");
+  deliverDataWithoutErrorCheck(packetToBuf(createStreamPacket(
+                                               *serverChosenConnId,
+                                               *originalConnId,
+                                               appDataPacketNum++,
+                                               streamId,
+                                               *secondData,
+                                               0 /* cipherOverhead */,
+                                               0 /* largestAcked */))
+                                   ->coalesce());
+}
+
 TEST_F(QuicClientVersionParamInvalidTest, InvalidVersion) {
   EXPECT_THROW(performFakeHandshake(), std::runtime_error);
 }

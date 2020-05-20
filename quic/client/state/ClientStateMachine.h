@@ -36,6 +36,8 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   std::shared_ptr<ClientHandshakeFactory> handshakeFactory;
   ClientHandshake* clientHandshakeLayer;
 
+  folly::Optional<TimePoint> lastCloseSentTime;
+
   // Save the server transport params here so that client can access the value
   // when it wants to write the values to psk cache
   // TODO Save TicketTransportParams here instead of in QuicClientTransport

@@ -680,6 +680,14 @@ void QuicClientTransport::writeData() {
     destConnId = &(*conn_->serverConnectionId);
   }
   if (closeState_ == CloseState::CLOSED) {
+    auto rtt = clientConn_->lossState.srtt == 0us
+        ? clientConn_->transportSettings.initialRtt
+        : clientConn_->lossState.srtt;
+    if (clientConn_->lastCloseSentTime &&
+        Clock::now() - *clientConn_->lastCloseSentTime < rtt) {
+      return;
+    }
+    clientConn_->lastCloseSentTime = Clock::now();
     if (clientConn_->clientHandshakeLayer->getPhase() ==
             ClientHandshake::Phase::Established &&
         conn_->oneRttWriteCipher) {
