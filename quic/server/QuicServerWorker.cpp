@@ -145,7 +145,7 @@ void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
   readBuffer_ = folly::IOBuf::create(
       transportSettings_.maxRecvPacketSize * numGROBuffers_);
   *buf = readBuffer_->writableData();
-  *len = transportSettings_.maxRecvPacketSize;
+  *len = transportSettings_.maxRecvPacketSize * numGROBuffers_;
 }
 
 // Returns true if we either drop the packet or send a version
