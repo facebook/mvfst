@@ -50,4 +50,24 @@ class SimpleBufAccessor : public BufAccessor {
   Buf buf_;
   size_t capacity_;
 };
+
+struct ScopedBufAccessor {
+ public:
+  explicit ScopedBufAccessor(BufAccessor* accessor) : bufAccessor_(accessor) {
+    CHECK(bufAccessor_->ownsBuffer());
+    buf_ = bufAccessor_->obtain();
+  }
+
+  ~ScopedBufAccessor() {
+    bufAccessor_->release(std::move(buf_));
+  }
+
+  std::unique_ptr<folly::IOBuf>& buf() {
+    return buf_;
+  }
+
+ private:
+  BufAccessor* bufAccessor_;
+  std::unique_ptr<folly::IOBuf> buf_;
+};
 } // namespace quic
