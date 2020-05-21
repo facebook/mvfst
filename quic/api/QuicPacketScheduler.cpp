@@ -541,6 +541,12 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     if (opPnSpace != PacketNumberSpace::AppData) {
       continue;
     }
+    size_t prevSize = 0;
+    if (conn_.transportSettings.dataPathType ==
+        DataPathType::ContinuousMemory) {
+      ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+      prevSize = scopedBufAccessor.buf()->length();
+    }
     // Reusing the same builder throughout loop bodies will lead to frames
     // belong to different original packets being written into the same clone
     // packet. So re-create a builder every time.
@@ -560,9 +566,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer);
     }
-    internalBuilder->setCipherOverhead(cipherOverhead_);
-    internalBuilder->encodePacketHeader();
-    PacketRebuilder rebuilder(*internalBuilder, conn_);
     // We shouldn't clone Handshake packet.
     if (iter->isHandshake) {
       continue;
@@ -573,12 +576,15 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
         conn_.outstandingPacketEvents.count(*iter->associatedEvent) == 0) {
       continue;
     }
-
-    // The writableBytes here is an optimization. If the writableBytes is too
-    // small for this packet. rebuildFromPacket should fail anyway.
+    // I think this only fail if udpSendPacketLen somehow shrinks in the middle
+    // of a connection.
     if (iter->encodedSize > writableBytes + cipherOverhead_) {
       continue;
     }
+
+    internalBuilder->setCipherOverhead(cipherOverhead_);
+    internalBuilder->encodePacketHeader();
+    PacketRebuilder rebuilder(*internalBuilder, conn_);
 
     // TODO: It's possible we write out a packet that's larger than the packet
     // size limit. For example, when the packet sequence number has advanced to
@@ -593,6 +599,22 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     if (rebuildResult) {
       return SchedulingResult(
           std::move(rebuildResult), std::move(*internalBuilder).buildPacket());
+    } else if (
+        conn_.transportSettings.dataPathType ==
+        DataPathType::ContinuousMemory) {
+      // When we use Inplace packet building and reuse the write buffer, even if
+      // the packet rebuild has failed, there might be some bytes already
+      // written into the buffer and the buffer tail pointer has already moved.
+      // We need to roll back the tail pointer to the position before the packet
+      // building to exclude those bytes. Otherwise these bytes will be sitting
+      // in between legit packets inside the buffer and will either cause errors
+      // further down the write path, or be sent out and then dropped at peer
+      // when peer fail to parse them.
+      internalBuilder.reset();
+      CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
+      ScopedBufAccessor scopedBufAccessor(conn_.bufAccessor);
+      auto& buf = scopedBufAccessor.buf();
+      buf->trimEnd(buf->length() - prevSize);
     }
   }
   return SchedulingResult(folly::none, folly::none);

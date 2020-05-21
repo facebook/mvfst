@@ -1210,5 +1210,88 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRemoveOne) {
   EXPECT_EQ(*builder.frames_[0].asWriteStreamFrame(), f1);
 }
 
+TEST_F(
+    QuicPacketSchedulerTest,
+    CloningSchedulerWithInplaceBuilderDoNotEncodeHeaderWithoutBuild) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  SimpleBufAccessor bufAccessor(2000);
+  auto buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+  bufAccessor.release(std::move(buf));
+  conn.bufAccessor = &bufAccessor;
+
+  FrameScheduler noopScheduler("frame");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "Little Hurry", 0);
+  addOutstandingPacket(conn);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandingPackets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  // Lie about the encodedSize to let the Cloner skip it:
+  conn.outstandingPackets.back().encodedSize = kDefaultUDPSendPacketLen * 2;
+  EXPECT_TRUE(cloningScheduler.hasData());
+
+  ASSERT_FALSE(noopScheduler.hasData());
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  InplaceQuicPacketBuilder builder(
+      bufAccessor,
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_FALSE(result.packetEvent.has_value());
+
+  // Nothing was written into the buffer:
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+}
+
+TEST_F(
+    QuicPacketSchedulerTest,
+    CloningSchedulerWithInplaceBuilderRollbackBufWhenFailToRebuild) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  SimpleBufAccessor bufAccessor(2000);
+  auto buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+  bufAccessor.release(std::move(buf));
+  conn.bufAccessor = &bufAccessor;
+
+  FrameScheduler noopScheduler("frame");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "HotPot", 0);
+  addOutstandingPacket(conn);
+  // Not adding frame to this outstanding packet so that rebuild will fail:
+  ASSERT_TRUE(conn.outstandingPackets.back().packet.frames.empty());
+  EXPECT_TRUE(cloningScheduler.hasData());
+
+  ASSERT_FALSE(noopScheduler.hasData());
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  InplaceQuicPacketBuilder builder(
+      bufAccessor,
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer);
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_FALSE(result.packetEvent.has_value());
+
+  // Nothing was written into the buffer:
+  EXPECT_TRUE(bufAccessor.ownsBuffer());
+  buf = bufAccessor.obtain();
+  EXPECT_EQ(buf->length(), 0);
+}
+
 } // namespace test
 } // namespace quic
