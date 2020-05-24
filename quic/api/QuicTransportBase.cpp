@@ -1437,8 +1437,13 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
   }
+  // We reuse this storage for storing streams which need callbacks.
+  std::vector<StreamId> tempStorage;
   // TODO move all of this callback processing to individual functions.
-  for (const auto& stream : conn_->streamManager->newPeerStreams()) {
+  tempStorage =
+      conn_->streamManager->consumeNewPeerStreams(std::move(tempStorage));
+  const auto& newPeerStreamsCopy = tempStorage;
+  for (const auto& stream : newPeerStreamsCopy) {
     CHECK_NOTNULL(connCallback_);
     if (isBidirectionalStream(stream)) {
       connCallback_->onNewBidirectionalStream(stream);
@@ -1446,29 +1451,32 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       connCallback_->onNewUnidirectionalStream(stream);
     }
     if (closeState_ != CloseState::OPEN) {
-      break;
+      return;
     }
   }
-  conn_->streamManager->clearNewPeerStreams();
 
-  // Handle pingCallbacks
   handlePingCallback();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
 
   // TODO: we're currently assuming that canceling write callbacks will not
   // cause reset of random streams. Maybe get rid of that assumption later.
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
-       closeState_ == CloseState::OPEN &&
        pendingResetIt != conn_->pendingEvents.resets.end();
        pendingResetIt++) {
     cancelDeliveryCallbacksForStream(pendingResetIt->first);
+    if (closeState_ != CloseState::OPEN) {
+      return;
+    }
   }
   auto deliverableStreamId = conn_->streamManager->popDeliverable();
-  while (closeState_ == CloseState::OPEN && deliverableStreamId.has_value()) {
+  while (deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
     auto stream = conn_->streamManager->getStream(streamId);
     auto minOffsetToDeliver = getStreamNextOffsetToDeliver(*stream);
 
-    while (closeState_ == CloseState::OPEN) {
+    while (true) {
       auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
       if (deliveryCallbacksForAckedStream == deliveryCallbacks_.end() ||
           deliveryCallbacksForAckedStream->second.empty()) {
@@ -1485,9 +1493,9 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       auto deliveryCallback = deliveryCallbackAndOffset.second;
       deliveryCallback->onDeliveryAck(
           streamId, currentDeliveryCallbackOffset, conn_->lossState.srtt);
-    }
-    if (closeState_ != CloseState::OPEN) {
-      break;
+      if (closeState_ != CloseState::OPEN) {
+        return;
+      }
     }
     auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
     if (deliveryCallbacksForAckedStream != deliveryCallbacks_.end() &&
@@ -1498,18 +1506,30 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   }
 
   invokeDataExpiredCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
   invokeDataRejectedCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
 
   // Iterate over streams that changed their flow control window and give
   // their registered listeners their updates.
   // We don't really need flow control notifications when we are closed.
-  for (auto streamId : conn_->streamManager->flowControlUpdated()) {
+  tempStorage =
+      conn_->streamManager->consumeFlowControlUpdated(std::move(tempStorage));
+  const auto& flowControlUpdatedCopy = tempStorage;
+  for (auto streamId : flowControlUpdatedCopy) {
     auto stream = conn_->streamManager->getStream(streamId);
     if (!stream->writable()) {
       pendingWriteCallbacks_.erase(streamId);
       continue;
     }
     CHECK_NOTNULL(connCallback_)->onFlowControlUpdate(streamId);
+    if (closeState_ != CloseState::OPEN) {
+      return;
+    }
     auto maxStreamWritable = maxWritableOnStream(*stream);
     if (maxStreamWritable != 0 && !pendingWriteCallbacks_.empty()) {
       auto pendingWriteIt = pendingWriteCallbacks_.find(stream->id);
@@ -1517,28 +1537,24 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
         auto wcb = pendingWriteIt->second;
         pendingWriteCallbacks_.erase(stream->id);
         wcb->onStreamWriteReady(stream->id, maxStreamWritable);
+        if (closeState_ != CloseState::OPEN) {
+          return;
+        }
       }
-    }
-    if (closeState_ != CloseState::OPEN) {
-      break;
     }
   }
-  conn_->streamManager->clearFlowControlUpdated();
 
-  if (closeState_ == CloseState::OPEN) {
-    for (auto itr : conn_->streamManager->stopSendingStreams()) {
-      auto streamId = itr.first;
-      CHECK_NOTNULL(connCallback_)->onStopSending(streamId, itr.second);
-      if (closeState_ != CloseState::OPEN) {
-        return;
-      }
+  const auto stopSendingStreamsCopy =
+      conn_->streamManager->consumeStopSending();
+  for (const auto& itr : stopSendingStreamsCopy) {
+    CHECK_NOTNULL(connCallback_)->onStopSending(itr.first, itr.second);
+    if (closeState_ != CloseState::OPEN) {
+      return;
     }
-    conn_->streamManager->clearStopSending();
   }
 
   auto maxConnWrite = maxWritableOnConn();
-  // We don't need onConnectionWriteReady notifications when we are closed.
-  if (closeState_ == CloseState::OPEN && maxConnWrite != 0) {
+  if (maxConnWrite != 0) {
     // If the connection now has flow control, we may either have been blocked
     // before on a pending write to the conn, or a stream's write.
     if (connWriteCallback_) {
@@ -1552,11 +1568,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     // flow control changed.
     auto writeCallbackIt = pendingWriteCallbacks_.begin();
 
-    // If we were closed, we would have errored out the callbacks which would
-    // invalidate iterators, so just ignore all other calls.
-    // We don't need writeReady notifications when we are closed.
-    while (closeState_ == CloseState::OPEN &&
-           writeCallbackIt != pendingWriteCallbacks_.end()) {
+    while (writeCallbackIt != pendingWriteCallbacks_.end()) {
       auto streamId = writeCallbackIt->first;
       auto wcb = writeCallbackIt->second;
       ++writeCallbackIt;
@@ -1569,6 +1581,9 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       if (maxStreamWritable != 0) {
         pendingWriteCallbacks_.erase(streamId);
         wcb->onStreamWriteReady(streamId, maxStreamWritable);
+        if (closeState_ != CloseState::OPEN) {
+          return;
+        }
       }
     }
   }

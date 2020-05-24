@@ -516,6 +516,19 @@ class QuicStreamManager {
   }
 
   /*
+   * Consume the flow control updated streams using the parameter vector.
+   */
+  auto consumeFlowControlUpdated(std::vector<StreamId>&& storage) {
+    std::vector<StreamId> result = storage;
+    result.clear();
+    result.reserve(flowControlUpdated_.size());
+    result.insert(
+        result.end(), flowControlUpdated_.begin(), flowControlUpdated_.end());
+    flowControlUpdated_.clear();
+    return result;
+  }
+
+  /*
    * Queue a stream which has had its flow control updated.
    */
   void queueFlowControlUpdated(StreamId streamId) {
@@ -602,6 +615,18 @@ class QuicStreamManager {
   }
 
   /*
+   * Consume the new peer streams using the parameter vector.
+   */
+  auto consumeNewPeerStreams(std::vector<StreamId>&& storage) {
+    std::vector<StreamId> result = storage;
+    result.clear();
+    result.reserve(newPeerStreams_.size());
+    result.insert(result.end(), newPeerStreams_.begin(), newPeerStreams_.end());
+    newPeerStreams_.clear();
+    return result;
+  }
+
+  /*
    * Returns the number of streams open and active (for which we have created
    * the stream state).
    */
@@ -615,6 +640,17 @@ class QuicStreamManager {
    */
   const auto& stopSendingStreams() const {
     return stopSendingStreams_;
+  }
+
+  /*
+   * Consume the stop sending streams.
+   */
+  auto consumeStopSending() {
+    std::vector<std::pair<StreamId, ApplicationErrorCode>> result;
+    result.reserve(stopSendingStreams_.size());
+    result.insert(
+        result.end(), stopSendingStreams_.begin(), stopSendingStreams_.end());
+    return result;
   }
 
   /*
