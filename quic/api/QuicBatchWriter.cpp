@@ -14,8 +14,13 @@
 #define USE_THREAD_LOCAL_BATCH_WRITER 0
 #endif
 
-#if USE_THREAD_LOCAL_BATCH_WRITER
 namespace {
+// There is a known problem in the CloningScheduler that it may write a packet
+// that's a few bytes larger than the original packet. If the original packet is
+// a full packet, then the new packet will be larger than a full packet.
+constexpr size_t kPacketSizeViolationTolerance = 10;
+
+#if USE_THREAD_LOCAL_BATCH_WRITER
 class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
  private:
   ThreadLocalBatchWriterCache() = default;
@@ -128,8 +133,8 @@ class ThreadLocalBatchWriterCache : public folly::AsyncTimeout {
   std::unique_ptr<quic::BatchWriter> batchWriter_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
 };
-} // namespace
 #endif
+} // namespace
 
 namespace quic {
 // BatchWriter
@@ -285,6 +290,9 @@ ssize_t GSOInplacePacketBatchWriter::write(
       (nextPacketSize_ && diffToEnd == nextPacketSize_))
       << "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
       << ", nextPacketSize_=" << nextPacketSize_;
+  CHECK_LT(diffToEnd, conn_.udpSendPacketLen + kPacketSizeViolationTolerance)
+      << "Remaining buffer contents larger than udpSendPacketLen by "
+      << (diffToEnd - conn_.udpSendPacketLen);
   uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);
   auto bytesWritten = (numPackets_ > 1)

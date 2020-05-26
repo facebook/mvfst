@@ -606,9 +606,10 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   ASSERT_FALSE(
       batchWriter->append(nullptr, 700, folly::SocketAddress(), nullptr));
 
-  size_t packetSizeTooBig = 1200;
-  rawBuf->append(packetSizeTooBig);
-  EXPECT_TRUE(batchWriter->needsFlush(packetSizeTooBig));
+  // There is a check against packet 10 bytes or more larger than the size limit
+  size_t packetSizeBig = 1009;
+  rawBuf->append(packetSizeBig);
+  EXPECT_TRUE(batchWriter->needsFlush(packetSizeBig));
 
   EXPECT_CALL(sock, write(_, _))
       .Times(1)
@@ -619,9 +620,41 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
       }));
   // No crash:
   EXPECT_EQ(700, batchWriter->write(sock, folly::SocketAddress()));
-
-  EXPECT_EQ(1200, rawBuf->length());
+  EXPECT_EQ(1009, rawBuf->length());
   EXPECT_EQ(0, rawBuf->headroom());
+}
+
+TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueTooBig) {
+  bool useThreadLocal = GetParam();
+  folly::EventBase evb;
+  folly::test::MockAsyncUDPSocket sock(&evb);
+  EXPECT_CALL(sock, getGSO()).WillRepeatedly(Return(1));
+
+  uint32_t batchSize = 20;
+  auto bufAccessor =
+      std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
+  conn_.bufAccessor = bufAccessor.get();
+  conn_.udpSendPacketLen = 1000;
+  auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
+      sock,
+      quic::QuicBatchingMode::BATCHING_MODE_GSO,
+      batchSize,
+      useThreadLocal,
+      quic::kDefaultThreadLocalDelay,
+      DataPathType::ContinuousMemory,
+      conn_);
+  auto buf = bufAccessor->obtain();
+  folly::IOBuf* rawBuf = buf.get();
+  bufAccessor->release(std::move(buf));
+  rawBuf->append(700);
+  ASSERT_FALSE(
+      batchWriter->append(nullptr, 700, folly::SocketAddress(), nullptr));
+
+  size_t packetSizeTooBig = 1090;
+  rawBuf->append(packetSizeTooBig);
+  EXPECT_TRUE(batchWriter->needsFlush(packetSizeTooBig));
+
+  EXPECT_DEATH(batchWriter->write(sock, folly::SocketAddress()), "");
 }
 
 INSTANTIATE_TEST_CASE_P(

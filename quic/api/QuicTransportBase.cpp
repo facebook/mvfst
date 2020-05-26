@@ -2441,6 +2441,9 @@ void QuicTransportBase::setTransportSettings(
   // If we've already encoded the transport parameters, silently return as
   // setting the transport settings again would be buggy.
   // TODO should we throw or return Expected here?
+  if (conn_->nodeType == QuicNodeType::Client) {
+    conn_->transportSettings.dataPathType = DataPathType::ChainedMemory;
+  }
   if (conn_->transportParametersEncoded) {
     return;
   }
