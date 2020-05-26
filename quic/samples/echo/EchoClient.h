@@ -14,6 +14,7 @@
 
 #include <glog/logging.h>
 
+#include <folly/fibers/Baton.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 
 #include <quic/api/QuicSocket.h>
@@ -82,6 +83,11 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
     LOG(ERROR) << "EchoClient error: " << toString(error.first);
+    startDone_.post();
+  }
+
+  void onTransportReady() noexcept override {
+    startDone_.post();
   }
 
   void onStreamWriteReady(
@@ -132,6 +138,8 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
       quicClient_->start(this);
     });
 
+    startDone_.wait();
+
     std::string message;
     auto client = quicClient_;
     // loop until Ctrl+D
@@ -181,6 +189,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;
+  folly::fibers::Baton startDone_;
 };
 } // namespace samples
 } // namespace quic
