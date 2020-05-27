@@ -8,11 +8,11 @@
 
 #pragma once
 
-#include <boost/variant.hpp>
 #include <folly/Range.h>
 #include <folly/String.h>
 #include <chrono>
 #include <cstdint>
+#include <ostream>
 
 namespace quic {
 

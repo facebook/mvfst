@@ -8,6 +8,7 @@
 
 #pragma once
 #include <fstream>
+#include <sstream>
 
 #include <folly/dynamic.h>
 #include <folly/logging/AsyncFileWriter.h>
