@@ -990,7 +990,7 @@ TEST_F(
   conn->congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .WillRepeatedly(Return());
-  EXPECT_CALL(*mockQLogger, addLossAlarm(5, 0, 10, kHandshakeAlarm));
+  EXPECT_CALL(*mockQLogger, addLossAlarm(5, 1, 10, kHandshakeAlarm));
   std::vector<PacketNum> lostPackets;
   PacketNum expectedLargestLostNum = 0;
   conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
@@ -1032,7 +1032,7 @@ TEST_F(QuicLossFunctionsTest, HandshakeAlarmWithOneRttCipher) {
   conn->oneRttWriteCipher = createNoOpAead();
   conn->lossState.currentAlarmMethod = LossState::AlarmMethod::Handshake;
   std::vector<PacketNum> lostPackets;
-  EXPECT_CALL(*mockQLogger, addLossAlarm(1, 0, 1, kHandshakeAlarm));
+  EXPECT_CALL(*mockQLogger, addLossAlarm(1, 1, 1, kHandshakeAlarm));
   sendPacket(*conn, TimePoint(100ms), folly::none, PacketType::Handshake);
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), Clock>(
       *conn, testingLossMarkFunc(lostPackets));
@@ -1318,6 +1318,21 @@ TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
   EXPECT_CALL(*transportInfoCb_, onPTO());
   onPTOAlarm(*conn);
   EXPECT_EQ(101, conn->lossState.totalPTOCount);
+}
+
+TEST_F(QuicLossFunctionsTest, HandshakeAlarmPTOCountingAndCallbacks) {
+  auto conn = createConn();
+  auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);
+  conn->qLogger = mockQLogger;
+  conn->lossState.ptoCount = 22;
+  conn->lossState.totalPTOCount = 100;
+  conn->lossState.handshakeAlarmCount = 3;
+  EXPECT_CALL(*mockQLogger, addLossAlarm(0, 4, 0, kHandshakeAlarm));
+  EXPECT_CALL(*transportInfoCb_, onPTO());
+  onHandshakeAlarm(*conn, [](const auto&, auto, bool, PacketNum) {});
+  EXPECT_EQ(101, conn->lossState.totalPTOCount);
+  EXPECT_EQ(23, conn->lossState.ptoCount);
+  EXPECT_EQ(4, conn->lossState.handshakeAlarmCount);
 }
 
 TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {

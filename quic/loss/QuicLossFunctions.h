@@ -299,13 +299,10 @@ void onHandshakeAlarm(
   // Alternatively we can experiment with only retransmit them without marking
   // loss
   VLOG(10) << __func__ << " " << conn;
-  if (conn.qLogger) {
-    conn.qLogger->addLossAlarm(
-        conn.lossState.largestSent,
-        conn.lossState.handshakeAlarmCount,
-        (uint64_t)conn.outstandingPackets.size(),
-        kHandshakeAlarm);
-  }
+  ++conn.lossState.ptoCount;
+  ++conn.lossState.totalPTOCount;
+  ++conn.lossState.handshakeAlarmCount;
+  QUIC_STATS(conn.statsCallback, onPTO);
   QUIC_TRACE(
       handshake_alarm,
       conn,
@@ -313,7 +310,13 @@ void onHandshakeAlarm(
       conn.lossState.handshakeAlarmCount,
       (uint64_t)conn.outstandingHandshakePacketsCount,
       (uint64_t)conn.outstandingPackets.size());
-  ++conn.lossState.handshakeAlarmCount;
+  if (conn.qLogger) {
+    conn.qLogger->addLossAlarm(
+        conn.lossState.largestSent,
+        conn.lossState.handshakeAlarmCount,
+        (uint64_t)conn.outstandingPackets.size(),
+        kHandshakeAlarm);
+  }
   CongestionController::LossEvent lossEvent(ClockType::now());
   auto iter = conn.outstandingPackets.begin();
   while (iter != conn.outstandingPackets.end()) {
