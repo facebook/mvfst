@@ -220,12 +220,29 @@ class SendmmsgGSOPacketBatchWriter : public BatchWriter {
   size_t currBufs_{0};
   // size of data in all the buffers
   size_t currSize_{0};
-  // size of the previous buffer chain appended to the buf_
-  size_t prevSize_{0};
   // array of IOBufs
   std::vector<std::unique_ptr<folly::IOBuf>> bufs_;
   std::vector<int> gso_;
+  std::vector<size_t> prevSize_;
   std::vector<folly::SocketAddress> addrs_;
+
+  struct Index {
+    Index& operator=(int idx) {
+      idx_ = idx;
+      return *this;
+    }
+
+    operator int() const {
+      return idx_;
+    }
+
+    bool valid() const {
+      return idx_ >= 0;
+    }
+    int idx_ = -1;
+  };
+
+  folly::F14FastMap<folly::SocketAddress, Index> addrMap_;
 };
 
 struct BatchWriterDeleter {

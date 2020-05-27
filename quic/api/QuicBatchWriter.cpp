@@ -421,10 +421,12 @@ size_t SendmmsgGSOPacketBatchWriter::size() const {
 void SendmmsgGSOPacketBatchWriter::reset() {
   bufs_.clear();
   gso_.clear();
+  prevSize_.clear();
   addrs_.clear();
+  addrMap_.clear();
+
   currBufs_ = 0;
   currSize_ = 0;
-  prevSize_ = 0;
 }
 
 bool SendmmsgGSOPacketBatchWriter::append(
@@ -434,41 +436,43 @@ bool SendmmsgGSOPacketBatchWriter::append(
     folly::AsyncUDPSocket* sock) {
   setSock(sock);
   currSize_ += size;
-  // see if we need to start a new chain
-  if (size > prevSize_ ||
-      (!addrs_.empty() && (addr != addrs_[addrs_.size() - 1]))) {
-    bufs_.emplace_back(std::move(buf));
-    // set the gso_ value to 0 for now
-    // this will change if we append to this chain
-    gso_.emplace_back(0);
-    addrs_.emplace_back(addr);
-    prevSize_ = size;
-    currBufs_++;
 
-    // reached max buffers
-    if (FOLLY_UNLIKELY(currBufs_ == maxBufs_)) {
-      return true;
+  // insert the entry if not present
+  auto& idx = addrMap_[addr];
+
+  // try to see if we can append
+  if (idx.valid()) {
+    if (size <= prevSize_[idx]) {
+      if ((gso_[idx] == 0) ||
+          (static_cast<size_t>(gso_[idx]) == prevSize_[idx])) {
+        // we can append
+        gso_[idx] = prevSize_[idx];
+        prevSize_[idx] = size;
+        bufs_[idx]->prependChain(std::move(buf));
+        currBufs_++;
+
+        // flush if we reach maxBufs_
+        return (currBufs_ == maxBufs_);
+      }
     }
-
-    return false;
   }
 
-  gso_.back() = prevSize_;
-  bufs_.back()->prependChain(std::move(buf));
+  // set the map index
+  idx = bufs_.size();
+
+  // add a new buffer
+  bufs_.emplace_back(std::move(buf));
+
+  // set the gso_ value to 0 for now
+  // this will change if we append to this chain
+  gso_.emplace_back(0);
+  prevSize_.emplace_back(size);
+  addrs_.emplace_back(addr);
+
   currBufs_++;
 
-  // reached max buffers
-  if (FOLLY_UNLIKELY(currBufs_ == maxBufs_)) {
-    return true;
-  }
-
-  if (size < prevSize_) {
-    // reset the prevSize_ so in the next loop
-    // we will start a new chain
-    prevSize_ = 0;
-  }
-
-  return false;
+  // flush if we reach maxBufs_
+  return (currBufs_ == maxBufs_);
 }
 
 ssize_t SendmmsgGSOPacketBatchWriter::write(
