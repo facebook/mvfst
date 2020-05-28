@@ -93,9 +93,11 @@ void appendPendingStreamReset(
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream);
 
 /**
- * Get the the minimal write offset that's yet to deliver to peer
+ * Get the the highest acked offset (if any) that we can execute delivery
+ * callbacks on.
  */
-uint64_t getStreamNextOffsetToDeliver(const QuicStreamState& stream);
+folly::Optional<uint64_t> getLargestDeliverableOffset(
+    const QuicStreamState& stream);
 
 /**
  * Common functions for merging data into the read buffer for a Quic stream like

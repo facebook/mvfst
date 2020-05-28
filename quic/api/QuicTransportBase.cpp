@@ -1474,16 +1474,16 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   while (deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
     auto stream = conn_->streamManager->getStream(streamId);
-    auto minOffsetToDeliver = getStreamNextOffsetToDeliver(*stream);
+    auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
 
-    while (true) {
+    while (maxOffsetToDeliver.has_value()) {
       auto deliveryCallbacksForAckedStream = deliveryCallbacks_.find(streamId);
       if (deliveryCallbacksForAckedStream == deliveryCallbacks_.end() ||
           deliveryCallbacksForAckedStream->second.empty()) {
         break;
       }
       if (deliveryCallbacksForAckedStream->second.front().first >
-          minOffsetToDeliver) {
+          *maxOffsetToDeliver) {
         break;
       }
       auto deliveryCallbackAndOffset =
@@ -1936,8 +1936,8 @@ QuicTransportBase::registerDeliveryCallback(
       deliveryCallbackIt->second.emplace(pos, offset, cb);
     }
     auto stream = conn_->streamManager->getStream(id);
-    auto minOffsetToDelivery = getStreamNextOffsetToDeliver(*stream);
-    if (offset < minOffsetToDelivery) {
+    auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
+    if (maxOffsetToDeliver.has_value() && (offset < *maxOffsetToDeliver)) {
       // This offset is already delivered
       runOnEvbAsync([id, cb, offset](auto selfObj) {
         if (selfObj->closeState_ != CloseState::OPEN) {

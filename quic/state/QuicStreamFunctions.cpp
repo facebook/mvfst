@@ -381,21 +381,16 @@ uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
       stream.currentWriteOffset + stream.writeBuffer.chainLength());
 }
 
-uint64_t getStreamNextOffsetToDeliver(const QuicStreamState& stream) {
-  auto minOffsetToDeliver = stream.currentWriteOffset;
+folly::Optional<uint64_t> getLargestDeliverableOffset(
+    const QuicStreamState& stream) {
   // If the acked intervals is not empty, then the furthest acked interval
   // starting at zero is the next offset. If there is no interval starting at
   // zero then we cannot deliver any offsets.
-  minOffsetToDeliver = std::min(
-      minOffsetToDeliver,
-      stream.ackedIntervals.empty() || stream.ackedIntervals.front().start != 0
-          ? minOffsetToDeliver
-          : stream.ackedIntervals.front().end);
-  minOffsetToDeliver = std::min(
-      minOffsetToDeliver,
-      stream.lossBuffer.empty() ? minOffsetToDeliver
-                                : stream.lossBuffer[0].offset);
-  return minOffsetToDeliver;
+  if (stream.ackedIntervals.empty() ||
+      stream.ackedIntervals.front().start != 0) {
+    return folly::none;
+  }
+  return stream.ackedIntervals.front().end;
 }
 
 // TODO reap

@@ -1880,28 +1880,17 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliver) {
+TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverNothingAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
-  EXPECT_EQ(100, getStreamNextOffsetToDeliver(stream));
+  EXPECT_EQ(folly::none, getLargestDeliverableOffset(stream));
 }
 
-TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverRetxBuffer) {
+TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverAllAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;
-  stream.retransmissionBuffer.emplace(
-      50, std::make_unique<StreamBuffer>(buildRandomInputData(10), 50));
-  stream.ackedIntervals.insert(0, 49);
-  EXPECT_EQ(49, getStreamNextOffsetToDeliver(stream));
-}
-
-TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverRetxAndLossBuffer) {
-  QuicStreamState stream(3, conn);
-  stream.currentWriteOffset = 100;
-  stream.lossBuffer.emplace_back(buildRandomInputData(10), 30);
-  stream.retransmissionBuffer.emplace(
-      50, std::make_unique<StreamBuffer>(buildRandomInputData(10), 50));
-  EXPECT_EQ(30, getStreamNextOffsetToDeliver(stream));
+  stream.ackedIntervals.insert(0, 99);
+  EXPECT_EQ(99, getLargestDeliverableOffset(stream).value());
 }
 
 TEST_F(QuicStreamFunctionsTest, LossBufferEmpty) {

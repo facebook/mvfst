@@ -1296,6 +1296,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpected) {
   transport->registerDeliveryCallback(stream, 20, &dcb2);
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   streamState->currentWriteOffset = 7;
+  streamState->ackedIntervals.insert(0, 6);
 
   EXPECT_CALL(dcb3, onDeliveryAck(_, _, _))
       .WillOnce(Invoke(

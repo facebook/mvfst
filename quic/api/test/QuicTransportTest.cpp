@@ -1802,9 +1802,11 @@ TEST_F(QuicTransportTest, DeliveryCallbackClosesTransportOnDelivered) {
   loopForWrites();
 
   auto& conn = transport_->getConnectionState();
+  auto streamState = conn.streamManager->getStream(stream1);
   conn.streamManager->addDeliverable(stream1);
   folly::SocketAddress addr;
   NetworkData emptyData;
+  streamState->ackedIntervals.insert(0, 19);
   // This will invoke the DeliveryClalback::onDelivered
   transport_->onNetworkData(addr, std::move(emptyData));
 }
@@ -1818,19 +1820,22 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksNothingDelivered) {
   transport_->writeChain(stream, buf->clone(), false, false);
   loopForWrites();
 
+  auto& conn = transport_->getConnectionState();
+  auto streamState = conn.streamManager->getStream(stream);
+
   folly::SocketAddress addr;
   NetworkData emptyData;
   transport_->onNetworkData(addr, std::move(emptyData));
+  streamState->ackedIntervals.insert(0, 19);
 
   // Clear out the other delivery callbacks before tear down transport.
   // Otherwise, transport will be holding on to delivery callback pointers
   // that are already dead:
   auto buf2 = buildRandomInputData(100);
   transport_->writeChain(stream, buf2->clone(), true, false);
+  streamState->ackedIntervals.insert(20, 99);
   loopForWrites();
 
-  auto& conn = transport_->getConnectionState();
-  auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
@@ -1855,6 +1860,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksAllDelivered) {
   conn.lossState.srtt = 100us;
   auto streamState = conn.streamManager->getStream(stream);
   streamState->retransmissionBuffer.clear();
+  streamState->ackedIntervals.insert(0, 1);
 
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -1882,6 +1888,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
 
   folly::SocketAddress addr;
   NetworkData emptyData;
+  streamState->ackedIntervals.insert(0, 99);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
@@ -1896,6 +1903,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksPartialDelivered) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
+  streamState->ackedIntervals.insert(100, 199);
   EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
@@ -1926,6 +1934,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
 
   folly::SocketAddress addr;
   NetworkData emptyData;
+  streamState->ackedIntervals.insert(0, 49);
   EXPECT_CALL(mockedDeliveryCallback1, onDeliveryAck(stream, 50, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData));
@@ -1940,6 +1949,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksRetxBuffer) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
+  streamState->ackedIntervals.insert(50, 199);
   EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
@@ -1971,6 +1981,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
           folly::IOBuf::copyBuffer("But i'm not delivered yet"), 51, false)));
   streamState->lossBuffer.emplace_back(
       folly::IOBuf::copyBuffer("And I'm lost"), 31, false);
+  streamState->ackedIntervals.insert(0, 30);
 
   folly::SocketAddress addr;
   NetworkData emptyData;
@@ -1988,6 +1999,7 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   streamState->lossBuffer.clear();
   conn.streamManager->addDeliverable(stream);
   NetworkData emptyData2;
+  streamState->ackedIntervals.insert(31, 199);
   EXPECT_CALL(mockedDeliveryCallback2, onDeliveryAck(stream, 50, 100us))
       .Times(1);
   EXPECT_CALL(mockedDeliveryCallback3, onDeliveryAck(stream, 150, 100us))
