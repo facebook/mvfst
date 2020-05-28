@@ -503,8 +503,8 @@ enum class EncryptionLevel : uint8_t {
  * exist for long time.
  */
 enum class DataPathType : uint8_t {
-  ChainedMemory,
-  ContinuousMemory,
+  ChainedMemory = 0,
+  ContinuousMemory = 1,
 };
 
 } // namespace quic
