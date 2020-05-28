@@ -4,7 +4,6 @@
 
 #include <quic/server/SlidingWindowRateLimiter.h>
 
-using namespace std::chrono_literals;
 using namespace quic;
 
 TEST(SlidingWindowRateLimiterTest, BasicExceedsCount) {
