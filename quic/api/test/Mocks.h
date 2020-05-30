@@ -167,7 +167,7 @@ class MockQuicTransport : public QuicServerTransport {
 
   virtual ~MockQuicTransport() {
     customDestructor();
-  };
+  }
 
   MOCK_METHOD0(customDestructor, void());
 

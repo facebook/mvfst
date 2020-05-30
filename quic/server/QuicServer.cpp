@@ -565,7 +565,7 @@ void QuicServer::setEventBaseObserver(
   runOnAllWorkers([observer](auto worker) {
     worker->getEventBase()->setObserver(observer);
   });
-};
+}
 
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
   if (initialized_) {

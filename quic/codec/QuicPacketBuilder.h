@@ -388,7 +388,7 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
 
   FOLLY_NODISCARD bool canBuildPacket() const noexcept override {
     return builder.canBuildPacket();
-  };
+  }
 
   FOLLY_NODISCARD uint32_t getHeaderBytes() const override {
     return builder.getHeaderBytes();

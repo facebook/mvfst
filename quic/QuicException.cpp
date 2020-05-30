@@ -16,49 +16,49 @@ namespace quic {
 QuicTransportException::QuicTransportException(
     const std::string& msg,
     TransportErrorCode errCode)
-    : std::runtime_error(msg), errCode_(errCode){};
+    : std::runtime_error(msg), errCode_(errCode) {}
 
 QuicTransportException::QuicTransportException(
     const char* msg,
     TransportErrorCode errCode)
-    : std::runtime_error(msg), errCode_(errCode){};
+    : std::runtime_error(msg), errCode_(errCode) {}
 
 QuicTransportException::QuicTransportException(
     const std::string& msg,
     TransportErrorCode errCode,
     FrameType frameType)
-    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType){};
+    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType) {}
 
 QuicTransportException::QuicTransportException(
     const char* msg,
     TransportErrorCode errCode,
     FrameType frameType)
-    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType){};
+    : std::runtime_error(msg), errCode_(errCode), frameType_(frameType) {}
 
 QuicInternalException::QuicInternalException(
     const std::string& msg,
     LocalErrorCode errCode)
-    : std::runtime_error(msg), errorCode_(errCode){};
+    : std::runtime_error(msg), errorCode_(errCode) {}
 
 QuicInternalException::QuicInternalException(
     const char* msg,
     LocalErrorCode errCode)
-    : std::runtime_error(msg), errorCode_(errCode){};
+    : std::runtime_error(msg), errorCode_(errCode) {}
 
 QuicInternalException::QuicInternalException(
     folly::StringPiece msg,
     LocalErrorCode errCode)
-    : std::runtime_error(folly::to<std::string>(msg)), errorCode_(errCode){};
+    : std::runtime_error(folly::to<std::string>(msg)), errorCode_(errCode) {}
 
 QuicApplicationException::QuicApplicationException(
     const std::string& msg,
     ApplicationErrorCode errorCode)
-    : std::runtime_error(msg), errorCode_(errorCode){};
+    : std::runtime_error(msg), errorCode_(errorCode) {}
 
 QuicApplicationException::QuicApplicationException(
     const char* msg,
     ApplicationErrorCode errorCode)
-    : std::runtime_error(msg), errorCode_(errorCode){};
+    : std::runtime_error(msg), errorCode_(errorCode) {}
 
 folly::StringPiece toString(LocalErrorCode code) {
   switch (code) {

@@ -72,7 +72,7 @@ folly::Expected<size_t, TransportErrorCode> encodeQuicInteger(
     return encodeEightBytes(std::move(bufop), value);
   }
   return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
-};
+}
 
 template <typename BufOp>
 folly::Expected<size_t, TransportErrorCode>
@@ -92,7 +92,7 @@ encodeQuicInteger(uint64_t value, BufOp bufop, int outputSize) {
       return encodeEightBytes(std::move(bufop), value);
   }
   return folly::makeUnexpected(TransportErrorCode::INTERNAL_ERROR);
-};
+}
 
 /**
  * Reads an integer out of the cursor and returns a pair with the integer and
@@ -141,7 +141,7 @@ class QuicInteger {
           folly::to<std::string>("Value too large ", value_), size.error());
     }
     return size.value();
-  };
+  }
 
   template <typename BufOp>
   size_t encode(BufOp appender, int outputSize) const {
@@ -152,7 +152,7 @@ class QuicInteger {
           folly::to<std::string>("Value too large ", value_), size.error());
     }
     return size.value();
-  };
+  }
 
   /**
    * Returns the number of bytes needed to represent the QUIC integer in
