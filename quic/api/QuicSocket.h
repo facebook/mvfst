@@ -798,15 +798,9 @@ class QuicSocket {
    * transport when the peer has acknowledged the receipt of all the data/eof
    * passed to write.
    *
-   * A returned IOBuf indicates that the passed data exceeded the transport
-   * flow control window or send buffer space.  The application must call write
-   * with this data again later, and should be a signal to apply backpressure.
-   * If EOF was true or a delivery callback was set they also need to be
-   * passed again later.  See notifyPendingWrite to register for a callback.
-   *
    * An error code is present if there was an error with the write.
    */
-  using WriteResult = folly::Expected<Buf, LocalErrorCode>;
+  using WriteResult = folly::Expected<folly::Unit, LocalErrorCode>;
   virtual WriteResult writeChain(
       StreamId id,
       Buf data,

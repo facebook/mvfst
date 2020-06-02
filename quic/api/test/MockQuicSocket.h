@@ -140,21 +140,15 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(
       unregisterStreamWriteCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId));
-  folly::Expected<Buf, LocalErrorCode> writeChain(
+  folly::Expected<folly::Unit, LocalErrorCode> writeChain(
       StreamId id,
       Buf data,
       bool eof,
       bool cork,
       DeliveryCallback* cb) override {
     SharedBuf sharedData(data.release());
-    auto res = writeChain(id, sharedData, eof, cork, cb);
-    if (res.hasError()) {
-      return folly::makeUnexpected(res.error());
-    } else {
-      return Buf(res.value());
-    }
+    return writeChain(id, sharedData, eof, cork, cb);
   }
-  using WriteResult = folly::Expected<folly::IOBuf*, LocalErrorCode>;
   MOCK_METHOD5(
       writeChain,
       WriteResult(StreamId, SharedBuf, bool, bool, DeliveryCallback*));

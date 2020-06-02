@@ -169,11 +169,6 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
     auto res = quicClient_->writeChain(id, message->clone(), true, false);
     if (res.hasError()) {
       LOG(ERROR) << "EchoClient writeChain error=" << uint32_t(res.error());
-    } else if (res.value()) {
-      LOG(INFO) << "EchoClient socket did not accept all data, buffering len="
-                << res.value()->computeChainDataLength();
-      data.append(std::move(res.value()));
-      quicClient_->notifyPendingWriteOnStream(id, this);
     } else {
       auto str = message->moveToFbString().toStdString();
       LOG(INFO) << "EchoClient wrote \"" << str << "\""

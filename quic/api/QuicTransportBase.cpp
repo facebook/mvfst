@@ -1899,7 +1899,7 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
         std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
   }
-  return nullptr;
+  return folly::unit;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>

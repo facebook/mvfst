@@ -105,11 +105,6 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
         sock->writeChain(id, std::move(echoedData), true, false, nullptr);
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
-    } else if (res.value()) {
-      LOG(INFO) << "socket did not accept all data, buffering len="
-                << res.value()->computeChainDataLength();
-      data.first.append(std::move(res.value()));
-      sock->notifyPendingWriteOnStream(id, this);
     } else {
       // echo is done, clear EOF
       data.second = false;
@@ -149,11 +144,6 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     auto res = sock->writeChain(id, originalData.move(), true, false, nullptr);
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
-    } else if (res.value()) {
-      LOG(INFO) << "socket did not accept all data, buffering len="
-                << res.value()->computeChainDataLength();
-      originalData.append(std::move(res.value()));
-      sock->notifyPendingWriteOnStream(id, this);
     } else {
       // echo is done, clear EOF
       data.second = false;

@@ -1043,7 +1043,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
-  QuicSocket::WriteResult result = transport->writeChain(
+  transport->writeChain(
       stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
@@ -1074,7 +1074,7 @@ TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
     throw std::runtime_error("You need to calm down.");
     return 0;
   }));
-  QuicSocket::WriteResult result = transport->writeChain(
+  transport->writeChain(
       stream,
       folly::IOBuf::copyBuffer("You are being too loud."),
       true,
@@ -1097,7 +1097,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
     throw std::runtime_error("Well there's your problem");
     return 0;
   }));
-  QuicSocket::WriteResult result = transport->writeChain(
+  transport->writeChain(
       stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
