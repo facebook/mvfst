@@ -330,6 +330,7 @@ void QuicServerWorkerTest::testSendReset(
         codec.setOneRttHeaderCipher(test::createNoOpHeaderCipher());
         StatelessResetToken token = generateStatelessResetToken();
         codec.setStatelessResetToken(token);
+        overridePacketWithToken(*buf, token);
         AckStates ackStates;
         auto packetQueue = bufToQueue(buf->clone());
         auto res = codec.parsePacket(packetQueue, ackStates);
@@ -2186,7 +2187,9 @@ void QuicServerTest::testReset(Buf packet) {
   StatelessResetToken token = generateStatelessResetToken();
   codec.setStatelessResetToken(token);
   AckStates ackStates;
-  auto packetQueue = bufToQueue(serverData->clone());
+  auto packetBuf = serverData->clone();
+  overridePacketWithToken(*packetBuf, token);
+  auto packetQueue = bufToQueue(std::move(packetBuf));
   auto res = codec.parsePacket(packetQueue, ackStates);
   EXPECT_NE(res.statelessReset(), nullptr);
 }

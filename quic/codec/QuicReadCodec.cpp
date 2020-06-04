@@ -234,34 +234,11 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
       std::move(longHeader), params_, std::move(decrypted));
 }
 
-CodecResult QuicReadCodec::parsePacket(
-    BufQueue& queue,
+CodecResult QuicReadCodec::tryParseShortHeaderPacket(
+    Buf data,
     const AckStates& ackStates,
-    size_t dstConnIdSize) {
-  if (queue.empty()) {
-    return CodecResult(Nothing());
-  }
-  DCHECK(!queue.front()->isChained());
-  folly::io::Cursor cursor(queue.front());
-  if (!cursor.canAdvance(sizeof(uint8_t))) {
-    return CodecResult(Nothing());
-  }
-  uint8_t initialByte = cursor.readBE<uint8_t>();
-  auto headerForm = getHeaderForm(initialByte);
-  if (headerForm == HeaderForm::Long) {
-    return parseLongHeaderPacket(queue, ackStates);
-  }
-  // Short header:
-  // TODO: support key phase one.
-  if (!oneRttReadCipher_ || !oneRttHeaderCipher_) {
-    VLOG(4) << nodeToString(nodeType_) << " cannot read key phase zero packet";
-    VLOG(20) << "cannot read data="
-             << folly::hexlify(queue.front()->clone()->moveToFbString()) << " "
-             << connIdToHex();
-    return CodecResult(
-        CipherUnavailable(queue.move(), 0, ProtectionType::KeyPhaseZero));
-  }
-
+    size_t dstConnIdSize,
+    folly::io::Cursor& cursor) {
   // TODO: allow other connid lengths from the state.
   size_t packetNumberOffset = 1 + dstConnIdSize;
   PacketNum expectedNextPacketNum =
@@ -270,15 +247,12 @@ CodecResult QuicReadCodec::parsePacket(
       : 0;
   size_t sampleOffset = packetNumberOffset + kMaxPacketNumEncodingSize;
   Sample sample;
-  if (queue.chainLength() < sampleOffset + sample.size()) {
+  if (data->computeChainDataLength() < sampleOffset + sample.size()) {
     VLOG(10) << "Dropping packet, too small for sample " << connIdToHex();
-    // There's not enough space for the short header packet, clear the queue
-    // to indicate there's no more parse-able data.
-    queue.move();
+    // There's not enough space for the short header packet
     return CodecResult(Nothing());
   }
-  // Take it out of the queue so we can do some writing.
-  auto data = queue.move();
+
   folly::MutableByteRange initialByteRange(data->writableData(), 1);
   folly::MutableByteRange packetNumberByteRange(
       data->writableData() + packetNumberOffset, kMaxPacketNumEncodingSize);
@@ -312,25 +286,9 @@ CodecResult QuicReadCodec::parsePacket(
   data->trimStart(aadLen);
 
   Buf decrypted;
-  // TODO: small optimization we can do here: only read the token if
-  // decryption fails
-  folly::Optional<StatelessResetToken> token;
-  auto encryptedDataLength = data->length();
-  if (statelessResetToken_ &&
-      encryptedDataLength > sizeof(StatelessResetToken)) {
-    token = StatelessResetToken();
-    memcpy(
-        token->data(),
-        data->data() + (encryptedDataLength - sizeof(StatelessResetToken)),
-        token->size());
-  }
   auto decryptAttempt = oneRttReadCipher_->tryDecrypt(
       std::move(data), &headerData, packetNum.first);
   if (!decryptAttempt) {
-    // Can't return the data now, already consumed it to try decrypting it.
-    if (token) {
-      return StatelessReset(*token);
-    }
     auto protectionType = shortHeader->getProtectionType();
     VLOG(10) << "Unable to decrypt packet=" << packetNum.first
              << " protectionType=" << (int)protectionType << " "
@@ -345,6 +303,62 @@ CodecResult QuicReadCodec::parsePacket(
 
   return decodeRegularPacket(
       std::move(*shortHeader), params_, std::move(decrypted));
+}
+
+CodecResult QuicReadCodec::parsePacket(
+    BufQueue& queue,
+    const AckStates& ackStates,
+    size_t dstConnIdSize) {
+  if (queue.empty()) {
+    return CodecResult(Nothing());
+  }
+  DCHECK(!queue.front()->isChained());
+  folly::io::Cursor cursor(queue.front());
+  if (!cursor.canAdvance(sizeof(uint8_t))) {
+    return CodecResult(Nothing());
+  }
+  uint8_t initialByte = cursor.readBE<uint8_t>();
+  auto headerForm = getHeaderForm(initialByte);
+  if (headerForm == HeaderForm::Long) {
+    return parseLongHeaderPacket(queue, ackStates);
+  }
+  // Missing 1-rtt Cipher is the only case we wouldn't consider reset
+  // TODO: support key phase one.
+  if (!oneRttReadCipher_ || !oneRttHeaderCipher_) {
+    VLOG(4) << nodeToString(nodeType_) << " cannot read key phase zero packet";
+    VLOG(20) << "cannot read data="
+             << folly::hexlify(queue.front()->clone()->moveToFbString()) << " "
+             << connIdToHex();
+    return CodecResult(
+        CipherUnavailable(queue.move(), 0, ProtectionType::KeyPhaseZero));
+  }
+
+  auto data = queue.move();
+  folly::Optional<StatelessResetToken> token;
+  if (nodeType_ == QuicNodeType::Client &&
+      initialByte & ShortHeader::kFixedBitMask) {
+    auto dataLength = data->length();
+    if (statelessResetToken_ && dataLength > sizeof(StatelessResetToken)) {
+      const uint8_t* tokenSource =
+          data->data() + (dataLength - sizeof(StatelessResetToken));
+      // Only allocate & copy the token if it matches the token we have
+      if (0 ==
+          memcmp(
+              tokenSource,
+              statelessResetToken_->data(),
+              sizeof(StatelessResetToken))) {
+        token = StatelessResetToken();
+        memcpy(token->data(), tokenSource, token->size());
+      }
+    }
+  }
+
+  auto maybeShortHeaderPacket = tryParseShortHeaderPacket(
+      std::move(data), ackStates, dstConnIdSize, cursor);
+  if (token && maybeShortHeaderPacket.nothing()) {
+    return StatelessReset(*token);
+  }
+  return maybeShortHeaderPacket;
 }
 
 const Aead* QuicReadCodec::getOneRttReadCipher() const {

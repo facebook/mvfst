@@ -278,5 +278,13 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
 // A Buf based overload of writeCryptoFrame for test only
 folly::Optional<WriteCryptoFrame>
 writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder);
+
+void overridePacketWithToken(
+    PacketBuilderInterface::Packet& packet,
+    const StatelessResetToken& token);
+
+void overridePacketWithToken(
+    folly::IOBuf& bodyBuf,
+    const StatelessResetToken& token);
 } // namespace test
 } // namespace quic

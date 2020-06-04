@@ -38,15 +38,18 @@ std::unique_ptr<QuicReadCodec> makeEncryptedCodec(
     ConnectionId clientConnId,
     std::unique_ptr<Aead> oneRttAead,
     std::unique_ptr<Aead> zeroRttAead = nullptr,
-    std::unique_ptr<StatelessResetToken> sourceToken = nullptr) {
+    std::unique_ptr<StatelessResetToken> sourceToken = nullptr,
+    QuicNodeType nodeType = QuicNodeType::Server) {
   FizzCryptoFactory cryptoFactory;
-  auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+  auto codec = std::make_unique<QuicReadCodec>(nodeType);
   codec->setClientConnectionId(clientConnId);
   codec->setInitialReadCipher(
       cryptoFactory.getClientInitialCipher(clientConnId, QuicVersion::MVFST));
   codec->setInitialHeaderCipher(cryptoFactory.makeClientInitialHeaderCipher(
       clientConnId, QuicVersion::MVFST));
-  codec->setZeroRttReadCipher(std::move(zeroRttAead));
+  if (zeroRttAead) {
+    codec->setZeroRttReadCipher(std::move(zeroRttAead));
+  }
   codec->setZeroRttHeaderCipher(test::createNoOpHeaderCipher());
   codec->setOneRttReadCipher(std::move(oneRttAead));
   codec->setOneRttHeaderCipher(test::createNoOpHeaderCipher());
@@ -353,7 +356,7 @@ TEST_F(QuicReadCodecTest, KeyPhaseOnePacket) {
   EXPECT_FALSE(parseSuccess(std::move(packet)));
 }
 
-TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
+TEST_F(QuicReadCodecTest, BadResetFirstTwoBits) {
   auto connId = getTestConnectionId();
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
@@ -362,7 +365,102 @@ TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
       {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
-      connId, std::move(aead), nullptr, std::move(fakeToken));
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
+  EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(
+          Invoke([](auto&, const auto&, auto) { return folly::none; }));
+  PacketNum packetNum = 1;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  overridePacketWithToken(streamPacket, tok);
+  uint8_t* packetHeaderBuffer = streamPacket.header.get()->writableData();
+  while (*packetHeaderBuffer & 0x40) {
+    uint8_t randomByte;
+    folly::Random::secureRandom(&randomByte, 1);
+    *packetHeaderBuffer =
+        (*packetHeaderBuffer & 0b00111111) | (randomByte & 0b11000000);
+  }
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_FALSE(isReset(std::move(packet)));
+}
+
+TEST_F(QuicReadCodecTest, RandomizedShortHeaderLeadsToReset) {
+  auto connId = getTestConnectionId();
+  auto aead = std::make_unique<MockAead>();
+  auto rawAead = aead.get();
+
+  StatelessResetToken tok(
+      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  auto fakeToken = std::make_unique<StatelessResetToken>(tok);
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
+  EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
+      .Times(AtMost(1))
+      .WillRepeatedly(
+          Invoke([](auto&, const auto&, auto) { return folly::none; }));
+  PacketNum packetNum = 1;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  overridePacketWithToken(streamPacket, tok);
+  uint8_t* packetHeaderBuffer = streamPacket.header.get()->writableData();
+  uint8_t randomByte;
+  folly::Random::secureRandom(&randomByte, 1);
+  *packetHeaderBuffer = 0x40 | (randomByte & 0b00111111);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_TRUE(isReset(std::move(packet)));
+}
+
+TEST_F(QuicReadCodecTest, StatelessResetTokenMismatch) {
+  auto connId = getTestConnectionId();
+  auto aead = std::make_unique<MockAead>();
+  auto rawAead = aead.get();
+
+  StatelessResetToken tok(
+      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  auto fakeToken = std::make_unique<StatelessResetToken>(tok);
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
       .WillOnce(Invoke([](auto&, const auto&, auto) { return folly::none; }));
@@ -381,6 +479,82 @@ TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
       folly::none,
       true,
       ProtectionType::KeyPhaseZero);
+  tok[0] ^= tok[0];
+  overridePacketWithToken(streamPacket, tok);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_FALSE(isReset(std::move(packet)));
+}
+
+TEST_F(QuicReadCodecTest, NoOneRttCipherNoReset) {
+  auto connId = getTestConnectionId();
+  auto aead = std::make_unique<MockAead>();
+  StatelessResetToken tok(
+      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  auto fakeToken = std::make_unique<StatelessResetToken>(tok);
+  auto codec = makeEncryptedCodec(
+      connId,
+      nullptr /* 1-rtt aead */,
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
+  PacketNum packetNum = 1;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  overridePacketWithToken(streamPacket, tok);
+  AckStates ackStates;
+  auto packetQueue = bufToQueue(packetToBuf(streamPacket));
+  auto packet = codec->parsePacket(packetQueue, ackStates);
+  EXPECT_EQ(CodecResult::Type::CIPHER_UNAVAILABLE, packet.type());
+  EXPECT_FALSE(isReset(std::move(packet)));
+}
+
+TEST_F(QuicReadCodecTest, FailToDecryptLeadsToReset) {
+  auto connId = getTestConnectionId();
+  auto aead = std::make_unique<MockAead>();
+  auto rawAead = aead.get();
+
+  StatelessResetToken tok(
+      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  auto fakeToken = std::make_unique<StatelessResetToken>(tok);
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
+  EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
+      .Times(1)
+      .WillOnce(Invoke([](auto&, const auto&, auto) { return folly::none; }));
+  PacketNum packetNum = 1;
+  StreamId streamId = 2;
+  auto data = folly::IOBuf::create(30);
+  data->append(30);
+  auto streamPacket = createStreamPacket(
+      connId,
+      connId,
+      packetNum,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      folly::none,
+      true,
+      ProtectionType::KeyPhaseZero);
+  overridePacketWithToken(streamPacket, tok);
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
@@ -395,7 +569,11 @@ TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
       {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
-      connId, std::move(aead), nullptr, std::move(fakeToken));
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Client);
 
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
@@ -415,6 +593,7 @@ TEST_F(QuicReadCodecTest, ShortPacketAutoPaddedIsReset) {
       folly::none,
       true,
       ProtectionType::KeyPhaseZero);
+  overridePacketWithToken(streamPacket, tok);
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
@@ -430,7 +609,11 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
       {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
   auto fakeToken = std::make_unique<StatelessResetToken>(tok);
   auto codec = makeEncryptedCodec(
-      connId, nullptr, std::move(aead), std::move(fakeToken));
+      connId,
+      nullptr /* 1-rtt aead */,
+      std::move(aead) /* 0-rtt aead */,
+      std::move(fakeToken),
+      QuicNodeType::Server);
 
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)
@@ -448,6 +631,7 @@ TEST_F(QuicReadCodecTest, FailToDecryptLongHeaderNoReset) {
       0 /* cipherOverhead */,
       0 /* largestAcked */,
       std::make_pair(LongHeader::Types::ZeroRtt, QuicVersion::MVFST));
+  overridePacketWithToken(streamPacket, tok);
   AckStates ackStates;
   auto packetQueue = bufToQueue(packetToBuf(streamPacket));
   auto packet = codec->parsePacket(packetQueue, ackStates);
@@ -459,7 +643,12 @@ TEST_F(QuicReadCodecTest, FailToDecryptNoTokenNoReset) {
   auto aead = std::make_unique<MockAead>();
   auto rawAead = aead.get();
 
-  auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
+  auto codec = makeEncryptedCodec(
+      connId,
+      std::move(aead),
+      nullptr /* 0-rtt zead */,
+      nullptr /* stateless reset token*/,
+      QuicNodeType::Client);
 
   EXPECT_CALL(*rawAead, _tryDecrypt(_, _, _))
       .Times(1)

@@ -744,5 +744,23 @@ writeCryptoFrame(uint64_t offsetIn, Buf data, PacketBuilderInterface& builder) {
   BufQueue bufQueue(std::move(data));
   return writeCryptoFrame(offsetIn, bufQueue, builder);
 }
+
+void overridePacketWithToken(
+    PacketBuilderInterface::Packet& packet,
+    const StatelessResetToken& token) {
+  overridePacketWithToken(*packet.body, token);
+}
+
+void overridePacketWithToken(
+    folly::IOBuf& bodyBuf,
+    const StatelessResetToken& token) {
+  bodyBuf.coalesce();
+  CHECK(bodyBuf.length() > sizeof(StatelessResetToken));
+  memcpy(
+      bodyBuf.writableData() + bodyBuf.length() - sizeof(StatelessResetToken),
+      token.data(),
+      token.size());
+}
+
 } // namespace test
 } // namespace quic
