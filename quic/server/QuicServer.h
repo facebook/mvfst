@@ -319,6 +319,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
  private:
   QuicServer();
 
+  static std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend();
+
   // helper function to initialize workers
   void initializeWorkers(
       const std::vector<folly::EventBase*>& evbs,

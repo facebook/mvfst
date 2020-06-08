@@ -6,6 +6,7 @@
 add_library(
   mvfst_server STATIC
   QuicServer.cpp
+  QuicServerBackend.cpp
   QuicServerPacketRouter.cpp
   QuicServerTransport.cpp
   QuicServerWorker.cpp

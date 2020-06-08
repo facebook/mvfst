@@ -17,8 +17,12 @@
 #include <quic/server/QuicSharedUDPSocketFactory.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 
-namespace quic {
+DEFINE_bool(
+    qs_io_uring_use_async_recv,
+    true,
+    "io_uring backend use async recv");
 
+namespace quic {
 namespace {
 // Determine which worker to route to
 // This **MUST** be kept in sync with the BPF program (if supplied)
@@ -91,7 +95,8 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   auto numWorkers = std::min(numCpu, maxWorkers);
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numWorkers; ++i) {
-    auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>();
+    auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>(
+        getEventBaseBackend(), nullptr, "");
     workerEvbs_.push_back(std::move(scopedEvb));
     if (evbObserver_) {
       workerEvbs_.back()->getEventBase()->runInEventBaseThreadAndWait([&] {
@@ -181,7 +186,8 @@ void QuicServer::initializeWorkers(
 }
 
 std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
-  auto worker = std::make_unique<QuicServerWorker>(this->shared_from_this());
+  auto worker = std::make_unique<QuicServerWorker>(
+      this->shared_from_this(), FLAGS_qs_io_uring_use_async_recv);
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
   worker->setTransportSettings(transportSettings_);

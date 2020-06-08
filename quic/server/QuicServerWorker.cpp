@@ -20,8 +20,11 @@
 namespace quic {
 
 QuicServerWorker::QuicServerWorker(
-    std::shared_ptr<QuicServerWorker::WorkerCallback> callback)
-    : callback_(callback), takeoverPktHandler_(this) {}
+    std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
+    bool setEventCallback)
+    : callback_(callback),
+      setEventCallback_(setEventCallback),
+      takeoverPktHandler_(this) {}
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
   return evb_;
@@ -36,6 +39,9 @@ void QuicServerWorker::setSocket(
 void QuicServerWorker::bind(const folly::SocketAddress& address) {
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
+  if (setEventCallback_) {
+    socket_->setEventCallback(this);
+  }
   if (socketOptions_) {
     applySocketOptions(
         *socket_.get(),
@@ -369,6 +375,43 @@ void QuicServerWorker::handleNetworkData(
     QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     VLOG(6) << "Failed to parse packet header " << ex.what();
   }
+}
+
+void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int res) {
+  auto bytesRead = res;
+  int gro = -1;
+  auto& msg = msgHdr->data_;
+  if (bytesRead > 0) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    if (msgHdr->data_.msg_control) {
+      struct cmsghdr* cmsg;
+      for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;
+           cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+        if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
+          auto grosizeptr = (uint16_t*)CMSG_DATA(cmsg);
+          gro = *grosizeptr;
+          break;
+        }
+      }
+    }
+#endif
+    bool truncated = false;
+    if ((size_t)bytesRead > msgHdr->len_) {
+      truncated = true;
+      bytesRead = ssize_t(msgHdr->len_);
+    }
+
+    readBuffer_ = std::move(msgHdr->ioBuf_);
+
+    folly::SocketAddress addr;
+    addr.setFromSockaddr(
+        reinterpret_cast<sockaddr*>(msg.msg_name), msg.msg_namelen);
+
+    OnDataAvailableParams params;
+    params.gro_ = gro;
+    onDataAvailable(addr, bytesRead, truncated, params);
+  }
+  msgHdr_.reset(msgHdr);
 }
 
 bool QuicServerWorker::tryHandlingAsHealthCheck(

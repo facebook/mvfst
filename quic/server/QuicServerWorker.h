@@ -28,7 +28,74 @@ namespace quic {
 
 class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
                          public QuicServerTransport::RoutingCallback,
-                         public ServerConnectionIdRejector {
+                         public ServerConnectionIdRejector,
+                         public folly::EventRecvmsgCallback {
+ private:
+  struct MsgHdr : public folly::EventRecvmsgCallback::MsgHdr {
+    static auto constexpr kBuffSize = 1024;
+
+    MsgHdr() = delete;
+    ~MsgHdr() override = default;
+    explicit MsgHdr(QuicServerWorker* worker) {
+      arg_ = worker;
+      freeFunc_ = MsgHdr::free;
+      cbFunc_ = MsgHdr::cb;
+    }
+
+    void reset() {
+      len_ = getBuffSize();
+      ioBuf_ = folly::IOBuf::create(len_);
+      ::memset(&data_, 0, sizeof(data_));
+      iov_.iov_base = ioBuf_->writableData();
+      iov_.iov_len = len_;
+      data_.msg_iov = &iov_;
+      data_.msg_iovlen = 1;
+      ::memset(&addrStorage_, 0, sizeof(addrStorage_));
+      auto* rawAddr = reinterpret_cast<sockaddr*>(&addrStorage_);
+      rawAddr->sa_family =
+          reinterpret_cast<QuicServerWorker*>(arg_)->getAddress().getFamily();
+      data_.msg_name = rawAddr;
+      ;
+      data_.msg_namelen = sizeof(addrStorage_);
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+      if (hasGRO()) {
+        data_.msg_control = control_;
+        data_.msg_controllen = sizeof(control_);
+      }
+#endif
+    }
+
+    static void free(folly::EventRecvmsgCallback::MsgHdr* msgHdr) {
+      delete msgHdr;
+    }
+
+    static void cb(folly::EventRecvmsgCallback::MsgHdr* msgHdr, int res) {
+      reinterpret_cast<QuicServerWorker*>(msgHdr->arg_)
+          ->eventRecvmsgCallback(reinterpret_cast<MsgHdr*>(msgHdr), res);
+    }
+
+    size_t getBuffSize() {
+      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
+      return worker->transportSettings_.maxRecvPacketSize *
+          worker->numGROBuffers_;
+    }
+
+    bool hasGRO() {
+      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
+      return worker->numGROBuffers_ > 1;
+    }
+
+    // data
+    Buf ioBuf_;
+    struct iovec iov_;
+    size_t len_{0};
+    // addr
+    struct sockaddr_storage addrStorage_;
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+    char control_[CMSG_SPACE(sizeof(uint16_t))];
+#endif
+  };
+
  public:
   using TransportSettingsOverrideFn =
       std::function<folly::Optional<quic::TransportSettings>(
@@ -48,7 +115,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
         bool isForwardedData) = 0;
   };
 
-  explicit QuicServerWorker(std::shared_ptr<WorkerCallback> callback);
+  explicit QuicServerWorker(
+      std::shared_ptr<WorkerCallback> callback,
+      bool setEventCallback = false);
 
   ~QuicServerWorker() override;
 
@@ -339,6 +408,18 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
     return statsCallback_.get();
   }
 
+  // from EventRecvmsgCallback
+  EventRecvmsgCallback::MsgHdr* allocateData() override {
+    auto* ret = msgHdr_.release();
+    if (!ret) {
+      ret = new MsgHdr(this);
+    }
+
+    ret->reset();
+
+    return ret;
+  }
+
  private:
   /**
    * Creates accepting socket from this server's listening address.
@@ -373,9 +454,12 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    */
   std::string logRoutingInfo(const ConnectionId& connId) const;
 
+  void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
+
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
+  bool setEventCallback_{false};
   folly::EventBase* evb_{nullptr};
 
   // factories are owned by quic server
@@ -423,6 +507,9 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   // Rate limits the creation of new connections for this worker.
   std::unique_ptr<RateLimiter> newConnRateLimiter_;
+
+  // EventRecvmsgCallback data
+  std::unique_ptr<MsgHdr> msgHdr_;
 };
 
 } // namespace quic
