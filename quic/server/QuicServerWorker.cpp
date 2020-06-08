@@ -719,16 +719,21 @@ void QuicServerWorker::sendResetPacket(
     // Only send resets in response to short header packets.
     return;
   }
-  uint16_t packetSize = networkData.totalData;
-  uint16_t maxResetPacketSize = std::min<uint16_t>(
-      std::max<uint16_t>(kMinStatelessPacketSize, packetSize),
-      kDefaultUDPSendPacketLen);
+  auto packetSize = networkData.totalData;
+  auto resetSize = std::min<uint16_t>(packetSize, kDefaultMaxUDPPayload);
+  // Per the spec, less than 43 we should respond with packet size - 1.
+  if (packetSize < 43) {
+    resetSize = std::max<uint16_t>(packetSize - 1, kMinStatelessPacketSize);
+  } else {
+    resetSize = std::max<uint16_t>(
+        folly::Random::secureRand32() % resetSize, kMinStatelessPacketSize);
+  }
   CHECK(transportSettings_.statelessResetTokenSecret.has_value());
   StatelessResetGenerator generator(
       *transportSettings_.statelessResetTokenSecret,
       getAddress().getFullyQualified());
   StatelessResetToken token = generator.generateToken(connId);
-  StatelessResetPacketBuilder builder(maxResetPacketSize, token);
+  StatelessResetPacketBuilder builder(resetSize, token);
   auto resetData = std::move(builder).buildPacket();
   auto resetDataLen = resetData->computeChainDataLength();
   socket_->write(client, std::move(resetData));

@@ -384,9 +384,11 @@ constexpr uint16_t kDefaultMaxNumPTO = 7;
 // Maximum early data size that we need to negotiate in TLS
 constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;
 
-// The minimum size of a stateless reset packet. This is the short header size,
-// and 16 bytes of the token and 16 bytes of randomness
-constexpr uint16_t kMinStatelessPacketSize = 13 + 16 + 16;
+// min connId size for one chosen by 'mvfst' as a peer
+constexpr size_t kMinSelfConnectionIdSize = 4;
+
+// 22 bytes longer than minimum connection id.
+constexpr uint16_t kMinStatelessPacketSize = 22 + kMinSelfConnectionIdSize;
 
 constexpr std::chrono::milliseconds kHappyEyeballsV4Delay = 100ms;
 

@@ -270,9 +270,9 @@ StatelessResetPacketBuilder::StatelessResetPacketBuilder(
     const StatelessResetToken& resetToken)
     : data_(folly::IOBuf::create(kAppenderGrowthSize)) {
   BufAppender appender(data_.get(), kAppenderGrowthSize);
-  // TODO: randomize the length
   uint16_t randomOctetLength = maxPacketSize - resetToken.size() - 1;
-  uint8_t initialByte = ShortHeader::kFixedBitMask;
+  uint8_t initialByte =
+      ShortHeader::kFixedBitMask | (0x3f & folly::Random::secureRand32());
   appender.writeBE<uint8_t>(initialByte);
   auto randomOctets = folly::IOBuf::create(randomOctetLength);
   folly::Random::secureRandom(randomOctets->writableData(), randomOctetLength);
