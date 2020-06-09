@@ -22,6 +22,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/samples/echo/LogQuicStats.h>
 
 namespace quic {
 namespace samples {
@@ -133,6 +134,9 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
         settings.partialReliabilityEnabled = true;
       }
       quicClient_->setTransportSettings(settings);
+
+      quicClient_->setTransportStatsCallback(
+          std::make_shared<LogQuicStats>("client"));
 
       LOG(INFO) << "EchoClient connecting to " << addr.describe();
       quicClient_->start(this);

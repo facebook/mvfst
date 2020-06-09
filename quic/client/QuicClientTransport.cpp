@@ -954,9 +954,7 @@ void QuicClientTransport::onDataAvailable(
       return;
     }
     data->append(len);
-    if (conn_->qLogger) {
-      conn_->qLogger->addDatagramReceived(len);
-    }
+    trackDatagramReceived(len);
     NetworkData networkData(std::move(data), packetReceiveTime);
     onNetworkData(server, std::move(networkData));
   } else {
@@ -975,9 +973,7 @@ void QuicClientTransport::onDataAvailable(
     }
 
     data->append(len);
-    if (conn_->qLogger) {
-      conn_->qLogger->addDatagramReceived(len);
-    }
+    trackDatagramReceived(len);
 
     NetworkData networkData;
     networkData.receiveTimePoint = packetReceiveTime;
@@ -1298,9 +1294,7 @@ void QuicClientTransport::recvMmsg(
     }
 
     QUIC_TRACE(udp_recvd, *conn_, bytesRead);
-    if (conn_->qLogger) {
-      conn_->qLogger->addDatagramReceived(bytesRead);
-    }
+    trackDatagramReceived(bytesRead);
   }
   for (; i < numPackets; i++) {
     freeBufs.emplace_back(std::move(readBuffers[i]));
@@ -1585,6 +1579,14 @@ void QuicClientTransport::setTransportStatsCallback(
   } else {
     conn_->statsCallback = nullptr;
   }
+}
+
+void QuicClientTransport::trackDatagramReceived(size_t len) {
+  if (conn_->qLogger) {
+    conn_->qLogger->addDatagramReceived(len);
+  }
+  QUIC_STATS(statsCallback_, onPacketReceived);
+  QUIC_STATS(statsCallback_, onRead, len);
 }
 
 } // namespace quic

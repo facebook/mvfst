@@ -12,6 +12,7 @@
 
 #include <quic/common/test/TestUtils.h>
 #include <quic/samples/echo/EchoHandler.h>
+#include <quic/samples/echo/LogQuicStats.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -69,6 +70,8 @@ class EchoServer {
         server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(prEnabled_));
+    server_->setTransportStatsCallbackFactory(
+        std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);

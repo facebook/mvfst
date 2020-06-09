@@ -208,6 +208,7 @@ class QuicClientTransport
  private:
   void setPartialReliabilityTransportParameter();
   void adjustGROBuffers();
+  void trackDatagramReceived(size_t len);
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned

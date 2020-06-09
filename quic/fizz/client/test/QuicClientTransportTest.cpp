@@ -34,6 +34,7 @@
 #include <quic/logging/test/Mocks.h>
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
+#include <quic/state/test/MockQuicStats.h>
 
 using namespace testing;
 using namespace folly;
@@ -280,6 +281,17 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     EXPECT_CALL(clientConnCallback, onReplaySafe());
   }
 
+  void expectStatsCallbacks() {
+    quicStats_ = std::make_shared<MockQuicStats>();
+    EXPECT_CALL(*quicStats_, onPacketReceived()).Times(AtLeast(1));
+    EXPECT_CALL(*quicStats_, onPacketSent()).Times(AtLeast(1));
+    EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
+    EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(1);
+    EXPECT_CALL(*quicStats_, onRead(_)).Times(AtLeast(1));
+    EXPECT_CALL(*quicStats_, onWrite(_)).Times(AtLeast(1));
+    client->setTransportStatsCallback(quicStats_);
+  }
+
   folly::Future<StreamPair> sendRequestAndResponse(
       std::unique_ptr<folly::IOBuf> data,
       StreamId streamid,
@@ -354,6 +366,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<QuicPskCache> pskCache_;
   std::shared_ptr<QuicServer> server_;
   bool connected_{false};
+  std::shared_ptr<MockQuicStats> quicStats_;
 };
 
 class StreamData {
@@ -426,6 +439,7 @@ void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
 
 TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   expectTransportCallbacks();
+  expectStatsCallbacks();
   client->start(&clientConnCallback);
 
   EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
