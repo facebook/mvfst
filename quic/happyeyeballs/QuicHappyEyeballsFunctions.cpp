@@ -135,12 +135,19 @@ void happyEyeballsSetUpSocket(
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::PRE_BIND);
   socket.setReuseAddr(false);
+
   if (localAddress.has_value()) {
     socket.bind(*localAddress);
-  } else if (peerAddress.getFamily() == AF_INET) {
-    socket.bind(folly::SocketAddress("0.0.0.0", 0));
-  } else {
-    socket.bind(folly::SocketAddress("::", 0));
+  }
+  if (transportSettings.connectUDP) {
+    socket.connect(peerAddress);
+  }
+  if (!socket.isBound()) {
+    if (peerAddress.getFamily() == AF_INET) {
+      socket.bind(folly::SocketAddress("0.0.0.0", 0));
+    } else {
+      socket.bind(folly::SocketAddress("::", 0));
+    }
   }
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
@@ -148,9 +155,6 @@ void happyEyeballsSetUpSocket(
     socket.setDFAndTurnOffPMTU();
   } else {
     socket.dontFragment(true);
-  }
-  if (transportSettings.connectUDP) {
-    socket.connect(peerAddress);
   }
   if (transportSettings.enableSocketErrMsgCallback) {
     socket.setErrMessageCallback(errMsgCallback);
