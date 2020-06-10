@@ -23,7 +23,7 @@ namespace quic {
  * order of packet number. For each ack block, we try to find a continuous range
  * of outstanding packets in the connection's outstanding packets list that is
  * acked by the current ack block. The search is in the reverse order of the
- * outstandingPackets given that the list is sorted in the ascending order of
+ * outstandings.packets given that the list is sorted in the ascending order of
  * packet number. For each outstanding packet that is acked by current ack
  * frame, ack and loss visitors are invoked on the sent frames. The outstanding
  * packets may contain packets from all three packet number spaces. But ack is
@@ -54,22 +54,22 @@ void processAckFrame(
       lastAckedPacketSentTime;
   auto ackBlockIt = frame.ackBlocks.cbegin();
   while (ackBlockIt != frame.ackBlocks.cend() &&
-         currentPacketIt != conn.outstandingPackets.rend()) {
+         currentPacketIt != conn.outstandings.packets.rend()) {
     // In reverse order, find the first outstanding packet that has a packet
     // number LE the endPacket of the current ack range.
     auto rPacketIt = std::lower_bound(
         currentPacketIt,
-        conn.outstandingPackets.rend(),
+        conn.outstandings.packets.rend(),
         ackBlockIt->endPacket,
         [&](const auto& packetWithTime, const auto& val) {
           return packetWithTime.packet.header.getPacketSequenceNum() > val;
         });
-    if (rPacketIt == conn.outstandingPackets.rend()) {
+    if (rPacketIt == conn.outstandings.packets.rend()) {
       // This means that all the packets are greater than the end packet.
       // Since we iterate the ACK blocks in reverse order of end packets, our
       // work here is done.
       VLOG(10) << __func__ << " less than all outstanding packets outstanding="
-               << conn.outstandingPackets.size() << " range=["
+               << conn.outstandings.packets.size() << " range=["
                << ackBlockIt->startPacket << ", " << ackBlockIt->endPacket
                << "]"
                << " " << conn;
@@ -80,7 +80,7 @@ void processAckFrame(
     // TODO: only process ACKs from packets which are sent from a greater than
     // or equal to crypto protection level.
     auto eraseEnd = rPacketIt;
-    while (rPacketIt != conn.outstandingPackets.rend()) {
+    while (rPacketIt != conn.outstandings.packets.rend()) {
       auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
       auto currentPacketNumberSpace =
           rPacketIt->packet.header.getPacketNumberSpace();
@@ -91,8 +91,8 @@ void processAckFrame(
         // this ack block. So the code erases the current iterator range and
         // move the iterator to be the next search point.
         if (rPacketIt != eraseEnd) {
-          auto nextElem =
-              conn.outstandingPackets.erase(rPacketIt.base(), eraseEnd.base());
+          auto nextElem = conn.outstandings.packets.erase(
+              rPacketIt.base(), eraseEnd.base());
           rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
           eraseEnd = rPacketIt;
         } else {
@@ -123,15 +123,15 @@ void processAckFrame(
         updateRtt(conn, rttSample, frame.ackDelay);
       }
       // Only invoke AckVisitor if the packet doesn't have an associated
-      // PacketEvent; or the PacketEvent is in conn.outstandingPacketEvents
+      // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
       if (!rPacketIt->associatedEvent ||
-          conn.outstandingPacketEvents.count(*rPacketIt->associatedEvent)) {
+          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent)) {
         for (auto& packetFrame : rPacketIt->packet.frames) {
           ackVisitor(*rPacketIt, packetFrame, frame);
         }
-        // Remove this PacketEvent from the outstandingPacketEvents set
+        // Remove this PacketEvent from the outstandings.packetEvents set
         if (rPacketIt->associatedEvent) {
-          conn.outstandingPacketEvents.erase(*rPacketIt->associatedEvent);
+          conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
         }
       }
       if (!ack.largestAckedPacket ||
@@ -167,7 +167,7 @@ void processAckFrame(
     // the next search point.
     if (rPacketIt != eraseEnd) {
       auto nextElem =
-          conn.outstandingPackets.erase(rPacketIt.base(), eraseEnd.base());
+          conn.outstandings.packets.erase(rPacketIt.base(), eraseEnd.base());
       currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
     } else {
       currentPacketIt = rPacketIt;
@@ -177,14 +177,15 @@ void processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  DCHECK_GE(conn.outstandingHandshakePacketsCount, handshakePacketAcked);
-  conn.outstandingHandshakePacketsCount -= handshakePacketAcked;
-  DCHECK_GE(conn.outstandingClonedPacketsCount, clonedPacketsAcked);
-  conn.outstandingClonedPacketsCount -= clonedPacketsAcked;
-  auto updatedOustandingPacketsCount = conn.outstandingPackets.size();
+  DCHECK_GE(conn.outstandings.handshakePacketsCount, handshakePacketAcked);
+  conn.outstandings.handshakePacketsCount -= handshakePacketAcked;
+  DCHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
+  conn.outstandings.clonedPacketsCount -= clonedPacketsAcked;
+  auto updatedOustandingPacketsCount = conn.outstandings.packets.size();
   DCHECK_GE(
-      updatedOustandingPacketsCount, conn.outstandingHandshakePacketsCount);
-  DCHECK_GE(updatedOustandingPacketsCount, conn.outstandingClonedPacketsCount);
+      updatedOustandingPacketsCount, conn.outstandings.handshakePacketsCount);
+  DCHECK_GE(
+      updatedOustandingPacketsCount, conn.outstandings.clonedPacketsCount);
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
       (ack.largestAckedPacket.has_value() || lossEvent)) {

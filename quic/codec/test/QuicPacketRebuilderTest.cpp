@@ -448,7 +448,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   PacketRebuilder rebuilder(regularBuilder2, conn);
   rebuilder.rebuildFromPacket(outstandingPacket);
   EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());
-  EXPECT_EQ(1, conn.outstandingClonedPacketsCount);
+  EXPECT_EQ(1, conn.outstandings.clonedPacketsCount);
 }
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {

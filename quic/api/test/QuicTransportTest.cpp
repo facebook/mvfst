@@ -243,7 +243,7 @@ size_t bufLength(
 }
 
 void dropPackets(QuicServerConnectionState& conn) {
-  for (const auto& packet : conn.outstandingPackets) {
+  for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
       const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
       if (!streamFrame) {
@@ -272,7 +272,7 @@ void dropPackets(QuicServerConnectionState& conn) {
       }
     }
   }
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
 }
 
 // Helper function to verify the data of buffer is written to outstanding
@@ -288,7 +288,7 @@ void verifyCorrectness(
   size_t totalLen = 0;
   bool finSet = false;
   std::vector<uint64_t> offsets;
-  for (const auto& packet : conn.outstandingPackets) {
+  for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
       auto streamFrame = frame.asWriteStreamFrame();
       if (!streamFrame) {
@@ -413,7 +413,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
   conn.congestionController = std::move(mockCongestionController);
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Invoke([&]() {
-        if (conn.outstandingPackets.empty()) {
+        if (conn.outstandings.packets.empty()) {
           return 5000;
         }
         return 0;
@@ -512,7 +512,7 @@ TEST_F(QuicTransportTest, WriteLarge) {
   transport_->writeChain(stream, buf->clone(), false, false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
-  EXPECT_EQ(NumFullPackets + 1, conn.outstandingPackets.size());
+  EXPECT_EQ(NumFullPackets + 1, conn.outstandings.packets.size());
   verifyCorrectness(conn, 0, stream, *buf);
 
   // Test retransmission
@@ -529,7 +529,7 @@ TEST_F(QuicTransportTest, WriteLarge) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(NumFullPackets + 1, conn.outstandingPackets.size());
+  EXPECT_EQ(NumFullPackets + 1, conn.outstandings.packets.size());
   verifyCorrectness(conn, 0, stream, *buf);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
@@ -545,7 +545,7 @@ TEST_F(QuicTransportTest, WriteMultipleTimes) {
       conn.streamManager->findStream(stream)->currentWriteOffset;
   verifyCorrectness(conn, 0, stream, *buf);
 
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
   conn.streamManager->findStream(stream)->retransmissionBuffer.clear();
   buf = buildRandomInputData(50);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
@@ -610,7 +610,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   transport_->writeChain(streamId, buf->clone(), false, false);
 
   loopForWrites();
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto& packet =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool blockedFound = false;
@@ -623,7 +623,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
     blockedFound = true;
   }
   EXPECT_TRUE(blockedFound);
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
 
   // Stream flow control
   auto buf1 = buf->clone();
@@ -793,7 +793,7 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_TRUE(conn.outstandingPackets.empty());
+  EXPECT_TRUE(conn.outstandings.packets.empty());
   EXPECT_EQ(conn.ackStates.appDataAckState.largestAckScheduled, end);
   EXPECT_FALSE(conn.ackStates.appDataAckState.needsToSendAckImmediately);
   EXPECT_EQ(0, conn.ackStates.appDataAckState.numNonRxPacketsRecvd);
@@ -833,7 +833,7 @@ TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   // We should write acks if there is data pending
   transport_->writeChain(streamId, buf->clone(), true, false);
   loopForWrites();
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto& packet =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   EXPECT_GE(packet.frames.size(), 2);
@@ -865,7 +865,7 @@ TEST_F(QuicTransportTest, RstStream) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -901,7 +901,7 @@ TEST_F(QuicTransportTest, StopSending) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   transport_->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -943,7 +943,7 @@ TEST_F(QuicTransportTest, SendPathChallenge) {
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(transport_->getPathValidationTimeout().isScheduled());
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -984,7 +984,7 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(transport_->getPathValidationTimeout().isScheduled());
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
 
   transport_->getPathValidationTimeout().cancelTimeout();
   transport_->getPathValidationTimeout().timeoutExpired();
@@ -1012,7 +1012,7 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge);
   EXPECT_TRUE(transport_->getPathValidationTimeout().isScheduled());
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
 
   PathChallengeFrame pathChallenge2(456);
   transport_->getPathValidationTimeout().cancelTimeout();
@@ -1029,14 +1029,14 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
   EXPECT_EQ(conn.outstandingPathValidation, pathChallenge2);
   EXPECT_TRUE(transport_->getPathValidationTimeout().isScheduled());
 
-  EXPECT_EQ(2, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(2, transport_->getConnectionState().outstandings.packets.size());
 }
 
 TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPackets.clear();
+  conn.outstandings.handshakePacketsCount = 0;
+  conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -1048,20 +1048,20 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto numPathChallengePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
   // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandingPackets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 3);
   numPathChallengePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
 
   EXPECT_EQ(numPathChallengePackets, 3);
@@ -1070,8 +1070,8 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPackets.clear();
+  conn.outstandings.handshakePacketsCount = 0;
+  conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -1084,8 +1084,8 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   loopForWrites();
 
   auto numPathChallengePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
@@ -1097,8 +1097,8 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
   numPathChallengePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
   EXPECT_EQ(numPathChallengePackets, 1);
 }
@@ -1113,7 +1113,7 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLoss) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1134,7 +1134,7 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1160,7 +1160,7 @@ TEST_F(QuicTransportTest, SendPathResponse) {
   loopForWrites();
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool foundPathResponse = false;
@@ -1184,7 +1184,7 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   auto streamId = transport_->createBidirectionalStream().value();
   transport_->writeChain(streamId, IOBuf::create(0), true, false);
   loopForWrites();
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto stream = conn.streamManager->getStream(streamId);
   EXPECT_EQ(1, stream->retransmissionBuffer.size());
   EXPECT_EQ(0, stream->retransmissionBuffer.at(0)->data.chainLength());
@@ -1201,10 +1201,10 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
   // the future, thus the EXPECT were written with LT and LE. But it will clone
   // for sure and we shouldn't crash.
   transport_->lossTimeout().timeoutExpired();
-  EXPECT_LT(1, conn.outstandingPackets.size());
+  EXPECT_LT(1, conn.outstandings.packets.size());
   size_t cloneCounter = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       [](const auto& packet) { return packet.associatedEvent.hasValue(); });
   EXPECT_LE(1, cloneCounter);
 }
@@ -1212,8 +1212,8 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
 TEST_F(QuicTransportTest, ClonePathResponse) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPackets.clear();
+  conn.outstandings.handshakePacketsCount = 0;
+  conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -1227,16 +1227,16 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 
   auto numPathResponsePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
   EXPECT_EQ(numPathResponsePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
   numPathResponsePackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
   EXPECT_EQ(numPathResponsePackets, 1);
 }
@@ -1252,7 +1252,7 @@ TEST_F(QuicTransportTest, DoNotResendPathResponseOnLoss) {
   loopForWrites();
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
 
@@ -1270,7 +1270,7 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
   loopForWrites();
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1295,8 +1295,8 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPackets.clear();
+  conn.outstandings.handshakePacketsCount = 0;
+  conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -1307,20 +1307,20 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto numNewConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
   EXPECT_EQ(numNewConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
   // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandingPackets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 3);
   numNewConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
   EXPECT_EQ(numNewConnIdPackets, 3);
 }
@@ -1356,7 +1356,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
   EXPECT_EQ(WriteDataReason::STREAM, conn.writeDebugState.writeDataReason);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Return(1000));
   loopForWrites();
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   EXPECT_EQ(0, conn.writeDebugState.currentEmptyLoopCount);
 
   // Queue a window update for a stream doesn't exist
@@ -1371,7 +1371,7 @@ TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
       onSuspiciousWriteLoops(1, WriteDataReason::STREAM_WINDOW_UPDATE, _, _))
       .Times(1);
   loopForWrites();
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   EXPECT_EQ(1, conn.writeDebugState.currentEmptyLoopCount);
 
   transport_->close(folly::none);
@@ -1386,7 +1386,7 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1410,7 +1410,7 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
   loopForWrites();
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1435,8 +1435,8 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandingHandshakePacketsCount = 0;
-  conn.outstandingPackets.clear();
+  conn.outstandings.handshakePacketsCount = 0;
+  conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -1446,10 +1446,10 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(conn.outstandingPackets.size(), 1);
+  EXPECT_EQ(conn.outstandings.packets.size(), 1);
   auto numRetireConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<
           QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
   EXPECT_EQ(numRetireConnIdPackets, 1);
@@ -1457,10 +1457,10 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
   // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandingPackets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 3);
   numRetireConnIdPackets = std::count_if(
-      conn.outstandingPackets.begin(),
-      conn.outstandingPackets.end(),
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
       findFrameInPacketFunc<
           QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
   EXPECT_EQ(numRetireConnIdPackets, 3);
@@ -1474,7 +1474,7 @@ TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1534,7 +1534,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
   // 2 packets are outstanding: one for Stream frame one for RstStream frame:
-  EXPECT_EQ(2, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(2, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1568,7 +1568,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
-  EXPECT_EQ(1, transport_->getConnectionState().outstandingPackets.size());
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
@@ -1605,7 +1605,7 @@ TEST_F(QuicTransportTest, RstStreamUDPWriteFailFatal) {
       .WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  EXPECT_TRUE(transport_->getConnectionState().outstandingPackets.empty());
+  EXPECT_TRUE(transport_->getConnectionState().outstandings.packets.empty());
 
   // Streams should be empty now since the connection will be closed.
   EXPECT_EQ(transport_->getConnectionState().streamManager->streamCount(), 0);
@@ -1640,7 +1640,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
 
   // only 2 packets are outstanding: one for Stream frame one for RstStream
   // frame. The 2nd writeChain won't write anything.
-  EXPECT_EQ(2, conn.outstandingPackets.size());
+  EXPECT_EQ(2, conn.outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   EXPECT_GE(packet.frames.size(), 1);
@@ -1720,7 +1720,7 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(1, res); // Write one packet out
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   EXPECT_GE(packet.frames.size(), 1);
@@ -1737,7 +1737,7 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   EXPECT_TRUE(connWindowFound);
 
   EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, 100);
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
 
   auto stream = transport_->createBidirectionalStream().value();
   auto streamState = conn.streamManager->getStream(stream);
@@ -1756,7 +1756,7 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(1, res); // Write one packet out
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto packet1 =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   const MaxStreamDataFrame* streamWindowUpdate =
@@ -2353,14 +2353,14 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& packet = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(1, packet.packet.frames.size());
   auto& frame = packet.packet.frames.front();
   const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame);
   EXPECT_EQ(streamFrame->streamId, s1);
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
 
   // Start from stream2 instead of stream1
   conn.schedulingState.nextScheduledStream = s2;
@@ -2376,14 +2376,14 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& packet2 = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(1, packet2.packet.frames.size());
   auto& frame2 = packet2.packet.frames.front();
   const WriteStreamFrame* streamFrame2 = frame2.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame2);
   EXPECT_EQ(streamFrame2->streamId, s2);
-  conn.outstandingPackets.clear();
+  conn.outstandings.packets.clear();
 
   // Test wrap around
   conn.schedulingState.nextScheduledStream = s2;
@@ -2398,7 +2398,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_EQ(1, conn.outstandingPackets.size());
+  EXPECT_EQ(1, conn.outstandings.packets.size());
   auto& packet3 = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
   EXPECT_EQ(2, packet3.packet.frames.size());
   auto& frame3 = packet3.packet.frames.front();
@@ -2424,7 +2424,7 @@ TEST_F(QuicTransportTest, NoStream) {
       *headerCipher_,
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
-  EXPECT_TRUE(conn.outstandingPackets.empty());
+  EXPECT_TRUE(conn.outstandings.packets.empty());
 }
 
 TEST_F(QuicTransportTest, CancelAckTimeout) {

@@ -50,8 +50,8 @@ PacingRate calculatePacingRate(
       conn.transportSettings.pacingTimerTickInterval,
       rtt * burstPerInterval / cwndInPackets);
   return PacingRate::Builder()
-        .setInterval(interval)
-        .setBurstSize(burstPerInterval)
-        .build();
+      .setInterval(interval)
+      .setBurstSize(burstPerInterval)
+      .build();
 }
 } // namespace quic

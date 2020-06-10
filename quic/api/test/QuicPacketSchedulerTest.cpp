@@ -37,8 +37,8 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, 0);
-  conn.outstandingHandshakePacketsCount++;
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0);
+  conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
 }
@@ -55,8 +55,8 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, true, 0);
-  conn.outstandingHandshakePacketsCount++;
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0);
+  conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
 }
@@ -68,7 +68,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandingPackets.emplace_back(packet, Clock::now(), 0, false, 0);
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, false, 0);
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }
@@ -436,7 +436,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   EXPECT_FALSE(cloningScheduler.hasData());
   auto packetNum = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   EXPECT_TRUE(cloningScheduler.hasData());
 
@@ -461,15 +461,15 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, but then mark the second one processed by
-  // adding a PacketEvent that's missing from the outstandingPacketEvents set
+  // adding a PacketEvent that's missing from the outstandings.packetEvents set
   PacketNum expected = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   addOutstandingPacket(conn);
-  conn.outstandingPackets.back().associatedEvent = 1;
+  conn.outstandings.packets.back().associatedEvent = 1;
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
 
   ShortHeader header(
@@ -511,10 +511,10 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   // Add two outstanding packets, with second one being handshake
   auto expected = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   addHandshakeOutstandingPacket(conn);
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
 
   ShortHeader header(
@@ -587,9 +587,9 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "GiantsShoulder", 0);
   auto expectedPacketEvent = addOutstandingPacket(conn);
-  ASSERT_EQ(1, conn.outstandingPackets.size());
-  conn.outstandingPackets.back().packet.frames.push_back(MaxDataFrame(1000));
-  conn.outstandingPackets.back().packet.frames.push_back(
+  ASSERT_EQ(1, conn.outstandings.packets.size());
+  conn.outstandings.packets.back().packet.frames.push_back(MaxDataFrame(1000));
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxStreamDataFrame(stream->id, 1000));
   conn.flowControlState.advertisedMaxOffset = 1000;
   stream->flowControlState.advertisedMaxOffset = 1000;
@@ -674,7 +674,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   CloningScheduler cloningScheduler(noopScheduler, conn, "93MillionMiles", 0);
   auto packetNum = addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   EXPECT_TRUE(cloningScheduler.hasData());
 
@@ -1227,10 +1227,10 @@ TEST_F(
   CloningScheduler cloningScheduler(noopScheduler, conn, "Little Hurry", 0);
   addOutstandingPacket(conn);
   // There needs to have retransmittable frame for the rebuilder to work
-  conn.outstandingPackets.back().packet.frames.push_back(
+  conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   // Lie about the encodedSize to let the Cloner skip it:
-  conn.outstandingPackets.back().encodedSize = kDefaultUDPSendPacketLen * 2;
+  conn.outstandings.packets.back().encodedSize = kDefaultUDPSendPacketLen * 2;
   EXPECT_TRUE(cloningScheduler.hasData());
 
   ASSERT_FALSE(noopScheduler.hasData());
@@ -1270,7 +1270,7 @@ TEST_F(
   CloningScheduler cloningScheduler(noopScheduler, conn, "HotPot", 0);
   addOutstandingPacket(conn);
   // Not adding frame to this outstanding packet so that rebuild will fail:
-  ASSERT_TRUE(conn.outstandingPackets.back().packet.frames.empty());
+  ASSERT_TRUE(conn.outstandings.packets.back().packet.frames.empty());
   EXPECT_TRUE(cloningScheduler.hasData());
 
   ASSERT_FALSE(noopScheduler.hasData());

@@ -412,8 +412,8 @@ void QuicTransportBase::closeImpl(
   connCallback_ = nullptr;
 
   // Don't need outstanding packets.
-  conn_->outstandingPackets.clear();
-  conn_->outstandingHandshakePacketsCount = 0;
+  conn_->outstandings.packets.clear();
+  conn_->outstandings.handshakePacketsCount = 0;
 
   // We don't need no congestion control.
   conn_->congestionController = nullptr;
@@ -2333,7 +2333,7 @@ void QuicTransportBase::cancelAllAppCallbacks(
 
 void QuicTransportBase::writeSocketData() {
   if (socket_) {
-    auto packetsBefore = conn_->outstandingPackets.size();
+    auto packetsBefore = conn_->outstandings.packets.size();
     writeData();
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
@@ -2342,7 +2342,7 @@ void QuicTransportBase::writeSocketData() {
             TransportErrorCode::PROTOCOL_VIOLATION);
       }
       setLossDetectionAlarm(*conn_, *this);
-      auto packetsAfter = conn_->outstandingPackets.size();
+      auto packetsAfter = conn_->outstandings.packets.size();
       bool packetWritten = (packetsAfter > packetsBefore);
       if (conn_->loopDetectorCallback && packetWritten) {
         conn_->writeDebugState.currentEmptyLoopCount = 0;

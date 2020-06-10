@@ -18,4 +18,4 @@ void updatePacingOnClose(QuicConnectionStateBase& conn) {
   conn.canBePaced = false;
 }
 
-}
+} // namespace quic

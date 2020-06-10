@@ -161,7 +161,7 @@ TEST_F(QuicOpenStateTest, AckStream) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto& streamFrame =
       *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -211,10 +211,10 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
       false);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 3);
-  EXPECT_EQ(3, conn->outstandingPackets.size());
+  EXPECT_EQ(3, conn->outstandings.packets.size());
 
   auto& streamFrame3 =
-      *conn->outstandingPackets[2].packet.frames[0].asWriteStreamFrame();
+      *conn->outstandings.packets[2].packet.frames[0].asWriteStreamFrame();
 
   sendAckSMHandler(*stream, streamFrame3);
   ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
@@ -222,7 +222,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   ASSERT_EQ(stream->ackedIntervals.front().end, 21);
 
   auto& streamFrame2 =
-      *conn->outstandingPackets[1].packet.frames[0].asWriteStreamFrame();
+      *conn->outstandings.packets[1].packet.frames[0].asWriteStreamFrame();
 
   sendAckSMHandler(*stream, streamFrame2);
   ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
@@ -230,7 +230,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   ASSERT_EQ(stream->ackedIntervals.front().end, 21);
 
   auto& streamFrame1 =
-      *conn->outstandingPackets[0].packet.frames[0].asWriteStreamFrame();
+      *conn->outstandings.packets[0].packet.frames[0].asWriteStreamFrame();
 
   sendAckSMHandler(*stream, streamFrame1);
   ASSERT_EQ(stream->sendState, StreamSendState::Open_E);
@@ -275,9 +275,9 @@ TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
       false);
 
   EXPECT_EQ(3, stream->retransmissionBuffer.size());
-  EXPECT_EQ(3, conn->outstandingPackets.size());
-  auto packet = conn->outstandingPackets[folly::Random::rand32() % 3];
-  auto streamFrame = *conn->outstandingPackets[std::rand() % 3]
+  EXPECT_EQ(3, conn->outstandings.packets.size());
+  auto packet = conn->outstandings.packets[folly::Random::rand32() % 3];
+  auto streamFrame = *conn->outstandings.packets[std::rand() % 3]
                           .packet.frames.front()
                           .asWriteStreamFrame();
   sendAckSMHandler(*stream, streamFrame);
@@ -305,7 +305,7 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkip) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto& streamFrame =
       *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -349,7 +349,7 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkipHalfBuf) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto& streamFrame =
       *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -400,7 +400,7 @@ TEST_F(QuicOpenStateTest, AckStreamAfterSkipOneAndAHalfBuf) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 2);
-  EXPECT_EQ(2, conn->outstandingPackets.size());
+  EXPECT_EQ(2, conn->outstandings.packets.size());
 
   auto streamFrameIt =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData);
@@ -545,7 +545,7 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStream) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto& streamFrame =
       *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -583,7 +583,7 @@ TEST_F(QuicHalfClosedRemoteStateTest, AckStreamAfterSkip) {
       true);
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 1);
-  EXPECT_EQ(1, conn->outstandingPackets.size());
+  EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto& streamFrame =
       *getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)

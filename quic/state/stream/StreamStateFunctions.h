@@ -19,4 +19,4 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error);
 void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame);
 
 bool isAllDataReceived(const QuicStreamState& stream);
-}
+} // namespace quic

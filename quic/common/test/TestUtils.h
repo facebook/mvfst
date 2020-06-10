@@ -202,7 +202,7 @@ OutstandingPacket* findOutstandingPacket(
     }
     return nullptr;
   };
-  return helper(conn.outstandingPackets);
+  return helper(conn.outstandings.packets);
 }
 
 // Helper function to generate a buffer containing random data of given length

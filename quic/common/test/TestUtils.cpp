@@ -45,7 +45,7 @@ const RegularQuicWritePacket& writeQuicPacket(
       version,
       conn.transportSettings.writeConnectionDataPacketsLimit);
   CHECK(
-      conn.outstandingPackets.rend() !=
+      conn.outstandings.packets.rend() !=
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData));
   return getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
 }
@@ -69,7 +69,7 @@ PacketNum rstStreamAndSendPacket(
       version,
       conn.transportSettings.writeConnectionDataPacketsLimit);
 
-  for (const auto& packet : conn.outstandingPackets) {
+  for (const auto& packet : conn.outstandings.packets) {
     for (const auto& frame : packet.packet.frames) {
       auto rstFrame = frame.asRstStreamFrame();
       if (!rstFrame) {

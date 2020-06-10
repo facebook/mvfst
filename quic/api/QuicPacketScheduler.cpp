@@ -510,9 +510,9 @@ CloningScheduler::CloningScheduler(
 
 bool CloningScheduler::hasData() const {
   return frameScheduler_.hasData() ||
-      (!conn_.outstandingPackets.empty() &&
-       conn_.outstandingPackets.size() !=
-           conn_.outstandingHandshakePacketsCount);
+      (!conn_.outstandings.packets.empty() &&
+       conn_.outstandings.packets.size() !=
+           conn_.outstandings.handshakePacketsCount);
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
@@ -534,8 +534,8 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   // This is a loop, but it builds at most one packet.
-  for (auto iter = conn_.outstandingPackets.rbegin();
-       iter != conn_.outstandingPackets.rend();
+  for (auto iter = conn_.outstandings.packets.rbegin();
+       iter != conn_.outstandings.packets.rend();
        ++iter) {
     auto opPnSpace = iter->packet.header.getPacketNumberSpace();
     if (opPnSpace != PacketNumberSpace::AppData) {
@@ -573,7 +573,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // If the packet is already a clone that has been processed, we don't clone
     // it again.
     if (iter->associatedEvent &&
-        conn_.outstandingPacketEvents.count(*iter->associatedEvent) == 0) {
+        conn_.outstandings.packetEvents.count(*iter->associatedEvent) == 0) {
       continue;
     }
     // I think this only fail if udpSendPacketLen somehow shrinks in the middle

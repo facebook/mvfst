@@ -25,16 +25,16 @@ uint64_t PacketRebuilder::getHeaderBytes() const {
 
 PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
   // Either the packet has never been cloned before, or it's associatedEvent is
-  // still in the outstandingPacketEvents set.
+  // still in the outstandings.packetEvents set.
   DCHECK(
       !packet.associatedEvent ||
-      conn_.outstandingPacketEvents.count(*packet.associatedEvent));
+      conn_.outstandings.packetEvents.count(*packet.associatedEvent));
   if (!packet.associatedEvent) {
     auto packetNum = packet.packet.header.getPacketSequenceNum();
-    DCHECK(!conn_.outstandingPacketEvents.count(packetNum));
+    DCHECK(!conn_.outstandings.packetEvents.count(packetNum));
     packet.associatedEvent = packetNum;
-    conn_.outstandingPacketEvents.insert(packetNum);
-    ++conn_.outstandingClonedPacketsCount;
+    conn_.outstandings.packetEvents.insert(packetNum);
+    ++conn_.outstandings.clonedPacketsCount;
   }
   return *packet.associatedEvent;
 }

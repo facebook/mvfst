@@ -38,7 +38,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
       conn,
       conn.lossState.largestSent.value_or(0),
       conn.lossState.ptoCount,
-      (uint64_t)conn.outstandingPackets.size());
+      (uint64_t)conn.outstandings.packets.size());
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;
@@ -46,7 +46,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
     conn.qLogger->addLossAlarm(
         conn.lossState.largestSent.value_or(0),
         conn.lossState.ptoCount,
-        (uint64_t)conn.outstandingPackets.size(),
+        (uint64_t)conn.outstandings.packets.size(),
         kPtoAlarm);
   }
   if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {

@@ -19,7 +19,7 @@ getPreviousOutstandingPacket(
     quic::PacketNumberSpace packetNumberSpace,
     std::deque<quic::OutstandingPacket>::reverse_iterator from) {
   return std::find_if(
-      from, conn.outstandingPackets.rend(), [=](const auto& op) {
+      from, conn.outstandings.packets.rend(), [=](const auto& op) {
         return packetNumberSpace == op.packet.header.getPacketNumberSpace();
       });
 }
@@ -212,23 +212,24 @@ std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace) {
   return getNextOutstandingPacket(
-      conn, packetNumberSpace, conn.outstandingPackets.begin());
+      conn, packetNumberSpace, conn.outstandings.packets.begin());
 }
 
 std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace) {
   return getPreviousOutstandingPacket(
-      conn, packetNumberSpace, conn.outstandingPackets.rbegin());
+      conn, packetNumberSpace, conn.outstandings.packets.rbegin());
 }
 
 std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace,
     std::deque<OutstandingPacket>::iterator from) {
-  return std::find_if(from, conn.outstandingPackets.end(), [=](const auto& op) {
-    return packetNumberSpace == op.packet.header.getPacketNumberSpace();
-  });
+  return std::find_if(
+      from, conn.outstandings.packets.end(), [=](const auto& op) {
+        return packetNumberSpace == op.packet.header.getPacketNumberSpace();
+      });
 }
 
 bool hasReceivedPacketsAtLastCloseSent(

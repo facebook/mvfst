@@ -3474,7 +3474,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   client->writeChain(streamId, expected->clone(), true, false);
   loopForWrites();
   // ack all the packets
-  ASSERT_FALSE(client->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
   AckBlocks acks;
   auto start = getFirstOutstandingPacket(
@@ -3549,7 +3549,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
   loopForWrites();
 
   // ack all the packets
-  ASSERT_FALSE(client->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
   AckBlocks acks;
   auto start = getFirstOutstandingPacket(
@@ -3961,7 +3961,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   // This will clear out all the outstanding packets
   AckBlocks sentPackets;
-  for (auto& packet : client->getNonConstConn().outstandingPackets) {
+  for (auto& packet : client->getNonConstConn().outstandings.packets) {
     auto packetNum = packet.packet.header.getPacketSequenceNum();
     sentPackets.insert(packetNum);
   }
@@ -3974,9 +3974,9 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
 
   // Clear out all the outstanding packets to simulate quiescent state.
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
-  client->getNonConstConn().outstandingPackets.clear();
-  client->getNonConstConn().outstandingHandshakePacketsCount = 0;
-  client->getNonConstConn().outstandingClonedPacketsCount = 0;
+  client->getNonConstConn().outstandings.packets.clear();
+  client->getNonConstConn().outstandings.handshakePacketsCount = 0;
+  client->getNonConstConn().outstandings.clonedPacketsCount = 0;
   client->idleTimeout().cancelTimeout();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");
@@ -4723,7 +4723,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
   loopForWrites();
-  ASSERT_FALSE(client->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
@@ -4748,7 +4748,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   };
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
   loopForWrites();
-  ASSERT_FALSE(client->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
   client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
 
@@ -5367,7 +5367,7 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
   }
 
   bool zeroRttPacketsOutstanding() {
-    for (auto& packet : client->getNonConstConn().outstandingPackets) {
+    for (auto& packet : client->getNonConstConn().outstandings.packets) {
       bool isZeroRtt =
           packet.packet.header.getProtectionType() == ProtectionType::ZeroRtt;
       if (isZeroRtt) {

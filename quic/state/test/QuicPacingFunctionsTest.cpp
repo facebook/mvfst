@@ -31,5 +31,5 @@ TEST_F(QuicPacingFunctionsTest, OnClose) {
   EXPECT_FALSE(conn.canBePaced);
 }
 
-}
-}
+} // namespace test
+} // namespace quic

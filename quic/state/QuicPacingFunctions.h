@@ -16,4 +16,4 @@ void updatePacingOnKeyEstablished(QuicConnectionStateBase& conn);
 
 void updatePacingOnClose(QuicConnectionStateBase& conn);
 
-}
+} // namespace quic

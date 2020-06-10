@@ -77,7 +77,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
       alarmDuration = 0us;
     }
     alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
-  } else if (conn.outstandingHandshakePacketsCount > 0) {
+  } else if (conn.outstandings.handshakePacketsCount > 0) {
     if (conn.lossState.srtt == 0us) {
       alarmDuration = conn.transportSettings.initialRtt * 2;
     } else {
@@ -106,7 +106,7 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
             lastSentPacketTime + alarmDuration - now);
   } else {
     auto lastSentPacketNum =
-        conn.outstandingPackets.back().packet.header.getPacketSequenceNum();
+        conn.outstandings.packets.back().packet.header.getPacketSequenceNum();
     VLOG(10) << __func__ << " alarm already due method=" << *alarmMethod
              << " lastSentPacketNum=" << lastSentPacketNum
              << " lastSentPacketTime="
@@ -138,7 +138,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
-  auto totalPacketsOutstanding = conn.outstandingPackets.size();
+  auto totalPacketsOutstanding = conn.outstandings.packets.size();
   /*
    * We have this condition to disambiguate the case where we have.
    * (1) All outstanding packets that are clones that are processed and there
@@ -151,11 +151,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * write them since we could be blocked by cwnd. So we must set the loss timer
    * so that we can write this data with the slack packet space for the clones.
    */
-  if (!hasDataToWrite && conn.outstandingPacketEvents.empty() &&
-      totalPacketsOutstanding == conn.outstandingClonedPacketsCount) {
+  if (!hasDataToWrite && conn.outstandings.packetEvents.empty() &&
+      totalPacketsOutstanding == conn.outstandings.clonedPacketsCount) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
-             << " handshakePackets=" << conn.outstandingHandshakePacketsCount
+             << " handshakePackets=" << conn.outstandings.handshakePacketsCount
              << " " << conn;
     conn.pendingEvents.setLossDetectionAlarm = false;
     timeout.cancelLossTimeout();
@@ -165,8 +165,8 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     VLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"
         << " outstanding=" << totalPacketsOutstanding
-        << " handshakePackets=" << conn.outstandingHandshakePacketsCount << " "
-        << nodeToString(conn.nodeType) << " " << conn;
+        << " handshakePackets=" << conn.outstandings.handshakePacketsCount
+        << " " << nodeToString(conn.nodeType) << " " << conn;
     return;
   }
   timeout.cancelLossTimeout();
@@ -176,7 +176,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
            << " alarm=" << alarmDuration.first.count() << "ms"
            << " method=" << conn.lossState.currentAlarmMethod
            << " outstanding=" << totalPacketsOutstanding
-           << " handshakePackets=" << conn.outstandingHandshakePacketsCount
+           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << nodeToString(conn.nodeType) << " " << conn;
   timeout.scheduleLossTimeout(alarmDuration.first);
   conn.pendingEvents.setLossDetectionAlarm = false;
@@ -198,7 +198,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       std::max(conn.lossState.srtt, conn.lossState.lrtt) *
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
-  VLOG(10) << __func__ << " outstanding=" << conn.outstandingPackets.size()
+  VLOG(10) << __func__ << " outstanding=" << conn.outstandings.packets.size()
            << " largestAcked=" << largestAcked.value_or(0)
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
@@ -206,7 +206,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   bool shouldSetTimer = false;
-  while (iter != conn.outstandingPackets.end()) {
+  while (iter != conn.outstandings.packets.end()) {
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
     if (!largestAcked.has_value() || currentPacketNum >= *largestAcked) {
@@ -228,40 +228,40 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     lossEvent.addLostPacket(pkt);
     if (pkt.associatedEvent) {
-      DCHECK_GT(conn.outstandingClonedPacketsCount, 0);
-      --conn.outstandingClonedPacketsCount;
+      DCHECK_GT(conn.outstandings.clonedPacketsCount, 0);
+      --conn.outstandings.clonedPacketsCount;
     }
     // Invoke LossVisitor if the packet doesn't have a associated PacketEvent;
-    // or if the PacketEvent is present in conn.outstandingPacketEvents.
+    // or if the PacketEvent is present in conn.outstandings.packetEvents.
     bool processed = pkt.associatedEvent &&
-        !conn.outstandingPacketEvents.count(*pkt.associatedEvent);
+        !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
     lossVisitor(conn, pkt.packet, processed, currentPacketNum);
-    // Remove the PacketEvent from the outstandingPacketEvents set
+    // Remove the PacketEvent from the outstandings.packetEvents set
     if (pkt.associatedEvent) {
-      conn.outstandingPacketEvents.erase(*pkt.associatedEvent);
+      conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
     }
     if (pkt.isHandshake) {
-      DCHECK(conn.outstandingHandshakePacketsCount);
-      --conn.outstandingHandshakePacketsCount;
+      DCHECK(conn.outstandings.handshakePacketsCount);
+      --conn.outstandings.handshakePacketsCount;
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
              << " handshake=" << pkt.isHandshake << " " << conn;
-    iter = conn.outstandingPackets.erase(iter);
+    iter = conn.outstandings.packets.erase(iter);
   }
 
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);
-  for (; earliest != conn.outstandingPackets.end();
+  for (; earliest != conn.outstandings.packets.end();
        earliest = getNextOutstandingPacket(conn, pnSpace, earliest + 1)) {
     if (!earliest->associatedEvent ||
-        conn.outstandingPacketEvents.count(*earliest->associatedEvent)) {
+        conn.outstandings.packetEvents.count(*earliest->associatedEvent)) {
       break;
     }
   }
-  if (shouldSetTimer && earliest != conn.outstandingPackets.end()) {
+  if (shouldSetTimer && earliest != conn.outstandings.packets.end()) {
     // We are eligible to set a loss timer and there are a few packets which
     // are unacked, so we can set the early retransmit timer for them.
     VLOG(10) << __func__ << " early retransmit timer outstanding="
-             << conn.outstandingPackets.empty() << " delayUntilLost"
+             << conn.outstandings.packets.empty() << " delayUntilLost"
              << delayUntilLost.count() << "us"
              << " " << conn;
     getLossTime(conn, pnSpace) = delayUntilLost + earliest->time;
@@ -308,18 +308,18 @@ void onHandshakeAlarm(
       conn,
       conn.lossState.largestSent.value_or(0),
       conn.lossState.handshakeAlarmCount,
-      (uint64_t)conn.outstandingHandshakePacketsCount,
-      (uint64_t)conn.outstandingPackets.size());
+      (uint64_t)conn.outstandings.handshakePacketsCount,
+      (uint64_t)conn.outstandings.packets.size());
   if (conn.qLogger) {
     conn.qLogger->addLossAlarm(
         conn.lossState.largestSent.value_or(0),
         conn.lossState.handshakeAlarmCount,
-        (uint64_t)conn.outstandingPackets.size(),
+        (uint64_t)conn.outstandings.packets.size(),
         kHandshakeAlarm);
   }
   CongestionController::LossEvent lossEvent(ClockType::now());
-  auto iter = conn.outstandingPackets.begin();
-  while (iter != conn.outstandingPackets.end()) {
+  auto iter = conn.outstandings.packets.begin();
+  while (iter != conn.outstandings.packets.end()) {
     // the word "handshake" in our code base is unfortunately overloaded.
     if (iter->isHandshake) {
       auto& packet = *iter;
@@ -329,11 +329,11 @@ void onHandshakeAlarm(
                << " packetNumSpace=" << currentPacketNumSpace << " " << conn;
       lossEvent.addLostPacket(std::move(packet));
       lossVisitor(conn, packet.packet, false, currentPacketNum);
-      DCHECK(conn.outstandingHandshakePacketsCount);
-      --conn.outstandingHandshakePacketsCount;
+      DCHECK(conn.outstandings.handshakePacketsCount);
+      --conn.outstandings.handshakePacketsCount;
       ++conn.lossState.timeoutBasedRtxCount;
       ++conn.lossState.rtxCount;
-      iter = conn.outstandingPackets.erase(iter);
+      iter = conn.outstandings.packets.erase(iter);
     } else {
       iter++;
     }
@@ -356,7 +356,7 @@ void onLossDetectionAlarm(
     QuicConnectionStateBase& conn,
     const LossVisitor& lossVisitor) {
   auto now = ClockType::now();
-  if (conn.outstandingPackets.empty()) {
+  if (conn.outstandings.packets.empty()) {
     VLOG(10) << "Transmission alarm fired with no outstanding packets " << conn;
     return;
   }
@@ -385,11 +385,11 @@ void onLossDetectionAlarm(
   } else {
     onPTOAlarm(conn);
   }
-  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandingPackets.empty();
+  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandings.packets.empty();
   VLOG(10) << __func__ << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
-           << " outstanding=" << conn.outstandingPackets.size()
-           << " handshakePackets=" << conn.outstandingHandshakePacketsCount
+           << " outstanding=" << conn.outstandings.packets.size()
+           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
 }
 
@@ -426,13 +426,13 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       lossVisitor,
       ack.ackTime,
       pnSpace);
-  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandingPackets.empty();
+  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandings.packets.empty();
   VLOG(10) << __func__
            << " largestAckedInPacket=" << ack.largestAckedPacket.value_or(0)
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
-           << " outstanding=" << conn.outstandingPackets.size()
-           << " handshakePackets=" << conn.outstandingHandshakePacketsCount
+           << " outstanding=" << conn.outstandings.packets.size()
+           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
   return lossEvent;
 }
@@ -446,7 +446,7 @@ void markZeroRttPacketsLost(
     const LossVisitor& lossVisitor) {
   CongestionController::LossEvent lossEvent(ClockType::now());
   auto iter = getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
-  while (iter != conn.outstandingPackets.end()) {
+  while (iter != conn.outstandings.packets.end()) {
     DCHECK_EQ(
         iter->packet.header.getPacketNumberSpace(), PacketNumberSpace::AppData);
     auto isZeroRttPacket =
@@ -456,16 +456,16 @@ void markZeroRttPacketsLost(
       DCHECK(!pkt.isHandshake);
       auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
       bool processed = pkt.associatedEvent &&
-          !conn.outstandingPacketEvents.count(*pkt.associatedEvent);
+          !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
       lossVisitor(conn, pkt.packet, processed, currentPacketNum);
-      // Remove the PacketEvent from the outstandingPacketEvents set
+      // Remove the PacketEvent from the outstandings.packetEvents set
       if (pkt.associatedEvent) {
-        conn.outstandingPacketEvents.erase(*pkt.associatedEvent);
-        DCHECK_GT(conn.outstandingClonedPacketsCount, 0);
-        --conn.outstandingClonedPacketsCount;
+        conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
+        DCHECK_GT(conn.outstandings.clonedPacketsCount, 0);
+        --conn.outstandings.clonedPacketsCount;
       }
       lossEvent.addLostPacket(pkt);
-      iter = conn.outstandingPackets.erase(iter);
+      iter = conn.outstandings.packets.erase(iter);
       iter = getNextOutstandingPacket(conn, PacketNumberSpace::AppData, iter);
     } else {
       iter =

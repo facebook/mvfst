@@ -72,6 +72,5 @@ TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
       conn.transportSettings.writeConnectionDataPacketsLimit, result.burstSize);
 }
 
-
 } // namespace test
 } // namespace quic

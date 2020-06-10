@@ -38,7 +38,7 @@ class PacketRebuilder {
   /**
    * A helper function that takes a OutstandingPacket that's not processed, and
    * return its associatedEvent. If this packet has never been cloned, then
-   * create the associatedEvent and add it into outstandingPacketEvents first.
+   * create the associatedEvent and add it into outstandings.packetEvents first.
    */
   PacketEvent cloneOutstandingPacket(OutstandingPacket& packet);
 

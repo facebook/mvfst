@@ -27,14 +27,12 @@ struct Bandwidth {
   UnitType unitType{UnitType::BYTES};
 
   explicit Bandwidth()
-      : units(0),
-        interval(std::chrono::microseconds::zero()) {}
+      : units(0), interval(std::chrono::microseconds::zero()) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,
       std::chrono::microseconds deliveryInterval)
-      : units(unitsDelievered),
-        interval(deliveryInterval) {}
+      : units(unitsDelievered), interval(deliveryInterval) {}
 
   explicit Bandwidth(
       uint64_t unitsDelievered,

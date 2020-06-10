@@ -621,14 +621,14 @@ void updateConnection(
   }
   auto packetIt =
       std::find_if(
-          conn.outstandingPackets.rbegin(),
-          conn.outstandingPackets.rend(),
+          conn.outstandings.packets.rbegin(),
+          conn.outstandings.packets.rend(),
           [packetNum](const auto& packetWithTime) {
             return packetWithTime.packet.header.getPacketSequenceNum() <
                 packetNum;
           })
           .base();
-  auto& pkt = *conn.outstandingPackets.emplace(
+  auto& pkt = *conn.outstandings.packets.emplace(
       packetIt,
       std::move(packet),
       std::move(sentTime),
@@ -647,7 +647,7 @@ void updateConnection(
         conn.lossState.totalBytesAckedAtLastAck);
   }
   if (packetEvent) {
-    DCHECK(conn.outstandingPacketEvents.count(*packetEvent));
+    DCHECK(conn.outstandings.packetEvents.count(*packetEvent));
     DCHECK(!isHandshake);
     pkt.associatedEvent = std::move(packetEvent);
     conn.lossState.totalBytesCloned += encodedSize;
@@ -675,19 +675,19 @@ void updateConnection(
     conn.pathValidationLimiter->onPacketSent(pkt.encodedSize);
   }
   if (pkt.isHandshake) {
-    ++conn.outstandingHandshakePacketsCount;
+    ++conn.outstandings.handshakePacketsCount;
     conn.lossState.lastHandshakePacketSentTime = pkt.time;
   }
   conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
   if (pkt.associatedEvent) {
     CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);
-    ++conn.outstandingClonedPacketsCount;
+    ++conn.outstandings.clonedPacketsCount;
     ++conn.lossState.timeoutBasedRtxCount;
   }
 
-  auto opCount = conn.outstandingPackets.size();
-  DCHECK_GE(opCount, conn.outstandingHandshakePacketsCount);
-  DCHECK_GE(opCount, conn.outstandingClonedPacketsCount);
+  auto opCount = conn.outstandings.packets.size();
+  DCHECK_GE(opCount, conn.outstandings.handshakePacketsCount);
+  DCHECK_GE(opCount, conn.outstandings.clonedPacketsCount);
 }
 
 uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {
@@ -1353,7 +1353,7 @@ void implicitAckCryptoStream(
   AckBlocks ackBlocks;
   ReadAckFrame implicitAck;
   implicitAck.ackDelay = 0ms;
-  for (const auto& op : conn.outstandingPackets) {
+  for (const auto& op : conn.outstandings.packets) {
     if (op.packet.header.getPacketNumberSpace() == packetNumSpace) {
       ackBlocks.insert(op.packet.header.getPacketSequenceNum());
     }

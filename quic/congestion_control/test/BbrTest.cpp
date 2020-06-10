@@ -548,7 +548,7 @@ TEST_F(BbrTest, BytesCounting) {
 
   PacketNum packetNum = 0;
   auto packet = makeTestingWritePacket(packetNum, 1200, 1200);
-  conn.outstandingPackets.push_back(packet);
+  conn.outstandings.packets.push_back(packet);
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);

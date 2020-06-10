@@ -506,7 +506,7 @@ class QuicServerTransportTest : public Test {
     // Issue (kMinNumAvailableConnIds - 1) more connection ids on handshake
     // complete
     auto numNewConnIdFrames = 0;
-    for (const auto& packet : server->getConn().outstandingPackets) {
+    for (const auto& packet : server->getConn().outstandings.packets) {
       for (const auto& frame : packet.packet.frames) {
         switch (frame.type()) {
           case QuicWriteFrame::Type::QuicSimpleFrame_E: {
@@ -813,9 +813,9 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
 TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   // Clear the receivedNewPacketBeforeWrite flag, since we may reveice from
   // client during the SetUp of the test case.
-  server->getNonConstConn().outstandingPackets.clear();
+  server->getNonConstConn().outstandings.packets.clear();
   server->getNonConstConn().receivedNewPacketBeforeWrite = false;
-  server->getNonConstConn().outstandingPackets.clear();
+  server->getNonConstConn().outstandings.packets.clear();
   StreamId streamId = server->createBidirectionalStream().value();
 
   server->idleTimeout().cancelTimeout();
@@ -1175,8 +1175,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   auto data = IOBuf::copyBuffer("Aloha");
 
   // Remove any packets that might have been queued.
-  server->getNonConstConn().outstandingPackets.clear();
-  server->getNonConstConn().outstandingHandshakePacketsCount = 0;
+  server->getNonConstConn().outstandings.packets.clear();
+  server->getNonConstConn().outstandings.handshakePacketsCount = 0;
   server->writeChain(streamId, data->clone(), false, false);
   loopForWrites();
   server->writeChain(streamId, data->clone(), false, false);
@@ -1184,10 +1184,10 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   loopForWrites();
 
   auto stream = server->getNonConstConn().streamManager->getStream(streamId);
-  ASSERT_FALSE(server->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(server->getConn().outstandings.packets.empty());
   ASSERT_FALSE(stream->retransmissionBuffer.empty());
   // We need more than one packet for this test.
-  ASSERT_FALSE(server->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(server->getConn().outstandings.packets.empty());
 
   PacketNum packetNum1 =
       getFirstOutstandingPacket(
@@ -1200,9 +1200,9 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
           ->packet.header.getPacketSequenceNum();
 
   uint32_t buffersInPacket1 = 0;
-  for (size_t i = 0; i < server->getNonConstConn().outstandingPackets.size();
+  for (size_t i = 0; i < server->getNonConstConn().outstandings.packets.size();
        ++i) {
-    auto& packet = server->getNonConstConn().outstandingPackets[i];
+    auto& packet = server->getNonConstConn().outstandings.packets[i];
     if (packet.packet.header.getPacketNumberSpace() !=
         PacketNumberSpace::AppData) {
       continue;
@@ -1265,7 +1265,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   auto empty = IOBuf::create(0);
   server->writeChain(streamId, std::move(empty), true, false);
   loopForWrites();
-  ASSERT_FALSE(server->getConn().outstandingPackets.empty());
+  ASSERT_FALSE(server->getConn().outstandings.packets.empty());
 
   PacketNum finPacketNum =
       getFirstOutstandingPacket(
@@ -1778,8 +1778,8 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().streamManager->getStream(streamId);
   // knock every handshake outstanding packets out
-  server->getNonConstConn().outstandingHandshakePacketsCount = 0;
-  server->getNonConstConn().outstandingPackets.clear();
+  server->getNonConstConn().outstandings.handshakePacketsCount = 0;
+  server->getNonConstConn().outstandings.packets.clear();
   for (auto& t : server->getNonConstConn().lossState.lossTimes) {
     t.reset();
   }
@@ -1788,17 +1788,18 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   loopForWrites();
   // Find the outstanding StopSending.
   auto packetItr = std::find_if(
-      server->getNonConstConn().outstandingPackets.begin(),
-      server->getNonConstConn().outstandingPackets.end(),
+      server->getNonConstConn().outstandings.packets.begin(),
+      server->getNonConstConn().outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
 
-  ASSERT_TRUE(packetItr != server->getNonConstConn().outstandingPackets.end());
+  ASSERT_TRUE(
+      packetItr != server->getNonConstConn().outstandings.packets.end());
   // Force a timeout with no data so that it clones the packet
   server->lossTimeout().timeoutExpired();
   loopForWrites();
   auto numStopSendingPackets = std::count_if(
-      server->getNonConstConn().outstandingPackets.begin(),
-      server->getNonConstConn().outstandingPackets.end(),
+      server->getNonConstConn().outstandings.packets.begin(),
+      server->getNonConstConn().outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
 
   EXPECT_GT(numStopSendingPackets, 1);
@@ -3696,7 +3697,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
   setupClientReadCodec();
   recvClientHello(true, QuicVersion::QUIC_DRAFT);
   recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
-  auto& packets = server->getConn().outstandingPackets;
+  auto& packets = server->getConn().outstandings.packets;
   ASSERT_FALSE(packets.empty());
   int numHandshakeDone = 0;
   for (auto& p : packets) {
