@@ -151,6 +151,15 @@ void happyEyeballsSetUpSocket(
   }
   applySocketOptions(
       socket, options, sockFamily, folly::SocketOptionKey::ApplyPos::POST_BIND);
+
+#ifdef SO_NOSIGPIPE
+  folly::SocketOptionKey nopipeKey = {SOL_SOCKET, SO_NOSIGPIPE};
+  if (!options.count(nopipeKey)) {
+    socket.applyOptions(
+        {{nopipeKey, 1}}, folly::SocketOptionKey::ApplyPos::POST_BIND);
+  }
+#endif
+
   if (transportSettings.turnoffPMTUD) {
     socket.setDFAndTurnOffPMTU();
   } else {
