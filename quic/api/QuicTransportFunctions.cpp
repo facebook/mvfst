@@ -207,7 +207,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
       *connection.bufAccessor,
       connection.udpSendPacketLen,
       std::move(header),
-      getAckState(connection, pnSpace).largestAckedByPeer);
+      getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   pktBuilder.setCipherOverhead(cipherOverhead);
   CHECK(scheduler.hasData());
   auto result =
@@ -287,7 +287,7 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
   RegularQuicPacketBuilder pktBuilder(
       connection.udpSendPacketLen,
       std::move(header),
-      getAckState(connection, pnSpace).largestAckedByPeer);
+      getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   // It's the scheduler's job to invoke encode header
   pktBuilder.setCipherOverhead(cipherOverhead);
   auto result =
@@ -605,7 +605,8 @@ void updateConnection(
   }
 
   increaseNextPacketNum(conn, packetNumberSpace);
-  conn.lossState.largestSent = std::max(conn.lossState.largestSent, packetNum);
+  conn.lossState.largestSent =
+      std::max(conn.lossState.largestSent.value_or(packetNum), packetNum);
   // updateConnection may be called multiple times during write. If before or
   // during any updateConnection, setLossDetectionAlarm is already set, we
   // shouldn't clear it:
@@ -903,7 +904,7 @@ void writeCloseCommon(
   RegularQuicPacketBuilder packetBuilder(
       connection.udpSendPacketLen,
       std::move(header),
-      getAckState(connection, pnSpace).largestAckedByPeer);
+      getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   packetBuilder.encodePacketHeader();
   packetBuilder.setCipherOverhead(aead.getCipherOverhead());
   size_t written = 0;

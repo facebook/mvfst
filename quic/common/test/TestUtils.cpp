@@ -119,7 +119,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
   RegularQuicPacketBuilder builder(
       dstConn.udpSendPacketLen,
       std::move(*header),
-      getAckState(dstConn, pnSpace).largestAckedByPeer);
+      getAckState(dstConn, pnSpace).largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   if (aead) {
     builder.setCipherOverhead(aead->getCipherOverhead());

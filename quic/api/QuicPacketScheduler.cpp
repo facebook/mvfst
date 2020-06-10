@@ -557,14 +557,14 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
       internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
           conn_.udpSendPacketLen - cipherOverhead_,
           header,
-          getAckState(conn_, builderPnSpace).largestAckedByPeer);
+          getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     } else {
       CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
       internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
           *conn_.bufAccessor,
           conn_.udpSendPacketLen - cipherOverhead_,
           header,
-          getAckState(conn_, builderPnSpace).largestAckedByPeer);
+          getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }
     // We shouldn't clone Handshake packet.
     if (iter->isHandshake) {

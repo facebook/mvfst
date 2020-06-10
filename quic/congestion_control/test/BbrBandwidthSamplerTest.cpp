@@ -144,7 +144,8 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   sampler.onAppLimited();
   EXPECT_TRUE(sampler.isAppLimited());
   CongestionController::AckEvent ackEvent;
-  ackEvent.largestAckedPacket = ++conn.lossState.largestSent;
+  conn.lossState.largestSent = conn.lossState.largestSent.value_or(0);
+  ackEvent.largestAckedPacket = ++conn.lossState.largestSent.value();
   auto packet =
       makeTestingWritePacket(*ackEvent.largestAckedPacket, 1000, 1000);
   ackEvent.largestAckedPacketSentTime = packet.time;

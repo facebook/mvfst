@@ -172,7 +172,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(*header),
-      getAckState(conn, packetNumberSpace).largestAckedByPeer);
+      getAckState(conn, packetNumberSpace).largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   EXPECT_TRUE(builder.canBuildPacket());
   auto packet = std::move(builder).buildPacket();
@@ -216,7 +216,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   conn.lossState.largestSent = getNextPacketNum(conn, packetNumberSpace);
   increaseNextPacketNum(conn, packetNumberSpace);
   conn.pendingEvents.setLossDetectionAlarm = true;
-  return conn.lossState.largestSent;
+  return conn.lossState.largestSent.value();
 }
 
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
@@ -713,9 +713,10 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckedPacket) {
   sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
 
   ReadAckFrame ackFrame;
-  ackFrame.largestAcked = conn->lossState.largestSent;
+  ackFrame.largestAcked = conn->lossState.largestSent.value_or(0);
   ackFrame.ackBlocks.emplace_back(
-      conn->lossState.largestSent, conn->lossState.largestSent);
+      conn->lossState.largestSent.value_or(0),
+      conn->lossState.largestSent.value_or(0));
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool, PacketNum) {

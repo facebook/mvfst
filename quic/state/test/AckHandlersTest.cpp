@@ -400,7 +400,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       Clock::now());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(conn.lossState.ptoCount, 1);
-  EXPECT_EQ(conn.ackStates.appDataAckState.largestAckedByPeer, 0);
+  EXPECT_TRUE(!conn.ackStates.appDataAckState.largestAckedByPeer.has_value());
 }
 
 TEST_P(AckHandlersTest, LossByAckedRecovered) {

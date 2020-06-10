@@ -97,7 +97,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingInitialPacket) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   FrameScheduler cryptoOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -129,7 +129,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingInitialPureAcks) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer);
+      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
   conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
   conn.ackStates.initialAckState.needsToSendAckImmediately = true;
   conn.ackStates.initialAckState.acks.insert(10);
@@ -163,7 +163,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingUpToWrapperSize) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer);
+      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
   conn.ackStates.initialAckState.largestRecvdPacketTime = Clock::now();
   conn.ackStates.initialAckState.needsToSendAckImmediately = true;
   conn.ackStates.initialAckState.acks.insert(10);
@@ -196,7 +196,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   RegularQuicPacketBuilder builder1(
       conn.udpSendPacketLen,
       std::move(longHeader1),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -228,7 +228,7 @@ TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   RegularQuicPacketBuilder builder1(
       conn.udpSendPacketLen,
       std::move(longHeader1),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -256,7 +256,7 @@ TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   RegularQuicPacketBuilder builder2(
       conn.udpSendPacketLen,
       std::move(longHeader2),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   writeDataToQuicStream(
       conn.cryptoState->initialStream, folly::IOBuf::copyBuffer("shlo again"));
   auto result2 = scheduler.scheduleFramesForPacket(
@@ -279,7 +279,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   FrameScheduler scheduler =
       std::move(
           FrameScheduler::Builder(
@@ -310,7 +310,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(longHeader),
-      conn.ackStates.handshakeAckState.largestAckedByPeer);
+      conn.ackStates.handshakeAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   PacketBuilderWrapper builderWrapper(builder, 13);
   CryptoStreamScheduler scheduler(
@@ -338,7 +338,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   RegularQuicPacketBuilder builder(
       25,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   FrameScheduler cryptoOnlyScheduler =
       std::move(
           FrameScheduler::Builder(
@@ -375,7 +375,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(stream->id);
@@ -397,7 +397,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   PacketBuilderWrapper builderWrapper(builder, 2);
   auto originalSpace = builder.remainingSpaceInPkt();
@@ -419,7 +419,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto originalSpace = builder.remainingSpaceInPkt();
   conn.streamManager->queueWindowUpdate(nonExistentStream);
@@ -448,7 +448,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
@@ -479,7 +479,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.initialAckState.largestAckedByPeer);
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
@@ -524,7 +524,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
@@ -557,7 +557,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_EQ(folly::none, result.packetEvent);
@@ -606,7 +606,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto packetResult = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
   EXPECT_EQ(expectedPacketEvent, *packetResult.packetEvent);
@@ -687,7 +687,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
       bufAccessor,
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
@@ -731,7 +731,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       bufAccessor,
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   ASSERT_TRUE(scheduler.hasData());
   auto result = scheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen);
@@ -759,7 +759,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       bufAccessor,
       conn.udpSendPacketLen,
       std::move(dupHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto cloneResult = cloningScheduler.scheduleFramesForPacket(
       std::move(internalBuilder), conn.udpSendPacketLen);
   EXPECT_TRUE(
@@ -798,7 +798,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto packetResult = scheduler.scheduleFramesForPacket(
       std::move(builder), conn.udpSendPacketLen - cipherOverhead);
   auto encodedSize = packetResult.packet->body->computeChainDataLength() +
@@ -820,7 +820,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   RegularQuicPacketBuilder throwawayBuilder(
       conn.udpSendPacketLen,
       std::move(cloneHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   FrameScheduler noopScheduler("noopScheduler");
   CloningScheduler cloningScheduler(
       noopScheduler, conn, "CopyCat", cipherOverhead);
@@ -905,7 +905,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
@@ -944,7 +944,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobin) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
@@ -1010,7 +1010,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinStreamPerPacket) {
   RegularQuicPacketBuilder builder1(
       conn.udpSendPacketLen,
       std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
   auto stream2 =
@@ -1078,7 +1078,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerRoundRobinControl) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader1),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto stream1 =
       conn.streamManager->createNextBidirectionalStream().value()->id;
@@ -1160,7 +1160,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerOneStream) {
   RegularQuicPacketBuilder builder(
       conn.udpSendPacketLen,
       std::move(shortHeader),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   auto stream1 = conn.streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream1, folly::IOBuf::copyBuffer("some data"), false);
@@ -1242,7 +1242,7 @@ TEST_F(
       bufAccessor,
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_FALSE(result.packetEvent.has_value());
@@ -1282,7 +1282,7 @@ TEST_F(
       bufAccessor,
       conn.udpSendPacketLen,
       std::move(header),
-      conn.ackStates.appDataAckState.largestAckedByPeer);
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_FALSE(result.packetEvent.has_value());

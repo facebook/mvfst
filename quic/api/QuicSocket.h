@@ -111,8 +111,8 @@ class QuicSocket {
     uint64_t totalBytesRetransmitted{0};
     uint32_t ptoCount{0};
     uint32_t totalPTOCount{0};
-    PacketNum largestPacketAckedByPeer{0};
-    PacketNum largestPacketSent{0};
+    folly::Optional<PacketNum> largestPacketAckedByPeer;
+    folly::Optional<PacketNum> largestPacketSent;
   };
 
   /**

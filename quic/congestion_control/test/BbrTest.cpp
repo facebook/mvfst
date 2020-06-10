@@ -162,7 +162,7 @@ TEST_F(BbrTest, LeaveStartup) {
   auto sendAckGrow = [&](bool growFast) {
     conn.lossState.largestSent = currentLatest;
     auto packet = makeTestingWritePacket(
-        conn.lossState.largestSent, 1000, 1000 + totalSent);
+        conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
     bbr.onPacketSent(packet);
     totalSent += 1000;
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
@@ -231,7 +231,7 @@ TEST_F(BbrTest, ProbeRtt) {
   auto sendFunc = [&]() {
     conn.lossState.largestSent = currentLatest;
     auto packet = makeTestingWritePacket(
-        conn.lossState.largestSent,
+        conn.lossState.largestSent.value(),
         conn.udpSendPacketLen,
         totalSent + conn.udpSendPacketLen);
     bbr.onPacketSent(packet);
@@ -396,7 +396,7 @@ TEST_F(BbrTest, AckAggregation) {
   auto sendAckGrow = [&](bool growFast) {
     conn.lossState.largestSent = currentLatest;
     auto packet = makeTestingWritePacket(
-        conn.lossState.largestSent, 1000, 1000 + totalSent);
+        conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
     bbr.onPacketSent(packet);
     totalSent += 1000;
     EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
@@ -437,7 +437,7 @@ TEST_F(BbrTest, AckAggregation) {
 
   conn.lossState.largestSent = currentLatest;
   auto packet = makeTestingWritePacket(
-      conn.lossState.largestSent, 1000, 1000 + totalSent);
+      conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
   bbr.onPacketSent(packet);
   totalSent += 1000;
   auto ackEvent = makeAck(currentLatest, 1000, Clock::now(), packet.time);
@@ -460,7 +460,7 @@ TEST_F(BbrTest, AckAggregation) {
   // Another round, this time send something larger than currentMaxAckHeight:
   conn.lossState.largestSent = currentLatest;
   auto packet1 = makeTestingWritePacket(
-      conn.lossState.largestSent,
+      conn.lossState.largestSent.value(),
       currentMaxAckHeight * 2 + 100,
       currentMaxAckHeight * 2 + 100 + totalSent);
   bbr.onPacketSent(packet1);
@@ -481,9 +481,10 @@ TEST_F(BbrTest, AppLimited) {
   auto rawBandwidthSampler = mockBandwidthSampler.get();
   bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
 
-  auto packet = makeTestingWritePacket(conn.lossState.largestSent, 1000, 1000);
+  auto packet = makeTestingWritePacket(
+      conn.lossState.largestSent.value_or(0), 1000, 1000);
   bbr.onPacketSent(packet);
-  conn.lossState.largestSent++;
+  conn.lossState.largestSent = conn.lossState.largestSent.value_or(0) + 1;
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.setAppLimited();
   EXPECT_CALL(*rawBandwidthSampler, isAppLimited())
@@ -504,7 +505,8 @@ TEST_F(BbrTest, AppLimitedIgnored) {
     EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
     bbr.setAppLimited();
     auto packet = makeTestingWritePacket(
-        conn.lossState.largestSent++, 1000, 1000 + inflightBytes);
+        conn.lossState.largestSent.value_or(0), 1000, 1000 + inflightBytes);
+    conn.lossState.largestSent = conn.lossState.largestSent.value_or(0) + 1;
     inflightBytes += 1000;
     bbr.onPacketSent(packet);
   }
@@ -526,11 +528,16 @@ TEST_F(BbrTest, ExtendMinRttExpiration) {
   EXPECT_CALL(*rawBandwidthSampler, onAppLimited()).Times(1);
   bbr.setAppLimited();
 
-  auto packet = makeTestingWritePacket(conn.lossState.largestSent, 1000, 1000);
+  auto packet = makeTestingWritePacket(
+      conn.lossState.largestSent.value_or(0), 1000, 1000);
   bbr.onPacketSent(packet);
   EXPECT_CALL(*rawRttSampler, timestampMinRtt(_)).Times(1);
   bbr.onPacketAckOrLoss(
-      makeAck(conn.lossState.largestSent, 1000, Clock::now(), packet.time),
+      makeAck(
+          conn.lossState.largestSent.value_or(0),
+          1000,
+          Clock::now(),
+          packet.time),
       folly::none);
 }
 

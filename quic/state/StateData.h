@@ -447,9 +447,8 @@ struct LossState {
   // The time when last handshake packet was sent
   TimePoint lastHandshakePacketSentTime;
   // Latest packet number sent
-  // TODO: 0 is a legit PacketNum now, we need to make this optional:
   // TODO: this also needs to be 3 numbers now...
-  PacketNum largestSent{0};
+  folly::Optional<PacketNum> largestSent;
   // Reordering threshold used
   uint32_t reorderingThreshold{kReorderingThreshold};
   // Timer for time reordering detection or early retransmit alarm.

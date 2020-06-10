@@ -189,7 +189,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
 template <class LossVisitor>
 folly::Optional<CongestionController::LossEvent> detectLossPackets(
     QuicConnectionStateBase& conn,
-    PacketNum largestAcked,
+    folly::Optional<PacketNum> largestAcked,
     const LossVisitor& lossVisitor,
     TimePoint lossTime,
     PacketNumberSpace pnSpace) {
@@ -199,7 +199,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandingPackets.size()
-           << " largestAcked=" << largestAcked
+           << " largestAcked=" << largestAcked.value_or(0)
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
@@ -209,7 +209,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   while (iter != conn.outstandingPackets.end()) {
     auto& pkt = *iter;
     auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
-    if (currentPacketNum >= largestAcked) {
+    if (!largestAcked.has_value() || currentPacketNum >= *largestAcked) {
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
@@ -219,7 +219,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     bool lost = (lossTime - pkt.time) > delayUntilLost;
     lost = lost ||
-        (largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
+        (*largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
     if (!lost) {
       // We can exit early here because if packet N doesn't meet the
       // threshold, then packet N + 1 will not either.
@@ -306,13 +306,13 @@ void onHandshakeAlarm(
   QUIC_TRACE(
       handshake_alarm,
       conn,
-      conn.lossState.largestSent,
+      conn.lossState.largestSent.value_or(0),
       conn.lossState.handshakeAlarmCount,
       (uint64_t)conn.outstandingHandshakePacketsCount,
       (uint64_t)conn.outstandingPackets.size());
   if (conn.qLogger) {
     conn.qLogger->addLossAlarm(
-        conn.lossState.largestSent,
+        conn.lossState.largestSent.value_or(0),
         conn.lossState.handshakeAlarmCount,
         (uint64_t)conn.outstandingPackets.size(),
         kHandshakeAlarm);
@@ -416,7 +416,9 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     // doesn't ack anything that's in OP list?
     conn.lossState.ptoCount = 0;
     conn.lossState.handshakeAlarmCount = 0;
-    largestAcked = std::max(largestAcked, *ack.largestAckedPacket);
+    largestAcked = std::max<PacketNum>(
+        largestAcked.value_or(*ack.largestAckedPacket),
+        *ack.largestAckedPacket);
   }
   auto lossEvent = detectLossPackets(
       conn,

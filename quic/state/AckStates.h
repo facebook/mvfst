@@ -31,8 +31,7 @@ struct AckState {
   // The receive time of the largest ack packet
   folly::Optional<TimePoint> largestRecvdPacketTime;
   // Latest packet number acked by peer
-  // TODO: 0 is a legit PacketNum now, we need to make this optional:
-  PacketNum largestAckedByPeer{0};
+  folly::Optional<PacketNum> largestAckedByPeer;
   // Largest received packet numbers on the connection.
   folly::Optional<PacketNum> largestReceivedPacketNum;
   // Largest received packet number at the time we sent our last close message.

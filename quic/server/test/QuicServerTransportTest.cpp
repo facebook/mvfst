@@ -1720,7 +1720,8 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      server->getConn().ackStates.appDataAckState.largestAckedByPeer);
+      server->getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(
+          0));
   builder.encodePacketHeader();
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
@@ -1751,7 +1752,8 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   RegularQuicPacketBuilder builder(
       server->getConn().udpSendPacketLen,
       std::move(header),
-      server->getConn().ackStates.appDataAckState.largestAckedByPeer);
+      server->getConn().ackStates.appDataAckState.largestAckedByPeer.value_or(
+          0));
   builder.encodePacketHeader();
   StopSendingFrame stopSendingFrame(
       streamId, GenericApplicationErrorCode::UNKNOWN);
