@@ -658,8 +658,8 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   if (connIdParam->hostId != hostId_) {
-    VLOG(3) << "Dropping packet routed to wrong host, routingInfo="
-            << logRoutingInfo(routingData.destinationConnId);
+    VLOG_EVERY_N(2, 100) << "Dropping packet routed to wrong host, routingInfo="
+                         << logRoutingInfo(routingData.destinationConnId);
     QUIC_STATS(
         statsCallback_,
         onPacketDropped,
