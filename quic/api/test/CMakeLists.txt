@@ -76,3 +76,14 @@ quic_add_test(TARGET QuicBatchWriterTest
   mvfst_server
   mvfst_transport
 )
+
+quic_add_test(TARGET QuicStreamAsyncTransportTest
+  SOURCES
+  QuicStreamAsyncTransportTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_buf_accessor
+  mvfst_client
+  mvfst_server
+  mvfst_transport
+)

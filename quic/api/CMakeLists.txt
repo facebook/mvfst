@@ -8,6 +8,7 @@ add_library(
   IoBufQuicBatch.cpp
   QuicBatchWriter.cpp
   QuicPacketScheduler.cpp
+  QuicStreamAsyncTransport.cpp
   QuicTransportBase.cpp
   QuicTransportFunctions.cpp
 )
