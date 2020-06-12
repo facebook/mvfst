@@ -124,32 +124,10 @@ class ServerHandshakeTest : public Test {
     initialize();
     handshake->accept(params);
 
-    EXPECT_CALL(serverCallback, onCryptoEventAvailable())
-        .WillRepeatedly(Invoke([&]() {
+    ON_CALL(serverCallback, onCryptoEventAvailable())
+        .WillByDefault(Invoke([this]() {
           VLOG(1) << "onCryptoEventAvailable";
-          try {
-            setHandshakeState();
-            waitForData = false;
-            auto writableBytes = getHandshakeWriteBytes();
-            while (writableBytes && !writableBytes->empty() && !waitForData) {
-              VLOG(1) << "server->client bytes="
-                      << writableBytes->computeChainDataLength();
-              clientReadBuffer.append(std::move(writableBytes));
-              if (!clientReadBuffer.empty()) {
-                fizzClient->newTransportData();
-              }
-              if (!waitForData) {
-                writableBytes = getHandshakeWriteBytes();
-              }
-            }
-          } catch (const QuicTransportException& e) {
-            VLOG(1) << "server exception " << e.what();
-            ex = std::make_exception_ptr(e);
-          }
-          if (!inRoundScope_) {
-            VLOG(1) << "Posting handshake cv";
-            handshakeCv.post();
-          }
+          processCryptoEvents();
         }));
     auto cachedPsk = clientCtx->getPsk(hostname);
     fizzClient->connect(
@@ -158,6 +136,32 @@ class ServerHandshakeTest : public Test {
         hostname,
         cachedPsk,
         std::make_shared<FizzClientExtensions>(clientExtensions));
+  }
+
+  void processCryptoEvents() {
+    try {
+      setHandshakeState();
+      waitForData = false;
+      auto writableBytes = getHandshakeWriteBytes();
+      while (writableBytes && !writableBytes->empty() && !waitForData) {
+        VLOG(1) << "server->client bytes="
+                << writableBytes->computeChainDataLength();
+        clientReadBuffer.append(std::move(writableBytes));
+        if (!clientReadBuffer.empty()) {
+          fizzClient->newTransportData();
+        }
+        if (!waitForData) {
+          writableBytes = getHandshakeWriteBytes();
+        }
+      }
+    } catch (const QuicTransportException& e) {
+      VLOG(1) << "server exception " << e.what();
+      ex = std::make_exception_ptr(e);
+    }
+    if (!inRoundScope_ && !handshakeCv.ready()) {
+      VLOG(1) << "Posting handshake cv";
+      handshakeCv.post();
+    }
   }
 
   void clientServerRound() {
@@ -174,7 +178,7 @@ class ServerHandshakeTest : public Test {
           handshake->doHandshake(std::move(content.data), encryptionLevel);
         }
       }
-      setHandshakeState();
+      processCryptoEvents();
     } catch (const QuicTransportException&) {
       ex = std::current_exception();
     }
@@ -500,6 +504,7 @@ TEST_F(ServerHandshakeWriteNSTTest, TestWriteNST) {
         return std::make_pair(folly::IOBuf::copyBuffer("appToken"), 100s);
       }));
   handshake->writeNewSessionTicket(appToken);
+  processCryptoEvents();
   evb.loop();
   EXPECT_TRUE(cache_->getPsk(kTestHostname.str()));
 }
