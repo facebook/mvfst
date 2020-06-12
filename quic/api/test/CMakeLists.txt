@@ -85,5 +85,6 @@ quic_add_test(TARGET QuicStreamAsyncTransportTest
   mvfst_buf_accessor
   mvfst_client
   mvfst_server
+  mvfst_test_utils
   mvfst_transport
 )
