@@ -323,12 +323,14 @@ TEST(BufWriterTest, BasicWrite) {
   EXPECT_EQ(64, reader.template readBE<uint64_t>());
 }
 
+#ifdef DEBUG
 TEST(BufWriterTest, WriteLimit) {
   auto testBuffer = folly::IOBuf::create(100);
   BufWriter writer(*testBuffer, 0);
   uint8_t eight = 8;
   EXPECT_DEATH(writer.writeBE(eight), "");
 }
+#endif
 
 TEST(BufWriterTest, Push) {
   auto testBuffer = folly::IOBuf::create(100);
