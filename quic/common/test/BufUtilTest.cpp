@@ -323,12 +323,19 @@ TEST(BufWriterTest, BasicWrite) {
   EXPECT_EQ(64, reader.template readBE<uint64_t>());
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 TEST(BufWriterTest, WriteLimit) {
   auto testBuffer = folly::IOBuf::create(100);
   BufWriter writer(*testBuffer, 0);
   uint8_t eight = 8;
   EXPECT_DEATH(writer.writeBE(eight), "");
+}
+
+TEST(BufWriterTest, PushLimit) {
+  auto testBuffer = folly::IOBuf::create(100);
+  BufWriter writer(*testBuffer, 100);
+  auto biggerBuffer = folly::IOBuf::create(200);
+  EXPECT_DEATH(writer.push(biggerBuffer->data(), 200), "");
 }
 #endif
 
@@ -342,13 +349,6 @@ TEST(BufWriterTest, Push) {
   EXPECT_EQ(
       "All you're gonna see it someday",
       reader.readFixedString(inputBuffer->computeChainDataLength()));
-}
-
-TEST(BufWriterTest, PushLimit) {
-  auto testBuffer = folly::IOBuf::create(100);
-  BufWriter writer(*testBuffer, 100);
-  auto biggerBuffer = folly::IOBuf::create(200);
-  EXPECT_DEATH(writer.push(biggerBuffer->data(), 200), "");
 }
 
 TEST(BufWriterTest, InsertSingle) {
