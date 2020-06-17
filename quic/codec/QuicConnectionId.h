@@ -57,6 +57,11 @@ struct ConnectionId {
    */
   static ConnectionId createWithoutChecks(const std::vector<uint8_t>& connidIn);
 
+  /**
+   * Create a random ConnectionId with the given length.
+   */
+  static ConnectionId createRandom(size_t len);
+
  private:
   ConnectionId() = default;
 

@@ -7,8 +7,10 @@
  */
 
 #include <quic/codec/QuicConnectionId.h>
-#include <glog/logging.h>
 #include <quic/QuicConstants.h>
+
+#include <folly/Random.h>
+#include <glog/logging.h>
 
 namespace quic {
 
@@ -65,6 +67,16 @@ ConnectionId ConnectionId::createWithoutChecks(
   if (connid.connidLen != 0) {
     memcpy(connid.connid.data(), connidIn.data(), connid.connidLen);
   }
+  return connid;
+}
+
+ConnectionId ConnectionId::createRandom(size_t len) {
+  ConnectionId connid;
+  if (len > kMaxConnectionIdSize) {
+    throw std::runtime_error("ConnectionId invalid size");
+  }
+  connid.connidLen = len;
+  folly::Random::secureRandom(connid.connid.data(), connid.connidLen);
   return connid;
 }
 

@@ -38,34 +38,21 @@ QuicClientTransport::QuicClientTransport(
     : QuicTransportBase(evb, std::move(socket)),
       happyEyeballsConnAttemptDelayTimeout_(this) {
   DCHECK(handshakeFactory);
-  // TODO(T53612743) Only enforce that the initial destination connection id
-  // is at least kMinInitialDestinationConnIdLength.
-  // All subsequent destination connection ids should be in between
-  // [kMinSelfConnectionIdSize, kMaxConnectionIdSize]
-  DCHECK(
-      connectionIdSize == 0 ||
-      (connectionIdSize >= kMinInitialDestinationConnIdLength &&
-       connectionIdSize <= kMaxConnectionIdSize));
   auto tempConn =
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
   conn_.reset(tempConn.release());
-  std::vector<uint8_t> connIdData(
-      std::max(kMinInitialDestinationConnIdLength, connectionIdSize));
-  folly::Random::secureRandom(connIdData.data(), connIdData.size());
 
-  auto connId = ConnectionId(
-      connectionIdSize == 0 ? std::vector<uint8_t>(0) : connIdData);
-  conn_->clientConnectionId = connId;
-  conn_->selfConnectionIds.emplace_back(
-      std::move(connId), kInitialSequenceNumber);
-
-  // Change destination connection to not be same as src connid to suss
-  // out bugs.
-  connIdData[0] ^= 0x1;
-  clientConn_->initialDestinationConnectionId = ConnectionId(connIdData);
+  auto srcConnId = connectionIdSize > 0
+      ? ConnectionId::createRandom(connectionIdSize)
+      : ConnectionId(std::vector<uint8_t>());
+  conn_->clientConnectionId = srcConnId;
   conn_->readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Client);
-  conn_->readCodec->setClientConnectionId(*conn_->clientConnectionId);
+  conn_->readCodec->setClientConnectionId(srcConnId);
+  conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
+  clientConn_->initialDestinationConnectionId =
+      ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
+
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent, conn_->originalVersion.value()));
   // TODO: generate this once we can generate the packet sequence number

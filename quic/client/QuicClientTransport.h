@@ -31,7 +31,7 @@ class QuicClientTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-      size_t connectionIdSize = kDefaultConnectionIdSize);
+      size_t connectionIdSize = 0);
 
   ~QuicClientTransport() override;
 
