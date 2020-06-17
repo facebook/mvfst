@@ -9,6 +9,7 @@
 #pragma once
 
 #include <glog/logging.h>
+#include <quic/codec/Types.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
@@ -59,8 +60,9 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onForwardedPacketProcessed";
   }
 
-  void onClientInitialReceived() override {
-    VLOG(2) << prefix_ << "onClientInitialReceived";
+  void onClientInitialReceived(QuicVersion version) override {
+    VLOG(2) << prefix_
+            << "onClientInitialReceived, version: " << quic::toString(version);
   }
 
   void onConnectionRateLimited() override {

@@ -13,6 +13,8 @@
 #include <folly/io/async/EventBase.h>
 #include <string>
 
+#include <quic/QuicConstants.h>
+
 namespace quic {
 
 /* Interface for Transport level stats per VIP (server)
@@ -85,7 +87,7 @@ class QuicTransportStatsCallback {
 
   virtual void onForwardedPacketProcessed() = 0;
 
-  virtual void onClientInitialReceived() = 0;
+  virtual void onClientInitialReceived(QuicVersion version) = 0;
 
   virtual void onConnectionRateLimited() = 0;
 

@@ -342,7 +342,10 @@ void QuicServerWorker::handleNetworkData(
 
     if (isInitial) {
       // This stats gets updated even if the client initial will be dropped.
-      QUIC_STATS(statsCallback_, onClientInitialReceived);
+      QUIC_STATS(
+          statsCallback_,
+          onClientInitialReceived,
+          parsedLongHeader->invariant.version);
     }
 
     if (maybeSendVersionNegotiationPacketOrDrop(

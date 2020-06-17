@@ -741,7 +741,8 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
   initialBuilder.encodePacketHeader();
   auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(QuicVersion::MVFST))
+      .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacket), Clock::now());
   eventbase_.loop();
@@ -755,7 +756,8 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   initialBuilderBigNum.encodePacketHeader();
   auto initialPacketBigNum =
       packetToBuf(std::move(initialBuilderBigNum).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(1);
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(QuicVersion::MVFST))
+      .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacketBigNum), Clock::now());
   eventbase_.loop();
@@ -766,7 +768,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
   handshakeBuilder.encodePacketHeader();
   auto handshakePacket = packetToBuf(std::move(handshakeBuilder).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived()).Times(0);
+  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(_)).Times(0);
   worker_->handleNetworkData(
       kClientAddr, std::move(handshakePacket), Clock::now());
   eventbase_.loop();
