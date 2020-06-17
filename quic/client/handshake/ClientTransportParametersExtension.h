@@ -25,6 +25,7 @@ struct ClientTransportParametersExtension {
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
       uint64_t activeConnectionIdLimit,
+      ConnectionId initialSourceCid,
       std::vector<TransportParameter> customTransportParameters =
           std::vector<TransportParameter>())
       : encodingVersion_(encodingVersion),
@@ -38,6 +39,7 @@ struct ClientTransportParametersExtension {
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
         activeConnectionLimit_(activeConnectionIdLimit),
+        initialSourceCid_(initialSourceCid),
         customTransportParameters_(customTransportParameters) {}
 
   folly::Optional<ServerTransportParameters> getServerTransportParams() {
@@ -55,6 +57,7 @@ struct ClientTransportParametersExtension {
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
   uint64_t activeConnectionLimit_;
+  ConnectionId initialSourceCid_;
   folly::Optional<ServerTransportParameters> serverTransportParameters_;
   std::vector<TransportParameter> customTransportParameters_;
 };

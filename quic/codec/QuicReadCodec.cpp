@@ -443,6 +443,14 @@ void QuicReadCodec::setStatelessResetToken(
   statelessResetToken_ = std::move(statelessResetToken);
 }
 
+const ConnectionId& QuicReadCodec::getClientConnectionId() const {
+  return clientConnectionId_.value();
+}
+
+const ConnectionId& QuicReadCodec::getServerConnectionId() const {
+  return serverConnectionId_.value();
+}
+
 const Aead* QuicReadCodec::getInitialCipher() const {
   return initialReadCipher_.get();
 }

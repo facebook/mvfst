@@ -104,14 +104,18 @@ TEST_F(QuicExtensionsTest, TestServerParamsD27) {
       ext->parameters[0].parameter, TransportParameterId::initial_max_data);
   EXPECT_EQ(
       ext->parameters[1].parameter,
-      TransportParameterId::original_connection_id);
+      TransportParameterId::original_destination_connection_id);
   EXPECT_EQ(
       *getIntegerParameter(
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
   ConnectionId connId(
       {'\x12', '\x12', '\x54', '\x76', '\x12', '\x56', '\x14', '\x69'});
-  EXPECT_EQ(*getOriginalConnIdParameter(ext->parameters), connId);
+  EXPECT_EQ(
+      *getConnIdParameter(
+          TransportParameterId::original_destination_connection_id,
+          ext->parameters),
+      connId);
   checkEncode(std::move(*ext), serverParamsD27, QuicVersion::QUIC_DRAFT);
 }
 

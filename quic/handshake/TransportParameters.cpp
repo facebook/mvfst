@@ -29,10 +29,10 @@ folly::Optional<uint64_t> getIntegerParameter(
   return parameter->first;
 }
 
-folly::Optional<ConnectionId> getOriginalConnIdParameter(
+folly::Optional<ConnectionId> getConnIdParameter(
+    TransportParameterId id,
     const std::vector<TransportParameter>& parameters) {
-  auto it =
-      findParameter(parameters, TransportParameterId::original_connection_id);
+  auto it = findParameter(parameters, id);
   if (it == parameters.end()) {
     return folly::none;
   }

@@ -135,8 +135,11 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
-    supportedVersions = std::vector<QuicVersion>{
-        {QuicVersion::MVFST, QuicVersion::MVFST_D24, QuicVersion::QUIC_DRAFT}};
+    supportedVersions =
+        std::vector<QuicVersion>{{QuicVersion::MVFST,
+                                  QuicVersion::MVFST_D24,
+                                  QuicVersion::QUIC_DRAFT,
+                                  QuicVersion::QUIC_DRAFT_LEGACY}};
     originalVersion = QuicVersion::MVFST;
     serverHandshakeLayer = new ServerHandshake(this);
     handshakeLayer.reset(serverHandshakeLayer);

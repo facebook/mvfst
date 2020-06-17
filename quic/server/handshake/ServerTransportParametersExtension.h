@@ -28,7 +28,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
       TransportPartialReliabilitySetting partialReliability,
-      const StatelessResetToken& token)
+      const StatelessResetToken& token,
+      ConnectionId initialSourceCid,
+      ConnectionId originalDestinationCid)
       : encodingVersion_(encodingVersion),
         initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
@@ -40,7 +42,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
         partialReliability_(partialReliability),
-        token_(token) {}
+        token_(token),
+        initialSourceCid_(initialSourceCid),
+        originalDestinationCid_(originalDestinationCid) {}
 
   ~ServerTransportParametersExtension() override = default;
 
@@ -59,6 +63,11 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     std::vector<fizz::Extension> exts;
 
     ServerTransportParameters params;
+    if (encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+      params.parameters.push_back(encodeConnIdParameter(
+          TransportParameterId::original_destination_connection_id,
+          originalDestinationCid_));
+    }
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::initial_max_stream_data_bidi_local,
         initialMaxStreamDataBidiLocal_));
@@ -94,6 +103,12 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         static_cast<TransportParameterId>(kPartialReliabilityParameterId),
         partialReliabilitySetting));
 
+    if (encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+      params.parameters.push_back(encodeConnIdParameter(
+          TransportParameterId::initial_source_connection_id,
+          initialSourceCid_));
+    }
+
     exts.push_back(encodeExtension(params, encodingVersion_));
     return exts;
   }
@@ -116,5 +131,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   TransportPartialReliabilitySetting partialReliability_;
   folly::Optional<ClientTransportParameters> clientTransportParameters_;
   StatelessResetToken token_;
+  ConnectionId initialSourceCid_;
+  ConnectionId originalDestinationCid_;
 };
 } // namespace quic

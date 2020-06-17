@@ -1147,6 +1147,10 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     params_ = std::move(params);
   }
 
+  void setServerTransportParams(ServerTransportParameters params) {
+    params_ = std::move(params);
+  }
+
   void setOneRttWriteCipher(std::unique_ptr<Aead> oneRttWriteCipher) {
     oneRttWriteCipher_ = std::move(oneRttWriteCipher);
   }
@@ -1229,7 +1233,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   folly::Optional<ServerTransportParameters> getServerTransportParams()
       override {
-    return std::move(params_);
+    return params_;
   }
 
   void triggerOnNewCachedPsk() {
@@ -5757,6 +5761,13 @@ INSTANTIATE_TEST_CASE_P(
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
+  auto params = mockClientHandshake->getServerTransportParams();
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::initial_source_connection_id, *serverChosenConnId));
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::original_destination_connection_id,
+      *client->getConn().initialDestinationConnectionId));
+  mockClientHandshake->setServerTransportParams(std::move(*params));
   auto serverHello = IOBuf::copyBuffer("Fake SHLO");
   PacketNum nextPacketNum = initialPacketNum++;
   auto& aead = getInitialCipher();

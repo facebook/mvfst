@@ -151,6 +151,8 @@ class QuicReadCodec {
   void setClientConnectionId(ConnectionId connId);
   void setServerConnectionId(ConnectionId connId);
   void setStatelessResetToken(StatelessResetToken statelessResetToken);
+  const ConnectionId& getClientConnectionId() const;
+  const ConnectionId& getServerConnectionId() const;
 
   /**
    * Should be invoked when the state machine believes that the handshake is

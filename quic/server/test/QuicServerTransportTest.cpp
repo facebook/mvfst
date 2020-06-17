@@ -137,6 +137,9 @@ class FakeServerHandshake : public ServerHandshake {
           TransportParameterId::active_connection_id_limit,
           *clientActiveConnectionIdLimit_));
     }
+    transportParams.push_back(encodeConnIdParameter(
+        TransportParameterId::initial_source_connection_id,
+        getTestConnectionId()));
 
     return ClientTransportParameters{std::move(transportParams)};
   }

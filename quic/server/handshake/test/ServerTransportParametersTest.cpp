@@ -46,7 +46,9 @@ TEST(ServerTransportParametersTest, TestGetExtensions) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       kDefaultPartialReliability,
-      generateStatelessResetToken());
+      generateStatelessResetToken(),
+      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId(std::vector<uint8_t>()));
   auto extensions = ext.getExtensions(getClientHello());
 
   EXPECT_EQ(extensions.size(), 1);
@@ -67,7 +69,9 @@ TEST(ServerTransportParametersTest, TestGetExtensionsMissingClientParams) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       kDefaultPartialReliability,
-      generateStatelessResetToken());
+      generateStatelessResetToken(),
+      ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+      ConnectionId(std::vector<uint8_t>()));
   EXPECT_THROW(ext.getExtensions(TestMessages::clientHello()), FizzException);
 }
 } // namespace test

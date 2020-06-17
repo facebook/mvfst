@@ -38,13 +38,14 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensions) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit));
+      kDefaultActiveConnectionIdLimit,
+      ConnectionId(std::vector<uint8_t>())));
   auto extensions = ext.getClientHelloExtensions();
 
   EXPECT_EQ(extensions.size(), 1);
-  auto serverParams = getClientExtension(extensions, QuicVersion::QUIC_DRAFT);
-  ASSERT_TRUE(serverParams.has_value());
-  EXPECT_EQ(serverParams->parameters.size(), 10);
+  auto clientParams = getClientExtension(extensions, QuicVersion::QUIC_DRAFT);
+  ASSERT_TRUE(clientParams.has_value());
+  EXPECT_EQ(clientParams->parameters.size(), 11);
 }
 
 TEST(FizzClientHandshakeTest, TestOnEE) {
@@ -59,7 +60,8 @@ TEST(FizzClientHandshakeTest, TestOnEE) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit));
+      kDefaultActiveConnectionIdLimit,
+      ConnectionId(std::vector<uint8_t>())));
   ext.getClientHelloExtensions();
   ext.onEncryptedExtensions(getEncryptedExtensions().extensions);
 }
@@ -76,7 +78,8 @@ TEST(FizzClientHandshakeTest, TestOnEEMissingServerParams) {
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
-      kDefaultActiveConnectionIdLimit));
+      kDefaultActiveConnectionIdLimit,
+      ConnectionId(std::vector<uint8_t>())));
   ext.getClientHelloExtensions();
   EXPECT_THROW(
       ext.onEncryptedExtensions(TestMessages::encryptedExt().extensions),
@@ -114,6 +117,7 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsCustomParams) {
       kDefaultAckDelayExponent,
       kDefaultUDPSendPacketLen,
       kDefaultActiveConnectionIdLimit,
+      ConnectionId(std::vector<uint8_t>()),
       customTransportParameters));
   auto extensions = ext.getClientHelloExtensions();
 

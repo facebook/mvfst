@@ -52,6 +52,8 @@ QuicClientTransport::QuicClientTransport(
   conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
   clientConn_->initialDestinationConnectionId =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
+  VLOG(4) << "initial dcid: "
+          << clientConn_->initialDestinationConnectionId->hex();
 
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent, conn_->originalVersion.value()));
@@ -840,6 +842,7 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->transportSettings.ackDelayExponent,
       conn_->transportSettings.maxRecvPacketSize,
       conn_->transportSettings.selfActiveConnectionIdLimit,
+      conn_->clientConnectionId.value(),
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
   handshakeLayer->connect(hostname_, std::move(paramsExtension));

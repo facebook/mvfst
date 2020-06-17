@@ -15,7 +15,7 @@
 namespace quic {
 
 enum class TransportParameterId : uint64_t {
-  original_connection_id = 0x0000,
+  original_destination_connection_id = 0x0000,
   idle_timeout = 0x0001,
   stateless_reset_token = 0x0002,
   max_packet_size = 0x0003,
@@ -29,7 +29,9 @@ enum class TransportParameterId : uint64_t {
   max_ack_delay = 0x000b,
   disable_migration = 0x000c,
   preferred_address = 0x000d,
-  active_connection_id_limit = 0x000e
+  active_connection_id_limit = 0x000e,
+  initial_source_connection_id = 0x000f,
+  retry_source_connection_id = 0x0010,
 };
 
 struct TransportParameter {
@@ -116,7 +118,8 @@ folly::Optional<uint64_t> getIntegerParameter(
     TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
-folly::Optional<ConnectionId> getOriginalConnIdParameter(
+folly::Optional<ConnectionId> getConnIdParameter(
+    TransportParameterId id,
     const std::vector<TransportParameter>& parameters);
 
 folly::Optional<StatelessResetToken> getStatelessResetTokenParameter(
@@ -133,13 +136,10 @@ inline TransportParameter encodeEmptyParameter(TransportParameterId id) {
   return param;
 }
 
-inline TransportParameter encodeOriginalConnIdParameter(
-    const ConnectionId& originalConnId) {
-  TransportParameter param;
-  param.parameter = TransportParameterId::original_connection_id;
-  param.value =
-      folly::IOBuf::copyBuffer(originalConnId.data(), originalConnId.size());
-  return param;
+inline TransportParameter encodeConnIdParameter(
+    TransportParameterId id,
+    const ConnectionId& connId) {
+  return {id, folly::IOBuf::copyBuffer(connId.data(), connId.size())};
 }
 
 inline TransportParameter encodeStatelessResetToken(

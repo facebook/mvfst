@@ -89,6 +89,23 @@ void processServerInitialParams(
   auto activeConnectionIdLimit = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       serverParams.parameters);
+  if (conn.version == QuicVersion::QUIC_DRAFT) {
+    auto initialSourceConnId = getConnIdParameter(
+        TransportParameterId::initial_source_connection_id,
+        serverParams.parameters);
+    auto originalDestinationConnId = getConnIdParameter(
+        TransportParameterId::original_destination_connection_id,
+        serverParams.parameters);
+    if (!initialSourceConnId || !originalDestinationConnId ||
+        initialSourceConnId.value() !=
+            conn.readCodec->getServerConnectionId() ||
+        originalDestinationConnId.value() !=
+            conn.initialDestinationConnectionId) {
+      throw QuicTransportException(
+          "Initial CID does not match.",
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
+  }
 
   // TODO Validate active_connection_id_limit
 

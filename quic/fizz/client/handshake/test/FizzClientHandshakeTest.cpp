@@ -70,7 +70,8 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit));
+            kDefaultActiveConnectionIdLimit,
+            ConnectionId(std::vector<uint8_t>())));
   }
 
   void SetUp() override {
@@ -109,7 +110,9 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
             kDefaultPartialReliability,
-            generateStatelessResetToken());
+            generateStatelessResetToken(),
+            ConnectionId(std::vector<uint8_t>{0xff, 0xfe, 0xfd, 0xfc}),
+            ConnectionId(std::vector<uint8_t>()));
     fizzServer.reset(
         new fizz::server::
             FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(
@@ -399,7 +402,8 @@ class ClientHandshakeCallbackTest : public ClientHandshakeTest {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit));
+            kDefaultActiveConnectionIdLimit,
+            ConnectionId(std::vector<uint8_t>())));
   }
 
  protected:
@@ -510,7 +514,8 @@ class ClientHandshakeZeroRttTest : public ClientHandshakeTest {
             kDefaultIdleTimeout,
             kDefaultAckDelayExponent,
             kDefaultUDPSendPacketLen,
-            kDefaultActiveConnectionIdLimit));
+            kDefaultActiveConnectionIdLimit,
+            ConnectionId(std::vector<uint8_t>())));
   }
 
   virtual void setupZeroRttServer() {

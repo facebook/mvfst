@@ -56,6 +56,11 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::active_connection_id_limit,
         clientParameters_->activeConnectionLimit_));
+    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+      params.parameters.push_back(encodeConnIdParameter(
+          TransportParameterId::initial_source_connection_id,
+          clientParameters_->initialSourceCid_));
+    }
 
     for (const auto& customParameter :
          clientParameters_->customTransportParameters_) {

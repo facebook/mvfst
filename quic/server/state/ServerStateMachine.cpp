@@ -122,6 +122,18 @@ void processClientInitialParams(
   auto activeConnectionIdLimit = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       clientParams.parameters);
+  if (conn.version == QuicVersion::QUIC_DRAFT) {
+    auto initialSourceConnId = getConnIdParameter(
+        TransportParameterId::initial_source_connection_id,
+        clientParams.parameters);
+    if (!initialSourceConnId ||
+        initialSourceConnId.value() !=
+            conn.readCodec->getClientConnectionId()) {
+      throw QuicTransportException(
+          "Initial CID does not match.",
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
+  }
 
   // TODO Validate active_connection_id_limit
 
@@ -590,7 +602,9 @@ void onServerReadDataFromOpen(
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,
             conn.transportSettings.partialReliabilityEnabled,
-            *newServerConnIdData->token));
+            *newServerConnIdData->token,
+            conn.serverConnectionId.value(),
+            initialDestinationConnectionId));
     conn.transportParametersEncoded = true;
     CryptoFactory& cryptoFactory = *conn.serverHandshakeLayer->cryptoFactory_;
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);

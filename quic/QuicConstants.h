@@ -195,7 +195,8 @@ enum class QuicVersion : uint32_t {
   VERSION_NEGOTIATION = 0x00000000,
   MVFST_D24 = 0xfaceb001,
   MVFST = 0xfaceb002,
-  QUIC_DRAFT = 0xFF00001b, // Draft-27
+  QUIC_DRAFT_LEGACY = 0xff00001b, // Draft-27
+  QUIC_DRAFT = 0xff00001d, // Draft-29
   MVFST_INVALID = 0xfaceb00f,
 };
 
