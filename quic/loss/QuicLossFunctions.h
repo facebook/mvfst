@@ -46,9 +46,6 @@ inline std::ostream& operator<<(
     std::ostream& os,
     const LossState::AlarmMethod& alarmMethod) {
   switch (alarmMethod) {
-    case LossState::AlarmMethod::Handshake:
-      os << "Handshake";
-      break;
     case LossState::AlarmMethod::EarlyRetransmitOrReordering:
       os << "EarlyRetransmitOrReordering";
       break;
@@ -77,19 +74,6 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
       alarmDuration = 0us;
     }
     alarmMethod = LossState::AlarmMethod::EarlyRetransmitOrReordering;
-  } else if (conn.outstandings.handshakePacketsCount > 0) {
-    if (conn.lossState.srtt == 0us) {
-      alarmDuration = conn.transportSettings.initialRtt * 2;
-    } else {
-      alarmDuration = conn.lossState.srtt * 2;
-    }
-    alarmDuration += conn.lossState.maxAckDelay;
-    alarmDuration *=
-        1ULL << std::min(conn.lossState.handshakeAlarmCount, (uint16_t)15);
-    alarmMethod = LossState::AlarmMethod::Handshake;
-    // Handshake packet loss timer shouldn't be affected by other packets.
-    lastSentPacketTime = conn.lossState.lastHandshakePacketSentTime;
-    DCHECK_NE(lastSentPacketTime.time_since_epoch().count(), 0);
   } else {
     auto ptoTimeout = calculatePTO(conn);
     ptoTimeout *= 1ULL << std::min(conn.lossState.ptoCount, (uint32_t)31);
@@ -165,6 +149,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     VLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"
         << " outstanding=" << totalPacketsOutstanding
+        << " initialPackets=" << conn.outstandings.initialPacketsCount
         << " handshakePackets=" << conn.outstandings.handshakePacketsCount
         << " " << nodeToString(conn.nodeType) << " " << conn;
     return;
@@ -175,7 +160,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   VLOG(10) << __func__ << " setting transmission"
            << " alarm=" << alarmDuration.first.count() << "ms"
            << " method=" << conn.lossState.currentAlarmMethod
+           << " haDataToWrite=" << hasDataToWrite
            << " outstanding=" << totalPacketsOutstanding
+           << " outstanding clone=" << conn.outstandings.clonedPacketsCount
+           << " packetEvents=" << conn.outstandings.packetEvents.size()
+           << " initialPackets=" << conn.outstandings.initialPacketsCount
            << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << nodeToString(conn.nodeType) << " " << conn;
   timeout.scheduleLossTimeout(alarmDuration.first);
@@ -240,9 +229,15 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     if (pkt.associatedEvent) {
       conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
     }
-    if (pkt.isHandshake) {
-      DCHECK(conn.outstandings.handshakePacketsCount);
-      --conn.outstandings.handshakePacketsCount;
+    if (pkt.isHandshake && !processed) {
+      if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
+        CHECK(conn.outstandings.initialPacketsCount);
+        --conn.outstandings.initialPacketsCount;
+      } else {
+        CHECK_EQ(PacketNumberSpace::Handshake, currentPacketNumberSpace);
+        CHECK(conn.outstandings.handshakePacketsCount);
+        --conn.outstandings.handshakePacketsCount;
+      }
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
              << " handshake=" << pkt.isHandshake << " " << conn;
@@ -291,63 +286,6 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
 
 void onPTOAlarm(QuicConnectionStateBase& conn);
 
-template <class LossVisitor, class ClockType = Clock>
-void onHandshakeAlarm(
-    QuicConnectionStateBase& conn,
-    const LossVisitor& lossVisitor) {
-  // TODO: This code marks all outstanding handshake packets as loss.
-  // Alternatively we can experiment with only retransmit them without marking
-  // loss
-  VLOG(10) << __func__ << " " << conn;
-  ++conn.lossState.ptoCount;
-  ++conn.lossState.totalPTOCount;
-  ++conn.lossState.handshakeAlarmCount;
-  QUIC_STATS(conn.statsCallback, onPTO);
-  QUIC_TRACE(
-      handshake_alarm,
-      conn,
-      conn.lossState.largestSent.value_or(0),
-      conn.lossState.handshakeAlarmCount,
-      (uint64_t)conn.outstandings.handshakePacketsCount,
-      (uint64_t)conn.outstandings.packets.size());
-  if (conn.qLogger) {
-    conn.qLogger->addLossAlarm(
-        conn.lossState.largestSent.value_or(0),
-        conn.lossState.handshakeAlarmCount,
-        (uint64_t)conn.outstandings.packets.size(),
-        kHandshakeAlarm);
-  }
-  CongestionController::LossEvent lossEvent(ClockType::now());
-  auto iter = conn.outstandings.packets.begin();
-  while (iter != conn.outstandings.packets.end()) {
-    // the word "handshake" in our code base is unfortunately overloaded.
-    if (iter->isHandshake) {
-      auto& packet = *iter;
-      auto currentPacketNum = packet.packet.header.getPacketSequenceNum();
-      auto currentPacketNumSpace = packet.packet.header.getPacketNumberSpace();
-      VLOG(10) << "HandshakeAlarm, removing packetNum=" << currentPacketNum
-               << " packetNumSpace=" << currentPacketNumSpace << " " << conn;
-      lossEvent.addLostPacket(std::move(packet));
-      lossVisitor(conn, packet.packet, false, currentPacketNum);
-      DCHECK(conn.outstandings.handshakePacketsCount);
-      --conn.outstandings.handshakePacketsCount;
-      ++conn.lossState.timeoutBasedRtxCount;
-      ++conn.lossState.rtxCount;
-      iter = conn.outstandings.packets.erase(iter);
-    } else {
-      iter++;
-    }
-  }
-  if (conn.congestionController && lossEvent.largestLostPacketNum.hasValue()) {
-    conn.congestionController->onRemoveBytesFromInflight(lossEvent.lostBytes);
-  }
-  if (conn.nodeType == QuicNodeType::Client && conn.oneRttWriteCipher) {
-    // When sending client finished, we should also send a 1-rtt probe packet to
-    // elicit an ack.
-    conn.pendingEvents.numProbePackets = kPacketToSendForPTO;
-  }
-}
-
 /*
  * Function invoked when loss detection timer fires
  */
@@ -379,9 +317,6 @@ void onLossDetectionAlarm(
       conn.congestionController->onPacketAckOrLoss(
           folly::none, std::move(lossEvent));
     }
-  } else if (
-      conn.lossState.currentAlarmMethod == LossState::AlarmMethod::Handshake) {
-    onHandshakeAlarm<LossVisitor, ClockType>(conn, lossVisitor);
   } else {
     onPTOAlarm(conn);
   }
@@ -389,6 +324,7 @@ void onLossDetectionAlarm(
   VLOG(10) << __func__ << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.packets.size()
+           << " initialPackets=" << conn.outstandings.initialPacketsCount
            << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
 }
@@ -415,7 +351,6 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     // TODO: Should we NOT reset these counters if the received Ack frame
     // doesn't ack anything that's in OP list?
     conn.lossState.ptoCount = 0;
-    conn.lossState.handshakeAlarmCount = 0;
     largestAcked = std::max<PacketNum>(
         largestAcked.value_or(*ack.largestAckedPacket),
         *ack.largestAckedPacket);
@@ -432,6 +367,7 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.packets.size()
+           << " initialPackets=" << conn.outstandings.initialPacketsCount
            << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
   return lossEvent;

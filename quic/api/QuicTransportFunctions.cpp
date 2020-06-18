@@ -140,7 +140,8 @@ uint64_t writeQuicDataToSocketImpl(
         aead,
         headerCipher,
         version);
-    connection.pendingEvents.numProbePackets = 0;
+    CHECK_GE(connection.pendingEvents.numProbePackets, written);
+    connection.pendingEvents.numProbePackets -= written;
   }
   auto schedulerBuilder =
       FrameScheduler::Builder(
@@ -648,7 +649,6 @@ void updateConnection(
   }
   if (packetEvent) {
     DCHECK(conn.outstandings.packetEvents.count(*packetEvent));
-    DCHECK(!isHandshake);
     pkt.associatedEvent = std::move(packetEvent);
     conn.lossState.totalBytesCloned += encodedSize;
   }
@@ -675,17 +675,24 @@ void updateConnection(
     conn.pathValidationLimiter->onPacketSent(pkt.encodedSize);
   }
   if (pkt.isHandshake) {
-    ++conn.outstandings.handshakePacketsCount;
+    if (!pkt.associatedEvent) {
+      if (packetNumberSpace == PacketNumberSpace::Initial) {
+        ++conn.outstandings.initialPacketsCount;
+      } else {
+        CHECK_EQ(packetNumberSpace, PacketNumberSpace::Handshake);
+        ++conn.outstandings.handshakePacketsCount;
+      }
+    }
     conn.lossState.lastHandshakePacketSentTime = pkt.time;
   }
   conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
   if (pkt.associatedEvent) {
-    CHECK_EQ(packetNumberSpace, PacketNumberSpace::AppData);
     ++conn.outstandings.clonedPacketsCount;
     ++conn.lossState.timeoutBasedRtxCount;
   }
 
   auto opCount = conn.outstandings.packets.size();
+  DCHECK_GE(opCount, conn.outstandings.initialPacketsCount);
   DCHECK_GE(opCount, conn.outstandings.handshakePacketsCount);
   DCHECK_GE(opCount, conn.outstandings.clonedPacketsCount);
 }
@@ -775,8 +782,31 @@ uint64_t writeCryptoAndAckDataToSocket(
                     .cryptoFrames())
           .build();
   auto builder = LongHeaderBuilder(packetType);
+  uint64_t written = 0;
+  auto& cryptoStream =
+      *getCryptoStream(*connection.cryptoState, encryptionLevel);
+  if ((connection.pendingEvents.numProbePackets &&
+       cryptoStream.retransmissionBuffer.size()) ||
+      scheduler.hasData()) {
+    written = writeProbingDataToSocket(
+        sock,
+        connection,
+        srcConnId,
+        dstConnId,
+        builder,
+        LongHeader::typeToPacketNumberSpace(packetType),
+        scheduler,
+        std::min<uint64_t>(
+            packetLimit, connection.pendingEvents.numProbePackets),
+        cleartextCipher,
+        headerCipher,
+        version,
+        token);
+    CHECK_GE(connection.pendingEvents.numProbePackets, written);
+    connection.pendingEvents.numProbePackets -= written;
+  }
   // Crypto data is written without aead protection.
-  auto written = writeConnectionDataToSocket(
+  written += writeConnectionDataToSocket(
       sock,
       connection,
       srcConnId,
@@ -785,7 +815,7 @@ uint64_t writeCryptoAndAckDataToSocket(
       LongHeader::typeToPacketNumberSpace(packetType),
       scheduler,
       congestionControlWritableBytes,
-      packetLimit,
+      packetLimit - written,
       cleartextCipher,
       headerCipher,
       version,
@@ -794,7 +824,7 @@ uint64_t writeCryptoAndAckDataToSocket(
                            << " written crypto and acks data type="
                            << packetType << " packets=" << written << " "
                            << connection;
-  DCHECK_GE(packetLimit, written);
+  CHECK_GE(packetLimit, written);
   return written;
 }
 
@@ -1205,7 +1235,8 @@ uint64_t writeProbingDataToSocket(
     uint8_t probesToSend,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
-    QuicVersion version) {
+    QuicVersion version,
+    const std::string& token) {
   // Skip a packet number for probing packets to elicit acks
   increaseNextPacketNum(connection, pnSpace);
   CloningScheduler cloningScheduler(
@@ -1222,9 +1253,12 @@ uint64_t writeProbingDataToSocket(
       probesToSend,
       aead,
       headerCipher,
-      version);
+      version,
+      token);
   if (probesToSend && !written) {
     // Fall back to send a ping:
+    // TODO: Now that Probes can be used for handshake packets. We need to make
+    // sure we only send Ping here, no other Simple frames.
     sendSimpleFrame(connection, PingFrame());
     auto pingScheduler = std::move(FrameScheduler::Builder(
                                        connection,

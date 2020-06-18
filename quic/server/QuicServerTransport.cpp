@@ -208,10 +208,13 @@ void QuicServerTransport::writeData() {
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
   if (conn_->initialWriteCipher) {
-    CryptoStreamScheduler initialScheduler(
-        *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
-    if (initialScheduler.hasData() ||
+    auto& initialCryptoStream =
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
+    CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
+    if ((conn_->pendingEvents.numProbePackets &&
+         initialCryptoStream.retransmissionBuffer.size() &&
+         conn_->outstandings.initialPacketsCount) ||
+        initialScheduler.hasData() ||
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialWriteCipher);
@@ -227,15 +230,18 @@ void QuicServerTransport::writeData() {
           version,
           packetLimit);
     }
-    if (!packetLimit) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }
   if (conn_->handshakeWriteCipher) {
-    CryptoStreamScheduler handshakeScheduler(
-        *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
-    if (handshakeScheduler.hasData() ||
+    auto& handshakeCryptoStream =
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
+    CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
+    if ((conn_->outstandings.handshakePacketsCount &&
+         handshakeCryptoStream.retransmissionBuffer.size() &&
+         conn_->pendingEvents.numProbePackets) ||
+        handshakeScheduler.hasData() ||
         (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
       CHECK(conn_->handshakeWriteCipher);
@@ -251,7 +257,7 @@ void QuicServerTransport::writeData() {
           version,
           packetLimit);
     }
-    if (!packetLimit) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }

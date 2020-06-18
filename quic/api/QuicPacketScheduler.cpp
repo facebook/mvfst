@@ -509,10 +509,7 @@ CloningScheduler::CloningScheduler(
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
-  return frameScheduler_.hasData() ||
-      (!conn_.outstandings.packets.empty() &&
-       conn_.outstandings.packets.size() !=
-           conn_.outstandings.handshakePacketsCount);
+  return frameScheduler_.hasData() || (!conn_.outstandings.packets.empty());
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
@@ -533,12 +530,15 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   auto header = builder.getPacketHeader();
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
-  // This is a loop, but it builds at most one packet.
-  for (auto iter = conn_.outstandings.packets.rbegin();
-       iter != conn_.outstandings.packets.rend();
-       ++iter) {
-    auto opPnSpace = iter->packet.header.getPacketNumberSpace();
-    if (opPnSpace != PacketNumberSpace::AppData) {
+  for (auto& outstandingPacket : conn_.outstandings.packets) {
+    auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();
+    // Reusing the RegularQuicPacketBuilder throughout loop bodies will lead to
+    // frames belong to different original packets being written into the same
+    // clone packet. So re-create a RegularQuicPacketBuilder every time.
+    // TODO: We can avoid the copy & rebuild of the header by creating an
+    // independent header builder.
+    auto builderPnSpace = builder.getPacketHeader().getPacketNumberSpace();
+    if (opPnSpace != builderPnSpace) {
       continue;
     }
     size_t prevSize = 0;
@@ -550,8 +550,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // Reusing the same builder throughout loop bodies will lead to frames
     // belong to different original packets being written into the same clone
     // packet. So re-create a builder every time.
-    auto builderPnSpace = header.getPacketNumberSpace();
-    CHECK_EQ(builderPnSpace, PacketNumberSpace::AppData);
     std::unique_ptr<PacketBuilderInterface> internalBuilder;
     if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
       internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
@@ -566,19 +564,16 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }
-    // We shouldn't clone Handshake packet.
-    if (iter->isHandshake) {
-      continue;
-    }
     // If the packet is already a clone that has been processed, we don't clone
     // it again.
-    if (iter->associatedEvent &&
-        conn_.outstandings.packetEvents.count(*iter->associatedEvent) == 0) {
+    if (outstandingPacket.associatedEvent &&
+        conn_.outstandings.packetEvents.count(
+            *outstandingPacket.associatedEvent) == 0) {
       continue;
     }
     // I think this only fail if udpSendPacketLen somehow shrinks in the middle
     // of a connection.
-    if (iter->encodedSize > writableBytes + cipherOverhead_) {
+    if (outstandingPacket.encodedSize > writableBytes + cipherOverhead_) {
       continue;
     }
 
@@ -595,7 +590,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // network just fine; Or we can throw away the built packet and send a ping.
 
     // Rebuilder will write the rest of frames
-    auto rebuildResult = rebuilder.rebuildFromPacket(*iter);
+    auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
     if (rebuildResult) {
       return SchedulingResult(
           std::move(rebuildResult), std::move(*internalBuilder).buildPacket());

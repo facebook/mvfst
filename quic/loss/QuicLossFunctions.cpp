@@ -52,7 +52,12 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
   if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
     throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
   }
-  conn.pendingEvents.numProbePackets = kPacketToSendForPTO;
+
+  // If there is only one packet outstanding, no point to clone it twice in the
+  // same write loop.
+  conn.pendingEvents.numProbePackets =
+      std::min<decltype(conn.pendingEvents.numProbePackets)>(
+          conn.outstandings.packets.size(), kPacketToSendForPTO);
 }
 
 void markPacketLoss(

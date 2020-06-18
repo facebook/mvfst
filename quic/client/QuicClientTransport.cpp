@@ -729,11 +729,14 @@ void QuicClientTransport::writeData() {
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
   if (conn_->initialWriteCipher) {
-    CryptoStreamScheduler initialScheduler(
-        *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial));
+    auto& initialCryptoStream =
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
+    CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
 
-    if (initialScheduler.hasData() ||
+    if ((initialCryptoStream.retransmissionBuffer.size() &&
+         conn_->outstandings.initialPacketsCount &&
+         conn_->pendingEvents.numProbePackets) ||
+        initialScheduler.hasData() ||
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialHeaderCipher);
@@ -749,15 +752,18 @@ void QuicClientTransport::writeData() {
           packetLimit,
           clientConn_->retryToken);
     }
-    if (!packetLimit) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }
   if (conn_->handshakeWriteCipher) {
-    CryptoStreamScheduler handshakeScheduler(
-        *conn_,
-        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake));
-    if (handshakeScheduler.hasData() ||
+    auto& handshakeCryptoStream =
+        *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
+    CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
+    if ((conn_->outstandings.handshakePacketsCount &&
+         handshakeCryptoStream.retransmissionBuffer.size() &&
+         conn_->pendingEvents.numProbePackets) ||
+        handshakeScheduler.hasData() ||
         (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
       CHECK(conn_->handshakeWriteHeaderCipher);
@@ -772,7 +778,7 @@ void QuicClientTransport::writeData() {
           version,
           packetLimit);
     }
-    if (!packetLimit) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }
@@ -788,7 +794,7 @@ void QuicClientTransport::writeData() {
         version,
         packetLimit);
   }
-  if (!packetLimit) {
+  if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
     return;
   }
   if (conn_->oneRttWriteCipher) {

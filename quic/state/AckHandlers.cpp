@@ -48,6 +48,7 @@ void processAckFrame(
   // acks which leads to different number of packets being acked usually.
   ack.ackedPackets.reserve(kDefaultRxPacketsBeforeAckAfterInit);
   auto currentPacketIt = getLastOutstandingPacket(conn, pnSpace);
+  uint64_t initialPacketAcked = 0;
   uint64_t handshakePacketAcked = 0;
   uint64_t clonedPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
@@ -107,8 +108,15 @@ void processAckFrame(
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
                << " handshake=" << (int)rPacketIt->isHandshake << " " << conn;
-      if (rPacketIt->isHandshake) {
-        ++handshakePacketAcked;
+      bool needsProcess = !rPacketIt->associatedEvent ||
+          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent);
+      if (rPacketIt->isHandshake && needsProcess) {
+        if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
+          ++initialPacketAcked;
+        } else {
+          CHECK_EQ(PacketNumberSpace::Handshake, currentPacketNumberSpace);
+          ++handshakePacketAcked;
+        }
       }
       ack.ackedBytes += rPacketIt->encodedSize;
       if (rPacketIt->associatedEvent) {
@@ -124,8 +132,8 @@ void processAckFrame(
       }
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
-      if (!rPacketIt->associatedEvent ||
-          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent)) {
+      if (needsProcess /*!rPacketIt->associatedEvent ||
+          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent)*/) {
         for (auto& packetFrame : rPacketIt->packet.frames) {
           ackVisitor(*rPacketIt, packetFrame, frame);
         }
@@ -177,20 +185,23 @@ void processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  DCHECK_GE(conn.outstandings.handshakePacketsCount, handshakePacketAcked);
+  CHECK_GE(conn.outstandings.initialPacketsCount, initialPacketAcked);
+  conn.outstandings.initialPacketsCount -= initialPacketAcked;
+  CHECK_GE(conn.outstandings.handshakePacketsCount, handshakePacketAcked);
   conn.outstandings.handshakePacketsCount -= handshakePacketAcked;
-  DCHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
+  CHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
   conn.outstandings.clonedPacketsCount -= clonedPacketsAcked;
   auto updatedOustandingPacketsCount = conn.outstandings.packets.size();
-  DCHECK_GE(
-      updatedOustandingPacketsCount, conn.outstandings.handshakePacketsCount);
-  DCHECK_GE(
-      updatedOustandingPacketsCount, conn.outstandings.clonedPacketsCount);
+  CHECK_GE(
+      updatedOustandingPacketsCount,
+      conn.outstandings.handshakePacketsCount +
+          conn.outstandings.initialPacketsCount);
+  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.clonedPacketsCount);
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
       (ack.largestAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
-      DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       lossEvent->persistentCongestion = isPersistentCongestion(
           conn,
           *lossEvent->smallestLostSentTime,

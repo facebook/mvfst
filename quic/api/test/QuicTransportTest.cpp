@@ -1037,14 +1037,13 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
-  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandings.packets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 2);
   numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
 
-  EXPECT_EQ(numPathChallengePackets, 3);
+  EXPECT_EQ(numPathChallengePackets, 2);
 }
 
 TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
@@ -1275,6 +1274,7 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
+  conn.outstandings.initialPacketsCount = 0;
   conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
@@ -1296,13 +1296,12 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
-  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandings.packets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 2);
   numNewConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
-  EXPECT_EQ(numNewConnIdPackets, 3);
+  EXPECT_EQ(numNewConnIdPackets, 2);
 }
 
 TEST_F(QuicTransportTest, BusyWriteLoopDetection) {
@@ -1415,6 +1414,7 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
+  conn.outstandings.initialPacketsCount = 0;
   conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
@@ -1436,14 +1436,13 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
 
   // Force a timeout with no data so that it clones the packet
   transport_->lossTimeout().timeoutExpired();
-  // On PTO, endpoint sends 2 probing packets, thus 1+2=3
-  EXPECT_EQ(conn.outstandings.packets.size(), 3);
+  EXPECT_EQ(conn.outstandings.packets.size(), 2);
   numRetireConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
       findFrameInPacketFunc<
           QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
-  EXPECT_EQ(numRetireConnIdPackets, 3);
+  EXPECT_EQ(numRetireConnIdPackets, 2);
 }
 
 TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {

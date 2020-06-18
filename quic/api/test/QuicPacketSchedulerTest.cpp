@@ -452,7 +452,76 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
-  EXPECT_EQ(packetNum, *result.packetEvent);
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
+}
+
+TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  FrameScheduler noopScheduler("frame");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
+  EXPECT_FALSE(cloningScheduler.hasData());
+  auto packetNum = addOutstandingPacket(conn);
+  // There needs to have retransmittable frame for the rebuilder to work
+  conn.outstandings.packets.back().packet.frames.push_back(
+      MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
+  EXPECT_TRUE(cloningScheduler.hasData());
+
+  ASSERT_FALSE(noopScheduler.hasData());
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder regularBuilder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  // Create few frames
+  ConnectionCloseFrame connCloseFrame(
+      QuicErrorCode(TransportErrorCode::FRAME_ENCODING_ERROR),
+      "The sun is in the sky.");
+  MaxStreamsFrame maxStreamFrame(999, true);
+  PingFrame pingFrame;
+  AckBlocks ackBlocks;
+  ackBlocks.insert(10, 100);
+  ackBlocks.insert(200, 1000);
+  AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
+
+  // Write those framses with a regular builder
+  writeFrame(connCloseFrame, regularBuilder);
+  writeFrame(QuicSimpleFrame(maxStreamFrame), regularBuilder);
+  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
+  writeAckFrame(ackMeta, regularBuilder);
+
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(regularBuilder), kDefaultUDPSendPacketLen);
+  EXPECT_TRUE(result.packetEvent.hasValue() && result.packet.hasValue());
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
+  // written packet should not have any frame in the builder
+  auto& writtenPacket = *result.packet;
+  auto shortHeader = writtenPacket.packet.header.asShort();
+  CHECK(shortHeader);
+  EXPECT_EQ(ProtectionType::KeyPhaseOne, shortHeader->getProtectionType());
+  EXPECT_EQ(
+      conn.ackStates.appDataAckState.nextPacketNum,
+      shortHeader->getPacketSequenceNum());
+
+  // Test that the only frame that's written is maxdataframe
+  EXPECT_GE(writtenPacket.packet.frames.size(), 1);
+  auto& writtenFrame = writtenPacket.packet.frames.at(0);
+  auto maxDataFrame = writtenFrame.asMaxDataFrame();
+  CHECK(maxDataFrame);
+  for (auto& frame : writtenPacket.packet.frames) {
+    bool present = false;
+    /* the next four frames should not be written */
+    present |= frame.asConnectionCloseFrame() ? true : false;
+    present |= frame.asQuicSimpleFrame() ? true : false;
+    present |= frame.asQuicSimpleFrame() ? true : false;
+    present |= frame.asWriteAckFrame() ? true : false;
+    ASSERT_FALSE(present);
+  }
 }
 
 TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
@@ -467,7 +536,8 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   addOutstandingPacket(conn);
-  conn.outstandings.packets.back().associatedEvent = 1;
+  conn.outstandings.packets.back().associatedEvent =
+      PacketEvent(PacketNumberSpace::AppData, 1);
   // There needs to have retransmittable frame for the rebuilder to work
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
@@ -483,10 +553,10 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
-  EXPECT_EQ(expected, *result.packetEvent);
+  EXPECT_EQ(expected, result.packetEvent->packetNumber);
 }
 
-TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasDataIgnoresNonAppData) {
+TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
   FrameScheduler noopScheduler("frame");
@@ -494,9 +564,25 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasDataIgnoresNonAppData) {
   EXPECT_FALSE(cloningScheduler.hasData());
 
   addHandshakeOutstandingPacket(conn);
+  EXPECT_TRUE(cloningScheduler.hasData());
+}
+
+TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  FrameScheduler noopScheduler("frame");
+  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
 
   addInitialOutstandingPacket(conn);
+  EXPECT_TRUE(cloningScheduler.hasData());
+}
+
+TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  FrameScheduler noopScheduler("frame");
+  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
 
   addOutstandingPacket(conn);
@@ -528,7 +614,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
-  EXPECT_EQ(expected, *result.packetEvent);
+  EXPECT_EQ(expected, result.packetEvent->packetNumber);
 }
 
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
@@ -586,7 +672,8 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   FrameScheduler noopScheduler("frame");
   CloningScheduler cloningScheduler(noopScheduler, conn, "GiantsShoulder", 0);
-  auto expectedPacketEvent = addOutstandingPacket(conn);
+  PacketEvent expectedPacketEvent(
+      PacketNumberSpace::AppData, addOutstandingPacket(conn));
   ASSERT_EQ(1, conn.outstandings.packets.size());
   conn.outstandings.packets.back().packet.frames.push_back(MaxDataFrame(1000));
   conn.outstandings.packets.back().packet.frames.push_back(
@@ -691,7 +778,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   auto result = cloningScheduler.scheduleFramesForPacket(
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
-  EXPECT_EQ(packetNum, *result.packetEvent);
+  EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
 
   // Something was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());
@@ -764,7 +851,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       std::move(internalBuilder), conn.udpSendPacketLen);
   EXPECT_TRUE(
       cloneResult.packetEvent.has_value() && cloneResult.packet.has_value());
-  EXPECT_EQ(packetNum, *cloneResult.packetEvent);
+  EXPECT_EQ(packetNum, cloneResult.packetEvent->packetNumber);
 
   // Something was written into the buffer:
   EXPECT_TRUE(bufAccessor.ownsBuffer());

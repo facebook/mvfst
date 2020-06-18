@@ -31,9 +31,11 @@ PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
       conn_.outstandings.packetEvents.count(*packet.associatedEvent));
   if (!packet.associatedEvent) {
     auto packetNum = packet.packet.header.getPacketSequenceNum();
-    DCHECK(!conn_.outstandings.packetEvents.count(packetNum));
-    packet.associatedEvent = packetNum;
-    conn_.outstandings.packetEvents.insert(packetNum);
+    auto packetNumberSpace = packet.packet.header.getPacketNumberSpace();
+    PacketEvent event(packetNumberSpace, packetNum);
+    DCHECK(!conn_.outstandings.packetEvents.count(event));
+    packet.associatedEvent = event;
+    conn_.outstandings.packetEvents.insert(event);
     ++conn_.outstandings.clonedPacketsCount;
   }
   return *packet.associatedEvent;
@@ -44,11 +46,12 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   // TODO: if PMTU changes between the transmission of the original packet and
   // now, then we cannot clone everything in the packet.
 
-  // TODO: make sure this cannot be called on handshake packets.
   bool writeSuccess = false;
   bool windowUpdateWritten = false;
   bool shouldWriteWindowUpdate = false;
   bool notPureAck = false;
+  auto encryptionLevel =
+      protectionTypeToEncryptionLevel(packet.packet.header.getProtectionType());
   for (auto iter = packet.packet.frames.cbegin();
        iter != packet.packet.frames.cend();
        iter++) {
@@ -109,15 +112,8 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
       }
       case QuicWriteFrame::Type::WriteCryptoFrame_E: {
         const WriteCryptoFrame& cryptoFrame = *frame.asWriteCryptoFrame();
-        // initialStream and handshakeStream can only be in handshake packet,
-        // so they are not clonable
-        CHECK(!packet.isHandshake);
-        // key update not supported
-        DCHECK(
-            packet.packet.header.getProtectionType() ==
-            ProtectionType::KeyPhaseZero);
-        auto& stream = conn_.cryptoState->oneRttStream;
-        auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, stream);
+        auto stream = getCryptoStream(*conn_.cryptoState, encryptionLevel);
+        auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, *stream);
 
         // No crypto data found to be cloned, just skip
         if (!buf) {

@@ -2411,8 +2411,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2452,7 +2452,7 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2487,8 +2487,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2527,7 +2527,7 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
@@ -2564,8 +2564,8 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -5174,23 +5174,6 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
   EXPECT_TRUE(isConnectionPaced(client->getConn()));
 }
 
-TEST_F(
-    QuicClientTransportAfterStartTest,
-    TestOneRttPacketWillNotRescheduleHandshakeAlarm) {
-  EXPECT_TRUE(client->lossTimeout().isScheduled());
-  auto timeRemaining1 = client->lossTimeout().getTimeRemaining();
-
-  auto sleepAmountMillis = 10;
-  usleep(sleepAmountMillis * 1000);
-  auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
-  loopForWrites();
-
-  EXPECT_TRUE(client->lossTimeout().isScheduled());
-  auto timeRemaining2 = client->lossTimeout().getTimeRemaining();
-  EXPECT_GE(timeRemaining1.count() - timeRemaining2.count(), sleepAmountMillis);
-}
-
 TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
   PingFrame pingFrame;
   ShortHeader header(
@@ -5564,72 +5547,6 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   mockClientHandshake->setZeroRttRejected(true);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   EXPECT_THROW(recvServerHello(), std::runtime_error);
-}
-
-TEST_F(
-    QuicZeroRttClientTest,
-    TestZeroRttPacketWillNotRescheduleHandshakeAlarm) {
-  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
-      .WillOnce(InvokeWithoutArgs([]() {
-        QuicCachedPsk quicCachedPsk;
-        quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
-            kDefaultStreamWindowSize;
-        quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
-            kDefaultStreamWindowSize;
-        quicCachedPsk.transportParams.initialMaxStreamDataUni =
-            kDefaultStreamWindowSize;
-        quicCachedPsk.transportParams.initialMaxData =
-            kDefaultConnectionWindowSize;
-        quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
-        quicCachedPsk.transportParams.maxRecvPacketSize =
-            kDefaultUDPReadBufferSize;
-        quicCachedPsk.transportParams.initialMaxStreamsBidi =
-            std::numeric_limits<uint32_t>::max();
-        quicCachedPsk.transportParams.initialMaxStreamsUni =
-            std::numeric_limits<uint32_t>::max();
-        return quicCachedPsk;
-      }));
-  bool performedValidation = false;
-  client->setEarlyDataAppParamsFunctions(
-      [&](const folly::Optional<std::string>&, const Buf&) {
-        performedValidation = true;
-        return true;
-      },
-      []() -> Buf { return nullptr; });
-  startClient();
-  EXPECT_TRUE(performedValidation);
-
-  EXPECT_TRUE(client->lossTimeout().isScheduled());
-  auto timeRemaining1 = client->lossTimeout().getTimeRemaining();
-
-  auto initialUDPSendPacketLen = client->getConn().udpSendPacketLen;
-  socketWrites.clear();
-
-  auto sleepAmountMillis = 10;
-  usleep(sleepAmountMillis * 1000);
-  auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
-  loopForWrites();
-
-  EXPECT_TRUE(client->lossTimeout().isScheduled());
-  auto timeRemaining2 = client->lossTimeout().getTimeRemaining();
-  EXPECT_GE(timeRemaining1.count() - timeRemaining2.count(), sleepAmountMillis);
-
-  EXPECT_TRUE(zeroRttPacketsOutstanding());
-  mockClientHandshake->setZeroRttRejected(false);
-  assertWritten(false, LongHeader::Types::ZeroRtt);
-  EXPECT_CALL(clientConnCallback, onReplaySafe());
-  recvServerHello();
-
-  // All the data is still there.
-  EXPECT_TRUE(zeroRttPacketsOutstanding());
-  // Transport parameters did not change since zero rtt was accepted.
-  verifyTransportParameters(
-      kDefaultConnectionWindowSize,
-      kDefaultStreamWindowSize,
-      kDefaultIdleTimeout,
-      kDefaultAckDelayExponent,
-      initialUDPSendPacketLen);
 }
 
 class QuicZeroRttHappyEyeballsClientTransportTest

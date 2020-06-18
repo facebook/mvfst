@@ -8,6 +8,7 @@ add_library(
   QuicStreamManager.cpp
   QuicStreamUtilities.cpp
   StateData.cpp
+  PacketEvent.cpp
   PendingPathRateLimiter.cpp
 )
 

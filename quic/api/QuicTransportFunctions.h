@@ -278,7 +278,8 @@ uint64_t writeProbingDataToSocket(
     uint8_t probesToSend,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
-    QuicVersion version);
+    QuicVersion version,
+    const std::string& token = std::string());
 
 HeaderBuilder LongHeaderBuilder(LongHeader::Types packetType);
 HeaderBuilder ShortHeaderBuilder();

@@ -18,6 +18,7 @@
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/state/AckStates.h>
+#include <quic/state/PacketEvent.h>
 #include <quic/state/PendingPathRateLimiter.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
@@ -102,23 +103,6 @@ struct NetworkDataSingle {
   }
 };
 
-/**
- * There are cases that we may clone an outstanding packet and resend it as is.
- * When that happens, we assign a PacketEvent to both the original and cloned
- * packet if no PacketEvent is already associated with the original packet. If
- * the original packet already has a PacketEvent, we copy that value into the
- * cloned packet.
- * A connection maintains a set of PacketEvents. When a packet with a
- * PacketEvent is acked or lost, we search the set. If the PacketEvent is
- * present in the set, we process the ack or loss event (e.g. update RTT, notify
- * CongestionController, and detect loss with this packet) as well as frames in
- * the packet. Then we remove the PacketEvent from the set. If the PacketEvent
- * is absent in the set, we consider all frames contained in the packet are
- * already processed. We will still handle the ack or loss event and update the
- * connection. But no frame will be processed.
- */
-using PacketEvent = PacketNum;
-
 // Data structure to represent outstanding retransmittable packets
 struct OutstandingPacket {
   // Structure representing the frames that are outstanding including the header
@@ -187,9 +171,14 @@ struct OutstandingsInfo {
   // associatedEvent or if it's not in this set, there is no need to process its
   // frames upon ack or loss.
   // TODO: Enforce only AppTraffic packets to be clonable
-  folly::F14FastSet<PacketEvent> packetEvents;
+  folly::F14FastSet<PacketEvent, PacketEventHash> packetEvents;
 
-  // Number of handshake packets outstanding.
+  // Number of outstanding packets in Initial space, not including cloned
+  // Initial packets.
+  uint64_t initialPacketsCount{0};
+
+  // Number of outstanding packets in Handshake space, not including cloned
+  // Handshake packets.
   uint64_t handshakePacketsCount{0};
 
   // Number of packets are clones or cloned.
@@ -449,7 +438,7 @@ using Resets = folly::F14FastMap<StreamId, RstStreamFrame>;
 using FrameList = std::vector<QuicSimpleFrame>;
 
 struct LossState {
-  enum class AlarmMethod { EarlyRetransmitOrReordering, Handshake, PTO };
+  enum class AlarmMethod { EarlyRetransmitOrReordering, PTO };
   // Smooth rtt
   std::chrono::microseconds srtt{0us};
   // Latest rtt
@@ -458,10 +447,8 @@ struct LossState {
   std::chrono::microseconds rttvar{0us};
   // Number of packet loss timer fired before receiving an ack
   uint32_t ptoCount{0};
-  // The number of times the handshake packets have been retransmitted without
-  // receiving an ack.
-  uint16_t handshakeAlarmCount{0};
-  // The time when last handshake packet was sent
+  // The time when last handshake packet (including both Initial and Handshake
+  // space) was sent
   TimePoint lastHandshakePacketSentTime;
   // Latest packet number sent
   // TODO: this also needs to be 3 numbers now...
