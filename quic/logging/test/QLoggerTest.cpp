@@ -274,7 +274,6 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
    "qlog_version": "draft-00",
    "summary": {
      "max_duration": 0,
-     "max_outgoing_loss_rate": "",
      "total_event_count": 1,
      "trace_count": 1
    },
@@ -514,7 +513,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
    "qlog_version": "draft-00",
    "summary": {
      "max_duration": "300",
-     "max_outgoing_loss_rate": "",
      "total_event_count": 3,
      "trace_count": 1
    },
@@ -1241,7 +1239,6 @@ TEST_F(QLoggerTest, PrettyStream) {
    ],
    "summary": {
      "max_duration": 0,
-     "max_outgoing_loss_rate": "",
      "total_event_count": 1,
      "trace_count": 1
    }
@@ -1301,7 +1298,6 @@ TEST_F(QLoggerTest, NonPrettyStream) {
    "qlog_version": "draft-00",
    "summary": {
      "max_duration": 0,
-     "max_outgoing_loss_rate": "",
      "total_event_count": 1,
      "trace_count": 1
    },

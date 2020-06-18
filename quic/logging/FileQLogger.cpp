@@ -408,7 +408,6 @@ folly::dynamic FileQLogger::generateSummary(
   // otherwise, it is the (time of the last event - time of the  first event)
   summaryObj["max_duration"] =
       (numEvents == 0) ? 0 : (endTime - startTime).count();
-  summaryObj["max_outgoing_loss_rate"] = "";
   summaryObj["total_event_count"] = numEvents;
   return summaryObj;
 }
