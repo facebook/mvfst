@@ -194,8 +194,7 @@ class AckScheduler {
   AckScheduler(const QuicConnectionStateBase& conn, const AckState& ackState);
 
   template <typename ClockType = Clock>
-  folly::Optional<PacketNum> writeNextAcks(
-      PacketBuilderInterface& builder);
+  folly::Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
 
   bool hasPendingAcks() const;
 
@@ -238,6 +237,18 @@ class SimpleFrameScheduler {
   bool hasPendingSimpleFrames() const;
 
   bool writeSimpleFrames(PacketBuilderInterface& builder);
+
+ private:
+  const QuicConnectionStateBase& conn_;
+};
+
+class PingFrameScheduler {
+ public:
+  explicit PingFrameScheduler(const QuicConnectionStateBase& conn);
+
+  bool hasPingFrame() const;
+
+  bool writePing(PacketBuilderInterface& builder);
 
  private:
   const QuicConnectionStateBase& conn_;
@@ -309,6 +320,7 @@ class FrameScheduler : public QuicPacketScheduler {
     Builder& blockedFrames();
     Builder& cryptoFrames();
     Builder& simpleFrames();
+    Builder& pingFrames();
 
     FrameScheduler build() &&;
 
@@ -327,6 +339,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool blockedScheduler_{false};
     bool cryptoStreamScheduler_{false};
     bool simpleFrameScheduler_{false};
+    bool pingFrameScheduler_{false};
   };
 
   explicit FrameScheduler(std::string name);
@@ -352,6 +365,7 @@ class FrameScheduler : public QuicPacketScheduler {
   folly::Optional<BlockedScheduler> blockedScheduler_;
   folly::Optional<CryptoStreamScheduler> cryptoStreamScheduler_;
   folly::Optional<SimpleFrameScheduler> simpleFrameScheduler_;
+  folly::Optional<PingFrameScheduler> pingFrameScheduler_;
   std::string name_;
 };
 

@@ -46,6 +46,7 @@ uint64_t writeProbingDataToSocketForTest(
       *conn.clientConnectionId,
       *conn.serverConnectionId,
       ShortHeaderBuilder(),
+      EncryptionLevel::AppData,
       PacketNumberSpace::AppData,
       scheduler,
       probesToSend,
@@ -75,6 +76,7 @@ void writeCryptoDataProbesToSocketForTest(
       *conn.clientConnectionId,
       *conn.serverConnectionId,
       LongHeaderBuilder(type),
+      protectionTypeToEncryptionLevel(longHeaderTypeToProtectionType(type)),
       LongHeader::typeToPacketNumberSpace(type),
       scheduler,
       probesToSend,
@@ -177,6 +179,17 @@ class QuicTransportFunctionsTest : public Test {
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<MockQuicStats> transportInfoCb_;
 };
+
+TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPList) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.push_back(PingFrame());
+  EXPECT_EQ(0, conn->outstandings.packets.size());
+  updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+  // But it won't set loss detection alarm
+  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
+}
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto conn = createConn();
@@ -1604,15 +1617,10 @@ TEST_F(QuicTransportFunctionsTest, ProbingNotFallbackToPingWhenNoQuota) {
 
 TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   auto conn = createConn();
-  auto mockCongestionController =
-      std::make_unique<NiceMock<MockCongestionController>>();
-  auto rawCongestionController = mockCongestionController.get();
-  conn->congestionController = std::move(mockCongestionController);
   EventBase evb;
   auto socket =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = socket.get();
-  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   EXPECT_CALL(*rawSocket, write(_, _))
       .Times(1)
       .WillOnce(Invoke([&](const SocketAddress&,
@@ -1629,17 +1637,8 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
           *aead,
           *headerCipher,
           getVersion(*conn)));
+  // Ping is the only non-retransmittable packet that will go into OP list
   EXPECT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_EQ(1, conn->outstandings.packets[0].packet.frames.size());
-  EXPECT_EQ(
-      QuicWriteFrame::Type::QuicSimpleFrame_E,
-      conn->outstandings.packets[0].packet.frames[0].type());
-  EXPECT_EQ(
-      QuicSimpleFrame::Type::PingFrame_E,
-      conn->outstandings.packets[0]
-          .packet.frames[0]
-          .asQuicSimpleFrame()
-          ->type());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {

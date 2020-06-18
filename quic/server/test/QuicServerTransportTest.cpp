@@ -3193,7 +3193,7 @@ TEST_F(
   EXPECT_TRUE(server->getConn().migrationState.lastCongestionAndRtt);
 }
 
-TEST_F(QuicServerTransportTest, PingIsRetransmittable) {
+TEST_F(QuicServerTransportTest, PingIsTreatedAsRetransmittable) {
   PingFrame pingFrame;
   ShortHeader header(
       ProtectionType::KeyPhaseZero,
@@ -3204,12 +3204,10 @@ TEST_F(QuicServerTransportTest, PingIsRetransmittable) {
       std::move(header),
       0 /* largestAcked */);
   builder.encodePacketHeader();
-  writeFrame(QuicSimpleFrame(pingFrame), builder);
+  writeFrame(pingFrame, builder);
   auto packet = std::move(builder).buildPacket();
   deliverData(packetToBuf(packet));
   EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
-  EXPECT_FALSE(getAckState(server->getConn(), PacketNumberSpace::AppData)
-                   .needsToSendAckImmediately);
 }
 
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {

@@ -159,6 +159,11 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = writeFrame(paddingFrame, builder_) != 0;
         break;
       }
+      case QuicWriteFrame::Type::PingFrame_E: {
+        const PingFrame& pingFrame = *frame.asPingFrame();
+        writeSuccess = writeFrame(pingFrame, builder_) != 0;
+        break;
+      }
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         auto updatedSimpleFrame =
@@ -185,7 +190,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     }
   }
   // We shouldn't clone if:
-  // (1) we only end up cloning acks and paddings.
+  // (1) we only end up cloning only acks, ping, or paddings.
   // (2) we should write window update, but didn't, and wrote nothing else.
   if (!notPureAck ||
       (shouldWriteWindowUpdate && !windowUpdateWritten && !writeSuccess)) {

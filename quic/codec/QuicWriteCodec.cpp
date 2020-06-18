@@ -328,17 +328,6 @@ size_t writeSimpleFrame(
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
 
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::PingFrame_E: {
-      const PingFrame& pingFrame = *frame.asPingFrame();
-      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PING));
-      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
-        builder.write(intFrameType);
-        builder.appendFrame(QuicSimpleFrame(pingFrame));
-        return intFrameType.getSize();
-      }
-      // no space left in packet
-      return size_t(0);
-    }
     case QuicSimpleFrame::Type::StopSendingFrame_E: {
       const StopSendingFrame& stopSendingFrame = *frame.asStopSendingFrame();
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::STOP_SENDING));
@@ -663,6 +652,17 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
             connectionCloseFrame.reasonPhrase.size());
         builder.appendFrame(std::move(connectionCloseFrame));
         return connCloseFrameSize;
+      }
+      // no space left in packet
+      return size_t(0);
+    }
+    case QuicWriteFrame::Type::PingFrame_E: {
+      const PingFrame& pingFrame = *frame.asPingFrame();
+      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::PING));
+      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+        builder.write(intFrameType);
+        builder.appendFrame(pingFrame);
+        return intFrameType.getSize();
       }
       // no space left in packet
       return size_t(0);

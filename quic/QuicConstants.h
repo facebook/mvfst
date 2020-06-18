@@ -462,6 +462,7 @@ enum class WriteDataReason {
   SIMPLE,
   RESET,
   PATHCHALLENGE,
+  PING,
 };
 
 enum class NoWriteReason {

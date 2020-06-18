@@ -81,6 +81,11 @@ FrameScheduler::Builder& FrameScheduler::Builder::simpleFrames() {
   return *this;
 }
 
+FrameScheduler::Builder& FrameScheduler::Builder::pingFrames() {
+  pingFrameScheduler_ = true;
+  return *this;
+}
+
 FrameScheduler FrameScheduler::Builder::build() && {
   FrameScheduler scheduler(std::move(name_));
   if (retransmissionScheduler_) {
@@ -108,6 +113,9 @@ FrameScheduler FrameScheduler::Builder::build() && {
   }
   if (simpleFrameScheduler_) {
     scheduler.simpleFrameScheduler_.emplace(SimpleFrameScheduler(conn_));
+  }
+  if (pingFrameScheduler_) {
+    scheduler.pingFrameScheduler_.emplace(PingFrameScheduler(conn_));
   }
   return scheduler;
 }
@@ -164,6 +172,9 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
       simpleFrameScheduler_->hasPendingSimpleFrames()) {
     simpleFrameScheduler_->writeSimpleFrames(wrapper);
   }
+  if (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame()) {
+    pingFrameScheduler_->writePing(wrapper);
+  }
   if (retransmissionScheduler_ && retransmissionScheduler_->hasPendingData()) {
     retransmissionScheduler_->writeRetransmissionStreams(wrapper);
   }
@@ -201,7 +212,8 @@ bool FrameScheduler::hasImmediateData() const {
        windowUpdateScheduler_->hasPendingWindowUpdates()) ||
       (blockedScheduler_ && blockedScheduler_->hasPendingBlockedFrames()) ||
       (simpleFrameScheduler_ &&
-       simpleFrameScheduler_->hasPendingSimpleFrames());
+       simpleFrameScheduler_->hasPendingSimpleFrames()) ||
+      (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame());
 }
 
 std::string FrameScheduler::name() const {
@@ -404,6 +416,17 @@ bool SimpleFrameScheduler::writeSimpleFrames(PacketBuilderInterface& builder) {
     framesWritten = true;
   }
   return framesWritten;
+}
+
+PingFrameScheduler::PingFrameScheduler(const QuicConnectionStateBase& conn)
+    : conn_(conn) {}
+
+bool PingFrameScheduler::hasPingFrame() const {
+  return conn_.pendingEvents.sendPing;
+}
+
+bool PingFrameScheduler::writePing(PacketBuilderInterface& builder) {
+  return 0 != writeFrame(PingFrame(), builder);
 }
 
 WindowUpdateScheduler::WindowUpdateScheduler(

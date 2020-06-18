@@ -79,7 +79,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(QuicSimpleFrame(maxStreamsFrame), regularBuilder1);
-  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder1);
+  writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
       regularBuilder1,
@@ -138,6 +138,9 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
         EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
         break;
       }
+      case QuicWriteFrame::Type::PingFrame_E:
+        EXPECT_NE(frame.asPingFrame(), nullptr);
+        break;
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         switch (simpleFrame.type()) {
@@ -146,11 +149,6 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
                 simpleFrame.asMaxStreamsFrame();
             EXPECT_NE(maxStreamFrame, nullptr);
             EXPECT_EQ(4321, maxStreamFrame->maxStreams);
-            break;
-          }
-          case QuicSimpleFrame::Type::PingFrame_E: {
-            const PingFrame* simplePingFrame = simpleFrame.asPingFrame();
-            EXPECT_NE(simplePingFrame, nullptr);
             break;
           }
           default:
@@ -394,7 +392,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   // Write them with a regular builder
   writeFrame(connCloseFrame, regularBuilder1);
   writeFrame(maxStreamIdFrame, regularBuilder1);
-  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder1);
+  writeFrame(pingFrame, regularBuilder1);
   writeAckFrame(ackMeta, regularBuilder1);
   writeStreamFrameHeader(
       regularBuilder1,
@@ -435,8 +433,8 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   RegularQuicPacketBuilder regularBuilder(
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
   regularBuilder.encodePacketHeader();
-  PingFrame pingFrame;
-  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
+  MaxDataFrame maxDataFrame(31415926);
+  writeFrame(maxDataFrame, regularBuilder);
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1000);
   QuicServerConnectionState conn;
@@ -449,6 +447,29 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   rebuilder.rebuildFromPacket(outstandingPacket);
   EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());
   EXPECT_EQ(1, conn.outstandings.clonedPacketsCount);
+}
+
+TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
+  RegularQuicPacketBuilder regularBuilder(
+      kDefaultUDPSendPacketLen, std::move(shortHeader1), 0);
+  regularBuilder.encodePacketHeader();
+  PingFrame pingFrame;
+  writeFrame(pingFrame, regularBuilder);
+  auto packet = std::move(regularBuilder).buildPacket();
+  auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 50);
+  EXPECT_EQ(1, outstandingPacket.packet.frames.size());
+  QuicServerConnectionState conn;
+  ShortHeader shortHeader2(
+      ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
+  RegularQuicPacketBuilder regularBuilder2(
+      kDefaultUDPSendPacketLen, std::move(shortHeader2), 0);
+  regularBuilder2.encodePacketHeader();
+  PacketRebuilder rebuilder(regularBuilder2, conn);
+  EXPECT_EQ(folly::none, rebuilder.rebuildFromPacket(outstandingPacket));
+  EXPECT_FALSE(outstandingPacket.associatedEvent.has_value());
+  EXPECT_EQ(0, conn.outstandings.clonedPacketsCount);
 }
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {

@@ -273,6 +273,7 @@ uint64_t writeProbingDataToSocket(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     const HeaderBuilder& builder,
+    EncryptionLevel encryptionLevel,
     PacketNumberSpace pnSpace,
     FrameScheduler scheduler,
     uint8_t probesToSend,

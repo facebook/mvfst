@@ -1293,20 +1293,20 @@ TEST_F(QuicWriteCodecTest, DecodeAppCloseLarge) {
 TEST_F(QuicWriteCodecTest, WritePing) {
   MockQuicPacketBuilder pktBuilder;
   setupCommonExpects(pktBuilder);
-  auto pingBytesWritten = writeFrame(QuicSimpleFrame(PingFrame()), pktBuilder);
+  auto pingBytesWritten = writeFrame(PingFrame(), pktBuilder);
 
   auto builtOut = std::move(pktBuilder).buildTestPacket();
   auto regularPacket = builtOut.first;
   EXPECT_EQ(1, pingBytesWritten);
-  auto simpleFrame = regularPacket.frames[0].asQuicSimpleFrame();
-  EXPECT_NE(simpleFrame->asPingFrame(), nullptr);
+  auto pingFrame = regularPacket.frames[0].asPingFrame();
+  EXPECT_NE(pingFrame, nullptr);
 
   auto wireBuf = std::move(builtOut.second);
   BufQueue queue;
   queue.append(wireBuf->clone());
   QuicFrame decodedFrame = parseQuicFrame(queue);
-  auto decodedSimpleFrame = decodedFrame.asQuicSimpleFrame();
-  EXPECT_NE(decodedSimpleFrame->asPingFrame(), nullptr);
+  auto decodedPingFrame = decodedFrame.asPingFrame();
+  EXPECT_NE(decodedPingFrame, nullptr);
 
   // At last, verify there is nothing left in the wire format bytes:
   EXPECT_EQ(queue.chainLength(), 0);
@@ -1316,7 +1316,7 @@ TEST_F(QuicWriteCodecTest, NoSpaceForPing) {
   MockQuicPacketBuilder pktBuilder;
   pktBuilder.remaining_ = 0;
   setupCommonExpects(pktBuilder);
-  EXPECT_EQ(0, writeFrame(QuicSimpleFrame(PingFrame()), pktBuilder));
+  EXPECT_EQ(0, writeFrame(PingFrame(), pktBuilder));
 }
 
 TEST_F(QuicWriteCodecTest, WritePadding) {

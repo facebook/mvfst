@@ -98,6 +98,8 @@ folly::StringPiece writeDataReasonString(WriteDataReason reason) {
       return "Reset";
     case WriteDataReason::PATHCHALLENGE:
       return "PathChallenge";
+    case WriteDataReason::PING:
+      return "Ping";
     case WriteDataReason::NO_WRITE:
       return "NoWrite";
   }

@@ -702,8 +702,7 @@ void onServerReadDataFromOpen(
         auto isAck = quicFrame.asReadAckFrame();
         auto isClose = quicFrame.asConnectionCloseFrame();
         auto isCrypto = quicFrame.asReadCryptoFrame();
-        auto isSimple = quicFrame.asQuicSimpleFrame();
-        auto isPing = isSimple ? isSimple->asPingFrame() : nullptr;
+        auto isPing = quicFrame.asPingFrame();
         // TODO: add path challenge and response
         if (!isPadding && !isAck && !isClose && !isCrypto && !isPing) {
           QUIC_STATS(
@@ -841,6 +840,9 @@ void onServerReadDataFromOpen(
                     commonAckVisitorForAckFrame(ackState, frame);
                     break;
                   }
+                  case QuicWriteFrame::Type::PingFrame_E:
+                    conn.pendingEvents.cancelPingTimeout = true;
+                    return;
                   case QuicWriteFrame::Type::QuicSimpleFrame_E: {
                     const QuicSimpleFrame& frame =
                         *packetFrame.asQuicSimpleFrame();
@@ -850,8 +852,6 @@ void onServerReadDataFromOpen(
                       // Call handshakeConfirmed outside of the packet
                       // processing loop to avoid a re-entrancy.
                       handshakeConfirmedThisLoop = true;
-                    } else {
-                      updateSimpleFrameOnAck(conn, frame);
                     }
                     break;
                   }
@@ -990,9 +990,14 @@ void onServerReadDataFromOpen(
               "Peer closed", TransportErrorCode::NO_ERROR);
           break;
         }
-        case QuicFrame::Type::PaddingFrame_E: {
+        case QuicFrame::Type::PingFrame_E:
+          isNonProbingPacket = true;
+          // Ping isn't retransmittable data. But we would like to ack them
+          // early.
+          pktHasRetransmittableData = true;
           break;
-        }
+        case QuicFrame::Type::PaddingFrame_E:
+          break;
         case QuicFrame::Type::QuicSimpleFrame_E: {
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();

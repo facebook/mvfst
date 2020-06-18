@@ -18,25 +18,10 @@ void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame) {
   conn.pendingEvents.frames.emplace_back(std::move(frame));
 }
 
-void updateSimpleFrameOnAck(
-    QuicConnectionStateBase& conn,
-    const QuicSimpleFrame& frame) {
-  switch (frame.type()) {
-    case QuicSimpleFrame::Type::PingFrame_E: {
-      conn.pendingEvents.cancelPingTimeout = true;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
 folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::PingFrame_E:
-      return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::StopSendingFrame_E:
       if (!conn.streamManager->streamExists(
               frame.asStopSendingFrame()->streamId)) {
@@ -102,9 +87,6 @@ void updateSimpleFrameOnPacketLoss(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::PingFrame_E: {
-      break;
-    }
     case QuicSimpleFrame::Type::StopSendingFrame_E: {
       const StopSendingFrame& stopSendingFrame = *frame.asStopSendingFrame();
       if (conn.streamManager->streamExists(stopSendingFrame.streamId)) {
@@ -160,9 +142,6 @@ bool updateSimpleFrameOnPacketReceived(
     PacketNum packetNum,
     bool fromChangedPeerAddress) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::PingFrame_E: {
-      return true;
-    }
     case QuicSimpleFrame::Type::StopSendingFrame_E: {
       const StopSendingFrame& stopSending = *frame.asStopSendingFrame();
       auto stream = conn.streamManager->getStream(stopSending.streamId);
@@ -291,8 +270,7 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E: {
-      // TODO junqiw
-      return false;
+      return true;
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
       if (conn.nodeType == QuicNodeType::Server) {

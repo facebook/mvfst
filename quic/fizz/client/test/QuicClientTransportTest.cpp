@@ -4630,7 +4630,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, UnencryptedPing) {
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   builder.encodePacketHeader();
   DCHECK(builder.canBuildPacket());
-  writeFrame(QuicWriteFrame(PingFrame()), builder);
+  writeFrame(PingFrame(), builder);
   auto packet = packetToBufCleartext(
       std::move(builder).buildPacket(),
       getInitialCipher(),
@@ -5174,7 +5174,7 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
   EXPECT_TRUE(isConnectionPaced(client->getConn()));
 }
 
-TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
+TEST_F(QuicClientTransportAfterStartTest, PingIsTreatedAsRetransmittable) {
   PingFrame pingFrame;
   ShortHeader header(
       ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
@@ -5183,12 +5183,10 @@ TEST_F(QuicClientTransportAfterStartTest, PingIsRetransmittable) {
       std::move(header),
       0 /* largestAcked */);
   builder.encodePacketHeader();
-  writeFrame(QuicSimpleFrame(pingFrame), builder);
+  writeFrame(pingFrame, builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   deliverData(packet->coalesce());
   EXPECT_TRUE(client->getConn().pendingEvents.scheduleAckTimeout);
-  EXPECT_FALSE(getAckState(client->getConn(), PacketNumberSpace::AppData)
-                   .needsToSendAckImmediately);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {

@@ -7,10 +7,6 @@ void addQuicSimpleFrameToEvent(
     quic::QLogPacketEvent* event,
     const quic::QuicSimpleFrame& simpleFrame) {
   switch (simpleFrame.type()) {
-    case quic::QuicSimpleFrame::Type::PingFrame_E: {
-      event->frames.push_back(std::make_unique<quic::PingFrameLog>());
-      break;
-    }
     case quic::QuicSimpleFrame::Type::StopSendingFrame_E: {
       const quic::StopSendingFrame& frame = *simpleFrame.asStopSendingFrame();
       event->frames.push_back(std::make_unique<quic::StopSendingFrameLog>(
@@ -167,6 +163,9 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
         break;
       }
+      case QuicFrame::Type::PingFrame_E:
+        event->frames.push_back(std::make_unique<quic::PingFrameLog>());
+        break;
       case QuicFrame::Type::QuicSimpleFrame_E: {
         const auto& simpleFrame = *quicFrame.asQuicSimpleFrame();
         addQuicSimpleFrameToEvent(event.get(), simpleFrame);

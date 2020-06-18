@@ -664,6 +664,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // close transport when the next packet number reaches kMaxPacketNum
     bool closeTransport{false};
+
+    // To send a ping frame
+    bool sendPing{false};
   };
 
   PendingEvents pendingEvents;

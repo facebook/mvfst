@@ -492,7 +492,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   // Write those framses with a regular builder
   writeFrame(connCloseFrame, regularBuilder);
   writeFrame(QuicSimpleFrame(maxStreamFrame), regularBuilder);
-  writeFrame(QuicSimpleFrame(pingFrame), regularBuilder);
+  writeFrame(pingFrame, regularBuilder);
   writeAckFrame(ackMeta, regularBuilder);
 
   auto result = cloningScheduler.scheduleFramesForPacket(

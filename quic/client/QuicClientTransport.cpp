@@ -220,8 +220,7 @@ void QuicClientTransport::processPacketData(
       auto isAck = quicFrame.asReadAckFrame();
       auto isClose = quicFrame.asConnectionCloseFrame();
       auto isCrypto = quicFrame.asReadCryptoFrame();
-      auto isSimple = quicFrame.asQuicSimpleFrame();
-      auto isPing = isSimple ? isSimple->asPingFrame() : nullptr;
+      auto isPing = quicFrame.asPingFrame();
       // TODO: add path challenge and response
       if (!isPadding && !isAck && !isClose && !isCrypto && !isPing) {
         throw QuicTransportException(
@@ -350,12 +349,10 @@ void QuicClientTransport::processPacketData(
                       *cryptoStream, frame.offset, frame.len);
                   break;
                 }
-                case QuicWriteFrame::Type::QuicSimpleFrame_E: {
-                  const quic::QuicSimpleFrame simpleFrame =
-                      *packetFrame.asQuicSimpleFrame();
-                  updateSimpleFrameOnAck(*conn_, simpleFrame);
+                case QuicWriteFrame::Type::PingFrame_E:
+                  conn_->pendingEvents.cancelPingTimeout = true;
                   break;
-                }
+                case QuicWriteFrame::Type::QuicSimpleFrame_E:
                 default:
                   // ignore other frames.
                   break;
@@ -482,9 +479,12 @@ void QuicClientTransport::processPacketData(
             "Peer closed", TransportErrorCode::NO_ERROR);
         break;
       }
-      case QuicFrame::Type::PaddingFrame_E: {
+      case QuicFrame::Type::PingFrame_E:
+        // Ping isn't retransmittable. But we would like to ack them early.
+        pktHasRetransmittableData = true;
         break;
-      }
+      case QuicFrame::Type::PaddingFrame_E:
+        break;
       case QuicFrame::Type::QuicSimpleFrame_E: {
         QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
         pktHasRetransmittableData = true;

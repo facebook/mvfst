@@ -20,13 +20,6 @@ namespace quic {
 void sendSimpleFrame(QuicConnectionStateBase& conn, QuicSimpleFrame frame);
 
 /*
- * Update the connection state on ack of the given simple frame.
- */
-void updateSimpleFrameOnAck(
-    QuicConnectionStateBase& conn,
-    const QuicSimpleFrame& frame);
-
-/*
  * Update connection state and the frame on clone of the given simple frame.
  * Returns the updated simple frame.
  */

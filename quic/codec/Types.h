@@ -598,7 +598,6 @@ struct RetryToken {
   F(NewConnectionIdFrame, __VA_ARGS__)    \
   F(MaxStreamsFrame, __VA_ARGS__)         \
   F(RetireConnectionIdFrame, __VA_ARGS__) \
-  F(PingFrame, __VA_ARGS__)               \
   F(HandshakeDoneFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
@@ -617,6 +616,7 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(ReadCryptoFrame, __VA_ARGS__)        \
   F(ReadNewTokenFrame, __VA_ARGS__)      \
   F(QuicSimpleFrame, __VA_ARGS__)        \
+  F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
@@ -634,6 +634,7 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(WriteStreamFrame, __VA_ARGS__)       \
   F(WriteCryptoFrame, __VA_ARGS__)       \
   F(QuicSimpleFrame, __VA_ARGS__)        \
+  F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)
 
 // Types of frames which are written.

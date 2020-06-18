@@ -540,7 +540,7 @@ TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
       largestAcked,
       kDefaultUDPSendPacketLen);
   builder->encodePacketHeader();
-  writeFrame(QuicSimpleFrame(PingFrame()), *builder);
+  writeFrame(PingFrame(), *builder);
   EXPECT_TRUE(builder->canBuildPacket());
   auto builtOut = std::move(*builder).buildPacket();
   auto resultPacket = builtOut.packet;

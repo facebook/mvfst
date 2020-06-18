@@ -122,7 +122,8 @@ uint64_t writeQuicDataToSocketImpl(
             .simpleFrames()
             .resetFrames()
             .streamFrames()
-            .streamRetransmissions();
+            .streamRetransmissions()
+            .pingFrames();
     if (!exceptCryptoStream) {
       probeSchedulerBuilder.cryptoFrames();
     }
@@ -133,6 +134,7 @@ uint64_t writeQuicDataToSocketImpl(
         srcConnId,
         dstConnId,
         builder,
+        EncryptionLevel::AppData,
         PacketNumberSpace::AppData,
         probeScheduler,
         std::min<uint64_t>(
@@ -155,7 +157,8 @@ uint64_t writeQuicDataToSocketImpl(
           .resetFrames()
           .windowUpdateFrames()
           .blockedFrames()
-          .simpleFrames();
+          .simpleFrames()
+          .pingFrames();
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();
   }
@@ -458,6 +461,7 @@ void updateConnection(
   auto packetNum = packet.header.getPacketSequenceNum();
   bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
   bool isHandshake = false;
+  bool isPing = false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
@@ -581,6 +585,10 @@ void updateConnection(
         conn.streamManager->removeBlocked(streamBlockedFrame.streamId);
         break;
       }
+      case QuicWriteFrame::Type::PingFrame_E:
+        conn.pendingEvents.sendPing = false;
+        isPing = true;
+        break;
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         retransmittable = true;
@@ -616,7 +624,7 @@ void updateConnection(
   }
   conn.lossState.totalBytesSent += encodedSize;
 
-  if (!retransmittable) {
+  if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
     return;
   }
@@ -794,6 +802,7 @@ uint64_t writeCryptoAndAckDataToSocket(
         srcConnId,
         dstConnId,
         builder,
+        encryptionLevel,
         LongHeader::typeToPacketNumberSpace(packetType),
         scheduler,
         std::min<uint64_t>(
@@ -1230,6 +1239,7 @@ uint64_t writeProbingDataToSocket(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     const HeaderBuilder& builder,
+    EncryptionLevel encryptionLevel,
     PacketNumberSpace pnSpace,
     FrameScheduler scheduler,
     uint8_t probesToSend,
@@ -1257,16 +1267,12 @@ uint64_t writeProbingDataToSocket(
       token);
   if (probesToSend && !written) {
     // Fall back to send a ping:
-    // TODO: Now that Probes can be used for handshake packets. We need to make
-    // sure we only send Ping here, no other Simple frames.
-    sendSimpleFrame(connection, PingFrame());
-    auto pingScheduler = std::move(FrameScheduler::Builder(
-                                       connection,
-                                       EncryptionLevel::AppData,
-                                       PacketNumberSpace::AppData,
-                                       "PingScheduler")
-                                       .simpleFrames())
-                             .build();
+    connection.pendingEvents.sendPing = true;
+    auto pingScheduler =
+        std::move(FrameScheduler::Builder(
+                      connection, encryptionLevel, pnSpace, "PingScheduler")
+                      .pingFrames())
+            .build();
     written += writeConnectionDataToSocket(
         sock,
         connection,
@@ -1361,6 +1367,9 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   }
   if ((conn.pendingEvents.pathChallenge != folly::none)) {
     return WriteDataReason::PATHCHALLENGE;
+  }
+  if (conn.pendingEvents.sendPing) {
+    return WriteDataReason::PING;
   }
   return WriteDataReason::NO_WRITE;
 }

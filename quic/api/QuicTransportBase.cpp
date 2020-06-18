@@ -2097,7 +2097,7 @@ void QuicTransportBase::sendPing(
   }
 
   // Step 1: Send a simple ping frame
-  quic::sendSimpleFrame(*conn_, PingFrame());
+  conn_->pendingEvents.sendPing = true;
   updateWriteLooper(true);
 
   // Step 2: Schedule the timeout on event base
