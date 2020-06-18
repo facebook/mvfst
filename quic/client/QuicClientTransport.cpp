@@ -30,6 +30,8 @@ namespace fsp = folly::portability::sockets;
 
 namespace quic {
 
+using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
+
 QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
@@ -184,6 +186,7 @@ void QuicClientTransport::processPacketData(
 
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
+    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(packetSize, kParse);
     }
@@ -629,6 +632,8 @@ void QuicClientTransport::onReadData(
     // If we are closed, then we shoudn't process new network data.
     // TODO: we might want to process network data if we decide that we should
     // exit draining state early
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::CLIENT_STATE_CLOSED);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(0, kAlreadyClosed);
     }
@@ -931,6 +936,8 @@ void QuicClientTransport::onDataAvailable(
   if (params.gro_ <= 0) {
     if (truncated) {
       // This is an error, drop the packet.
+      QUIC_STATS(
+          statsCallback_, onPacketDropped, PacketDropReason::UDP_TRUNCATED);
       if (conn_->qLogger) {
         conn_->qLogger->addPacketDrop(len, kUdpTruncated);
       }
@@ -956,6 +963,8 @@ void QuicClientTransport::onDataAvailable(
       auto delta = len % params.gro_;
       len -= delta;
 
+      QUIC_STATS(
+          statsCallback_, onPacketDropped, PacketDropReason::UDP_TRUNCATED);
       if (conn_->qLogger) {
         conn_->qLogger->addPacketDrop(delta, kUdpTruncated);
       }

@@ -42,6 +42,9 @@ class QuicTransportStatsCallback {
     SERVER_SHUTDOWN,
     INITIAL_CONNID_SMALL,
     CANNOT_MAKE_TRANSPORT,
+    UDP_TRUNCATED,
+    CLIENT_STATE_CLOSED,
+    CLIENT_SHUTDOWN,
     // NOTE: MAX should always be at the end
     MAX
   };
@@ -172,6 +175,12 @@ class QuicTransportStatsCallback {
         return "INITIAL_CONNID_SMALL";
       case PacketDropReason::CANNOT_MAKE_TRANSPORT:
         return "CANNOT_MAKE_TRANSPORT";
+      case PacketDropReason::UDP_TRUNCATED:
+        return "UDP_TRUNCATED";
+      case PacketDropReason::CLIENT_STATE_CLOSED:
+        return "CLIENT_STATE_CLOSED";
+      case PacketDropReason::CLIENT_SHUTDOWN:
+        return "CLIENT_SHUTDOWN";
       case PacketDropReason::MAX:
         return "MAX";
       default:
