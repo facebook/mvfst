@@ -125,7 +125,6 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   // We cannot return early if the writablyBytes dropps to 0 here, since pure
   // acks can skip writableBytes entirely.
   PacketBuilderWrapper wrapper(builder, writableBytes);
-  auto ackMode = hasImmediateData() ? AckMode::Immediate : AckMode::Pending;
   bool cryptoDataWritten = false;
   bool rstWritten = false;
   if (cryptoStreamScheduler_ && cryptoStreamScheduler_->hasData()) {
@@ -134,18 +133,19 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   if (rstScheduler_ && rstScheduler_->hasPendingRsts()) {
     rstWritten = rstScheduler_->writeRsts(wrapper);
   }
+  // TODO: Long time ago we decided RST has higher priority than Acks. Why tho?
   if (ackScheduler_ && ackScheduler_->hasPendingAcks()) {
     if (cryptoDataWritten || rstWritten) {
       // If packet has non ack data, it is subject to congestion control. We
       // need to use the wrapper/
-      ackScheduler_->writeNextAcks(wrapper, ackMode);
+      ackScheduler_->writeNextAcks(wrapper);
     } else {
       // If we start with writing acks, we will let the ack scheduler write
       // up to the full packet space. If the ack bytes exceeds the writable
       // bytes, this will be a pure ack packet and it will skip congestion
       // controller. Otherwise, we will give other schedulers an opportunity to
       // write up to writable bytes.
-      ackScheduler_->writeNextAcks(builder, ackMode);
+      ackScheduler_->writeNextAcks(builder);
     }
   }
   if (windowUpdateScheduler_ &&

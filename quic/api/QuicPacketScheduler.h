@@ -60,9 +60,6 @@ class QuicPacketScheduler {
   virtual std::string name() const = 0;
 };
 
-// A tag to denote how we should schedule ack in this packet.
-enum class AckMode { Pending, Immediate };
-
 class RetransmissionScheduler {
  public:
   explicit RetransmissionScheduler(const QuicConnectionStateBase& conn);
@@ -198,23 +195,11 @@ class AckScheduler {
 
   template <typename ClockType = Clock>
   folly::Optional<PacketNum> writeNextAcks(
-      PacketBuilderInterface& builder,
-      AckMode mode);
+      PacketBuilderInterface& builder);
 
   bool hasPendingAcks() const;
 
  private:
-  /* Write out pending acks if needsToSendAckImmeidately in the connection's
-   * pendingEvent is true.
-   */
-  template <typename ClockType>
-  folly::Optional<PacketNum> writeAcksIfPending(
-      PacketBuilderInterface& builder);
-
-  // Write out pending acks
-  template <typename ClockType>
-  folly::Optional<PacketNum> writeAcksImpl(PacketBuilderInterface& builder);
-
   const QuicConnectionStateBase& conn_;
   const AckState& ackState_;
 };

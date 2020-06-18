@@ -800,26 +800,6 @@ TEST_F(QuicTransportTest, WriteImmediateAcks) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(conn));
 }
 
-TEST_F(QuicTransportTest, NotWriteAcksIfNoData) {
-  auto& conn = transport_->getConnectionState();
-
-  addAckStatesWithCurrentTimestamps(conn.ackStates.appDataAckState, 0, 100);
-  conn.ackStates.appDataAckState.needsToSendAckImmediately = false;
-  conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
-  // Should not write ack blocks if there is only ack to write
-  EXPECT_EQ(
-      0,
-      writeQuicDataToSocket(
-          *socket_,
-          conn,
-          *conn.clientConnectionId,
-          *conn.serverConnectionId,
-          *aead_,
-          *headerCipher_,
-          transport_->getVersion(),
-          conn.transportSettings.writeConnectionDataPacketsLimit));
-}
-
 TEST_F(QuicTransportTest, WritePendingAckIfHavingData) {
   auto& conn = transport_->getConnectionState();
   auto streamId = transport_->createBidirectionalStream().value();

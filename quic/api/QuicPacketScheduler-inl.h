@@ -15,30 +15,6 @@ namespace quic {
 
 template <typename ClockType>
 inline folly::Optional<PacketNum> AckScheduler::writeNextAcks(
-    PacketBuilderInterface& builder,
-    AckMode mode) {
-  switch (mode) {
-    case AckMode::Immediate: {
-      return writeAcksImpl<ClockType>(builder);
-    }
-    case AckMode::Pending: {
-      return writeAcksIfPending<ClockType>(builder);
-    }
-  }
-  folly::assume_unreachable();
-}
-
-template <typename ClockType>
-inline folly::Optional<PacketNum> AckScheduler::writeAcksIfPending(
-    PacketBuilderInterface& builder) {
-  if (ackState_.needsToSendAckImmediately) {
-    return writeAcksImpl<ClockType>(builder);
-  }
-  return folly::none;
-}
-
-template <typename ClockType>
-folly::Optional<PacketNum> AckScheduler::writeAcksImpl(
     PacketBuilderInterface& builder) {
   // Use default ack delay for long headers. Usually long headers are sent
   // before crypto negotiation, so the peer might not know about the ack delay

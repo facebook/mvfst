@@ -1856,10 +1856,11 @@ TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteCipherAndAckStateMatch) {
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteNoImmediateAcks) {
   auto conn = createConn();
   conn->oneRttWriteCipher = test::createNoOpAead();
-  conn->ackStates.initialAckState.needsToSendAckImmediately = false;
-  conn->ackStates.handshakeAckState.needsToSendAckImmediately = false;
+  conn->ackStates.appDataAckState.acks.insert(0, 100);
   conn->ackStates.appDataAckState.needsToSendAckImmediately = false;
   EXPECT_FALSE(hasAckDataToWrite(*conn));
+  conn->ackStates.appDataAckState.needsToSendAckImmediately = true;
+  EXPECT_TRUE(hasAckDataToWrite(*conn));
 }
 
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteNoAcksScheduled) {
