@@ -295,7 +295,6 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
          "relative_time",
          "CATEGORY",
          "EVENT_TYPE",
-         "TRIGGER",
          "DATA"
        ],
        "events": [
@@ -303,7 +302,6 @@ TEST_F(QLoggerTest, QLoggerFollyDynamic) {
            "31",
            "TRANSPORT",
            "PACKET_RECEIVED",
-           "DEFAULT",
            {
              "frames": [
                {
@@ -354,7 +352,6 @@ TEST_F(QLoggerTest, RegularPacketFollyDynamic) {
          "0",
          "TRANSPORT",
          "PACKET_RECEIVED",
-         "DEFAULT",
          {
            "frames": [
              {
@@ -397,7 +394,6 @@ TEST_F(QLoggerTest, RegularWritePacketFollyDynamic) {
              "0",
              "TRANSPORT",
              "PACKET_SENT",
-             "DEFAULT",
              {
                "frames": [
                  {
@@ -437,7 +433,6 @@ TEST_F(QLoggerTest, RegularPacketAckFrameFollyDynamic) {
            "0",
            "TRANSPORT",
            "PACKET_SENT",
-           "DEFAULT",
            {
              "frames": [
                {
@@ -480,7 +475,6 @@ TEST_F(QLoggerTest, VersionPacketFollyDynamic) {
              "0",
              "TRANSPORT",
              "PACKET_SENT",
-             "DEFAULT",
              {
                "header": {
                  "packet_size": 10
@@ -534,7 +528,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
          "relative_time",
          "CATEGORY",
          "EVENT_TYPE",
-         "TRIGGER",
          "DATA"
        ],
        "events": [
@@ -542,7 +535,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
            "0",
            "TRANSPORT",
            "PACKET_SENT",
-           "DEFAULT",
            {
              "header": {
                "packet_size": 10
@@ -558,7 +550,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
            "1",
            "TRANSPORT",
            "PACKET_SENT",
-           "DEFAULT",
            {
              "frames": [
                {
@@ -587,7 +578,6 @@ TEST_F(QLoggerTest, AddingMultiplePacketEvents) {
            "2",
            "TRANSPORT",
            "PACKET_SENT",
-           "DEFAULT",
            {
              "frames": [
                {
@@ -654,7 +644,6 @@ TEST_F(QLoggerTest, AddingMultipleFrames) {
              "0",
              "TRANSPORT",
              "PACKET_SENT",
-             "DEFAULT",
              {
                "frames": [
                  {
@@ -714,7 +703,6 @@ TEST_F(QLoggerTest, ConnectionCloseFollyDynamic) {
            "0",
            "CONNECTIVITY",
            "CONNECTION_CLOSE",
-           "DEFAULT",
            {
              "drain_connection": true,
              "error": "Connection reset",
@@ -739,7 +727,6 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
      "0",
      "TRANSPORT",
      "TRANSPORT_SUMMARY",
-     "DEFAULT",
      {
        "total_bytes_sent": 1,
        "total_bytes_recvd": 2,
@@ -770,7 +757,6 @@ TEST_F(QLoggerTest, CongestionMetricUpdateFollyDynamic) {
         "0",
         "METRIC_UPDATE",
         "CONGESTION_METRIC_UPDATE",
-        "DEFAULT",
         {
           "bytes_in_flight": 20,
           "congestion_event": "persistent congestion",
@@ -800,7 +786,6 @@ TEST_F(QLoggerTest, PacingMetricUpdateFollyDynamic) {
         "0",
         "METRIC_UPDATE",
         "PACING_METRIC_UPDATE",
-        "DEFAULT",
         {
          "pacing_burst_size": 20,
          "pacing_interval": 30
@@ -823,7 +808,6 @@ TEST_F(QLoggerTest, AppIdleFollyDynamic) {
         "0",
         "IDLE_UPDATE",
         "APP_IDLE_UPDATE",
-        "DEFAULT",
         {
          "idle_event": "app idle",
          "idle": true
@@ -846,7 +830,6 @@ TEST_F(QLoggerTest, PacketDropFollyDynamic) {
         "0",
         "LOSS",
         "PACKET_DROP",
-        "DEFAULT",
         {
          "drop_reason": "max buffered",
          "packet_size": 100
@@ -869,7 +852,6 @@ TEST_F(QLoggerTest, DatagramReceivedFollyDynamic) {
       "0",
        "TRANSPORT",
        "DATAGRAM_RECEIVED",
-       "DEFAULT",
        {
          "data_len": 8
        }
@@ -891,7 +873,6 @@ TEST_F(QLoggerTest, LossAlarmFollyDynamic) {
       "0",
        "LOSS",
        "LOSS_ALARM",
-       "DEFAULT",
        {
          "largest_sent": 100,
          "alarm_count": 14,
@@ -916,7 +897,6 @@ TEST_F(QLoggerTest, PacketsLostFollyDynamic) {
       "0",
        "LOSS",
        "PACKETS_LOST",
-       "DEFAULT",
        {
          "largest_lost_packet_num": 10,
          "lost_bytes": 9,
@@ -940,7 +920,6 @@ TEST_F(QLoggerTest, TransportStateUpdateFollyDynamic) {
     "0",
      "TRANSPORT",
      "TRANSPORT_STATE_UPDATE",
-     "DEFAULT",
      {
        "update": "transport ready"
      }
@@ -962,7 +941,6 @@ TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
     "0",
      "TRANSPORT",
      "PACKET_BUFFERED",
-     "DEFAULT",
      {
        "packet_num": 10,
        "protection_type": "Handshake",
@@ -986,7 +964,6 @@ TEST_F(QLoggerTest, MetricUpdateFollyDynamic) {
       "0",
       "RECOVERY",
       "METRIC_UPDATE",
-      "DEFAULT",
       {
         "ack_delay": 13,
         "latest_rtt": 10,
@@ -1011,7 +988,6 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamicTTFB) {
       "0",
       "HTTP3",
       "STREAM_STATE_UPDATE",
-      "DEFAULT",
       {
         "id": 10,
         "ttfb": 20,
@@ -1035,7 +1011,6 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamicTTLB) {
       "0",
       "HTTP3",
       "STREAM_STATE_UPDATE",
-      "DEFAULT",
       {
         "id": 10,
         "ttlb": 20,
@@ -1061,7 +1036,6 @@ TEST_F(
       "0",
       "HTTP3",
       "STREAM_STATE_UPDATE",
-      "DEFAULT",
       {
         "id": 10,
         "update": "on eom"
@@ -1084,7 +1058,6 @@ TEST_F(QLoggerTest, StreamStateUpdateFollyDynamic) {
       "0",
       "HTTP3",
       "STREAM_STATE_UPDATE",
-      "DEFAULT",
       {
         "id": 10,
         "ms_since_creation": 20,
@@ -1108,7 +1081,6 @@ TEST_F(QLoggerTest, PaddingFramesFollyDynamic) {
      "0",
      "TRANSPORT",
      "PACKET_SENT",
-     "DEFAULT",
      {
        "frames": [
          {
@@ -1141,7 +1113,6 @@ TEST_F(QLoggerTest, ConnectionMigration) {
       "0",
       "TRANSPORT",
       "CONNECTION_MIGRATION",
-      "DEFAULT",
       {
         "intentional": true,
         "type": "initiating"
@@ -1164,7 +1135,6 @@ TEST_F(QLoggerTest, PathValidation) {
       "0",
       "TRANSPORT",
       "PATH_VALIDATION",
-      "DEFAULT",
       {
         "success": false,
         "vantagePoint": "server"
@@ -1203,7 +1173,6 @@ TEST_F(QLoggerTest, PrettyStream) {
          "relative_time",
          "CATEGORY",
          "EVENT_TYPE",
-         "TRIGGER",
          "DATA"
        ],
        "events": [
@@ -1211,7 +1180,6 @@ TEST_F(QLoggerTest, PrettyStream) {
            "31",
            "TRANSPORT",
            "PACKET_RECEIVED",
-           "DEFAULT",
            {
              "frames": [
                {
@@ -1319,7 +1287,6 @@ TEST_F(QLoggerTest, NonPrettyStream) {
          "relative_time",
          "CATEGORY",
          "EVENT_TYPE",
-         "TRIGGER",
          "DATA"
        ],
        "events": [
@@ -1327,7 +1294,6 @@ TEST_F(QLoggerTest, NonPrettyStream) {
            "31",
            "TRANSPORT",
            "PACKET_RECEIVED",
-           "DEFAULT",
            {
              "frames": [
                {
