@@ -1223,7 +1223,7 @@ uint64_t writeProbingDataToSocket(
       aead,
       headerCipher,
       version);
-  if (written < probesToSend) {
+  if (probesToSend && !written) {
     // Fall back to send a ping:
     sendSimpleFrame(connection, PingFrame());
     auto pingScheduler = std::move(FrameScheduler::Builder(

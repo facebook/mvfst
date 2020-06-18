@@ -1572,6 +1572,30 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   EXPECT_FALSE(cryptoStream->retransmissionBuffer.empty());
 }
 
+TEST_F(QuicTransportFunctionsTest, ProbingNotFallbackToPingWhenNoQuota) {
+  auto conn = createConn();
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn->congestionController = std::move(mockCongestionController);
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = socket.get();
+  EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
+  EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
+  uint8_t probesToSend = 0;
+  EXPECT_EQ(
+      0,
+      writeProbingDataToSocketForTest(
+          *rawSocket,
+          *conn,
+          probesToSend,
+          *aead,
+          *headerCipher,
+          getVersion(*conn)));
+}
+
 TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
   auto conn = createConn();
   auto mockCongestionController =
