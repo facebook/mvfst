@@ -290,10 +290,6 @@ void QuicClientTransport::processPacketData(
                 // drop the handshake cipher and outstanding packets after the
                 // processing loop.
                 if (conn_->handshakeWriteCipher) {
-                  CHECK(conn_->oneRttWriteCipher);
-                  CHECK(conn_->oneRttWriteHeaderCipher);
-                  CHECK(conn_->readCodec->getOneRttReadCipher());
-                  CHECK(conn_->readCodec->getOneRttHeaderCipher());
                   conn_->handshakeLayer->handshakeConfirmed();
                 }
                 // TODO reap

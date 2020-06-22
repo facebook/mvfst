@@ -2170,6 +2170,9 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
   conn->readCodec->setHandshakeReadCipher(createNoOpAead());
   conn->readCodec->setHandshakeHeaderCipher(createNoOpHeaderCipher());
   conn->oneRttWriteCipher = createNoOpAead();
+  conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();
+  conn->readCodec->setOneRttReadCipher(createNoOpAead());
+  conn->readCodec->setOneRttHeaderCipher(createNoOpHeaderCipher());
   writeCryptoDataProbesToSocketForTest(
       *socket,
       *conn,

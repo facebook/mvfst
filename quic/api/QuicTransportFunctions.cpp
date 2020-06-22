@@ -1434,8 +1434,11 @@ void implicitAckCryptoStream(
           }
         }
       },
-      // Can't do anything with loss at this point.
-      [](auto&, auto&, auto, auto) {},
+      // We shouldn't mark anything as lost from the implicit ACK, as it should
+      // be ACKing the entire rangee.
+      [](auto&, auto&, auto, auto) {
+        LOG(FATAL) << "Got loss from implicit crypto ACK.";
+      },
       implicitAckTime);
   // Clear our the loss buffer explicity. The implicit ACK itself will not
   // remove data already in the loss buffer.
@@ -1447,7 +1450,12 @@ void implicitAckCryptoStream(
 }
 
 void handshakeConfirmed(QuicConnectionStateBase& conn) {
+  // If we've supposedly confirmed the handshake and don't have the 1RTT
+  // ciphers installed, we are going to have problems.
   CHECK(conn.oneRttWriteCipher);
+  CHECK(conn.oneRttWriteHeaderCipher);
+  CHECK(conn.readCodec->getOneRttReadCipher());
+  CHECK(conn.readCodec->getOneRttHeaderCipher());
   conn.readCodec->onHandshakeDone(Clock::now());
   conn.initialWriteCipher.reset();
   conn.initialHeaderCipher.reset();
