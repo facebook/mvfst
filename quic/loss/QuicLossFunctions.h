@@ -145,6 +145,19 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
     timeout.cancelLossTimeout();
     return;
   }
+  /**
+   * Either previous timer or an Ack can clear the lossTime without setting a
+   * new one, for example, if such timer or ack marks everything as loss, or
+   * every as acked. In that case, if an early retransmit timer is already set,
+   * we should clear it.
+   */
+  if (conn.lossState.currentAlarmMethod ==
+          LossState::AlarmMethod::EarlyRetransmitOrReordering &&
+      !earliestLossTimer(conn).first) {
+    VLOG(10) << __func__
+             << " unset alarm due to invalidated early retran timer";
+    timeout.cancelLossTimeout();
+  }
   if (!conn.pendingEvents.setLossDetectionAlarm) {
     VLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"

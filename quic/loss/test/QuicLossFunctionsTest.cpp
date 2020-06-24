@@ -258,10 +258,70 @@ TEST_F(QuicLossFunctionsTest, HasDataToWrite) {
   sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
   conn->streamManager->addLoss(1);
   conn->pendingEvents.setLossDetectionAlarm = true;
-  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(2);
   EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
   setLossDetectionAlarm(*conn, timeout);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
+}
+
+TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {
+  auto conn = createConn();
+  // make delayUntilLoss relatively large
+  conn->lossState.srtt = 1s;
+  conn->lossState.lrtt = 1s;
+  auto currentTime = Clock::now();
+  auto firstPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::Initial);
+  auto secondPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::Initial);
+  ASSERT_GT(secondPacketNum, firstPacketNum);
+  ASSERT_EQ(2, conn->outstandings.packets.size());
+  // detectLossPackets will set lossTime on Initial space.
+  auto lossVisitor = [](auto&, auto&, bool, PacketNum) { ASSERT_FALSE(true); };
+  detectLossPackets(
+      *conn,
+      secondPacketNum,
+      lossVisitor,
+      Clock::now(),
+      PacketNumberSpace::Initial);
+  ASSERT_TRUE(earliestLossTimer(*conn).first.has_value());
+  ASSERT_EQ(PacketNumberSpace::Initial, earliestLossTimer(*conn).second);
+  conn->pendingEvents.setLossDetectionAlarm = true;
+
+  // Schedule a loss timer
+  EXPECT_CALL(timeout, isLossTimeoutScheduled()).WillRepeatedly(Return(false));
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
+  EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
+  setLossDetectionAlarm(*conn, timeout);
+  EXPECT_EQ(
+      LossState::AlarmMethod::EarlyRetransmitOrReordering,
+      conn->lossState.currentAlarmMethod);
+
+  // Ack the initial packets
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = secondPacketNum;
+  ackFrame.ackBlocks.emplace_back(firstPacketNum, secondPacketNum);
+  // Ack won't cancel loss timer
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(0);
+  processAckFrame(
+      *conn,
+      PacketNumberSpace::Initial,
+      ackFrame,
+      [&](auto&, auto&, auto&) {},
+      lossVisitor,
+      Clock::now());
+
+  // Send out a AppData packet that isn't retransmittable
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  conn->pendingEvents.setLossDetectionAlarm = false;
+
+  // setLossDetectionAlarm will cancel loss timer, and not schedule another one.
+  EXPECT_CALL(timeout, isLossTimeoutScheduled())
+      .Times(1)
+      .WillOnce(Return(false));
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
+  EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(0);
+  setLossDetectionAlarm(*conn, timeout);
 }
 
 TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
