@@ -2107,11 +2107,7 @@ void QuicTransportBase::sendPing(
 }
 
 void QuicTransportBase::lossTimeoutExpired() noexcept {
-  DCHECK_NE(closeState_, CloseState::CLOSED);
-  // TODO this is a bandaid, but we should bail here.
-  if (closeState_ != CloseState::OPEN) {
-    return;
-  }
+  CHECK_NE(closeState_, CloseState::CLOSED);
   // onLossDetectionAlarm will set packetToSend in pending events
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   try {
