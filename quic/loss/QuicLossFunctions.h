@@ -314,10 +314,7 @@ void onLossDetectionAlarm(
   if (conn.lossState.currentAlarmMethod ==
       LossState::AlarmMethod::EarlyRetransmitOrReordering) {
     auto lossTimeAndSpace = earliestLossTimer(conn);
-    if (!lossTimeAndSpace.first) {
-      LOG(ERROR) << "Invalid Quic loss timer";
-      return;
-    }
+    CHECK(lossTimeAndSpace.first);
     auto lossEvent = detectLossPackets<LossVisitor>(
         conn,
         getAckState(conn, lossTimeAndSpace.second).largestAckedByPeer,
