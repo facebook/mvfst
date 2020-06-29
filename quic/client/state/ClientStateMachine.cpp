@@ -162,7 +162,7 @@ void processServerInitialParams(
   // Currently no-op for a client; it doesn't issue connection ids
   // to the server.
   conn.peerActiveConnectionIdLimit =
-      activeConnectionIdLimit.value_or(kDefaultConnectionIdLimit);
+      activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
   if (partialReliability && *partialReliability != 0 &&
       conn.transportSettings.partialReliabilityEnabled) {

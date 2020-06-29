@@ -185,7 +185,7 @@ void processClientInitialParams(
   }
 
   conn.peerActiveConnectionIdLimit =
-      activeConnectionIdLimit.value_or(kDefaultConnectionIdLimit);
+      activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
 
   if (partialReliability && *partialReliability != 0 &&
       conn.transportSettings.partialReliabilityEnabled) {

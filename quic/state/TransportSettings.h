@@ -155,7 +155,7 @@ struct TransportSettings {
   // Default initial RTT
   std::chrono::microseconds initialRtt{kDefaultInitialRtt};
   // The active_connection_id_limit that is sent to the peer.
-  uint64_t selfActiveConnectionIdLimit{kDefaultConnectionIdLimit};
+  uint64_t selfActiveConnectionIdLimit{kDefaultActiveConnectionIdLimit};
   // Maximum size of the batch that should be used when receiving packets from
   // the kernel in one event loop.
   size_t maxRecvBatchSize{5};
