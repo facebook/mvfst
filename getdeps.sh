@@ -25,7 +25,7 @@ mkdir -p "$STAGE"
 
 for getdeps in "${GETDEPS_PATHS[@]}"; do
     if [[ -x "$getdeps" ]]; then
-        "$getdeps" build mvfst --current-project mvfst "$@"
+        "$getdeps" build mvfst --current-project mvfst "$@" --install-prefix=${STAGE}
         exit 0
     fi
 done
