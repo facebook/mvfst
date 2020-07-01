@@ -114,6 +114,7 @@ function install_dependencies_linux() {
   sudo apt-get install        \
     g++                       \
     cmake                     \
+    m4                        \
     libboost-all-dev          \
     libevent-dev              \
     libdouble-conversion-dev  \
@@ -136,6 +137,7 @@ function install_dependencies_mac() {
   # install the default dependencies from homebrew
   brew install               \
     cmake                    \
+    m4                       \
     boost                    \
     double-conversion        \
     gflags                   \
