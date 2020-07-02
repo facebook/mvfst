@@ -66,20 +66,8 @@ void IOBufQuicBatch::reset() {
 }
 
 bool IOBufQuicBatch::isRetriableError(int err) {
-  if (err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS ||
-      err == EMSGSIZE) {
-    return true;
-  }
-  auto now = Clock::now();
-  if (conn_.transportSettings.continueOnNetworkUnreachable &&
-      isNetworkUnreachable(err)) {
-    if (!conn_.continueOnNetworkUnreachableDeadline) {
-      conn_.continueOnNetworkUnreachableDeadline =
-          now + conn_.transportSettings.continueOnNetworkUnreachableDuration;
-    }
-    return now <= *conn_.continueOnNetworkUnreachableDeadline;
-  }
-  return false;
+  return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS ||
+      err == EMSGSIZE;
 }
 
 bool IOBufQuicBatch::flushInternal() {
@@ -163,9 +151,6 @@ bool IOBufQuicBatch::flushInternal() {
     // TODO: Remove once we use write event from libevent.
     return false; // done
   }
-
-  // Reset the deadline after successful write
-  conn_.continueOnNetworkUnreachableDeadline = folly::none;
 
   return true; // success, not done yet
 }

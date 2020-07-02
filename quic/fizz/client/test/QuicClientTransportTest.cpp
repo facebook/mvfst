@@ -1927,79 +1927,6 @@ TEST_F(QuicClientTransportTest, NetworkUnreachableIsFatalToConn) {
   loopForWrites();
 }
 
-TEST_F(QuicClientTransportTest, NetworkUnreachableIsNotFatalIfContinue) {
-  TransportSettings settings;
-  settings.continueOnNetworkUnreachable = true;
-  client->setTransportSettings(settings);
-  client->addNewPeerAddress(serverAddr);
-  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
-  setupCryptoLayer();
-  EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
-  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
-  client->start(&clientConnCallback);
-  EXPECT_TRUE(client->getConn().continueOnNetworkUnreachableDeadline);
-  ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(client->idleTimeout().isScheduled());
-}
-
-TEST_F(
-    QuicClientTransportTest,
-    NetworkUnreachableIsFatalIfContinueAfterDeadline) {
-  TransportSettings settings;
-  settings.continueOnNetworkUnreachable = true;
-  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
-  client->getNonConstConn().qLogger = qLogger;
-
-  client->setTransportSettings(settings);
-  client->addNewPeerAddress(serverAddr);
-  setupCryptoLayer();
-  EXPECT_CALL(*sock, write(_, _))
-      .WillRepeatedly(SetErrnoAndReturn(ENETUNREACH, -1));
-  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
-  client->start(&clientConnCallback);
-  ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(client->idleTimeout().isScheduled());
-  usleep(std::chrono::duration_cast<std::chrono::microseconds>(
-             settings.continueOnNetworkUnreachableDuration)
-             .count());
-  EXPECT_CALL(clientConnCallback, onConnectionError(_));
-  loopForWrites();
-
-  std::vector<int> indices =
-      getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 2);
-
-  std::array<std::string, 2> updates = {kStart, kLossTimeoutExpired};
-  for (int i = 0; i < 2; ++i) {
-    auto tmp = std::move(qLogger->logs[indices[i]]);
-    auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());
-    EXPECT_EQ(event->update, updates[i]);
-  }
-}
-
-TEST_F(
-    QuicClientTransportTest,
-    NetworkUnreachableDeadlineIsResetAfterSuccessfulWrite) {
-  TransportSettings settings;
-  settings.continueOnNetworkUnreachable = true;
-  client->setTransportSettings(settings);
-  client->addNewPeerAddress(serverAddr);
-  EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
-  setupCryptoLayer();
-  EXPECT_CALL(*sock, write(_, _))
-      .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1))
-      .WillOnce(Return(1));
-  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
-  client->start(&clientConnCallback);
-  EXPECT_TRUE(client->getConn().continueOnNetworkUnreachableDeadline);
-  ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
-  ASSERT_TRUE(client->idleTimeout().isScheduled());
-
-  client->lossTimeout().cancelTimeout();
-  client->lossTimeout().timeoutExpired();
-  EXPECT_FALSE(client->getConn().continueOnNetworkUnreachableDeadline);
-}
-
 TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV4Address) {
   auto& conn = client->getConn();
 
@@ -2337,10 +2264,9 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
     TransportSettings settings;
-    settings.continueOnNetworkUnreachable = true;
     client->setTransportSettings(settings);
     EXPECT_CALL(*sock, write(firstAddress, _))
-        .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
+        .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     EXPECT_CALL(*secondSock, write(_, _));
     client->start(&clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
