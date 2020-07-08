@@ -110,6 +110,13 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
   GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
   GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
   GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
+  GMOCK_METHOD1_(, noexcept, , onBidirectionalStreamsAvailable, void(uint64_t));
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      onUnidirectionalStreamsAvailable,
+      void(uint64_t));
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {

@@ -33,7 +33,8 @@ enum class TestFrameType : uint8_t {
   STREAM,
   CRYPTO,
   EXPIRED_DATA,
-  REJECTED_DATA
+  REJECTED_DATA,
+  MAX_STREAMS
 };
 
 // A made up encoding decoding of a stream.
@@ -84,6 +85,16 @@ Buf encodeMinStreamDataFrame(const MinStreamDataFrame& frame) {
   return buf;
 }
 
+// A made up encoding of a MaxStreamsFrame.
+Buf encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
+  auto buf = IOBuf::create(25);
+  folly::io::Appender appender(buf.get(), 25);
+  appender.writeBE(static_cast<uint8_t>(TestFrameType::MAX_STREAMS));
+  appender.writeBE<uint8_t>(frame.isForBidirectionalStream() ? 1 : 0);
+  appender.writeBE<uint64_t>(frame.maxStreams);
+  return buf;
+}
+
 std::pair<Buf, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
   Buf outData;
   auto len = cursor.readBE<uint32_t>();
@@ -120,6 +131,12 @@ MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
   frame.maximumData = cursor.readBE<uint64_t>();
   frame.minimumStreamOffset = cursor.readBE<uint64_t>();
   return frame;
+}
+
+MaxStreamsFrame decodeMaxStreamsFrame(folly::io::Cursor& cursor) {
+  bool isBidi = cursor.readBE<uint8_t>();
+  auto maxStreams = cursor.readBE<uint64_t>();
+  return MaxStreamsFrame(maxStreams, isBidi);
 }
 
 class TestPingCallback : public QuicSocket::PingCallback {
@@ -194,6 +211,15 @@ class TestQuicTransport
         }
         onRecvMinStreamDataFrame(stream, minDataFrame, packetNum_);
         packetNum_++;
+      } else if (type == TestFrameType::MAX_STREAMS) {
+        auto maxStreamsFrame = decodeMaxStreamsFrame(cursor);
+        if (maxStreamsFrame.isForBidirectionalStream()) {
+          conn_->streamManager->setMaxLocalBidirectionalStreams(
+              maxStreamsFrame.maxStreams);
+        } else {
+          conn_->streamManager->setMaxLocalUnidirectionalStreams(
+              maxStreamsFrame.maxStreams);
+        }
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         QuicStreamState* stream = conn_->streamManager->getStream(buffer.first);
@@ -300,6 +326,12 @@ class TestQuicTransport
 
   void addMinStreamDataFrameToStream(MinStreamDataFrame frame) {
     auto buf = encodeMinStreamDataFrame(frame);
+    SocketAddress addr("127.0.0.1", 1000);
+    onNetworkData(addr, NetworkData(std::move(buf), Clock::now()));
+  }
+
+  void addMaxStreamsFrame(MaxStreamsFrame frame) {
+    auto buf = encodeMaxStreamsFrame(frame);
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), Clock::now()));
   }
@@ -1021,6 +1053,74 @@ TEST_F(QuicTransportImplTest, CreateStreamLimitsUnidirectionalFew) {
   EXPECT_EQ(result.error(), LocalErrorCode::STREAM_LIMIT_EXCEEDED);
   EXPECT_TRUE(transport->createBidirectionalStream());
   transport.reset();
+}
+
+TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallback) {
+  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
+      0, /*force=*/true);
+
+  EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_))
+      .WillOnce(Invoke([](uint64_t numAvailableStreams) {
+        EXPECT_EQ(numAvailableStreams, 1);
+      }));
+  transport->addMaxStreamsFrame(MaxStreamsFrame(1, /*isBidirectionalIn=*/true));
+  EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 1);
+
+  // same value max streams frame doesn't trigger callback
+  transport->addMaxStreamsFrame(MaxStreamsFrame(1, /*isBidirectionalIn=*/true));
+}
+
+TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallbackAfterExausted) {
+  transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
+      0, /*force=*/true);
+
+  EXPECT_CALL(connCallback, onBidirectionalStreamsAvailable(_)).Times(2);
+  transport->addMaxStreamsFrame(MaxStreamsFrame(
+      1,
+      /*isBidirectionalIn=*/true));
+  EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 1);
+
+  auto result = transport->createBidirectionalStream();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 0);
+
+  transport->addMaxStreamsFrame(MaxStreamsFrame(
+      2,
+      /*isBidirectionalIn=*/true));
+}
+
+TEST_F(QuicTransportImplTest, oneUniStreamsAvailableCallback) {
+  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
+      0, /*force=*/true);
+
+  EXPECT_CALL(connCallback, onUnidirectionalStreamsAvailable(_))
+      .WillOnce(Invoke([](uint64_t numAvailableStreams) {
+        EXPECT_EQ(numAvailableStreams, 1);
+      }));
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(1, /*isBidirectionalIn=*/false));
+  EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 1);
+
+  // same value max streams frame doesn't trigger callback
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(1, /*isBidirectionalIn=*/false));
+}
+
+TEST_F(QuicTransportImplTest, onUniStreamsAvailableCallbackAfterExausted) {
+  transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
+      0, /*force=*/true);
+
+  EXPECT_CALL(connCallback, onUnidirectionalStreamsAvailable(_)).Times(2);
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(1, /*isBidirectionalIn=*/false));
+  EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 1);
+
+  auto result = transport->createUnidirectionalStream();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 0);
+
+  transport->addMaxStreamsFrame(
+      MaxStreamsFrame(2, /*isBidirectionalIn=*/false));
 }
 
 TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {

@@ -487,6 +487,7 @@ class QuicTransportBase : public QuicSocket {
   void invokePeekDataAndCallbacks();
   void invokeDataExpiredCallbacks();
   void invokeDataRejectedCallbacks();
+  void invokeStreamsAvailableCallbacks();
   void updateReadLooper();
   void updatePeekLooper();
   void updateWriteLooper(bool thisIteration);

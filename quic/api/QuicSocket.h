@@ -86,6 +86,20 @@ class QuicSocket {
      * Called after the transport successfully processes the received packet.
      */
     virtual void onFirstPeerPacketProcessed() noexcept {}
+
+    /**
+     * Called when more bidirectional streams become available for creation
+     * (max local bidirectional stream ID was increased).
+     */
+    virtual void onBidirectionalStreamsAvailable(
+        uint64_t /*numStreamsAvailable*/) noexcept {}
+
+    /**
+     * Called when more unidirectional streams become available for creation
+     * (max local unidirectional stream ID was increased).
+     */
+    virtual void onUnidirectionalStreamsAvailable(
+        uint64_t /*numStreamsAvailable*/) noexcept {}
   };
 
   /**

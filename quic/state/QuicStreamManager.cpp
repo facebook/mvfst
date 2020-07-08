@@ -155,6 +155,7 @@ void QuicStreamManager::setMaxLocalBidirectionalStreams(
       initialLocalBidirectionalStreamId_;
   if (force || maxStreamId > maxLocalBidirectionalStreamId_) {
     maxLocalBidirectionalStreamId_ = maxStreamId;
+    maxLocalBidirectionalStreamIdIncreased_ = true;
   }
 }
 
@@ -170,6 +171,7 @@ void QuicStreamManager::setMaxLocalUnidirectionalStreams(
       initialLocalUnidirectionalStreamId_;
   if (force || maxStreamId > maxLocalUnidirectionalStreamId_) {
     maxLocalUnidirectionalStreamId_ = maxStreamId;
+    maxLocalUnidirectionalStreamIdIncreased_ = true;
   }
 }
 
@@ -209,6 +211,18 @@ void QuicStreamManager::setMaxRemoteUnidirectionalStreamsInternal(
   if (force || maxStreamId > maxRemoteUnidirectionalStreamId_) {
     maxRemoteUnidirectionalStreamId_ = maxStreamId;
   }
+}
+
+bool QuicStreamManager::consumeMaxLocalBidirectionalStreamIdIncreased() {
+  bool res = maxLocalBidirectionalStreamIdIncreased_;
+  maxLocalBidirectionalStreamIdIncreased_ = false;
+  return res;
+}
+
+bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
+  bool res = maxLocalUnidirectionalStreamIdIncreased_;
+  maxLocalUnidirectionalStreamIdIncreased_ = false;
+  return res;
 }
 
 void QuicStreamManager::refreshTransportSettings(
@@ -371,16 +385,15 @@ QuicStreamManager::createStream(StreamId streamId) {
   if (existingStream) {
     return existingStream;
   }
-  auto& nextAcceptableStreamId = isUnidirectionalStream(streamId)
+  bool isUni = isUnidirectionalStream(streamId);
+  auto& nextAcceptableStreamId = isUni
       ? nextAcceptableLocalUnidirectionalStreamId_
       : nextAcceptableLocalBidirectionalStreamId_;
-  auto maxStreamId = isUnidirectionalStream(streamId)
-      ? maxLocalUnidirectionalStreamId_
-      : maxLocalBidirectionalStreamId_;
+  auto maxStreamId =
+      isUni ? maxLocalUnidirectionalStreamId_ : maxLocalBidirectionalStreamId_;
 
-  auto& openLocalStreams = isUnidirectionalStream(streamId)
-      ? openUnidirectionalLocalStreams_
-      : openBidirectionalLocalStreams_;
+  auto& openLocalStreams =
+      isUni ? openUnidirectionalLocalStreams_ : openBidirectionalLocalStreams_;
   auto openedResult = openLocalStreamIfNotClosed(
       streamId, openLocalStreams, nextAcceptableStreamId, maxStreamId);
   if (openedResult != LocalErrorCode::NO_ERROR) {
@@ -523,4 +536,5 @@ void QuicStreamManager::setStreamAsControl(QuicStreamState& stream) {
 bool QuicStreamManager::isAppIdle() const {
   return isAppIdle_;
 }
+
 } // namespace quic

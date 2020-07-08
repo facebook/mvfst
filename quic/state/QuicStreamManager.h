@@ -125,24 +125,36 @@ class QuicStreamManager {
   bool streamExists(StreamId streamId);
 
   uint64_t openableLocalBidirectionalStreams() {
+    CHECK_GE(
+        maxLocalBidirectionalStreamId_,
+        nextAcceptableLocalBidirectionalStreamId_);
     return (maxLocalBidirectionalStreamId_ -
             nextAcceptableLocalBidirectionalStreamId_) /
         detail::kStreamIncrement;
   }
 
   uint64_t openableLocalUnidirectionalStreams() {
+    CHECK_GE(
+        maxLocalUnidirectionalStreamId_,
+        nextAcceptableLocalUnidirectionalStreamId_);
     return (maxLocalUnidirectionalStreamId_ -
             nextAcceptableLocalUnidirectionalStreamId_) /
         detail::kStreamIncrement;
   }
 
   uint64_t openableRemoteBidirectionalStreams() {
+    CHECK_GE(
+        maxRemoteBidirectionalStreamId_,
+        nextAcceptablePeerBidirectionalStreamId_);
     return (maxRemoteBidirectionalStreamId_ -
             nextAcceptablePeerBidirectionalStreamId_) /
         detail::kStreamIncrement;
   }
 
   uint64_t openableRemoteUnidirectionalStreams() {
+    CHECK_GE(
+        maxRemoteUnidirectionalStreamId_,
+        nextAcceptablePeerUnidirectionalStreamId_);
     return (maxRemoteUnidirectionalStreamId_ -
             nextAcceptablePeerUnidirectionalStreamId_) /
         detail::kStreamIncrement;
@@ -311,6 +323,18 @@ class QuicStreamManager {
    * unless force is true.
    */
   void setMaxRemoteUnidirectionalStreams(uint64_t maxStreams);
+
+  /*
+   * Returns true if MaxLocalBidirectionalStreamId was increased
+   * since last call of this function (resets flag).
+   */
+  bool consumeMaxLocalBidirectionalStreamIdIncreased();
+
+  /*
+   * Returns true if MaxLocalUnidirectionalStreamId was increased
+   * since last call of this function (resets flag).
+   */
+  bool consumeMaxLocalUnidirectionalStreamIdIncreased();
 
   void refreshTransportSettings(const TransportSettings& settings);
 
@@ -831,6 +855,9 @@ class QuicStreamManager {
   bool isAppIdle_{false};
 
   const TransportSettings* transportSettings_;
+
+  bool maxLocalBidirectionalStreamIdIncreased_{false};
+  bool maxLocalUnidirectionalStreamIdIncreased_{false};
 };
 
 } // namespace quic

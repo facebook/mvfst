@@ -1101,6 +1101,25 @@ void QuicTransportBase::invokeDataRejectedCallbacks() {
   self->conn_->streamManager->clearDataRejected();
 }
 
+void QuicTransportBase::invokeStreamsAvailableCallbacks() {
+  if (conn_->streamManager->consumeMaxLocalBidirectionalStreamIdIncreased()) {
+    // check in case new streams were created in preceding callbacks
+    // and max is already reached
+    auto numStreams = getNumOpenableBidirectionalStreams();
+    if (numStreams > 0) {
+      connCallback_->onBidirectionalStreamsAvailable(numStreams);
+    }
+  }
+  if (conn_->streamManager->consumeMaxLocalUnidirectionalStreamIdIncreased()) {
+    // check in case new streams were created in preceding callbacks
+    // and max is already reached
+    auto numStreams = getNumOpenableUnidirectionalStreams();
+    if (numStreams > 0) {
+      connCallback_->onUnidirectionalStreamsAvailable(numStreams);
+    }
+  }
+}
+
 folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>
 QuicTransportBase::sendDataRejected(StreamId id, uint64_t offset) {
   if (!conn_->partialReliabilityEnabled) {
@@ -1589,6 +1608,8 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       }
     }
   }
+
+  invokeStreamsAvailableCallbacks();
 }
 
 void QuicTransportBase::onNetworkData(
