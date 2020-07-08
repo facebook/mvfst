@@ -903,8 +903,7 @@ void QuicClientTransport::errMessage(
 
 void QuicClientTransport::onReadError(
     const folly::AsyncSocketException& ex) noexcept {
-  if (conn_->transportSettings.closeClientOnReadError &&
-      closeState_ == CloseState::OPEN) {
+  if (closeState_ == CloseState::OPEN) {
     // closeNow will skip draining the socket. onReadError doesn't gets
     // triggered by retriable errors. If we are here, there is no point of
     // draining the socket.

@@ -1734,7 +1734,6 @@ TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
   client->onReadError(folly::AsyncSocketException(
       folly::AsyncSocketException::INTERNAL_ERROR, "Where you wanna go", -1));
   EXPECT_FALSE(client->isClosed());
-  client->getNonConstConn().transportSettings.closeClientOnReadError = true;
   client->onReadError(folly::AsyncSocketException(
       folly::AsyncSocketException::INTERNAL_ERROR,
       "He never saw it coming at all",
