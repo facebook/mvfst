@@ -164,6 +164,8 @@ struct TransportSettings {
   // Whether or not we should stop writing a packet after writing a single
   // stream frame to it.
   bool streamFramePerPacket{false};
+  // Ensure read callbacks are ordered by Stream ID.
+  bool orderedReadCallbacks{false};
 };
 
 } // namespace quic

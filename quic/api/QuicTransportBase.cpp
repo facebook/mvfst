@@ -765,6 +765,9 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
       readableStreams.begin(),
       readableStreams.end(),
       std::back_inserter(readableStreamsCopy));
+  if (self->conn_->transportSettings.orderedReadCallbacks) {
+    std::sort(readableStreamsCopy.begin(), readableStreamsCopy.end());
+  }
   for (StreamId streamId : readableStreamsCopy) {
     auto callback = self->readCallbacks_.find(streamId);
     if (callback == self->readCallbacks_.end()) {
