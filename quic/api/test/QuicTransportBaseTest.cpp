@@ -581,7 +581,6 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableOrdered) {
   transport.reset();
 }
 
-
 TEST_F(QuicTransportImplTest, ReadCallbackChangeReadCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
 
