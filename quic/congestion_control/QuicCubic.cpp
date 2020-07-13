@@ -39,6 +39,13 @@ uint64_t Cubic::getWritableBytes() const noexcept {
       : 0;
 }
 
+void Cubic::handoff(uint64_t newCwnd, uint64_t newInflight) noexcept {
+  cwndBytes_ = newCwnd;
+  // inflightBytes_ = newInflight;
+  conn_.lossState.inflightBytes = newInflight;
+  state_ = CubicStates::Steady;
+}
+
 uint64_t Cubic::getCongestionWindow() const noexcept {
   return cwndBytes_;
 }

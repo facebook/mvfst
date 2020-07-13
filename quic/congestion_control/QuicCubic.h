@@ -100,6 +100,8 @@ class Cubic : public CongestionController {
 
   bool isAppLimited() const noexcept override;
 
+  void handoff(uint64_t newCwnd, uint64_t newInflight) noexcept;
+
   CongestionControlType type() const noexcept override;
 
  protected:
