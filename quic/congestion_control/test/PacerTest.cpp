@@ -151,13 +151,6 @@ TEST_F(PacerTest, CachedBatchSize) {
   EXPECT_EQ(80, pacer.getCachedWriteBatchSize());
 }
 
-TEST_F(PacerTest, AppLimited) {
-  conn.transportSettings.writeConnectionDataPacketsLimit = 12;
-  pacer.setAppLimited(true);
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(12, pacer.updateAndGetWriteBatchSize(Clock::now()));
-}
-
 TEST_F(PacerTest, Tokens) {
   // Pacer has tokens right after init:
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());

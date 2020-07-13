@@ -62,17 +62,13 @@ void DefaultPacer::onPacketsLoss() {
 }
 
 std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
-  return (appLimited_ || tokens_) ? 0us : writeInterval_;
+  return tokens_ ? 0us : writeInterval_;
 }
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
     scheduledWriteTime_.reset();
   };
-  if (appLimited_) {
-    cachedBatchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
-    return cachedBatchSize_;
-  }
   if (writeInterval_ == 0us) {
     return batchSize_;
   }
@@ -100,9 +96,4 @@ void DefaultPacer::setPacingRateCalculator(
     PacingRateCalculator pacingRateCalculator) {
   pacingRateCalculator_ = std::move(pacingRateCalculator);
 }
-
-void DefaultPacer::setAppLimited(bool limited) {
-  appLimited_ = limited;
-}
-
 } // namespace quic
