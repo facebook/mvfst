@@ -17,7 +17,7 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/handshake/ServerHandshake.h>
@@ -303,7 +303,7 @@ class QuicServerTransportTest : public Test {
     supportedVersions = {QuicVersion::MVFST, QuicVersion::QUIC_DRAFT};
     serverCtx = createServerCtx();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
-    ccFactory_ = std::make_shared<DefaultCongestionControllerFactory>();
+    ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
     server = std::make_shared<TestingQuicServerTransport>(
         &evb, std::move(sock), connCallback, serverCtx);
     server->setCongestionControllerFactory(ccFactory_);

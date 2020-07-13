@@ -16,7 +16,7 @@
 
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
@@ -313,6 +313,8 @@ class TPerfServer {
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
     settings.canIgnorePathMTU = true;
+    server_->setCongestionControllerFactory(
+        std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
   }
 

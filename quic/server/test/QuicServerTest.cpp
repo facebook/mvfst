@@ -18,6 +18,7 @@
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
@@ -152,7 +153,7 @@ class QuicServerWorkerTest : public Test {
     worker_->setTransportStatsCallback(std::move(transportInfoCb));
     worker_->setConnectionIdAlgo(std::make_unique<DefaultConnectionIdAlgo>());
     worker_->setCongestionControllerFactory(
-        std::make_shared<DefaultCongestionControllerFactory>());
+        std::make_shared<ServerCongestionControllerFactory>());
     transportInfoCb_ = (MockQuicStats*)worker_->getTransportStatsCallback();
 
     auto cb = [&](const folly::SocketAddress& addr,
