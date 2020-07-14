@@ -84,7 +84,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
     event->packetType = kShortHeaderPacketType.toString();
   } else {
     event->packetType =
-        toString(regularPacket.header.asLong()->getHeaderType());
+        toQlogString(regularPacket.header.asLong()->getHeaderType()).str();
   }
   if (event->packetType != toString(LongHeader::Types::Retry)) {
     // A Retry packet does not include a packet number.
@@ -196,7 +196,8 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
   if (shortHeader) {
     event->packetType = kShortHeaderPacketType.toString();
   } else {
-    event->packetType = toString(writePacket.header.asLong()->getHeaderType());
+    event->packetType =
+        toQlogString(writePacket.header.asLong()->getHeaderType()).str();
   }
 
   uint64_t numPaddingFrames = 0;
@@ -310,7 +311,7 @@ std::unique_ptr<QLogRetryEvent> BaseQLogger::createPacketEvent(
   event->tokenSize = retryPacket.header.getToken().size();
   event->eventType =
       isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
-  event->packetType = toString(retryPacket.header.getHeaderType());
+  event->packetType = toQlogString(retryPacket.header.getHeaderType()).str();
   return event;
 }
 

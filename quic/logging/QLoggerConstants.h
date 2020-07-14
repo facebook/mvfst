@@ -9,11 +9,12 @@
 #pragma once
 
 #include <folly/String.h>
+#include <quic/codec/Types.h>
 #include "quic/QuicConstants.h"
 
 namespace quic {
 constexpr folly::StringPiece kShortHeaderPacketType = "1RTT";
-constexpr auto kVersionNegotiationPacketType = "VersionNegotiation";
+constexpr auto kVersionNegotiationPacketType = "version_negotiation";
 constexpr auto kHTTP3ProtocolType = "QUIC_HTTP3";
 constexpr auto kNoError = "no error";
 constexpr auto kGracefulExit = "graceful exit";
@@ -87,5 +88,9 @@ constexpr folly::StringPiece kQLogClientVantagePoint = "client";
 using VantagePoint = QuicNodeType;
 
 folly::StringPiece vantagePointString(VantagePoint vantagePoint) noexcept;
+
+folly::StringPiece toQlogString(FrameType frame);
+
+folly::StringPiece toQlogString(LongHeader::Types type);
 
 } // namespace quic

@@ -18,4 +18,81 @@ folly::StringPiece vantagePointString(VantagePoint vantagePoint) noexcept {
   }
   folly::assume_unreachable();
 }
+
+folly::StringPiece toQlogString(FrameType frame) {
+  switch (frame) {
+    case FrameType::PADDING:
+      return "padding";
+    case FrameType::PING:
+      return "ping";
+    case FrameType::ACK:
+      return "ack";
+    case FrameType::ACK_ECN:
+      return "ack_ecn";
+    case FrameType::RST_STREAM:
+      return "rst_stream";
+    case FrameType::STOP_SENDING:
+      return "stop_sending";
+    case FrameType::CRYPTO_FRAME:
+      return "crypto_frame";
+    case FrameType::NEW_TOKEN:
+      return "new_token";
+    case FrameType::STREAM:
+    case FrameType::STREAM_FIN:
+    case FrameType::STREAM_LEN:
+    case FrameType::STREAM_LEN_FIN:
+    case FrameType::STREAM_OFF:
+    case FrameType::STREAM_OFF_FIN:
+    case FrameType::STREAM_OFF_LEN:
+    case FrameType::STREAM_OFF_LEN_FIN:
+      return "stream";
+    case FrameType::MAX_DATA:
+      return "max_data";
+    case FrameType::MAX_STREAM_DATA:
+      return "max_stream_data";
+    case FrameType::MAX_STREAMS_BIDI:
+    case FrameType::MAX_STREAMS_UNI:
+      return "max_streams";
+    case FrameType::DATA_BLOCKED:
+      return "data_blocked";
+    case FrameType::STREAM_DATA_BLOCKED:
+      return "stream_data_blocked";
+    case FrameType::STREAMS_BLOCKED_BIDI:
+    case FrameType::STREAMS_BLOCKED_UNI:
+      return "streams_blocked";
+    case FrameType::NEW_CONNECTION_ID:
+      return "new_connection_id";
+    case FrameType::RETIRE_CONNECTION_ID:
+      return "retire_connection_id";
+    case FrameType::PATH_CHALLENGE:
+      return "path_challenge";
+    case FrameType::PATH_RESPONSE:
+      return "path_response";
+    case FrameType::CONNECTION_CLOSE:
+    case FrameType::CONNECTION_CLOSE_APP_ERR:
+      return "connection_close";
+    case FrameType::MIN_STREAM_DATA:
+      return "min_stream_data";
+    case FrameType::EXPIRED_STREAM_DATA:
+      return "expired_stream_data";
+    case FrameType::HANDSHAKE_DONE:
+      return "handshake_done";
+  }
+  folly::assume_unreachable();
+}
+
+folly::StringPiece toQlogString(LongHeader::Types type) {
+  switch (type) {
+    case LongHeader::Types::Initial:
+      return "initial";
+    case LongHeader::Types::Retry:
+      return "RETRY";
+    case LongHeader::Types::Handshake:
+      return "handshake";
+    case LongHeader::Types::ZeroRtt:
+      return "0RTT";
+  }
+  folly::assume_unreachable();
+}
+
 } // namespace quic

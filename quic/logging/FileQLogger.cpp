@@ -388,7 +388,7 @@ folly::dynamic FileQLogger::toDynamicBase() const {
 
   dynamicTrace["events"] = folly::dynamic::array();
   dynamicTrace["event_fields"] =
-      folly::dynamic::array("relative_time", "CATEGORY", "EVENT_TYPE", "DATA");
+      folly::dynamic::array("relative_time", "category", "event", "data");
 
   dynamicObj["traces"].push_back(dynamicTrace);
 

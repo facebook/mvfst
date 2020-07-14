@@ -321,7 +321,7 @@ enum class QLogEventType : uint32_t {
   PathValidation
 };
 
-std::string toString(QLogEventType type);
+folly::StringPiece toString(QLogEventType type);
 
 class QLogEvent {
  public:
@@ -653,7 +653,5 @@ class QLogPathValidationEvent : public QLogEvent {
   bool success_;
   VantagePoint vantagePoint_;
 };
-
-std::string toString(QLogEventType type);
 
 } // namespace quic

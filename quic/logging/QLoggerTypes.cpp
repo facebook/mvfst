@@ -13,14 +13,14 @@ namespace quic {
 
 folly::dynamic PaddingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::PADDING);
+  d["frame_type"] = toQlogString(FrameType::PADDING);
   d["num_frames"] = numFrames;
   return d;
 }
 
 folly::dynamic RstStreamFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::RST_STREAM);
+  d["frame_type"] = toQlogString(FrameType::RST_STREAM);
   d["stream_id"] = streamId;
   d["error_code"] = errorCode;
   d["offset"] = offset;
@@ -35,9 +35,9 @@ folly::dynamic ConnectionCloseFrameLog::toDynamic() const {
   auto isLocalErrorCode = errorCode.asLocalErrorCode();
 
   if (isTransportErrorCode || isLocalErrorCode) {
-    d["frame_type"] = toString(FrameType::CONNECTION_CLOSE);
+    d["frame_type"] = toQlogString(FrameType::CONNECTION_CLOSE);
   } else if (isApplicationErrorCode) {
-    d["frame_type"] = toString(FrameType::CONNECTION_CLOSE_APP_ERR);
+    d["frame_type"] = toQlogString(FrameType::CONNECTION_CLOSE_APP_ERR);
   }
 
   d["error_code"] = toString(errorCode);
@@ -48,14 +48,14 @@ folly::dynamic ConnectionCloseFrameLog::toDynamic() const {
 
 folly::dynamic MaxDataFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::MAX_DATA);
+  d["frame_type"] = toQlogString(FrameType::MAX_DATA);
   d["maximum_data"] = maximumData;
   return d;
 }
 
 folly::dynamic MaxStreamDataFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::MAX_STREAM_DATA);
+  d["frame_type"] = toQlogString(FrameType::MAX_STREAM_DATA);
   d["stream_id"] = streamId;
   d["maximum_data"] = maximumData;
   return d;
@@ -89,20 +89,20 @@ folly::dynamic StreamsBlockedFrameLog::toDynamic() const {
 
 folly::dynamic PingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::PING);
+  d["frame_type"] = toQlogString(FrameType::PING);
   return d;
 }
 
 folly::dynamic DataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::DATA_BLOCKED);
+  d["frame_type"] = toQlogString(FrameType::DATA_BLOCKED);
   d["data_limit"] = dataLimit;
   return d;
 }
 
 folly::dynamic StreamDataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::STREAM_DATA_BLOCKED);
+  d["frame_type"] = toQlogString(FrameType::STREAM_DATA_BLOCKED);
   d["stream_id"] = streamId;
   d["data_limit"] = dataLimit;
   return d;
@@ -114,13 +114,13 @@ folly::dynamic StreamFrameLog::toDynamic() const {
   d["length"] = len;
   d["fin"] = fin;
   d["stream_id"] = folly::to<std::string>(streamId);
-  d["frame_type"] = toString(FrameType::STREAM);
+  d["frame_type"] = toQlogString(FrameType::STREAM);
   return d;
 }
 
 folly::dynamic CryptoFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::CRYPTO_FRAME);
+  d["frame_type"] = toQlogString(FrameType::CRYPTO_FRAME);
   d["offset"] = offset;
   d["len"] = len;
   return d;
@@ -128,7 +128,7 @@ folly::dynamic CryptoFrameLog::toDynamic() const {
 
 folly::dynamic StopSendingFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::STOP_SENDING);
+  d["frame_type"] = toQlogString(FrameType::STOP_SENDING);
   d["stream_id"] = streamId;
   d["error_code"] = errorCode;
   return d;
@@ -136,7 +136,7 @@ folly::dynamic StopSendingFrameLog::toDynamic() const {
 
 folly::dynamic MinStreamDataFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::MIN_STREAM_DATA);
+  d["frame_type"] = toQlogString(FrameType::MIN_STREAM_DATA);
   d["stream_id"] = streamId;
   d["maximum_data"] = maximumData;
   d["minimum_stream_offset"] = minimumStreamOffset;
@@ -145,7 +145,7 @@ folly::dynamic MinStreamDataFrameLog::toDynamic() const {
 
 folly::dynamic ExpiredStreamDataFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::EXPIRED_STREAM_DATA);
+  d["frame_type"] = toQlogString(FrameType::EXPIRED_STREAM_DATA);
   d["stream_id"] = streamId;
   d["minimum_stream_offset"] = minimumStreamOffset;
   return d;
@@ -153,21 +153,21 @@ folly::dynamic ExpiredStreamDataFrameLog::toDynamic() const {
 
 folly::dynamic PathChallengeFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::PATH_CHALLENGE);
+  d["frame_type"] = toQlogString(FrameType::PATH_CHALLENGE);
   d["path_data"] = pathData;
   return d;
 }
 
 folly::dynamic PathResponseFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::PATH_RESPONSE);
+  d["frame_type"] = toQlogString(FrameType::PATH_RESPONSE);
   d["path_data"] = pathData;
   return d;
 }
 
 folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::NEW_CONNECTION_ID);
+  d["frame_type"] = toQlogString(FrameType::NEW_CONNECTION_ID);
   d["sequence"] = sequence;
 
   folly::dynamic dToken = folly::dynamic::array();
@@ -181,7 +181,7 @@ folly::dynamic NewConnectionIdFrameLog::toDynamic() const {
 
 folly::dynamic RetireConnectionIdFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::RETIRE_CONNECTION_ID);
+  d["frame_type"] = toQlogString(FrameType::RETIRE_CONNECTION_ID);
   d["sequence"] = sequence;
   return d;
 }
@@ -195,7 +195,7 @@ folly::dynamic ReadAckFrameLog::toDynamic() const {
         folly::dynamic::array(b.startPacket, b.endPacket));
   }
   d["acked_ranges"] = ackRangeDynamic;
-  d["frame_type"] = toString(FrameType::ACK);
+  d["frame_type"] = toQlogString(FrameType::ACK);
   d["ack_delay"] = ackDelay.count();
   return d;
 }
@@ -208,20 +208,20 @@ folly::dynamic WriteAckFrameLog::toDynamic() const {
     ackRangeDynamic.push_back(folly::dynamic::array(it->start, it->end));
   }
   d["acked_ranges"] = ackRangeDynamic;
-  d["frame_type"] = toString(FrameType::ACK);
+  d["frame_type"] = toQlogString(FrameType::ACK);
   d["ack_delay"] = ackDelay.count();
   return d;
 }
 
 folly::dynamic ReadNewTokenFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::NEW_TOKEN);
+  d["frame_type"] = toQlogString(FrameType::NEW_TOKEN);
   return d;
 }
 
 folly::dynamic HandshakeDoneFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toString(FrameType::HANDSHAKE_DONE);
+  d["frame_type"] = toQlogString(FrameType::HANDSHAKE_DONE);
   return d;
 }
 
@@ -239,7 +239,7 @@ folly::dynamic QLogPacketEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -266,7 +266,7 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
 
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -281,7 +281,7 @@ folly::dynamic QLogVersionNegotiationEvent::toDynamic() const {
 folly::dynamic QLogRetryEvent::toDynamic() const {
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -312,7 +312,7 @@ folly::dynamic QLogConnectionCloseEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "CONNECTIVITY",
+      "connectivity",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -356,7 +356,7 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -396,7 +396,7 @@ folly::dynamic QLogCongestionMetricUpdateEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "METRIC_UPDATE",
+      "metric_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -464,7 +464,7 @@ folly::dynamic QLogPacingMetricUpdateEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "METRIC_UPDATE",
+      "metric_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -493,7 +493,7 @@ QLogPacingObservationEvent::QLogPacingObservationEvent(
 folly::dynamic QLogPacingObservationEvent::toDynamic() const {
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "METRIC_UPDATE",
+      "metric_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -519,7 +519,7 @@ folly::dynamic QLogAppIdleUpdateEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "IDLE_UPDATE",
+      "idle_update",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -543,7 +543,7 @@ folly::dynamic QLogPacketDropEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
-      folly::to<std::string>(refTime.count()), "LOSS", toString(eventType));
+      folly::to<std::string>(refTime.count()), "loss", toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
   data["packet_size"] = packetSize;
@@ -566,7 +566,7 @@ folly::dynamic QLogDatagramReceivedEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -594,7 +594,7 @@ folly::dynamic QLogLossAlarmEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
-      folly::to<std::string>(refTime.count()), "LOSS", toString(eventType));
+      folly::to<std::string>(refTime.count()), "loss", toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
   data["largest_sent"] = largestSent;
@@ -622,7 +622,7 @@ folly::dynamic QLogPacketsLostEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
-      folly::to<std::string>(refTime.count()), "LOSS", toString(eventType));
+      folly::to<std::string>(refTime.count()), "loss", toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
   data["largest_lost_packet_num"] = largestLostPacketNum;
@@ -646,7 +646,7 @@ folly::dynamic QLogTransportStateUpdateEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -673,7 +673,7 @@ folly::dynamic QLogPacketBufferedEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -699,7 +699,7 @@ folly::dynamic QLogPacketAckEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -725,7 +725,7 @@ folly::dynamic QLogMetricUpdateEvent::toDynamic() const {
   // creating a folly::dynamic array to hold the information corresponding to
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
-      folly::to<std::string>(refTime.count()), "RECOVERY", toString(eventType));
+      folly::to<std::string>(refTime.count()), "recovery", toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
   data["latest_rtt"] = latestRtt.count();
@@ -788,7 +788,7 @@ folly::dynamic QLogConnectionMigrationEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -816,7 +816,7 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
   // the event fields relative_time, category, event_type, trigger, data
   folly::dynamic d = folly::dynamic::array(
       folly::to<std::string>(refTime.count()),
-      "TRANSPORT",
+      "transport",
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
@@ -830,52 +830,51 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
   return d;
 }
 
-std::string toString(QLogEventType type) {
+folly::StringPiece toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
-      return "PACKET_SENT";
+      return "packet_sent";
     case QLogEventType::PacketReceived:
-      return "PACKET_RECEIVED";
+      return "packet_received";
     case QLogEventType::ConnectionClose:
-      return "CONNECTION_CLOSE";
+      return "connection_close";
     case QLogEventType::TransportSummary:
-      return "TRANSPORT_SUMMARY";
+      return "transport_summary";
     case QLogEventType::CongestionMetricUpdate:
-      return "CONGESTION_METRIC_UPDATE";
+      return "congestion_metric_update";
     case QLogEventType::PacingMetricUpdate:
-      return "PACING_METRIC_UPDATE";
+      return "pacing_metric_update";
     case QLogEventType::AppIdleUpdate:
-      return "APP_IDLE_UPDATE";
+      return "app_idle_update";
     case QLogEventType::PacketDrop:
-      return "PACKET_DROP";
+      return "packet_drop";
     case QLogEventType::DatagramReceived:
-      return "DATAGRAM_RECEIVED";
+      return "datagram_received";
     case QLogEventType::LossAlarm:
-      return "LOSS_ALARM";
+      return "loss_alarm";
     case QLogEventType::PacketsLost:
-      return "PACKETS_LOST";
+      return "packets_lost";
     case QLogEventType::TransportStateUpdate:
-      return "TRANSPORT_STATE_UPDATE";
+      return "transport_state_update";
     case QLogEventType::PacketBuffered:
-      return "PACKET_BUFFERED";
+      return "packet_buffered";
     case QLogEventType::PacketAck:
-      return "PACKET_ACK";
+      return "packet_ack";
     case QLogEventType::MetricUpdate:
-      return "METRIC_UPDATE";
+      return "metric_update";
     case QLogEventType::StreamStateUpdate:
-      return "STREAM_STATE_UPDATE";
+      return "stream_state_update";
     case QLogEventType::PacingObservation:
-      return "PACING_OBSERVATION";
+      return "pacing_observation";
     case QLogEventType::AppLimitedUpdate:
-      return "APP_LIMITED_UPDATE";
+      return "app_limited_update";
     case QLogEventType::BandwidthEstUpdate:
-      return "BANDWIDTH_EST_UPDATE";
+      return "bandwidth_est_update";
     case QLogEventType::ConnectionMigration:
-      return "CONNECTION_MIGRATION";
+      return "connection_migration";
     case QLogEventType::PathValidation:
-      return "PATH_VALIDATION";
+      return "path_validation";
   }
-  LOG(WARNING) << "toString has unhandled QLog event type";
-  return "UNKNOWN";
+  folly::assume_unreachable();
 }
 } // namespace quic
