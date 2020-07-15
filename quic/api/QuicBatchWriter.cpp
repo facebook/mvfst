@@ -290,9 +290,10 @@ ssize_t GSOInplacePacketBatchWriter::write(
       (nextPacketSize_ && diffToEnd == nextPacketSize_))
       << "diffToEnd=" << diffToEnd << ", pktLimit=" << conn_.udpSendPacketLen
       << ", nextPacketSize_=" << nextPacketSize_;
-  CHECK_LT(diffToEnd, conn_.udpSendPacketLen + kPacketSizeViolationTolerance)
-      << "Remaining buffer contents larger than udpSendPacketLen by "
-      << (diffToEnd - conn_.udpSendPacketLen);
+  if (diffToEnd >= conn_.udpSendPacketLen + kPacketSizeViolationTolerance) {
+    LOG(ERROR) << "Remaining buffer contents larger than udpSendPacketLen by "
+               << (diffToEnd - conn_.udpSendPacketLen);
+  }
   uint64_t diffToStart = lastPacketEnd_ - buf->data();
   buf->trimEnd(diffToEnd);
   auto bytesWritten = (numPackets_ > 1)

@@ -267,6 +267,10 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
   // Include previous packets back.
   packetBuf->prepend(prevSize);
   connection.bufAccessor->release(std::move(packetBuf));
+  if (encodedSize > connection.udpSendPacketLen) {
+    LOG(ERROR) << "Quic sending pkt larger than limit, encodedSize="
+               << encodedSize;
+  }
   // TODO: I think we should add an API that doesn't need a buffer.
   bool ret = ioBufBatch.write(nullptr /* no need to pass buf */, encodedSize);
   // update stats and connection
@@ -338,6 +342,10 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
       packetBuf->length() - headerLen,
       headerCipher);
   auto encodedSize = packetBuf->computeChainDataLength();
+  if (encodedSize > connection.udpSendPacketLen) {
+    LOG(ERROR) << "Quic sending pkt larger than limit, encodedSize="
+               << encodedSize;
+  }
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
   if (ret) {
     // update stats and connection
