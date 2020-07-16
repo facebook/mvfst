@@ -297,6 +297,12 @@ class MockLifecycleObserver : public QuicSocket::LifecycleObserver {
           const folly::Optional<std::pair<QuicErrorCode, std::string>>&));
 };
 
+class MockInstrumentationObserver : public QuicSocket::InstrumentationObserver {
+ public:
+  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
+  GMOCK_METHOD1_(, noexcept, , appRateLimited, void(QuicSocket*));
+};
+
 inline std::ostream& operator<<(std::ostream& os, const MockQuicTransport&) {
   return os;
 }

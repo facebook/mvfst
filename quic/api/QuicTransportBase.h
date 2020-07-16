@@ -510,6 +510,32 @@ class QuicTransportBase : public QuicSocket {
   FOLLY_NODISCARD const LifecycleObserverVec& getLifecycleObservers()
       const override;
 
+  /**
+   * Adds a instrumentation observer.
+   *
+   * Instrumentation observers get notified of various socket events.
+   *
+   * @param observer     Observer to add (implements InstrumentationObserver).
+   */
+  void addInstrumentationObserver(InstrumentationObserver* observer) override;
+
+  /**
+   * Removes a instrumentation observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether observer found and removed from list.
+   */
+  bool removeInstrumentationObserver(
+      InstrumentationObserver* observer) override;
+
+  /**
+   * Returns installed instrumentation observers.
+   *
+   * @return             Reference to const vector with installed observers.
+   */
+  FOLLY_NODISCARD const InstrumentationObserverVec&
+  getInstrumentationObservers() const override;
+
  protected:
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
@@ -662,6 +688,9 @@ class QuicTransportBase : public QuicSocket {
 
   // Lifecycle observers
   LifecycleObserverVec lifecycleObservers_;
+
+  // Instrumentation observers
+  InstrumentationObserverVec instrumentationObservers_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

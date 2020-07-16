@@ -225,6 +225,11 @@ void QuicTransportBase::closeImpl(
   for (const auto& cb : lifecycleObservers_) {
     cb->close(this, errorCode);
   }
+  for (const auto& cb : instrumentationObservers_) {
+    cb->observerDetach(this);
+  }
+  instrumentationObservers_.clear();
+
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
@@ -2364,7 +2369,7 @@ void QuicTransportBase::cancelAllAppCallbacks(
 }
 
 void QuicTransportBase::addLifecycleObserver(LifecycleObserver* observer) {
-  lifecycleObservers_.push_back(observer);
+  lifecycleObservers_.push_back(CHECK_NOTNULL(observer));
   observer->observerAttach(this);
 }
 
@@ -2385,6 +2390,33 @@ bool QuicTransportBase::removeLifecycleObserver(LifecycleObserver* observer) {
 const QuicTransportBase::LifecycleObserverVec&
 QuicTransportBase::getLifecycleObservers() const {
   return lifecycleObservers_;
+}
+
+void QuicTransportBase::addInstrumentationObserver(
+    InstrumentationObserver* observer) {
+  instrumentationObservers_.push_back(CHECK_NOTNULL(observer));
+}
+
+bool QuicTransportBase::removeInstrumentationObserver(
+    InstrumentationObserver* observer) {
+  const auto eraseIt = std::remove(
+      instrumentationObservers_.begin(),
+      instrumentationObservers_.end(),
+      observer);
+  if (eraseIt == instrumentationObservers_.end()) {
+    return false;
+  }
+
+  for (auto it = eraseIt; it != instrumentationObservers_.end(); it++) {
+    (*it)->observerDetach(this);
+  }
+  instrumentationObservers_.erase(eraseIt, instrumentationObservers_.end());
+  return true;
+}
+
+const QuicTransportBase::InstrumentationObserverVec&
+QuicTransportBase::getInstrumentationObservers() const {
+  return instrumentationObservers_;
 }
 
 void QuicTransportBase::writeSocketData() {
@@ -2433,7 +2465,11 @@ void QuicTransportBase::writeSocketData() {
           currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
+        // notify via connection call and any instrumentation callbacks
         connCallback_->onAppRateLimited();
+        for (const auto& cb : instrumentationObservers_) {
+          cb->appRateLimited(this);
+        }
       }
     }
   }

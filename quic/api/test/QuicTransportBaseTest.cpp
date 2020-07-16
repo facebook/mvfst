@@ -2968,5 +2968,84 @@ TEST_F(QuicTransportImplTest, LifecycleObserverMultipleAttachDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb2.get());
 }
 
+TEST_F(QuicTransportImplTest, InstrumentationObserverAttachRemove) {
+  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(), UnorderedElementsAre(cb.get()));
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeInstrumentationObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_THAT(transport->getInstrumentationObservers(), IsEmpty());
+}
+
+TEST_F(QuicTransportImplTest, InstrumentationObserverRemoveMissing) {
+  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  EXPECT_FALSE(transport->removeInstrumentationObserver(cb.get()));
+  EXPECT_THAT(transport->getInstrumentationObservers(), IsEmpty());
+}
+
+TEST_F(QuicTransportImplTest, InstrumentationObserverAttachDestroyTransport) {
+  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(), UnorderedElementsAre(cb.get()));
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicTransportImplTest, InstrumentationObserverMultipleAttachRemove) {
+  auto cb1 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb1.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(),
+      UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb2.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  EXPECT_CALL(*cb2, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeInstrumentationObserver(cb2.get()));
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(),
+      UnorderedElementsAre(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb1, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeInstrumentationObserver(cb1.get()));
+  EXPECT_THAT(transport->getInstrumentationObservers(), IsEmpty());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  transport = nullptr;
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    InstrumentationObserverMultipleAttachDestroyTransport) {
+  auto cb1 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb1.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(),
+      UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport->addInstrumentationObserver(cb2.get());
+  EXPECT_THAT(
+      transport->getInstrumentationObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  EXPECT_CALL(*cb1, observerDetach(transport.get()));
+  EXPECT_CALL(*cb2, observerDetach(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
 } // namespace test
 } // namespace quic

@@ -355,6 +355,102 @@ TEST_F(QuicTransportTest, AppLimited) {
   transport_->close(folly::none);
 }
 
+TEST_F(
+    QuicTransportTest,
+    NotAppLimitedWithNoWritableBytesWithInstrumentationObservers) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Invoke([&]() {
+        if (conn.outstandings.packets.empty()) {
+          return 5000;
+        }
+        return 0;
+      }));
+
+  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport_->addInstrumentationObserver(cb.get());
+
+  auto stream = transport_->createBidirectionalStream().value();
+  transport_->writeChain(
+      stream,
+      IOBuf::copyBuffer("An elephant sitting still"),
+      false,
+      false,
+      nullptr);
+  EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_CALL(*cb, observerDetach(transport_.get()));
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(
+    QuicTransportTest,
+    NotAppLimitedWithLargeBufferWithInstrumentationObservers) {
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(5000));
+
+  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport_->addInstrumentationObserver(cb.get());
+
+  auto stream = transport_->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(100 * 2000);
+  transport_->writeChain(stream, buf->clone(), false, false, nullptr);
+  EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_CALL(*cb, observerDetach(transport_.get()));
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicTransportTest, AppLimitedWithInstrumentationObservers) {
+  auto cb1 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  transport_->addInstrumentationObserver(cb1.get());
+  transport_->addInstrumentationObserver(cb2.get());
+
+  auto& conn = transport_->getConnectionState();
+  // Replace with MockConnectionCallback:
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(5000));
+
+  auto stream = transport_->createBidirectionalStream().value();
+  transport_->writeChain(
+      stream,
+      IOBuf::copyBuffer("An elephant sitting still"),
+      false,
+      false,
+      nullptr);
+  EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(1);
+  EXPECT_CALL(*cb1, appRateLimited(transport_.get()));
+  EXPECT_CALL(*cb2, appRateLimited(transport_.get()));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_CALL(*cb1, observerDetach(transport_.get()));
+  EXPECT_CALL(*cb2, observerDetach(transport_.get()));
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
 TEST_F(QuicTransportTest, WriteSmall) {
   // Testing writing a small buffer that could be fit in a single packet
   auto stream = transport_->createBidirectionalStream().value();

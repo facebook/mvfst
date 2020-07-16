@@ -952,7 +952,7 @@ class QuicSocket {
     virtual void observerAttach(QuicSocket* /* socket */) noexcept = 0;
 
     /**
-     * observerDetached() will be invoked if the observer is uninstalled prior
+     * observerDetach() will be invoked if the observer is uninstalled prior
      * to socket destruction.
      *
      * No further callbacks will be invoked after observerDetach().
@@ -1020,5 +1020,64 @@ class QuicSocket {
    */
   FOLLY_NODISCARD virtual const LifecycleObserverVec& getLifecycleObservers()
       const = 0;
+
+  /**
+   * ===== Instrumentation Observer API =====
+   */
+
+  /**
+   * Observer of socket instrumentation events.
+   */
+  class InstrumentationObserver {
+   public:
+    virtual ~InstrumentationObserver() = default;
+
+    /**
+     * observerDetach() will be invoked when the observer is uninstalled.
+     *
+     * No further callbacks will be invoked after observerDetach().
+     *
+     * @param socket      Socket where observer was uninstalled.
+     */
+    virtual void observerDetach(QuicSocket* /* socket */) noexcept = 0;
+
+    /**
+     * appRateLimited() is invoked when the socket is app rate limited.
+     *
+     * @param socket      Socket that has become application rate limited.
+     */
+    virtual void appRateLimited(QuicSocket* /* socket */) {}
+  };
+
+  // Container for instrumentation observers.
+  // Avoids heap allocation for up to 2 observers being installed.
+  using InstrumentationObserverVec = SmallVec<InstrumentationObserver*, 2>;
+
+  /**
+   * Adds a instrumentation observer.
+   *
+   * Instrumentation observers get notified of various socket events.
+   *
+   * @param observer     Observer to add (implements InstrumentationObserver).
+   */
+  virtual void addInstrumentationObserver(
+      InstrumentationObserver* observer) = 0;
+
+  /**
+   * Removes a instrumentation observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether observer found and removed from list.
+   */
+  virtual bool removeInstrumentationObserver(
+      InstrumentationObserver* observer) = 0;
+
+  /**
+   * Returns installed instrumentation observers.
+   *
+   * @return             Reference to const vector with installed observers.
+   */
+  FOLLY_NODISCARD virtual const InstrumentationObserverVec&
+  getInstrumentationObservers() const = 0;
 };
 } // namespace quic

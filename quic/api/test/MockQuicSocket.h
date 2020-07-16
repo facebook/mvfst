@@ -240,5 +240,11 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(addLifecycleObserver, void(LifecycleObserver*));
   MOCK_METHOD1(removeLifecycleObserver, bool(LifecycleObserver*));
   MOCK_CONST_METHOD0(getLifecycleObservers, const LifecycleObserverVec&());
+
+  MOCK_METHOD1(addInstrumentationObserver, void(InstrumentationObserver*));
+  MOCK_METHOD1(removeInstrumentationObserver, bool(InstrumentationObserver*));
+  MOCK_CONST_METHOD0(
+      getInstrumentationObservers,
+      const InstrumentationObserverVec&());
 };
 } // namespace quic
