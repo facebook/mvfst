@@ -13,6 +13,7 @@
 #include <quic/congestion_control/BbrRttSampler.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/congestion_control/NewReno.h>
+#include <quic/congestion_control/QuicCCP.h>
 #include <quic/congestion_control/QuicCubic.h>
 
 #include <memory>
@@ -41,6 +42,15 @@ ServerCongestionControllerFactory::makeCongestionController(
       congestionController = std::move(bbr);
       break;
     }
+    case CongestionControlType::CCP:
+#ifdef CCP_ENABLED
+      congestionController = std::make_unique<CCP>(conn);
+#else
+      throw QuicInternalException(
+          "ccp not enabled. must be compiled with -DCCP_ENABLED",
+          LocalErrorCode::INTERNAL_ERROR);
+#endif
+      break;
     case CongestionControlType::None:
       break;
   }

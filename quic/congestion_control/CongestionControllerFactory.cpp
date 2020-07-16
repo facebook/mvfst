@@ -41,6 +41,10 @@ DefaultCongestionControllerFactory::makeCongestionController(
       congestionController = std::move(bbr);
       break;
     }
+    case CongestionControlType::CCP:
+      throw QuicInternalException(
+          "CCP congestion control only available on server (via ServerCongestionControllerFactory)",
+          LocalErrorCode::INTERNAL_ERROR);
     case CongestionControlType::None:
       break;
   }
