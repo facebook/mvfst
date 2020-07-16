@@ -685,4 +685,51 @@ std::vector<folly::EventBase*> QuicServer::getWorkerEvbs() const noexcept {
   return ebvs;
 }
 
+bool QuicServer::addAcceptObserver(
+    folly::EventBase* evb,
+    AcceptObserver* observer) {
+  CHECK(initialized_);
+  CHECK(evb);
+  bool success = false;
+  evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
+    std::lock_guard<std::mutex> guard(startMutex_);
+    if (shutdown_) {
+      return;
+    }
+    auto it = evbToWorkers_.find(evb);
+    if (it != evbToWorkers_.end()) {
+      it->second->addAcceptObserver(observer);
+      success = true;
+    } else {
+      VLOG(3) << "Couldn't find associated worker for the given eventbase, "
+              << "unable to add AcceptObserver";
+      success = false;
+    }
+  });
+  return success;
+}
+
+bool QuicServer::removeAcceptObserver(
+    folly::EventBase* evb,
+    AcceptObserver* observer) {
+  CHECK(initialized_);
+  CHECK(evb);
+  bool success = false;
+  evb->runImmediatelyOrRunInEventBaseThreadAndWait([&] {
+    std::lock_guard<std::mutex> guard(startMutex_);
+    if (shutdown_) {
+      return;
+    }
+    auto it = evbToWorkers_.find(evb);
+    if (it != evbToWorkers_.end()) {
+      success = it->second->removeAcceptObserver(observer);
+    } else {
+      VLOG(3) << "Couldn't find associated worker for the given eventbase, "
+              << "unable to remove AcceptObserver";
+      success = false;
+    }
+  });
+  return success;
+}
+
 } // namespace quic

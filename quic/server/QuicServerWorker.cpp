@@ -14,6 +14,7 @@
 #include <quic/common/SocketUtil.h>
 #include <quic/common/Timers.h>
 
+#include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
@@ -24,7 +25,8 @@ QuicServerWorker::QuicServerWorker(
     bool setEventCallback)
     : callback_(callback),
       setEventCallback_(setEventCallback),
-      takeoverPktHandler_(this) {}
+      takeoverPktHandler_(this),
+      observerList_(this) {}
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
   return evb_;
@@ -617,6 +619,10 @@ void QuicServerWorker::dispatchPacketData(
                 client.describe(),
                 logRoutingInfo(routingData.destinationConnId));
             dropPacket = true;
+          } else {
+            for (const auto& observer : observerList_.getAll()) {
+              observer->accept(trans.get());
+            }
           }
           transport = trans;
         }
@@ -1071,4 +1077,34 @@ std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
              (uint32_t)connIdParam->hostId)
       .str();
 }
+
+QuicServerWorker::AcceptObserverList::AcceptObserverList(
+    QuicServerWorker* worker)
+    : worker_(worker) {}
+
+QuicServerWorker::AcceptObserverList::~AcceptObserverList() {
+  for (const auto& cb : observers_) {
+    cb->acceptorDestroy(worker_);
+  }
+}
+
+void QuicServerWorker::AcceptObserverList::add(AcceptObserver* observer) {
+  observers_.emplace_back(CHECK_NOTNULL(observer));
+  observer->observerAttach(worker_);
+}
+
+bool QuicServerWorker::AcceptObserverList::remove(AcceptObserver* observer) {
+  const auto eraseIt =
+      std::remove(observers_.begin(), observers_.end(), observer);
+  if (eraseIt == observers_.end()) {
+    return false;
+  }
+
+  for (auto it = eraseIt; it != observers_.end(); it++) {
+    (*it)->observerDetach(worker_);
+  }
+  observers_.erase(eraseIt, observers_.end());
+  return true;
+}
+
 } // namespace quic

@@ -316,6 +316,37 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   std::vector<folly::EventBase*> getWorkerEvbs() const noexcept;
 
+  /**
+   * Adds observer for accept events.
+   *
+   * Adds for the worker associated with the given EventBase. This is relevant
+   * if the QuicServer is initialized with a vector of EventBase supplied by
+   * the caller. With this approach, each worker thread can (but is not
+   * required to) have its own observer, removing the need for the observer
+   * implementation to be thread safe.
+   *
+   * Can be used to install socket observers and instrumentation without
+   * changing / interfering with application-specific acceptor logic.
+   *
+   * See AcceptObserver class for details.
+   *
+   * @param evb           Worker EventBase for which we want to add observer.
+   * @param observer      Observer to add (implements AcceptObserver).
+   * @return              Whether worker found and observer added.
+   */
+  bool addAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
+
+  /**
+   * Remove observer for accept events.
+   *
+   * Removes for the worker associated with the given EventBase.
+   *
+   * @param evb           Worker EventBase for which we want to remove observer.
+   * @param observer      Observer to remove.
+   * @return              Whether worker + observer found and observer removed.
+   */
+  bool removeAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
+
  private:
   QuicServer();
 

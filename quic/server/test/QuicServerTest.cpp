@@ -19,6 +19,7 @@
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
+#include <quic/server/AcceptObserver.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
@@ -31,6 +32,8 @@ using OnDataAvailableParams =
     folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams;
 
 const folly::SocketAddress kClientAddr("1.2.3.4", 1234);
+const folly::SocketAddress kClientAddr2("1.2.3.5", 1235);
+const folly::SocketAddress kClientAddr3("1.2.3.6", 1236);
 
 namespace quic {
 namespace {
@@ -966,6 +969,141 @@ TEST_F(QuicServerWorkerTest, AssignBufAccessor) {
   // From shutdownAllConnections:
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(1);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(1);
+}
+
+class MockAcceptObserver : public AcceptObserver {
+ public:
+  GMOCK_METHOD1_(, noexcept, , accept, void(QuicTransportBase* const));
+  GMOCK_METHOD1_(, noexcept, , acceptorDestroy, void(QuicServerWorker*));
+  GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicServerWorker*));
+  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicServerWorker*));
+};
+
+TEST_F(QuicServerWorkerTest, AcceptObserver) {
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb.get());
+
+  auto initTestSocketAndTransport = [this]() {
+    NiceMock<MockConnectionCallback> connCb;
+    auto mockSock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(
+        &eventbase_);
+    EXPECT_CALL(*mockSock, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+    MockQuicTransport::Ptr mockTransport = std::make_shared<MockQuicTransport>(
+        worker_->getEventBase(), std::move(mockSock), connCb, nullptr);
+    EXPECT_CALL(*mockTransport, setRoutingCallback(nullptr));
+    EXPECT_CALL(*mockTransport, setTransportStatsCallback(nullptr));
+    EXPECT_CALL(*mockTransport, getEventBase())
+        .WillRepeatedly(Return(&eventbase_));
+    EXPECT_CALL(*mockTransport, getOriginalPeerAddress())
+        .WillRepeatedly(ReturnRef(kClientAddr));
+    return std::make_pair(std::move(mockSock), std::move(mockTransport));
+  };
+
+  // add first connection, expect events
+  const auto [sock1, transport1] = initTestSocketAndTransport();
+  EXPECT_CALL(*cb, accept(transport1.get()));
+  createQuicConnection(kClientAddr, getTestConnectionId(hostId_), transport1);
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // add second connection, expect events
+  const auto [sock2, transport2] = initTestSocketAndTransport();
+  EXPECT_CALL(*cb, accept(transport2.get()));
+  createQuicConnection(kClientAddr2, getTestConnectionId(hostId_), transport2);
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // remove AcceptObserver
+  EXPECT_CALL(*cb, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // add third connection, no events
+  const auto [sock3, transport3] = initTestSocketAndTransport();
+  createQuicConnection(kClientAddr3, getTestConnectionId(hostId_), transport3);
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverRemove) {
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverRemoveMissing) {
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_FALSE(worker_->removeAcceptObserver(cb.get()));
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverDestroyWorker) {
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // destroy the acceptor while the AcceptObserver is installed
+  EXPECT_CALL(*cb, acceptorDestroy(worker_.get()));
+  worker_ = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverMultipleRemove) {
+  auto cb1 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb1.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+
+  auto cb2 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb2.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb2, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb2.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb1, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverMultipleAcceptorDestroyed) {
+  auto cb1 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb1.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+
+  auto cb2 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb2.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  // destroy the acceptor while the AcceptObserver is installed
+  EXPECT_CALL(*cb1, acceptorDestroy(worker_.get()));
+  EXPECT_CALL(*cb2, acceptorDestroy(worker_.get()));
+  worker_ = nullptr;
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverRemoveCallbackThenDestroyWorker) {
+  auto cb = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  worker_ = nullptr;
 }
 
 auto createInitialStream(
