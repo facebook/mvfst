@@ -15,6 +15,7 @@
 #include <quic/common/Timers.h>
 
 #include <quic/server/AcceptObserver.h>
+#include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
@@ -26,7 +27,9 @@ QuicServerWorker::QuicServerWorker(
     : callback_(callback),
       setEventCallback_(setEventCallback),
       takeoverPktHandler_(this),
-      observerList_(this) {}
+      observerList_(this) {
+  ccpReader_ = std::make_unique<CCPReader>();
+}
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
   return evb_;
@@ -574,6 +577,9 @@ void QuicServerWorker::dispatchPacketData(
           trans->setRoutingCallback(this);
           trans->setSupportedVersions(supportedVersions_);
           trans->setOriginalPeerAddress(client);
+#ifdef CCP_ENABLED
+          trans->setCcpDatapath(getCcpReader()->getDatapath());
+#endif
           trans->setCongestionControllerFactory(ccFactory_);
           if (transportSettingsOverrideFn_) {
             folly::Optional<TransportSettings> overridenTransportSettings =
@@ -823,6 +829,10 @@ uint8_t QuicServerWorker::getWorkerId() const noexcept {
 
 void QuicServerWorker::setHostId(uint16_t hostId) noexcept {
   hostId_ = hostId;
+}
+
+CCPReader* QuicServerWorker::getCcpReader() const noexcept {
+  return ccpReader_.get();
 }
 
 void QuicServerWorker::setNewConnectionSocketFactory(

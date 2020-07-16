@@ -12,6 +12,7 @@
 #include <folly/io/async/EventBaseManager.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
+#include <quic/server/CCPReader.h>
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -203,11 +204,15 @@ void QuicServer::bindWorkersToSocket(
   auto numWorkers = evbs.size();
   CHECK(!initialized_);
   boundAddress_ = address;
+  auto usingCCP = isUsingCCP();
+  auto ccpInitFailed = false;
   for (size_t i = 0; i < numWorkers; ++i) {
     auto workerEvb = evbs[i];
     workerEvb->runInEventBaseThreadAndWait([self = this->shared_from_this(),
                                             workerEvb,
                                             numWorkers,
+                                            usingCCP,
+                                            &ccpInitFailed,
                                             processId = processId_,
                                             idx = i] {
       std::lock_guard<std::mutex> guard(self->startMutex_);
@@ -248,12 +253,31 @@ void QuicServer::bindWorkersToSocket(
           self->boundAddress_ = worker->getAddress();
         }
       }
+      if (usingCCP) {
+        try {
+          worker->getCcpReader()->try_initialize(
+              worker->getEventBase(), worker->getWorkerId());
+        } catch (const folly::AsyncSocketException& ex) {
+          // probably means the unix socket failed to bind
+          LOG(ERROR) << "error initializing ccp: " << ex.what()
+                     << "\nshutting down...";
+          // TODO also update counters
+          ccpInitFailed = true;
+        } catch (const std::exception& ex) {
+          LOG(ERROR) << "error initializing ccp: " << ex.what()
+                     << "\nshutting down...";
+          ccpInitFailed = true;
+        }
+      }
       if (idx == (numWorkers - 1)) {
         VLOG(4) << "Initialized all workers in the eventbase";
         self->initialized_ = true;
         self->startCv_.notify_all();
       }
     });
+    if (usingCCP && ccpInitFailed) {
+      shutdown();
+    }
   }
 }
 
@@ -266,9 +290,14 @@ void QuicServer::start() {
     workerPtr_.reset(
         worker, [](auto /* worker */, folly::TLPDestructionMode) {});
   });
+  auto usingCCP = isUsingCCP();
   for (auto& worker : workers_) {
-    worker->getEventBase()->runInEventBaseThread(
-        [&worker] { worker->start(); });
+    worker->getEventBase()->runInEventBaseThread([&worker, usingCCP] {
+      if (usingCCP) {
+        worker->getCcpReader()->start();
+      }
+      worker->start();
+    });
   }
 }
 
@@ -439,9 +468,13 @@ void QuicServer::shutdown(LocalErrorCode error) {
         !worker->getEventBase()->isInEventBaseThread());
   }
   shutdown_ = true;
+  auto usingCCP = isUsingCCP();
   for (auto& worker : workers_) {
     worker->getEventBase()->runInEventBaseThreadAndWait([&] {
       worker->shutdownAllConnections(error);
+      if (usingCCP) {
+        worker->getCcpReader()->shutdown();
+      }
       workerPtr_.reset();
     });
     // protecting the erase in map with the mutex since
@@ -546,6 +579,23 @@ void QuicServer::setTransportSettings(TransportSettings transportSettings) {
   runOnAllWorkers([transportSettings](auto worker) mutable {
     worker->setTransportSettings(transportSettings);
   });
+}
+
+void QuicServer::setCcpConfig(std::string ccpConfig) {
+  ccpConfig_ = std::move(ccpConfig);
+}
+
+bool QuicServer::isUsingCCP() {
+  auto foundConfig = !ccpConfig_.empty();
+#ifdef CCP_ENABLED
+  return foundConfig;
+#else
+  if (foundConfig) {
+    LOG(ERROR)
+        << "found ccp config, but server was not compiled with ccp support. recompile with -DCCP_ENABLED.";
+  }
+  return false;
+#endif
 }
 
 void QuicServer::rejectNewConnections(bool reject) {

@@ -14,6 +14,7 @@ add_library(
   Copa.cpp
   NewReno.cpp
   QuicCubic.cpp
+  QuicCCP.cpp
   Pacer.cpp
 )
 

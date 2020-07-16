@@ -10,6 +10,7 @@ add_library(
   QuicServerPacketRouter.cpp
   QuicServerTransport.cpp
   QuicServerWorker.cpp
+  CCPReader.cpp
   SlidingWindowRateLimiter.cpp
   handshake/ServerHandshake.cpp
   handshake/AppToken.cpp
@@ -34,6 +35,7 @@ target_compile_options(
 add_dependencies(
   mvfst_server
   mvfst_buf_accessor
+  mvfst_cc_algo
   mvfst_constants
   mvfst_codec
   mvfst_codec_types

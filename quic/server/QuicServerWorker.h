@@ -18,6 +18,7 @@
 #include <quic/common/BufAccessor.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerPacketRouter.h>
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicUDPSocketFactory.h>
@@ -304,6 +305,13 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    */
   void setRateLimiter(std::unique_ptr<RateLimiter> rateLimiter);
 
+  /*
+   * Get a reference to this worker's corresponding CCPReader.
+   * Each worker has a CCPReader that handles recieving messages from CCP
+   * and dispatching them to the correct connection.
+   */
+  FOLLY_NODISCARD CCPReader* getCcpReader() const noexcept;
+
   // Read callback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
 
@@ -570,6 +578,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   // List of AcceptObservers
   AcceptObserverList observerList_;
+
+  std::unique_ptr<CCPReader> ccpReader_;
 };
 
 } // namespace quic

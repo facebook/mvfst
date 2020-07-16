@@ -50,7 +50,9 @@ CCP::CCP(QuicConnectionStateBase& conn)
 
   // Inform CCP about this new connection. The returned ccp_conn_ object
   // contains per-connection state and must be passed to all other libccp
-  // functions regarding this connection.
+  // functions regarding this connection. We pass a reference to ourself
+  // so that it can be pulled out later by CCPReader when it needs to look
+  // up the correct CCP instance for a given connection id.
   ccp_conn_ = ccp_connection_start(datapath_, (void*)this, &info);
   if (ccp_conn_ == nullptr) {
     fallback();

@@ -160,6 +160,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    */
   void setTransportSettings(TransportSettings transportSettings);
 
+  void setCcpConfig(std::string ccpConfig);
+
   /**
    * Tells the server to start rejecting any new connection
    */
@@ -373,6 +375,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
                                                QuicVersion::MVFST_D24,
                                                QuicVersion::QUIC_DRAFT,
                                                QuicVersion::QUIC_DRAFT_LEGACY}};
+
+  bool isUsingCCP();
+
   std::atomic<bool> shutdown_{true};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   TransportSettings transportSettings_;
@@ -382,6 +387,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::condition_variable startCv_;
   std::atomic<bool> takeoverHandlerInitialized_{false};
   std::vector<std::unique_ptr<folly::ScopedEventBaseThread>> workerEvbs_;
+  std::string ccpConfig_;
   std::vector<std::unique_ptr<QuicServerWorker>> workers_;
   // Thread local pointer to QuicServerWorker. This is useful to avoid
   // looking up the worker to route to.
