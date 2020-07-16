@@ -114,6 +114,15 @@ class QuicServerTransport
 
   virtual void setBufAccessor(BufAccessor* bufAccessor);
 
+#ifdef CCP_ENABLED
+  /*
+   * This function must be called with an initialized ccp_datapath (via
+   * libccp:ccp_init) before starting any connections using the CCP congestion
+   * control algorithm. See further notes on this struct in the header file.
+   */
+  void setCcpDatapath(struct ccp_datapath* datapath);
+#endif
+
  protected:
   // From ServerHandshake::HandshakeCallback
   virtual void onCryptoEventAvailable() noexcept override;

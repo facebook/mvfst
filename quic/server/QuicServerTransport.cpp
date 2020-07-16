@@ -493,4 +493,10 @@ void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
   conn_->bufAccessor = bufAccessor;
 }
 
+#ifdef CCP_ENABLED
+void QuicServerTransport::setCcpDatapath(struct ccp_datapath* datapath) {
+  serverConn_->ccpDatapath = datapath;
+}
+#endif
+
 } // namespace quic
