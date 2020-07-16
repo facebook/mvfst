@@ -236,5 +236,9 @@ class MockQuicSocket : public QuicSocket {
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
       earlyDataAppParamsValidator_;
   folly::Function<Buf()> earlyDataAppParamsGetter_;
+
+  MOCK_METHOD1(addLifecycleObserver, void(LifecycleObserver*));
+  MOCK_METHOD1(removeLifecycleObserver, bool(LifecycleObserver*));
+  MOCK_CONST_METHOD0(getLifecycleObservers, const LifecycleObserverVec&());
 };
 } // namespace quic

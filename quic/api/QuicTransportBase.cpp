@@ -126,6 +126,9 @@ QuicTransportBase::~QuicTransportBase() {
     sock->pauseRead();
     sock->close();
   }
+  for (const auto& cb : lifecycleObservers_) {
+    cb->destroy(this);
+  }
 }
 
 bool QuicTransportBase::good() const {
@@ -219,6 +222,9 @@ void QuicTransportBase::closeImpl(
     folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode,
     bool drainConnection,
     bool sendCloseImmediately) {
+  for (const auto& cb : lifecycleObservers_) {
+    cb->close(this, errorCode);
+  }
   if (closeState_ == CloseState::CLOSED) {
     return;
   }
@@ -2355,6 +2361,30 @@ void QuicTransportBase::cancelAllAppCallbacks(
     wcb->onStreamWriteError(it->first, err);
     it = pendingWriteCallbacks_.erase(it);
   }
+}
+
+void QuicTransportBase::addLifecycleObserver(LifecycleObserver* observer) {
+  lifecycleObservers_.push_back(observer);
+  observer->observerAttach(this);
+}
+
+bool QuicTransportBase::removeLifecycleObserver(LifecycleObserver* observer) {
+  const auto eraseIt = std::remove(
+      lifecycleObservers_.begin(), lifecycleObservers_.end(), observer);
+  if (eraseIt == lifecycleObservers_.end()) {
+    return false;
+  }
+
+  for (auto it = eraseIt; it != lifecycleObservers_.end(); it++) {
+    (*it)->observerDetach(this);
+  }
+  lifecycleObservers_.erase(eraseIt, lifecycleObservers_.end());
+  return true;
+}
+
+const QuicTransportBase::LifecycleObserverVec&
+QuicTransportBase::getLifecycleObservers() const {
+  return lifecycleObservers_;
 }
 
 void QuicTransportBase::writeSocketData() {

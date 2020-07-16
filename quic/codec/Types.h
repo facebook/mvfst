@@ -12,13 +12,13 @@
 #include <folly/IPAddress.h>
 #include <folly/Optional.h>
 #include <folly/io/Cursor.h>
-#include <folly/small_vector.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicInteger.h>
 #include <quic/common/BufUtil.h>
 #include <quic/common/IntervalSet.h>
+#include <quic/common/SmallVec.h>
 #include <quic/common/Variant.h>
 
 /**
@@ -30,14 +30,6 @@ namespace quic {
 
 using StreamId = uint64_t;
 using PacketNum = uint64_t;
-
-#if !FOLLY_MOBILE
-template <class T, std::size_t N, class S>
-using SmallVec = folly::small_vector<T, N, S>;
-#else
-template <class T, std::size_t N, class S>
-using SmallVec = std::vector<T>;
-#endif
 
 enum class PacketNumberSpace : uint8_t {
   Initial,

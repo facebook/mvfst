@@ -2786,5 +2786,187 @@ TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
   evb->loopOnce();
 }
 
+TEST_F(QuicTransportImplTest, LifecycleObserverAttachRemove) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_THAT(transport->getLifecycleObservers(), IsEmpty());
+}
+
+TEST_F(QuicTransportImplTest, LifecycleObserverRemoveMissing) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_FALSE(transport->removeLifecycleObserver(cb.get()));
+  EXPECT_THAT(transport->getLifecycleObservers(), IsEmpty());
+}
+
+TEST_F(QuicTransportImplTest, LifecycleObserverDestroyTransport) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+  InSequence s;
+  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
+  EXPECT_CALL(*cb, destroy(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    LifecycleObserverCloseNoErrorThenDestroyTransport) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+
+  const std::pair<QuicErrorCode, std::string> defaultError = std::make_pair(
+      GenericApplicationErrorCode::NO_ERROR,
+      toString(GenericApplicationErrorCode::NO_ERROR));
+  EXPECT_CALL(*cb, close(transport.get(), folly::Optional(defaultError)));
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(cb.get());
+  InSequence s;
+  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
+  EXPECT_CALL(*cb, destroy(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    LifecycleObserverCloseWithErrorThenDestroyTransport) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+
+  const auto testError = std::make_pair(
+      QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
+      std::string("testError"));
+  EXPECT_CALL(*cb, close(transport.get(), folly::Optional(testError)));
+  transport->close(testError);
+  Mock::VerifyAndClearExpectations(cb.get());
+  InSequence s;
+  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
+  EXPECT_CALL(*cb, destroy(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicTransportImplTest, LifecycleObserverDetachObserverImmediately) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_THAT(transport->getLifecycleObservers(), IsEmpty());
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    LifecycleObserverDetachObserverAfterTransportClose) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+
+  EXPECT_CALL(*cb, close(transport.get(), _));
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_THAT(transport->getLifecycleObservers(), IsEmpty());
+}
+
+TEST_F(
+    QuicTransportImplTest,
+    LifecycleObserverDetachObserverOnCloseDuringTransportDestroy) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb.get()));
+
+  InSequence s;
+  EXPECT_CALL(*cb, close(transport.get(), _))
+      .WillOnce(Invoke([&cb](auto callbackTransport, auto /* errorOpt */) {
+        EXPECT_TRUE(callbackTransport->removeLifecycleObserver(cb.get()));
+      }));
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
+TEST_F(QuicTransportImplTest, LifecycleObserverMultipleAttachRemove) {
+  auto cb1 = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb1.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb2.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  EXPECT_CALL(*cb2, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb2.get()));
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb1, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb1.get()));
+  EXPECT_THAT(transport->getLifecycleObservers(), IsEmpty());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  transport = nullptr;
+}
+
+TEST_F(QuicTransportImplTest, LifecycleObserverMultipleAttachDestroyTransport) {
+  auto cb1 = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb1.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(), UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb2.get());
+  EXPECT_THAT(
+      transport->getLifecycleObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  InSequence s;
+  EXPECT_CALL(*cb1, close(transport.get(), _));
+  EXPECT_CALL(*cb2, close(transport.get(), _));
+  EXPECT_CALL(*cb1, close(transport.get(), _));
+  EXPECT_CALL(*cb2, close(transport.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport.get()));
+  EXPECT_CALL(*cb2, destroy(transport.get()));
+  transport = nullptr;
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
 } // namespace test
 } // namespace quic

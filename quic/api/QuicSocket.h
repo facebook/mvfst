@@ -13,6 +13,7 @@
 #include <folly/io/IOBuf.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
+#include <quic/common/SmallVec.h>
 #include <quic/state/StateData.h>
 
 #include <chrono>
@@ -926,5 +927,93 @@ class QuicSocket {
    * Set congestion control type.
    */
   virtual void setCongestionControl(CongestionControlType type) = 0;
+
+  /**
+   * ===== Lifecycle Observer API =====
+   */
+
+  /**
+   * Observer of socket lifecycle events.
+   */
+  class LifecycleObserver {
+   public:
+    virtual ~LifecycleObserver() = default;
+
+    /**
+     * observerAttach() will be invoked when an observer is added.
+     *
+     * @param socket      Socket where observer was installed.
+     */
+    virtual void observerAttach(QuicSocket* /* socket */) noexcept = 0;
+
+    /**
+     * observerDetached() will be invoked if the observer is uninstalled prior
+     * to socket destruction.
+     *
+     * No further callbacks will be invoked after observerDetach().
+     *
+     * @param socket      Socket where observer was uninstalled.
+     */
+    virtual void observerDetach(QuicSocket* /* socket */) noexcept = 0;
+
+    /**
+     * destroy() will be invoked when the QuicSocket's destructor is invoked.
+     *
+     * No further callbacks will be invoked after destroy().
+     *
+     * @param socket      Socket being destroyed.
+     */
+    virtual void destroy(QuicSocket* /* socket */) noexcept = 0;
+
+    /**
+     * close() will be invoked when the socket is being closed.
+     *
+     * If the callback handler does not unsubscribe itself upon being called,
+     * then it may be called multiple times (e.g., by a call to close() by
+     * the application, and then again when closeNow() is called on
+     * destruction).
+     *
+     * @param socket      Socket being closed.
+     * @param errorOpt    Error information, if connection closed due to error.
+     */
+    virtual void close(
+        QuicSocket* /* socket */,
+        const folly::Optional<std::pair<
+            QuicErrorCode,
+            std::string>>& /* errorOpt */) noexcept = 0;
+  };
+
+  // Container for lifecycle observers.
+  // Avoids heap allocation for up to 2 observers being installed.
+  using LifecycleObserverVec = SmallVec<LifecycleObserver*, 2>;
+
+  /**
+   * Adds a lifecycle observer.
+   *
+   * Observers can tie their lifetime to aspects of this socket's lifecycle /
+   * lifetime and perform inspection at various states.
+   *
+   * This enables instrumentation to be added without changing / interfering
+   * with how the application uses the socket.
+   *
+   * @param observer     Observer to add (implements LifecycleObserver).
+   */
+  virtual void addLifecycleObserver(LifecycleObserver* observer) = 0;
+
+  /**
+   * Removes a lifecycle observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether observer found and removed from list.
+   */
+  virtual bool removeLifecycleObserver(LifecycleObserver* observer) = 0;
+
+  /**
+   * Returns installed lifecycle observers.
+   *
+   * @return             Reference to const vector with installed observers.
+   */
+  FOLLY_NODISCARD virtual const LifecycleObserverVec& getLifecycleObservers()
+      const = 0;
 };
 } // namespace quic

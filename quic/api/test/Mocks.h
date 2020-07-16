@@ -281,6 +281,21 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD2(onSuspiciousReadLoops, void(uint64_t, NoReadReason));
 };
 
+class MockLifecycleObserver : public QuicSocket::LifecycleObserver {
+ public:
+  GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicSocket*));
+  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
+  GMOCK_METHOD1_(, noexcept, , destroy, void(QuicSocket*));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      close,
+      void(
+          QuicSocket*,
+          const folly::Optional<std::pair<QuicErrorCode, std::string>>&));
+};
+
 inline std::ostream& operator<<(std::ostream& os, const MockQuicTransport&) {
   return os;
 }

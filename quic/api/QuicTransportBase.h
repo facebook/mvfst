@@ -481,6 +481,35 @@ class QuicTransportBase : public QuicSocket {
   virtual void cancelAllAppCallbacks(
       const std::pair<QuicErrorCode, folly::StringPiece>& error) noexcept;
 
+  /**
+   * Adds a lifecycle observer.
+   *
+   * Observers can tie their lifetime to aspects of this socket's lifecycle /
+   * lifetime and perform inspection at various states.
+   *
+   * This enables instrumentation to be added without changing / interfering
+   * with how the application uses the socket.
+   *
+   * @param observer     Observer to add (implements LifecycleObserver).
+   */
+  void addLifecycleObserver(LifecycleObserver* observer) override;
+
+  /**
+   * Removes a lifecycle observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether observer found and removed from list.
+   */
+  bool removeLifecycleObserver(LifecycleObserver* observer) override;
+
+  /**
+   * Returns installed lifecycle observers.
+   *
+   * @return             Reference to const vector with installed observers.
+   */
+  FOLLY_NODISCARD const LifecycleObserverVec& getLifecycleObservers()
+      const override;
+
  protected:
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
@@ -630,6 +659,9 @@ class QuicTransportBase : public QuicSocket {
   std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
 
   folly::Optional<std::string> exceptionCloseWhat_;
+
+  // Lifecycle observers
+  LifecycleObserverVec lifecycleObservers_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);
