@@ -101,6 +101,11 @@ class QuicSocket {
      */
     virtual void onUnidirectionalStreamsAvailable(
         uint64_t /*numStreamsAvailable*/) noexcept {}
+
+    /**
+     * Invoked when transport is detected to be app rate limited.
+     */
+    virtual void onAppRateLimited() noexcept {}
   };
 
   /**

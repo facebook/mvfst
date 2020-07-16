@@ -117,6 +117,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       ,
       onUnidirectionalStreamsAvailable,
       void(uint64_t));
+  GMOCK_METHOD0_(, noexcept, , onAppRateLimited, void());
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {

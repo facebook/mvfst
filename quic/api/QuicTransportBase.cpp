@@ -2433,6 +2433,7 @@ void QuicTransportBase::writeSocketData() {
           currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
+        connCallback_->onAppRateLimited();
       }
     }
   }

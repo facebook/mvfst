@@ -280,6 +280,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
       false,
       nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
   transport_->close(folly::none);
 }
@@ -307,6 +308,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
       false,
       nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
   transport_->close(folly::none);
 }
@@ -325,6 +327,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
   auto buf = buildRandomInputData(100 * 2000);
   transport_->writeChain(stream, buf->clone(), false, false, nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);
+  EXPECT_CALL(connCallback_, onAppRateLimited()).Times(0);
   loopForWrites();
   transport_->close(folly::none);
 }
@@ -347,6 +350,7 @@ TEST_F(QuicTransportTest, AppLimited) {
       false,
       nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(1);
+  EXPECT_CALL(connCallback_, onAppRateLimited()).Times(1);
   loopForWrites();
   transport_->close(folly::none);
 }
