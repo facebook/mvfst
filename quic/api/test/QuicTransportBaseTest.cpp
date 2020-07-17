@@ -353,7 +353,12 @@ class TestQuicTransport
     auto deliveryCb = deliveryCallbacks_.find(id);
     if (deliveryCb != deliveryCallbacks_.end()) {
       for (auto& cbs : deliveryCb->second) {
-        cbs.second->onDeliveryAck(id, cbs.first, stream->conn.lossState.srtt);
+        ByteEvent event = {};
+        event.id = id;
+        event.offset = cbs.first;
+        event.type = ByteEvent::Type::ACK;
+        event.srtt = stream->conn.lossState.srtt;
+        cbs.second->onByteEvent(event);
         if (closeState_ != CloseState::OPEN) {
           break;
         }
@@ -1312,32 +1317,6 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
   transport->driveReadCallbacks();
   EXPECT_FALSE(transport->transportConn->streamManager->streamExists(stream2));
   transport.reset();
-}
-
-TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksDeque) {
-  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
-      mockedDeliveryCallback2;
-  std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>> callbacks;
-  callbacks.emplace_back(0, &mockedDeliveryCallback1);
-  callbacks.emplace_back(100, &mockedDeliveryCallback2);
-  StreamId id = 0x123;
-  EXPECT_CALL(mockedDeliveryCallback1, onCanceled(id, 0)).Times(1);
-  EXPECT_CALL(mockedDeliveryCallback2, onCanceled(id, 100)).Times(1);
-  TestQuicTransport::cancelDeliveryCallbacks(id, callbacks);
-}
-
-TEST_F(QuicTransportImplTest, CancelAllDeliveryCallbacksMap) {
-  NiceMock<MockDeliveryCallback> mockedDeliveryCallback1,
-      mockedDeliveryCallback2;
-  folly::F14FastMap<
-      StreamId,
-      std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>
-      callbacks;
-  callbacks[0x123].emplace_back(0, &mockedDeliveryCallback1);
-  callbacks[0x135].emplace_back(100, &mockedDeliveryCallback2);
-  EXPECT_CALL(mockedDeliveryCallback1, onCanceled(0x123, 0)).Times(1);
-  EXPECT_CALL(mockedDeliveryCallback2, onCanceled(0x135, 100)).Times(1);
-  TestQuicTransport::cancelDeliveryCallbacks(callbacks);
 }
 
 TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {

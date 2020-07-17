@@ -458,8 +458,7 @@ class QuicSocket {
   virtual void unsetAllPeekCallbacks() = 0;
 
   /**
-   * Convenience function that sets the read callbacks of all streams to be
-   * nullptr.
+   * Convenience function that cancels delivery callbacks of all streams.
    */
   virtual void unsetAllDeliveryCallbacks() = 0;
 
@@ -788,14 +787,56 @@ class QuicSocket {
       unregisterStreamWriteCallback(StreamId) = 0;
 
   /**
+   * Structure used to communicate TX and ACK/Delivery notifications.
+   */
+  struct ByteEvent {
+    enum class Type { ACK = 1 };
+
+    StreamId id{0};
+    uint64_t offset{0};
+    Type type;
+
+    // sRTT at time of event
+    // TODO(bschlinker): Deprecate, caller can fetch transport state if desired.
+    std::chrono::microseconds srtt{0us};
+  };
+
+  /**
+   * Structure used to communicate cancellation of a ByteEvent.
+   *
+   * According to Dictionary.com, cancellation is more frequent in American
+   * English than cancelation. Yet in American English, the preferred style is
+   * typically not to double the final L, so cancel generally becomes canceled.
+   */
+  using ByteEventCancellation = ByteEvent;
+
+  /**
+   * Callback class for receiving byte event (TX/ACK) notifications.
+   */
+  class ByteEventCallback {
+   public:
+    virtual ~ByteEventCallback() = default;
+
+    /**
+     * Invoked when the byte event has occurred.
+     */
+    virtual void onByteEvent(ByteEvent byteEvent) = 0;
+
+    /**
+     * Invoked if byte event is canceled due to reset, shutdown, or other error.
+     */
+    virtual void onByteEventCanceled(ByteEventCancellation cancellation) = 0;
+  };
+
+  /**
    * Callback class for receiving ack notifications
    */
-  class DeliveryCallback {
+  class DeliveryCallback : public ByteEventCallback {
    public:
     virtual ~DeliveryCallback() = default;
 
     /**
-     * Invoked when the peer has acknowledged the receipt of the specificed
+     * Invoked when the peer has acknowledged the receipt of the specified
      * offset.  rtt is the current RTT estimate for the connection.
      */
     virtual void onDeliveryAck(
@@ -808,7 +849,62 @@ class QuicSocket {
      * delivered (due to a reset or other error).
      */
     virtual void onCanceled(StreamId id, uint64_t offset) = 0;
+
+   private:
+    // Temporary shim during transition to ByteEvent
+    void onByteEvent(ByteEvent byteEvent) final {
+      CHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
+      onDeliveryAck(byteEvent.id, byteEvent.offset, byteEvent.srtt);
+    }
+
+    // Temporary shim during transition to ByteEvent
+    void onByteEventCanceled(ByteEventCancellation cancellation) final {
+      CHECK_EQ((int)ByteEvent::Type::ACK, (int)cancellation.type); // sanity
+      onCanceled(cancellation.id, cancellation.offset);
+    }
   };
+
+  /**
+   * Register a byte event to be triggered when specified event type occurs for
+   * the specified stream and offset.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  registerByteEventCallback(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const uint64_t offset,
+      ByteEventCallback* cb) = 0;
+
+  /**
+   * Cancel byte event callbacks for given stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  virtual void cancelByteEventCallbacksForStream(
+      const StreamId id,
+      const folly::Optional<uint64_t>& offset = folly::none) = 0;
+
+  /**
+   * Cancel byte event callbacks for given type and stream.
+   *
+   * If an offset is provided, cancels only callbacks with an offset less than
+   * or equal to the provided offset, otherwise cancels all callbacks.
+   */
+  virtual void cancelByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId id,
+      const folly::Optional<uint64_t>& offset = folly::none) = 0;
+
+  /**
+   * Cancel all byte event callbacks of all streams.
+   */
+  virtual void cancelAllByteEventCallbacks() = 0;
+
+  /**
+   * Cancel all byte event callbacks of all streams of the given type.
+   */
+  virtual void cancelByteEventCallbacks(const ByteEvent::Type type) = 0;
 
   /**
    * Write data/eof to the given stream.
@@ -830,12 +926,12 @@ class QuicSocket {
 
   /**
    * Register a callback to be invoked when the peer has acknowledged the
-   * given offset on the given stream
+   * given offset on the given stream.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,
-      DeliveryCallback* cb) = 0;
+      ByteEventCallback* cb) = 0;
 
   /**
    * Close the stream for writing.  Equivalent to writeChain(id, nullptr, true).

@@ -1033,9 +1033,9 @@ QuicTransportBase::sendDataExpired(StreamId id, uint64_t offset) {
   auto stream = conn_->streamManager->getStream(id);
   auto newOffset = advanceMinimumRetransmittableOffset(stream, offset);
 
-  // Invoke any delivery callbacks that are set for any offset below newOffset.
+  // Cancel byte event callbacks that are set for any offset below newOffset.
   if (newOffset) {
-    cancelDeliveryCallbacksForStream(id, *newOffset);
+    cancelByteEventCallbacksForStream(id, *newOffset);
   }
 
   updateWriteLooper(true);
@@ -1101,7 +1101,7 @@ void QuicTransportBase::invokeDataRejectedCallbacks() {
     // Invoke any delivery callbacks that are set for any offset below newly set
     // minimumRetransmittableOffset.
     if (!stream->streamReadError) {
-      cancelDeliveryCallbacksForStream(
+      cancelByteEventCallbacksForStream(
           streamId, stream->minimumRetransmittableOffset);
     }
 
@@ -1221,54 +1221,58 @@ void QuicTransportBase::updateWriteLooper(bool thisIteration) {
   }
 }
 
-void QuicTransportBase::cancelDeliveryCallbacksForStream(StreamId streamId) {
-  if (isReceivingStream(conn_->nodeType, streamId)) {
-    return;
-  }
-  conn_->streamManager->removeDeliverable(streamId);
-  auto deliveryCallbackIter = deliveryCallbacks_.find(streamId);
-  if (deliveryCallbackIter == deliveryCallbacks_.end()) {
-    return;
-  }
-  while (!deliveryCallbackIter->second.empty()) {
-    auto deliveryCallback = deliveryCallbackIter->second.front();
-    deliveryCallbackIter->second.pop_front();
-    deliveryCallback.second->onCanceled(streamId, deliveryCallback.first);
-    if (closeState_ != CloseState::OPEN) {
-      // socket got closed - we can't use deliveryCallbackIter anymore,
-      // closeImpl should take care of delivering callbacks that are left in
-      // deliveryCallbackIter->second
-      return;
-    }
-  }
-  deliveryCallbacks_.erase(deliveryCallbackIter);
+void QuicTransportBase::cancelDeliveryCallbacksForStream(StreamId id) {
+  cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id);
 }
 
 void QuicTransportBase::cancelDeliveryCallbacksForStream(
-    StreamId streamId,
+    StreamId id,
     uint64_t offset) {
-  if (isReceivingStream(conn_->nodeType, streamId)) {
+  cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id, offset);
+}
+
+void QuicTransportBase::cancelByteEventCallbacksForStream(
+    const StreamId id,
+    const folly::Optional<uint64_t>& offset) {
+  cancelByteEventCallbacksForStream(ByteEvent::Type::ACK, id, offset);
+}
+
+void QuicTransportBase::cancelByteEventCallbacksForStream(
+    const ByteEvent::Type type,
+    const StreamId id,
+    const folly::Optional<uint64_t>& offset) {
+  if (isReceivingStream(conn_->nodeType, id)) {
     return;
   }
 
-  auto deliveryCallbackIter = deliveryCallbacks_.find(streamId);
-  if (deliveryCallbackIter == deliveryCallbacks_.end()) {
-    conn_->streamManager->removeDeliverable(streamId);
+  auto& byteEventMap = getByteEventMap(type);
+  auto byteEventMapIt = byteEventMap.find(id);
+  if (byteEventMapIt == byteEventMap.end()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+    }
     return;
   }
+  auto& streamByteEvents = byteEventMapIt->second;
 
   // Callbacks are kept sorted by offset, so we can just walk the queue and
   // invoke those with offset below provided offset.
-  while (!deliveryCallbackIter->second.empty()) {
-    auto deliveryCallback = deliveryCallbackIter->second.front();
-    auto& cbOffset = deliveryCallback.first;
-    if (cbOffset < offset) {
-      deliveryCallbackIter->second.pop_front();
-      deliveryCallback.second->onCanceled(streamId, cbOffset);
+  while (!streamByteEvents.empty()) {
+    // decomposition not supported for xplat
+    const auto cbOffset = streamByteEvents.front().first;
+    const auto callback = streamByteEvents.front().second;
+    if (!offset.has_value() || cbOffset < *offset) {
+      streamByteEvents.pop_front();
+      ByteEventCancellation cancellation = {};
+      cancellation.id = id;
+      cancellation.offset = cbOffset;
+      cancellation.type = type;
+      callback->onByteEventCanceled(cancellation);
       if (closeState_ != CloseState::OPEN) {
-        // socket got closed - we can't use deliveryCallbackIter anymore,
-        // closeImpl should take care of delivering callbacks that are left in
-        // deliveryCallbackIter->second
+        // socket got closed - we can't use streamByteEvents anymore,
+        // closeImpl should take care of cleaning up any remaining callbacks
         return;
       }
     } else {
@@ -1278,9 +1282,34 @@ void QuicTransportBase::cancelDeliveryCallbacksForStream(
   }
 
   // Clean up state for this stream if no callbacks left to invoke.
-  if (deliveryCallbackIter->second.empty()) {
-    conn_->streamManager->removeDeliverable(streamId);
-    deliveryCallbacks_.erase(deliveryCallbackIter);
+  if (streamByteEvents.empty()) {
+    switch (type) {
+      case ByteEvent::Type::ACK:
+        conn_->streamManager->removeDeliverable(id);
+        break;
+    }
+    byteEventMap.erase(byteEventMapIt);
+  }
+}
+
+void QuicTransportBase::cancelAllByteEventCallbacks() {
+  cancelByteEventCallbacks(ByteEvent::Type::ACK);
+}
+
+void QuicTransportBase::cancelByteEventCallbacks(const ByteEvent::Type type) {
+  ByteEventMap byteEventMap = std::move(getByteEventMap(type));
+  for (const auto& byteEventMapIt : byteEventMap) {
+    const auto streamId = byteEventMapIt.first;
+    const auto callbackMap = byteEventMapIt.second;
+    for (const auto& callbackMapIt : callbackMap) {
+      const auto offset = callbackMapIt.first;
+      const auto callback = callbackMapIt.second;
+      ByteEventCancellation cancellation = {};
+      cancellation.id = streamId;
+      cancellation.offset = offset;
+      cancellation.type = type;
+      callback->onByteEventCanceled(cancellation);
+    }
   }
 }
 
@@ -1500,7 +1529,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
        pendingResetIt != conn_->pendingEvents.resets.end();
        pendingResetIt++) {
-    cancelDeliveryCallbacksForStream(pendingResetIt->first);
+    cancelByteEventCallbacksForStream(pendingResetIt->first);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
@@ -1526,8 +1555,13 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       deliveryCallbacksForAckedStream->second.pop_front();
       auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.first;
       auto deliveryCallback = deliveryCallbackAndOffset.second;
-      deliveryCallback->onDeliveryAck(
-          streamId, currentDeliveryCallbackOffset, conn_->lossState.srtt);
+
+      ByteEvent byteEvent = {};
+      byteEvent.id = streamId;
+      byteEvent.offset = currentDeliveryCallbackOffset;
+      byteEvent.type = ByteEvent::Type::ACK;
+      byteEvent.srtt = conn_->lossState.srtt;
+      deliveryCallback->onByteEvent(byteEvent);
       if (closeState_ != CloseState::OPEN) {
         return;
       }
@@ -1943,7 +1977,16 @@ folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::registerDeliveryCallback(
     StreamId id,
     uint64_t offset,
-    DeliveryCallback* cb) {
+    ByteEventCallback* cb) {
+  return registerByteEventCallback(ByteEvent::Type::ACK, id, offset, cb);
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::registerByteEventCallback(
+    const ByteEvent::Type type,
+    const StreamId id,
+    const uint64_t offset,
+    ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -1954,48 +1997,64 @@ QuicTransportBase::registerDeliveryCallback(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  if (cb) {
-    auto deliveryCallbackIt = deliveryCallbacks_.find(id);
-    if (deliveryCallbackIt == deliveryCallbacks_.end()) {
-      deliveryCallbacks_.emplace(
-          id,
-          std::initializer_list<decltype(
-              deliveryCallbacks_)::mapped_type::value_type>({{offset, cb}}));
-    } else {
-      // Keep DeliveryCallbacks for the same stream sorted by offsets:
-      auto pos = std::upper_bound(
-          deliveryCallbackIt->second.begin(),
-          deliveryCallbackIt->second.end(),
+  if (!cb) {
+    return folly::unit;
+  }
+
+  ByteEventMap& byteEventMap = getByteEventMap(type);
+  auto byteEventMapIt = byteEventMap.find(id);
+  if (byteEventMapIt == byteEventMap.end()) {
+    byteEventMap.emplace(
+        id,
+        std::initializer_list<std::remove_reference<decltype(
+            byteEventMap)>::type::mapped_type::value_type>({{offset, cb}}));
+  } else {
+    // Keep ByteEvents for the same stream sorted by offsets:
+    auto pos = std::upper_bound(
+        byteEventMapIt->second.begin(),
+        byteEventMapIt->second.end(),
+        offset,
+        [&](uint64_t o, const std::pair<uint64_t, ByteEventCallback*>& p) {
+          return o < p.first;
+        });
+    byteEventMapIt->second.emplace(pos, offset, cb);
+  }
+  auto stream = conn_->streamManager->getStream(id);
+
+  folly::Optional<uint64_t> nextOffsetToWait;
+  switch (type) {
+    case ByteEvent::Type::ACK:
+      nextOffsetToWait = getLargestDeliverableOffset(*stream);
+      break;
+  }
+  if (nextOffsetToWait.has_value() && (offset < *nextOffsetToWait)) {
+    // This byte event has already occurred
+    runOnEvbAsync([id, cb, offset, type](auto selfObj) {
+      if (selfObj->closeState_ != CloseState::OPEN) {
+        // Close will error out all byte event callbacks.
+        return;
+      }
+
+      auto& byteEventMapL = selfObj->getByteEventMap(type);
+      auto streamByteEventCbIt = byteEventMapL.find(id);
+      if (streamByteEventCbIt == byteEventMapL.end()) {
+        return;
+      }
+      auto pos = std::lower_bound(
+          streamByteEventCbIt->second.begin(),
+          streamByteEventCbIt->second.end(),
           offset,
-          [&](uint64_t o, const std::pair<uint64_t, DeliveryCallback*>& p) {
-            return o < p.first;
+          [&](const std::pair<uint64_t, ByteEventCallback*>& p, uint64_t o) {
+            return p.first < o;
           });
-      deliveryCallbackIt->second.emplace(pos, offset, cb);
-    }
-    auto stream = conn_->streamManager->getStream(id);
-    auto maxOffsetToDeliver = getLargestDeliverableOffset(*stream);
-    if (maxOffsetToDeliver.has_value() && (offset < *maxOffsetToDeliver)) {
-      // This offset is already delivered
-      runOnEvbAsync([id, cb, offset](auto selfObj) {
-        if (selfObj->closeState_ != CloseState::OPEN) {
-          // Close will error out all the delivery callbacks.
-          return;
-        }
-        auto streamDeliveryCbIt = selfObj->deliveryCallbacks_.find(id);
-        if (streamDeliveryCbIt == selfObj->deliveryCallbacks_.end()) {
-          return;
-        }
-        auto pos = std::lower_bound(
-            streamDeliveryCbIt->second.begin(),
-            streamDeliveryCbIt->second.end(),
-            offset,
-            [&](const std::pair<uint64_t, DeliveryCallback*>& p, uint64_t o) {
-              return p.first < o;
-            });
-        streamDeliveryCbIt->second.erase(pos);
-        cb->onDeliveryAck(id, offset, selfObj->conn_->lossState.srtt);
-      });
-    }
+      streamByteEventCbIt->second.erase(pos);
+
+      ByteEvent byteEvent = {};
+      byteEvent.id = id;
+      byteEvent.offset = offset;
+      byteEvent.type = type;
+      cb->onByteEvent(byteEvent);
+    });
   }
   return folly::unit;
 }
@@ -2037,7 +2096,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
          closeState_ == CloseState::OPEN &&
          pendingResetIt != conn_->pendingEvents.resets.end();
          pendingResetIt++) {
-      cancelDeliveryCallbacksForStream(pendingResetIt->first);
+      cancelByteEventCallbacksForStream(pendingResetIt->first);
     }
     pendingWriteCallbacks_.erase(id);
     QUIC_STATS(conn_->statsCallback, onQuicStreamReset);
@@ -2333,10 +2392,8 @@ void QuicTransportBase::cancelAllAppCallbacks(
     updateWriteLooper(true);
   };
   conn_->streamManager->clearActionable();
-  // Move the whole delivery callback map:
-  auto deliveryCallbacks = std::move(deliveryCallbacks_);
-  // Invoke onCanceled on the copy
-  cancelDeliveryCallbacks(deliveryCallbacks);
+  // Cancel any pending ByteEvent callbacks
+  cancelAllByteEventCallbacks();
   // TODO: this will become simpler when we change the underlying data
   // structure of read callbacks.
   // TODO: this approach will make the app unable to setReadCallback to
@@ -2503,29 +2560,6 @@ void QuicTransportBase::writeSocketDataAndCatch() {
     closeImpl(std::make_pair(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeSocketDataAndCatch()  error")));
-  }
-}
-
-void QuicTransportBase::cancelDeliveryCallbacks(
-    StreamId id,
-    const std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>&
-        deliveryCallbacks) {
-  for (auto iter = deliveryCallbacks.begin(); iter != deliveryCallbacks.end();
-       iter++) {
-    auto currentDeliveryCallbackOffset = iter->first;
-    auto deliveryCallback = iter->second;
-    deliveryCallback->onCanceled(id, currentDeliveryCallbackOffset);
-  }
-}
-
-void QuicTransportBase::cancelDeliveryCallbacks(
-    const folly::F14FastMap<
-        StreamId,
-        std::deque<std::pair<uint64_t, QuicSocket::DeliveryCallback*>>>&
-        deliveryCallbacks) {
-  for (auto iter = deliveryCallbacks.begin(); iter != deliveryCallbacks.end();
-       iter++) {
-    cancelDeliveryCallbacks(iter->first, iter->second);
   }
 }
 
@@ -2736,6 +2770,16 @@ QuicTransportBase::maybeResetStreamFromReadError(
     return resetStream(id, *code);
   }
   return folly::Expected<folly::Unit, LocalErrorCode>(folly::unit);
+}
+
+QuicTransportBase::ByteEventMap& QuicTransportBase::getByteEventMap(
+    const ByteEvent::Type type) {
+  switch (type) {
+    case ByteEvent::Type::ACK:
+      return deliveryCallbacks_;
+  }
+  LOG(FATAL) << "Unhandled case in getByteEventMap";
+  folly::assume_unreachable();
 }
 
 } // namespace quic
