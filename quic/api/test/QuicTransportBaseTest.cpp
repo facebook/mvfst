@@ -28,6 +28,7 @@ namespace quic {
 namespace test {
 
 constexpr uint8_t kStreamIncrement = 0x04;
+using ByteEvent = QuicTransportBase::ByteEvent;
 
 enum class TestFrameType : uint8_t {
   STREAM,
@@ -365,6 +366,22 @@ class TestQuicTransport
       }
       deliveryCallbacks_.erase(deliveryCb);
     }
+
+    auto txCallbacksForStream = txCallbacks_.find(id);
+    if (txCallbacksForStream != txCallbacks_.end()) {
+      for (auto& cbs : txCallbacksForStream->second) {
+        ByteEvent event = {};
+        event.id = id;
+        event.offset = cbs.first;
+        event.type = ByteEvent::Type::TX;
+        cbs.second->onByteEvent(event);
+        if (closeState_ != CloseState::OPEN) {
+          break;
+        }
+      }
+      txCallbacks_.erase(txCallbacksForStream);
+    }
+
     SocketAddress addr("127.0.0.1", 1000);
     // some fake data to trigger close behavior.
     auto buf = encodeStreamBuffer(
@@ -434,6 +451,10 @@ class QuicTransportImplTest : public Test {
         kDefaultMaxStreamsBidirectional);
     conn.streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
+  }
+
+  auto getTxMatcher(StreamId id, uint64_t offset) {
+    return MockByteEventCallback::getTxMatcher(id, offset);
   }
 
  protected:
@@ -1365,91 +1386,621 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
   transport->close(folly::none);
 }
 
-TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpire) {
+TEST_F(QuicTransportImplTest, TxDeliveryCallbackOnSendDataExpire) {
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
   NiceMock<MockDeliveryCallback> dcb1;
   NiceMock<MockDeliveryCallback> dcb2;
 
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream2, 10, &txcb2);
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
-  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+  transport->registerDeliveryCallback(stream2, 10, &dcb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
   EXPECT_CALL(dcb1, onCanceled(_, _));
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
 
   auto res = transport->sendDataExpired(stream1, 11);
   EXPECT_EQ(res.hasError(), false);
-
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, _));
 
   transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, DeliveryCallbackOnSendDataExpireCallbacksLeft) {
+TEST_F(QuicTransportImplTest, TxDeliveryCallbackOnSendDataExpireCallbacksLeft) {
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
   NiceMock<MockDeliveryCallback> dcb1;
   NiceMock<MockDeliveryCallback> dcb2;
 
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream1, 20, &txcb1);
+  transport->registerTxCallback(stream2, 10, &txcb2);
+  transport->registerTxCallback(stream2, 20, &txcb2);
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream1, 20, &dcb1);
+  transport->registerDeliveryCallback(stream2, 10, &dcb2);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
   EXPECT_CALL(dcb1, onCanceled(_, _));
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
 
   auto res = transport->sendDataExpired(stream1, 11);
   EXPECT_EQ(res.hasError(), false);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
 
-  EXPECT_CALL(dcb2, onCanceled(_, _));
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 20)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20)));
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(1);
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(2);
 
   transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpected) {
+TEST_F(QuicTransportImplTest, RegisterTxDeliveryCallbackLowerThanExpected) {
   auto stream = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
+  StrictMock<MockByteEventCallback> txcb3;
   NiceMock<MockDeliveryCallback> dcb1;
   NiceMock<MockDeliveryCallback> dcb2;
   NiceMock<MockDeliveryCallback> dcb3;
 
+  transport->registerTxCallback(stream, 10, &txcb1);
+  transport->registerTxCallback(stream, 20, &txcb2);
   transport->registerDeliveryCallback(stream, 10, &dcb1);
   transport->registerDeliveryCallback(stream, 20, &dcb2);
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   streamState->currentWriteOffset = 7;
   streamState->ackedIntervals.insert(0, 6);
 
-  EXPECT_CALL(dcb3, onDeliveryAck(_, _, _))
-      .WillOnce(Invoke(
-          [](auto /* id */, auto offset, auto) { EXPECT_EQ(offset, 2); }));
+  EXPECT_CALL(txcb3, onByteEvent(getTxMatcher(stream, 2)));
+  EXPECT_CALL(dcb3, onDeliveryAck(stream, 2, _));
+  transport->registerTxCallback(stream, 2, &txcb3);
   transport->registerDeliveryCallback(stream, 2, &dcb3);
   evb->loopOnce();
+  Mock::VerifyAndClearExpectations(&txcb3);
+  Mock::VerifyAndClearExpectations(&dcb3);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream, 20)));
   EXPECT_CALL(dcb1, onCanceled(_, _));
   EXPECT_CALL(dcb2, onCanceled(_, _));
   transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&txcb3);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+  Mock::VerifyAndClearExpectations(&dcb3);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackLowerThanExpectedClose) {
+TEST_F(
+    QuicTransportImplTest,
+    RegisterTxDeliveryCallbackLowerThanExpectedClose) {
   auto stream = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb;
   NiceMock<MockDeliveryCallback> dcb;
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   streamState->currentWriteOffset = 7;
 
+  EXPECT_CALL(txcb, onByteEventCanceled(getTxMatcher(stream, 2)));
   EXPECT_CALL(dcb, onCanceled(_, _));
+  transport->registerTxCallback(stream, 2, &txcb);
   transport->registerDeliveryCallback(stream, 2, &dcb);
   transport->close(folly::none);
   evb->loopOnce();
+  Mock::VerifyAndClearExpectations(&txcb);
+  Mock::VerifyAndClearExpectations(&dcb);
+}
+
+TEST_F(QuicTransportImplTest, CancelAllByteEventCallbacks) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+
+  NiceMock<MockByteEventCallback> txcb1;
+  NiceMock<MockByteEventCallback> txcb2;
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream2, 20, &txcb2);
+
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20)));
+  EXPECT_CALL(dcb1, onCanceled(_, _));
+  EXPECT_CALL(dcb2, onCanceled(_, _));
+
+  transport->cancelAllByteEventCallbacks();
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+}
+
+TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStream) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream2, 20, &txcb2);
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10));
+  EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
+
+  transport->cancelByteEventCallbacksForStream(stream1);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      1,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20)));
+  EXPECT_CALL(dcb1, onCanceled(stream1, _)).Times(0);
+  EXPECT_CALL(dcb2, onCanceled(_, 20));
+
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+}
+
+TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStreamWithOffset) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream1, 15, &txcb1);
+  transport->registerTxCallback(stream1, 20, &txcb1);
+  transport->registerTxCallback(stream2, 10, &txcb2);
+  transport->registerTxCallback(stream2, 15, &txcb2);
+  transport->registerTxCallback(stream2, 20, &txcb2);
+
+  EXPECT_EQ(3, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(3, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream1, 15, &dcb1);
+  transport->registerDeliveryCallback(stream1, 20, &dcb1);
+  transport->registerDeliveryCallback(stream2, 10, &dcb2);
+  transport->registerDeliveryCallback(stream2, 15, &dcb2);
+  transport->registerDeliveryCallback(stream2, 20, &dcb2);
+
+  EXPECT_EQ(6, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(6, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10));
+
+  // cancels if offset is < (not <=) offset provided
+  transport->cancelByteEventCallbacksForStream(stream1, 15);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(4, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(6, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 15)));
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 20)));
+  EXPECT_CALL(dcb1, onCanceled(stream1, 15));
+  EXPECT_CALL(dcb1, onCanceled(stream1, 20));
+
+  // cancels if offset is < (not <=) offset provided
+  transport->cancelByteEventCallbacksForStream(stream1, 21);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(6, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      3,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 15)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20)));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 10));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 15));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 20));
+
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(0, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+}
+
+TEST_F(QuicTransportImplTest, CancelByteEventCallbacksTx) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream1, 15, &txcb1);
+  transport->registerTxCallback(stream2, 10, &txcb2);
+  transport->registerTxCallback(stream2, 15, &txcb2);
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream1, 15, &dcb1);
+  transport->registerDeliveryCallback(stream2, 10, &dcb2);
+  transport->registerDeliveryCallback(stream2, 15, &dcb2);
+
+  EXPECT_EQ(4, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(4, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 15)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 15)));
+
+  transport->cancelByteEventCallbacks(ByteEvent::Type::TX);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10));
+  EXPECT_CALL(dcb1, onCanceled(stream1, 15));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 10));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 15));
+
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+}
+
+TEST_F(QuicTransportImplTest, CancelByteEventCallbacksDelivery) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
+  NiceMock<MockDeliveryCallback> dcb1;
+  NiceMock<MockDeliveryCallback> dcb2;
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream1, 15, &txcb1);
+  transport->registerTxCallback(stream2, 10, &txcb2);
+  transport->registerTxCallback(stream2, 15, &txcb2);
+  transport->registerDeliveryCallback(stream1, 10, &dcb1);
+  transport->registerDeliveryCallback(stream1, 15, &dcb1);
+  transport->registerDeliveryCallback(stream2, 10, &dcb2);
+  transport->registerDeliveryCallback(stream2, 15, &dcb2);
+
+  EXPECT_EQ(4, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(4, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(dcb1, onCanceled(stream1, 10));
+  EXPECT_CALL(dcb1, onCanceled(stream1, 15));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 10));
+  EXPECT_CALL(dcb2, onCanceled(stream2, 15));
+
+  transport->cancelByteEventCallbacks(ByteEvent::Type::ACK);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
+
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream1));
+  EXPECT_EQ(2, transport->getNumByteEventCallbacksForStream(stream2));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream1));
+  EXPECT_EQ(
+      2,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::TX, stream2));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream1));
+  EXPECT_EQ(
+      0,
+      transport->getNumByteEventCallbacksForStream(
+          ByteEvent::Type::ACK, stream2));
+
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10)));
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 15)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 10)));
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 15)));
+
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
+  Mock::VerifyAndClearExpectations(&dcb1);
+  Mock::VerifyAndClearExpectations(&dcb2);
 }
 
 TEST_F(QuicTransportImplTest, TestNotifyPendingConnWriteOnCloseWithoutError) {
@@ -1519,6 +2070,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
   }
   evb->loopOnce();
 }
+
 TEST_F(QuicTransportImplTest, TestTransportCloseWithMaxPacketNumber) {
   transport->setServerConnectionId();
   transport->transportConn->pendingEvents.closeTransport = false;
@@ -1527,6 +2079,7 @@ TEST_F(QuicTransportImplTest, TestTransportCloseWithMaxPacketNumber) {
   transport->transportConn->pendingEvents.closeTransport = true;
   EXPECT_THROW(transport->invokeWriteSocketData(), QuicTransportException);
 }
+
 TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
@@ -1535,13 +2088,16 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   NiceMock<MockWriteCallback> wcb;
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
-  NiceMock<MockDeliveryCallback> deliveryCb;
+  StrictMock<MockByteEventCallback> txCb;
+  StrictMock<MockDeliveryCallback> deliveryCb;
   EXPECT_CALL(
       wcb, onStreamWriteError(stream, IsError(LocalErrorCode::NO_ERROR)));
   EXPECT_CALL(
       wcbConn, onConnectionWriteError(IsError(LocalErrorCode::NO_ERROR)));
   EXPECT_CALL(rcb, readError(stream, IsError(LocalErrorCode::NO_ERROR)));
   EXPECT_CALL(deliveryCb, onCanceled(stream, _));
+  EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 0)));
+  EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 4)));
 
   transport->notifyPendingWriteOnConnection(&wcbConn);
   transport->notifyPendingWriteOnStream(stream, &wcb);
@@ -1550,6 +2106,8 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(
       stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
+  EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
   transport->closeGracefully();
 
   ASSERT_FALSE(transport->transportClosed);
@@ -1558,6 +2116,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   EXPECT_TRUE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnStream(stream, &wcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
+  EXPECT_TRUE(transport->registerTxCallback(stream, 2, &txCb).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
   EXPECT_TRUE(
@@ -1584,9 +2143,12 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
   NiceMock<MockDeliveryCallback> deliveryCb;
+  NiceMock<MockByteEventCallback> txCb;
   EXPECT_CALL(
       rcb, readError(stream, IsError(GenericApplicationErrorCode::NO_ERROR)));
   EXPECT_CALL(deliveryCb, onDeliveryAck(stream, _, _));
+  EXPECT_CALL(txCb, onByteEvent(getTxMatcher(stream, 0)));
+  EXPECT_CALL(txCb, onByteEvent(getTxMatcher(stream, 4)));
 
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
@@ -1596,11 +2158,14 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(
       stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
+  EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
 
   // Close the last stream.
   auto streamState = transport->transportConn->streamManager->getStream(stream);
-  // Fake that the data was delivered to keep all the state consistent.
+  // Fake that the data was TXed and delivered to keep all the state consistent.
   streamState->currentWriteOffset = 7;
+  transport->transportConn->streamManager->addTx(stream);
   transport->transportConn->streamManager->addDeliverable(stream);
   transport->closeStream(stream);
   transport->close(folly::none);
@@ -1611,6 +2176,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   EXPECT_TRUE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnStream(stream, &wcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
+  EXPECT_TRUE(transport->registerTxCallback(stream, 2, &txCb).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
   EXPECT_TRUE(
@@ -1624,6 +2190,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
   NiceMock<MockDeliveryCallback> deliveryCb;
+  NiceMock<MockByteEventCallback> txCb;
   EXPECT_CALL(
       wcb,
       onStreamWriteError(
@@ -1634,6 +2201,8 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   EXPECT_CALL(
       rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(deliveryCb, onCanceled(stream, _));
+  EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 0)));
+  EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 4)));
 
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
 
@@ -1644,6 +2213,8 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(
       stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
+  EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
   transport->close(std::make_pair(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("Error")));
@@ -1654,6 +2225,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   EXPECT_TRUE(transport->setReadCallback(stream, &rcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnStream(stream, &wcb).hasError());
   EXPECT_TRUE(transport->notifyPendingWriteOnConnection(&wcbConn).hasError());
+  EXPECT_TRUE(transport->registerTxCallback(stream, 2, &txCb).hasError());
   EXPECT_TRUE(
       transport->registerDeliveryCallback(stream, 2, &deliveryCb).hasError());
   EXPECT_TRUE(
@@ -1861,6 +2433,20 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(
       transport->registerDeliveryCallback(stream, 0, nullptr)
+          .thenOrThrow([&](auto) {}),
+      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+  EXPECT_THROW(
+      transport->registerTxCallback(stream, 0, nullptr).thenOrThrow([&](auto) {
+      }),
+      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+  EXPECT_THROW(
+      transport
+          ->registerByteEventCallback(ByteEvent::Type::ACK, stream, 0, nullptr)
+          .thenOrThrow([&](auto) {}),
+      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+  EXPECT_THROW(
+      transport
+          ->registerByteEventCallback(ByteEvent::Type::TX, stream, 0, nullptr)
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(
@@ -2524,16 +3110,21 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackDataAvailable) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
+TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithTxAndDeliveryCallbacks) {
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
   NiceMock<MockDeliveryCallback> dcb1;
   NiceMock<MockDeliveryCallback> dcb2;
   NiceMock<MockDataRejectedCallback> dataRejectedCb1;
   NiceMock<MockDataRejectedCallback> dataRejectedCb2;
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream2, 20, &txcb2);
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream2, 20, &dcb2);
@@ -2541,26 +3132,36 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
   transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
   transport->setDataRejectedCallback(stream2, &dataRejectedCb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10))).Times(1);
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
   EXPECT_CALL(dcb1, onCanceled(stream1, 10)).Times(1);
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dataRejectedCb1, onDataRejected(stream1, 15));
+
   transport->addMinStreamDataFrameToStream(
       MinStreamDataFrame(stream1, kDefaultStreamWindowSize, 15));
-
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
   Mock::VerifyAndClearExpectations(&dataRejectedCb1);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20))).Times(1);
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(stream2, 20)).Times(1);
   EXPECT_CALL(dataRejectedCb2, onDataRejected(stream2, 23));
+
   transport->addMinStreamDataFrameToStream(
       MinStreamDataFrame(stream2, kDefaultStreamWindowSize, 23));
-
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
   Mock::VerifyAndClearExpectations(&dataRejectedCb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
   transport->close(folly::none);
@@ -2568,16 +3169,23 @@ TEST_F(QuicTransportImplTest, DataRejecteddCallbackWithDeliveryCallbacks) {
 
 TEST_F(
     QuicTransportImplTest,
-    DataRejecteddCallbackWithDeliveryCallbacksSomeLeft) {
+    DataRejecteddCallbackWithTxAndDeliveryCallbacksSomeLeft) {
   transport->transportConn->partialReliabilityEnabled = true;
 
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
+  StrictMock<MockByteEventCallback> txcb1;
+  StrictMock<MockByteEventCallback> txcb2;
   NiceMock<MockDeliveryCallback> dcb1;
   NiceMock<MockDeliveryCallback> dcb2;
   NiceMock<MockDataRejectedCallback> dataRejectedCb1;
   NiceMock<MockDataRejectedCallback> dataRejectedCb2;
+
+  transport->registerTxCallback(stream1, 10, &txcb1);
+  transport->registerTxCallback(stream1, 25, &txcb1);
+  transport->registerTxCallback(stream2, 20, &txcb2);
+  transport->registerTxCallback(stream2, 29, &txcb2);
 
   transport->registerDeliveryCallback(stream1, 10, &dcb1);
   transport->registerDeliveryCallback(stream1, 25, &dcb1);
@@ -2587,26 +3195,36 @@ TEST_F(
   transport->setDataRejectedCallback(stream1, &dataRejectedCb1);
   transport->setDataRejectedCallback(stream2, &dataRejectedCb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 10))).Times(1);
+  EXPECT_CALL(txcb2, onByteEventCanceled(_)).Times(0);
   EXPECT_CALL(dcb1, onCanceled(stream1, 10)).Times(1);
   EXPECT_CALL(dcb2, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dataRejectedCb1, onDataRejected(stream1, 15));
+
   transport->addMinStreamDataFrameToStream(
       MinStreamDataFrame(stream1, kDefaultStreamWindowSize, 15));
-
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
   Mock::VerifyAndClearExpectations(&dataRejectedCb1);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(_)).Times(0);
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 20))).Times(1);
   EXPECT_CALL(dcb1, onCanceled(_, _)).Times(0);
   EXPECT_CALL(dcb2, onCanceled(stream2, 20)).Times(1);
   EXPECT_CALL(dataRejectedCb2, onDataRejected(stream2, 23));
+
   transport->addMinStreamDataFrameToStream(
       MinStreamDataFrame(stream2, kDefaultStreamWindowSize, 23));
-
+  Mock::VerifyAndClearExpectations(&txcb1);
+  Mock::VerifyAndClearExpectations(&txcb2);
   Mock::VerifyAndClearExpectations(&dcb1);
   Mock::VerifyAndClearExpectations(&dcb2);
   Mock::VerifyAndClearExpectations(&dataRejectedCb2);
 
+  EXPECT_CALL(txcb1, onByteEventCanceled(getTxMatcher(stream1, 25))).Times(1);
+  EXPECT_CALL(txcb2, onByteEventCanceled(getTxMatcher(stream2, 29))).Times(1);
   EXPECT_CALL(dcb1, onCanceled(stream1, 25)).Times(1);
   EXPECT_CALL(dcb2, onCanceled(stream2, 29)).Times(1);
   transport->close(folly::none);

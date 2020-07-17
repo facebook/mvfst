@@ -498,6 +498,7 @@ void updateConnection(
           updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
           maybeWriteBlockAfterSocketWrite(*stream);
           conn.streamManager->updateWritableStreams(*stream);
+          conn.streamManager->addTx(writeStreamFrame.streamId);
         }
         conn.streamManager->updateLossStreams(*stream);
         break;

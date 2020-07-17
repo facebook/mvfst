@@ -451,11 +451,10 @@ class QuicStreamManager {
     auto itr = deliverableStreams_.begin();
     if (itr == deliverableStreams_.end()) {
       return folly::none;
-    } else {
-      StreamId ret = *itr;
-      deliverableStreams_.erase(itr);
-      return ret;
     }
+    StreamId ret = *itr;
+    deliverableStreams_.erase(itr);
+    return ret;
   }
 
   /*
@@ -470,6 +469,55 @@ class QuicStreamManager {
    */
   bool deliverableContains(StreamId streamId) const {
     return deliverableStreams_.count(streamId) > 0;
+  }
+
+  /*
+   * Returns a const reference to the underlying TX streams container.
+   */
+  FOLLY_NODISCARD const auto& txStreams() const {
+    return txStreams_;
+  }
+
+  /*
+   * Add a stream to list of streams that have transmitted.
+   */
+  void addTx(StreamId streamId) {
+    txStreams_.insert(streamId);
+  }
+
+  /*
+   * Remove a TX stream.
+   */
+  void removeTx(StreamId streamId) {
+    txStreams_.erase(streamId);
+  }
+
+  /*
+   * Pop a TX stream id and return it.
+   */
+  folly::Optional<StreamId> popTx() {
+    auto itr = txStreams_.begin();
+    if (itr == txStreams_.end()) {
+      return folly::none;
+    } else {
+      StreamId ret = *itr;
+      txStreams_.erase(itr);
+      return ret;
+    }
+  }
+
+  /*
+   * Returns if there are any TX streams.
+   */
+  FOLLY_NODISCARD bool hasTx() const {
+    return !txStreams_.empty();
+  }
+
+  /*
+   * Returns if the stream is in the TX container.
+   */
+  FOLLY_NODISCARD bool txContains(StreamId streamId) const {
+    return txStreams_.count(streamId) > 0;
   }
 
   /*
@@ -708,6 +756,7 @@ class QuicStreamManager {
    */
   void clearActionable() {
     deliverableStreams_.clear();
+    txStreams_.clear();
     readableStreams_.clear();
     peekableStreams_.clear();
     flowControlUpdated_.clear();
@@ -844,6 +893,9 @@ class QuicStreamManager {
 
   // Set of control streams that have writable data
   std::set<StreamId> writableControlStreams_;
+
+  // Streams that may be able to call TxCallback
+  folly::F14FastSet<StreamId> txStreams_;
 
   // Streams that may be able to callback DeliveryCallback
   folly::F14FastSet<StreamId> deliverableStreams_;

@@ -422,6 +422,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   writableControlStreams_.erase(streamId);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
+  txStreams_.erase(streamId);
   windowUpdates_.erase(streamId);
   lossStreams_.erase(streamId);
   stopSendingStreams_.erase(streamId);

@@ -129,6 +129,31 @@ class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
   MOCK_METHOD2(onCanceled, void(StreamId, uint64_t));
 };
 
+class MockByteEventCallback : public QuicSocket::ByteEventCallback {
+ public:
+  ~MockByteEventCallback() override = default;
+  MOCK_METHOD1(onByteEvent, void(QuicSocket::ByteEvent));
+  MOCK_METHOD1(onByteEventCanceled, void(QuicSocket::ByteEvent));
+
+  static auto getTxMatcher(StreamId id, uint64_t offset) {
+    return AllOf(
+        testing::Field(
+            &QuicSocket::ByteEvent::type,
+            testing::Eq(QuicSocket::ByteEvent::Type::TX)),
+        testing::Field(&QuicSocket::ByteEvent::id, testing::Eq(id)),
+        testing::Field(&QuicSocket::ByteEvent::offset, testing::Eq(offset)));
+  }
+
+  static auto getAckMatcher(StreamId id, uint64_t offset) {
+    return AllOf(
+        testing::Field(
+            &QuicSocket::ByteEvent::type,
+            testing::Eq(QuicSocket::ByteEvent::Type::ACK)),
+        testing::Field(&QuicSocket::ByteEvent::id, testing::Eq(id)),
+        testing::Field(&QuicSocket::ByteEvent::offset, testing::Eq(offset)));
+  }
+};
+
 class MockDataExpiredCallback : public QuicSocket::DataExpiredCallback {
  public:
   ~MockDataExpiredCallback() override = default;

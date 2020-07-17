@@ -1880,6 +1880,38 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
+TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedNothingTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 0;
+  EXPECT_EQ(folly::none, getLargestWriteOffsetTxed(stream));
+}
+
+TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 1;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(0, getLargestWriteOffsetTxed(stream).value());
+}
+
+TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedHundredBytesTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 100;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(99, getLargestWriteOffsetTxed(stream).value());
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    StreamLargestWriteOffsetTxedIgnoreFinalWriteOffset) {
+  // finalWriteOffset is set when writeChain is called with EoR, but we should
+  // always use currentWriteOffset to determine how many bytes have been TXed
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 10;
+  stream.finalWriteOffset = 100;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(9, getLargestWriteOffsetTxed(stream).value());
+}
+
 TEST_F(QuicStreamFunctionsTest, StreamNextOffsetToDeliverNothingAcked) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 100;

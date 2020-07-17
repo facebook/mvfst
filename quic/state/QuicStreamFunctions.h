@@ -93,6 +93,14 @@ void appendPendingStreamReset(
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream);
 
 /**
+ * Get the largest write offset the stream has transmitted / written to socket.
+ *
+ * If no bytes have been written to the socket yet, returns folly::none.
+ */
+folly::Optional<uint64_t> getLargestWriteOffsetTxed(
+    const QuicStreamState& stream);
+
+/**
  * Get the the highest acked offset (if any) that we can execute delivery
  * callbacks on.
  */

@@ -106,6 +106,10 @@ class QuicTransportTest : public Test {
     evb_.loopOnce(EVLOOP_NONBLOCK);
   }
 
+  auto getTxMatcher(StreamId id, uint64_t offset) {
+    return MockByteEventCallback::getTxMatcher(id, offset);
+  }
+
  protected:
   folly::EventBase evb_;
   MockAsyncUDPSocket* socket_;
@@ -1964,6 +1968,414 @@ TEST_F(QuicTransportTest, InvokeDeliveryCallbacksLossAndRetxBuffer) {
   EXPECT_CALL(mockedDeliveryCallback3, onDeliveryAck(stream, 150, 100us))
       .Times(1);
   transport_->onNetworkData(addr, std::move(emptyData2));
+}
+
+TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByte) {
+  // register all possible ways to get a DeliveryCb
+  //
+  // applications built atop QUIC may capture both first and last byte timings,
+  // which in this test are the same byte
+  StrictMock<MockDeliveryCallback> writeChainDeliveryCb;
+  StrictMock<MockDeliveryCallback> firstByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> lastByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> unsentByteDeliveryCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(1);
+  transport_->writeChain(
+      stream,
+      buf->clone(),
+      false /* eof */,
+      false /* cork */,
+      &writeChainDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &lastByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 1, &unsentByteDeliveryCb);
+
+  // writeChain, first, last byte callbacks triggered after delivery
+  auto& conn = transport_->getConnectionState();
+  folly::SocketAddress addr;
+  conn.streamManager->addDeliverable(stream);
+  conn.lossState.srtt = 100us;
+  NetworkData networkData;
+  auto streamState = conn.streamManager->getStream(stream);
+  streamState->ackedIntervals.insert(0, 0);
+  EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  transport_->onNetworkData(addr, std::move(networkData));
+  Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+
+  // try to set both offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
+  transport_->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &lastByteDeliveryCb);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+
+  // unsentByteDeliveryCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 1)).Times(1);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
+}
+
+TEST_F(QuicTransportTest, InvokeDeliveryCallbacksSingleByteWithFin) {
+  // register all possible ways to get a DeliveryCb
+  //
+  // applications built atop QUIC may capture both first and last byte timings,
+  // which in this test are the same byte
+  StrictMock<MockDeliveryCallback> writeChainDeliveryCb;
+  StrictMock<MockDeliveryCallback> firstByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> lastByteDeliveryCb;
+  StrictMock<MockDeliveryCallback> finDeliveryCb;
+  StrictMock<MockDeliveryCallback> unsentByteDeliveryCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(1);
+  transport_->writeChain(
+      stream,
+      buf->clone(),
+      true /* eof */,
+      false /* cork */,
+      &writeChainDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &lastByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 1, &finDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 2, &unsentByteDeliveryCb);
+
+  // writeChain, first, last byte, fin callbacks triggered after delivery
+  auto& conn = transport_->getConnectionState();
+  folly::SocketAddress addr;
+  conn.streamManager->addDeliverable(stream);
+  conn.lossState.srtt = 100us;
+  NetworkData networkData;
+  auto streamState = conn.streamManager->getStream(stream);
+  streamState->ackedIntervals.insert(0, 1);
+  EXPECT_CALL(writeChainDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, 100us)).Times(1);
+  EXPECT_CALL(finDeliveryCb, onDeliveryAck(stream, 1, 100us)).Times(1);
+  transport_->onNetworkData(addr, std::move(networkData));
+  Mock::VerifyAndClearExpectations(&writeChainDeliveryCb);
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+
+  // try to set all three offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
+  EXPECT_CALL(lastByteDeliveryCb, onDeliveryAck(stream, 0, _)).Times(1);
+  EXPECT_CALL(finDeliveryCb, onDeliveryAck(stream, 1, _)).Times(1);
+  transport_->registerDeliveryCallback(stream, 0, &firstByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 0, &lastByteDeliveryCb);
+  transport_->registerDeliveryCallback(stream, 1, &finDeliveryCb);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&lastByteDeliveryCb);
+  Mock::VerifyAndClearExpectations(&finDeliveryCb);
+
+  // unsentByteDeliveryCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(unsentByteDeliveryCb, onCanceled(stream, 2)).Times(1);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&unsentByteDeliveryCb);
+}
+
+TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByte) {
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  StrictMock<MockByteEventCallback> pastlastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(1);
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, 0, &lastByteTxCb);
+  transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+
+  // first and last byte TX callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // try to set the first and last byte offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, 0, &lastByteTxCb);
+  loopForWrites(); // have to loop since processed async
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // even if we register pastlastByte again, it shouldn't be triggered
+  transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+
+  // pastlastByteTxCb::onByteEvent will never get called
+  // cancel gets called instead
+  // onByteEventCanceled called twice, since added twice
+  EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 1)))
+      .Times(2);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+}
+
+TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteWithFin) {
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  StrictMock<MockByteEventCallback> finTxCb;
+  StrictMock<MockByteEventCallback> pastlastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(1);
+  transport_->writeChain(
+      stream, buf->clone(), true /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, 0, &lastByteTxCb);
+  transport_->registerTxCallback(stream, 1, &finTxCb);
+  transport_->registerTxCallback(stream, 2, &pastlastByteTxCb);
+
+  // first, last byte, and fin TX callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(finTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&finTxCb);
+
+  // try to set all three offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(finTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, 0, &lastByteTxCb);
+  transport_->registerTxCallback(stream, 1, &finTxCb);
+  loopForWrites(); // have to loop since processed async
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&finTxCb);
+
+  // pastlastByteTxCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 2)))
+      .Times(1);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+}
+
+TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytes) {
+  const uint64_t streamBytes = 10;
+  const uint64_t lastByte = streamBytes - 1;
+
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  StrictMock<MockByteEventCallback> pastlastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(streamBytes);
+  CHECK_EQ(streamBytes, buf->length());
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+  transport_->registerTxCallback(stream, lastByte + 1, &pastlastByteTxCb);
+
+  // first and last byte TX callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // try to set the first and last byte offsets again
+  // callbacks should be triggered immediately
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+  loopForWrites(); // have to loop since processed async
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // pastlastByteTxCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(
+      pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, lastByte + 1)))
+      .Times(1);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+}
+
+TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesWriteRateLimited) {
+  // configure connection to write one packet each round
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.writeConnectionDataPacketsLimit = 1;
+
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> secondPacketByteOffsetTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  StrictMock<MockByteEventCallback> pastlastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  const uint64_t streamBytes = kDefaultUDPSendPacketLen * 4;
+  const uint64_t lastByte = streamBytes - 1;
+  auto buf = buildRandomInputData(streamBytes);
+  CHECK_EQ(streamBytes, buf->length());
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(
+      stream, kDefaultUDPSendPacketLen * 2, &secondPacketByteOffsetTxCb);
+  transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+  transport_->registerTxCallback(stream, lastByte + 1, &pastlastByteTxCb);
+
+  // first byte gets TXed on first call to loopForWrites
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+
+  // second packet byte offset gets TXed on second call to loopForWrites
+  EXPECT_CALL(
+      secondPacketByteOffsetTxCb,
+      onByteEvent(getTxMatcher(stream, kDefaultUDPSendPacketLen * 2)))
+      .Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // nothing happens on third or fourth call to loopForWrites
+  loopForWrites();
+  loopForWrites();
+
+  // due to overhead, last byte gets TXed on fifth call to loopForWrites
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+
+  // pastlastByteTxCb::onByteEvent will never get called
+  // cancel gets called instead
+  EXPECT_CALL(
+      pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, lastByte + 1)))
+      .Times(1);
+  transport_->close(folly::none);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+}
+
+TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesMultipleWrites) {
+  // configure connection to write one packet each round
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.writeConnectionDataPacketsLimit = 1;
+
+  StrictMock<MockByteEventCallback> txCb1;
+  StrictMock<MockByteEventCallback> txCb2;
+  StrictMock<MockByteEventCallback> txCb3;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  // call writeChain, writing 10 bytes
+  {
+    auto buf = buildRandomInputData(10);
+    transport_->writeChain(
+        stream, buf->clone(), false /* eof */, false /* cork */);
+  }
+  transport_->registerTxCallback(stream, 0, &txCb1);
+  EXPECT_CALL(txCb1, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb1);
+
+  // call writeChain and write another 10 bytes
+  {
+    auto buf = buildRandomInputData(10);
+    transport_->writeChain(
+        stream, buf->clone(), false /* eof */, false /* cork */);
+  }
+  transport_->registerTxCallback(stream, 10, &txCb2);
+  EXPECT_CALL(txCb2, onByteEvent(getTxMatcher(stream, 10))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb2);
+
+  // write the fin
+  {
+    auto buf = buildRandomInputData(0);
+    transport_->writeChain(
+        stream, buf->clone(), true /* eof */, false /* cork */);
+  }
+  transport_->registerTxCallback(stream, 20, &txCb3);
+  EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb3);
+}
+
+TEST_F(
+    QuicTransportTest,
+    InvokeTxAndDeliveryCallbacksMultipleBytesMultipleWrites) {
+  // configure connection to write one packet each round
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.writeConnectionDataPacketsLimit = 1;
+
+  StrictMock<MockByteEventCallback> txCb1;
+  StrictMock<MockByteEventCallback> txCb2;
+  StrictMock<MockByteEventCallback> txCb3;
+
+  StrictMock<MockDeliveryCallback> deliveryCb1;
+  StrictMock<MockDeliveryCallback> deliveryCb2;
+  StrictMock<MockDeliveryCallback> deliveryCb3;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  // call writeChain, writing 10 bytes
+  {
+    auto buf = buildRandomInputData(10);
+    transport_->writeChain(
+        stream, buf->clone(), false /* eof */, false /* cork */, &deliveryCb1);
+  }
+  transport_->registerTxCallback(stream, 0, &txCb1);
+  EXPECT_CALL(txCb1, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb1);
+
+  // call writeChain and write another 10 bytes
+  {
+    auto buf = buildRandomInputData(10);
+    transport_->writeChain(
+        stream, buf->clone(), false /* eof */, false /* cork */, &deliveryCb2);
+  }
+  transport_->registerTxCallback(stream, 10, &txCb2);
+  EXPECT_CALL(txCb2, onByteEvent(getTxMatcher(stream, 10))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb2);
+
+  // write the fin
+  {
+    auto buf = buildRandomInputData(0);
+    transport_->writeChain(
+        stream, buf->clone(), true /* eof */, false /* cork */, &deliveryCb3);
+  }
+  transport_->registerTxCallback(stream, 20, &txCb3);
+  EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&txCb3);
+
+  folly::SocketAddress addr;
+  conn.streamManager->addDeliverable(stream);
+  conn.lossState.srtt = 100us;
+  NetworkData networkData;
+  auto streamState = conn.streamManager->getStream(stream);
+  streamState->ackedIntervals.insert(0, 20);
+  EXPECT_CALL(deliveryCb1, onDeliveryAck(stream, 9, 100us)).Times(1);
+  EXPECT_CALL(deliveryCb2, onDeliveryAck(stream, 19, 100us)).Times(1);
+  EXPECT_CALL(deliveryCb3, onDeliveryAck(stream, 20, 100us)).Times(1);
+  transport_->onNetworkData(addr, std::move(networkData));
 }
 
 TEST_F(QuicTransportTest, NotifyPendingWriteConnImmediate) {

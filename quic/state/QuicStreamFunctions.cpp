@@ -381,6 +381,16 @@ uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
       stream.currentWriteOffset + stream.writeBuffer.chainLength());
 }
 
+folly::Optional<uint64_t> getLargestWriteOffsetTxed(
+    const QuicStreamState& stream) {
+  // currentWriteOffset is really nextWriteOffset
+  // when 0, it indicates nothing has been written yet
+  if (stream.currentWriteOffset == 0) {
+    return folly::none;
+  }
+  return stream.currentWriteOffset - 1;
+}
+
 folly::Optional<uint64_t> getLargestDeliverableOffset(
     const QuicStreamState& stream) {
   // If the acked intervals is not empty, then the furthest acked interval

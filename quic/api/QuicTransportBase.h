@@ -314,6 +314,19 @@ class QuicTransportBase : public QuicSocket {
   void cancelDeliveryCallbacksForStream(StreamId id, uint64_t offset) override;
 
   /**
+   * Register a callback to be invoked when the stream offset was transmitted.
+   *
+   * Currently, an offset is considered "transmitted" if it has been written to
+   * to the underlying UDP socket, indicating that it has passed through
+   * congestion control and pacing. In the future, this callback may be
+   * triggered by socket/NIC software or hardware timestamps.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
+      const StreamId id,
+      const uint64_t offset,
+      ByteEventCallback* cb) override;
+
+  /**
    * Register a byte event to be triggered when specified event type occurs for
    * the specified stream and offset.
    */
@@ -353,6 +366,19 @@ class QuicTransportBase : public QuicSocket {
    * Cancel all byte event callbacks of all streams of the given type.
    */
   void cancelByteEventCallbacks(const ByteEvent::Type type) override;
+
+  /**
+   * Get the number of pending byte events for the given stream.
+   */
+  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
+      const StreamId id) const override;
+
+  /**
+   * Get the number of pending byte events of specified type for given stream.
+   */
+  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId id) const override;
 
   // Timeout functions
   class LossTimeout : public folly::HHWheelTimer::Callback {
@@ -556,6 +582,7 @@ class QuicTransportBase : public QuicSocket {
   getInstrumentationObservers() const override;
 
  protected:
+  void processCallbacksAfterWriteData();
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
   void invokePeekDataAndCallbacks();
@@ -639,6 +666,27 @@ class QuicTransportBase : public QuicSocket {
   using ByteEventMap = folly::
       F14FastMap<StreamId, std::deque<std::pair<uint64_t, ByteEventCallback*>>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
+  [[nodiscard]] const ByteEventMap& getByteEventMapConst(
+      const ByteEvent::Type type) const;
+
+  /**
+   * Helper function that calls passed function for each ByteEvent type.
+   *
+   * Removes number of locations to update when a byte event is added.
+   */
+  void invokeForEachByteEventType(
+      const std::function<void(const ByteEvent::Type)>& fn) {
+    for (const auto& type : ByteEvent::kByteEventTypes) {
+      fn(type);
+    }
+  }
+
+  void invokeForEachByteEventTypeConst(
+      const std::function<void(const ByteEvent::Type)>& fn) const {
+    for (const auto& type : ByteEvent::kByteEventTypes) {
+      fn(type);
+    }
+  }
 
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
@@ -681,6 +729,7 @@ class QuicTransportBase : public QuicSocket {
   folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
 
   ByteEventMap deliveryCallbacks_;
+  ByteEventMap txCallbacks_;
 
   folly::F14FastMap<StreamId, DataExpiredCallbackData> dataExpiredCallbacks_;
   folly::F14FastMap<StreamId, DataRejectedCallbackData> dataRejectedCallbacks_;

@@ -790,7 +790,9 @@ class QuicSocket {
    * Structure used to communicate TX and ACK/Delivery notifications.
    */
   struct ByteEvent {
-    enum class Type { ACK = 1 };
+    enum class Type { ACK = 1, TX = 2 };
+    static constexpr std::array<Type, 2> kByteEventTypes = {Type::ACK,
+                                                            Type::TX};
 
     StreamId id{0};
     uint64_t offset{0};
@@ -865,6 +867,19 @@ class QuicSocket {
   };
 
   /**
+   * Register a callback to be invoked when the stream offset was transmitted.
+   *
+   * Currently, an offset is considered "transmitted" if it has been written to
+   * to the underlying UDP socket, indicating that it has passed through
+   * congestion control and pacing. In the future, this callback may be
+   * triggered by socket/NIC software or hardware timestamps.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
+      const StreamId id,
+      const uint64_t offset,
+      ByteEventCallback* cb) = 0;
+
+  /**
    * Register a byte event to be triggered when specified event type occurs for
    * the specified stream and offset.
    */
@@ -905,6 +920,19 @@ class QuicSocket {
    * Cancel all byte event callbacks of all streams of the given type.
    */
   virtual void cancelByteEventCallbacks(const ByteEvent::Type type) = 0;
+
+  /**
+   * Get the number of pending byte events for the given stream.
+   */
+  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
+      const StreamId streamId) const = 0;
+
+  /**
+   * Get the number of pending byte events of specified type for given stream.
+   */
+  FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(
+      const ByteEvent::Type type,
+      const StreamId streamId) const = 0;
 
   /**
    * Write data/eof to the given stream.

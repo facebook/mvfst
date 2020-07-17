@@ -140,13 +140,19 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(
       unregisterStreamWriteCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId));
+  MOCK_METHOD3(
+      registerTxCallback,
+      folly::Expected<folly::Unit, LocalErrorCode>(
+          const StreamId,
+          const uint64_t,
+          ByteEventCallback*));
   MOCK_METHOD4(
       registerByteEventCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(
           const ByteEvent::Type,
-          const StreamId id,
-          const uint64_t offset,
-          ByteEventCallback* cb));
+          const StreamId,
+          const uint64_t,
+          ByteEventCallback*));
   MOCK_METHOD2(
       cancelByteEventCallbacksForStream,
       void(const StreamId id, const folly::Optional<uint64_t>& offset));
@@ -158,6 +164,12 @@ class MockQuicSocket : public QuicSocket {
           const folly::Optional<uint64_t>& offset));
   MOCK_METHOD0(cancelAllByteEventCallbacks, void());
   MOCK_METHOD1(cancelByteEventCallbacks, void(const ByteEvent::Type));
+  MOCK_CONST_METHOD1(
+      getNumByteEventCallbacksForStream,
+      size_t(const StreamId id));
+  MOCK_CONST_METHOD2(
+      getNumByteEventCallbacksForStream,
+      size_t(const ByteEvent::Type, const StreamId));
   folly::Expected<folly::Unit, LocalErrorCode> writeChain(
       StreamId id,
       Buf data,
