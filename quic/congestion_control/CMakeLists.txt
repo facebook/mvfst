@@ -16,6 +16,7 @@ add_library(
   QuicCubic.cpp
   QuicCCP.cpp
   Pacer.cpp
+  ServerCongestionControllerFactory.cpp
 )
 
 target_include_directories(
