@@ -3426,7 +3426,12 @@ TEST_F(
   const std::pair<QuicErrorCode, std::string> defaultError = std::make_pair(
       GenericApplicationErrorCode::NO_ERROR,
       toString(GenericApplicationErrorCode::NO_ERROR));
-  EXPECT_CALL(*cb, close(transport.get(), folly::Optional(defaultError)));
+  EXPECT_CALL(
+      *cb,
+      close(
+          transport.get(),
+          folly::Optional<std::pair<QuicErrorCode, std::string>>(
+              defaultError)));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;
@@ -3448,7 +3453,11 @@ TEST_F(
   const auto testError = std::make_pair(
       QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
       std::string("testError"));
-  EXPECT_CALL(*cb, close(transport.get(), folly::Optional(testError)));
+  EXPECT_CALL(
+      *cb,
+      close(
+          transport.get(),
+          folly::Optional<std::pair<QuicErrorCode, std::string>>(testError)));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;
