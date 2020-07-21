@@ -556,6 +556,34 @@ TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
   EXPECT_GT(decodedRegularPacket.frames.size(), 1);
 }
 
+TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
+  ConnectionId emptyCID(std::vector<uint8_t>(0));
+  PacketNum packetNum = 0;
+  PacketNum largestAcked = 0;
+  size_t cipherOverhead = 200;
+  auto builder = testBuilderProvider(
+      GetParam(),
+      kDefaultUDPSendPacketLen,
+      LongHeader(
+          LongHeader::Types::Handshake,
+          emptyCID,
+          emptyCID,
+          packetNum,
+          QuicVersion::MVFST),
+      largestAcked,
+      kDefaultUDPSendPacketLen);
+  builder->encodePacketHeader();
+  builder->setCipherOverhead(cipherOverhead);
+  while (builder->canBuildPacket()) {
+    writeFrame(PingFrame(), *builder);
+  }
+  auto builtOut = std::move(*builder).buildPacket();
+  auto resultRegularPacket = builtOut.packet;
+  EXPECT_LT(
+      resultRegularPacket.frames.size(),
+      kDefaultUDPSendPacketLen - cipherOverhead);
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicPacketBuilderTests,
     QuicPacketBuilderTest,
