@@ -83,7 +83,7 @@ class PacketBuilderInterface {
   // Returns the packet header for the current packet.
   FOLLY_NODISCARD virtual const PacketHeader& getPacketHeader() const = 0;
 
-  virtual void setCipherOverhead(uint8_t overhead) = 0;
+  virtual void accountForCipherOverhead(uint8_t overhead) = 0;
 
   /**
    * Whether the packet builder is able to build a packet. This should be
@@ -149,7 +149,7 @@ class InplaceQuicPacketBuilder final : public PacketBuilderInterface {
 
   FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
 
-  void setCipherOverhead(uint8_t overhead) noexcept override;
+  void accountForCipherOverhead(uint8_t overhead) noexcept override;
 
   FOLLY_NODISCARD uint32_t getHeaderBytes() const override;
 
@@ -228,7 +228,7 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
    */
   FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
 
-  void setCipherOverhead(uint8_t overhead) noexcept override;
+  void accountForCipherOverhead(uint8_t overhead) noexcept override;
 
   FOLLY_NODISCARD bool hasFramesPending() const override;
 
@@ -382,8 +382,8 @@ class PacketBuilderWrapper : public PacketBuilderInterface {
     return std::move(builder).buildPacket();
   }
 
-  void setCipherOverhead(uint8_t overhead) noexcept override {
-    builder.setCipherOverhead(overhead);
+  void accountForCipherOverhead(uint8_t overhead) noexcept override {
+    builder.accountForCipherOverhead(overhead);
   }
 
   FOLLY_NODISCARD bool canBuildPacket() const noexcept override {

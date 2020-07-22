@@ -3842,7 +3842,7 @@ Buf getHandshakePacketWithFrame(
       std::move(header),
       clientPacketNum / 2 /* largestAcked */);
   builder.encodePacketHeader();
-  builder.setCipherOverhead(clientWriteCipher.getCipherOverhead());
+  builder.accountForCipherOverhead(clientWriteCipher.getCipherOverhead());
   writeFrame(std::move(frame), builder);
   return packetToBufCleartext(
       std::move(builder).buildPacket(),

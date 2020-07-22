@@ -322,7 +322,7 @@ TEST_P(QuicPacketBuilderTest, TestPaddingAccountsForCipherOverhead) {
       largestAckedPacketNum,
       kDefaultUDPSendPacketLen);
   builder->encodePacketHeader();
-  builder->setCipherOverhead(cipherOverhead);
+  builder->accountForCipherOverhead(cipherOverhead);
   EXPECT_TRUE(builder->canBuildPacket());
   writeFrame(PaddingFrame(), *builder);
   auto builtOut = std::move(*builder).buildPacket();
@@ -573,7 +573,7 @@ TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
       largestAcked,
       kDefaultUDPSendPacketLen);
   builder->encodePacketHeader();
-  builder->setCipherOverhead(cipherOverhead);
+  builder->accountForCipherOverhead(cipherOverhead);
   while (builder->canBuildPacket()) {
     writeFrame(PingFrame(), *builder);
   }

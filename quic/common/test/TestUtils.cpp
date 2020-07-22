@@ -122,7 +122,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
       getAckState(dstConn, pnSpace).largestAckedByPeer.value_or(0));
   builder.encodePacketHeader();
   if (aead) {
-    builder.setCipherOverhead(aead->getCipherOverhead());
+    builder.accountForCipherOverhead(aead->getCipherOverhead());
   }
   DCHECK(builder.canBuildPacket());
   AckFrameMetaData ackData(
@@ -330,7 +330,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
         packetSizeLimit, std::move(header), largestAcked));
   }
   builder->encodePacketHeader();
-  builder->setCipherOverhead(cipherOverhead);
+  builder->accountForCipherOverhead(cipherOverhead);
   writeStreamFrameHeader(
       *builder,
       streamId,
@@ -366,7 +366,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     builder = &fallbackBuilder;
   }
   builder->encodePacketHeader();
-  builder->setCipherOverhead(aead.getCipherOverhead());
+  builder->accountForCipherOverhead(aead.getCipherOverhead());
   writeCryptoFrame(offset, data.clone(), *builder);
   return std::move(*builder).buildPacket();
 }
@@ -408,7 +408,7 @@ RegularQuicPacketBuilder::Packet createCryptoPacket(
   RegularQuicPacketBuilder builder(
       packetSizeLimit, std::move(*header), largestAcked);
   builder.encodePacketHeader();
-  builder.setCipherOverhead(aead.getCipherOverhead());
+  builder.accountForCipherOverhead(aead.getCipherOverhead());
   writeCryptoFrame(offset, data.clone(), builder);
   return std::move(builder).buildPacket();
 }

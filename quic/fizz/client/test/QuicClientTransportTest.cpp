@@ -4582,7 +4582,7 @@ Buf getHandshakePacketWithFrame(
       std::move(header),
       packetNum / 2 /* largestAcked */);
   builder.encodePacketHeader();
-  builder.setCipherOverhead(serverWriteCipher.getCipherOverhead());
+  builder.accountForCipherOverhead(serverWriteCipher.getCipherOverhead());
   writeFrame(std::move(frame), builder);
   return packetToBufCleartext(
       std::move(builder).buildPacket(),

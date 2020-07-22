@@ -261,7 +261,8 @@ const PacketHeader& RegularQuicPacketBuilder::getPacketHeader() const {
   return packet_.header;
 }
 
-void RegularQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
+void RegularQuicPacketBuilder::accountForCipherOverhead(
+    uint8_t overhead) noexcept {
   cipherOverhead_ = overhead;
   remainingBytes_ -= overhead;
 }
@@ -483,7 +484,8 @@ PacketBuilderInterface::Packet InplaceQuicPacketBuilder::buildPacket() && {
   return builtPacket;
 }
 
-void InplaceQuicPacketBuilder::setCipherOverhead(uint8_t overhead) noexcept {
+void InplaceQuicPacketBuilder::accountForCipherOverhead(
+    uint8_t overhead) noexcept {
   cipherOverhead_ = overhead;
   remainingBytes_ -= overhead;
 }

@@ -600,7 +600,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
       continue;
     }
 
-    internalBuilder->setCipherOverhead(cipherOverhead_);
+    internalBuilder->accountForCipherOverhead(cipherOverhead_);
     internalBuilder->encodePacketHeader();
     PacketRebuilder rebuilder(*internalBuilder, conn_);
 

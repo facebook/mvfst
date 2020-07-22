@@ -147,7 +147,7 @@ TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);
   builder.encodePacketHeader();
-  builder.setCipherOverhead(0);
+  builder.accountForCipherOverhead(0);
   writeCryptoFrame(0, folly::IOBuf::copyBuffer("CHLO"), builder);
   auto packet = packetToBuf(std::move(builder).buildPacket());
   auto packetQueue = bufToQueue(std::move(packet));
