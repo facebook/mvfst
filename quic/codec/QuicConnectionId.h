@@ -161,17 +161,4 @@ bool operator!=(
     const ServerConnectionIdParams& lhs,
     const ServerConnectionIdParams& rhs);
 
-/**
- * Returns a pair of length of the connection ids decoded from the long header.
- * Returns (Destination connid length, Source connid length)
- */
-std::pair<uint8_t, uint8_t> decodeConnectionIdLengths(uint8_t connIdSize);
-
-/**
- * Given 2 connection ids, encodes their lengths in the wire format for the Quic
- * long header.
- */
-uint8_t encodeConnectionIdLengths(
-    uint8_t destinationConnectionIdSize,
-    uint8_t sourceConnectionIdSize);
 } // namespace quic

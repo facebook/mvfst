@@ -105,26 +105,6 @@ void ServerConnectionIdParams::setWorkerId(uint8_t workerIdIn) {
   workerId = workerIdIn;
 }
 
-std::pair<uint8_t, uint8_t> decodeConnectionIdLengths(uint8_t connIdSize) {
-  uint8_t dcidLen = (connIdSize >> 4);
-  uint8_t scidLen = connIdSize & 0x0F;
-  dcidLen = dcidLen == 0 ? 0 : dcidLen + 3;
-  scidLen = scidLen == 0 ? 0 : scidLen + 3;
-  return std::make_pair(dcidLen, scidLen);
-}
-
-uint8_t encodeConnectionIdLengths(
-    uint8_t destinationConnectionIdSize,
-    uint8_t sourceConnectionIdSize) {
-  DCHECK_LE(destinationConnectionIdSize, kMaxConnectionIdSize);
-  DCHECK_LE(sourceConnectionIdSize, kMaxConnectionIdSize);
-  uint8_t dstByte =
-      destinationConnectionIdSize == 0 ? 0 : destinationConnectionIdSize - 3;
-  uint8_t srcByte =
-      sourceConnectionIdSize == 0 ? 0 : sourceConnectionIdSize - 3;
-  return ((dstByte << 4)) | (srcByte);
-}
-
 bool operator==(
     const ServerConnectionIdParams& lhs,
     const ServerConnectionIdParams& rhs) {
