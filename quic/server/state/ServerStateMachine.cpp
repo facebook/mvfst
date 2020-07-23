@@ -1079,6 +1079,14 @@ void onServerReadDataFromOpen(
         outOfOrder,
         pktHasRetransmittableData,
         pktHasCryptoData);
+    if (encryptionLevel == EncryptionLevel::Handshake &&
+        conn.version != QuicVersion::MVFST_D24 && conn.initialWriteCipher) {
+      conn.initialWriteCipher.reset();
+      conn.initialHeaderCipher.reset();
+      conn.readCodec->setInitialReadCipher(nullptr);
+      conn.readCodec->setInitialHeaderCipher(nullptr);
+      implicitAckCryptoStream(conn, EncryptionLevel::Initial);
+    }
     QUIC_STATS(conn.statsCallback, onPacketProcessed);
   }
   VLOG_IF(4, !udpData.empty())

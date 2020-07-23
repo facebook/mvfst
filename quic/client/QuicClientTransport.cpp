@@ -619,6 +619,14 @@ void QuicClientTransport::processPacketData(
       outOfOrder,
       pktHasRetransmittableData,
       pktHasCryptoData);
+  if (encryptionLevel == EncryptionLevel::Handshake &&
+      conn_->version != QuicVersion::MVFST_D24 && conn_->initialWriteCipher) {
+    conn_->initialWriteCipher.reset();
+    conn_->initialHeaderCipher.reset();
+    conn_->readCodec->setInitialReadCipher(nullptr);
+    conn_->readCodec->setInitialHeaderCipher(nullptr);
+    implicitAckCryptoStream(*conn_, EncryptionLevel::Initial);
+  }
 }
 
 void QuicClientTransport::onReadData(
