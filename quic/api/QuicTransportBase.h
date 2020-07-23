@@ -370,13 +370,13 @@ class QuicTransportBase : public QuicSocket {
   /**
    * Get the number of pending byte events for the given stream.
    */
-  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
-      const StreamId id) const override;
+  FOLLY_NODISCARD size_t
+  getNumByteEventCallbacksForStream(const StreamId id) const override;
 
   /**
    * Get the number of pending byte events of specified type for given stream.
    */
-  [[nodiscard]] size_t getNumByteEventCallbacksForStream(
+  FOLLY_NODISCARD size_t getNumByteEventCallbacksForStream(
       const ByteEvent::Type type,
       const StreamId id) const override;
 
@@ -666,7 +666,7 @@ class QuicTransportBase : public QuicSocket {
   using ByteEventMap = folly::
       F14FastMap<StreamId, std::deque<std::pair<uint64_t, ByteEventCallback*>>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
-  [[nodiscard]] const ByteEventMap& getByteEventMapConst(
+  FOLLY_NODISCARD const ByteEventMap& getByteEventMapConst(
       const ByteEvent::Type type) const;
 
   /**
