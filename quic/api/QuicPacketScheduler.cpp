@@ -576,14 +576,14 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     std::unique_ptr<PacketBuilderInterface> internalBuilder;
     if (conn_.transportSettings.dataPathType == DataPathType::ChainedMemory) {
       internalBuilder = std::make_unique<RegularQuicPacketBuilder>(
-          conn_.udpSendPacketLen - cipherOverhead_,
+          conn_.udpSendPacketLen,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     } else {
       CHECK(conn_.bufAccessor && conn_.bufAccessor->ownsBuffer());
       internalBuilder = std::make_unique<InplaceQuicPacketBuilder>(
           *conn_.bufAccessor,
-          conn_.udpSendPacketLen - cipherOverhead_,
+          conn_.udpSendPacketLen,
           header,
           getAckState(conn_, builderPnSpace).largestAckedByPeer.value_or(0));
     }
