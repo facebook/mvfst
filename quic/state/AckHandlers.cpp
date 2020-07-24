@@ -202,6 +202,11 @@ void processAckFrame(
       (ack.largestAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
       CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
+      // TODO it's not clear that we should be using the smallest and largest
+      // lost times here. It may perhaps be better to only consider the latest
+      // contiguous lost block and determine if that block is larger than the
+      // congestion period. Alternatively we could consider every lost block
+      // and check if any of them constitute persistent congestion.
       lossEvent->persistentCongestion = isPersistentCongestion(
           conn,
           *lossEvent->smallestLostSentTime,
