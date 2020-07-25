@@ -1737,7 +1737,9 @@ TEST_F(QuicTransportTest, FlowControlCallbacks) {
   conn.streamManager->queueFlowControlUpdated(streamState->id);
   conn.streamManager->queueFlowControlUpdated(streamState2->id);
   EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState->id));
-  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState2->id));
+  // We should be able to create streams from this callback.
+  EXPECT_CALL(connCallback_, onFlowControlUpdate(streamState2->id))
+      .WillOnce(Invoke([&](auto) { transport_->createBidirectionalStream(); }));
   transport_->onNetworkData(
       SocketAddress("::1", 10000),
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));

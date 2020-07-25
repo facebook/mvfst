@@ -1689,6 +1689,8 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     if (closeState_ != CloseState::OPEN) {
       return;
     }
+    // In case the callback modified the stream map, get it again.
+    stream = conn_->streamManager->getStream(streamId);
     auto maxStreamWritable = maxWritableOnStream(*stream);
     if (maxStreamWritable != 0 && !pendingWriteCallbacks_.empty()) {
       auto pendingWriteIt = pendingWriteCallbacks_.find(stream->id);
