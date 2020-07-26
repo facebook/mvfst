@@ -439,7 +439,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    *
    * @param observer     Observer to add (implements AcceptObserver).
    */
-  void addAcceptObserver(AcceptObserver* observer) {
+  virtual void addAcceptObserver(AcceptObserver* observer) {
     observerList_.add(observer);
   }
 
@@ -449,7 +449,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * @param observer     Observer to remove.
    * @return             Whether observer found and removed from list.
    */
-  bool removeAcceptObserver(AcceptObserver* observer) {
+  virtual bool removeAcceptObserver(AcceptObserver* observer) {
     return observerList_.remove(observer);
   }
 
