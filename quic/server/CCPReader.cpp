@@ -152,7 +152,8 @@ void CCPReader::try_initialize(folly::EventBase* evb, uint8_t id) {
   // libccp.
   int ret = ccp_init(&ccpDatapath_);
   if (ret < 0) {
-    LOG(ERROR) << "ccp_init failed err=" << ret;
+    LOG(ERROR) << "[ccp] ccp_init failed ret=" << ret;
+    throw std::runtime_error("internal bug: unable to interface with libccp");
   }
 
   // This message registers us with CCP. CCP ignores messages from
@@ -163,8 +164,23 @@ void CCPReader::try_initialize(folly::EventBase* evb, uint8_t id) {
   std::unique_ptr<folly::IOBuf> ready_msg =
       folly::IOBuf::wrapBuffer(ready_buf, wrote);
   ret = writeOwnedBuffer(std::move(ready_msg));
+  // Since we start ccp within a separate thread from QuicServer, its possible
+  // that it hasn't been scheduled yet when we send this message, in which case
+  // we will get an unable to connet to socket error (111). If this happens,
+  // sleep a bit and then retry. If after a few tries we still can't connect,
+  // then something is probably wrong with CCP and we should exit.
+  int tries = 1;
+  while (ret == -1 && errno == 111 && tries < MAX_CCP_CONNECT_RETRIES) {
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(CCP_CONNECT_RETRY_WAIT_US));
+    ready_msg = folly::IOBuf::wrapBuffer(ready_buf, wrote);
+    ret = writeOwnedBuffer(std::move(ready_msg));
+    tries += 1;
+  }
   if (ret < 0) {
-    LOG(ERROR) << "ccp_init_msg failed ret=" << ret << " errno=" << errno;
+    LOG(ERROR) << "[ccp] write_ready_msg failed after " << tries
+               << " tries ret=" << ret << " errno=" << errno;
+    throw std::runtime_error("unable to connect to ccp");
   }
 }
 

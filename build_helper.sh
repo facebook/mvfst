@@ -320,12 +320,25 @@ function setup_libccp() {
   cd "$BWD" || exit
 }
 
+function setup_rust() {
+  if ! [ -x "$(command -v rustc)" ] || ! [ -x "$(command -v cargo)" ]; then
+    echo -e "${COLOR_RED}[ ERROR ] Rust not found (required for CCP support).${COLOR_OFF}\n"
+    echo -e "    To install rust, run the following command, then rerun build_helper.sh:\n"
+    echo -e "    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y\n"
+    echo -e "    You may also need to run \`source $HOME/.cargo/env\` after installing to add rust to your PATH.\n\n"
+    exit
+  else
+    echo -e "${COLOR_GREEN}[ INFO ] Found rust (required for CCP support).${COLOR_OFF}"
+  fi
+}
+
 detect_platform
 setup_fmt
 setup_folly
 setup_fizz
 if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
   setup_libccp
+  setup_rust
 fi
 
 

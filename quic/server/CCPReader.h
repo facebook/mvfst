@@ -42,6 +42,13 @@ struct ccp_datapath; // forward declaration for when ccp is not enabled
  */
 #define FALLBACK_TIMEOUT_US_LIBCCP 1000000
 
+/**
+ * Defines the maximum number of times we will retry connecting to CCP, and
+ * how long to wait in between each retry. See CCPReader::try_initialize().
+ */
+#define MAX_CCP_CONNECT_RETRIES 3
+#define CCP_CONNECT_RETRY_WAIT_US 1000
+
 namespace quic {
 
 /**

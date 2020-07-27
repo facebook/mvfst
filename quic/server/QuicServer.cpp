@@ -12,6 +12,9 @@
 #include <folly/io/async/EventBaseManager.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
+#ifdef CCP_ENABLED
+#include <quic/congestion_control/third_party/ccp/libstartccp.h>
+#endif
 #include <quic/server/CCPReader.h>
 #include <quic/server/QuicReusePortUDPSocketFactory.h>
 #include <quic/server/QuicServerTransport.h>
@@ -139,8 +142,22 @@ void QuicServer::initialize(
   if (!ccFactory_) {
     ccFactory_ = std::make_shared<DefaultCongestionControllerFactory>();
   }
+
+  startCcpIfEnabled();
   initializeWorkers(evbs, useDefaultTransport);
   bindWorkersToSocket(address, evbs);
+}
+
+void QuicServer::startCcpIfEnabled() {
+#ifdef CCP_ENABLED
+  if (isUsingCCP()) {
+    ccpEvb_ = std::make_unique<folly::ScopedEventBaseThread>();
+    // run_forever (unsurpisingly) blocks until explicitly killed, so we start
+    // it in its own evb
+    ccpEvb_->getEventBase()->runInEventBaseThread(
+        [&] { ccp_run_forever(ccpConfig_.c_str(), 1); });
+  }
+#endif
 }
 
 void QuicServer::initializeWorkers(
