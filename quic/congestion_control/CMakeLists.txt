@@ -46,6 +46,7 @@ target_link_libraries(
   mvfst_exception
   mvfst_state_machine
   mvfst_state_functions
+  ${LIBCCP_LIBRARY}
 )
 
 file(

@@ -57,6 +57,7 @@ target_link_libraries(
   mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_transport
+  ${LIBCCP_LIBRARY}
 )
 
 file(

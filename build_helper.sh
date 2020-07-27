@@ -26,11 +26,12 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -m                                     (optional): Build folly without jemalloc
   -s                                     (optional): Skip installing system package dependencies
   -c                                     (optional): Use ccache
+  -z                                     (optional): enable CCP support
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:msc" arg; do
+while getopts ":hp:i:mscz" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
@@ -46,6 +47,9 @@ while getopts ":hp:i:msc" arg; do
       ;;
     c)
       MVFST_USE_CCACHE=true
+      ;;
+    z)
+      MVFST_ENABLE_CCP=true
       ;;
     h | *) # Display help.
       usage
@@ -80,10 +84,12 @@ mkdir -p "$MVFST_BUILD_DIR"
 if [ -z "${INSTALL_PREFIX-}" ]; then
   FOLLY_INSTALL_DIR=$DEPS_DIR
   FIZZ_INSTALL_DIR=$DEPS_DIR
+  LIBCCP_INSTALL_DIR=$DEPS_DIR
   MVFST_INSTALL_DIR=$BWD
 else
   FOLLY_INSTALL_DIR=$INSTALL_PREFIX
   FIZZ_INSTALL_DIR=$INSTALL_PREFIX
+  LIBCCP_INSTALL_DIR=$INSTALL_PREFIX
   MVFST_INSTALL_DIR=$INSTALL_PREFIX
 fi
 
@@ -288,19 +294,55 @@ function detect_platform() {
   echo -e "${COLOR_GREEN}Detected platform: $Platform ${COLOR_OFF}"
 }
 
+function setup_libccp() {
+  LIBCCP_DIR=$DEPS_DIR/libccp
+  LIBCCP_BUILD_DIR=$LIBCCP_DIR/build/
+  if [ ! -d "$LIBCCP_DIR" ] ; then
+    echo -e "${COLOR_GREEN}[ INFO ] Cloning libccp repo ${COLOR_OFF}"
+    git clone https://github.com/ccp-project/libccp "$LIBCCP_DIR"
+  fi
+
+  #synch_dependency_to_commit "$LIBCCP_DIR" "$MVFST_ROOT_DIR/build/deps/github_hashes/libccp-rev.txt"
+
+  echo -e "${COLOR_GREEN}Building libccp ${COLOR_OFF}"
+  mkdir -p "$LIBCCP_BUILD_DIR"
+  cd "$LIBCCP_BUILD_DIR" || exit
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo       \
+    -DBUILD_TESTS=ON                            \
+    -DCMAKE_PREFIX_PATH="$LIBCCP_INSTALL_DIR"     \
+    -DCMAKE_INSTALL_PREFIX="$LIBCCP_INSTALL_DIR"  \
+    -DCMAKE_CXX_FLAGS=\D__CPLUSPLUS__=1 \
+    "${CMAKE_EXTRA_ARGS[@]}"                    \
+    "$LIBCCP_DIR"
+  make -j "$nproc"
+  make install
+  echo -e "${COLOR_GREEN}libccp is installed ${COLOR_OFF}"
+  cd "$BWD" || exit
+}
+
 detect_platform
 setup_fmt
 setup_folly
 setup_fizz
+if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
+  setup_libccp
+fi
+
 
 # build mvfst:
 cd "$MVFST_BUILD_DIR" || exit
-cmake -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
-  -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR"     \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo               \
-  -DBUILD_TESTS=On                                \
-  "${CMAKE_EXTRA_ARGS[@]}"                        \
-  ../..
+mvfst_cmake_build_args=(
+  -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
+  -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR" \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
+  -DBUILD_TESTS=On                            \
+  "${CMAKE_EXTRA_ARGS[@]}"                    \
+)
+if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
+    mvfst_cmake_build_args+=(-DCCP_ENABLED=TRUE)
+fi
+cmake "${mvfst_cmake_build_args[@]}" ../..
 make -j "$nproc"
+
 echo -e "${COLOR_GREEN}MVFST build is complete. To run unit test: \
   cd _build/build && make test ${COLOR_OFF}"
