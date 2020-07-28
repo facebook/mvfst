@@ -34,7 +34,8 @@ DEFINE_uint64(
     "Amount of data written to stream each iteration");
 DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
 DEFINE_uint64(window, 64 * 1024, "Flow control window size");
-DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/none");
+DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/ccp/none");
+DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
 DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_bool(gso, false, "Enable GSO writes to the socket");
 DEFINE_uint32(
@@ -67,6 +68,11 @@ DEFINE_uint32(
         quic::kDefaultV6UDPSendPacketLen),
     "Maximum packet size to advertise to the peer.");
 DEFINE_bool(use_inplace_write, false, "Data path type");
+DEFINE_double(latency_factor, 0.5, "Latency factor (delta) for Copa");
+DEFINE_uint32(
+    num_server_worker,
+    1,
+    "Max number of mvfst server worker threads");
 
 namespace quic {
 namespace tperf {
@@ -313,16 +319,18 @@ class TPerfServer {
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
     settings.canIgnorePathMTU = true;
+    settings.latencyFactor = FLAGS_latency_factor;
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
+    server_->setCcpConfig(FLAGS_ccp_config);
   }
 
   void start() {
     // Create a SocketAddress and the default or passed in host.
     folly::SocketAddress addr1(host_.c_str(), port_);
     addr1.setFromHostPort(host_, port_);
-    server_->start(addr1, 0);
+    server_->start(addr1, FLAGS_num_server_worker);
     LOG(INFO) << "tperf server started at: " << addr1.describe();
     eventBase_.loopForever();
   }
@@ -543,6 +551,8 @@ quic::CongestionControlType flagsToCongestionControlType(
     return quic::CongestionControlType::BBR;
   } else if (congestionControlType == "copa") {
     return quic::CongestionControlType::Copa;
+  } else if (congestionControlType == "ccp") {
+    return quic::CongestionControlType::CCP;
   } else if (congestionControlType == "none") {
     return quic::CongestionControlType::None;
   }
