@@ -37,7 +37,7 @@ void DefaultPacer::refreshPacingRate(
         pacingRateCalculator_(conn_, cwndBytes, minCwndInMss_, rtt);
     writeInterval_ = pacingRate.interval;
     batchSize_ = pacingRate.burstSize;
-    tokens_ += batchSize_;
+    tokens_ = batchSize_;
   }
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
@@ -66,10 +66,6 @@ void DefaultPacer::setPacingRate(
       conn.transportSettings.pacingTimerTickInterval);
 }
 
-void DefaultPacer::onPacedWriteScheduled(TimePoint currentTime) {
-  scheduledWriteTime_ = currentTime;
-}
-
 void DefaultPacer::onPacketSent() {
   if (tokens_) {
     --tokens_;
@@ -78,6 +74,7 @@ void DefaultPacer::onPacketSent() {
 
 void DefaultPacer::onPacketsLoss() {
   tokens_ = 0UL;
+  lastWriteTime_.reset();
 }
 
 std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
@@ -86,16 +83,21 @@ std::chrono::microseconds DefaultPacer::getTimeUntilNextWrite() const {
 
 uint64_t DefaultPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
   SCOPE_EXIT {
-    scheduledWriteTime_.reset();
+    lastWriteTime_ = currentTime;
   };
   if (writeInterval_ == 0us) {
     return batchSize_;
   }
-  if (!scheduledWriteTime_ || *scheduledWriteTime_ >= currentTime) {
+  if (!lastWriteTime_) {
     return tokens_;
   }
+  /**
+   * Don't let `+ writeInterval_` confuse you. A few lines later we use
+   * `cachedBatchSize_ - batchSize_` instead of `cachedBatchSize_` to increase
+   * token_.
+   */
   auto adjustedInterval = std::chrono::duration_cast<std::chrono::microseconds>(
-      currentTime - *scheduledWriteTime_ + writeInterval_);
+      currentTime - *lastWriteTime_ + writeInterval_);
   cachedBatchSize_ = std::ceil(
       adjustedInterval.count() * batchSize_ * 1.0 / writeInterval_.count());
   if (cachedBatchSize_ < batchSize_) {

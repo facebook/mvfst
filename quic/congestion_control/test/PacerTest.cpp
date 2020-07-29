@@ -49,11 +49,8 @@ TEST_F(PacerTest, RateCalculator) {
   });
   pacer.refreshPacingRate(200000, 200us);
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(
-      4321 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-  consumeTokensHelper(
-      pacer, 4321 + conn.transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_EQ(4321, pacer.updateAndGetWriteBatchSize(Clock::now()));
+  consumeTokensHelper(pacer, 4321);
   EXPECT_EQ(1234us, pacer.getTimeUntilNextWrite());
 }
 
@@ -66,23 +63,8 @@ TEST_F(PacerTest, CompensateTimerDrift) {
   });
   auto currentTime = Clock::now();
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
-  pacer.onPacedWriteScheduled(currentTime);
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
-
-  // Query batch size again without calling onPacedWriteScheduled won't do timer
-  // drift compensation. But token_ keeps the last compenstation.
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
-
-  // Consume a few:
-  consumeTokensHelper(pacer, 3);
-
-  EXPECT_EQ(
-      20 + conn.transportSettings.writeConnectionDataPacketsLimit - 3,
-      pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
 }
 
 TEST_F(PacerTest, NextWriteTime) {
@@ -142,21 +124,20 @@ TEST_F(PacerTest, CachedBatchSize) {
   EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
 
   auto currentTime = Clock::now();
-  pacer.onPacedWriteScheduled(currentTime);
   pacer.updateAndGetWriteBatchSize(currentTime);
   EXPECT_EQ(40, pacer.getCachedWriteBatchSize());
 
-  pacer.onPacedWriteScheduled(currentTime + 100ms);
   pacer.updateAndGetWriteBatchSize(currentTime + 200ms);
-  EXPECT_EQ(80, pacer.getCachedWriteBatchSize());
+  EXPECT_EQ(120, pacer.getCachedWriteBatchSize());
 }
 
 TEST_F(PacerTest, Tokens) {
   // Pacer has tokens right after init:
+  auto currentTime = Clock::now();
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
+      pacer.updateAndGetWriteBatchSize(currentTime));
 
   // Consume all initial tokens:
   consumeTokensHelper(
@@ -174,24 +155,20 @@ TEST_F(PacerTest, Tokens) {
   pacer.refreshPacingRate(100, 100ms);
 
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(Clock::now()));
+  EXPECT_EQ(10 + 10, pacer.updateAndGetWriteBatchSize(currentTime + 10ms));
 
   // Consume all tokens:
-  consumeTokensHelper(pacer, 10);
+  consumeTokensHelper(pacer, 20);
 
   EXPECT_EQ(10ms, pacer.getTimeUntilNextWrite());
-  EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(Clock::now()));
+  EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(currentTime + 10ms));
 
-  // Do a schedule:
-  auto curTime = Clock::now();
-  pacer.onPacedWriteScheduled(curTime);
   // 10ms later you should have 10 mss credit:
-  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(curTime + 10ms));
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 20ms));
 
   // Schedule again from this point:
-  pacer.onPacedWriteScheduled(curTime + 10ms);
   // Then elapse another 10ms, and previous tokens hasn't been used:
-  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(curTime + 20ms));
+  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 30ms));
 }
 
 } // namespace test

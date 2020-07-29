@@ -201,14 +201,6 @@ struct Pacer {
       uint64_t rate_bps) = 0;
 
   /**
-   * Notify the Pacer that a paced write is scheduled.
-   *
-   * currentTime: the time that the timer is scheduled. NOT the time that a
-   *              write is scheduled to happen.
-   */
-  virtual void onPacedWriteScheduled(TimePoint currentTime) = 0;
-
-  /**
    * API for Trnasport to query the interval before next write
    */
   virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;
