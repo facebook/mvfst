@@ -2036,7 +2036,17 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
             id, currentLargestWriteOffset + dataLength - 1, cb);
       }
     }
+    bool wasAppLimitedOrIdle = false;
+    if (conn_->congestionController) {
+      wasAppLimitedOrIdle = conn_->congestionController->isAppLimited();
+      wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
+    }
     writeDataToQuicStream(*stream, std::move(data), eof);
+    // If we were previously app limited, drop whatever tokens we have
+    // collected while idle and restart pacing with the current rate.
+    if (wasAppLimitedOrIdle && conn_->pacer) {
+      conn_->pacer->resetPacingTokens();
+    }
     updateWriteLooper(true);
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "

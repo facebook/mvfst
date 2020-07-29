@@ -169,6 +169,13 @@ TEST_F(PacerTest, Tokens) {
   // Schedule again from this point:
   // Then elapse another 10ms, and previous tokens hasn't been used:
   EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 30ms));
+
+  // Simulate going to app-limited by consuming a single token.
+  consumeTokensHelper(pacer, 1);
+  // Reset the pacing tokens, we should effectively be totally reset.
+  pacer.resetPacingTokens();
+  EXPECT_EQ(0ms, pacer.getTimeUntilNextWrite());
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 500ms));
 }
 
 } // namespace test

@@ -66,6 +66,11 @@ void DefaultPacer::setPacingRate(
       conn.transportSettings.pacingTimerTickInterval);
 }
 
+void DefaultPacer::resetPacingTokens() {
+  tokens_ = batchSize_;
+  lastWriteTime_.reset();
+}
+
 void DefaultPacer::onPacketSent() {
   if (tokens_) {
     --tokens_;

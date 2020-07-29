@@ -201,6 +201,12 @@ struct Pacer {
       uint64_t rate_bps) = 0;
 
   /**
+   * Resets the collected tokens, effectively restarting pacing with the current
+   * rate.
+   */
+  virtual void resetPacingTokens() = 0;
+
+  /**
    * API for Trnasport to query the interval before next write
    */
   virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;

@@ -34,6 +34,8 @@ class DefaultPacer : public Pacer {
   // rate_bps is *bytes* per second
   void setPacingRate(QuicConnectionStateBase& conn, uint64_t rate_bps) override;
 
+  void resetPacingTokens() override;
+
   std::chrono::microseconds getTimeUntilNextWrite() const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;
