@@ -152,7 +152,7 @@ TEST_F(PacerTest, Tokens) {
   });
 
   // These input doesn't matter, the rate calculator above returns fixed values.
-  pacer.refreshPacingRate(100, 100ms);
+  pacer.refreshPacingRate(100, 100ms, currentTime);
 
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
   EXPECT_EQ(10 + 10, pacer.updateAndGetWriteBatchSize(currentTime + 10ms));
@@ -169,6 +169,14 @@ TEST_F(PacerTest, Tokens) {
   // Schedule again from this point:
   // Then elapse another 10ms, and previous tokens hasn't been used:
   EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 30ms));
+
+  // Refresh the pacing rate between writes. Our rate never changes, so we
+  // should end up with batchSize (10) + the amount since the last write (10)
+  // = 20.
+  pacer.refreshPacingRate(100, 100ms, currentTime + 40ms);
+  // After this call, we should collect an additional 10 tokens, as 10ms have
+  // elapsed since the refresh call.
+  EXPECT_EQ(30, pacer.updateAndGetWriteBatchSize(currentTime + 50ms));
 
   // Simulate going to app-limited by consuming a single token.
   consumeTokensHelper(pacer, 1);

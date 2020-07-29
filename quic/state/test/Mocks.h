@@ -33,7 +33,9 @@ class MockCongestionController : public CongestionController {
 
 class MockPacer : public Pacer {
  public:
-  MOCK_METHOD2(refreshPacingRate, void(uint64_t, std::chrono::microseconds));
+  MOCK_METHOD3(
+      refreshPacingRate,
+      void(uint64_t, std::chrono::microseconds, TimePoint currentTime));
   MOCK_METHOD2(setPacingRate, void(QuicConnectionStateBase&, uint64_t));
   MOCK_METHOD0(resetPacingTokens, void());
   MOCK_CONST_METHOD0(getTimeUntilNextWrite, std::chrono::microseconds());

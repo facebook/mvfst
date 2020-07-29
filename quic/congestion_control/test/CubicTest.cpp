@@ -250,11 +250,12 @@ TEST_F(CubicTest, PacingGain) {
   conn.lossState.srtt = 3000us;
   auto packet = makeTestingWritePacket(0, 1500, 1500);
   cubic.onPacketSent(packet);
-  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _))
+  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](uint64_t cwndBytes, std::chrono::microseconds) {
-        EXPECT_EQ(cubic.getCongestionWindow() * 2, cwndBytes);
-      }));
+      .WillOnce(
+          Invoke([&](uint64_t cwndBytes, std::chrono::microseconds, auto) {
+            EXPECT_EQ(cubic.getCongestionWindow() * 2, cwndBytes);
+          }));
   cubic.onPacketAckOrLoss(
       makeAck(0, 1500, Clock::now(), packet.time), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
@@ -264,23 +265,25 @@ TEST_F(CubicTest, PacingGain) {
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet1);
   // reduce cwnd to 9 MSS
-  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _))
+  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](uint64_t cwndBytes, std::chrono::microseconds) {
-        EXPECT_EQ(
-            static_cast<uint64_t>(cubic.getCongestionWindow() * 1.25),
-            cwndBytes);
-      }));
+      .WillOnce(
+          Invoke([&](uint64_t cwndBytes, std::chrono::microseconds, auto) {
+            EXPECT_EQ(
+                static_cast<uint64_t>(cubic.getCongestionWindow() * 1.25),
+                cwndBytes);
+          }));
   cubic.onPacketAckOrLoss(folly::none, loss);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 
   auto packet2 = makeTestingWritePacket(2, 1500, 4500);
   cubic.onPacketSent(packet2);
-  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _))
+  EXPECT_CALL(*rawPacer, refreshPacingRate(_, _, _))
       .Times(1)
-      .WillOnce(Invoke([&](uint64_t cwndBytes, std::chrono::microseconds) {
-        EXPECT_EQ(cubic.getCongestionWindow(), cwndBytes);
-      }));
+      .WillOnce(
+          Invoke([&](uint64_t cwndBytes, std::chrono::microseconds, auto) {
+            EXPECT_EQ(cubic.getCongestionWindow(), cwndBytes);
+          }));
   cubic.onPacketAckOrLoss(
       makeAck(2, 1500, Clock::now(), packet2.time), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());

@@ -191,10 +191,12 @@ struct Pacer {
   /**
    * API for CongestionController to notify Pacer the latest cwnd value in bytes
    * and connection RTT so that Pacer can recalculate pacing rates.
+   * Note the third parameter is here for testing purposes.
    */
   virtual void refreshPacingRate(
       uint64_t cwndBytes,
-      std::chrono::microseconds rtt) = 0;
+      std::chrono::microseconds rtt,
+      TimePoint currentTime = Clock::now()) = 0;
 
   virtual void setPacingRate(
       QuicConnectionStateBase& conn,

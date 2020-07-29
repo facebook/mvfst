@@ -28,8 +28,10 @@ class DefaultPacer : public Pacer {
       const QuicConnectionStateBase& conn,
       uint64_t minCwndInMss);
 
-  void refreshPacingRate(uint64_t cwndBytes, std::chrono::microseconds rtt)
-      override;
+  void refreshPacingRate(
+      uint64_t cwndBytes,
+      std::chrono::microseconds rtt,
+      TimePoint currentTime = Clock::now()) override;
 
   // rate_bps is *bytes* per second
   void setPacingRate(QuicConnectionStateBase& conn, uint64_t rate_bps) override;
