@@ -330,9 +330,6 @@ ssize_t CCPReader::writeOwnedBuffer(std::unique_ptr<folly::IOBuf>) {
 uint8_t CCPReader::getWorkerId() const noexcept {
   return parentWorkerId_;
 }
-struct ccp_datapath* FOLLY_NULLABLE CCPReader::getDatapath() noexcept {
-  return nullptr;
-}
 void CCPReader::shutdown() {}
 CCPReader::~CCPReader() = default;
 

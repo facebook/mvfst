@@ -13,8 +13,6 @@
 
 #ifdef CCP_ENABLED
 #include <ccp/ccp.h>
-#else
-struct ccp_datapath; // forward declaration for when ccp is not enabled
 #endif
 
 /**
@@ -101,7 +99,9 @@ class CCPReader : public folly::AsyncUDPSocket::ReadCallback {
   // (libccp's wrapper around a QuicServerWorker), needed
   // for interacting with libccp. This gets passed to CCP alg instances
   // by the QuicServerConnectionState object.
+#ifdef CCP_ENABLED
   struct ccp_datapath* FOLLY_NULLABLE getDatapath() noexcept;
+#endif
 
   void shutdown();
 
