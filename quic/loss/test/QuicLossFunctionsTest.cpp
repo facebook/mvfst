@@ -1014,8 +1014,7 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   MockClock::mockNow = [=]() { return sendTime; };
   auto alarm = calculateAlarmDuration<MockClock>(*conn);
   EXPECT_EQ(
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          expectedDelayUntilLost),
+      folly::chrono::ceil<std::chrono::milliseconds>(expectedDelayUntilLost),
       alarm.first);
   EXPECT_EQ(LossState::AlarmMethod::EarlyRetransmitOrReordering, alarm.second);
   // Manual set lossState. Calling setLossDetectionAlarm requries a Timeout

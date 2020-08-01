@@ -8,6 +8,7 @@
 
 #include <quic/api/QuicTransportBase.h>
 
+#include <folly/Chrono.h>
 #include <folly/ScopeGuard.h>
 #include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicTransportFunctions.h>
@@ -448,7 +449,7 @@ void QuicTransportBase::closeImpl(
     DCHECK(!drainTimeout_.isScheduled());
     getEventBase()->timer().scheduleTimeout(
         &drainTimeout_,
-        std::chrono::duration_cast<std::chrono::milliseconds>(
+        folly::chrono::ceil<std::chrono::milliseconds>(
             kDrainFactor * calculatePTO(*conn_)));
   } else {
     drainTimeoutExpired();
@@ -2413,8 +2414,7 @@ void QuicTransportBase::scheduleAckTimeout() {
           std::chrono::duration_cast<std::chrono::microseconds>(
               wheelTimer.getTickInterval()),
           timeMin(kMaxAckTimeout, factoredRtt));
-      auto timeoutMs =
-          std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
+      auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                << " factoredRtt=" << factoredRtt.count() << "us"
                << " " << *this;
@@ -2459,8 +2459,8 @@ void QuicTransportBase::schedulePathValidationTimeout() {
 
     auto validationTimeout =
         std::max(3 * pto, 6 * conn_->transportSettings.initialRtt);
-    auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        validationTimeout);
+    auto timeoutMs =
+        folly::chrono::ceil<std::chrono::milliseconds>(validationTimeout);
     VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms " << *this;
     getEventBase()->timer().scheduleTimeout(&pathValidationTimeout_, timeoutMs);
   }

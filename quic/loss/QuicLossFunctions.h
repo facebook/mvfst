@@ -18,6 +18,7 @@
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
 
+#include <folly/Chrono.h>
 #include <folly/Overload.h>
 #include <folly/io/async/AsyncTimeout.h>
 
@@ -85,9 +86,8 @@ calculateAlarmDuration(const QuicConnectionStateBase& conn) {
   // The alarm duration is calculated based on the last packet that was sent
   // rather than the current time.
   if (lastSentPacketTime + alarmDuration > now) {
-    adjustedAlarmDuration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            lastSentPacketTime + alarmDuration - now);
+    adjustedAlarmDuration = folly::chrono::ceil<std::chrono::milliseconds>(
+        lastSentPacketTime + alarmDuration - now);
   } else {
     auto lastSentPacketNum =
         conn.outstandings.packets.back().packet.header.getPacketSequenceNum();

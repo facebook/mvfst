@@ -11,6 +11,8 @@
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/state/QuicStateFunctions.h>
 
+#include <folly/Chrono.h>
+
 namespace quic {
 
 Cubic::Cubic(
@@ -174,11 +176,11 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
       cubic_appidle,
       conn_,
       idle,
-      std::chrono::duration_cast<std::chrono::milliseconds>(
+      folly::chrono::ceil<std::chrono::milliseconds>(
           eventTime.time_since_epoch())
           .count(),
       steadyState_.lastReductionTime
-          ? std::chrono::duration_cast<std::chrono::milliseconds>(
+          ? folly::chrono::ceil<std::chrono::milliseconds>(
                 steadyState_.lastReductionTime->time_since_epoch())
                 .count()
           : -1);
@@ -192,7 +194,7 @@ void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
   if (!idle && currentAppIdle && *quiescenceStart_ <= eventTime &&
       steadyState_.lastReductionTime) {
     *steadyState_.lastReductionTime +=
-        std::chrono::duration_cast<std::chrono::milliseconds>(
+        folly::chrono::ceil<std::chrono::milliseconds>(
             eventTime - *quiescenceStart_);
   }
   if (!idle) {
@@ -261,7 +263,7 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
     LOG(WARNING) << "Cubic ackTime earlier than reduction time";
     return 0;
   }
-  auto timeElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+  auto timeElapsed = folly::chrono::ceil<std::chrono::milliseconds>(
       ackTime - *steadyState_.lastReductionTime);
   int64_t delta = 0;
   double timeElapsedCount = static_cast<double>(timeElapsed.count());
