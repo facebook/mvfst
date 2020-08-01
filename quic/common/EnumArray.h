@@ -11,6 +11,7 @@
 #include <folly/Portability.h>
 #include <array>
 #include <utility>
+#include <glog/logging.h>
 
 namespace quic {
 
