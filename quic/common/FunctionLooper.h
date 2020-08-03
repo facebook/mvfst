@@ -41,6 +41,8 @@ class FunctionLooper : public folly::EventBase::LoopCallback,
 
   void setPacingTimer(TimerHighRes::SharedPtr pacingTimer) noexcept;
 
+  bool hasPacingTimer() const noexcept;
+
   void runLoopCallback() noexcept override;
 
   /**

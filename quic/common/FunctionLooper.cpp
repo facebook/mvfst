@@ -23,6 +23,10 @@ void FunctionLooper::setPacingTimer(
   pacingTimer_ = std::move(pacingTimer);
 }
 
+bool FunctionLooper::hasPacingTimer() const noexcept {
+  return pacingTimer_ != nullptr;
+}
+
 void FunctionLooper::setPacingFunction(
     folly::Function<std::chrono::microseconds()>&& pacingFunc) {
   pacingFunc_ = std::move(pacingFunc);

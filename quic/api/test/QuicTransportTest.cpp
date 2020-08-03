@@ -2450,6 +2450,37 @@ TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferFreeUpSpace) {
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 }
 
+TEST_F(QuicTransportTest, NoPacingTimerNoPacing) {
+  TransportSettings transportSettings;
+  transportSettings.pacingEnabled = true;
+  transport_->setTransportSettings(transportSettings);
+  transport_->getConnectionState().canBePaced = true;
+  EXPECT_FALSE(isConnectionPaced(transport_->getConnectionState()));
+}
+
+TEST_F(QuicTransportTest, SetPacingTimerThenEnablesPacing) {
+  TransportSettings transportSettings;
+  transportSettings.pacingEnabled = true;
+  transport_->setPacingTimer(
+      TimerHighRes::newTimer(&evb_, transportSettings.pacingTimerTickInterval));
+  transport_->setTransportSettings(transportSettings);
+  transport_->getConnectionState().canBePaced = true;
+  EXPECT_TRUE(isConnectionPaced(transport_->getConnectionState()));
+}
+
+TEST_F(QuicTransportTest, NoPacingNoBbr) {
+  TransportSettings transportSettings;
+  transportSettings.defaultCongestionController = CongestionControlType::BBR;
+  transportSettings.pacingEnabled = false;
+  auto ccFactory = std::make_shared<DefaultCongestionControllerFactory>();
+  transport_->setCongestionControllerFactory(ccFactory);
+  transport_->setTransportSettings(transportSettings);
+  EXPECT_FALSE(isConnectionPaced(transport_->getConnectionState()));
+  EXPECT_NE(
+      CongestionControlType::BBR,
+      transport_->getTransportInfo().congestionControlType);
+}
+
 TEST_F(QuicTransportTest, NotifyPendingWriteConnBufferUseTotalSpace) {
   TransportSettings transportSettings;
   transportSettings.totalBufferSpaceAvailable = 100;

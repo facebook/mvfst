@@ -5087,16 +5087,12 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
   auto cc = client->getConn().congestionController.get();
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 
-  // Pacing should be disabled.
-  EXPECT_FALSE(isConnectionPaced(client->getConn()));
-
-  // Change to BBR
+  // Change to BBR, which requires enable pacing first
+  client->setPacingTimer(TimerHighRes::newTimer(eventbase_.get(), 1ms));
+  client->getNonConstConn().transportSettings.pacingEnabled = true;
   client->setCongestionControl(CongestionControlType::BBR);
   cc = client->getConn().congestionController.get();
   EXPECT_EQ(CongestionControlType::BBR, cc->type());
-
-  // Pacing should be enabled.
-  EXPECT_TRUE(isConnectionPaced(client->getConn()));
 }
 
 TEST_F(QuicClientTransportAfterStartTest, PingIsTreatedAsRetransmittable) {
