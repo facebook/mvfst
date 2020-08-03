@@ -9,9 +9,9 @@
 #pragma once
 
 #include <folly/Portability.h>
+#include <glog/logging.h>
 #include <array>
 #include <utility>
-#include <glog/logging.h>
 
 namespace quic {
 
