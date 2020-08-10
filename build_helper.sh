@@ -182,13 +182,13 @@ function setup_fmt() {
   mkdir -p "$FMT_BUILD_DIR"
   cd "$FMT_BUILD_DIR" || exit
 
-  cmake                                           \
-    -DCMAKE_PREFIX_PATH="$DEPS_DIR"               \
-    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR"            \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo             \
-    -DFMT_DOC=OFF                                 \
-    -DFMT_TEST=OFF                                \
-    "${CMAKE_EXTRA_ARGS[@]}"                      \
+  cmake                                             \
+    -DCMAKE_PREFIX_PATH="$DEPS_DIR"                 \
+    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR"              \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo               \
+    -DFMT_DOC=OFF                                   \
+    -DFMT_TEST=OFF                                  \
+    ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
     ..
   make -j "$nproc"
   make install
@@ -248,10 +248,10 @@ function setup_folly() {
   cd "$FOLLY_BUILD_DIR" || exit
 
   # check for environment variable. If
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo         \
-    -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"      \
-    -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"   \
-    "${CMAKE_EXTRA_ARGS[@]}"                      \
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
+    -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"        \
+    -DCMAKE_INSTALL_PREFIX="$FOLLY_INSTALL_DIR"     \
+    ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
     ..
   make -j "$nproc"
   make install
@@ -272,11 +272,11 @@ function setup_fizz() {
   echo -e "${COLOR_GREEN}Building Fizz ${COLOR_OFF}"
   mkdir -p "$FIZZ_BUILD_DIR"
   cd "$FIZZ_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo       \
-    -DBUILD_TESTS=ON                            \
-    -DCMAKE_PREFIX_PATH="$FIZZ_INSTALL_DIR"     \
-    -DCMAKE_INSTALL_PREFIX="$FIZZ_INSTALL_DIR"  \
-    "${CMAKE_EXTRA_ARGS[@]}"                    \
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
+    -DBUILD_TESTS=ON                                \
+    -DCMAKE_PREFIX_PATH="$FIZZ_INSTALL_DIR"         \
+    -DCMAKE_INSTALL_PREFIX="$FIZZ_INSTALL_DIR"      \
+    ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
     "$FIZZ_DIR/fizz"
   make -j "$nproc"
   make install
@@ -307,12 +307,12 @@ function setup_libccp() {
   echo -e "${COLOR_GREEN}Building libccp ${COLOR_OFF}"
   mkdir -p "$LIBCCP_BUILD_DIR"
   cd "$LIBCCP_BUILD_DIR" || exit
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo       \
-    -DBUILD_TESTS=ON                            \
-    -DCMAKE_PREFIX_PATH="$LIBCCP_INSTALL_DIR"     \
-    -DCMAKE_INSTALL_PREFIX="$LIBCCP_INSTALL_DIR"  \
-    -DCMAKE_CXX_FLAGS=\D__CPLUSPLUS__=1 \
-    "${CMAKE_EXTRA_ARGS[@]}"                    \
+  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
+    -DBUILD_TESTS=ON                                \
+    -DCMAKE_PREFIX_PATH="$LIBCCP_INSTALL_DIR"       \
+    -DCMAKE_INSTALL_PREFIX="$LIBCCP_INSTALL_DIR"    \
+    -DCMAKE_CXX_FLAGS=\D__CPLUSPLUS__=1             \
+    ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
     "$LIBCCP_DIR"
   make -j "$nproc"
   make install
@@ -345,11 +345,11 @@ fi
 # build mvfst:
 cd "$MVFST_BUILD_DIR" || exit
 mvfst_cmake_build_args=(
-  -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"    \
-  -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR" \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
-  -DBUILD_TESTS=On                            \
-  "${CMAKE_EXTRA_ARGS[@]}"                    \
+  -DCMAKE_PREFIX_PATH="$FOLLY_INSTALL_DIR"        \
+  -DCMAKE_INSTALL_PREFIX="$MVFST_INSTALL_DIR"     \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo               \
+  -DBUILD_TESTS=On                                \
+  ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
 )
 if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
     mvfst_cmake_build_args+=(-DCCP_ENABLED=TRUE)
