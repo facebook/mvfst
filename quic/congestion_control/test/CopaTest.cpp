@@ -17,6 +17,7 @@ using namespace testing;
 namespace quic {
 namespace test {
 
+// TODO: Add UT for different latency factor values
 class CopaTest : public Test {
  public:
   CongestionController::LossEvent createLossEvent(
@@ -129,6 +130,7 @@ class CopaTest : public Test {
 
 TEST_F(CopaTest, TestWritableBytes) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   EXPECT_TRUE(copa.inSlowStart());
 
@@ -144,6 +146,7 @@ TEST_F(CopaTest, TestWritableBytes) {
 
 TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -176,6 +179,7 @@ TEST_F(CopaTest, PersistentCongestion) {
 
 TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -207,6 +211,7 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
 
 TEST_F(CopaTest, TestSlowStartAck) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -308,6 +313,7 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
 TEST_F(CopaTest, TestSteadyStateChanges) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto now = Clock::now();
   auto lastCwnd = exitSlowStart(copa, conn, now);
@@ -344,6 +350,7 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
 
 TEST_F(CopaTest, TestVelocity) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -438,6 +445,7 @@ TEST_F(CopaTest, TestVelocity) {
 
 TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -458,6 +466,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
 
 TEST_F(CopaTest, PacketLossInvokesPacer) {
   QuicServerConnectionState conn;
+  conn.transportSettings.latencyFactor = 0.5;
   Copa copa(conn);
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();

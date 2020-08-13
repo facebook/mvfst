@@ -95,6 +95,6 @@ class Copa : public CongestionController {
    * means it will maximime throughput at expense of delay. Higher value means
    * it will minimize delay at expense of throughput.
    */
-  double latencyFactor_{0.50};
+  double latencyFactor_{0.05};
 };
 } // namespace quic
