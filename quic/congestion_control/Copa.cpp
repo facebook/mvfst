@@ -28,8 +28,8 @@ Copa::Copa(QuicConnectionStateBase& conn)
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
-  if (conn_.transportSettings.latencyFactor.has_value()) {
-    latencyFactor_ = conn_.transportSettings.latencyFactor.value();
+  if (conn_.transportSettings.copaDeltaParam.has_value()) {
+    deltaParam_ = conn_.transportSettings.copaDeltaParam.value();
   }
   QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
@@ -204,7 +204,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
     increaseCwnd = true;
   } else {
     auto targetRate = (1.0 * conn_.udpSendPacketLen * 1000000) /
-        (latencyFactor_ * delayInMicroSec);
+        (deltaParam_ * delayInMicroSec);
     auto currentRate = (1.0 * cwndBytes_ * 1000000) / rttStandingMicroSec;
 
     VLOG(10) << __func__ << " estimated target rate=" << targetRate
@@ -242,7 +242,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
       }
       uint64_t addition = (ack.ackedPackets.size() * conn_.udpSendPacketLen *
                            conn_.udpSendPacketLen * velocityState_.velocity) /
-          (latencyFactor_ * cwndBytes_);
+          (deltaParam_ * cwndBytes_);
       VLOG(10) << __func__ << " increasing cwnd from=" << cwndBytes_ << " by "
                << addition << " " << conn_;
       addAndCheckOverflow(cwndBytes_, addition);
@@ -258,7 +258,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
     }
     uint64_t reduction = (ack.ackedPackets.size() * conn_.udpSendPacketLen *
                           conn_.udpSendPacketLen * velocityState_.velocity) /
-        (latencyFactor_ * cwndBytes_);
+        (deltaParam_ * cwndBytes_);
     VLOG(10) << __func__ << " decreasing cwnd from=" << cwndBytes_ << " by "
              << reduction << " " << conn_;
     isSlowStart_ = false;

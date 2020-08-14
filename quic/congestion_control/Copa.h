@@ -91,10 +91,10 @@ class Copa : public CongestionController {
 
   VelocityState velocityState_;
   /**
-   * latencyFactor_ determines how latency sensitive the algorithm is. Lower
+   * deltaParam determines how latency sensitive the algorithm is. Lower
    * means it will maximime throughput at expense of delay. Higher value means
    * it will minimize delay at expense of throughput.
    */
-  double latencyFactor_{0.05};
+  double deltaParam_{0.05};
 };
 } // namespace quic

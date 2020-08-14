@@ -319,7 +319,7 @@ class TPerfServer {
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
     settings.canIgnorePathMTU = true;
-    settings.latencyFactor = FLAGS_latency_factor;
+    settings.copaDeltaParam = FLAGS_latency_factor;
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);

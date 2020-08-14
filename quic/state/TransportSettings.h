@@ -60,7 +60,7 @@ struct TransportSettings {
       CongestionControlType::Cubic};
   // Param to determine sensitivity of CongestionController to latency. Only
   // used by COPA.
-  folly::Optional<double> latencyFactor;
+  folly::Optional<double> copaDeltaParam;
   // The max UDP packet size we are willing to receive.
   uint64_t maxRecvPacketSize{kDefaultUDPReadBufferSize};
   // Number of buffers to allocate for GRO
