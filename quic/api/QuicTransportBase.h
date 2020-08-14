@@ -114,7 +114,9 @@ class QuicTransportBase : public QuicSocket {
 
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
-      ReadCallback* cb) override;
+      ReadCallback* cb,
+      folly::Optional<ApplicationErrorCode> err =
+          GenericApplicationErrorCode::NO_ERROR) override;
   void unsetAllReadCallbacks() override;
   void unsetAllPeekCallbacks() override;
   void unsetAllDeliveryCallbacks() override;
@@ -610,7 +612,8 @@ class QuicTransportBase : public QuicSocket {
   void checkForClosedStream();
   folly::Expected<folly::Unit, LocalErrorCode> setReadCallbackInternal(
       StreamId id,
-      ReadCallback* cb) noexcept;
+      ReadCallback* cb,
+      folly::Optional<ApplicationErrorCode> err) noexcept;
   folly::Expected<folly::Unit, LocalErrorCode> setPeekCallbackInternal(
       StreamId id,
       PeekCallback* cb) noexcept;

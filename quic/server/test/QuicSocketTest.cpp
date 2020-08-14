@@ -27,7 +27,7 @@ class QuicSocketTest : public Test {
   }
 
   void openStream(StreamId) {
-    EXPECT_CALL(*socket_, setReadCallback(3, &handler_));
+    EXPECT_CALL(*socket_, setReadCallback(3, &handler_, _));
     socket_->cb_->onNewBidirectionalStream(3);
   }
 

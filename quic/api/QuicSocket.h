@@ -439,11 +439,19 @@ class QuicSocket {
   /**
    * Set the read callback for the given stream.  Note that read callback is
    * expected to be set all the time. Removing read callback indicates that
-   * stream is no longer intended to be read again.
+   * stream is no longer intended to be read again. This will issue a
+   * StopSending if cb is being set to nullptr after previously being not
+   * nullptr. The err parameter is used to control the error sent in the
+   * StopSending. By default when cb is nullptr this function will cause the
+   * transport to send a StopSending frame with
+   * GenericApplicationErrorCode::NO_ERROR. If err is specified to be
+   * folly::none, no StopSending will be sent.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> setReadCallback(
       StreamId id,
-      ReadCallback* cb) = 0;
+      ReadCallback* cb,
+      folly::Optional<ApplicationErrorCode> err =
+          GenericApplicationErrorCode::NO_ERROR) = 0;
 
   /**
    * Convenience function that sets the read callbacks of all streams to be

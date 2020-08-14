@@ -888,6 +888,85 @@ TEST_F(QuicTransportTest, StopSending) {
   EXPECT_TRUE(foundStopSending);
 }
 
+TEST_F(QuicTransportTest, StopSendingReadCallbackDefault) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  transport_->setReadCallback(streamId, &readCb);
+  transport_->setReadCallback(streamId, nullptr);
+  loopForWrites();
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
+  auto packet =
+      getLastOutstandingPacket(
+          transport_->getConnectionState(), PacketNumberSpace::AppData)
+          ->packet;
+  EXPECT_EQ(1, packet.frames.size());
+  bool foundStopSending = false;
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
+    const StopSendingFrame* stopSending = simpleFrame->asStopSendingFrame();
+    if (!stopSending) {
+      continue;
+    }
+    EXPECT_EQ(streamId, stopSending->streamId);
+    EXPECT_EQ(GenericApplicationErrorCode::NO_ERROR, stopSending->errorCode);
+    foundStopSending = true;
+  }
+  EXPECT_TRUE(foundStopSending);
+}
+
+TEST_F(QuicTransportTest, StopSendingReadCallback) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  transport_->setReadCallback(streamId, &readCb);
+  transport_->setReadCallback(
+      streamId, nullptr, GenericApplicationErrorCode::UNKNOWN);
+  loopForWrites();
+  EXPECT_EQ(1, transport_->getConnectionState().outstandings.packets.size());
+  auto packet =
+      getLastOutstandingPacket(
+          transport_->getConnectionState(), PacketNumberSpace::AppData)
+          ->packet;
+  EXPECT_EQ(1, packet.frames.size());
+  bool foundStopSending = false;
+  for (auto& frame : packet.frames) {
+    const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
+    if (!simpleFrame) {
+      continue;
+    }
+    const StopSendingFrame* stopSending = simpleFrame->asStopSendingFrame();
+    if (!stopSending) {
+      continue;
+    }
+    EXPECT_EQ(streamId, stopSending->streamId);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, stopSending->errorCode);
+    foundStopSending = true;
+  }
+  EXPECT_TRUE(foundStopSending);
+}
+
+TEST_F(QuicTransportTest, StopSendingReadCallbackNone) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  transport_->setReadCallback(streamId, &readCb);
+  transport_->setReadCallback(streamId, nullptr, folly::none);
+  loopForWrites();
+  EXPECT_EQ(0, transport_->getConnectionState().outstandings.packets.size());
+}
+
+TEST_F(QuicTransportTest, NoStopSendingReadCallback) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  NiceMock<MockReadCallback> readCb;
+  transport_->setReadCallback(streamId, &readCb);
+  loopForWrites();
+  EXPECT_EQ(0, transport_->getConnectionState().outstandings.packets.size());
+  transport_->setReadCallback(streamId, nullptr, folly::none);
+}
+
 TEST_F(QuicTransportTest, SendPathChallenge) {
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   auto& conn = transport_->getConnectionState();

@@ -650,7 +650,8 @@ QuicTransportBase::setStreamFlowControlWindow(
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setReadCallback(
     StreamId id,
-    ReadCallback* cb) {
+    ReadCallback* cb,
+    folly::Optional<ApplicationErrorCode> err) {
   if (isSendingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -660,12 +661,15 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setReadCallback(
   if (!conn_->streamManager->streamExists(id)) {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
-  return setReadCallbackInternal(id, cb);
+  return setReadCallbackInternal(id, cb, err);
 }
 
 void QuicTransportBase::unsetAllReadCallbacks() {
   for (auto& streamCallbackPair : readCallbacks_) {
-    setReadCallbackInternal(streamCallbackPair.first, nullptr);
+    setReadCallbackInternal(
+        streamCallbackPair.first,
+        nullptr,
+        GenericApplicationErrorCode::NO_ERROR);
   }
 }
 
@@ -685,7 +689,8 @@ void QuicTransportBase::unsetAllDeliveryCallbacks() {
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setReadCallbackInternal(
     StreamId id,
-    ReadCallback* cb) noexcept {
+    ReadCallback* cb,
+    folly::Optional<ApplicationErrorCode> err) noexcept {
   VLOG(4) << "Setting setReadCallback for stream=" << id << " cb=" << cb << " "
           << *this;
   auto readCbIt = readCallbacks_.find(id);
@@ -702,8 +707,8 @@ QuicTransportBase::setReadCallbackInternal(
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   } else {
     readCb = cb;
-    if (readCb == nullptr) {
-      return stopSending(id, GenericApplicationErrorCode::NO_ERROR);
+    if (readCb == nullptr && err) {
+      return stopSending(id, err.value());
     }
   }
   updateReadLooper();
