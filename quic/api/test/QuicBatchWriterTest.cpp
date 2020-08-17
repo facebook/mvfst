@@ -590,7 +590,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   auto bufAccessor =
       std::make_unique<SimpleBufAccessor>(conn_.udpSendPacketLen * batchSize);
   conn_.bufAccessor = bufAccessor.get();
-  conn_.udpSendPacketLen = 1000;
+  updateUdpSendPacketLen(conn_, 1000);
   auto batchWriter = quic::BatchWriterFactory::makeBatchWriter(
       sock,
       quic::QuicBatchingMode::BATCHING_MODE_GSO,

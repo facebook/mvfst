@@ -10,6 +10,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/QuicConstants.h>
+#include <quic/state/QuicStateFunctions.h>
 #include <quic/state/StateData.h>
 
 using namespace testing;
@@ -21,7 +22,7 @@ class CongestionControlFunctionsTest : public Test {};
 
 TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1;
+  updateUdpSendPacketLen(conn, 1);
   conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   std::chrono::microseconds rtt(1000 * 100);
@@ -39,7 +40,7 @@ TEST_F(CongestionControlFunctionsTest, CalculatePacingRate) {
 
 TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1;
+  updateUdpSendPacketLen(conn, 1);
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
       conn, 100, conn.transportSettings.minCwndInMss, 100ms);
@@ -51,7 +52,7 @@ TEST_F(CongestionControlFunctionsTest, MinPacingRate) {
 
 TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1;
+  updateUdpSendPacketLen(conn, 1);
   conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   auto result = calculatePacingRate(
@@ -62,7 +63,7 @@ TEST_F(CongestionControlFunctionsTest, SmallCwnd) {
 
 TEST_F(CongestionControlFunctionsTest, RttSmallerThanInterval) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  conn.udpSendPacketLen = 1;
+  updateUdpSendPacketLen(conn, 1);
   conn.transportSettings.minBurstPackets = 1;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   auto result =

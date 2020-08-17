@@ -87,7 +87,7 @@ TEST_F(PendingPathRateLimiterTest, TestSetInitialCredit) {
   EXPECT_EQ(
       limiter_.currentCredit(now, std::chrono::microseconds{kRtt}),
       maxWindowBytes);
-  conn_.udpSendPacketLen = 2000;
+  updateUdpSendPacketLen(conn_, 2000);
   PendingPathRateLimiter limiter2{conn_.udpSendPacketLen};
   EXPECT_EQ(
       limiter2.currentCredit(now, std::chrono::microseconds{kRtt}),

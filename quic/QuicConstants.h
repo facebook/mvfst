@@ -38,8 +38,8 @@ constexpr uint16_t kDefaultMaxUDPPayload = 1452;
 // maximum QUIC packet size.
 constexpr uint16_t kMinMaxUDPPayload = 1200;
 
-// How many bytes to reduce from udpSendPacketLen when socket write leads to
-// EMSGSIZE.
+// How many bytes to reduce from udpSendPacketLen when socket write leads
+// to EMSGSIZE.
 constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 
 // Size of read buffer we provide to AsyncUDPSocket. The packet size cannot be

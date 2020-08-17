@@ -176,13 +176,10 @@ void processClientInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
-  // TODO: udpSendPacketLen should also be limited by PMTU
-  if (conn.transportSettings.canIgnorePathMTU) {
-    if (*packetSize > kDefaultMaxUDPPayload) {
-      *packetSize = kDefaultUDPSendPacketLen;
-    }
-    conn.udpSendPacketLen = *packetSize;
+  if (*packetSize > kDefaultMaxUDPPayload) {
+    *packetSize = kDefaultUDPSendPacketLen;
   }
+  updateUdpSendPacketLen(conn, *packetSize);
 
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);

@@ -1423,17 +1423,21 @@ void QuicClientTransport::addNewPeerAddress(folly::SocketAddress peerAddress) {
   CHECK(peerAddress.isInitialized());
 
   if (happyEyeballsEnabled_) {
-    conn_->udpSendPacketLen = std::min(
-        conn_->udpSendPacketLen,
-        (peerAddress.getFamily() == AF_INET6 ? kDefaultV6UDPSendPacketLen
-                                             : kDefaultV4UDPSendPacketLen));
+    updateUdpSendPacketLen(
+        *conn_,
+        std::min(
+            conn_->udpSendPacketLen,
+            (peerAddress.getFamily() == AF_INET6
+                 ? kDefaultV6UDPSendPacketLen
+                 : kDefaultV4UDPSendPacketLen)));
     happyEyeballsAddPeerAddress(*conn_, peerAddress);
     return;
   }
 
-  conn_->udpSendPacketLen = peerAddress.getFamily() == AF_INET6
-      ? kDefaultV6UDPSendPacketLen
-      : kDefaultV4UDPSendPacketLen;
+  updateUdpSendPacketLen(
+      *conn_,
+      peerAddress.getFamily() == AF_INET6 ? kDefaultV6UDPSendPacketLen
+                                          : kDefaultV4UDPSendPacketLen);
   conn_->originalPeerAddress = peerAddress;
   conn_->peerAddress = std::move(peerAddress);
 }

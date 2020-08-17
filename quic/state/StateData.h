@@ -728,8 +728,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // until the handshake sets the timeout.
   std::chrono::milliseconds peerIdleTimeout{kMaxIdleTimeout};
 
-  // The max UDP packet size we will be sending, limited by both the received
-  // max_packet_size in Transport Parameters and PMTU
+  // The max_packet_size Transport Parameters
+  uint64_t peerMaxPacketSize{kDefaultUDPSendPacketLen};
+
+  // Current PMTU, which may change as d6d discovers new PMTU on the path
+  uint64_t currentPMTU{kDefaultUDPSendPacketLen};
+
+  // The effective max UDP packet size we will be sending, limited by both the
+  // received max_packet_size in Transport Parameters and PMTU. Should not be
+  // set directly, use setUDPSendPacketLen()
   uint64_t udpSendPacketLen{kDefaultUDPSendPacketLen};
 
   struct PacketSchedulingState {

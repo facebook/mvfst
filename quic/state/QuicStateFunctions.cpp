@@ -208,6 +208,22 @@ void increaseNextPacketNum(
   }
 }
 
+void updatePeerMaxPacketSize(QuicConnectionStateBase& conn, uint64_t size) {
+  conn.peerMaxPacketSize = size;
+  conn.udpSendPacketLen = std::min(conn.peerMaxPacketSize, conn.currentPMTU);
+}
+
+void updateCurrentPMTU(QuicConnectionStateBase& conn, uint64_t size) {
+  conn.currentPMTU = size;
+  conn.udpSendPacketLen = std::min(conn.peerMaxPacketSize, conn.currentPMTU);
+}
+
+void updateUdpSendPacketLen(QuicConnectionStateBase& conn, uint64_t size) {
+  conn.peerMaxPacketSize = size;
+  conn.currentPMTU = size;
+  conn.udpSendPacketLen = size;
+}
+
 std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace) {

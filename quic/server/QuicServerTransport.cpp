@@ -61,9 +61,10 @@ void QuicServerTransport::setRoutingCallback(
 void QuicServerTransport::setOriginalPeerAddress(
     const folly::SocketAddress& addr) {
   conn_->originalPeerAddress = addr;
-  conn_->udpSendPacketLen = addr.getFamily() == AF_INET6
-      ? kDefaultV6UDPSendPacketLen
-      : kDefaultV4UDPSendPacketLen;
+  updateUdpSendPacketLen(
+      *conn_,
+      addr.getFamily() == AF_INET6 ? kDefaultV6UDPSendPacketLen
+                                   : kDefaultV4UDPSendPacketLen);
 }
 
 void QuicServerTransport::setServerConnectionIdParams(

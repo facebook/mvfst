@@ -862,7 +862,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
 TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  conn.udpSendPacketLen = 1000;
+  updateUdpSendPacketLen(conn, 1000);
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   conn.flowControlState.peerAdvertisedMaxOffset = 100000;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
