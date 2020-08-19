@@ -323,7 +323,7 @@ class InplaceSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
    * packet size + cipher oveahead and that iobuf has enough tailroom,
    * otherwise false
    */
-  [[nodiscard]] bool canBuildPacket() const noexcept override;
+  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
 
   Packet buildPacket() && override;
 
@@ -352,12 +352,12 @@ class VersionNegotiationPacketBuilder {
    * Whether the packet builder is able to build a packet. This should be
    * checked right after the creation of a packet builder object.
    */
-  [[nodiscard]] bool canBuildPacket() const noexcept;
+  FOLLY_NODISCARD bool canBuildPacket() const noexcept;
 
  private:
   void writeVersionNegotiationPacket(const std::vector<QuicVersion>& versions);
 
-  [[nodiscard]] uint8_t generateRandomPacketType() const;
+  FOLLY_NODISCARD uint8_t generateRandomPacketType() const;
 
  private:
   uint32_t remainingBytes_;
