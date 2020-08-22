@@ -42,6 +42,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->originalVersion = conn->originalVersion;
   newConn->originalPeerAddress = conn->originalPeerAddress;
   newConn->peerAddress = conn->peerAddress;
+  newConn->udpSendPacketLen = conn->udpSendPacketLen;
   newConn->peerMaxPacketSize = conn->peerMaxPacketSize;
   newConn->currentPMTU = conn->currentPMTU;
   newConn->supportedVersions = conn->supportedVersions;
@@ -152,10 +153,14 @@ void processServerInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
-  if (*packetSize > kDefaultMaxUDPPayload) {
-    *packetSize = kDefaultUDPSendPacketLen;
+
+  // TODO: udpSendPacketLen should also be limited by PMTU
+  if (conn.transportSettings.canIgnorePathMTU) {
+    if (*packetSize > kDefaultMaxUDPPayload) {
+      *packetSize = kDefaultUDPSendPacketLen;
+    }
+    updateUdpSendPacketLen(conn, *packetSize);
   }
-  updateUdpSendPacketLen(conn, *packetSize);
 
   // Currently no-op for a client; it doesn't issue connection ids
   // to the server.
@@ -233,7 +238,7 @@ void updateTransportParamsFromCachedEarlyParams(
     const CachedServerTransportParameters& transportParams) {
   conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
   if (conn.transportSettings.canIgnorePathMTU) {
-    conn.peerMaxPacketSize = transportParams.maxRecvPacketSize;
+    updateUdpSendPacketLen(conn, transportParams.maxRecvPacketSize);
   }
   conn.flowControlState.peerAdvertisedMaxOffset =
       transportParams.initialMaxData;
