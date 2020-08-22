@@ -360,7 +360,7 @@ void QuicServerWorker::handleNetworkData(
 
     if (!isUsingClientConnId &&
         parsedLongHeader->invariant.dstConnId.size() <
-            kMinSelfConnectionIdSize) {
+            kMinSelfConnectionIdV1Size) {
       // drop packet if connId is present but is not valid.
       VLOG(3) << "Dropping packet due to invalid connectionId";
       QUIC_STATS(

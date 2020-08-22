@@ -14,7 +14,6 @@
 #include <folly/portability/GTest.h>
 #include <quic/QuicException.h>
 #include <quic/codec/Decode.h>
-#include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 
 using namespace testing;
@@ -192,25 +191,6 @@ TEST_F(TypesTest, KeyPhase) {
       0,
       QuicVersion::MVFST);
   EXPECT_EQ(longHeader2.getProtectionType(), ProtectionType::ZeroRtt);
-}
-
-TEST_F(TypesTest, TestConnIdWorkerId) {
-  std::vector<uint8_t> connIdData(kDefaultConnectionIdSize);
-  folly::Random::secureRandom(connIdData.data(), connIdData.size());
-  auto connIdAlgo = std::make_unique<DefaultConnectionIdAlgo>();
-  for (uint8_t i = 0; i <= 254; i++) {
-    uint8_t processId = i % 2;
-    uint16_t hostId = folly::Random::rand32() % 4095;
-    ServerConnectionIdParams params(hostId, processId, i);
-    auto paramsAfterEncode =
-        connIdAlgo->parseConnectionId(*connIdAlgo->encodeConnectionId(params));
-    EXPECT_TRUE(connIdAlgo->canParse(*connIdAlgo->encodeConnectionId(params)));
-    EXPECT_EQ(paramsAfterEncode->hostId, hostId);
-    EXPECT_EQ(paramsAfterEncode->workerId, i);
-    EXPECT_EQ(paramsAfterEncode->processId, processId);
-  }
-  ServerConnectionIdParams vParam(0x2, 7, 7, 7);
-  EXPECT_FALSE(connIdAlgo->canParse(*connIdAlgo->encodeConnectionId(vParam)));
 }
 
 TEST_F(TypesTest, ShortHeaderPacketNumberSpace) {

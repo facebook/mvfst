@@ -89,11 +89,11 @@ bool ConnectionId::operator!=(const ConnectionId& other) const {
   return !operator==(other);
 }
 
-void ServerConnectionIdParams::setVersion(uint8_t versionIn) {
+void ServerConnectionIdParams::setVersion(ConnectionIdVersion versionIn) {
   version = versionIn;
 }
 
-void ServerConnectionIdParams::setHostId(uint16_t hostIdIn) {
+void ServerConnectionIdParams::setHostId(uint32_t hostIdIn) {
   hostId = hostIdIn;
 }
 

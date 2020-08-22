@@ -393,11 +393,14 @@ constexpr uint16_t kDefaultMaxNumPTO = 7;
 // Maximum early data size that we need to negotiate in TLS
 constexpr uint32_t kRequiredMaxEarlyDataSize = 0xffffffff;
 
-// min connId size for one chosen by 'mvfst' as a peer
-constexpr size_t kMinSelfConnectionIdSize = 4;
+// min connId size for one chosen by 'mvfst' as a peer (for version 1 of CID)
+constexpr size_t kMinSelfConnectionIdV1Size = 4;
+
+// min connId size for one chosen by 'mvfst' as a peer (for version 2 of CID)
+constexpr size_t kMinSelfConnectionIdV2Size = 6;
 
 // 22 bytes longer than minimum connection id.
-constexpr uint16_t kMinStatelessPacketSize = 22 + kMinSelfConnectionIdSize;
+constexpr uint16_t kMinStatelessPacketSize = 22 + kMinSelfConnectionIdV1Size;
 
 constexpr std::chrono::milliseconds kHappyEyeballsV4Delay = 100ms;
 

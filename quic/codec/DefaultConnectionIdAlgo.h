@@ -24,12 +24,23 @@ namespace quic {
  * First 2 (0 - 1) bits are reserved for short version id of the connection id
  * If the load balancer (e.g. L4 lb) doesn't understand this version,
  * it can fallback to default routing
- * Next 16 (3 - 17) bits are reserved to be used for L4 LB
- * Next eight bits (18 - 25) are reserved for worker id
- * bit 26 is reserved for the Quic server id: server id is used to distinguish
- * between the takeover instance and the taken over one
-   0     1          2 3 4 5 .. 17 18    19 20 .. 25 26          27 28 ... 63
-  |SHORT VERSION|   For L4 LB           | WORKER_ID  | SERVER_ID |  ..
+ * Depending on version following mappings:
+ * Version 1:
+ *    Next 16 bits (3 - 17)  are reserved for host id (L4 LB use)
+ *    Next 8 bits (18 - 25) are reserved for worker id
+ *    Next bit 26 is reserved for the Quic server id: server id is used to
+ *    distinguish between the takeover instance and the taken over one
+   0     1 2 3 4 5 .. 17 18    19 20 .. 25 26          27 28 ... 63
+  |VERSION|   For L4 LB       | WORKER_ID  | SERVER_ID |  ..
+ *
+ * Version 2:
+ *    Next 6 bits (2 - 7) are not used (random)
+ *    Next 24 bits (8 - 31) are reserved for host id
+ *    Next 8 bits (32 - 39) are reserved for worker id
+ *    Next bit 40 is reserved for the Quic server id
+   0     1 2  ..  7 8   ..   31 32   ..   39    40       41 ... 63
+  |VERSION| UNUSED | For L4 LB | WORKER_ID  | SERVER_ID |  ..
+
  */
 class DefaultConnectionIdAlgo : public ConnectionIdAlgo {
  public:

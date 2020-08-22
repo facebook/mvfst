@@ -30,10 +30,10 @@ constexpr size_t kMaxConnectionIdSize = 20;
 // on inbound initial packets.
 constexpr size_t kMinInitialDestinationConnIdLength = 8;
 
-// set conn id version at the first 4 bits
-constexpr uint8_t kShortVersionId = 0x1;
-
 constexpr uint64_t kInitialSequenceNumber = 0x0;
+
+// First two bits of CID is version
+enum class ConnectionIdVersion : uint8_t { V0 = 0, V1 = 1, V2 = 2, V3 = 3 };
 
 struct ConnectionId {
   uint8_t* data();
@@ -103,18 +103,18 @@ struct ConnectionIdData {
  */
 struct ServerConnectionIdParams {
   explicit ServerConnectionIdParams(
-      uint16_t hostIdIn,
+      uint32_t hostIdIn,
       uint8_t processIdIn,
       uint8_t workerIdIn)
       : ServerConnectionIdParams(
-            kShortVersionId,
+            ConnectionIdVersion::V1,
             hostIdIn,
             processIdIn,
             workerIdIn) {}
 
   explicit ServerConnectionIdParams(
-      uint8_t versionIn,
-      uint16_t hostIdIn,
+      ConnectionIdVersion versionIn,
+      uint32_t hostIdIn,
       uint8_t processIdIn,
       uint8_t workerIdIn) {
     setVersion(versionIn);
@@ -126,12 +126,13 @@ struct ServerConnectionIdParams {
   /**
    * Set Quic connection-id short version
    */
-  void setVersion(uint8_t versionIn);
+  void setVersion(ConnectionIdVersion versionIn);
 
   /**
    * Set Quic Host id
+   * Depending on version, lower 2 or 3 bytes used
    */
-  void setHostId(uint16_t hostIdIn);
+  void setHostId(uint32_t hostIdIn);
 
   /**
    * Set Quic process id
@@ -144,9 +145,9 @@ struct ServerConnectionIdParams {
   void setWorkerId(uint8_t workerIdIn);
 
   // Quic connection-id short version
-  uint8_t version{0};
+  ConnectionIdVersion version{ConnectionIdVersion::V0};
   // Quic Host id
-  uint16_t hostId{0};
+  uint32_t hostId{0};
   // Quic process id
   uint8_t processId{0};
   // Quic server worker Id
