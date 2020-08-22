@@ -56,24 +56,6 @@ void increaseNextPacketNum(
     PacketNumberSpace pnSpace) noexcept;
 
 /**
- * Update peerMaxPacketSize, will re-calculate udpSendPacketLen
- */
-void updatePeerMaxPacketSize(QuicConnectionStateBase& conn, uint64_t size);
-
-/**
- * Update currPMTU, will re-calculate udpSendPacketLen
- */
-void updateCurrentPMTU(QuicConnectionStateBase& conn, uint64_t size);
-
-/**
- * Update the actual maximum udp packet length, this will set both
- * peerMaxPacketSize and PMTU to the same value.
- * This is useful for initialization when setting peer socket address and
- * testing.
- */
-void updateUdpSendPacketLen(QuicConnectionStateBase& conn, uint64_t size);
-
-/**
  * Update largestReceivedPacketNum in ackState with packetNum. Return if the
  * current packetNum is received out of order.
  */

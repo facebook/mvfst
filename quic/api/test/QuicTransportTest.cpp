@@ -3034,7 +3034,7 @@ TEST_F(QuicTransportTest, PacingWillBurstFirst) {
 TEST_F(QuicTransportTest, AlreadyScheduledPacingNoWrite) {
   transport_->setPacingTimer(TimerHighRes::newTimer(&evb_, 1ms));
   auto& conn = transport_->getConnectionState();
-  updateUdpSendPacketLen(conn, 100);
+  conn.udpSendPacketLen = 100;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();

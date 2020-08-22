@@ -1087,7 +1087,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
   auto conn = createConn();
-  updateUdpSendPacketLen(*conn, 30);
+  conn->udpSendPacketLen = 30;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -1162,7 +1162,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
-  updateUdpSendPacketLen(*conn, aead->getCipherOverhead() + 50);
+  conn->udpSendPacketLen = aead->getCipherOverhead() + 50;
 
   EventBase evb;
   auto socket =
@@ -2124,7 +2124,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
 
 TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {
   auto conn = createConn();
-  updateUdpSendPacketLen(*conn, 2000);
+  conn->udpSendPacketLen = 2000;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -2217,7 +2217,7 @@ TEST_F(QuicTransportFunctionsTest, HandshakeConfirmedDropCipher) {
 
 TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
   auto conn = createConn();
-  updateUdpSendPacketLen(*conn, 1200);
+  conn->udpSendPacketLen = 1200;
   EventBase evb;
   auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
   auto rawSocket = sock.get();

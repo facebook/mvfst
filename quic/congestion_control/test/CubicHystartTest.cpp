@@ -19,7 +19,7 @@ class CubicHystartTest : public Test {};
 
 TEST_F(CubicHystartTest, SendAndAck) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  updateUdpSendPacketLen(conn, 100);
+  conn.udpSendPacketLen = 100;
   Cubic cubic(conn);
   auto initCwnd = cubic.getWritableBytes();
   // Packet 0 is sent:
@@ -54,7 +54,7 @@ TEST_F(CubicHystartTest, CwndLargerThanSSThresh) {
 
 TEST_F(CubicHystartTest, NoDelayIncrease) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  updateUdpSendPacketLen(conn, 100);
+  conn.udpSendPacketLen = 100;
   Cubic cubic(conn);
   auto initCwnd = cubic.getWritableBytes();
   // Packet 0 is sent:

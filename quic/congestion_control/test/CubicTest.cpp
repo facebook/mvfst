@@ -115,7 +115,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  updateUdpSendPacketLen(conn, 200);
+  conn.udpSendPacketLen = 200;
   // initCwnd > initSsthresh: an ack will immediately make the state machine
   // transit to Steady state:
   Cubic cubic(conn, 1000);
@@ -178,7 +178,7 @@ TEST_F(CubicTest, AppIdle) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  updateUdpSendPacketLen(conn, 1500);
+  conn.udpSendPacketLen = 1500;
   TestingCubic cubic(conn);
   cubic.setStateForTest(CubicStates::Steady);
 
@@ -244,7 +244,7 @@ TEST_F(CubicTest, PacingGain) {
   conn.pacer = std::move(mockPacer);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  updateUdpSendPacketLen(conn, 1500);
+  conn.udpSendPacketLen = 1500;
   Cubic cubic(conn);
 
   conn.lossState.srtt = 3000us;

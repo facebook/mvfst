@@ -1811,12 +1811,12 @@ TEST_F(QuicClientTransportTest, AddNewPeerAddressSetsPacketSize) {
   folly::SocketAddress v4Address("0.0.0.0", 0);
   ASSERT_TRUE(v4Address.getFamily() == AF_INET);
   client->addNewPeerAddress(v4Address);
-  EXPECT_EQ(kDefaultV4UDPSendPacketLen, client->getConn().currentPMTU);
+  EXPECT_EQ(kDefaultV4UDPSendPacketLen, client->getConn().udpSendPacketLen);
 
   folly::SocketAddress v6Address("::", 0);
   ASSERT_TRUE(v6Address.getFamily() == AF_INET6);
   client->addNewPeerAddress(v6Address);
-  EXPECT_EQ(kDefaultV6UDPSendPacketLen, client->getConn().currentPMTU);
+  EXPECT_EQ(kDefaultV6UDPSendPacketLen, client->getConn().udpSendPacketLen);
 
   client->closeNow(folly::none);
 }

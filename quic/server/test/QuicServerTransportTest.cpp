@@ -3783,11 +3783,11 @@ TEST_F(
 
 TEST_F(QuicUnencryptedServerTransportTest, MaxReceivePacketSizeTooLarge) {
   getFakeHandshakeLayer()->allowZeroRttKeys();
-  auto originalPeerMaxPacketSize = server->getConn().udpSendPacketLen;
+  auto originalUdpSize = server->getConn().udpSendPacketLen;
   fakeHandshake->maxRecvPacketSize = 4096;
   setupClientReadCodec();
   recvClientHello();
-  EXPECT_NE(originalPeerMaxPacketSize, server->getConn().udpSendPacketLen);
+  EXPECT_NE(originalUdpSize, server->getConn().udpSendPacketLen);
   EXPECT_EQ(server->getConn().udpSendPacketLen, kDefaultUDPSendPacketLen);
 }
 

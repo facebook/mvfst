@@ -181,7 +181,7 @@ void processClientInitialParams(
     if (*packetSize > kDefaultMaxUDPPayload) {
       *packetSize = kDefaultUDPSendPacketLen;
     }
-    updateUdpSendPacketLen(conn, *packetSize);
+    conn.udpSendPacketLen = *packetSize;
   }
 
   conn.peerActiveConnectionIdLimit =

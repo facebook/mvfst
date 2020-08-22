@@ -20,7 +20,7 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   // initCwnd > initSsthresh: an ack will immediately make the state machine
   // transit to Steady state:
-  updateUdpSendPacketLen(conn, 200); // initCwnd = 2000, minCwnd = 400
+  conn.udpSendPacketLen = 200; // initCwnd = 2000, minCwnd = 400
   Cubic cubic(conn, 1000);
 
   // Send one and get acked, this moves the state machine to steady. Cwnd will
