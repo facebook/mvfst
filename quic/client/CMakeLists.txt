@@ -64,3 +64,5 @@ install(
   EXPORT mvfst-exports
   DESTINATION lib
 )
+
+add_subdirectory(test)
