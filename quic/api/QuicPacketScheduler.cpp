@@ -532,7 +532,7 @@ CloningScheduler::CloningScheduler(
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
-  return frameScheduler_.hasData() || (!conn_.outstandings.packets.empty());
+  return frameScheduler_.hasData() || conn_.outstandings.numOutstanding() > 0;
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
@@ -554,6 +554,9 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
+    if (outstandingPacket.declaredLost) {
+      continue;
+    }
     auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();
     // Reusing the RegularQuicPacketBuilder throughout loop bodies will lead to
     // frames belong to different original packets being written into the same

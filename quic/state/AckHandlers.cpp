@@ -47,7 +47,7 @@ void processAckFrame(
   // different acking policy. It's also possibly that all acked packets are pure
   // acks which leads to different number of packets being acked usually.
   ack.ackedPackets.reserve(kDefaultRxPacketsBeforeAckAfterInit);
-  auto currentPacketIt = getLastOutstandingPacket(conn, pnSpace);
+  auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
   uint64_t initialPacketAcked = 0;
   uint64_t handshakePacketAcked = 0;
   uint64_t clonedPacketsAcked = 0;
@@ -70,7 +70,7 @@ void processAckFrame(
       // Since we iterate the ACK blocks in reverse order of end packets, our
       // work here is done.
       VLOG(10) << __func__ << " less than all outstanding packets outstanding="
-               << conn.outstandings.packets.size() << " range=["
+               << conn.outstandings.numOutstanding() << " range=["
                << ackBlockIt->startPacket << ", " << ackBlockIt->endPacket
                << "]"
                << " " << conn;
@@ -108,6 +108,19 @@ void processAckFrame(
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
                << " handshake=" << (int)rPacketIt->isHandshake << " " << conn;
+      // If we hit a packet which has been lost we need to count the spurious
+      // loss and ignore all other processing.
+      // TODO also remove any stream data from the loss buffer.
+      if (rPacketIt->declaredLost) {
+        CHECK_GT(conn.outstandings.declaredLostCount, 0);
+        conn.lossState.spuriousLossCount++;
+        QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
+        // Decrement the counter, trust that we will erase this as part of
+        // the bulk erase.
+        conn.outstandings.declaredLostCount--;
+        rPacketIt++;
+        continue;
+      }
       bool needsProcess = !rPacketIt->associatedEvent ||
           conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent);
       if (rPacketIt->isHandshake && needsProcess) {
@@ -191,7 +204,9 @@ void processAckFrame(
   conn.outstandings.handshakePacketsCount -= handshakePacketAcked;
   CHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
   conn.outstandings.clonedPacketsCount -= clonedPacketsAcked;
-  auto updatedOustandingPacketsCount = conn.outstandings.packets.size();
+  CHECK_GE(
+      conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
+  auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
   CHECK_GE(
       updatedOustandingPacketsCount,
       conn.outstandings.handshakePacketsCount +
@@ -214,6 +229,45 @@ void processAckFrame(
     }
     conn.congestionController->onPacketAckOrLoss(
         std::move(ack), std::move(lossEvent));
+  }
+  clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
+}
+
+void clearOldOutstandingPackets(
+    QuicConnectionStateBase& conn,
+    TimePoint time,
+    PacketNumberSpace pnSpace) {
+  if (conn.outstandings.declaredLostCount) {
+    // Reap any old packets declared lost that are unlikely to be ACK'd.
+    auto threshold = calculatePTO(conn);
+    auto opItr = conn.outstandings.packets.begin();
+    auto eraseBegin = opItr;
+    while (opItr != conn.outstandings.packets.end()) {
+      // This case can happen when we have buffered an undecryptable ACK and
+      // are able to decrypt it later.
+      if (time < opItr->time) {
+        break;
+      }
+      if (opItr->packet.header.getPacketNumberSpace() != pnSpace) {
+        if (eraseBegin != opItr) {
+          // We want to keep [eraseBegin, opItr) within a single PN space.
+          opItr = conn.outstandings.packets.erase(eraseBegin, opItr);
+        }
+        opItr++;
+        eraseBegin = opItr;
+        continue;
+      }
+      auto timeSinceSent = time - opItr->time;
+      if (opItr->declaredLost && timeSinceSent > threshold) {
+        opItr++;
+        conn.outstandings.declaredLostCount--;
+      } else {
+        break;
+      }
+    }
+    if (eraseBegin != opItr) {
+      conn.outstandings.packets.erase(eraseBegin, opItr);
+    }
   }
 }
 

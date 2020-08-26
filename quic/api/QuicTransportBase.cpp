@@ -2594,7 +2594,7 @@ QuicTransportBase::getInstrumentationObservers() const {
 
 void QuicTransportBase::writeSocketData() {
   if (socket_) {
-    auto packetsBefore = conn_->outstandings.packets.size();
+    auto packetsBefore = conn_->outstandings.numOutstanding();
     writeData();
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
@@ -2603,7 +2603,7 @@ void QuicTransportBase::writeSocketData() {
             TransportErrorCode::PROTOCOL_VIOLATION);
       }
       setLossDetectionAlarm(*conn_, *this);
-      auto packetsAfter = conn_->outstandings.packets.size();
+      auto packetsAfter = conn_->outstandings.numOutstanding();
       bool packetWritten = (packetsAfter > packetsBefore);
       if (conn_->loopDetectorCallback && packetWritten) {
         conn_->writeDebugState.currentEmptyLoopCount = 0;

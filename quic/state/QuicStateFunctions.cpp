@@ -20,9 +20,21 @@ getPreviousOutstandingPacket(
     std::deque<quic::OutstandingPacket>::reverse_iterator from) {
   return std::find_if(
       from, conn.outstandings.packets.rend(), [=](const auto& op) {
+        return !op.declaredLost &&
+            packetNumberSpace == op.packet.header.getPacketNumberSpace();
+      });
+}
+std::deque<quic::OutstandingPacket>::reverse_iterator
+getPreviousOutstandingPacketIncludingLost(
+    quic::QuicConnectionStateBase& conn,
+    quic::PacketNumberSpace packetNumberSpace,
+    std::deque<quic::OutstandingPacket>::reverse_iterator from) {
+  return std::find_if(
+      from, conn.outstandings.packets.rend(), [=](const auto& op) {
         return packetNumberSpace == op.packet.header.getPacketNumberSpace();
       });
 }
+
 } // namespace
 
 namespace quic {
@@ -222,13 +234,22 @@ std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
       conn, packetNumberSpace, conn.outstandings.packets.rbegin());
 }
 
+std::deque<OutstandingPacket>::reverse_iterator
+getLastOutstandingPacketIncludingLost(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace packetNumberSpace) {
+  return getPreviousOutstandingPacketIncludingLost(
+      conn, packetNumberSpace, conn.outstandings.packets.rbegin());
+}
+
 std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace,
     std::deque<OutstandingPacket>::iterator from) {
   return std::find_if(
       from, conn.outstandings.packets.end(), [=](const auto& op) {
-        return packetNumberSpace == op.packet.header.getPacketNumberSpace();
+        return !op.declaredLost &&
+            packetNumberSpace == op.packet.header.getPacketNumberSpace();
       });
 }
 

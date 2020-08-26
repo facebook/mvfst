@@ -150,6 +150,10 @@ struct OutstandingPacket {
    */
   bool isAppLimited{false};
 
+  // True if spurious loss detection is enabled and this packet was declared
+  // lost.
+  bool declaredLost{false};
+
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
@@ -183,6 +187,14 @@ struct OutstandingsInfo {
 
   // Number of packets are clones or cloned.
   uint64_t clonedPacketsCount{0};
+
+  // Number of packets currently declared lost.
+  uint64_t declaredLostCount{0};
+
+  // Number of packets outstanding and not declared lost.
+  uint64_t numOutstanding() {
+    return packets.size() - declaredLostCount;
+  }
 };
 
 struct Pacer {
@@ -465,6 +477,9 @@ struct LossState {
   // Total number of packet retransmitted on this connection, including packet
   // clones, retransmitted clones, handshake and rejected zero rtt packets.
   uint32_t rtxCount{0};
+  // Total number of packets which were declared lost spuriously, i.e. we
+  // received an ACK for them later.
+  uint32_t spuriousLossCount{0};
   // Total number of retransmission due to PTO
   uint32_t timeoutBasedRtxCount{0};
   // Total number of PTO count

@@ -123,6 +123,7 @@ class QuicSocket {
     uint64_t pacingBurstSize{0};
     std::chrono::microseconds pacingInterval{0us};
     uint32_t packetsRetransmitted{0};
+    uint32_t packetsSpuriouslyLost{0};
     uint32_t timeoutBasedLoss{0};
     std::chrono::microseconds pto{0us};
     uint64_t bytesSent{0};

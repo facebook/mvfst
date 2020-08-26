@@ -740,9 +740,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
   EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
 
   // Packet 6 should remain in packet as the delta is less than threshold
-  EXPECT_EQ(conn->outstandings.packets.size(), 1);
-  auto packetNum =
-      conn->outstandings.packets.front().packet.header.getPacketSequenceNum();
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(conn->outstandings.packets.size(), 1 + numDeclaredLost);
+  auto first = getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake);
+  auto packetNum = first->packet.header.getPacketSequenceNum();
   EXPECT_EQ(packetNum, 6);
 }
 
@@ -776,8 +780,13 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   handleAckForLoss(
       *conn, testLossMarkFunc, ackEvent, PacketNumberSpace::Handshake);
 
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(1, numDeclaredLost);
   EXPECT_EQ(0, conn->lossState.ptoCount);
-  EXPECT_TRUE(conn->outstandings.packets.empty());
+  EXPECT_EQ(numDeclaredLost, conn->outstandings.packets.size());
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
   EXPECT_TRUE(testLossMarkFuncCalled);
 }
@@ -973,12 +982,17 @@ TEST_F(QuicLossFunctionsTest, TestTimeReordering) {
   EXPECT_EQ(2, lossEvent->largestLostPacketNum.value());
   EXPECT_EQ(TimePoint(900ms), lossEvent->lossTime);
   // Packet 1,2 should be marked as loss
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
   EXPECT_EQ(lostPacket.size(), 2);
+  EXPECT_EQ(numDeclaredLost, lostPacket.size());
   EXPECT_EQ(lostPacket.front(), 1);
   EXPECT_EQ(lostPacket.back(), 2);
 
   // Packet 6, 7 should remain in outstanding packet list
-  EXPECT_EQ(2, conn->outstandings.packets.size());
+  EXPECT_EQ(2 + numDeclaredLost, conn->outstandings.packets.size());
   auto packetNum = getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
                        ->packet.header.getPacketSequenceNum();
   EXPECT_EQ(packetNum, 6);
@@ -1026,10 +1040,15 @@ TEST_F(QuicLossFunctionsTest, LossTimePreemptsCryptoTimer) {
   MockClock::mockNow = [=]() { return sendTime + expectedDelayUntilLost + 5s; };
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
       *conn, testingLossMarkFunc(lostPackets));
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
   EXPECT_EQ(1, lostPackets.size());
+  EXPECT_EQ(numDeclaredLost, lostPackets.size());
   EXPECT_FALSE(
       conn->lossState.lossTimes[PacketNumberSpace::Handshake].has_value());
-  EXPECT_TRUE(conn->outstandings.packets.empty());
+  EXPECT_EQ(numDeclaredLost, conn->outstandings.packets.size());
 }
 
 TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
@@ -1242,8 +1261,13 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
       countingLossVisitor,
       TimePoint(100ms),
       PacketNumberSpace::AppData);
+  auto numDeclaredLost = std::count_if(
+      conn->outstandings.packets.begin(),
+      conn->outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(2, numDeclaredLost);
   EXPECT_EQ(1, lossVisitorCount);
-  EXPECT_EQ(4, conn->outstandings.packets.size());
+  EXPECT_EQ(4 + numDeclaredLost, conn->outstandings.packets.size());
 }
 
 TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {

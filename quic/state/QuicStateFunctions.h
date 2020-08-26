@@ -89,6 +89,10 @@ std::deque<OutstandingPacket>::iterator getFirstOutstandingPacket(
 std::deque<OutstandingPacket>::reverse_iterator getLastOutstandingPacket(
     QuicConnectionStateBase& conn,
     PacketNumberSpace packetNumberSpace);
+std::deque<OutstandingPacket>::reverse_iterator
+getLastOutstandingPacketIncludingLost(
+    QuicConnectionStateBase& conn,
+    PacketNumberSpace packetNumberSpace);
 
 bool hasReceivedPackets(const QuicConnectionStateBase& conn) noexcept;
 

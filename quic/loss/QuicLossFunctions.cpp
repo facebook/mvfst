@@ -38,7 +38,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
       conn,
       conn.lossState.largestSent.value_or(0),
       conn.lossState.ptoCount,
-      (uint64_t)conn.outstandings.packets.size());
+      conn.outstandings.numOutstanding());
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;
@@ -46,7 +46,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
     conn.qLogger->addLossAlarm(
         conn.lossState.largestSent.value_or(0),
         conn.lossState.ptoCount,
-        (uint64_t)conn.outstandings.packets.size(),
+        conn.outstandings.numOutstanding(),
         kPtoAlarm);
   }
   if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
@@ -57,7 +57,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
   // same write loop.
   conn.pendingEvents.numProbePackets =
       std::min<decltype(conn.pendingEvents.numProbePackets)>(
-          conn.outstandings.packets.size(), kPacketToSendForPTO);
+          conn.outstandings.numOutstanding(), kPacketToSendForPTO);
 }
 
 void markPacketLoss(
@@ -65,6 +65,7 @@ void markPacketLoss(
     RegularQuicWritePacket& packet,
     bool processed,
     PacketNum currentPacketNum) {
+  QUIC_STATS(conn.statsCallback, onPacketLoss);
   for (auto& packetFrame : packet.frames) {
     switch (packetFrame.type()) {
       case QuicWriteFrame::Type::MaxStreamDataFrame_E: {

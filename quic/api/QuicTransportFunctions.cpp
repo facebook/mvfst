@@ -712,7 +712,7 @@ void updateConnection(
     ++conn.lossState.timeoutBasedRtxCount;
   }
 
-  auto opCount = conn.outstandings.packets.size();
+  auto opCount = conn.outstandings.numOutstanding();
   DCHECK_GE(opCount, conn.outstandings.initialPacketsCount);
   DCHECK_GE(opCount, conn.outstandings.handshakePacketsCount);
   DCHECK_GE(opCount, conn.outstandings.clonedPacketsCount);

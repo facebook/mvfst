@@ -34,6 +34,15 @@ void processAckFrame(
     const TimePoint& ackReceiveTime);
 
 /**
+ * Clears outstanding packets marked as lost that are not likely to be ACKed
+ * (have been lost for >= 1 PTO).
+ */
+void clearOldOutstandingPackets(
+    QuicConnectionStateBase& outstandings,
+    TimePoint time,
+    PacketNumberSpace pnSpace);
+
+/**
  * Visitor function to be invoked when we receive an ACK of the WriteAckFrame
  * that we sent.
  */

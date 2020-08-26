@@ -94,17 +94,150 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
     start--;
   }
   // only unacked packets should be remaining
-  EXPECT_EQ(conn.outstandings.packets.size(), 5);
+  auto numDeclaredLost = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_GT(numDeclaredLost, 0);
+  EXPECT_EQ(numDeclaredLost, lostPackets.size());
+  EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
+  EXPECT_EQ(conn.outstandings.packets.size(), numDeclaredLost + 5);
+}
+
+TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
+  QuicServerConnectionState conn;
+  conn.lossState.reorderingThreshold = 85;
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  // Get the time based loss detection out of the way
+  conn.lossState.srtt = 10s;
+
+  StreamId currentStreamId = 10;
+  auto sentTime = Clock::now();
+  for (PacketNum packetNum = 10; packetNum <= 101; packetNum++) {
+    RegularQuicWritePacket regularPacket =
+        createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(currentStreamId++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings.packets.emplace_back(OutstandingPacket(
+        std::move(regularPacket), sentTime, 1, false, packetNum));
+  }
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 101;
+  // ACK packet ranges 21 - 101
+  for (PacketNum packetNum = 101; packetNum > 30; packetNum -= 20) {
+    ackFrame.ackBlocks.emplace_back(packetNum - 20, packetNum);
+  }
+
+  std::vector<WriteStreamFrame> streams;
+  std::vector<PacketNum> lostPackets;
+  uint64_t expectedAckedBytes = 81;
+  uint64_t expectedAckedPackets = expectedAckedBytes; // each packet size is 1
+  size_t lostPacketsCounter = 0;
+  EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+      .Times(3)
+      .WillOnce(Invoke([&](auto ack, auto loss) {
+        if (ack) {
+          EXPECT_EQ(101, *ack->largestAckedPacket);
+          EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
+          EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
+        }
+        if (loss) {
+          lostPacketsCounter++;
+        }
+      }))
+      .WillRepeatedly(Invoke([](auto, auto) {}));
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [&](const auto&, const auto& packetFrame, const ReadAckFrame&) {
+        auto& stream = *packetFrame.asWriteStreamFrame();
+        streams.emplace_back(stream);
+      },
+      testLossHandler(lostPackets),
+      Clock::now());
+  EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
+
+  StreamId start = currentStreamId - 1;
+  for (auto& stream : streams) {
+    EXPECT_EQ(stream.streamId, start);
+    start--;
+  }
+  // only unacked packets should be remaining
+  auto numDeclaredLost = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_GT(numDeclaredLost, 0);
+  EXPECT_EQ(numDeclaredLost, lostPackets.size());
+  EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
+  EXPECT_EQ(conn.outstandings.packets.size(), numDeclaredLost + 5);
   PacketNum lostPackt = 10;
   for (auto& pkt : lostPackets) {
     EXPECT_EQ(pkt, lostPackt++);
   }
   PacketNum packetNum = 16;
   for (auto& packet : conn.outstandings.packets) {
+    if (packet.declaredLost) {
+      continue;
+    }
     auto currentPacketNum = packet.packet.header.getPacketSequenceNum();
     EXPECT_EQ(currentPacketNum, packetNum);
     packetNum++;
   }
+
+  // 15 is lost, 16 is not, if we get an ack covering both both should be
+  // cleared.
+  auto itr = std::find_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) {
+        return op.packet.header.getPacketSequenceNum() == 15 ||
+            op.packet.header.getPacketSequenceNum() == 16;
+      });
+  EXPECT_TRUE(itr != conn.outstandings.packets.end());
+  EXPECT_TRUE(itr->declaredLost);
+  EXPECT_EQ(itr->packet.header.getPacketSequenceNum(), 15);
+  itr++;
+  EXPECT_TRUE(itr != conn.outstandings.packets.end());
+  EXPECT_FALSE(itr->declaredLost);
+  EXPECT_EQ(itr->packet.header.getPacketSequenceNum(), 16);
+  EXPECT_EQ(conn.lossState.spuriousLossCount, 0);
+  ackFrame.ackBlocks.emplace_back(15, 16);
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](auto, auto, auto) {},
+      [](auto&, auto&, auto, auto) {},
+      Clock::now());
+  itr = std::find_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) {
+        return op.packet.header.getPacketSequenceNum() == 15 ||
+            op.packet.header.getPacketSequenceNum() == 16;
+      });
+  EXPECT_TRUE(itr == conn.outstandings.packets.end());
+
+  // Duplicate ACK much later, should clear out declared lost.
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](auto, auto, auto) {},
+      [](auto&, auto&, auto, auto) {},
+      Clock::now() + 2 * calculatePTO(conn));
+
+  numDeclaredLost = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(numDeclaredLost, 0);
+  EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
+  EXPECT_EQ(conn.lossState.spuriousLossCount, 1);
 }
 
 TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
@@ -184,15 +317,11 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   std::iota(remainingPackets.begin() + 11, remainingPackets.end(), 46);
 
   std::vector<PacketNum> actualPacketNumbers;
-  std::transform(
-      conn.outstandings.packets.begin(),
-      conn.outstandings.packets.end(),
-      std::back_insert_iterator<decltype(actualPacketNumbers)>(
-          actualPacketNumbers),
-      [](const auto& packet) {
-        return packet.packet.header.getPacketSequenceNum();
-      });
-
+  for (auto& op : conn.outstandings.packets) {
+    if (!op.declaredLost) {
+      actualPacketNumbers.push_back(op.packet.header.getPacketSequenceNum());
+    }
+  }
   EXPECT_TRUE(std::equal(
       actualPacketNumbers.begin(),
       actualPacketNumbers.end(),
@@ -489,18 +618,25 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
       Clock::now());
   // When [3, 7] are acked, [0, 2] may also be marked loss if they are in the
   // same packet number space, due to reordering threshold
+  auto numDeclaredLost = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      [](auto& op) { return op.declaredLost; });
+  EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
   if (GetParam() == PacketNumberSpace::Initial) {
+    EXPECT_EQ(numDeclaredLost, 1);
     EXPECT_EQ(1, conn.outstandings.initialPacketsCount);
     // AppData packets won't be acked by an ack in Initial space:
     // So 0, 2, 4, 6, 8 and 9 are left in OP list
-    EXPECT_EQ(6, conn.outstandings.packets.size());
+    EXPECT_EQ(numDeclaredLost + 6, conn.outstandings.packets.size());
   } else if (GetParam() == PacketNumberSpace::Handshake) {
+    EXPECT_EQ(numDeclaredLost, 1);
     EXPECT_EQ(1, conn.outstandings.handshakePacketsCount);
     // AppData packets won't be acked by an ack in Handshake space:
     // So 0, 2, 4, 6, 8 and 9 are left in OP list
-    EXPECT_EQ(6, conn.outstandings.packets.size());
+    EXPECT_EQ(numDeclaredLost + 6, conn.outstandings.packets.size());
   } else {
-    EXPECT_EQ(2, conn.outstandings.packets.size());
+    EXPECT_EQ(numDeclaredLost + 2, conn.outstandings.packets.size());
   }
 }
 

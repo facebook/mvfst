@@ -44,6 +44,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onPacketRetransmission";
   }
 
+  void onPacketLoss() override {
+    VLOG(2) << prefix_ << "onPacketLoss";
+  }
+
+  void onPacketSpuriousLoss() override {
+    VLOG(2) << prefix_ << "onPacketSpuriousLoss";
+  }
+
   void onPacketDropped(PacketDropReason reason) override {
     VLOG(2) << prefix_ << "onPacketDropped reason=" << toString(reason);
   }

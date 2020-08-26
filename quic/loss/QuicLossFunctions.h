@@ -122,7 +122,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
-  auto totalPacketsOutstanding = conn.outstandings.packets.size();
+  auto totalPacketsOutstanding = conn.outstandings.numOutstanding();
   /*
    * We have this condition to disambiguate the case where we have.
    * (1) All outstanding packets that are clones that are processed and there
@@ -200,7 +200,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       std::max(conn.lossState.srtt, conn.lossState.lrtt) *
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
-  VLOG(10) << __func__ << " outstanding=" << conn.outstandings.packets.size()
+  VLOG(10) << __func__ << " outstanding=" << conn.outstandings.numOutstanding()
            << " largestAcked=" << largestAcked.value_or(0)
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
@@ -254,7 +254,11 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
              << " handshake=" << pkt.isHandshake << " " << conn;
-    iter = conn.outstandings.packets.erase(iter);
+    // Rather than erasing here, instead mark the packet as lost so we can
+    // determine if this was spurious later.
+    conn.outstandings.declaredLostCount++;
+    iter->declaredLost = true;
+    iter++;
   }
 
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);
@@ -333,10 +337,11 @@ void onLossDetectionAlarm(
   } else {
     onPTOAlarm(conn);
   }
-  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandings.packets.empty();
+  conn.pendingEvents.setLossDetectionAlarm =
+      conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__ << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
-           << " outstanding=" << conn.outstandings.packets.size()
+           << " outstanding=" << conn.outstandings.numOutstanding()
            << " initialPackets=" << conn.outstandings.initialPacketsCount
            << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
@@ -374,12 +379,13 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       lossVisitor,
       ack.ackTime,
       pnSpace);
-  conn.pendingEvents.setLossDetectionAlarm = !conn.outstandings.packets.empty();
+  conn.pendingEvents.setLossDetectionAlarm =
+      conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__
            << " largestAckedInPacket=" << ack.largestAckedPacket.value_or(0)
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
-           << " outstanding=" << conn.outstandings.packets.size()
+           << " outstanding=" << conn.outstandings.numOutstanding()
            << " initialPackets=" << conn.outstandings.initialPacketsCount
            << " handshakePackets=" << conn.outstandings.handshakePacketsCount
            << " " << conn;
