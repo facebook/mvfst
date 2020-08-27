@@ -2677,23 +2677,26 @@ void QuicTransportBase::writeSocketDataAndCatch() {
 
 void QuicTransportBase::setTransportSettings(
     TransportSettings transportSettings) {
-  // If we've already encoded the transport parameters, silently return as
-  // setting the transport settings again would be buggy.
-  // TODO should we throw or return Expected here?
   if (conn_->nodeType == QuicNodeType::Client) {
     conn_->transportSettings.dataPathType = DataPathType::ChainedMemory;
   }
+  // If transport parameters are encoded, we can only update congestion control
+  // related params. Setting other transport settings again would be buggy.
+  // TODO should we throw or return Expected here?
   if (conn_->transportParametersEncoded) {
-    return;
+    updateCongestionControlSettings(transportSettings);
+  } else {
+    // TODO: We should let chain based GSO to use bufAccessor in the future as
+    // well.
+    CHECK(
+        conn_->bufAccessor ||
+        transportSettings.dataPathType != DataPathType::ContinuousMemory);
+    conn_->transportSettings = std::move(transportSettings);
+    conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
   }
-  // TODO: We should let chain based GSO to use bufAccessor in the future as
-  // well.
-  CHECK(
-      conn_->bufAccessor ||
-      transportSettings.dataPathType != DataPathType::ContinuousMemory);
-  conn_->transportSettings = std::move(transportSettings);
-  conn_->streamManager->refreshTransportSettings(conn_->transportSettings);
+
   // A few values cannot be overridden to be lower than default:
+  // TODO refactor transport settings to avoid having to update params twice.
   if (conn_->transportSettings.defaultCongestionController !=
       CongestionControlType::None) {
     conn_->transportSettings.initCwndInMss =
@@ -2718,6 +2721,22 @@ void QuicTransportBase::setTransportSettings(
       conn_->transportSettings.pacingEnabled = false;
     }
   }
+}
+
+void QuicTransportBase::updateCongestionControlSettings(
+    const TransportSettings& transportSettings) {
+  conn_->transportSettings.defaultCongestionController =
+      transportSettings.defaultCongestionController;
+  conn_->transportSettings.initCwndInMss = transportSettings.initCwndInMss;
+  conn_->transportSettings.minCwndInMss = transportSettings.minCwndInMss;
+  conn_->transportSettings.maxCwndInMss = transportSettings.maxCwndInMss;
+  conn_->transportSettings.limitedCwndInMss =
+      transportSettings.limitedCwndInMss;
+  conn_->transportSettings.pacingEnabled = transportSettings.pacingEnabled;
+  conn_->transportSettings.pacingTimerTickInterval =
+      transportSettings.pacingTimerTickInterval;
+  conn_->transportSettings.minBurstPackets = transportSettings.minBurstPackets;
+  conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

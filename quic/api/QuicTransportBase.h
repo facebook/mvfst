@@ -584,6 +584,8 @@ class QuicTransportBase : public QuicSocket {
   getInstrumentationObservers() const override;
 
  protected:
+  void updateCongestionControlSettings(
+      const TransportSettings& transportSettings);
   void processCallbacksAfterWriteData();
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
