@@ -9,8 +9,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <folly/Overload.h>
-
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>

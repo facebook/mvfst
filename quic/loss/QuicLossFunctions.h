@@ -19,7 +19,6 @@
 #include <quic/state/StateData.h>
 
 #include <folly/Chrono.h>
-#include <folly/Overload.h>
 #include <folly/io/async/AsyncTimeout.h>
 
 namespace quic {

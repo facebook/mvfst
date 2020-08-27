@@ -7,7 +7,6 @@
  */
 
 #include <folly/Optional.h>
-#include <folly/Overload.h>
 #include <folly/portability/GTest.h>
 
 #include <quic/QuicException.h>

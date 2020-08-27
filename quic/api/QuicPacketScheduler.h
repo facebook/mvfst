@@ -9,7 +9,6 @@
 #pragma once
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <folly/Overload.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicPacketBuilder.h>

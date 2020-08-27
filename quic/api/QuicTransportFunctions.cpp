@@ -8,7 +8,6 @@
 
 #include <quic/api/QuicTransportFunctions.h>
 
-#include <folly/Overload.h>
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicTransportFunctions.h>

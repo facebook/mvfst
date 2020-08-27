@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <folly/Overload.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/state/StateData.h>

@@ -7,7 +7,6 @@
  */
 
 #include <quic/codec/Types.h>
-#include <folly/Overload.h>
 #include <folly/String.h>
 #include <folly/container/Array.h>
 #include <folly/io/IOBuf.h>
