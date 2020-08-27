@@ -666,8 +666,14 @@ class QuicTransportBase : public QuicSocket {
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
 
-  using ByteEventMap = folly::
-      F14FastMap<StreamId, std::deque<std::pair<uint64_t, ByteEventCallback*>>>;
+  struct ByteEventDetail {
+    ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
+        : offset(offsetIn), callback(callbackIn) {}
+    uint64_t offset;
+    ByteEventCallback* callback;
+  };
+
+  using ByteEventMap = folly::F14FastMap<StreamId, std::deque<ByteEventDetail>>;
   ByteEventMap& getByteEventMap(const ByteEvent::Type type);
   FOLLY_NODISCARD const ByteEventMap& getByteEventMapConst(
       const ByteEvent::Type type) const;

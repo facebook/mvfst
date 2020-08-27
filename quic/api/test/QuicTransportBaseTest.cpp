@@ -356,10 +356,10 @@ class TestQuicTransport
       for (auto& cbs : deliveryCb->second) {
         ByteEvent event = {};
         event.id = id;
-        event.offset = cbs.first;
+        event.offset = cbs.offset;
         event.type = ByteEvent::Type::ACK;
         event.srtt = stream->conn.lossState.srtt;
-        cbs.second->onByteEvent(event);
+        cbs.callback->onByteEvent(event);
         if (closeState_ != CloseState::OPEN) {
           break;
         }
@@ -372,9 +372,9 @@ class TestQuicTransport
       for (auto& cbs : txCallbacksForStream->second) {
         ByteEvent event = {};
         event.id = id;
-        event.offset = cbs.first;
+        event.offset = cbs.offset;
         event.type = ByteEvent::Type::TX;
-        cbs.second->onByteEvent(event);
+        cbs.callback->onByteEvent(event);
         if (closeState_ != CloseState::OPEN) {
           break;
         }

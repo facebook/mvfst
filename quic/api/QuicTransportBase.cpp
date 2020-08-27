@@ -1271,8 +1271,8 @@ void QuicTransportBase::cancelByteEventCallbacksForStream(
   // invoke those with offset below provided offset.
   while (!streamByteEvents.empty()) {
     // decomposition not supported for xplat
-    const auto cbOffset = streamByteEvents.front().first;
-    const auto callback = streamByteEvents.front().second;
+    const auto cbOffset = streamByteEvents.front().offset;
+    const auto callback = streamByteEvents.front().callback;
     if (!offset.has_value() || cbOffset < *offset) {
       streamByteEvents.pop_front();
       ByteEventCancellation cancellation = {};
@@ -1316,8 +1316,8 @@ void QuicTransportBase::cancelByteEventCallbacks(const ByteEvent::Type type) {
     const auto streamId = byteEventMapIt.first;
     const auto callbackMap = byteEventMapIt.second;
     for (const auto& callbackMapIt : callbackMap) {
-      const auto offset = callbackMapIt.first;
-      const auto callback = callbackMapIt.second;
+      const auto offset = callbackMapIt.offset;
+      const auto callback = callbackMapIt.callback;
       ByteEventCancellation cancellation = {};
       cancellation.id = streamId;
       cancellation.offset = offset;
@@ -1548,8 +1548,8 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
 
     // lambda to help get the next callback to call for this stream
     auto getNextTxCallbackForStreamAndCleanup =
-        [this, &largestOffsetTxed](const auto& streamId)
-        -> folly::Optional<std::pair<uint64_t, ByteEventCallback*>> {
+        [this, &largestOffsetTxed](
+            const auto& streamId) -> folly::Optional<ByteEventDetail> {
       auto txCallbacksForStreamIt = txCallbacks_.find(streamId);
       if (txCallbacksForStreamIt == txCallbacks_.end() ||
           txCallbacksForStreamIt->second.empty()) {
@@ -1557,7 +1557,7 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
       }
 
       auto& txCallbacksForStream = txCallbacksForStreamIt->second;
-      if (txCallbacksForStream.front().first > *largestOffsetTxed) {
+      if (txCallbacksForStream.front().offset > *largestOffsetTxed) {
         return folly::none;
       }
 
@@ -1570,16 +1570,15 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
       return result;
     };
 
-    folly::Optional<std::pair<uint64_t, ByteEventCallback*>>
-        nextOffsetAndCallback;
+    folly::Optional<ByteEventDetail> nextOffsetAndCallback;
     while (
         (nextOffsetAndCallback =
              getNextTxCallbackForStreamAndCleanup(streamId))) {
       ByteEvent byteEvent = {};
       byteEvent.id = streamId;
-      byteEvent.offset = nextOffsetAndCallback->first;
+      byteEvent.offset = nextOffsetAndCallback->offset;
       byteEvent.type = ByteEvent::Type::TX;
-      nextOffsetAndCallback->second->onByteEvent(byteEvent);
+      nextOffsetAndCallback->callback->onByteEvent(byteEvent);
 
       // connection may be closed by callback
       if (closeState_ != CloseState::OPEN) {
@@ -1641,15 +1640,15 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
           deliveryCallbacksForAckedStream->second.empty()) {
         break;
       }
-      if (deliveryCallbacksForAckedStream->second.front().first >
+      if (deliveryCallbacksForAckedStream->second.front().offset >
           *maxOffsetToDeliver) {
         break;
       }
       auto deliveryCallbackAndOffset =
           deliveryCallbacksForAckedStream->second.front();
       deliveryCallbacksForAckedStream->second.pop_front();
-      auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.first;
-      auto deliveryCallback = deliveryCallbackAndOffset.second;
+      auto currentDeliveryCallbackOffset = deliveryCallbackAndOffset.offset;
+      auto deliveryCallback = deliveryCallbackAndOffset.callback;
 
       ByteEvent byteEvent = {};
       byteEvent.id = streamId;
@@ -2129,9 +2128,7 @@ QuicTransportBase::registerByteEventCallback(
         byteEventMapIt->second.begin(),
         byteEventMapIt->second.end(),
         offset,
-        [&](uint64_t o, const std::pair<uint64_t, ByteEventCallback*>& p) {
-          return o < p.first;
-        });
+        [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
     byteEventMapIt->second.emplace(pos, offset, cb);
   }
   auto stream = conn_->streamManager->getStream(id);
@@ -2162,9 +2159,7 @@ QuicTransportBase::registerByteEventCallback(
           streamByteEventCbIt->second.begin(),
           streamByteEventCbIt->second.end(),
           offset,
-          [&](const std::pair<uint64_t, ByteEventCallback*>& p, uint64_t o) {
-            return p.first < o;
-          });
+          [&](const ByteEventDetail& p, uint64_t o) { return p.offset < o; });
       streamByteEventCbIt->second.erase(pos);
 
       ByteEvent byteEvent = {};
