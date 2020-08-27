@@ -682,6 +682,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // To send a ping frame
     bool sendPing{false};
+
+    // Do we need to send data blocked frame when connection is blocked.
+    bool sendDataBlocked{false};
   };
 
   PendingEvents pendingEvents;

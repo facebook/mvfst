@@ -7,6 +7,7 @@
  */
 
 #include <quic/api/QuicPacketScheduler.h>
+#include <quic/flowcontrol/QuicFlowController.h>
 
 namespace quic {
 
@@ -468,10 +469,23 @@ BlockedScheduler::BlockedScheduler(const QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
 bool BlockedScheduler::hasPendingBlockedFrames() const {
-  return !conn_.streamManager->blockedStreams().empty();
+  return !conn_.streamManager->blockedStreams().empty() ||
+      conn_.pendingEvents.sendDataBlocked;
 }
 
 void BlockedScheduler::writeBlockedFrames(PacketBuilderInterface& builder) {
+  if (conn_.pendingEvents.sendDataBlocked) {
+    // Connection is write blocked due to connection level flow control.
+    DataBlockedFrame blockedFrame(
+        conn_.flowControlState.peerAdvertisedMaxOffset);
+    auto result = writeFrame(blockedFrame, builder);
+    if (!result) {
+      // If there is not enough room to write data blocked frame in the
+      // curretn packet, we won't be able to write stream blocked frames either
+      // so just return.
+      return;
+    }
+  }
   for (const auto& blockedStream : conn_.streamManager->blockedStreams()) {
     auto bytesWritten = writeFrame(blockedStream.second, builder);
     if (!bytesWritten) {

@@ -589,7 +589,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   auto buf = buildRandomInputData(150);
   folly::IOBuf passedIn;
-  // Write blocked frame
+  // Write stream blocked frame
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   transport_->writeChain(streamId, buf->clone(), false, false);
 
@@ -598,15 +598,20 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto& packet =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool blockedFound = false;
+  bool dataBlockedFound = false;
   for (auto& frame : packet.frames) {
     auto blocked = frame.asStreamDataBlockedFrame();
-    if (!blocked) {
+    auto dataBlocked = frame.asDataBlockedFrame();
+    if (!blocked && !dataBlocked) {
       continue;
     }
-    EXPECT_EQ(blocked->streamId, streamId);
-    blockedFound = true;
+    if (blocked) {
+      EXPECT_EQ(blocked->streamId, streamId);
+      blockedFound = true;
+    }
   }
   EXPECT_TRUE(blockedFound);
+  EXPECT_FALSE(dataBlockedFound);
   conn.outstandings.packets.clear();
 
   // Stream flow control
@@ -628,9 +633,10 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   verifyCorrectness(conn, 100, streamId, *buf1, false, false);
 
   // Connection flow controled
+  auto num_outstandings = conn.outstandings.packets.size();
   stream->flowControlState.peerAdvertisedMaxOffset = 300;
   conn.streamManager->updateWritableStreams(*stream);
-  EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
+  EXPECT_CALL(*socket_, write(_, _)).Times(2).WillRepeatedly(Invoke(bufLength));
   writeQuicDataToSocket(
       *socket_,
       conn,
@@ -643,6 +649,34 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   auto buf2 = buf->clone();
   buf2->trimEnd(30);
   verifyCorrectness(conn, 100, streamId, *buf2, false, false);
+
+  // Verify that there is one Data Blocked frame emitted.
+  EXPECT_EQ(conn.outstandings.packets.size(), num_outstandings + 2);
+  packet = getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
+  dataBlockedFound = false;
+  for (auto& frame : packet.frames) {
+    auto dataBlocked = frame.asDataBlockedFrame();
+    if (!dataBlocked) {
+      continue;
+    }
+    EXPECT_FALSE(dataBlockedFound);
+    EXPECT_EQ(dataBlocked->dataLimit, 220);
+    dataBlockedFound = true;
+  }
+  EXPECT_TRUE(dataBlockedFound);
+
+  // Try again, verify that there should not be any Data blocked frame emitted
+  // again.
+  EXPECT_CALL(*socket_, write(_, _)).Times(0);
+  writeQuicDataToSocket(
+      *socket_,
+      conn,
+      *conn.clientConnectionId,
+      *conn.serverConnectionId,
+      *aead_,
+      *headerCipher_,
+      transport_->getVersion(),
+      conn.transportSettings.writeConnectionDataPacketsLimit);
 
   // Flow control lifted
   stream->conn.flowControlState.peerAdvertisedMaxOffset = 300;

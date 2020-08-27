@@ -11,6 +11,7 @@
 #include <quic/QuicException.h>
 #include <quic/logging/QLogger.h>
 #include <quic/logging/QuicLogger.h>
+#include <quic/state/StreamData.h>
 #include <limits>
 
 namespace quic {
@@ -216,6 +217,13 @@ void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
   }
 }
 
+void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn) {
+  if (getSendConnFlowControlBytesWire(conn) == 0) {
+    conn.pendingEvents.sendDataBlocked = true;
+  }
+  return;
+}
+
 void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   // Only write blocked when the flow control bytes are used up and there are
   // still pending data
@@ -394,6 +402,10 @@ void onStreamWindowUpdateLost(QuicStreamState& stream) {
 
 void onBlockedLost(QuicStreamState& stream) {
   maybeWriteBlockAfterSocketWrite(stream);
+}
+
+void onDataBlockedLost(QuicConnectionStateBase& conn) {
+  maybeWriteDataBlockedAfterSocketWrite(conn);
 }
 
 void updateFlowControlList(QuicStreamState& stream) {

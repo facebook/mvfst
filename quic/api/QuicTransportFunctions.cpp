@@ -501,6 +501,7 @@ void updateConnection(
         if (newStreamDataWritten) {
           updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
           maybeWriteBlockAfterSocketWrite(*stream);
+          maybeWriteDataBlockedAfterSocketWrite(conn);
           conn.streamManager->updateWritableStreams(*stream);
           conn.streamManager->addTx(writeStreamFrame.streamId);
         }
@@ -573,6 +574,14 @@ void updateConnection(
                  << conn;
         onConnWindowUpdateSent(
             conn, packetNum, maxDataFrame.maximumData, sentTime);
+        break;
+      }
+      case QuicWriteFrame::Type::DataBlockedFrame_E: {
+        VLOG(10) << nodeToString(conn.nodeType)
+                 << " sent conn data blocked frame=" << packetNum << " "
+                 << conn;
+        retransmittable = true;
+        conn.pendingEvents.sendDataBlocked = false;
         break;
       }
       case QuicWriteFrame::Type::MaxStreamDataFrame_E: {

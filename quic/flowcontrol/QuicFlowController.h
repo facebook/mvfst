@@ -40,6 +40,8 @@ void updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream);
 
+void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn);
+
 void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream);
 
 void handleStreamWindowUpdate(
@@ -73,6 +75,8 @@ void onStreamWindowUpdateLost(QuicStreamState& stream);
 void onConnWindowUpdateLost(QuicConnectionStateBase& conn);
 
 void onBlockedLost(QuicStreamState& stream);
+
+void onDataBlockedLost(QuicConnectionStateBase& conn);
 
 /**
  * Returns the number of bytes that the peer is willing to receive from

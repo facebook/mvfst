@@ -96,6 +96,13 @@ void markPacketLoss(
       }
       // For other frame types, we only process them if the packet is not a
       // processed clone.
+      case QuicWriteFrame::Type::DataBlockedFrame_E: {
+        if (processed) {
+          break;
+        }
+        onDataBlockedLost(conn);
+        break;
+      }
       case QuicWriteFrame::Type::WriteStreamFrame_E: {
         WriteStreamFrame frame = *packetFrame.asWriteStreamFrame();
         if (processed) {
