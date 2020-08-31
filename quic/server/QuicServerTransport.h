@@ -17,6 +17,8 @@
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
+#include <folly/io/async/AsyncTransportCertificate.h>
+
 namespace quic {
 
 class QuicServerTransport
@@ -122,6 +124,9 @@ class QuicServerTransport
    */
   void setCcpDatapath(struct ccp_datapath* datapath);
 #endif
+
+  const std::shared_ptr<const folly::AsyncTransportCertificate>
+  getPeerCertificate() const override;
 
  protected:
   // From ServerHandshake::HandshakeCallback

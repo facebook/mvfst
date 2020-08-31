@@ -499,4 +499,13 @@ void QuicServerTransport::setCcpDatapath(struct ccp_datapath* datapath) {
 }
 #endif
 
+const std::shared_ptr<const folly::AsyncTransportCertificate>
+QuicServerTransport::getPeerCertificate() const {
+  const auto handshakeLayer = serverConn_->serverHandshakeLayer;
+  if (handshakeLayer) {
+    return handshakeLayer->getState().clientCert();
+  }
+  return nullptr;
+}
+
 } // namespace quic

@@ -11,6 +11,7 @@
 #include <folly/Expected.h>
 #include <folly/Optional.h>
 #include <folly/io/IOBuf.h>
+#include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
@@ -241,6 +242,15 @@ class QuicSocket {
    * Get the local socket address
    */
   virtual const folly::SocketAddress& getLocalAddress() const = 0;
+
+  /**
+   * Get the cert presented by peer
+   */
+  FOLLY_NODISCARD virtual const std::shared_ptr<
+      const folly::AsyncTransportCertificate>
+  getPeerCertificate() const {
+    return nullptr;
+  }
 
   /**
    * Determine if transport is open and ready to read or write.
