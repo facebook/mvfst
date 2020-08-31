@@ -11,6 +11,7 @@
 #include <folly/portability/GMock.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
+#include <quic/client/handshake/ClientHandshakeFactory.h>
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
 
