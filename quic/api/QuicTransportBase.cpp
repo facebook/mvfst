@@ -2867,8 +2867,11 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id);
-  return StreamTransportInfo{
-      stream->totalHolbTime, stream->holbCount, bool(stream->lastHolbTime)};
+  auto packets = getNumPacketsTxWithNewData(*stream);
+  return StreamTransportInfo{stream->totalHolbTime,
+                             stream->holbCount,
+                             bool(stream->lastHolbTime),
+                             packets};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {

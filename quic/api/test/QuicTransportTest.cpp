@@ -3141,5 +3141,144 @@ TEST_F(QuicTransportTest, SaneCwndSettings) {
       conn.congestionController->getCongestionWindow());
 }
 
+TEST_F(QuicTransportTest, GetStreamPackestTxedSingleByte) {
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(1);
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+
+  // when first byte TX callback gets invoked, numPacketsTxWithNewData should be
+  // one
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 1);
+      }));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+}
+
+TEST_F(QuicTransportTest, GetStreamPacketsTxedMultipleBytes) {
+  const uint64_t streamBytes = 10;
+  const uint64_t lastByte = streamBytes - 1;
+
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+
+  auto buf = buildRandomInputData(streamBytes);
+  CHECK_EQ(streamBytes, buf->length());
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+
+  // when first and last byte TX callbacsk fired, numPacketsTxWithNewData should
+  // be 1
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 1);
+      }));
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 1);
+      }));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+}
+
+TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
+  auto& conn = transport_->getConnectionState();
+  conn.transportSettings.writeConnectionDataPacketsLimit = 1;
+
+  const uint64_t streamBytes = kDefaultUDPSendPacketLen * 4;
+  const uint64_t lastByte = streamBytes - 1;
+
+  // 20 bytes overhead per packet should be more than enough
+  const uint64_t firstPacketNearTailByte = kDefaultUDPSendPacketLen - 20;
+  const uint64_t secondPacketNearHeadByte = kDefaultUDPSendPacketLen;
+  const uint64_t secondPacketNearTailByte = kDefaultUDPSendPacketLen * 2 - 40;
+
+  StrictMock<MockByteEventCallback> firstByteTxCb;
+  StrictMock<MockByteEventCallback> firstPacketNearTailByteTxCb;
+  StrictMock<MockByteEventCallback> secondPacketNearHeadByteTxCb;
+  StrictMock<MockByteEventCallback> secondPacketNearTailByteTxCb;
+  StrictMock<MockByteEventCallback> lastByteTxCb;
+  auto stream = transport_->createBidirectionalStream().value();
+  auto buf = buildRandomInputData(streamBytes);
+  CHECK_EQ(streamBytes, buf->length());
+  transport_->writeChain(
+      stream, buf->clone(), false /* eof */, false /* cork */);
+  transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  transport_->registerTxCallback(
+      stream, firstPacketNearTailByte, &firstPacketNearTailByteTxCb);
+  transport_->registerTxCallback(
+      stream, secondPacketNearHeadByte, &secondPacketNearHeadByteTxCb);
+  transport_->registerTxCallback(
+      stream, secondPacketNearTailByte, &secondPacketNearTailByteTxCb);
+  transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+
+  // first byte and first packet last bytes get Txed on first loopForWrites
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 1);
+      }));
+  EXPECT_CALL(
+      firstPacketNearTailByteTxCb,
+      onByteEvent(getTxMatcher(stream, firstPacketNearTailByte)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 1);
+      }));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstPacketNearTailByteTxCb);
+
+  // second packet should be send on the second loopForWrites
+  EXPECT_CALL(
+      secondPacketNearHeadByteTxCb,
+      onByteEvent(getTxMatcher(stream, secondPacketNearHeadByte)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 2);
+      }));
+  EXPECT_CALL(
+      secondPacketNearTailByteTxCb,
+      onByteEvent(getTxMatcher(stream, secondPacketNearTailByte)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* even */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 2);
+      }));
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&secondPacketNearHeadByteTxCb);
+  Mock::VerifyAndClearExpectations(&secondPacketNearTailByteTxCb);
+
+  // last byte will be sent on the fifth loopForWrites
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1)
+      .WillOnce(Invoke([&](QuicSocket::ByteEvent /* event */) {
+        auto info = *transport_->getStreamTransportInfo(stream);
+        EXPECT_EQ(info.numPacketsTxWithNewData, 5);
+      }));
+  loopForWrites();
+  loopForWrites();
+  loopForWrites();
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+}
+
 } // namespace test
 } // namespace quic

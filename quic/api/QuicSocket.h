@@ -150,6 +150,9 @@ class QuicSocket {
 
     // Is the stream head-of-line blocked?
     bool isHolb{false};
+
+    // Number of packets transmitted that carry new STREAM frame for this stream
+    uint64_t numPacketsTxWithNewData{0};
   };
 
   /**

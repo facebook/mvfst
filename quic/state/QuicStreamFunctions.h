@@ -108,6 +108,12 @@ folly::Optional<uint64_t> getLargestDeliverableOffset(
     const QuicStreamState& stream);
 
 /**
+ * Get the cumulative number of packets that contains STREAM frame for this
+ * stream. It does not count retransmissions.
+ */
+uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream);
+
+/**
  * Common functions for merging data into the read buffer for a Quic stream like
  * object. Callers should provide a connFlowControlVisitor which will be invoked
  * when flow control operations need to be performed.

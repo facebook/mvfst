@@ -403,6 +403,10 @@ folly::Optional<uint64_t> getLargestDeliverableOffset(
   return stream.ackedIntervals.front().end;
 }
 
+uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream) {
+  return stream.numPacketsTxWithNewData;
+}
+
 // TODO reap
 void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoState) {
   // Cancel any retransmissions we might want to do for the crypto stream.

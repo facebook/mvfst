@@ -92,6 +92,10 @@ struct QuicStreamLike {
   // Read side eof offset.
   folly::Optional<uint64_t> finalReadOffset;
 
+  // Current cumulative number of packets sent for this stream. It only counts
+  // egress packets that contains a *new* STREAM frame for this stream.
+  uint64_t numPacketsTxWithNewData{0};
+
   /*
    * Either insert a new entry into the loss buffer, or merge the buffer with
    * an existing entry.

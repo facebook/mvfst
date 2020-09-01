@@ -433,6 +433,10 @@ bool handleStreamWritten(
     PacketNumberSpace packetNumberSpace) {
   // Handle new data first
   if (frameOffset == stream.currentWriteOffset) {
+    // Count packet. It's based on the assumption that schedluing scheme will
+    // only writes one STREAM frame for a stream in a packet. If that doesn't
+    // hold, we need to avoid double-counting.
+    stream.numPacketsTxWithNewData++;
     handleNewStreamDataWritten(
         conn, stream, frameLen, frameFin, packetNum, packetNumberSpace);
     return true;
