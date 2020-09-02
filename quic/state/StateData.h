@@ -800,6 +800,16 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   HappyEyeballsState happyEyeballsState;
 
+  struct D6DState {
+    // The base PMTU to start probing with
+    uint16_t basePMTU{kDefaultD6DBasePMTU};
+
+    // The raise timeout
+    std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};
+  };
+
+  D6DState d6d;
+
   // Whether a connection can be paced based on its handshake and close states.
   // For example, we may not want to pace a connection that's still handshaking.
   bool canBePaced{false};

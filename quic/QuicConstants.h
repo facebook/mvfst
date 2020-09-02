@@ -46,6 +46,15 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 // larger than this, unless configured otherwise.
 constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
+// Default base PMTU used by D6D probing
+constexpr uint16_t kDefaultD6DBasePMTU = kDefaultUDPSendPacketLen;
+
+// The default d6d raise timeout, recommended by the spec
+constexpr std::chrono::seconds kDefaultD6DRaiseTimeout = 600s;
+
+// The minimum d6d raise timeout
+constexpr std::chrono::seconds kMinD6DRaiseTimeout = 50s;
+
 // Number of GRO buffers to use
 // 1 means GRO is not enabled
 // 64 is the max possible value
@@ -204,7 +213,15 @@ using QuicVersionType = std::underlying_type<QuicVersion>::type;
 
 using TransportPartialReliabilitySetting = bool;
 
+/**
+ * Parameter ids for private transport parameter
+ */
+
 constexpr uint16_t kPartialReliabilityParameterId = 0xFF00; // subject to change
+
+constexpr uint16_t kD6DBasePMTUParameterId = 0x0377;
+
+constexpr uint16_t kD6DRaiseTimeoutParameterId = 0xF695;
 
 constexpr uint32_t kDrainFactor = 3;
 

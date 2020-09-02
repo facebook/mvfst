@@ -1502,7 +1502,53 @@ void QuicClientTransport::setPartialReliabilityTransportParameter() {
           kPartialReliabilityParameterId, partialReliabilitySetting);
 
   if (!setCustomTransportParameter(std::move(partialReliabilityCustomParam))) {
-    LOG(ERROR) << "failed to set partial reliability transport setting";
+    LOG(ERROR) << "failed to set partial reliability transport parameter";
+  }
+}
+
+void QuicClientTransport::setD6DBasePMTUTransportParameter() {
+  if (!conn_->transportSettings.d6dConfig.enabled) {
+    return;
+  }
+
+  uint64_t basePMTUSetting =
+      conn_->transportSettings.d6dConfig.advertisedBasePMTU;
+
+  // Sanity check
+  if (basePMTUSetting < kMinMaxUDPPayload ||
+      basePMTUSetting > kDefaultMaxUDPPayload) {
+    LOG(ERROR) << "insane base PMTU, skipping: " << basePMTUSetting;
+    return;
+  }
+
+  auto basePMTUCustomParam = std::make_unique<CustomIntegralTransportParameter>(
+      kD6DBasePMTUParameterId, basePMTUSetting);
+
+  if (!setCustomTransportParameter(std::move(basePMTUCustomParam))) {
+    LOG(ERROR) << "failed to set D6D base PMTU transport parameter";
+  }
+}
+
+void QuicClientTransport::setD6DRaiseTimeoutTransportParameter() {
+  if (!conn_->transportSettings.d6dConfig.enabled) {
+    return;
+  }
+
+  std::chrono::seconds raiseTimeoutSetting =
+      conn_->transportSettings.d6dConfig.advertisedRaiseTimeout;
+
+  // Sanity check
+  if (raiseTimeoutSetting < kMinD6DRaiseTimeout) {
+    LOG(ERROR) << "d6d raise timeout exceeding lower bound, skipping: "
+               << raiseTimeoutSetting.count();
+  }
+
+  auto raiseTimeoutCustomParam =
+      std::make_unique<CustomIntegralTransportParameter>(
+          kD6DRaiseTimeoutParameterId, raiseTimeoutSetting.count());
+
+  if (!setCustomTransportParameter(std::move(raiseTimeoutCustomParam))) {
+    LOG(ERROR) << "failed to set D6D raise timeout transport parameter";
   }
 }
 

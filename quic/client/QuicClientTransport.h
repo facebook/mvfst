@@ -207,6 +207,8 @@ class QuicClientTransport
 
  private:
   void setPartialReliabilityTransportParameter();
+  void setD6DBasePMTUTransportParameter();
+  void setD6DRaiseTimeoutTransportParameter();
   void adjustGROBuffers();
   void trackDatagramReceived(size_t len);
 

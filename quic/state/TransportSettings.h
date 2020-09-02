@@ -39,6 +39,33 @@ struct BbrConfig {
   bool drainToTarget{false};
 };
 
+struct D6DConfig {
+  /**
+   * Currently, only server does probing, so this flags means different things
+   * for server and client. For server, it means whether it should enable d6d
+   * when it receives the base PMTU transport parameter. For client, it means
+   * whether it will send the base PMTU transport parameter during handshake.
+   * As a result, d6d is activated for a connection only when *both* client and
+   * server enables d6d.
+   */
+  bool enabled{false};
+
+  /**
+   * Base PMTU that client advertises to server. This is needed because
+   * depending on the situation there are clients who want to start from a
+   * larger/smaller base PMTU. Server makes no use of this value, but should
+   * rely on the transport parameter received from client.
+   */
+  uint16_t advertisedBasePMTU{kDefaultD6DBasePMTU};
+
+  /**
+   * The D6D raise timeout that client advertises to server. We might need to
+   * tune this value for different paths. Again, server makes no use of this
+   * value, but should rely on the transport parameter.
+   */
+  std::chrono::seconds advertisedRaiseTimeout{kDefaultD6DRaiseTimeout};
+};
+
 struct TransportSettings {
   // The initial connection window advertised to the peer.
   uint64_t advertisedInitialConnectionWindowSize{kDefaultConnectionWindowSize};
@@ -166,6 +193,8 @@ struct TransportSettings {
   bool streamFramePerPacket{false};
   // Ensure read callbacks are ordered by Stream ID.
   bool orderedReadCallbacks{false};
+  // Config struct for D6D
+  D6DConfig d6dConfig;
 };
 
 } // namespace quic
