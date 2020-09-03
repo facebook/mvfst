@@ -109,7 +109,7 @@ class QuicPacketBuilderTest : public TestWithParam<TestFlavor> {
     folly::assume_unreachable();
   }
 
- private:
+ protected:
   std::unique_ptr<BufAccessor> simpleBufAccessor_;
 };
 
@@ -275,6 +275,67 @@ TEST_P(QuicPacketBuilderTest, ShortHeaderRegularPacket) {
   EXPECT_EQ(ProtectionType::KeyPhaseZero, decodedHeader.getProtectionType());
   EXPECT_EQ(connId, decodedHeader.getConnectionId());
   EXPECT_EQ(pktNum, decodedHeader.getPacketSequenceNum());
+}
+
+TEST_P(QuicPacketBuilderTest, EnforcePacketSizeWithCipherOverhead) {
+  auto connId = getTestConnectionId();
+  PacketNum pktNum = 222;
+
+  PacketNum largestAckedPacketNum = 0;
+  size_t cipherOverhead = 2;
+  uint64_t enforcedSize = 1400;
+  auto aead = std::make_unique<NiceMock<MockAead>>();
+  auto aead_ = aead.get();
+  EXPECT_CALL(*aead_, _inplaceEncrypt(_, _, _))
+      .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
+        auto overhead = folly::IOBuf::create(1000);
+        overhead->append(cipherOverhead);
+        auto clone = buf->clone();
+        clone->prependChain(std::move(overhead));
+        return std::move(clone);
+      }));
+
+  auto builder = testBuilderProvider(
+      GetParam(),
+      kDefaultUDPSendPacketLen,
+      ShortHeader(ProtectionType::KeyPhaseZero, connId, pktNum),
+      largestAckedPacketNum,
+      2000);
+  builder->accountForCipherOverhead(cipherOverhead);
+  builder->encodePacketHeader();
+
+  // write out at least one frame
+  writeFrame(PaddingFrame(), *builder);
+  EXPECT_TRUE(builder->canBuildPacket());
+  auto builtOut = std::move(*builder).buildPacket();
+
+  auto param = GetParam();
+  if (param == TestFlavor::Regular) {
+    EXPECT_EQ(builtOut.body->isManagedOne(), true);
+    RegularSizeEnforcedPacketBuilder sizeEnforcedBuilder(
+        std::move(builtOut), enforcedSize, cipherOverhead);
+    EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
+    auto out = std::move(sizeEnforcedBuilder).buildPacket();
+    EXPECT_EQ(
+        out.header->computeChainDataLength() +
+            out.body->computeChainDataLength(),
+        enforcedSize - cipherOverhead);
+    auto buf = packetToBuf(out, aead_);
+    EXPECT_EQ(buf->computeChainDataLength(), enforcedSize);
+
+  } else {
+    EXPECT_EQ(builtOut.body->isManagedOne(), false);
+    InplaceSizeEnforcedPacketBuilder sizeEnforcedBuilder(
+        *simpleBufAccessor_, std::move(builtOut), enforcedSize, cipherOverhead);
+    EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
+    auto out = std::move(sizeEnforcedBuilder).buildPacket();
+    EXPECT_EQ(
+        out.header->computeChainDataLength() +
+            out.body->computeChainDataLength(),
+        enforcedSize - cipherOverhead);
+    auto buf = packetToBuf(out, aead_);
+    EXPECT_EQ(buf->computeChainDataLength(), enforcedSize);
+  }
 }
 
 TEST_P(QuicPacketBuilderTest, ShortHeaderWithNoFrames) {

@@ -255,6 +255,88 @@ class RegularQuicPacketBuilder final : public PacketBuilderInterface {
   folly::Optional<PacketNumEncodingResult> packetNumberEncoding_;
 };
 
+/**
+ * A less involving interface for packet builder, this enables polymorphism
+ * for wrapper-like packet builders (e.g. RegularSizeEnforcedPacketBuilder).
+ */
+class WrapperPacketBuilderInterface {
+ public:
+  using Packet = PacketBuilderInterface::Packet;
+
+  virtual ~WrapperPacketBuilderInterface() = default;
+
+  FOLLY_NODISCARD virtual bool canBuildPacket() const noexcept = 0;
+
+  virtual Packet buildPacket() && = 0;
+};
+
+/**
+ * This builder will enforce the packet size by appending padding frames for
+ * chained memory. This means appending IOBuf at the end of the chain. The
+ * caller should ensure canBuildPacket() returns true before constructing the
+ * builder.
+ */
+class RegularSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
+ public:
+  using Packet = PacketBuilderInterface::Packet;
+
+  explicit RegularSizeEnforcedPacketBuilder(
+      Packet packet,
+      uint64_t enforcedSize,
+      uint32_t cipherOverhead);
+
+  /**
+   * Returns true when packet has short header, and that enforced size >
+   * current packet size + cipher overhead, otherwise false
+   */
+  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+
+  Packet buildPacket() && override;
+
+ private:
+  RegularQuicWritePacket packet_;
+  Buf header_;
+  Buf body_;
+  BufAppender bodyAppender_;
+  uint64_t enforcedSize_;
+  uint32_t cipherOverhead_;
+};
+
+/**
+ * This builder will enforce the packet size by appending padding frames for
+ * continuous memory. This means pushing padding frame directly to the current
+ * tail offset. The caller should ensure canBuildPacket() returns true before
+ * constructing the builder.
+ */
+class InplaceSizeEnforcedPacketBuilder : public WrapperPacketBuilderInterface {
+ public:
+  using Packet = PacketBuilderInterface::Packet;
+
+  explicit InplaceSizeEnforcedPacketBuilder(
+      BufAccessor& bufAccessor,
+      Packet packet,
+      uint64_t enforcedSize,
+      uint32_t cipherOverhead);
+
+  /**
+   * Returns true when packet has short header, and that enforced size> current
+   * packet size + cipher oveahead and that iobuf has enough tailroom,
+   * otherwise false
+   */
+  FOLLY_NODISCARD bool canBuildPacket() const noexcept override;
+
+  Packet buildPacket() && override;
+
+ private:
+  BufAccessor& bufAccessor_;
+  Buf iobuf_;
+  RegularQuicWritePacket packet_;
+  Buf header_;
+  Buf body_;
+  uint64_t enforcedSize_;
+  uint32_t cipherOverhead_;
+};
+
 class VersionNegotiationPacketBuilder {
  public:
   explicit VersionNegotiationPacketBuilder(
