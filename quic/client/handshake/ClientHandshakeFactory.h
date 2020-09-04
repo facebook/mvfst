@@ -21,9 +21,6 @@ class ClientHandshakeFactory {
 
   /**
    * Construct a new client handshake.
-   * /!\ The ClientHandshake constructed might keep a reference to cryptoState.
-   * It is up to the caller to ensure the lifetime of cryptoState exceed the one
-   * of the ClientHandshake.
    */
   virtual std::unique_ptr<ClientHandshake> makeClientHandshake(
       QuicClientConnectionState* conn) = 0;
