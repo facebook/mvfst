@@ -9,6 +9,7 @@
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/test/Mocks.h>
 
 using namespace testing;
@@ -28,7 +29,8 @@ void assertServerConnIdParamsEq(
 
 namespace test {
 TEST(ServerStateMachineTest, TestAddConnId) {
-  QuicServerConnectionState serverState;
+  QuicServerConnectionState serverState(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   ServerConnectionIdParams originalParams(12, 1, 37);
 
   auto algo = std::make_unique<DefaultConnectionIdAlgo>();
@@ -73,7 +75,8 @@ TEST(ServerStateMachineTest, TestAddConnId) {
 }
 
 TEST(ServerStateMachineTest, TestCidRejected) {
-  QuicServerConnectionState serverConn;
+  QuicServerConnectionState serverConn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   MockServerConnectionIdRejector mockRejector;
   ServerConnectionIdParams serverCidParams(10, 11, 12);
   MockConnectionIdAlgo mockCidAlgo;
@@ -104,7 +107,8 @@ TEST(ServerStateMachineTest, TestCidRejected) {
 }
 
 TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
-  QuicServerConnectionState serverConn;
+  QuicServerConnectionState serverConn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   MockServerConnectionIdRejector mockRejector;
   ServerConnectionIdParams serverCidParams(10, 11, 12);
   MockConnectionIdAlgo mockCidAlgo;
@@ -131,7 +135,8 @@ TEST(ServerStateMachineTest, TestCidRejectedThenFail) {
 }
 
 TEST(ServerStateMachineTest, TestCidRejectedGiveUp) {
-  QuicServerConnectionState serverConn;
+  QuicServerConnectionState serverConn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   MockServerConnectionIdRejector mockRejector;
   ServerConnectionIdParams serverCidParams(10, 11, 12);
   MockConnectionIdAlgo mockCidAlgo;

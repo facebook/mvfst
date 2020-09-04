@@ -10,6 +10,7 @@
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <gtest/gtest.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
 using namespace testing;
@@ -25,6 +26,9 @@ constexpr const auto kNumLoops = 10;
 
 struct QuicBatchWriterTest : public ::testing::Test,
                              public ::testing::WithParamInterface<bool> {
+  QuicBatchWriterTest()
+      : conn_(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+
  protected:
   QuicServerConnectionState conn_;
 };

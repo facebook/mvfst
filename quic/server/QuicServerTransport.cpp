@@ -8,9 +8,11 @@
 
 #include <quic/server/QuicServerTransport.h>
 
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+
 #include <algorithm>
 
 namespace quic {
@@ -21,7 +23,8 @@ QuicServerTransport::QuicServerTransport(
     ConnectionCallback& cb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx)
     : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
-  auto tempConn = std::make_unique<QuicServerConnectionState>();
+  auto tempConn = std::make_unique<QuicServerConnectionState>(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());

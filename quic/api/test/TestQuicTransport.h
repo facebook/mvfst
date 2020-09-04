@@ -11,6 +11,7 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 namespace quic {
 
@@ -24,7 +25,8 @@ class TestQuicTransport
       ConnectionCallback& cb)
       : QuicTransportBase(evb, std::move(socket)) {
     setConnectionCallback(&cb);
-    conn_.reset(new QuicServerConnectionState());
+    conn_.reset(new QuicServerConnectionState(
+        std::make_shared<FizzServerQuicHandshakeContext>()));
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});
     conn_->serverConnectionId = ConnectionId({1, 2, 3, 4});
     conn_->version = QuicVersion::MVFST;

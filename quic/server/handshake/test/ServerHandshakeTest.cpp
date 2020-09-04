@@ -28,6 +28,7 @@
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/ServerHandshake.h>
@@ -49,7 +50,9 @@ class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
 };
 
 struct TestingServerConnectionState : public QuicServerConnectionState {
-  explicit TestingServerConnectionState() : QuicServerConnectionState() {}
+  explicit TestingServerConnectionState()
+      : QuicServerConnectionState(
+            std::make_shared<FizzServerQuicHandshakeContext>()) {}
 
   uint32_t getDestructorGuardCount() const {
     return folly::DelayedDestruction::getDestructorGuardCount();

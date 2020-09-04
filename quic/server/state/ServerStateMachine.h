@@ -20,6 +20,7 @@
 #include <quic/logging/QuicLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/handshake/ServerHandshake.h>
+#include <quic/server/handshake/ServerHandshakeFactory.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QPRFunctions.h>
@@ -141,7 +142,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
 
   folly::Optional<ConnectionIdData> createAndAddNewSelfConnId() override;
 
-  QuicServerConnectionState() : QuicConnectionStateBase(QuicNodeType::Server) {
+  QuicServerConnectionState(
+      std::shared_ptr<ServerHandshakeFactory> handshakeFactory)
+      : QuicConnectionStateBase(QuicNodeType::Server) {
     state = ServerState::Open;
     // Create the crypto stream.
     cryptoState = std::make_unique<QuicCryptoState>();
@@ -155,8 +158,10 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
                                   QuicVersion::QUIC_DRAFT,
                                   QuicVersion::QUIC_DRAFT_LEGACY}};
     originalVersion = QuicVersion::MVFST;
-    serverHandshakeLayer = new ServerHandshake(this);
-    handshakeLayer.reset(serverHandshakeLayer);
+    DCHECK(handshakeFactory);
+    auto tmpServerHandshake = handshakeFactory->makeServerHandshake(this);
+    serverHandshakeLayer = tmpServerHandshake.get();
+    handshakeLayer = std::move(tmpServerHandshake);
     // We shouldn't normally need to set this until we're starting the
     // transport, however writing unit tests is much easier if we set this here.
     updateFlowControlStateWithSettings(flowControlState, transportSettings);

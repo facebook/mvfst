@@ -17,6 +17,10 @@ add_library(
   handshake/DefaultAppTokenValidator.cpp
   handshake/StatelessResetGenerator.cpp
   state/ServerStateMachine.cpp
+
+  # Fizz specific parts, will be split in its own lib eventually.
+  ../fizz/server/handshake/FizzServerQuicHandshakeContext.cpp
+  ../fizz/server/handshake/FizzServerHandshake.cpp
 )
 
 target_include_directories(
