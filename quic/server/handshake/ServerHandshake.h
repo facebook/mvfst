@@ -252,6 +252,9 @@ class ServerHandshake : public Handshake {
    */
   void processPendingEvents();
 
+ private:
+  virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
+
  protected:
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
