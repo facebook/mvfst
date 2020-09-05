@@ -634,7 +634,8 @@ void onServerReadDataFromOpen(
             conn.serverConnectionId.value(),
             initialDestinationConnectionId));
     conn.transportParametersEncoded = true;
-    CryptoFactory& cryptoFactory = *conn.serverHandshakeLayer->cryptoFactory_;
+    const CryptoFactory& cryptoFactory =
+        conn.serverHandshakeLayer->getCryptoFactory();
     conn.readCodec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
     conn.readCodec->setInitialReadCipher(cryptoFactory.getClientInitialCipher(
         initialDestinationConnectionId, version));
