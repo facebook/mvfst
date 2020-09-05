@@ -198,25 +198,6 @@ class ServerHandshake : public Handshake {
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
 
-  class ActionMoveVisitor : public boost::static_visitor<> {
-   public:
-    explicit ActionMoveVisitor(ServerHandshake& server);
-
-    void operator()(fizz::DeliverAppData&);
-    void operator()(fizz::WriteToSocket& write);
-    void operator()(fizz::server::ReportEarlyHandshakeSuccess&);
-    void operator()(fizz::server::ReportHandshakeSuccess&);
-    void operator()(fizz::ReportError& err);
-    void operator()(fizz::WaitForData&);
-    void operator()(fizz::server::MutateState& mutator);
-    void operator()(fizz::server::AttemptVersionFallback&);
-    void operator()(fizz::SecretAvailable&);
-    void operator()(fizz::EndOfData&);
-
-   private:
-    ServerHandshake& server_;
-  };
-
   virtual ~ServerHandshake() = default;
 
   void onError(std::pair<std::string, TransportErrorCode> error);
@@ -238,6 +219,7 @@ class ServerHandshake : public Handshake {
   /**
    * Run the actions once they have been completed.
    */
+  class ActionMoveVisitor;
   void processActions(
       fizz::server::ServerStateMachine::CompletedActions actions);
 
@@ -257,7 +239,6 @@ class ServerHandshake : public Handshake {
   std::deque<PendingEvent> pendingEvents_;
 
   QuicCryptoState& cryptoState_;
-  ActionMoveVisitor visitor_;
   bool inProcessPendingEvents_{false};
   bool waitForData_{false};
 
