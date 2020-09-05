@@ -28,6 +28,7 @@
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
+#include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/server/handshake/AppToken.h>
@@ -836,9 +837,10 @@ TEST_F(ServerHandshakeZeroRttTest, TestResumption) {
 }
 
 TEST_F(ServerHandshakeZeroRttTest, TestRejectZeroRttNotEnabled) {
-  auto realServerCtx = handshake->getContext();
+  auto realServerCtx =
+      dynamic_cast<FizzServerHandshake*>(handshake)->getContext();
   auto nonConstServerCtx =
-      const_cast<fizz::server::FizzServerContext*>(realServerCtx.get());
+      const_cast<fizz::server::FizzServerContext*>(realServerCtx);
   nonConstServerCtx->setEarlyDataSettings(
       false, fizz::server::ClockSkewTolerance(), nullptr);
   EXPECT_CALL(*validator_, validate(_)).Times(0);
