@@ -22,7 +22,7 @@ namespace test {
 class QPRFunctionsTest : public Test {
  public:
   QPRFunctionsTest()
-      : conn(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+      : conn(FizzServerQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =

@@ -57,7 +57,7 @@ class UpdateLargestReceivedPacketNumTest
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
   auto currentLargestReceived =
       *getAckState(conn, GetParam()).largestReceivedPacketNum;
@@ -71,7 +71,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
 
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOld) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   getAckState(conn, GetParam()).largestReceivedPacketNum = 100;
   auto currentLargestReceived =
       *getAckState(conn, GetParam()).largestReceivedPacketNum;
@@ -95,7 +95,7 @@ class UpdateAckStateTest : public TestWithParam<PacketNumberSpace> {};
 
 TEST_P(UpdateAckStateTest, TestUpdateAckState) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   PacketNum nextPacketNum = 0;
   auto& ackState = getAckState(conn, GetParam());
   updateAckState(conn, GetParam(), nextPacketNum++, true, false, Clock::now());
@@ -173,7 +173,7 @@ TEST_P(UpdateAckStateTest, TestUpdateAckState) {
 
 TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequency) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.rxPacketsBeforeAckInitThreshold = 20;
   conn.transportSettings.rxPacketsBeforeAckBeforeInit = 2;
   conn.transportSettings.rxPacketsBeforeAckAfterInit = 10;
@@ -373,7 +373,7 @@ class QuicStateFunctionsTest : public TestWithParam<PacketNumberSpace> {};
 
 TEST_F(QuicStateFunctionsTest, RttCalculationNoAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto rttSample = 1100us;
   updateRtt(conn, rttSample, 0us);
   EXPECT_EQ(1100, conn.lossState.srtt.count());
@@ -383,7 +383,7 @@ TEST_F(QuicStateFunctionsTest, RttCalculationNoAckDelay) {
 
 TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto rttSample = 1000us;
   updateRtt(conn, rttSample, 300us);
   EXPECT_EQ(700, conn.lossState.srtt.count());
@@ -395,7 +395,7 @@ TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelay) {
 
 TEST_F(QuicStateFunctionsTest, RttCalculationWithMrttAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.mrtt = 100us;
   auto rttSample = 1000us;
   updateRtt(conn, rttSample, 300us);
@@ -408,7 +408,7 @@ TEST_F(QuicStateFunctionsTest, RttCalculationWithMrttAckDelay) {
 
 TEST_F(QuicStateFunctionsTest, RttCalculationIgnoreAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.mrtt = 700us;
   auto rttSample = 900us;
   updateRtt(conn, rttSample, 300us);
@@ -421,7 +421,7 @@ TEST_F(QuicStateFunctionsTest, RttCalculationIgnoreAckDelay) {
 
 TEST_F(QuicStateFunctionsTest, RttCalculationAckDelayLarger) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto rttSample = 10us;
   updateRtt(conn, rttSample, 300us);
   EXPECT_EQ(10, conn.lossState.srtt.count());
@@ -433,7 +433,7 @@ TEST_F(QuicStateFunctionsTest, RttCalculationAckDelayLarger) {
 
 TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   stream.finalReadOffset = 1024;
@@ -447,7 +447,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineConnectionError) {
 
 TEST_F(QuicStateFunctionsTest, InvokeResetDoesNotSendFlowControl) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 90);
   // this would normally trigger a flow control update.
@@ -466,7 +466,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
   // We isolate invalid events on streams to affect only the streams. Is that
   // a good idea? We'll find out.
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   QuicStreamState stream(1, conn);
   RstStreamFrame rst(1, GenericApplicationErrorCode::UNKNOWN, 100);
   try {
@@ -481,7 +481,7 @@ TEST_F(QuicStateFunctionsTest, TestInvokeStreamStateMachineStreamError) {
 
 TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   conn.qLogger = qLogger;
 
@@ -522,7 +522,7 @@ TEST_F(QuicStateFunctionsTest, UpdateMinRtt) {
 
 TEST_F(QuicStateFunctionsTest, UpdateMaxAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   EXPECT_EQ(0us, conn.lossState.maxAckDelay);
   auto rttSample = 100us;
 

@@ -27,7 +27,7 @@ constexpr const auto kNumLoops = 10;
 struct QuicBatchWriterTest : public ::testing::Test,
                              public ::testing::WithParamInterface<bool> {
   QuicBatchWriterTest()
-      : conn_(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+      : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
 
  protected:
   QuicServerConnectionState conn_;

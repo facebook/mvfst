@@ -27,7 +27,7 @@ namespace test {
 
 TEST(DefaultAppTokenValidatorTest, TestValidParams) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
@@ -56,7 +56,7 @@ TEST(
     DefaultAppTokenValidatorTest,
     TestValidUnequalParamsUpdateTransportSettings) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
   conn.transportSettings.zeroRttSourceTokenMatchingPolicy =
@@ -91,7 +91,7 @@ TEST(
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -107,7 +107,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidNullAppToken) {
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -126,7 +126,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidEmptyTransportParams) {
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -162,7 +162,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidMissingParams) {
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -192,7 +192,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidRedundantParameter) {
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -220,7 +220,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidDecreasedInitialMaxStreamData) {
 
 TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -248,7 +248,7 @@ TEST(DefaultAppTokenValidatorTest, TestChangedIdleTimeout) {
 
 TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -276,7 +276,7 @@ TEST(DefaultAppTokenValidatorTest, TestDecreasedInitialMaxStreams) {
 
 TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.peerAddress = folly::SocketAddress("1.2.3.4", 443);
   conn.version = QuicVersion::MVFST;
 
@@ -304,7 +304,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
 class SourceAddressTokenTest : public Test {
  public:
   SourceAddressTokenTest()
-      : conn_(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+      : conn_(FizzServerQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
     conn_.peerAddress = folly::SocketAddress("1.2.3.4", 443);

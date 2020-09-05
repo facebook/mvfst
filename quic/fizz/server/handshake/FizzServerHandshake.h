@@ -26,7 +26,6 @@ class FizzServerHandshake : public ServerHandshake {
 
  private:
   void initializeImpl(
-      std::shared_ptr<const fizz::server::FizzServerContext> context,
       HandshakeCallback* callback,
       std::unique_ptr<fizz::server::AppTokenValidator> validator) override;
 

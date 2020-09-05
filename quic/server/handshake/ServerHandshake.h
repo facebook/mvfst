@@ -87,7 +87,6 @@ class ServerHandshake : public Handshake {
    */
   virtual void initialize(
       folly::Executor* executor,
-      std::shared_ptr<const fizz::server::FizzServerContext> context,
       HandshakeCallback* callback,
       std::unique_ptr<fizz::server::AppTokenValidator> validator = nullptr);
 
@@ -277,7 +276,6 @@ class ServerHandshake : public Handshake {
 
  private:
   virtual void initializeImpl(
-      std::shared_ptr<const fizz::server::FizzServerContext> context,
       HandshakeCallback* callback,
       std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
 

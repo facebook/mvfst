@@ -186,7 +186,7 @@ TEST_F(QuicPacketSchedulerTest, PaddingUpToWrapperSize) {
 
 TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
   PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
   LongHeader longHeader1(
@@ -219,7 +219,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoServerInitialPadded) {
 
 TEST_F(QuicPacketSchedulerTest, PadTwoInitialPackets) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
   PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
   LongHeader longHeader1(
@@ -303,7 +303,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoPaddingRetransmissionClientInitial) {
 
 TEST_F(QuicPacketSchedulerTest, CryptoSchedulerOnlySingleLossFits) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
   LongHeader longHeader(
       LongHeader::Types::Handshake,
@@ -367,7 +367,7 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto connId = getTestConnectionId();
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -390,7 +390,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerExists) {
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto connId = getTestConnectionId();
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
@@ -414,7 +414,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameNoSpace) {
 
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto connId = getTestConnectionId();
   StreamId nonExistentStream = 11;
 

@@ -60,7 +60,7 @@ createPacket(PacketNum packetNum, uint32_t size, TimePoint sendTime) {
 
 TEST_F(NewRenoTest, TestLoss) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -100,7 +100,7 @@ TEST_F(NewRenoTest, TestLoss) {
 
 TEST_F(NewRenoTest, SendMoreThanWritable) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -118,7 +118,7 @@ TEST_F(NewRenoTest, SendMoreThanWritable) {
 
 TEST_F(NewRenoTest, TestSlowStartAck) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -139,7 +139,7 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
 
 TEST_F(NewRenoTest, TestSteadyStateAck) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -181,7 +181,7 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
 
 TEST_F(NewRenoTest, TestWritableBytes) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -197,7 +197,7 @@ TEST_F(NewRenoTest, TestWritableBytes) {
 
 TEST_F(NewRenoTest, PersistentCongestion) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -218,7 +218,7 @@ TEST_F(NewRenoTest, PersistentCongestion) {
 
 TEST_F(NewRenoTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 

@@ -50,9 +50,9 @@ class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
 };
 
 struct TestingServerConnectionState : public QuicServerConnectionState {
-  explicit TestingServerConnectionState()
-      : QuicServerConnectionState(
-            std::make_shared<FizzServerQuicHandshakeContext>()) {}
+  explicit TestingServerConnectionState(
+      std::shared_ptr<FizzServerQuicHandshakeContext> context)
+      : QuicServerConnectionState(std::move(context)) {}
 
   uint32_t getDestructorGuardCount() const {
     return folly::DelayedDestruction::getDestructorGuardCount();
@@ -70,19 +70,22 @@ class ServerHandshakeTest : public Test {
   }
 
   virtual void initialize() {
-    handshake->initialize(&evb, serverCtx, &serverCallback);
+    handshake->initialize(&evb, &serverCallback);
   }
 
   void SetUp() override {
     folly::ssl::init();
-    conn.reset(new TestingServerConnectionState());
-    cryptoState = conn->cryptoState.get();
     clientCtx = std::make_shared<fizz::client::FizzClientContext>();
     clientCtx->setOmitEarlyRecordLayer(true);
     clientCtx->setFactory(std::make_shared<QuicFizzFactory>());
     clientCtx->setClock(std::make_shared<fizz::test::MockClock>());
     serverCtx = quic::test::createServerCtx();
     setupClientAndServerContext();
+    auto fizzServerContext = FizzServerQuicHandshakeContext::Builder()
+                                 .setFizzServerContext(serverCtx)
+                                 .build();
+    conn.reset(new TestingServerConnectionState(fizzServerContext));
+    cryptoState = conn->cryptoState.get();
     handshake = conn->serverHandshakeLayer;
     hostname = kTestHostname.str();
     verifier = std::make_shared<fizz::test::MockCertificateVerifier>();
@@ -814,8 +817,7 @@ class ServerHandshakeZeroRttTest
     auto validator =
         std::make_unique<fizz::server::test::MockAppTokenValidator>();
     validator_ = validator.get();
-    handshake->initialize(
-        &evb, serverCtx, &serverCallback, std::move(validator));
+    handshake->initialize(&evb, &serverCallback, std::move(validator));
   }
 
  protected:

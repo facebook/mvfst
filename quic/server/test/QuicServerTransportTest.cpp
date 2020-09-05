@@ -343,10 +343,19 @@ class QuicServerTransportTest : public Test {
         server->getConn().peerConnectionIds[0].connId);
   }
 
+  std::shared_ptr<FizzServerQuicHandshakeContext> getFizzServerContext() {
+    if (!fizzServerContext) {
+      fizzServerContext = FizzServerQuicHandshakeContext::Builder()
+                              .setFizzServerContext(createServerCtx())
+                              .build();
+    }
+
+    return fizzServerContext;
+  }
+
   virtual void initializeServerHandshake() {
     fakeHandshake = new FakeServerHandshake(
-        server->getNonConstConn(),
-        std::make_shared<FizzServerQuicHandshakeContext>());
+        server->getNonConstConn(), getFizzServerContext());
   }
 
   virtual bool getDisableMigration() {
@@ -679,6 +688,7 @@ class QuicServerTransportTest : public Test {
   std::shared_ptr<TestingQuicServerTransport> server;
   folly::test::MockAsyncUDPSocket* socket;
   FakeServerHandshake* fakeHandshake{nullptr};
+  std::shared_ptr<FizzServerQuicHandshakeContext> fizzServerContext;
   PacketNum clientNextInitialPacketNum{0}, clientNextHandshakePacketNum{0},
       clientNextAppDataPacketNum{0};
 };
@@ -2200,7 +2210,7 @@ class QuicServerTransportAllowMigrationTest
   virtual void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
         server->getNonConstConn(),
-        std::make_shared<FizzServerQuicHandshakeContext>(),
+        FizzServerQuicHandshakeContext::Builder().build(),
         false,
         false,
         GetParam().clientSentActiveConnIdTransportParam);
@@ -3869,7 +3879,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNotAllowedInUnencryptedPacket) {
 TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   folly::EventBase testLooper;
   setupClientReadCodec();
-  getFakeHandshakeLayer()->initialize(&testLooper, serverCtx, server.get());
+  getFakeHandshakeLayer()->initialize(&testLooper, server.get());
 
   recvClientHello();
   testLooper.loop();
@@ -3921,7 +3931,7 @@ class QuicServerTransportPendingDataTest
   void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
         server->getNonConstConn(),
-        std::make_shared<FizzServerQuicHandshakeContext>(),
+        FizzServerQuicHandshakeContext::Builder().build(),
         GetParam().chloSync,
         GetParam().cfinSync);
     if (GetParam().acceptZeroRtt) {
@@ -4091,7 +4101,7 @@ class QuicServerTransportHandshakeTest
   void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
         server->getNonConstConn(),
-        std::make_shared<FizzServerQuicHandshakeContext>(),
+        FizzServerQuicHandshakeContext::Builder().build(),
         GetParam().chloSync,
         GetParam().cfinSync);
     if (GetParam().acceptZeroRtt) {
