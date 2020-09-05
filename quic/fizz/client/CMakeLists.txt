@@ -25,14 +25,12 @@ add_dependencies(
   mvfst_fizz_client
   mvfst_client
   mvfst_fizz_handshake
-  mvfst_codec_packet_number_cipher
 )
 
 target_link_libraries(
   mvfst_fizz_client PUBLIC
   mvfst_client
   mvfst_fizz_handshake
-  mvfst_codec_packet_number_cipher
 )
 
 file(

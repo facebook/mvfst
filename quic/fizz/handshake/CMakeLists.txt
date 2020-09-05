@@ -26,12 +26,16 @@ target_compile_options(
 
 add_dependencies(
   mvfst_fizz_handshake
+  ${LIBFIZZ_LIBRARY}
   mvfst_handshake
+  mvfst_codec_packet_number_cipher
 )
 
 target_link_libraries(
   mvfst_fizz_handshake PUBLIC
   ${LIBFIZZ_LIBRARY}
+  mvfst_handshake
+  mvfst_codec_packet_number_cipher
 )
 
 file(
