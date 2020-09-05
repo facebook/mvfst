@@ -38,22 +38,7 @@ void ServerHandshake::initialize(
     HandshakeCallback* callback,
     std::unique_ptr<fizz::server::AppTokenValidator> validator) {
   executor_ = executor;
-  auto ctx = std::make_shared<fizz::server::FizzServerContext>(*context);
-  auto cryptoFactory = std::make_shared<FizzCryptoFactory>();
-  ctx->setFactory(cryptoFactory->getFizzFactory());
-  cryptoFactory_ = std::move(cryptoFactory);
-  ctx->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
-  ctx->setVersionFallbackEnabled(false);
-  // Since Draft-17, client won't sent EOED
-  ctx->setOmitEarlyRecordLayer(true);
-  context_ = std::move(ctx);
-  callback_ = callback;
-
-  if (validator) {
-    state_.appTokenValidator() = std::move(validator);
-  } else {
-    state_.appTokenValidator() = std::make_unique<FailingAppTokenValidator>();
-  }
+  initializeImpl(std::move(context), callback, std::move(validator));
 }
 
 void ServerHandshake::doHandshake(
@@ -435,7 +420,7 @@ void ServerHandshake::ActionMoveVisitor::operator()(
       folly::range(secretAvailable.secret.secret),
       kQuicKeyLabel,
       kQuicIVLabel);
-  auto headerCipher = server_.cryptoFactory_->makePacketNumberCipher(
+  auto headerCipher = server_.getCryptoFactory().makePacketNumberCipher(
       folly::range(secretAvailable.secret.secret));
   switch (secretAvailable.secret.type.type()) {
     case fizz::SecretType::Type::EarlySecrets_E:

@@ -10,6 +10,8 @@
 
 #include <quic/server/handshake/ServerHandshake.h>
 
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
+
 namespace quic {
 
 class FizzServerQuicHandshakeContext;
@@ -21,7 +23,17 @@ class FizzServerHandshake : public ServerHandshake {
       QuicServerConnectionState* conn,
       std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext);
 
+  const CryptoFactory& getCryptoFactory() const override;
+
  private:
+  void initializeImpl(
+      std::shared_ptr<const fizz::server::FizzServerContext> context,
+      HandshakeCallback* callback,
+      std::unique_ptr<fizz::server::AppTokenValidator> validator) override;
+
+ private:
+  FizzCryptoFactory cryptoFactory_;
+
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext_;
 };
 
