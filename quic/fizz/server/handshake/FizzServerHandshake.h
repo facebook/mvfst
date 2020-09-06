@@ -30,6 +30,7 @@ class FizzServerHandshake : public ServerHandshake {
       std::unique_ptr<fizz::server::AppTokenValidator> validator) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
+  void processSocketData(folly::IOBufQueue& queue) override;
 
   FizzCryptoFactory cryptoFactory_;
 

@@ -47,6 +47,10 @@ EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
       state_.readRecordLayer()->getEncryptionLevel());
 }
 
+void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
+  startActions(machine_.processSocketData(state_, queue));
+}
+
 const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
   return cryptoFactory_;
 }

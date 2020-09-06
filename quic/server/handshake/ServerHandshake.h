@@ -280,5 +280,6 @@ class ServerHandshake : public Handshake {
       std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
+  virtual void processSocketData(folly::IOBufQueue& queue) = 0;
 }; // namespace quic
 } // namespace quic

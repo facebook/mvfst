@@ -250,35 +250,31 @@ void ServerHandshake::processPendingEvents() {
   };
 
   while (!actionGuard_ && !error_) {
-    folly::Optional<fizz::server::ServerStateMachine::ProcessingActions>
-        actions;
     actionGuard_ = folly::DelayedDestruction::DestructorGuard(conn_);
     if (!waitForData_) {
       switch (getReadRecordLayerEncryptionLevel()) {
         case EncryptionLevel::Initial:
-          actions.emplace(machine_.processSocketData(state_, initialReadBuf_));
+          processSocketData(initialReadBuf_);
           break;
         case EncryptionLevel::Handshake:
-          actions.emplace(
-              machine_.processSocketData(state_, handshakeReadBuf_));
+          processSocketData(handshakeReadBuf_);
           break;
         case EncryptionLevel::EarlyData:
         case EncryptionLevel::AppData:
           // TODO: Get rid of appDataReadBuf_ once we do not need EndOfEarlyData
           // any more.
-          actions.emplace(machine_.processSocketData(state_, appDataReadBuf_));
+          processSocketData(appDataReadBuf_);
           break;
       }
     } else if (!pendingEvents_.empty()) {
       auto write = std::move(pendingEvents_.front());
       pendingEvents_.pop_front();
-      actions.emplace(
+      startActions(
           machine_.processWriteNewSessionTicket(state_, std::move(write)));
     } else {
       actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
       return;
     }
-    startActions(std::move(*actions));
   }
 }
 
