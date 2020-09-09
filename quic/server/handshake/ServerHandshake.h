@@ -105,6 +105,13 @@ class ServerHandshake : public Handshake {
   virtual void writeNewSessionTicket(const AppToken& appToken);
 
   /**
+   * Returns a reference to the CryptoFactory used internaly.
+   */
+  virtual const CryptoFactory& getCryptoFactory() const {
+    return *cryptoFactory_;
+  }
+
+  /**
    * An edge triggered API to get the handshakeWriteCipher. Once you receive the
    * write cipher subsequent calls will return null.
    */
@@ -247,6 +254,7 @@ class ServerHandshake : public Handshake {
    */
   void processPendingEvents();
 
+ protected:
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
   QuicConnectionStateBase* conn_;
