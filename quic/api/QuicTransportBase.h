@@ -517,9 +517,7 @@ class QuicTransportBase : public QuicSocket {
     conn_->logger = std::move(logger);
   }
 
-  virtual void setQLogger(std::shared_ptr<QLogger> qLogger) {
-    conn_->qLogger = std::move(qLogger);
-  }
+  virtual void setQLogger(std::shared_ptr<QLogger> qLogger);
 
   void setLoopDetectorCallback(std::shared_ptr<LoopDetectorCallback> callback) {
     conn_->loopDetectorCallback = std::move(callback);
@@ -774,6 +772,8 @@ class QuicTransportBase : public QuicSocket {
 
   // Instrumentation observers
   InstrumentationObserverVec instrumentationObservers_;
+
+  uint64_t qlogRefcnt_{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

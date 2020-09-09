@@ -1981,6 +1981,39 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   client->closeNow(folly::none);
 }
 
+TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
+  auto mockQLogger1 = std::make_shared<MockQLogger>(VantagePoint::Client);
+  auto mockQLogger2 = std::make_shared<MockQLogger>(VantagePoint::Client);
+  EXPECT_CALL(*mockQLogger1, setDcid(client->getConn().clientConnectionId))
+      .Times(AtLeast(1));
+  EXPECT_CALL(*mockQLogger2, setDcid(client->getConn().clientConnectionId))
+      .Times(AtLeast(1));
+
+  // no-op
+  client->setQLogger(nullptr);
+  CHECK_EQ(client->getQLogger(), nullptr);
+
+  // set
+  client->setQLogger(mockQLogger1);
+  CHECK_EQ(client->getQLogger(), mockQLogger1);
+  client->setQLogger(mockQLogger2);
+  CHECK_EQ(client->getQLogger(), mockQLogger2);
+
+  // mix set and unset
+  client->setQLogger(nullptr);
+  CHECK_EQ(client->getQLogger(), mockQLogger2);
+  client->setQLogger(mockQLogger1);
+  CHECK_EQ(client->getQLogger(), mockQLogger1);
+  client->setQLogger(nullptr);
+  CHECK_EQ(client->getQLogger(), mockQLogger1);
+
+  // final unset
+  client->setQLogger(nullptr);
+  CHECK_EQ(client->getQLogger(), nullptr);
+
+  client->closeNow(folly::none);
+}
+
 TEST_F(QuicClientTransportTest, SwitchServerCidsNoOtherIds) {
   auto originalCid =
       ConnectionIdData(ConnectionId(std::vector<uint8_t>{1, 2, 3, 4}), 2);

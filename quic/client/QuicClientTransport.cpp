@@ -1587,10 +1587,9 @@ void QuicClientTransport::setSupportedVersions(
 void QuicClientTransport::setQLogger(std::shared_ptr<QLogger> qLogger) {
   // TODO: For a client transport, client CID isn't dcid. But FileQLogger will
   // use dcid as file name.
-  if (!qLogger) {
-    return;
+  if (qLogger) {
+    qLogger->setDcid(conn_->clientConnectionId);
   }
-  qLogger->setDcid(conn_->clientConnectionId);
   QuicTransportBase::setQLogger(std::move(qLogger));
 }
 
