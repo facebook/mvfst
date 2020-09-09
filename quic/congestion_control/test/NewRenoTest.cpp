@@ -10,6 +10,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 using namespace testing;
 
@@ -58,7 +59,8 @@ createPacket(PacketNum packetNum, uint32_t size, TimePoint sendTime) {
 }
 
 TEST_F(NewRenoTest, TestLoss) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -97,7 +99,8 @@ TEST_F(NewRenoTest, TestLoss) {
 }
 
 TEST_F(NewRenoTest, SendMoreThanWritable) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -114,7 +117,8 @@ TEST_F(NewRenoTest, SendMoreThanWritable) {
 }
 
 TEST_F(NewRenoTest, TestSlowStartAck) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -134,7 +138,8 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
 }
 
 TEST_F(NewRenoTest, TestSteadyStateAck) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -175,7 +180,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
 }
 
 TEST_F(NewRenoTest, TestWritableBytes) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -190,7 +196,8 @@ TEST_F(NewRenoTest, TestWritableBytes) {
 }
 
 TEST_F(NewRenoTest, PersistentCongestion) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 
@@ -210,7 +217,8 @@ TEST_F(NewRenoTest, PersistentCongestion) {
 }
 
 TEST_F(NewRenoTest, RemoveBytesWithoutLossOrAck) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   NewReno reno(conn);
   EXPECT_TRUE(reno.inSlowStart());
 

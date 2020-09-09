@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/test/Mocks.h>
@@ -20,6 +21,8 @@ namespace test {
 
 class QuicStreamManagerTest : public Test {
  public:
+  QuicStreamManagerTest()
+      : conn(std::make_shared<FizzServerQuicHandshakeContext>()) {}
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;

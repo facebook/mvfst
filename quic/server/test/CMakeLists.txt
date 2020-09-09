@@ -27,7 +27,6 @@ quic_add_test(TARGET QuicServerTransportTest
   Folly::folly
   mvfst_codec_pktbuilder
   mvfst_codec_types
-  mvfst_fizz_handshake
   mvfst_server
   mvfst_state_stream_functions
   mvfst_test_utils

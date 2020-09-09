@@ -11,6 +11,7 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -149,7 +150,8 @@ class QuicTransportFunctionsTest : public Test {
   }
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
-    auto conn = std::make_unique<QuicServerConnectionState>();
+    auto conn = std::make_unique<QuicServerConnectionState>(
+        std::make_shared<FizzServerQuicHandshakeContext>());
     conn->serverConnectionId = getTestConnectionId();
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
@@ -1555,7 +1557,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   conn.serverConnectionId = getTestConnectionId();
   conn.clientConnectionId = getTestConnectionId();
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it

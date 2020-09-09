@@ -15,6 +15,7 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/Mocks.h>
@@ -156,7 +157,8 @@ class TestQuicTransport
       ConnectionCallback& cb)
       : QuicTransportBase(evb, std::move(socket)) {
     setConnectionCallback(&cb);
-    auto conn = std::make_unique<QuicServerConnectionState>();
+    auto conn = std::make_unique<QuicServerConnectionState>(
+        std::make_shared<FizzServerQuicHandshakeContext>());
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
     conn->version = QuicVersion::MVFST;
     transportConn = conn.get();

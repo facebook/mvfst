@@ -9,6 +9,7 @@
 #include <quic/state/stream/StreamStateFunctions.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -22,7 +23,8 @@ namespace test {
 class StreamStateFunctionsTests : public Test {};
 
 TEST_F(StreamStateFunctionsTests, BasicResetTest) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId streamId = 0xbaad;
   QuicStreamState stream(streamId, conn);
   appendDataToReadBuffer(
@@ -55,14 +57,16 @@ TEST_F(StreamStateFunctionsTests, BasicResetTest) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedEmptyStream) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   EXPECT_FALSE(isAllDataReceived(stream));
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferHasHole) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -74,7 +78,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferHasHole) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferNoHoleNoFin) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -85,7 +90,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferNoHoleNoFin) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferEmptyBufferFin) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -95,7 +101,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferEmptyBufferFin) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferBufferFin) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -107,7 +114,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedReadBufferBufferFin) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataNoHole) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -123,7 +131,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataNoHole) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataHasHole) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 100;
@@ -139,7 +148,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedMultipleStreamDataHasHole) {
 }
 
 TEST_F(StreamStateFunctionsTests, IsAllDataReceivedAllDataRead) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.currentReadOffset = 101;
@@ -148,7 +158,8 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedAllDataRead) {
 }
 
 TEST_F(StreamStateFunctionsTests, SendReset) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
@@ -163,7 +174,8 @@ TEST_F(StreamStateFunctionsTests, SendReset) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
@@ -186,7 +198,8 @@ TEST_F(StreamStateFunctionsTests, ResetNoFlowControlGenerated) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
 
@@ -221,7 +234,8 @@ TEST_F(StreamStateFunctionsTests, ResetFlowControlGenerated) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 10);
@@ -234,7 +248,8 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetNotMatch) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 30);
@@ -246,7 +261,8 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetLessThanMaxObserved) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanStreamFlowControl) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 200);
@@ -258,7 +274,8 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanStreamFlowControl) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanConnFlowControl) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 200);
@@ -277,7 +294,8 @@ TEST_F(StreamStateFunctionsTests, ResetOffsetGreaterThanConnFlowControl) {
 }
 
 TEST_F(StreamStateFunctionsTests, ResetAfterReadingAllBytesTillFin) {
-  QuicServerConnectionState conn;
+  QuicServerConnectionState conn(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   StreamId id = 1;
   QuicStreamState stream(id, conn);
   RstStreamFrame rst(id, GenericApplicationErrorCode::UNKNOWN, 100);

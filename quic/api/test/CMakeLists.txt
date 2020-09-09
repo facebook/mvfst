@@ -51,10 +51,10 @@ quic_add_test(TARGET QuicPacketSchedulerTest
   DEPENDS
   Folly::folly
   mvfst_fizz_client
+  mvfst_server
   mvfst_codec_pktbuilder
   mvfst_transport
   mvfst_test_utils
-  mvfst_server
 )
 
 quic_add_test(TARGET IoBufQuicBatchTest

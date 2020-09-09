@@ -16,6 +16,7 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -60,7 +61,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       PacketType packetType);
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
-    auto conn = std::make_unique<QuicServerConnectionState>();
+    auto conn = std::make_unique<QuicServerConnectionState>(
+        std::make_shared<FizzServerQuicHandshakeContext>());
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->ackStates.initialAckState.nextPacketNum = 1;

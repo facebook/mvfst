@@ -15,6 +15,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
 using namespace folly;
@@ -52,6 +53,9 @@ class QuicStreamFunctionsTest : public Test {
 
 class QuicServerStreamFunctionsTest : public Test {
  public:
+  QuicServerStreamFunctionsTest()
+      : conn(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
@@ -1102,7 +1106,8 @@ TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
 TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
-  QuicServerConnectionState serverState;
+  QuicServerConnectionState serverState(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   QuicNodeType nodeType;
   StreamId id;
 
@@ -1130,7 +1135,8 @@ TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
 TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
-  QuicServerConnectionState serverState;
+  QuicServerConnectionState serverState(
+      std::make_shared<FizzServerQuicHandshakeContext>());
   QuicNodeType nodeType;
   StreamId id;
 
