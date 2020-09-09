@@ -155,6 +155,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     supportedVersions =
         std::vector<QuicVersion>{{QuicVersion::MVFST,
                                   QuicVersion::MVFST_D24,
+                                  QuicVersion::MVFST_EXPERIMENTAL,
                                   QuicVersion::QUIC_DRAFT,
                                   QuicVersion::QUIC_DRAFT_LEGACY}};
     originalVersion = QuicVersion::MVFST;

@@ -206,6 +206,7 @@ enum class QuicVersion : uint32_t {
   MVFST = 0xfaceb002,
   QUIC_DRAFT_LEGACY = 0xff00001b, // Draft-27
   QUIC_DRAFT = 0xff00001d, // Draft-29
+  MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_INVALID = 0xfaceb00f,
 };
 
