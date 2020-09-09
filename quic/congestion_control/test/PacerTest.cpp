@@ -7,6 +7,7 @@
  */
 
 #include <quic/congestion_control/Pacer.h>
+#include <quic/congestion_control/TokenlessPacer.h>
 #include <folly/portability/GTest.h>
 
 using namespace testing;
@@ -33,7 +34,26 @@ class PacerTest : public Test {
   DefaultPacer pacer{conn, conn.transportSettings.minCwndInMss};
 };
 
+class TokenlessPacerTest : public Test {
+ public:
+  void SetUp() override {
+    conn.transportSettings.pacingTimerTickInterval = 1us;
+  }
+
+ protected:
+  QuicConnectionStateBase conn{QuicNodeType::Client};
+  TokenlessPacer pacer{conn, conn.transportSettings.minCwndInMss};
+};
+
+
 TEST_F(PacerTest, WriteBeforeScheduled) {
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      pacer.updateAndGetWriteBatchSize(Clock::now()));
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+}
+
+TEST_F(TokenlessPacerTest, WriteBeforeScheduled) {
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit,
       pacer.updateAndGetWriteBatchSize(Clock::now()));
@@ -67,6 +87,19 @@ TEST_F(PacerTest, CompensateTimerDrift) {
   EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
 }
 
+TEST_F(TokenlessPacerTest, NoCompensateTimerDrift) {
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100us); // These two values do not matter here
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
+}
+
 TEST_F(PacerTest, NextWriteTime) {
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
 
@@ -87,6 +120,25 @@ TEST_F(PacerTest, NextWriteTime) {
 
   // Then we use real delay:
   EXPECT_EQ(1000us, pacer.getTimeUntilNextWrite());
+}
+
+TEST_F(TokenlessPacerTest, NextWriteTime) {
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds rtt) {
+    return PacingRate::Builder().setInterval(rtt).setBurstSize(10).build();
+  });
+  pacer.refreshPacingRate(20, 1000us);
+  // Right after refresh, it's always 0us. You can always send right after an
+  // ack.
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(Clock::now()));
+
+  // Then we use real delay:
+  EXPECT_NEAR(1000, pacer.getTimeUntilNextWrite().count(), 100);
 }
 
 TEST_F(PacerTest, ImpossibleToPace) {
