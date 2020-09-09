@@ -11,6 +11,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/BufUtil.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
+#include <quic/congestion_control/TokenlessPacer.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -86,6 +87,16 @@ void recoverOrResetCongestionAndRttState(
     conn.migrationState.lastCongestionAndRtt = folly::none;
   } else {
     resetCongestionAndRttState(conn);
+  }
+}
+
+void setExperimentalSettings(QuicServerConnectionState& conn) {
+  if (conn.pacer) {
+    bool usingBbr = conn.congestionController &&
+        (conn.congestionController->type() == CongestionControlType::BBR);
+    conn.pacer = std::make_unique<TokenlessPacer>(
+        conn,
+        usingBbr ? kMinCwndInMssForBbr : conn.transportSettings.minCwndInMss);
   }
 }
 } // namespace
@@ -765,6 +776,9 @@ void onServerReadDataFromOpen(
             "Invalid packet type", TransportErrorCode::PROTOCOL_VIOLATION);
       }
       conn.version = longHeader->getVersion();
+      if (conn.version == QuicVersion::MVFST_EXPERIMENTAL) {
+        setExperimentalSettings(conn);
+      }
     }
 
     if (conn.peerAddress != readData.peer) {
