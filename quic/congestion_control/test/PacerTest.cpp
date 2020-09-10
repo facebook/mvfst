@@ -7,8 +7,8 @@
  */
 
 #include <quic/congestion_control/Pacer.h>
-#include <quic/congestion_control/TokenlessPacer.h>
 #include <folly/portability/GTest.h>
+#include <quic/congestion_control/TokenlessPacer.h>
 
 using namespace testing;
 
@@ -44,7 +44,6 @@ class TokenlessPacerTest : public Test {
   QuicConnectionStateBase conn{QuicNodeType::Client};
   TokenlessPacer pacer{conn, conn.transportSettings.minCwndInMss};
 };
-
 
 TEST_F(PacerTest, WriteBeforeScheduled) {
   EXPECT_EQ(
