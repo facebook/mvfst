@@ -5,7 +5,7 @@
 
 # Always install this header, even when not building tests.
 # It can be used by dependent projects to build their own tests
-install(FILES MockQuicSocket.h DESTINATION include/quic/api/test)
+install(FILES MockQuicSocket.h Mocks.h DESTINATION include/quic/api/test)
 
 if(NOT BUILD_TESTS)
   return()
