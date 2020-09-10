@@ -2292,17 +2292,14 @@ TEST_F(QuicTransportImplTest, AsyncStreamFlowControlWrite) {
   auto stream = transport->createBidirectionalStream().value();
   auto streamState = transport->transportConn->streamManager->getStream(stream);
   transport->setServerConnectionId();
-  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.has_value());
   transport->writeLooper()->stop();
   streamState->flowControlState.advertisedMaxOffset = 0; // Easier to calculate
   transport->setStreamFlowControlWindow(stream, 4000);
   EXPECT_EQ(0, streamState->flowControlState.advertisedMaxOffset);
-  EXPECT_FALSE(streamState->latestMaxStreamDataPacket.has_value());
   // Loop it:
   EXPECT_TRUE(transport->writeLooper()->isRunning());
   transport->writeLooper()->runLoopCallback();
   EXPECT_EQ(4000, streamState->flowControlState.advertisedMaxOffset);
-  EXPECT_TRUE(streamState->latestMaxStreamDataPacket.has_value());
 }
 
 TEST_F(QuicTransportImplTest, ExceptionInWriteLooperDoesNotCrash) {

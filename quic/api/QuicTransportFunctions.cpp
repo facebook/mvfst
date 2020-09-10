@@ -575,8 +575,7 @@ void updateConnection(
         VLOG(10) << nodeToString(conn.nodeType)
                  << " sent conn window update in packetNum=" << packetNum << " "
                  << conn;
-        onConnWindowUpdateSent(
-            conn, packetNum, maxDataFrame.maximumData, sentTime);
+        onConnWindowUpdateSent(conn, maxDataFrame.maximumData, sentTime);
         break;
       }
       case QuicWriteFrame::Type::DataBlockedFrame_E: {
@@ -597,7 +596,7 @@ void updateConnection(
                  << " sent packet with window update packetNum=" << packetNum
                  << " stream=" << maxStreamDataFrame.streamId << " " << conn;
         onStreamWindowUpdateSent(
-            *stream, packetNum, maxStreamDataFrame.maximumData, sentTime);
+            *stream, maxStreamDataFrame.maximumData, sentTime);
         break;
       }
       case QuicWriteFrame::Type::StreamDataBlockedFrame_E: {
@@ -1461,7 +1460,7 @@ void implicitAckCryptoStream(
       },
       // We shouldn't mark anything as lost from the implicit ACK, as it should
       // be ACKing the entire rangee.
-      [](auto&, auto&, auto, auto) {
+      [](auto&, auto&, auto) {
         LOG(FATAL) << "Got loss from implicit crypto ACK.";
       },
       implicitAckTime);

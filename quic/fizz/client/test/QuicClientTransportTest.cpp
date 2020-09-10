@@ -4706,8 +4706,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto packetNum = forceLossPacket->header.getPacketSequenceNum();
-  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false, packetNum);
+  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
   auto& pendingLossStreams = client->getConn().streamManager->lossStreams();
   auto it =
       std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
@@ -4733,8 +4732,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
 
   RegularQuicWritePacket* forceLossPacket =
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
-  auto packetNum = forceLossPacket->header.getPacketSequenceNum();
-  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false, packetNum);
+  markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
   auto stream = CHECK_NOTNULL(
       client->getNonConstConn().streamManager->getStream(streamId));
   ASSERT_TRUE(stream->lossBuffer.empty());

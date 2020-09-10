@@ -19,7 +19,7 @@ using AckVisitor = std::function<
     void(const OutstandingPacket&, const QuicWriteFrame&, const ReadAckFrame&)>;
 
 using LossVisitor = std::function<
-    void(QuicConnectionStateBase&, RegularQuicWritePacket&, bool, PacketNum)>;
+    void(QuicConnectionStateBase&, RegularQuicWritePacket&, bool)>;
 
 /**
  * Processes an ack frame and removes any outstanding packets

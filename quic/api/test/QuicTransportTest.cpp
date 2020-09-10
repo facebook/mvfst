@@ -1196,7 +1196,7 @@ TEST_F(QuicTransportTest, ResendPathChallengeOnLoss) {
           ->packet;
 
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
-  markPacketLoss(conn, packet, false, 2);
+  markPacketLoss(conn, packet, false);
   EXPECT_EQ(*conn.pendingEvents.pathChallenge, pathChallenge);
 }
 
@@ -1221,7 +1221,7 @@ TEST_F(QuicTransportTest, DoNotResendLostPathChallengeIfNotOutstanding) {
   transport_->getPathValidationTimeout().timeoutExpired();
 
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
-  markPacketLoss(conn, packet, false, 2);
+  markPacketLoss(conn, packet, false);
   EXPECT_FALSE(conn.pendingEvents.pathChallenge);
 }
 
@@ -1332,7 +1332,7 @@ TEST_F(QuicTransportTest, DoNotResendPathResponseOnLoss) {
   auto packet =
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
 
-  markPacketLoss(conn, packet, false, 2);
+  markPacketLoss(conn, packet, false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 0);
 }
 
@@ -1469,7 +1469,7 @@ TEST_F(QuicTransportTest, ResendNewConnectionIdOnLoss) {
           ->packet;
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  markPacketLoss(conn, packet, false, 2);
+  markPacketLoss(conn, packet, false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   NewConnectionIdFrame* connIdFrame =
       conn.pendingEvents.frames.front().asNewConnectionIdFrame();
@@ -1557,7 +1557,7 @@ TEST_F(QuicTransportTest, ResendRetireConnectionIdOnLoss) {
           ->packet;
 
   EXPECT_TRUE(conn.pendingEvents.frames.empty());
-  markPacketLoss(conn, packet, false, 2);
+  markPacketLoss(conn, packet, false);
   EXPECT_EQ(conn.pendingEvents.frames.size(), 1);
   RetireConnectionIdFrame* retireFrame =
       conn.pendingEvents.frames.front().asRetireConnectionIdFrame();

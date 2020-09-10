@@ -157,21 +157,13 @@ TEST_F(QuicFlowControlTest, GenerateMaxDataFrameChangeWindowLarger) {
   conn_.flowControlState.sumCurReadOffset = 301;
   auto frame = generateMaxDataFrame(conn_);
   EXPECT_EQ(801, frame.maximumData);
-  onConnWindowUpdateSent(
-      conn_,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      frame.maximumData,
-      Clock::now());
+  onConnWindowUpdateSent(conn_, frame.maximumData, Clock::now());
   EXPECT_EQ(801, conn_.flowControlState.advertisedMaxOffset);
 
   conn_.flowControlState.windowSize = 1001;
   auto frame2 = generateMaxDataFrame(conn_);
   EXPECT_EQ(1302, frame2.maximumData);
-  onConnWindowUpdateSent(
-      conn_,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      frame2.maximumData,
-      Clock::now());
+  onConnWindowUpdateSent(conn_, frame2.maximumData, Clock::now());
   EXPECT_EQ(
       frame2.maximumData,
       conn_.flowControlState.sumCurReadOffset +
@@ -262,13 +254,7 @@ TEST_F(QuicFlowControlTest, MaybeSendStreamWindowUpdateChangeWindowSmaller) {
   ASSERT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   auto sendTime = Clock::now();
   onStreamWindowUpdateSent(
-      stream,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      generateMaxStreamDataFrame(stream).maximumData,
-      sendTime);
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *stream.latestMaxStreamDataPacket);
+      stream, generateMaxStreamDataFrame(stream).maximumData, sendTime);
 
   stream.flowControlState.windowSize = 10;
   // change the read bytes to be within the maybeSendUpdate size of the previous
@@ -346,13 +332,7 @@ TEST_F(QuicFlowControlTest, MaybeSendStreamWindowUpdateChangeWindowLarger) {
   maybeSendStreamWindowUpdate(stream, Clock::now());
   EXPECT_TRUE(conn_.streamManager->pendingWindowUpdate(stream.id));
   onStreamWindowUpdateSent(
-      stream,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      generateMaxStreamDataFrame(stream).maximumData,
-      Clock::now());
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *stream.latestMaxStreamDataPacket);
+      stream, generateMaxStreamDataFrame(stream).maximumData, Clock::now());
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
 
   stream.flowControlState.windowSize = 1001;
@@ -378,14 +358,7 @@ TEST_F(QuicFlowControlTest, SendingConnectionWindowUpdate) {
 
   // Clear out the window update.
   auto sendTime = Clock::now();
-  onConnWindowUpdateSent(
-      conn_,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      frameOffset,
-      sendTime);
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *conn_.latestMaxDataPacket);
+  onConnWindowUpdateSent(conn_, frameOffset, sendTime);
   EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
   EXPECT_EQ(conn_.flowControlState.advertisedMaxOffset, frameOffset);
   EXPECT_EQ(*conn_.flowControlState.timeOfLastFlowControlUpdate, sendTime);
@@ -406,14 +379,7 @@ TEST_F(QuicFlowControlTest, SendingStreamWindowUpdate) {
   EXPECT_EQ(800, frameOffset);
 
   auto sendTime = Clock::now();
-  onStreamWindowUpdateSent(
-      stream,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      frameOffset,
-      sendTime);
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *stream.latestMaxStreamDataPacket);
+  onStreamWindowUpdateSent(stream, frameOffset, sendTime);
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(stream.id));
   EXPECT_EQ(stream.flowControlState.advertisedMaxOffset, frameOffset);
   EXPECT_EQ(*stream.flowControlState.timeOfLastFlowControlUpdate, sendTime);
@@ -844,11 +810,7 @@ TEST_F(QuicFlowControlTest, OnConnWindowUpdateSentWithoutPendingEvent) {
   conn_.flowControlState.windowSize = 1000;
   conn_.flowControlState.advertisedMaxOffset = 0;
   conn_.flowControlState.sumCurReadOffset = 0;
-  onConnWindowUpdateSent(
-      conn_, conn_.ackStates.appDataAckState.nextPacketNum, 1000, Clock::now());
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *conn_.latestMaxDataPacket);
+  onConnWindowUpdateSent(conn_, 1000, Clock::now());
   EXPECT_EQ(1000, conn_.flowControlState.advertisedMaxOffset);
   EXPECT_FALSE(conn_.pendingEvents.connWindowUpdate);
 }
@@ -859,14 +821,7 @@ TEST_F(QuicFlowControlTest, OnStreamWindowUpdateSentWithoutPendingEvent) {
   stream.currentReadOffset = 0;
   stream.flowControlState.advertisedMaxOffset = 0;
   stream.flowControlState.windowSize = 1000;
-  onStreamWindowUpdateSent(
-      stream,
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      1000,
-      Clock::now());
-  EXPECT_EQ(
-      conn_.ackStates.appDataAckState.nextPacketNum,
-      *stream.latestMaxStreamDataPacket);
+  onStreamWindowUpdateSent(stream, 1000, Clock::now());
   EXPECT_EQ(1000, stream.flowControlState.advertisedMaxOffset);
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(id));
 }

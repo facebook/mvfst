@@ -63,8 +63,7 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
 void markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
-    bool processed,
-    PacketNum currentPacketNum) {
+    bool processed) {
   QUIC_STATS(conn.statsCallback, onPacketLoss);
   for (auto& packetFrame : packet.frames) {
     switch (packetFrame.type()) {
@@ -72,26 +71,19 @@ void markPacketLoss(
         MaxStreamDataFrame& frame = *packetFrame.asMaxStreamDataFrame();
         // For all other frames, we process it if it's not from a clone
         // packet, or if the clone and its siblings have never been processed.
-        // But for both MaxData and MaxStreamData, clone and its siblings may
-        // have different values. So we process it if it matches the
-        // latestMaxDataPacket or latestMaxStreamDataPacket. If an older
-        // packet also has such frames, it's ok to skip process of such loss
-        // since newer value is already sent in later packets.
+        // But for both MaxData and MaxStreamData, we opportunistically send
+        // an update to avoid stalling the peer.
         auto stream = conn.streamManager->getStream(frame.streamId);
         if (!stream) {
           break;
         }
         // TODO: check for the stream is in Open or HalfClosedLocal state, the
         // peer doesn't need a flow control update in these cases.
-        if (stream->latestMaxStreamDataPacket == currentPacketNum) {
-          onStreamWindowUpdateLost(*stream);
-        }
+        onStreamWindowUpdateLost(*stream);
         break;
       }
       case QuicWriteFrame::Type::MaxDataFrame_E: {
-        if (conn.latestMaxDataPacket == currentPacketNum) {
-          onConnWindowUpdateLost(conn);
-        }
+        onConnWindowUpdateLost(conn);
         break;
       }
       // For other frame types, we only process them if the packet is not a

@@ -236,7 +236,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     // or if the PacketEvent is present in conn.outstandings.packetEvents.
     bool processed = pkt.associatedEvent &&
         !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
-    lossVisitor(conn, pkt.packet, processed, currentPacketNum);
+    lossVisitor(conn, pkt.packet, processed);
     // Remove the PacketEvent from the outstandings.packetEvents set
     if (pkt.associatedEvent) {
       conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
@@ -354,8 +354,7 @@ void onLossDetectionAlarm(
 void markPacketLoss(
     QuicConnectionStateBase& conn,
     RegularQuicWritePacket& packet,
-    bool processed,
-    PacketNum currentPacketNum);
+    bool processed);
 
 template <class LossVisitor>
 folly::Optional<CongestionController::LossEvent> handleAckForLoss(
@@ -408,10 +407,9 @@ void markZeroRttPacketsLost(
     if (isZeroRttPacket) {
       auto& pkt = *iter;
       DCHECK(!pkt.isHandshake);
-      auto currentPacketNum = pkt.packet.header.getPacketSequenceNum();
       bool processed = pkt.associatedEvent &&
           !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
-      lossVisitor(conn, pkt.packet, processed, currentPacketNum);
+      lossVisitor(conn, pkt.packet, processed);
       // Remove the PacketEvent from the outstandings.packetEvents set
       if (pkt.associatedEvent) {
         conn.outstandings.packetEvents.erase(*pkt.associatedEvent);

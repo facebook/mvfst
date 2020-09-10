@@ -193,10 +193,6 @@ struct QuicStreamState : public QuicStreamLike {
   // State machine data
   StreamRecvState recvState{StreamRecvState::Open_E};
 
-  // The packet number of the latest packet that contains a MaxStreamDataFrame
-  // sent out by us.
-  folly::Optional<PacketNum> latestMaxStreamDataPacket;
-
   // Tells whether this stream is a control stream.
   // It is set by the app via setControlStream and the transport can use this
   // knowledge for optimizations e.g. for setting the app limited state on

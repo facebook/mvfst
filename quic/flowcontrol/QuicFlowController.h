@@ -60,13 +60,11 @@ void handleConnBlocked(QuicConnectionStateBase& conn);
 
 void onStreamWindowUpdateSent(
     QuicStreamState& stream,
-    PacketNum packetNum,
     uint64_t maximumData,
     TimePoint sentTime);
 
 void onConnWindowUpdateSent(
     QuicConnectionStateBase& conn,
-    PacketNum pacektNum,
     uint64_t maximumData,
     TimePoint sentTime);
 

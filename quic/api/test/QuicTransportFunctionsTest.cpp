@@ -1023,7 +1023,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetNum = packet.packet.header.getPacketSequenceNum();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   MaxStreamDataFrame streamWindowUpdate(stream->id, 0);
   conn->streamManager->queueWindowUpdate(stream->id);
@@ -1049,18 +1048,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   auto frame = static_cast<MaxStreamDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->streamId, stream->id);
   EXPECT_EQ(frame->maximumData, 0);
-
-  EXPECT_EQ(packetNum, *stream->latestMaxStreamDataPacket);
-  EXPECT_FALSE(conn->latestMaxDataPacket.has_value());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  auto packetNum = packet.packet.header.getPacketSequenceNum();
   conn->pendingEvents.connWindowUpdate = true;
-  auto stream = conn->streamManager->createNextBidirectionalStream().value();
   MaxDataFrame connWindowUpdate(conn->flowControlState.advertisedMaxOffset);
   packet.packet.frames.push_back(std::move(connWindowUpdate));
   updateConnection(
@@ -1082,9 +1076,6 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   EXPECT_EQ(event->frames.size(), 1);
   auto frame = static_cast<MaxDataFrameLog*>(event->frames[0].get());
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
-
-  EXPECT_FALSE(stream->latestMaxStreamDataPacket.has_value());
-  EXPECT_EQ(packetNum, *conn->latestMaxDataPacket);
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {

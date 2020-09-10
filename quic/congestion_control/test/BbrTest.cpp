@@ -553,7 +553,7 @@ TEST_F(BbrTest, BytesCounting) {
   ackFrame.largestAcked = packetNum;
   ackFrame.ackBlocks.emplace_back(packetNum, packetNum);
   auto ackVisitor = [&](auto&, auto&, auto&) {};
-  auto lossVisitor = [&](auto&, auto&, bool, PacketNum) {};
+  auto lossVisitor = [&](auto&, auto&, bool) {};
   processAckFrame(
       conn,
       PacketNumberSpace::AppData,

@@ -1733,11 +1733,7 @@ TEST_F(QuicServerTransportTest, StopSendingLoss) {
   ASSERT_TRUE(builder.canBuildPacket());
   writeFrame(QuicSimpleFrame(stopSendingFrame), builder);
   auto packet = std::move(builder).buildPacket();
-  markPacketLoss(
-      server->getNonConstConn(),
-      packet.packet,
-      false,
-      clientNextAppDataPacketNum);
+  markPacketLoss(server->getNonConstConn(), packet.packet, false);
   EXPECT_EQ(server->getNonConstConn().pendingEvents.frames.size(), 1);
   StopSendingFrame* stopFrame = server->getNonConstConn()
                                     .pendingEvents.frames.front()
@@ -1769,11 +1765,7 @@ TEST_F(QuicServerTransportTest, StopSendingLossAfterStreamClosed) {
   // clear out all the streams, this is not a great way to simulate closed
   // streams, but good enough for this test.
   server->getNonConstConn().streamManager->clearOpenStreams();
-  markPacketLoss(
-      server->getNonConstConn(),
-      packet.packet,
-      false,
-      server->getNonConstConn().ackStates.appDataAckState.nextPacketNum);
+  markPacketLoss(server->getNonConstConn(), packet.packet, false);
   EXPECT_EQ(server->getNonConstConn().pendingEvents.frames.size(), 0);
 }
 

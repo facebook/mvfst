@@ -362,12 +362,9 @@ uint64_t getRecvConnFlowControlBytes(const QuicConnectionStateBase& conn) {
 
 void onConnWindowUpdateSent(
     QuicConnectionStateBase& conn,
-    PacketNum packetNum,
     uint64_t maximumDataSent,
     TimePoint sentTime) {
   DCHECK_GE(maximumDataSent, conn.flowControlState.advertisedMaxOffset);
-  DCHECK_LE(conn.latestMaxDataPacket.value_or(packetNum), packetNum);
-  conn.latestMaxDataPacket = packetNum;
   conn.flowControlState.advertisedMaxOffset = maximumDataSent;
   conn.flowControlState.timeOfLastFlowControlUpdate = sentTime;
   conn.pendingEvents.connWindowUpdate = false;
@@ -376,11 +373,8 @@ void onConnWindowUpdateSent(
 
 void onStreamWindowUpdateSent(
     QuicStreamState& stream,
-    PacketNum packetNum,
     uint64_t maximumDataSent,
     TimePoint sentTime) {
-  DCHECK_LE(stream.latestMaxStreamDataPacket.value_or(packetNum), packetNum);
-  stream.latestMaxStreamDataPacket = packetNum;
   stream.flowControlState.advertisedMaxOffset = maximumDataSent;
   stream.flowControlState.timeOfLastFlowControlUpdate = sentTime;
   stream.conn.streamManager->removeWindowUpdate(stream.id);

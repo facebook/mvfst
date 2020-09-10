@@ -28,11 +28,10 @@ namespace test {
 class AckHandlersTest : public TestWithParam<PacketNumberSpace> {};
 
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
-  return
-      [&lostPackets](QuicConnectionStateBase&, auto& packet, bool, PacketNum) {
-        auto packetNum = packet.header.getPacketSequenceNum();
-        lostPackets.push_back(packetNum);
-      };
+  return [&lostPackets](QuicConnectionStateBase&, auto& packet, bool) {
+    auto packetNum = packet.header.getPacketSequenceNum();
+    lostPackets.push_back(packetNum);
+  };
 }
 
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
@@ -214,7 +213,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       GetParam(),
       ackFrame,
       [](auto, auto, auto) {},
-      [](auto&, auto&, auto, auto) {},
+      [](auto&, auto&, auto) {},
       Clock::now());
   itr = std::find_if(
       conn.outstandings.packets.begin(),
@@ -231,7 +230,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       GetParam(),
       ackFrame,
       [](auto, auto, auto) {},
-      [](auto&, auto&, auto, auto) {},
+      [](auto&, auto&, auto) {},
       Clock::now() + 2 * calculatePTO(conn));
 
   numDeclaredLost = std::count_if(
@@ -477,10 +476,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
           commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
         }
       },
-      [](auto& /* conn */,
-         auto& /* packet */,
-         bool /* processed */,
-         PacketNum /* currentPacketNum */) {},
+      [](auto& /* conn */, auto& /* packet */, bool /* processed */
+      ) {},
       Clock::now());
   EXPECT_EQ(2, conn.ackStates.appDataAckState.acks.size());
   EXPECT_EQ(
@@ -503,10 +500,8 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
           commonAckVisitorForAckFrame(conn.ackStates.appDataAckState, *frame);
         }
       },
-      [](auto& /* conn */,
-         auto& /* packet */,
-         bool /* processed */,
-         PacketNum /* currentPacketNum */) {},
+      [](auto& /* conn */, auto& /* packet */, bool /* processed */
+      ) {},
       Clock::now());
   EXPECT_TRUE(conn.ackStates.appDataAckState.acks.empty());
 }
@@ -532,7 +527,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
       GetParam(),
       ackFrame,
       [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
+      [](auto&, auto&, bool) {},
       Clock::now());
   EXPECT_TRUE(conn.pendingEvents.setLossDetectionAlarm);
   EXPECT_EQ(conn.lossState.ptoCount, 1);
@@ -553,7 +548,7 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
       GetParam(),
       ackFrame,
       [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
+      [](auto&, auto&, bool) {},
       Clock::now());
 }
 
@@ -586,7 +581,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
       GetParam(),
       ackFrame,
       [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
+      [](auto&, auto&, bool) {},
       Clock::now());
   EXPECT_EQ(1, conn.outstandings.packets.size());
 }
@@ -705,10 +700,8 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
       GetParam(),
       ackFrame,
       countingAckVisitor,
-      [&](auto& /*conn*/,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op lossVisitor */ },
+      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
+      ) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(1, ackVisitorCounter);
 }
@@ -755,10 +748,8 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       GetParam(),
       ackFrame,
       countingAckVisitor,
-      [&](auto& /*conn*/,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op lossVisitor */ },
+      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
+      ) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(0, ackVisitorCounter);
 }
@@ -809,10 +800,8 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       GetParam(),
       ackFrame1,
       countingAckVisitor,
-      [&](auto& /*conn*/,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op lossVisitor */ },
+      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
+      ) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(1, ackVisitorCounter);
 
@@ -825,10 +814,8 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
       GetParam(),
       ackFrame2,
       countingAckVisitor,
-      [&](auto& /* conn */,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op */ },
+      [&](auto& /* conn */, auto& /* packet */, bool /* processed */
+      ) { /* no-op */ },
       Clock::now());
   EXPECT_EQ(1, ackVisitorCounter);
 }
@@ -874,10 +861,8 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
       GetParam(),
       ackFrame,
       countingAckVisitor,
-      [&](auto& /* conn */,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op */ },
+      [&](auto& /* conn */, auto& /* packet */, bool /* processed */
+      ) { /* no-op */ },
       Clock::now());
   EXPECT_EQ(2, ackVisitorCounter);
   EXPECT_EQ(0, conn.outstandings.clonedPacketsCount);
@@ -906,7 +891,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
       GetParam(),
       ackFrame,
       [&](const auto&, const auto&, const auto&) { /* ackVisitor */ },
-      [&](auto&, auto&, bool, PacketNum) { /* lossVisitor */ },
+      [&](auto&, auto&, bool) { /* lossVisitor */ },
       receiveTime);
   EXPECT_EQ(10us, conn.lossState.mrtt);
 }
@@ -971,10 +956,8 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       PacketNumberSpace::AppData,
       ackFrame,
       countingAckVisitor,
-      [&](auto& /*conn*/,
-          auto& /* packet */,
-          bool /* processed */,
-          PacketNum) { /* no-op lossVisitor */ },
+      [&](auto& /*conn*/, auto& /* packet */, bool /* processed */
+      ) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(0, ackVisitorCounter);
 }
@@ -1006,7 +989,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       GetParam(),
       ackFrame,
       [&](auto, auto, auto) { /* ackVisitor */ },
-      [&](auto&, auto&, auto, auto) { /* lossVisitor */ },
+      [&](auto&, auto&, auto) { /* lossVisitor */ },
       receiveTime);
   EXPECT_EQ(2468 + 111, conn.lossState.totalBytesSentAtLastAck);
   EXPECT_EQ(1357 + 111, conn.lossState.totalBytesAckedAtLastAck);
@@ -1065,7 +1048,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       GetParam(),
       ackFrame,
       [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool, PacketNum) {},
+      [](auto&, auto&, bool) {},
       ackTime);
 }
 

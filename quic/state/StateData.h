@@ -757,10 +757,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   PacketSchedulingState schedulingState;
 
-  // The packet number of the latest packet that contains a MaxDataFrame sent
-  // out by us.
-  folly::Optional<PacketNum> latestMaxDataPacket;
-
   // Logger for this connection.
   std::shared_ptr<Logger> logger;
 
