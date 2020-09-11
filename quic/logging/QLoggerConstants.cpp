@@ -77,6 +77,8 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "expired_stream_data";
     case FrameType::HANDSHAKE_DONE:
       return "handshake_done";
+    case FrameType::KNOB:
+      return "knob";
   }
   folly::assume_unreachable();
 }

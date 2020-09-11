@@ -61,6 +61,54 @@ struct PingFrame {
   }
 };
 
+struct KnobFrame {
+  KnobFrame(uint64_t knobSpaceIn, uint64_t idIn, Buf blobIn)
+      : knobSpace(knobSpaceIn), id(idIn), blob(std::move(blobIn)) {
+    len = blob->length();
+  }
+
+  bool operator==(const KnobFrame& rhs) const {
+    return knobSpace == rhs.knobSpace && id == rhs.id && len == rhs.len &&
+        blob->length() == rhs.blob->length() &&
+        memcmp(blob->data(), rhs.blob->data(), blob->length()) == 0;
+  }
+
+  KnobFrame& operator=(const KnobFrame& other) {
+    knobSpace = other.knobSpace;
+    id = other.id;
+    if (other.blob) {
+      blob = other.blob->clone();
+    }
+    return *this;
+  }
+
+  KnobFrame& operator=(KnobFrame&& other) noexcept {
+    knobSpace = other.knobSpace;
+    id = other.id;
+    if (other.blob) {
+      blob = std::move(other.blob);
+    }
+    return *this;
+  }
+
+  KnobFrame(const KnobFrame& other)
+      : knobSpace(other.knobSpace),
+        id(other.id),
+        len(other.len),
+        blob(other.blob->clone()) {}
+
+  KnobFrame(KnobFrame&& other) noexcept
+      : knobSpace(other.knobSpace),
+        id(other.id),
+        len(other.len),
+        blob(std::move(other.blob)) {}
+
+  uint64_t knobSpace;
+  uint64_t id;
+  uint64_t len;
+  Buf blob;
+};
+
 /**
  * AckBlock represents a series of continuous packet sequences from
  * [startPacket, endPacket]
@@ -590,7 +638,8 @@ struct RetryToken {
   F(NewConnectionIdFrame, __VA_ARGS__)    \
   F(MaxStreamsFrame, __VA_ARGS__)         \
   F(RetireConnectionIdFrame, __VA_ARGS__) \
-  F(HandshakeDoneFrame, __VA_ARGS__)
+  F(HandshakeDoneFrame, __VA_ARGS__)      \
+  F(KnobFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 

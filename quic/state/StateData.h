@@ -685,6 +685,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Do we need to send data blocked frame when connection is blocked.
     bool sendDataBlocked{false};
+
+    std::vector<KnobFrame> knobs;
   };
 
   PendingEvents pendingEvents;

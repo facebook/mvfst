@@ -65,6 +65,12 @@ void addQuicSimpleFrameToEvent(
       event->frames.push_back(std::make_unique<quic::HandshakeDoneFrameLog>());
       break;
     }
+    case quic::QuicSimpleFrame::Type::KnobFrame_E: {
+      const quic::KnobFrame& frame = *simpleFrame.asKnobFrame();
+      event->frames.push_back(std::make_unique<quic::KnobFrameLog>(
+          frame.knobSpace, frame.id, frame.blob->length()));
+      break;
+    }
   }
 }
 } // namespace

@@ -117,6 +117,7 @@ enum class FrameType : uint64_t {
   HANDSHAKE_DONE = 0x1E,
   MIN_STREAM_DATA = 0xFE, // subject to change
   EXPIRED_STREAM_DATA = 0xFF, // subject to change
+  KNOB = 0x1550,
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {
@@ -193,6 +194,7 @@ enum class LocalErrorCode : uint32_t {
   STREAM_LIMIT_EXCEEDED = 0x40000018,
   CONNECTION_ABANDONED = 0x40000019,
   CALLBACK_ALREADY_INSTALLED = 0x4000001A,
+  KNOB_FRAME_UNSUPPORTED = 0x4000001B,
 };
 
 enum class QuicNodeType : bool {

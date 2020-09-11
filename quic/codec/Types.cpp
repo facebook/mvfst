@@ -425,6 +425,8 @@ std::string toString(FrameType frame) {
       return "EXPIRED_STREAM_DATA";
     case FrameType::HANDSHAKE_DONE:
       return "HANDSHAKE_DONE";
+    case FrameType::KNOB:
+      return "KNOB";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";

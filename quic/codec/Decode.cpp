@@ -71,6 +71,33 @@ PingFrame decodePingFrame(folly::io::Cursor&) {
   return PingFrame();
 }
 
+KnobFrame decodeKnobFrame(folly::io::Cursor& cursor) {
+  auto knobSpace = decodeQuicInteger(cursor);
+  if (!knobSpace) {
+    throw QuicTransportException(
+        "Bad knob space",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::KNOB);
+  }
+  auto knobId = decodeQuicInteger(cursor);
+  if (!knobId) {
+    throw QuicTransportException(
+        "Bad knob id",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::KNOB);
+  }
+  auto knobLen = decodeQuicInteger(cursor);
+  if (!knobLen) {
+    throw QuicTransportException(
+        "Bad knob len",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::KNOB);
+  }
+  Buf knobBlob;
+  cursor.cloneAtMost(knobBlob, knobLen->first);
+  return KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob));
+}
+
 ReadAckFrame decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
@@ -774,6 +801,8 @@ QuicFrame parseFrame(
         return QuicFrame(decodeExpiredStreamDataFrame(cursor));
       case FrameType::HANDSHAKE_DONE:
         return QuicFrame(decodeHandshakeDoneFrame(cursor));
+      case FrameType::KNOB:
+        return QuicFrame(decodeKnobFrame(cursor));
     }
   } catch (const std::exception&) {
     error = true;

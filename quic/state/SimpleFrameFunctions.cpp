@@ -53,10 +53,10 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
       return folly::none;
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
     case QuicSimpleFrame::Type::MaxStreamsFrame_E:
+    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
+    case QuicSimpleFrame::Type::KnobFrame_E:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
       // TODO junqiw
-      return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
       return QuicSimpleFrame(frame);
   }
   folly::assume_unreachable();
@@ -131,6 +131,7 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
     case QuicSimpleFrame::Type::MaxStreamsFrame_E:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
+    case QuicSimpleFrame::Type::KnobFrame_E:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -283,6 +284,13 @@ bool updateSimpleFrameOnPacketReceived(
       // any dropping, as this gives us a chance to process ACKs in this
       // packet.
       conn.handshakeLayer->handshakeConfirmed();
+      return true;
+    }
+    case QuicSimpleFrame::Type::KnobFrame_E: {
+      // TODO it's const so we have to copy it
+      const KnobFrame& knobFrame = *frame.asKnobFrame();
+      conn.pendingEvents.knobs.emplace_back(
+          knobFrame.knobSpace, knobFrame.id, knobFrame.blob->clone());
       return true;
     }
   }

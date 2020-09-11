@@ -129,6 +129,21 @@ class DataBlockedFrameLog : public QLogFrame {
   folly::dynamic toDynamic() const override;
 };
 
+class KnobFrameLog : public QLogFrame {
+ public:
+  uint64_t knobSpace;
+  uint64_t knobId;
+  size_t knobBlobLen;
+
+  explicit KnobFrameLog(
+      uint64_t knobSpaceIn,
+      uint64_t knobIdIn,
+      size_t knobBlobLenIn)
+      : knobSpace(knobSpaceIn), knobId(knobIdIn), knobBlobLen(knobBlobLenIn) {}
+  ~KnobFrameLog() override = default;
+  [[nodiscard]] folly::dynamic toDynamic() const override;
+};
+
 class StreamDataBlockedFrameLog : public QLogFrame {
  public:
   StreamId streamId;

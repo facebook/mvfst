@@ -118,6 +118,8 @@ folly::StringPiece toString(LocalErrorCode code) {
       return "Stream limit exceeded";
     case LocalErrorCode::CONNECTION_ABANDONED:
       return "Connection abandoned";
+    case LocalErrorCode::KNOB_FRAME_UNSUPPORTED:
+      return "Knob Frame Not Supported";
   }
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";

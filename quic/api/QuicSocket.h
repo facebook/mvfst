@@ -107,6 +107,12 @@ class QuicSocket {
      * Invoked when transport is detected to be app rate limited.
      */
     virtual void onAppRateLimited() noexcept {}
+
+    /**
+     * Invoked when we receive a KnobFrame from the peer
+     */
+    virtual void
+    onKnob(uint64_t /*knobSpace*/, uint64_t /*knobId*/, Buf /*knobBlob*/) {}
   };
 
   /**
@@ -418,6 +424,14 @@ class QuicSocket {
   virtual void setTransportSettings(TransportSettings transportSettings) = 0;
 
   virtual const TransportSettings& getTransportSettings() const = 0;
+
+  /**
+   * Set a "knob". This will emit a knob frame to the peer, which the peer
+   * application can act on by e.g. changing transport settings during the
+   * connection.
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) = 0;
 
   /**
    * Is partial reliability supported.

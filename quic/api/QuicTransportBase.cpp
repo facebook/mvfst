@@ -1615,6 +1615,14 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
   }
 }
 
+void QuicTransportBase::handleKnobCallbacks() {
+  for (auto& knobFrame : conn_->pendingEvents.knobs) {
+    connCallback_->onKnob(
+        knobFrame.knobSpace, knobFrame.id, std::move(knobFrame.blob));
+  }
+  conn_->pendingEvents.knobs.clear();
+}
+
 void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
@@ -1641,6 +1649,8 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
   }
+
+  handleKnobCallbacks();
 
   // TODO: we're currently assuming that canceling write callbacks will not
   // cause reset of random streams. Maybe get rid of that assumption later.
@@ -2761,6 +2771,19 @@ void QuicTransportBase::updateCongestionControlSettings(
       transportSettings.pacingTimerTickInterval;
   conn_->transportSettings.minBurstPackets = transportSettings.minBurstPackets;
   conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
+  // TODO: If we decide to support Knob frame on non-MVFST Quic versions,
+  // we have to implement it as a TransportParameter
+  if (conn_->version && *(conn_->version) == QuicVersion::MVFST) {
+    sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
+    return folly::unit;
+  }
+  LOG(ERROR)
+      << "Cannot set Knob Frame. QUIC negotiation not complete or negotiated version is not MVFST";
+  return folly::makeUnexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

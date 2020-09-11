@@ -490,6 +490,26 @@ size_t writeSimpleFrame(
       // no space left in packet
       return size_t(0);
     }
+    case QuicSimpleFrame::Type::KnobFrame_E: {
+      const KnobFrame& knobFrame = *frame.asKnobFrame();
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::KNOB));
+      QuicInteger intKnobSpace(knobFrame.knobSpace);
+      QuicInteger intKnobId(knobFrame.id);
+      QuicInteger intKnobLen(knobFrame.len);
+      size_t knobFrameLen = intFrameType.getSize() + intKnobSpace.getSize() +
+          intKnobId.getSize() + intKnobLen.getSize() + intKnobLen.getValue();
+      if (packetSpaceCheck(spaceLeft, knobFrameLen)) {
+        builder.write(intFrameType);
+        builder.write(intKnobSpace);
+        builder.write(intKnobId);
+        builder.write(intKnobLen);
+        builder.insert(knobFrame.blob->clone());
+        builder.appendFrame(QuicSimpleFrame(knobFrame));
+        return knobFrameLen;
+      }
+      // no space left in packet
+      return size_t(0);
+    }
   }
   folly::assume_unreachable();
 }

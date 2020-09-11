@@ -100,6 +100,15 @@ folly::dynamic DataBlockedFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic KnobFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["frame_type"] = toQlogString(FrameType::KNOB);
+  d["knob_space"] = knobSpace;
+  d["knob_id"] = knobId;
+  d["knob_blob_len"] = knobBlobLen;
+  return d;
+}
+
 folly::dynamic StreamDataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::STREAM_DATA_BLOCKED);
