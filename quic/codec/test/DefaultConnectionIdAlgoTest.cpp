@@ -11,8 +11,6 @@
 #include <folly/portability/GTest.h>
 #include <bitset>
 
-using namespace testing;
-
 namespace quic::test {
 
 TEST(DefaultConnectionIdAlgoTest, canParse) {

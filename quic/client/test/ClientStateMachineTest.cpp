@@ -8,8 +8,6 @@
 #include "quic/client/test/Mocks.h"
 
 using namespace ::testing;
-using namespace std::literals::chrono_literals;
-
 namespace quic::test {
 
 namespace {

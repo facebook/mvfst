@@ -9,9 +9,6 @@
 #include <quic/state/PacketEvent.h>
 #include <gtest/gtest.h>
 
-using namespace folly;
-using namespace testing;
-
 namespace quic {
 namespace test {
 TEST(PacketEventTest, EqTest) {
