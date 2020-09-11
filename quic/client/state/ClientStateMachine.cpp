@@ -234,9 +234,6 @@ void updateTransportParamsFromCachedEarlyParams(
     QuicClientConnectionState& conn,
     const CachedServerTransportParameters& transportParams) {
   conn.peerIdleTimeout = std::chrono::milliseconds(transportParams.idleTimeout);
-  if (conn.transportSettings.canIgnorePathMTU) {
-    conn.udpSendPacketLen = transportParams.maxRecvPacketSize;
-  }
   conn.flowControlState.peerAdvertisedMaxOffset =
       transportParams.initialMaxData;
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
