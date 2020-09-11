@@ -19,6 +19,8 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/server/handshake/FizzServerHandshake.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/server/test/Mocks.h>
@@ -38,14 +40,15 @@ using ByteEvent = QuicTransportBase::ByteEvent;
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 } // namespace
 
-class FakeServerHandshake : public ServerHandshake {
+class FakeServerHandshake : public FizzServerHandshake {
  public:
   explicit FakeServerHandshake(
       QuicServerConnectionState& conn,
+      std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext,
       bool chloSync = false,
       bool cfinSync = false,
       folly::Optional<uint64_t> clientActiveConnectionIdLimit = folly::none)
-      : ServerHandshake(&conn),
+      : FizzServerHandshake(&conn, std::move(fizzContext)),
         conn_(conn),
         chloSync_(chloSync),
         cfinSync_(cfinSync),
@@ -341,7 +344,9 @@ class QuicServerTransportTest : public Test {
   }
 
   virtual void initializeServerHandshake() {
-    fakeHandshake = new FakeServerHandshake(server->getNonConstConn());
+    fakeHandshake = new FakeServerHandshake(
+        server->getNonConstConn(),
+        std::make_shared<FizzServerQuicHandshakeContext>());
   }
 
   virtual bool getDisableMigration() {
@@ -2195,6 +2200,7 @@ class QuicServerTransportAllowMigrationTest
   virtual void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
         server->getNonConstConn(),
+        std::make_shared<FizzServerQuicHandshakeContext>(),
         false,
         false,
         GetParam().clientSentActiveConnIdTransportParam);
@@ -3914,7 +3920,10 @@ class QuicServerTransportPendingDataTest
 
   void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
-        server->getNonConstConn(), GetParam().chloSync, GetParam().cfinSync);
+        server->getNonConstConn(),
+        std::make_shared<FizzServerQuicHandshakeContext>(),
+        GetParam().chloSync,
+        GetParam().cfinSync);
     if (GetParam().acceptZeroRtt) {
       fakeHandshake->allowZeroRttKeys();
     }
@@ -4081,7 +4090,10 @@ class QuicServerTransportHandshakeTest
 
   void initializeServerHandshake() override {
     fakeHandshake = new FakeServerHandshake(
-        server->getNonConstConn(), GetParam().chloSync, GetParam().cfinSync);
+        server->getNonConstConn(),
+        std::make_shared<FizzServerQuicHandshakeContext>(),
+        GetParam().chloSync,
+        GetParam().cfinSync);
     if (GetParam().acceptZeroRtt) {
       fakeHandshake->allowZeroRttKeys();
     }

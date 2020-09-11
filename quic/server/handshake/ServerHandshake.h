@@ -107,9 +107,7 @@ class ServerHandshake : public Handshake {
   /**
    * Returns a reference to the CryptoFactory used internaly.
    */
-  virtual const CryptoFactory& getCryptoFactory() const {
-    return *cryptoFactory_;
-  }
+  virtual const CryptoFactory& getCryptoFactory() const = 0;
 
   /**
    * An edge triggered API to get the handshakeWriteCipher. Once you receive the
@@ -294,7 +292,12 @@ class ServerHandshake : public Handshake {
 
   Phase phase_{Phase::Handshake};
 
-  std::shared_ptr<CryptoFactory> cryptoFactory_;
   std::shared_ptr<ServerTransportParametersExtension> transportParams_;
+
+ private:
+  virtual void initializeImpl(
+      std::shared_ptr<const fizz::server::FizzServerContext> context,
+      HandshakeCallback* callback,
+      std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
 }; // namespace quic
 } // namespace quic
