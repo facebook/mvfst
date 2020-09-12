@@ -255,16 +255,16 @@ void ServerHandshake::processPendingEvents() {
         actions;
     actionGuard_ = folly::DelayedDestruction::DestructorGuard(conn_);
     if (!waitForData_) {
-      switch (state_.readRecordLayer()->getEncryptionLevel()) {
-        case fizz::EncryptionLevel::Plaintext:
+      switch (getReadRecordLayerEncryptionLevel()) {
+        case EncryptionLevel::Initial:
           actions.emplace(machine_.processSocketData(state_, initialReadBuf_));
           break;
-        case fizz::EncryptionLevel::Handshake:
+        case EncryptionLevel::Handshake:
           actions.emplace(
               machine_.processSocketData(state_, handshakeReadBuf_));
           break;
-        case fizz::EncryptionLevel::EarlyData:
-        case fizz::EncryptionLevel::AppTraffic:
+        case EncryptionLevel::EarlyData:
+        case EncryptionLevel::AppData:
           // TODO: Get rid of appDataReadBuf_ once we do not need EndOfEarlyData
           // any more.
           actions.emplace(machine_.processSocketData(state_, appDataReadBuf_));

@@ -280,5 +280,7 @@ class ServerHandshake : public Handshake {
       std::shared_ptr<const fizz::server::FizzServerContext> context,
       HandshakeCallback* callback,
       std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
+
+  virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
 }; // namespace quic
 } // namespace quic

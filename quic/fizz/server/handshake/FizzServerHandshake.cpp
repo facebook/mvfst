@@ -8,6 +8,8 @@
 
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 
+#include <quic/fizz/handshake/FizzBridge.h>
+
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
 // QuicServerConnectionState.
@@ -38,6 +40,11 @@ void FizzServerHandshake::initializeImpl(
   } else {
     state_.appTokenValidator() = std::make_unique<FailingAppTokenValidator>();
   }
+}
+
+EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
+  return getEncryptionLevelFromFizz(
+      state_.readRecordLayer()->getEncryptionLevel());
 }
 
 const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
