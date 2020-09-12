@@ -423,6 +423,10 @@ class TestQuicTransport
     writeSocketData();
   }
 
+  void invokeProcessCallbacksAfterNetworkData() {
+    processCallbacksAfterNetworkData();
+  }
+
   QuicServerConnectionState* transportConn;
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
@@ -3650,6 +3654,28 @@ TEST_F(
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
+}
+
+TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksDeleted) {
+  auto noopCallback = [] {};
+  transport->transportConn->pendingCallbacks.emplace_back(noopCallback);
+  EXPECT_EQ(1, size(transport->transportConn->pendingCallbacks));
+  transport->invokeProcessCallbacksAfterNetworkData();
+  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
+}
+
+TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksInvoked) {
+  uint32_t callbacksInvoked = 0;
+  auto countingCallback = [&]() { callbacksInvoked++; };
+
+  for (int i = 0; i < 2; i++) {
+    transport->transportConn->pendingCallbacks.emplace_back(countingCallback);
+  }
+  EXPECT_EQ(2, size(transport->transportConn->pendingCallbacks));
+  transport->invokeProcessCallbacksAfterNetworkData();
+
+  EXPECT_EQ(2, callbacksInvoked);
+  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
 }
 
 } // namespace test

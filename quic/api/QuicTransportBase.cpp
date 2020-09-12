@@ -249,10 +249,10 @@ void QuicTransportBase::closeImpl(
   for (const auto& cb : lifecycleObservers_) {
     cb->close(this, errorCode);
   }
-  for (const auto& cb : instrumentationObservers_) {
+  for (const auto& cb : conn_->instrumentationObservers_) {
     cb->observerDetach(this);
   }
-  instrumentationObservers_.clear();
+  conn_->instrumentationObservers_.clear();
 
   if (closeState_ == CloseState::CLOSED) {
     return;
@@ -1645,6 +1645,12 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     }
   }
 
+  // to call any callbacks added for observers
+  for (const auto& callback : conn_->pendingCallbacks) {
+    callback();
+  }
+  conn_->pendingCallbacks.clear();
+
   handlePingCallback();
   if (closeState_ != CloseState::OPEN) {
     return;
@@ -2596,29 +2602,30 @@ QuicTransportBase::getLifecycleObservers() const {
 
 void QuicTransportBase::addInstrumentationObserver(
     InstrumentationObserver* observer) {
-  instrumentationObservers_.push_back(CHECK_NOTNULL(observer));
+  conn_->instrumentationObservers_.push_back(CHECK_NOTNULL(observer));
 }
 
 bool QuicTransportBase::removeInstrumentationObserver(
     InstrumentationObserver* observer) {
   const auto eraseIt = std::remove(
-      instrumentationObservers_.begin(),
-      instrumentationObservers_.end(),
+      conn_->instrumentationObservers_.begin(),
+      conn_->instrumentationObservers_.end(),
       observer);
-  if (eraseIt == instrumentationObservers_.end()) {
+  if (eraseIt == conn_->instrumentationObservers_.end()) {
     return false;
   }
 
-  for (auto it = eraseIt; it != instrumentationObservers_.end(); it++) {
+  for (auto it = eraseIt; it != conn_->instrumentationObservers_.end(); it++) {
     (*it)->observerDetach(this);
   }
-  instrumentationObservers_.erase(eraseIt, instrumentationObservers_.end());
+  conn_->instrumentationObservers_.erase(
+      eraseIt, conn_->instrumentationObservers_.end());
   return true;
 }
 
-const QuicTransportBase::InstrumentationObserverVec&
+const InstrumentationObserverVec&
 QuicTransportBase::getInstrumentationObservers() const {
-  return instrumentationObservers_;
+  return conn_->instrumentationObservers_;
 }
 
 void QuicTransportBase::writeSocketData() {
@@ -2669,7 +2676,7 @@ void QuicTransportBase::writeSocketData() {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any instrumentation callbacks
         connCallback_->onAppRateLimited();
-        for (const auto& cb : instrumentationObservers_) {
+        for (const auto& cb : conn_->instrumentationObservers_) {
           cb->appRateLimited(this);
         }
       }

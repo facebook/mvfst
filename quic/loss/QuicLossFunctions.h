@@ -9,6 +9,7 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
+#include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/flowcontrol/QuicFlowController.h>
@@ -204,6 +205,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
+  InstrumentationObserver::ObserverLossEvent observerLossEvent(lossTime);
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   bool shouldSetTimer = false;
@@ -218,16 +220,19 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       iter++;
       continue;
     }
-    bool lost = (lossTime - pkt.time) > delayUntilLost;
-    lost = lost ||
+    bool lostByTimeout = (lossTime - pkt.time) > delayUntilLost;
+    bool lostByReorder =
         (*largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
-    if (!lost) {
+
+    if (!(lostByTimeout || lostByReorder)) {
       // We can exit early here because if packet N doesn't meet the
       // threshold, then packet N + 1 will not either.
       shouldSetTimer = true;
       break;
     }
     lossEvent.addLostPacket(pkt);
+    observerLossEvent.addLostPacket(lostByTimeout, lostByReorder, pkt);
+
     if (pkt.associatedEvent) {
       DCHECK_GT(conn.outstandings.clonedPacketsCount, 0);
       --conn.outstandings.clonedPacketsCount;
@@ -258,6 +263,15 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
     iter++;
+  }
+
+  // if there are observers, enqueue a function to call it
+  if (observerLossEvent.hasPackets()) {
+    for (const auto& observer : conn.instrumentationObservers_) {
+      conn.pendingCallbacks.emplace_back([observer, observerLossEvent] {
+        observer->packetLossDetected(observerLossEvent);
+      });
+    }
   }
 
   auto earliest = getFirstOutstandingPacket(conn, pnSpace);

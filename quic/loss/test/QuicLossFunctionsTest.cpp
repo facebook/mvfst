@@ -12,6 +12,7 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/io/async/test/MockTimeoutManager.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
@@ -121,6 +122,11 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   MockLossTimeout timeout;
   std::unique_ptr<MockQuicStats> transportInfoCb_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
+
+  auto getLossPacketMatcher(bool lossByReorder, bool lossByTimeout) {
+    return MockInstrumentationObserver::getLossPacketMatcher(
+        lossByReorder, lossByTimeout);
+  }
 };
 
 auto testingLossMarkFunc(std::vector<PacketNum>& lostPackets) {
@@ -1590,6 +1596,210 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
   EXPECT_FALSE(
       isPersistentCongestion(*conn, currentTime - 42s + 1ms, currentTime));
   EXPECT_FALSE(isPersistentCongestion(*conn, currentTime - 100us, currentTime));
+}
+
+TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
+  auto ib = MockInstrumentationObserver();
+  auto conn = createConn();
+  // Register 1 instrumentation observer
+  conn->instrumentationObservers_.emplace_back(&ib);
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn->lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(200ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // expecting 1 callback to be stacked
+  EXPECT_EQ(1, size(conn->pendingCallbacks));
+
+  // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
+  // 1, 2 and 6 are "lost" due to reodering. None lost due to timeout
+  EXPECT_CALL(
+      ib,
+      packetLossDetected(Field(
+          &InstrumentationObserver::ObserverLossEvent::lostPackets,
+          UnorderedElementsAre(
+              getLossPacketMatcher(true, false),
+              getLossPacketMatcher(true, false),
+              getLossPacketMatcher(true, false)))))
+      .Times(1);
+
+  for (auto& callback : conn->pendingCallbacks) {
+    callback();
+  }
+}
+
+TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
+  auto ib = MockInstrumentationObserver();
+  auto conn = createConn();
+  // Register 1 instrumentation observer
+  conn->instrumentationObservers_.emplace_back(&ib);
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  PacketNum largestSent = 0;
+
+  // send 7 packets
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // setting a very high reordering threshold to force loss by timeout only
+  conn->lossState.reorderingThreshold = 100;
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // expecting 1 callback to be stacked
+  EXPECT_EQ(1, size(conn->pendingCallbacks));
+
+  // expecting all packets to be lost due to timeout
+  EXPECT_CALL(
+      ib,
+      packetLossDetected(Field(
+          &InstrumentationObserver::ObserverLossEvent::lostPackets,
+          UnorderedElementsAre(
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true),
+              getLossPacketMatcher(false, true)))))
+      .Times(1);
+
+  for (auto& callback : conn->pendingCallbacks) {
+    callback();
+  }
+}
+
+TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
+  auto ib = MockInstrumentationObserver();
+  auto conn = createConn();
+  // Register 1 instrumentation observer
+  conn->instrumentationObservers_.emplace_back(&ib);
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a low reorder threshold
+  conn->lossState.reorderingThreshold = 1;
+
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // expecting 1 callback to be stacked
+  EXPECT_EQ(1, size(conn->pendingCallbacks));
+
+  // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
+  // 1, 2, 6 are lost due to reodering and timeout.
+  // 7 just timed out
+  EXPECT_CALL(
+      ib,
+      packetLossDetected(Field(
+          &InstrumentationObserver::ObserverLossEvent::lostPackets,
+          UnorderedElementsAre(
+              getLossPacketMatcher(true, true),
+              getLossPacketMatcher(true, true),
+              getLossPacketMatcher(true, true),
+              getLossPacketMatcher(false, true)))))
+      .Times(1);
+
+  for (auto& callback : conn->pendingCallbacks) {
+    callback();
+  }
+}
+
+TEST_F(QuicLossFunctionsTest, TestNoInstrumentationObserverCallback) {
+  auto conn = createConn();
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a low reorder threshold
+  conn->lossState.reorderingThreshold = 1;
+
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // expecting 0 callbacks to be queued
+  EXPECT_EQ(0, size(conn->pendingCallbacks));
 }
 
 INSTANTIATE_TEST_CASE_P(
