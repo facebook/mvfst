@@ -817,9 +817,8 @@ uint64_t writeCryptoAndAckDataToSocket(
   uint64_t written = 0;
   auto& cryptoStream =
       *getCryptoStream(*connection.cryptoState, encryptionLevel);
-  if ((connection.pendingEvents.numProbePackets &&
-       cryptoStream.retransmissionBuffer.size()) ||
-      scheduler.hasData()) {
+  if (connection.pendingEvents.numProbePackets &&
+      (cryptoStream.retransmissionBuffer.size() || scheduler.hasData())) {
     written = writeProbingDataToSocket(
         sock,
         connection,

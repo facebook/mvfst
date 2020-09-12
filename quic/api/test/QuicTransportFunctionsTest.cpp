@@ -1638,7 +1638,6 @@ TEST_F(QuicTransportFunctionsTest, ProbingFallbackToPing) {
 
 TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
   auto conn = createConn();
-  // TODO: use handshake write cipher with draft-14.
   auto cryptoStream = &conn->cryptoState->initialStream;
   auto buf = buildRandomInputData(200);
   writeDataToQuicStream(*cryptoStream, buf->clone());
@@ -1661,6 +1660,48 @@ TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
   ASSERT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
                   ->isHandshake);
+}
+
+TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
+  auto conn = createConn();
+  auto cryptoStream = &conn->cryptoState->initialStream;
+  auto buf = buildRandomInputData(200);
+  writeDataToQuicStream(*cryptoStream, buf->clone());
+  EventBase evb;
+  auto socket =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
+  auto rawSocket = socket.get();
+  EXPECT_EQ(
+      1,
+      writeCryptoAndAckDataToSocket(
+          *rawSocket,
+          *conn,
+          *conn->clientConnectionId,
+          *conn->serverConnectionId,
+          LongHeader::Types::Initial,
+          *conn->initialWriteCipher,
+          *conn->initialHeaderCipher,
+          getVersion(*conn),
+          conn->transportSettings.writeConnectionDataPacketsLimit));
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+  EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
+                  ->isHandshake);
+  ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
+  ASSERT_TRUE(cryptoStream->writeBuffer.empty());
+
+  conn->pendingEvents.numProbePackets = 0;
+  EXPECT_EQ(
+      0,
+      writeCryptoAndAckDataToSocket(
+          *rawSocket,
+          *conn,
+          *conn->clientConnectionId,
+          *conn->serverConnectionId,
+          LongHeader::Types::Initial,
+          *conn->initialWriteCipher,
+          *conn->initialHeaderCipher,
+          getVersion(*conn),
+          conn->transportSettings.writeConnectionDataPacketsLimit));
 }
 
 TEST_F(QuicTransportFunctionsTest, WritePureAckWhenNoWritableBytes) {
