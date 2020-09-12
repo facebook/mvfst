@@ -377,6 +377,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
 
   std::vector<QuicVersion> supportedVersions_{{QuicVersion::MVFST,
                                                QuicVersion::MVFST_D24,
+                                               QuicVersion::MVFST_EXPERIMENTAL,
                                                QuicVersion::QUIC_DRAFT,
                                                QuicVersion::QUIC_DRAFT_LEGACY}};
 
