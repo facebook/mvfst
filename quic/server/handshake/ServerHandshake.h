@@ -109,12 +109,6 @@ class ServerHandshake : public Handshake {
   virtual const CryptoFactory& getCryptoFactory() const = 0;
 
   /**
-   * An edge triggered API to get the handshakeWriteCipher. Once you receive the
-   * write cipher subsequent calls will return null.
-   */
-  std::unique_ptr<Aead> getHandshakeWriteCipher();
-
-  /**
    * An edge triggered API to get the handshakeReadCipher. Once you receive the
    * write cipher subsequent calls will return null.
    */
@@ -155,12 +149,6 @@ class ServerHandshake : public Handshake {
    * receive the header cipher subsequent calls will return null.
    */
   std::unique_ptr<PacketNumberCipher> getHandshakeReadHeaderCipher();
-
-  /**
-   * An edge triggered API to get the handshake rtt write header cpher. Once you
-   * receive the header cipher subsequent calls will return null.
-   */
-  std::unique_ptr<PacketNumberCipher> getHandshakeWriteHeaderCipher();
 
   /**
    * An edge triggered API to get the zero rtt header cpher. Once you
@@ -260,7 +248,6 @@ class ServerHandshake : public Handshake {
   folly::Optional<std::pair<std::string, TransportErrorCode>> error_;
 
   std::unique_ptr<Aead> handshakeReadCipher_;
-  std::unique_ptr<Aead> handshakeWriteCipher_;
   std::unique_ptr<Aead> oneRttReadCipher_;
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<Aead> zeroRttReadCipher_;
@@ -268,7 +255,6 @@ class ServerHandshake : public Handshake {
   std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher_;
-  std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher_;
   std::unique_ptr<PacketNumberCipher> zeroRttReadHeaderCipher_;
 
   bool inHandshakeStack_{false};

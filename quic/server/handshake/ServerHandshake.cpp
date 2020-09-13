@@ -74,13 +74,6 @@ void ServerHandshake::writeNewSessionTicket(const AppToken& appToken) {
   }
 }
 
-std::unique_ptr<Aead> ServerHandshake::getHandshakeWriteCipher() {
-  if (error_) {
-    throw QuicTransportException(error_->first, error_->second);
-  }
-  return std::move(handshakeWriteCipher_);
-}
-
 std::unique_ptr<Aead> ServerHandshake::getHandshakeReadCipher() {
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
@@ -131,14 +124,6 @@ ServerHandshake::getHandshakeReadHeaderCipher() {
     throw QuicTransportException(error_->first, error_->second);
   }
   return std::move(handshakeReadHeaderCipher_);
-}
-
-std::unique_ptr<PacketNumberCipher>
-ServerHandshake::getHandshakeWriteHeaderCipher() {
-  if (error_) {
-    throw QuicTransportException(error_->first, error_->second);
-  }
-  return std::move(handshakeWriteHeaderCipher_);
 }
 
 std::unique_ptr<PacketNumberCipher>
@@ -455,8 +440,8 @@ void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       handshakeReadHeaderCipher_ = std::move(headerCipher);
       break;
     case CipherKind::HandshakeWrite:
-      handshakeWriteCipher_ = std::move(aead);
-      handshakeWriteHeaderCipher_ = std::move(headerCipher);
+      conn_->handshakeWriteCipher = std::move(aead);
+      conn_->handshakeWriteHeaderCipher = std::move(headerCipher);
       break;
     case CipherKind::OneRttRead:
       oneRttReadCipher_ = std::move(aead);

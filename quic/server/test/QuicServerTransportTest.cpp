@@ -167,8 +167,8 @@ class FakeServerHandshake : public FizzServerHandshake {
   }
 
   void setHandshakeKeys() {
-    handshakeWriteCipher_ = createNoOpAead();
-    handshakeWriteHeaderCipher_ = createNoOpHeaderCipher();
+    conn_.handshakeWriteCipher = createNoOpAead();
+    conn_.handshakeWriteHeaderCipher = createNoOpHeaderCipher();
     handshakeReadCipher_ = createNoOpAead();
     handshakeReadHeaderCipher_ = createNoOpHeaderCipher();
   }

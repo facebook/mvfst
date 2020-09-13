@@ -221,7 +221,7 @@ class ServerHandshakeTest : public Test {
     auto oneRttWriteCipherTmp = handshake->getOneRttWriteCipher();
     auto oneRttReadCipherTmp = handshake->getOneRttReadCipher();
     auto zeroRttReadCipherTmp = handshake->getZeroRttReadCipher();
-    auto handshakeWriteCipherTmp = handshake->getHandshakeWriteCipher();
+    auto handshakeWriteCipherTmp = std::move(conn->handshakeWriteCipher);
     auto handshakeReadCipherTmp = handshake->getHandshakeReadCipher();
     if (oneRttWriteCipherTmp) {
       oneRttWriteCipher = std::move(oneRttWriteCipherTmp);

@@ -29,8 +29,7 @@ using namespace std::chrono_literals;
 namespace {
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 constexpr size_t kConnIdEncodingRetryLimit = 16;
-} // namespace
-namespace {
+
 bool maybeNATRebinding(
     const folly::SocketAddress& newPeerAddress,
     const folly::SocketAddress& oldPeerAddress) {
@@ -318,18 +317,12 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     conn.writableBytesLimit = folly::none;
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
   }
-  auto handshakeWriteCipher = handshakeLayer->getHandshakeWriteCipher();
   auto handshakeReadCipher = handshakeLayer->getHandshakeReadCipher();
-  auto handshakeWriteHeaderCipher =
-      handshakeLayer->getHandshakeWriteHeaderCipher();
   auto handshakeReadHeaderCipher =
       handshakeLayer->getHandshakeReadHeaderCipher();
-  if (handshakeWriteCipher) {
+  if (handshakeReadCipher) {
     CHECK(
-        handshakeReadCipher && handshakeWriteHeaderCipher &&
         handshakeReadHeaderCipher);
-    conn.handshakeWriteCipher = std::move(handshakeWriteCipher);
-    conn.handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
     conn.readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
     conn.readCodec->setHandshakeHeaderCipher(
         std::move(handshakeReadHeaderCipher));
