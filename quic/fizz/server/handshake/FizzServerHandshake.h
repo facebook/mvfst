@@ -11,6 +11,8 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/server/handshake/ServerHandshake.h>
 
+#include <fizz/server/ServerProtocol.h>
+
 namespace quic {
 
 class FizzServerQuicHandshakeContext;
@@ -24,8 +26,6 @@ class FizzServerHandshake : public ServerHandshake {
 
   const CryptoFactory& getCryptoFactory() const override;
 
-  void processAccept() override;
-
   /**
    * Returns the context used by the ServerHandshake.
    */
@@ -37,10 +37,16 @@ class FizzServerHandshake : public ServerHandshake {
       std::unique_ptr<fizz::server::AppTokenValidator> validator) override;
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
+  void processSocketData(folly::IOBufQueue& queue) override;
   std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(folly::ByteRange secret) override;
 
-  void processSocketData(folly::IOBufQueue& queue) override;
+  void processAccept() override;
+  bool processPendingCryptoEvent() override;
+  void writeNewSessionTicketToCrypto(const AppToken& appToken) override;
+
+  using PendingEvent = fizz::WriteNewSessionTicket;
+  std::deque<PendingEvent> pendingEvents_;
 
   FizzCryptoFactory cryptoFactory_;
 

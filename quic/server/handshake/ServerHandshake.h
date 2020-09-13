@@ -11,7 +11,6 @@
 #include <fizz/protocol/DefaultCertificateVerifier.h>
 #include <fizz/server/FizzServer.h>
 #include <fizz/server/FizzServerContext.h>
-#include <fizz/server/ServerProtocol.h>
 
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/DelayedDestruction.h>
@@ -233,8 +232,6 @@ class ServerHandshake : public Handshake {
   QuicConnectionStateBase* conn_;
   folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
-  using PendingEvent = fizz::WriteNewSessionTicket;
-  std::deque<PendingEvent> pendingEvents_;
 
   QuicCryptoState& cryptoState_;
   bool inProcessPendingEvents_{false};
@@ -269,11 +266,13 @@ class ServerHandshake : public Handshake {
       std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
-
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
-  virtual void processAccept() = 0;
   virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(folly::ByteRange secret) = 0;
+
+  virtual void processAccept() = 0;
+  virtual bool processPendingCryptoEvent() = 0;
+  virtual void writeNewSessionTicketToCrypto(const AppToken& appToken) = 0;
 }; // namespace quic
 
 } // namespace quic

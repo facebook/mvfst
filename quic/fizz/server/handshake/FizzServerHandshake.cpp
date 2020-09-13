@@ -6,8 +6,9 @@
  *
  */
 
-#include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/server/handshake/AppToken.h>
+#include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <fizz/protocol/Protocol.h>
@@ -59,9 +60,21 @@ void FizzServerHandshake::initializeImpl(
   }
 }
 
+const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
+  return cryptoFactory_;
+}
+
+const fizz::server::FizzServerContext* FizzServerHandshake::getContext() const {
+  return state_.context();
+}
+
 EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
   return getEncryptionLevelFromFizz(
       state_.readRecordLayer()->getEncryptionLevel());
+}
+
+void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
+  startActions(machine_.processSocketData(state_, queue));
 }
 
 std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
@@ -78,21 +91,27 @@ FizzServerHandshake::buildCiphers(folly::ByteRange secret) {
   return {std::move(aead), std::move(headerCipher)};
 }
 
-const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
-  return cryptoFactory_;
-}
-
 void FizzServerHandshake::processAccept() {
   addProcessingActions(machine_.processAccept(
       state_, executor_, state_.context(), transportParams_));
 }
 
-const fizz::server::FizzServerContext* FizzServerHandshake::getContext() const {
-  return state_.context();
+bool FizzServerHandshake::processPendingCryptoEvent() {
+  if (pendingEvents_.empty()) {
+    return false;
+  }
+
+  auto write = std::move(pendingEvents_.front());
+  pendingEvents_.pop_front();
+  startActions(machine_.processWriteNewSessionTicket(state_, std::move(write)));
+  return true;
 }
 
-void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
-  startActions(machine_.processSocketData(state_, queue));
+void FizzServerHandshake::writeNewSessionTicketToCrypto(
+    const AppToken& appToken) {
+  fizz::WriteNewSessionTicket writeNST;
+  writeNST.appToken = encodeAppToken(appToken);
+  pendingEvents_.push_back(std::move(writeNST));
 }
 
 } // namespace quic
