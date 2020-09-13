@@ -19,6 +19,7 @@ add_library(
   state/ServerStateMachine.cpp
 
   # Fizz specific parts, will be split in its own lib eventually.
+  ../fizz/server/handshake/AppToken.cpp
   ../fizz/server/handshake/FizzServerQuicHandshakeContext.cpp
   ../fizz/server/handshake/FizzServerHandshake.cpp
 )

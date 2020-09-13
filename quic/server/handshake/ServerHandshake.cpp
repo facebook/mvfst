@@ -10,6 +10,7 @@
 
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {

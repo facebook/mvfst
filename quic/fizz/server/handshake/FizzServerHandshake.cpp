@@ -11,11 +11,26 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <fizz/protocol/Protocol.h>
+#include <fizz/server/State.h>
 
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
 // QuicServerConnectionState.
 #include <quic/server/state/ServerStateMachine.h>
+
+namespace fizz {
+namespace server {
+struct ResumptionState;
+} // namespace server
+} // namespace fizz
+
+namespace {
+class FailingAppTokenValidator : public fizz::server::AppTokenValidator {
+  bool validate(const fizz::server::ResumptionState&) const override {
+    return false;
+  }
+};
+} // namespace
 
 namespace quic {
 

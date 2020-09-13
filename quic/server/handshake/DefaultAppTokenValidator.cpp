@@ -11,6 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/api/QuicSocket.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/handshake/TransportParameters.h>
 #include <quic/server/state/ServerStateMachine.h>
 
