@@ -41,6 +41,7 @@ void processAckFrame(
   // TODO: send error if we get an ack for a packet we've not sent t18721184
   CongestionController::AckEvent ack;
   ack.ackTime = ackReceiveTime;
+  ack.implicit = frame.implicit;
   // Using kDefaultRxPacketsBeforeAckAfterInit to reseve for ackedPackets
   // container is a hueristic. Other quic implementations may have very
   // different acking policy. It's also possibly that all acked packets are pure
@@ -139,7 +140,7 @@ void processAckFrame(
           ackReceiveTime > rPacketIt->time ? ackReceiveTime : Clock::now();
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
           ackReceiveTimeOrNow - rPacketIt->time);
-      if (currentPacketNum == frame.largestAcked) {
+      if (!ack.implicit && currentPacketNum == frame.largestAcked) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
       // D6D probe acked. Put it after updateRTT so that srtt update is
@@ -166,7 +167,7 @@ void processAckFrame(
         ack.largestAckedPacketSentTime = rPacketIt->time;
         ack.largestAckedPacketAppLimited = rPacketIt->isAppLimited;
       }
-      if (ackReceiveTime > rPacketIt->time) {
+      if (!ack.implicit && ackReceiveTime > rPacketIt->time) {
         ack.mrttSample =
             std::min(ack.mrttSample.value_or(rttSample), rttSample);
       }

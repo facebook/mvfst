@@ -176,6 +176,31 @@ void BbrCongestionController::onPacketAcked(
     const AckEvent& ack,
     uint64_t prevInflightBytes,
     bool hasLoss) {
+  SCOPE_EXIT {
+    if (conn_.qLogger) {
+      conn_.qLogger->addCongestionMetricUpdate(
+          conn_.lossState.inflightBytes,
+          getCongestionWindow(),
+          kCongestionPacketAck,
+          bbrStateToString(state_),
+          bbrRecoveryStateToString(recoveryState_));
+    }
+    QUIC_TRACE(
+        bbr_ack,
+        conn_,
+        bbrStateToString(state_),
+        bbrRecoveryStateToString(recoveryState_),
+        getCongestionWindow(),
+        cwnd_,
+        sendQuantum_,
+        conn_.lossState.inflightBytes);
+  };
+  if (ack.implicit) {
+    // This is an implicit ACK during the handshake, we can't trust very
+    // much about it except the fact that it does ACK some bytes.
+    updateCwnd(ack.ackedBytes, 0);
+    return;
+  }
   if (ack.mrttSample && minRttSampler_) {
     bool updated =
         minRttSampler_->newRttSample(ack.mrttSample.value(), ack.ackTime);
@@ -237,23 +262,6 @@ void BbrCongestionController::onPacketAcked(
 
   updateCwnd(ack.ackedBytes, excessiveBytes);
   updatePacing();
-  if (conn_.qLogger) {
-    conn_.qLogger->addCongestionMetricUpdate(
-        conn_.lossState.inflightBytes,
-        getCongestionWindow(),
-        kCongestionPacketAck,
-        bbrStateToString(state_),
-        bbrRecoveryStateToString(recoveryState_));
-  }
-  QUIC_TRACE(
-      bbr_ack,
-      conn_,
-      bbrStateToString(state_),
-      bbrRecoveryStateToString(recoveryState_),
-      getCongestionWindow(),
-      cwnd_,
-      sendQuantum_,
-      conn_.lossState.inflightBytes);
 }
 
 // TODO: We used to check if there is available bandwidth and rtt samples in

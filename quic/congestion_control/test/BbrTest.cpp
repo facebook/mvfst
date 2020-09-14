@@ -145,6 +145,34 @@ TEST_F(BbrTest, StartupCwnd) {
   EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
 }
 
+TEST_F(BbrTest, StartupCwndImplicit) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  conn.udpSendPacketLen = 1000;
+  BbrCongestionController bbr(conn);
+  auto mockRttSampler = std::make_unique<MockMinRttSampler>();
+  auto mockBandwidthSampler = std::make_unique<MockBandwidthSampler>();
+  auto rawRttSampler = mockRttSampler.get();
+  auto rawBandwidthSampler = mockBandwidthSampler.get();
+  bbr.setRttSampler(std::move(mockRttSampler));
+  bbr.setBandwidthSampler(std::move(mockBandwidthSampler));
+
+  auto packet = makeTestingWritePacket(0, 3000, 3000);
+  bbr.onPacketSent(packet);
+  auto startingCwnd = bbr.getCongestionWindow();
+  conn.lossState.srtt = 100us;
+  EXPECT_CALL(*rawRttSampler, newRttSample(_, _)).Times(0);
+  EXPECT_CALL(*rawRttSampler, minRtt()).WillRepeatedly(Return(100us));
+  EXPECT_CALL(*rawBandwidthSampler, getBandwidth())
+      .WillRepeatedly(Return(
+          Bandwidth(5000ULL * 1000 * 1000, std::chrono::microseconds(1))));
+  // Target cwnd will be 100 * 5000 * 2.885 = 1442500, but you haven't finished
+  // STARTUP, too bad kiddo, you only grow a little today
+  auto ack = makeAck(0, 3000, Clock::now(), packet.time);
+  ack.implicit = true;
+  bbr.onPacketAckOrLoss(ack, folly::none);
+  EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
+}
+
 TEST_F(BbrTest, LeaveStartup) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   conn.udpSendPacketLen = 1000;

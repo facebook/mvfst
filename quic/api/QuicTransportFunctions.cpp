@@ -1443,6 +1443,7 @@ void implicitAckCryptoStream(
   AckBlocks ackBlocks;
   ReadAckFrame implicitAck;
   implicitAck.ackDelay = 0ms;
+  implicitAck.implicit = true;
   for (const auto& op : conn.outstandings.packets) {
     if (op.packet.header.getPacketNumberSpace() == packetNumSpace) {
       ackBlocks.insert(op.packet.header.getPacketSequenceNum());

@@ -144,6 +144,8 @@ struct AckBlock {
 struct ReadAckFrame {
   PacketNum largestAcked;
   std::chrono::microseconds ackDelay{0us};
+  // Only true for the special case of packet number space dropping.
+  bool implicit{false};
   // Should have at least 1 block.
   // These are ordered in descending order by start packet.
   using Vec = SmallVec<AckBlock, kNumInitialAckBlocksPerFrame, uint16_t>;

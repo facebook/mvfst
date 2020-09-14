@@ -255,6 +255,8 @@ struct CongestionController {
     // The minimal RTT sample among packets acked by this AckEvent. This RTT
     // includes ack delay.
     folly::Optional<std::chrono::microseconds> mrttSample;
+    // If this AckEvent came from an implicit ACK rather than a real one.
+    bool implicit{false};
 
     struct AckPacket {
       // Packet sent time when this acked pakcet was first sent.
