@@ -100,7 +100,10 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numWorkers; ++i) {
     auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>(
-        getEventBaseBackend(), nullptr, "");
+        folly::EventBase::Options().setBackendFactory(
+            [] { return getEventBaseBackend(); }),
+        nullptr,
+        "");
     workerEvbs_.push_back(std::move(scopedEvb));
     if (evbObserver_) {
       workerEvbs_.back()->getEventBase()->runInEventBaseThreadAndWait([&] {
