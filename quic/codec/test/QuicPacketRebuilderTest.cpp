@@ -66,7 +66,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
@@ -204,7 +204,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildAfterResetStream) {
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
   regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
@@ -241,7 +241,7 @@ TEST_F(QuicPacketRebuilderTest, FinOnlyStreamRebuild) {
       kDefaultUDPSendPacketLen, std::move(shortHeader1), 0 /* largestAcked */);
   regularBuilder1.encodePacketHeader();
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
@@ -286,7 +286,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildDataStreamAndEmptyCryptoStream) {
   regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   StreamId streamId = stream->id;
@@ -350,7 +350,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuildEmptyCryptoStream) {
   regularBuilder1.encodePacketHeader();
   // Get a bunch frames
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   uint64_t cryptoOffset = 0;
   auto cryptoBuf = folly::IOBuf::copyBuffer("NewSessionTicket");
 
@@ -389,7 +389,7 @@ TEST_F(QuicPacketRebuilderTest, CannotRebuild) {
   ackBlocks.insert(200, 1000);
   AckFrameMetaData ackMeta(ackBlocks, 0us, kDefaultAckDelayExponent);
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
@@ -445,7 +445,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   auto packet = std::move(regularBuilder).buildPacket();
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 1000);
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
@@ -469,7 +469,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
   auto outstandingPacket = makeDummyOutstandingPacket(packet.packet, 50);
   EXPECT_EQ(1, outstandingPacket.packet.frames.size());
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   ShortHeader shortHeader2(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), 0);
   RegularQuicPacketBuilder regularBuilder2(
@@ -483,7 +483,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(100);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;
@@ -558,7 +558,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlyNotSkipLen) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(100);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
   auto streamId = stream->id;

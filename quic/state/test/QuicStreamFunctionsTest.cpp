@@ -54,7 +54,7 @@ class QuicStreamFunctionsTest : public Test {
 class QuicServerStreamFunctionsTest : public Test {
  public:
   QuicServerStreamFunctionsTest()
-      : conn(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+      : conn(FizzServerQuicHandshakeContext::Builder().build()) {}
 
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
@@ -1107,7 +1107,7 @@ TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   QuicNodeType nodeType;
   StreamId id;
 
@@ -1136,7 +1136,7 @@ TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
   QuicServerConnectionState serverState(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   QuicNodeType nodeType;
   StreamId id;
 

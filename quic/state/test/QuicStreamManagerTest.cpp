@@ -22,7 +22,7 @@ namespace test {
 class QuicStreamManagerTest : public Test {
  public:
   QuicStreamManagerTest()
-      : conn(std::make_shared<FizzServerQuicHandshakeContext>()) {}
+      : conn(FizzServerQuicHandshakeContext::Builder().build()) {}
   void SetUp() override {
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;

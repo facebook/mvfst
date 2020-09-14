@@ -31,11 +31,10 @@ void ServerHandshake::accept(
 
 void ServerHandshake::initialize(
     folly::Executor* executor,
-    std::shared_ptr<const fizz::server::FizzServerContext> context,
     HandshakeCallback* callback,
     std::unique_ptr<fizz::server::AppTokenValidator> validator) {
   executor_ = executor;
-  initializeImpl(std::move(context), callback, std::move(validator));
+  initializeImpl(callback, std::move(validator));
 }
 
 void ServerHandshake::doHandshake(

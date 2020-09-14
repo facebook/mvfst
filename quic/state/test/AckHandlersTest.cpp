@@ -36,7 +36,7 @@ auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
 
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.reorderingThreshold = 85;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -107,7 +107,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
 
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.reorderingThreshold = 85;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -244,7 +244,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
 
 TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.reorderingThreshold = 30;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -342,7 +342,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
 
 TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.reorderingThreshold = 10;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
@@ -436,7 +436,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
 
 TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.connectionTime = Clock::now();
   auto firstPacket = createNewPacket(100 /* packetNum */, GetParam());
   WriteAckFrame firstAckFrame;
@@ -508,7 +508,7 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
 
 TEST_P(AckHandlersTest, NoNewAckedPacket) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockController = std::make_unique<MockCongestionController>();
   auto rawController = mockController.get();
   conn.congestionController = std::move(mockController);
@@ -536,7 +536,7 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
 
 TEST_P(AckHandlersTest, LossByAckedRecovered) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockController);
 
@@ -554,7 +554,7 @@ TEST_P(AckHandlersTest, LossByAckedRecovered) {
 
 TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockController);
   // Get the time based loss detection out of the way
@@ -588,7 +588,7 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
 
 TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   StreamId stream = 1;
   for (PacketNum packetNum = 0; packetNum < 10; packetNum++) {
     auto regularPacket = createNewPacket(
@@ -647,7 +647,7 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
 
 TEST_P(AckHandlersTest, PurgeAcks) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(900, 1000);
   ackFrame.ackBlocks.emplace_back(500, 700);
@@ -666,7 +666,7 @@ TEST_P(AckHandlersTest, PurgeAcks) {
 
 TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -708,7 +708,7 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
 
 TEST_P(AckHandlersTest, SkipAckVisitor) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
@@ -756,7 +756,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
 
 TEST_P(AckHandlersTest, NoDoubleProcess) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.congestionController.reset();
 
   WriteStreamFrame frame(0, 0, 0, true);
@@ -822,7 +822,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
 
 TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.congestionController = nullptr;
   WriteStreamFrame frame(0, 0, 0, true);
   auto packetNum1 = conn.ackStates.appDataAckState.nextPacketNum;
@@ -870,7 +870,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
 
 TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.congestionController = nullptr;
   conn.lossState.mrtt = 200us;
   PacketNum packetNum = 0;
@@ -899,7 +899,7 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
 // Ack only acks packets aren't outstanding, but TimeReordering still finds loss
 TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);
   conn.qLogger = mockQLogger;
 
@@ -964,7 +964,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
 
 TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.congestionController = nullptr;
   conn.lossState.totalBytesSent = 2468;
   conn.lossState.totalBytesAcked = 1357;
@@ -1000,7 +1000,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
 
 TEST_P(AckHandlersTest, AckEventCreation) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);

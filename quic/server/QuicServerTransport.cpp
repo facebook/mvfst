@@ -24,7 +24,9 @@ QuicServerTransport::QuicServerTransport(
     std::shared_ptr<const fizz::server::FizzServerContext> ctx)
     : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder()
+          .setFizzServerContext(ctx_)
+          .build());
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
@@ -140,10 +142,7 @@ void QuicServerTransport::accept() {
   updateFlowControlStateWithSettings(
       conn_->flowControlState, conn_->transportSettings);
   serverConn_->serverHandshakeLayer->initialize(
-      evb_,
-      ctx_,
-      this,
-      std::make_unique<DefaultAppTokenValidator>(serverConn_));
+      evb_, this, std::make_unique<DefaultAppTokenValidator>(serverConn_));
 }
 
 void QuicServerTransport::writeData() {

@@ -151,7 +151,7 @@ class QuicTransportFunctionsTest : public Test {
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
     auto conn = std::make_unique<QuicServerConnectionState>(
-        std::make_shared<FizzServerQuicHandshakeContext>());
+        FizzServerQuicHandshakeContext::Builder().build());
     conn->serverConnectionId = getTestConnectionId();
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
@@ -1549,7 +1549,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
 
 TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.serverConnectionId = getTestConnectionId();
   conn.clientConnectionId = getTestConnectionId();
   // writeCryptoDataProbesToSocketForTest writes Initial LongHeader, thus it

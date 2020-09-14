@@ -7,8 +7,8 @@
  */
 
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
-
 #include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
@@ -23,16 +23,16 @@ FizzServerHandshake::FizzServerHandshake(
     : ServerHandshake(conn), fizzContext_(std::move(fizzContext)) {}
 
 void FizzServerHandshake::initializeImpl(
-    std::shared_ptr<const fizz::server::FizzServerContext> context,
     HandshakeCallback* callback,
     std::unique_ptr<fizz::server::AppTokenValidator> validator) {
-  auto ctx = std::make_shared<fizz::server::FizzServerContext>(*context);
-  ctx->setFactory(cryptoFactory_.getFizzFactory());
-  ctx->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
-  ctx->setVersionFallbackEnabled(false);
+  auto context = std::make_shared<fizz::server::FizzServerContext>(
+      *fizzContext_->getContext());
+  context->setFactory(cryptoFactory_.getFizzFactory());
+  context->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
+  context->setVersionFallbackEnabled(false);
   // Since Draft-17, client won't sent EOED
-  ctx->setOmitEarlyRecordLayer(true);
-  context_ = std::move(ctx);
+  context->setOmitEarlyRecordLayer(true);
+  context_ = std::move(context);
   callback_ = callback;
 
   if (validator) {

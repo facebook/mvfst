@@ -33,7 +33,7 @@ void verifyStreamReset(
 
 std::unique_ptr<QuicServerConnectionState> createConn() {
   auto conn = std::make_unique<QuicServerConnectionState>(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn->clientConnectionId = getTestConnectionId();
   conn->version = QuicVersion::MVFST;
   conn->ackStates.initialAckState.nextPacketNum = 1;

@@ -131,7 +131,7 @@ class CopaTest : public Test {
 
 TEST_F(CopaTest, TestWritableBytes) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   EXPECT_TRUE(copa.inSlowStart());
@@ -148,7 +148,7 @@ TEST_F(CopaTest, TestWritableBytes) {
 
 TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -182,7 +182,7 @@ TEST_F(CopaTest, PersistentCongestion) {
 
 TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -215,7 +215,7 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
 
 TEST_F(CopaTest, TestSlowStartAck) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -318,7 +318,7 @@ TEST_F(CopaTest, TestSlowStartAck) {
 
 TEST_F(CopaTest, TestSteadyStateChanges) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto now = Clock::now();
@@ -356,7 +356,7 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
 
 TEST_F(CopaTest, TestVelocity) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
   Copa copa(conn);
@@ -452,7 +452,7 @@ TEST_F(CopaTest, TestVelocity) {
 
 TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -474,7 +474,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
 
 TEST_F(CopaTest, PacketLossInvokesPacer) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
   Copa copa(conn);
   auto mockPacer = std::make_unique<MockPacer>();

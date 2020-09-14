@@ -26,7 +26,7 @@ class TestQuicTransport
       : QuicTransportBase(evb, std::move(socket)) {
     setConnectionCallback(&cb);
     conn_.reset(new QuicServerConnectionState(
-        std::make_shared<FizzServerQuicHandshakeContext>()));
+        FizzServerQuicHandshakeContext::Builder().build()));
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});
     conn_->serverConnectionId = ConnectionId({1, 2, 3, 4});
     conn_->version = QuicVersion::MVFST;
