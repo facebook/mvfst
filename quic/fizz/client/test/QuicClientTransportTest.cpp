@@ -1991,7 +1991,7 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
 
   // no-op
   client->setQLogger(nullptr);
-  CHECK_EQ(client->getQLogger(), nullptr);
+  CHECK(client->getQLogger() == nullptr);
 
   // set
   client->setQLogger(mockQLogger1);
@@ -2009,7 +2009,7 @@ TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
 
   // final unset
   client->setQLogger(nullptr);
-  CHECK_EQ(client->getQLogger(), nullptr);
+  CHECK(client->getQLogger() == nullptr);
 
   client->closeNow(folly::none);
 }
