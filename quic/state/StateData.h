@@ -736,7 +736,27 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   HappyEyeballsState happyEyeballsState;
 
+  struct D6DProbePacket {
+    D6DProbePacket() = delete;
+
+    explicit D6DProbePacket(PacketNum packetNumIn, uint32_t packetSizeIn)
+        : packetNum(packetNumIn), packetSize(packetSizeIn) {}
+
+    // Packet num
+    PacketNum packetNum;
+
+    // Udp packet payload size
+    uint32_t packetSize;
+  };
+
   struct D6DState {
+    // The <packet sequence number, udp payload size> of the last sent d6d probe
+    // packet
+    folly::Optional<D6DProbePacket> lastProbe;
+
+    // The number of outstanding probe packets
+    uint64_t outstandingProbes{0};
+
     // The base PMTU to start probing with
     uint16_t basePMTU{kDefaultD6DBasePMTU};
 

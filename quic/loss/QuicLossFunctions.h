@@ -122,13 +122,14 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
-  auto totalPacketsOutstanding = conn.outstandings.numOutstanding();
+  auto totalPacketsOutstanding = conn.outstandings.packets.size();
+  auto totalD6DProbesOutstanding = conn.d6d.outstandingProbes;
   /*
    * We have this condition to disambiguate the case where we have.
-   * (1) All outstanding packets that are clones that are processed and there
-   *  is no data to write.
-   * (2) All outstanding are clones that are processed and there is data to
-   *  write.
+   * (1) All outstanding packets (except for d6d probes) that are clones that
+   *  are processed and there is no data to write.
+   * (2) All outstanding (except for d6d probes) are clones that are processed
+   *  and there is data to write.
    * If there are only clones with no data, then we don't need to set the timer.
    * This will free up the evb. However after a PTO verified event, clones take
    * up space in cwnd. If we have data left to write, we would not be able to
@@ -136,7 +137,8 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    * so that we can write this data with the slack packet space for the clones.
    */
   if (!hasDataToWrite && conn.outstandings.packetEvents.empty() &&
-      totalPacketsOutstanding == conn.outstandings.clonedPacketsCount) {
+      (totalPacketsOutstanding - totalD6DProbesOutstanding) ==
+          conn.outstandings.clonedPacketsCount) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
              << " handshakePackets=" << conn.outstandings.handshakePacketsCount
@@ -216,7 +218,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
-    if (currentPacketNumberSpace != pnSpace) {
+    if (currentPacketNumberSpace != pnSpace || pkt.isD6DProbe) {
       iter++;
       continue;
     }

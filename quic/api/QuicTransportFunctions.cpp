@@ -477,6 +477,8 @@ void updateConnection(
   bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
   bool isHandshake = false;
   bool isPing = false;
+  bool isD6DProbe =
+      conn.d6d.lastProbe ? (packetNum == conn.d6d.lastProbe->packetNum) : false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
@@ -610,7 +612,15 @@ void updateConnection(
         break;
       }
       case QuicWriteFrame::Type::PingFrame_E:
-        conn.pendingEvents.sendPing = false;
+        // If this is a d6d probe, the it does not consume the sendPing request
+        // from application, because this packet, albeit containing a ping
+        // frame, is larger than the current PMTU and will potentially get
+        // dropped in the path. Additionally, the loss of this packet will not
+        // trigger retransmission, therefore tying it with the sendPing event
+        // will make this api unreliable.
+        if (!isD6DProbe) {
+          conn.pendingEvents.sendPing = false;
+        }
         isPing = true;
         break;
       case QuicWriteFrame::Type::QuicSimpleFrame_E: {
@@ -646,7 +656,16 @@ void updateConnection(
   if (!conn.pendingEvents.setLossDetectionAlarm) {
     conn.pendingEvents.setLossDetectionAlarm = retransmittable;
   }
-  conn.lossState.totalBytesSent += encodedSize;
+  if (!isD6DProbe) {
+    // two reasons for avoiding incrementing totalBytesSent for d6d probes:
+    // 1. in BBR totalBytesSent is compared against initCwnd and only when
+    // totalBytesSent >= initCwnd do we update pacing.
+    // 2. totalBytesSent is also used to calculate send rate, adding probe size
+    // will slighly increase the send rate.
+    // We don't want d6d probe to cause side effect on congestion control, so we
+    // don't count probe size.
+    conn.lossState.totalBytesSent += encodedSize;
+  }
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
@@ -667,7 +686,12 @@ void updateConnection(
       std::move(sentTime),
       encodedSize,
       isHandshake,
+      isD6DProbe,
       conn.lossState.totalBytesSent);
+  if (isD6DProbe) {
+    ++conn.d6d.outstandingProbes;
+    return;
+  }
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()
       : false;

@@ -142,6 +142,12 @@ void processAckFrame(
       if (currentPacketNum == frame.largestAcked) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
+      // D6D probe acked. Put it after updateRTT so that srtt update is
+      // reflected in the next timeout
+      if (rPacketIt->isD6DProbe) {
+        // Could be an ack for an old probe, but let the handler deal with it
+        // TODO(xtt): onD6DProbeAcked(conn, *rPacketIt);
+      }
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
       if (needsProcess /*!rPacketIt->associatedEvent ||

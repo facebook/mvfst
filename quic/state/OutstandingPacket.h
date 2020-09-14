@@ -23,6 +23,8 @@ struct OutstandingPacket {
   uint32_t encodedSize;
   // Whether this packet has any data from stream 0
   bool isHandshake;
+  // Whether the packet is a d6d probe
+  bool isD6DProbe;
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
@@ -73,6 +75,21 @@ struct OutstandingPacket {
         time(std::move(timeIn)),
         encodedSize(encodedSizeIn),
         isHandshake(isHandshakeIn),
+        isD6DProbe(false),
+        totalBytesSent(totalBytesSentIn) {}
+
+  OutstandingPacket(
+      RegularQuicWritePacket packetIn,
+      TimePoint timeIn,
+      uint32_t encodedSizeIn,
+      bool isHandshakeIn,
+      bool isD6DProbeIn,
+      uint64_t totalBytesSentIn)
+      : packet(std::move(packetIn)),
+        time(std::move(timeIn)),
+        encodedSize(encodedSizeIn),
+        isHandshake(isHandshakeIn),
+        isD6DProbe(isD6DProbeIn),
         totalBytesSent(totalBytesSentIn) {}
 };
 } // namespace quic

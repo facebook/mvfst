@@ -59,7 +59,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       QuicConnectionStateBase& conn,
       TimePoint time,
       folly::Optional<PacketEvent> associatedEvent,
-      PacketType packetType);
+      PacketType packetType,
+      bool isD6DProbe = false);
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
     auto conn = std::make_unique<QuicServerConnectionState>(
@@ -142,7 +143,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     QuicConnectionStateBase& conn,
     TimePoint time,
     folly::Optional<PacketEvent> associatedEvent,
-    PacketType packetType) {
+    PacketType packetType,
+    bool isD6DProbe) {
   folly::Optional<PacketHeader> header;
   bool isHandshake = false;
   switch (packetType) {
@@ -203,7 +205,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     encodedSize += packet.body->computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacket(
-      packet.packet, time, encodedSize, isHandshake, encodedSize);
+      packet.packet, time, encodedSize, isHandshake, isD6DProbe, encodedSize);
   outstandingPacket.associatedEvent = associatedEvent;
   if (isHandshake) {
     conn.lossState.lastHandshakePacketSentTime = time;
@@ -236,6 +238,9 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   conn.lossState.largestSent = getNextPacketNum(conn, packetNumberSpace);
   increaseNextPacketNum(conn, packetNumberSpace);
   conn.pendingEvents.setLossDetectionAlarm = true;
+  if (isD6DProbe) {
+    ++conn.d6d.outstandingProbes;
+  }
   return conn.lossState.largestSent.value();
 }
 
@@ -269,6 +274,40 @@ TEST_F(QuicLossFunctionsTest, HasDataToWrite) {
   EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(1);
   setLossDetectionAlarm(*conn, timeout);
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
+}
+
+TEST_F(QuicLossFunctionsTest, D6DProbeDoesNotSetLossDetectionAlarms) {
+  auto conn = createConn();
+  sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt, true);
+  conn->pendingEvents.setLossDetectionAlarm = true;
+  EXPECT_CALL(timeout, cancelLossTimeout()).Times(1);
+  EXPECT_CALL(timeout, scheduleLossTimeout(_)).Times(0);
+  setLossDetectionAlarm(*conn, timeout);
+  EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
+}
+
+TEST_F(QuicLossFunctionsTest, D6DProbeExcludedInLossEvent) {
+  auto conn = createConn();
+  // 0 rtt means all packets are automatically lost upon sending
+  conn->lossState.srtt = 0s;
+  conn->lossState.lrtt = 0s;
+  auto currentTime = Clock::now();
+  auto firstPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::OneRtt, true);
+  auto secondPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::OneRtt, true);
+  ASSERT_GT(secondPacketNum, firstPacketNum);
+  ASSERT_EQ(2, conn->outstandings.packets.size());
+  auto lossVisitor = [](auto&, auto&, bool) { ASSERT_FALSE(true); };
+  auto lossEvent = detectLossPackets(
+      *conn,
+      secondPacketNum,
+      lossVisitor,
+      Clock::now(),
+      PacketNumberSpace::AppData);
+  // We should not set loss timer for un-acked d6d probes
+  ASSERT_FALSE(earliestLossTimer(*conn).first.has_value());
+  ASSERT_FALSE(lossEvent);
 }
 
 TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {

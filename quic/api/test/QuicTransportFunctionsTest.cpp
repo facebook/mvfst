@@ -358,6 +358,22 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   }
 }
 
+TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNotConsumeSendPing) {
+  auto conn = createConn();
+  conn->pendingEvents.sendPing = true; // Simulate application sendPing()
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.push_back(PingFrame());
+  auto packetNum = packet.packet.header.getPacketSequenceNum();
+  conn->d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(packetNum, 50);
+  updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
+  EXPECT_EQ(1, conn->outstandings.packets.size());
+  EXPECT_TRUE(conn->outstandings.packets.front().isD6DProbe);
+  EXPECT_EQ(1, conn->d6d.outstandingProbes);
+  // sendPing should still be active since d6d probe should be "hidden" from
+  // application
+  EXPECT_TRUE(conn->pendingEvents.sendPing);
+}
+
 TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
   auto conn = createConn();
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);

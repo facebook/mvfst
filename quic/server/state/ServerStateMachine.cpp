@@ -837,7 +837,7 @@ void onServerReadDataFromOpen(
               conn,
               packetNumberSpace,
               ackFrame,
-              [&](const OutstandingPacket&,
+              [&](const OutstandingPacket& packet,
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
                 switch (packetFrame.type()) {
@@ -884,7 +884,9 @@ void onServerReadDataFromOpen(
                     break;
                   }
                   case QuicWriteFrame::Type::PingFrame_E:
-                    conn.pendingEvents.cancelPingTimeout = true;
+                    if (!packet.isD6DProbe) {
+                      conn.pendingEvents.cancelPingTimeout = true;
+                    }
                     return;
                   case QuicWriteFrame::Type::QuicSimpleFrame_E: {
                     const QuicSimpleFrame& frame =
