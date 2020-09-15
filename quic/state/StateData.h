@@ -626,6 +626,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // To send a ping frame
     bool sendPing{false};
 
+    // To send a d6d probe packet
+    bool sendD6DProbePacket{false};
+
     // Do we need to send data blocked frame when connection is blocked.
     bool sendDataBlocked{false};
 
@@ -764,6 +767,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // The base PMTU to start probing with
     uint16_t basePMTU{kDefaultD6DBasePMTU};
+
+    // Current probe size
+    uint32_t currentProbeSize{kDefaultD6DBasePMTU};
 
     // The raise timeout
     std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};

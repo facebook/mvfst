@@ -1341,6 +1341,49 @@ uint64_t writeProbingDataToSocket(
   return written;
 }
 
+uint64_t writeD6DProbeToSocket(
+    folly::AsyncUDPSocket& sock,
+    QuicConnectionStateBase& connection,
+    const ConnectionId& srcConnId,
+    const ConnectionId& dstConnId,
+    const Aead& aead,
+    const PacketNumberCipher& headerCipher,
+    QuicVersion version) {
+  if (!connection.pendingEvents.sendD6DProbePacket) {
+    return 0;
+  }
+  auto builder = ShortHeaderBuilder();
+  // D6D probe is always in AppData pnSpace
+  auto pnSpace = PacketNumberSpace::AppData;
+  // Skip a packet number for probing packets to elicit acks
+  increaseNextPacketNum(connection, pnSpace);
+  D6DProbeScheduler d6dProbeScheduler(
+      connection,
+      "D6DProbeScheduler",
+      aead.getCipherOverhead(),
+      connection.d6d.currentProbeSize);
+  auto written = writeConnectionDataToSocket(
+      sock,
+      connection,
+      srcConnId,
+      dstConnId,
+      builder,
+      pnSpace,
+      d6dProbeScheduler,
+      unlimitedWritableBytes,
+      1,
+      aead,
+      headerCipher,
+      version);
+  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
+                           << " writing d6d probes using scheduler=D6DScheduler"
+                           << connection;
+  if (written > 0) {
+    connection.pendingEvents.sendD6DProbePacket = false;
+  }
+  return written;
+}
+
 WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
   if (conn.pendingEvents.numProbePackets) {
     VLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"

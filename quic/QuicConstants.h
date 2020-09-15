@@ -22,6 +22,7 @@ using DurationRep = std::chrono::microseconds::rep;
 using namespace std::chrono_literals;
 
 // Default QUIC packet size for both read and write.
+// TODO(xtt): make them configurable
 constexpr uint64_t kDefaultV4UDPSendPacketLen = 1252;
 constexpr uint64_t kDefaultV6UDPSendPacketLen = 1232;
 // With Android NDK r15c for some apps we use gnu-libstdc++ instead of

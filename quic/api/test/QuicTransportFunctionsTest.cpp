@@ -2519,5 +2519,42 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   EXPECT_EQ(conn->outstandings.packets.size(), outstandingPacketsCount + 3);
 }
 
+TEST_F(QuicTransportFunctionsTest, WriteD6DProbesWithInplaceBuilder) {
+  auto conn = createConn();
+  conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
+  conn->d6d.currentProbeSize = 1450;
+  conn->pendingEvents.sendD6DProbePacket = true;
+  auto simpleBufAccessor =
+      std::make_unique<SimpleBufAccessor>(kDefaultMaxUDPPayload * 16);
+  auto outputBuf = simpleBufAccessor->obtain();
+  auto bufPtr = outputBuf.get();
+  simpleBufAccessor->release(std::move(outputBuf));
+  conn->bufAccessor = simpleBufAccessor.get();
+  conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_GSO;
+  EventBase evb;
+  folly::test::MockAsyncUDPSocket mockSock(&evb);
+  EXPECT_CALL(mockSock, getGSO()).WillRepeatedly(Return(true));
+  EXPECT_CALL(mockSock, write(_, _))
+      .Times(1)
+      .WillOnce(Invoke([&](const SocketAddress&,
+                           const std::unique_ptr<folly::IOBuf>& sockBuf) {
+        EXPECT_EQ(sockBuf->length(), conn->d6d.currentProbeSize);
+        EXPECT_EQ(sockBuf.get(), bufPtr);
+        EXPECT_TRUE(folly::IOBufEqualTo()(*sockBuf, *bufPtr));
+        EXPECT_FALSE(sockBuf->isChained());
+        return sockBuf->computeChainDataLength();
+      }));
+  writeD6DProbeToSocket(
+      mockSock,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn));
+  EXPECT_EQ(0, bufPtr->length());
+  EXPECT_EQ(0, bufPtr->headroom());
+}
+
 } // namespace test
 } // namespace quic
