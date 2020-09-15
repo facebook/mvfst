@@ -288,6 +288,9 @@ void BbrCongestionController::updatePacing() noexcept {
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
   conn_.pacer->refreshPacingRate(pacingWindow_, mrtt);
+  if (state_ == BbrState::Drain) {
+    conn_.pacer->resetPacingTokens();
+  }
 }
 
 void BbrCongestionController::handleAckInProbeBw(
