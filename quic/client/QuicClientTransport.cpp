@@ -10,6 +10,7 @@
 
 #include <folly/portability/Sockets.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/api/LoopDetectorCallback.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
@@ -531,72 +532,89 @@ void QuicClientTransport::processPacketData(
     // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
     // was rejected, or we have derived 1-rtt keys and 0-rtt was never
     // attempted.
-    if ((oneRttKeyDerivationTriggered &&
-         ((zeroRttRejected.has_value() && *zeroRttRejected) ||
-          !zeroRttRejected.has_value()))) {
-      auto originalPeerMaxOffset =
-          conn_->flowControlState.peerAdvertisedMaxOffset;
-      auto originalPeerInitialStreamOffsetBidiLocal =
-          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal;
-      auto originalPeerInitialStreamOffsetBidiRemote =
-          conn_->flowControlState
-              .peerAdvertisedInitialMaxStreamOffsetBidiRemote;
-      auto originalPeerInitialStreamOffsetUni =
-          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni;
-      VLOG(10) << "Client negotiated transport params " << *this;
+    if (oneRttKeyDerivationTriggered) {
       auto serverParams = handshakeLayer->getServerTransportParams();
       if (!serverParams) {
         throw QuicTransportException(
             "No server transport params",
             TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
       }
-      auto maxStreamsBidi = getIntegerParameter(
-          TransportParameterId::initial_max_streams_bidi,
-          serverParams->parameters);
-      auto maxStreamsUni = getIntegerParameter(
-          TransportParameterId::initial_max_streams_uni,
-          serverParams->parameters);
-      processServerInitialParams(
-          *clientConn_, std::move(*serverParams), packetNum);
+      if ((zeroRttRejected.has_value() && *zeroRttRejected) ||
+          !zeroRttRejected.has_value()) {
+        auto originalPeerMaxOffset =
+            conn_->flowControlState.peerAdvertisedMaxOffset;
+        auto originalPeerInitialStreamOffsetBidiLocal =
+            conn_->flowControlState
+                .peerAdvertisedInitialMaxStreamOffsetBidiLocal;
+        auto originalPeerInitialStreamOffsetBidiRemote =
+            conn_->flowControlState
+                .peerAdvertisedInitialMaxStreamOffsetBidiRemote;
+        auto originalPeerInitialStreamOffsetUni =
+            conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni;
+        VLOG(10) << "Client negotiated transport params " << *this;
+        auto maxStreamsBidi = getIntegerParameter(
+            TransportParameterId::initial_max_streams_bidi,
+            serverParams->parameters);
+        auto maxStreamsUni = getIntegerParameter(
+            TransportParameterId::initial_max_streams_uni,
+            serverParams->parameters);
+        processServerInitialParams(
+            *clientConn_, std::move(*serverParams), packetNum);
 
-      cacheServerInitialParams(
-          *clientConn_,
-          conn_->flowControlState.peerAdvertisedMaxOffset,
-          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal,
-          conn_->flowControlState
-              .peerAdvertisedInitialMaxStreamOffsetBidiRemote,
-          conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
-          maxStreamsBidi.value_or(0),
-          maxStreamsUni.value_or(0));
+        cacheServerInitialParams(
+            *clientConn_,
+            conn_->flowControlState.peerAdvertisedMaxOffset,
+            conn_->flowControlState
+                .peerAdvertisedInitialMaxStreamOffsetBidiLocal,
+            conn_->flowControlState
+                .peerAdvertisedInitialMaxStreamOffsetBidiRemote,
+            conn_->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni,
+            maxStreamsBidi.value_or(0),
+            maxStreamsUni.value_or(0));
 
-      auto& statelessResetToken = clientConn_->statelessResetToken;
-      if (statelessResetToken) {
-        conn_->readCodec->setStatelessResetToken(*statelessResetToken);
-      }
-      if (zeroRttRejected.has_value() && *zeroRttRejected) {
-        // verify that the new flow control parameters are >= the original
-        // transport parameters that were use. This is the easy case. If the
-        // flow control decreases then we are just screwed and we need to have
-        // the app retry the connection. The other parameters can be updated.
-        // TODO: implement undo transport state on retry.
-        if (originalPeerMaxOffset >
-                conn_->flowControlState.peerAdvertisedMaxOffset ||
-            originalPeerInitialStreamOffsetBidiLocal >
-                conn_->flowControlState
-                    .peerAdvertisedInitialMaxStreamOffsetBidiLocal ||
-            originalPeerInitialStreamOffsetBidiRemote >
-                conn_->flowControlState
-                    .peerAdvertisedInitialMaxStreamOffsetBidiRemote ||
+        auto& statelessResetToken = clientConn_->statelessResetToken;
+        if (statelessResetToken) {
+          conn_->readCodec->setStatelessResetToken(*statelessResetToken);
+        }
+        if (zeroRttRejected.has_value() && *zeroRttRejected) {
+          // verify that the new flow control parameters are >= the original
+          // transport parameters that were use. This is the easy case. If the
+          // flow control decreases then we are just screwed and we need to have
+          // the app retry the connection. The other parameters can be updated.
+          // TODO: implement undo transport state on retry.
+          if (originalPeerMaxOffset >
+                  conn_->flowControlState.peerAdvertisedMaxOffset ||
+              originalPeerInitialStreamOffsetBidiLocal >
+                  conn_->flowControlState
+                      .peerAdvertisedInitialMaxStreamOffsetBidiLocal ||
+              originalPeerInitialStreamOffsetBidiRemote >
+                  conn_->flowControlState
+                      .peerAdvertisedInitialMaxStreamOffsetBidiRemote ||
 
-            originalPeerInitialStreamOffsetUni >
-                conn_->flowControlState
-                    .peerAdvertisedInitialMaxStreamOffsetUni) {
-          throw QuicTransportException(
-              "Rejection of zero rtt parameters unsupported",
-              TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+              originalPeerInitialStreamOffsetUni >
+                  conn_->flowControlState
+                      .peerAdvertisedInitialMaxStreamOffsetUni) {
+            throw QuicTransportException(
+                "Rejection of zero rtt parameters unsupported",
+                TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+          }
         }
       }
+      // TODO This sucks, but manually update the max packet size until we fix
+      // 0-rtt transport parameters.
+      if (conn_->transportSettings.canIgnorePathMTU &&
+          zeroRttRejected.has_value() && !*zeroRttRejected) {
+        auto updatedPacketSize = getIntegerParameter(
+            TransportParameterId::max_packet_size, serverParams->parameters);
+        updatedPacketSize = std::max<uint64_t>(
+            updatedPacketSize.value_or(kDefaultUDPSendPacketLen),
+            kDefaultUDPSendPacketLen);
+        updatedPacketSize =
+            std::min<uint64_t>(*updatedPacketSize, kDefaultMaxUDPPayload);
+        conn_->udpSendPacketLen = *updatedPacketSize;
+      }
     }
+
     if (zeroRttRejected.has_value() && *zeroRttRejected) {
       // TODO: Make sure the alpn is the same, if not then do a full undo of the
       // state.

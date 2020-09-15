@@ -61,7 +61,7 @@ TEST_F(ClientStateMachineTest, TestUpdateTransportParamsFromCachedEarlyParams) {
 
   updateTransportParamsFromCachedEarlyParams(*client_, kParams);
   EXPECT_EQ(client_->peerIdleTimeout, idleTimeout);
-  EXPECT_EQ(client_->udpSendPacketLen, maxRecvPacketSize);
+  EXPECT_NE(client_->udpSendPacketLen, maxRecvPacketSize);
   EXPECT_EQ(client_->flowControlState.peerAdvertisedMaxOffset, initialMaxData);
   EXPECT_EQ(
       client_->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal,

@@ -35,6 +35,7 @@
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 #include <quic/state/test/MockQuicStats.h>
+#include "quic/QuicConstants.h"
 
 using namespace testing;
 using namespace folly;
@@ -5366,7 +5367,6 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   startClient();
   EXPECT_TRUE(performedValidation);
 
-  auto initialUDPSendPacketLen = client->getConn().udpSendPacketLen;
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
@@ -5382,12 +5382,13 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   // All the data is still there.
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   // Transport parameters did not change since zero rtt was accepted.
+  // Except for max packet size.
   verifyTransportParameters(
       kDefaultConnectionWindowSize,
       kDefaultStreamWindowSize,
       kDefaultIdleTimeout,
       kDefaultAckDelayExponent,
-      initialUDPSendPacketLen);
+      kDefaultMaxUDPPayload);
 
   EXPECT_CALL(*mockQuicPskCache_, putPsk(hostname_, _))
       .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
