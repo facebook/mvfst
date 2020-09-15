@@ -9,6 +9,7 @@
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/fizz/handshake/FizzBridge.h>
 
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
@@ -58,6 +59,10 @@ void FizzServerHandshake::processAccept() {
 
 const fizz::server::FizzServerContext* FizzServerHandshake::getContext() const {
   return state_.context();
+}
+
+void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
+  startActions(machine_.processSocketData(state_, queue));
 }
 
 } // namespace quic

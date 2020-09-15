@@ -274,6 +274,7 @@ class ServerHandshake : public Handshake {
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
 
+  virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual void processAccept() = 0;
 }; // namespace quic
 

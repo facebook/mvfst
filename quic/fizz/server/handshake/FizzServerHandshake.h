@@ -38,6 +38,8 @@ class FizzServerHandshake : public ServerHandshake {
 
   EncryptionLevel getReadRecordLayerEncryptionLevel() override;
 
+  void processSocketData(folly::IOBufQueue& queue) override;
+
   FizzCryptoFactory cryptoFactory_;
 
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext_;
