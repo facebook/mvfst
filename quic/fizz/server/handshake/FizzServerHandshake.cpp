@@ -9,7 +9,6 @@
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
-#include <quic/fizz/handshake/FizzBridge.h>
 
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
