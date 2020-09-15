@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <folly/Portability.h>
 #include <folly/dynamic.h>
 #include <quic/codec/Types.h>
 #include <quic/logging/QLoggerConstants.h>
@@ -141,7 +142,7 @@ class KnobFrameLog : public QLogFrame {
       size_t knobBlobLenIn)
       : knobSpace(knobSpaceIn), knobId(knobIdIn), knobBlobLen(knobBlobLenIn) {}
   ~KnobFrameLog() override = default;
-  [[nodiscard]] folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class StreamDataBlockedFrameLog : public QLogFrame {
