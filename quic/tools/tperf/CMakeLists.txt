@@ -20,8 +20,6 @@ target_include_directories(tperf PRIVATE
   ${LIBGTEST_INCLUDE_DIR}
 )
 
-add_dependencies(tperf googletest)
-
 target_link_libraries(
   tperf PUBLIC
   Folly::folly
@@ -29,5 +27,4 @@ target_link_libraries(
   mvfst_test_utils
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
-  ${LIBGTEST_LIBRARIES}
 )
