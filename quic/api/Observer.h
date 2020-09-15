@@ -29,10 +29,12 @@ class InstrumentationObserver {
         const quic::OutstandingPacket& pkt)
         : lostByTimeout(lostbytimeout),
           lostByReorderThreshold(lostbyreorder),
-          packet(pkt) {}
+          metrics(pkt.metrics),
+          lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
     bool lostByTimeout{false};
     bool lostByReorderThreshold{false};
-    const quic::OutstandingPacket packet;
+    const quic::OutstandingPacketMetrics metrics;
+    const folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
   };
 
   struct ObserverLossEvent {
@@ -52,6 +54,22 @@ class InstrumentationObserver {
     const TimePoint lossTime;
     std::vector<LostPacket> lostPackets;
   };
+
+  struct PacketRTT {
+    explicit PacketRTT(
+      std::chrono::microseconds rttsample,
+      std::chrono::microseconds ackdelay,
+      const quic::OutstandingPacket& pkt)
+      : rttSample(rttsample),
+        ackDelay(ackdelay),
+        metrics(pkt.metrics),
+        lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
+    std::chrono::microseconds rttSample;
+    std::chrono::microseconds ackDelay;
+    const quic::OutstandingPacketMetrics metrics;
+    const folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
+  };
+
   virtual ~InstrumentationObserver() = default;
 
   /**
@@ -78,6 +96,14 @@ class InstrumentationObserver {
    */
   virtual void packetLossDetected(
       const struct ObserverLossEvent& /* lossEvent */) {}
+
+  /**
+   * rttSampleGenerated() is invoked when a RTT sample is made.
+   *
+   * @param packet   const reference to the packet with the RTT
+   */
+  virtual void rttSampleGenerated(
+      const struct PacketRTT& /* RTT sample */) {}
 };
 
 // Container for instrumentation observers.

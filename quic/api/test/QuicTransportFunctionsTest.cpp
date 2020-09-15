@@ -367,7 +367,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNotConsumeSendPing) {
   conn->d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(packetNum, 50);
   updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
   EXPECT_EQ(1, conn->outstandings.packets.size());
-  EXPECT_TRUE(conn->outstandings.packets.front().isD6DProbe);
+  EXPECT_TRUE(conn->outstandings.packets.front().metrics.isD6DProbe);
   EXPECT_EQ(1, conn->d6d.outstandingProbes);
   // sendPing should still be active since d6d probe should be "hidden" from
   // application
@@ -959,7 +959,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   EXPECT_EQ(
       13579 + 555,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
-          ->totalBytesSent);
+          ->metrics.totalBytesSent);
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
                   ->lastAckedPacketInfo.has_value());
   EXPECT_EQ(
@@ -1025,10 +1025,10 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   EXPECT_EQ(frame->maximumData, maxDataAmt);
   EXPECT_EQ(
       futureMoment,
-      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->time);
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->metrics.time);
   EXPECT_EQ(
       1500,
-      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->encodedSize);
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->metrics.encodedSize);
   EXPECT_EQ(
       event,
       *getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
@@ -1676,7 +1676,7 @@ TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
           conn->transportSettings.writeConnectionDataPacketsLimit));
   ASSERT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
-                  ->isHandshake);
+                  ->metrics.isHandshake);
 }
 
 TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
@@ -1702,7 +1702,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
           conn->transportSettings.writeConnectionDataPacketsLimit));
   ASSERT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
-                  ->isHandshake);
+                  ->metrics.isHandshake);
   ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->writeBuffer.empty());
 
@@ -2474,7 +2474,7 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingWithInplaceBuilder) {
   ASSERT_FALSE(streamScheduler.hasPendingData());
 
   // The first packet has be a full packet
-  auto firstPacketSize = conn->outstandings.packets.front().encodedSize;
+  auto firstPacketSize = conn->outstandings.packets.front().metrics.encodedSize;
   auto outstandingPacketsCount = conn->outstandings.packets.size();
   ASSERT_EQ(firstPacketSize, conn->udpSendPacketLen);
   EXPECT_CALL(mockSock, write(_, _))

@@ -547,7 +547,8 @@ OutstandingPacket makeTestingWritePacket(
     PacketNum desiredPacketSeqNum,
     size_t desiredSize,
     uint64_t totalBytesSent,
-    TimePoint sentTime) {
+    TimePoint sentTime /* = Clock::now() */,
+    uint64_t inflightBytes /* = 0 */) {
   LongHeader longHeader(
       LongHeader::Types::ZeroRtt,
       getTestConnectionId(1),
@@ -556,7 +557,7 @@ OutstandingPacket makeTestingWritePacket(
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
   return OutstandingPacket(
-      packet, sentTime, desiredSize, false, totalBytesSent);
+      packet, sentTime, desiredSize, false, totalBytesSent, inflightBytes);
 }
 
 CongestionController::AckEvent makeAck(
@@ -731,10 +732,10 @@ bool matchError(
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacket outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
-      .setSentTime(outstandingPacket.time)
-      .setEncodedSize(outstandingPacket.encodedSize)
+      .setSentTime(outstandingPacket.metrics.time)
+      .setEncodedSize(outstandingPacket.metrics.encodedSize)
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
-      .setTotalBytesSentThen(outstandingPacket.totalBytesSent)
+      .setTotalBytesSentThen(outstandingPacket.metrics.totalBytesSent)
       .setAppLimited(outstandingPacket.isAppLimited)
       .build();
 }

@@ -108,7 +108,7 @@ void processAckFrame(
       }
       VLOG(10) << __func__ << " acked packetNum=" << currentPacketNum
                << " space=" << currentPacketNumberSpace
-               << " handshake=" << (int)rPacketIt->isHandshake << " " << conn;
+               << " handshake=" << (int)rPacketIt->metrics.isHandshake << " " << conn;
       // If we hit a packet which has been lost we need to count the spurious
       // loss and ignore all other processing.
       // TODO also remove any stream data from the loss buffer.
@@ -124,7 +124,7 @@ void processAckFrame(
       }
       bool needsProcess = !rPacketIt->associatedEvent ||
           conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent);
-      if (rPacketIt->isHandshake && needsProcess) {
+      if (rPacketIt->metrics.isHandshake && needsProcess) {
         if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
           ++initialPacketAcked;
         } else {
@@ -132,21 +132,27 @@ void processAckFrame(
           ++handshakePacketAcked;
         }
       }
-      ack.ackedBytes += rPacketIt->encodedSize;
+      ack.ackedBytes += rPacketIt->metrics.encodedSize;
       if (rPacketIt->associatedEvent) {
         ++clonedPacketsAcked;
       }
       // Update RTT if current packet is the largestAcked in the frame:
       auto ackReceiveTimeOrNow =
-          ackReceiveTime > rPacketIt->time ? ackReceiveTime : Clock::now();
+          ackReceiveTime > rPacketIt->metrics.time ? ackReceiveTime : Clock::now();
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
-          ackReceiveTimeOrNow - rPacketIt->time);
+          ackReceiveTimeOrNow - rPacketIt->metrics.time);
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
+        InstrumentationObserver::PacketRTT packetRTT(rttSample, frame.ackDelay, *rPacketIt);
+        for(const auto& observer : conn.instrumentationObservers_) {
+          conn.pendingCallbacks.emplace_back([observer, packetRTT] {
+            observer->rttSampleGenerated(packetRTT);
+          });
+        }
         updateRtt(conn, rttSample, frame.ackDelay);
       }
       // D6D probe acked. Put it after updateRTT so that srtt update is
       // reflected in the next timeout
-      if (rPacketIt->isD6DProbe) {
+      if (rPacketIt->metrics.isD6DProbe) {
         // Could be an ack for an old probe, but let the handler deal with it
         // TODO(xtt): onD6DProbeAcked(conn, *rPacketIt);
       }
@@ -165,27 +171,27 @@ void processAckFrame(
       if (!ack.largestAckedPacket ||
           *ack.largestAckedPacket < currentPacketNum) {
         ack.largestAckedPacket = currentPacketNum;
-        ack.largestAckedPacketSentTime = rPacketIt->time;
+        ack.largestAckedPacketSentTime = rPacketIt->metrics.time;
         ack.largestAckedPacketAppLimited = rPacketIt->isAppLimited;
       }
-      if (!ack.implicit && ackReceiveTime > rPacketIt->time) {
+      if (!ack.implicit && ackReceiveTime > rPacketIt->metrics.time) {
         ack.mrttSample =
             std::min(ack.mrttSample.value_or(rttSample), rttSample);
       }
-      conn.lossState.totalBytesAcked += rPacketIt->encodedSize;
+      conn.lossState.totalBytesAcked += rPacketIt->metrics.encodedSize;
       conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
       conn.lossState.totalBytesAckedAtLastAck = conn.lossState.totalBytesAcked;
       if (!lastAckedPacketSentTime) {
-        lastAckedPacketSentTime = rPacketIt->time;
+        lastAckedPacketSentTime = rPacketIt->metrics.time;
       }
       conn.lossState.lastAckedTime = ackReceiveTime;
       conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       ack.ackedPackets.push_back(
           CongestionController::AckEvent::AckPacket::Builder()
-              .setSentTime(rPacketIt->time)
-              .setEncodedSize(rPacketIt->encodedSize)
+              .setSentTime(rPacketIt->metrics.time)
+              .setEncodedSize(rPacketIt->metrics.encodedSize)
               .setLastAckedPacketInfo(std::move(rPacketIt->lastAckedPacketInfo))
-              .setTotalBytesSentThen(rPacketIt->totalBytesSent)
+              .setTotalBytesSentThen(rPacketIt->metrics.totalBytesSent)
               .setAppLimited(rPacketIt->isAppLimited)
               .build());
       rPacketIt++;
@@ -253,7 +259,7 @@ void clearOldOutstandingPackets(
     while (opItr != conn.outstandings.packets.end()) {
       // This case can happen when we have buffered an undecryptable ACK and
       // are able to decrypt it later.
-      if (time < opItr->time) {
+      if (time < opItr->metrics.time) {
         break;
       }
       if (opItr->packet.header.getPacketNumberSpace() != pnSpace) {
@@ -265,7 +271,7 @@ void clearOldOutstandingPackets(
         eraseBegin = opItr;
         continue;
       }
-      auto timeSinceSent = time - opItr->time;
+      auto timeSinceSent = time - opItr->metrics.time;
       if (opItr->declaredLost && timeSinceSent > threshold) {
         opItr++;
         conn.outstandings.declaredLostCount--;

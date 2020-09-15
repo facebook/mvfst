@@ -205,7 +205,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     encodedSize += packet.body->computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacket(
-      packet.packet, time, encodedSize, isHandshake, isD6DProbe, encodedSize);
+      packet.packet, time, encodedSize, isHandshake, isD6DProbe, encodedSize, 0);
   outstandingPacket.associatedEvent = associatedEvent;
   if (isHandshake) {
     conn.lossState.lastHandshakePacketSentTime = time;
@@ -755,7 +755,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
        iter <
        getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 5;
        iter++) {
-    if (iter->isHandshake) {
+    if (iter->metrics.isHandshake) {
       conn->outstandings.handshakePacketsCount--;
     }
   }
@@ -807,7 +807,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
   conn->outstandings.packets.emplace_back(
-      OutstandingPacket(outstandingRegularPacket, now, 0, false, 0));
+      OutstandingPacket(outstandingRegularPacket, now, 0, false, 0, 0));
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool) {

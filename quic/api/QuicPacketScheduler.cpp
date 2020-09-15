@@ -613,7 +613,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     }
     // I think this only fail if udpSendPacketLen somehow shrinks in the middle
     // of a connection.
-    if (outstandingPacket.encodedSize > writableBytes + cipherOverhead_) {
+    if (outstandingPacket.metrics.encodedSize > writableBytes + cipherOverhead_) {
       continue;
     }
 

@@ -40,7 +40,7 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0);
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0, 0);
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -58,7 +58,7 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0);
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0, 0);
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -71,7 +71,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, false, 0);
+  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, false, 0, 0);
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }
@@ -1371,7 +1371,7 @@ TEST_F(
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   // Lie about the encodedSize to let the Cloner skip it:
-  conn.outstandings.packets.back().encodedSize = kDefaultUDPSendPacketLen * 2;
+  conn.outstandings.packets.back().metrics.encodedSize = kDefaultUDPSendPacketLen * 2;
   EXPECT_TRUE(cloningScheduler.hasData());
 
   ASSERT_FALSE(noopScheduler.hasData());
