@@ -26,6 +26,15 @@ quic_add_test(TARGET QuicStreamFunctionsTest
   mvfst_test_utils
 )
 
+quic_add_test(TARGET QuicStreamManagerTest
+  QuicStreamManagerTest.cpp
+  DEPENDS
+  mvfst_client
+  mvfst_server
+  mvfst_state_stream_functions
+  mvfst_test_utils
+)
+
 quic_add_test(TARGET AckHandlersTest
   SOURCES
   AckHandlersTest.cpp
