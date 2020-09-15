@@ -33,6 +33,7 @@ struct OutstandingPacket {
   struct LastAckedPacketInfo {
     TimePoint sentTime;
     TimePoint ackTime;
+    TimePoint adjustedAckTime;
     // Total sent bytes on this connection when the last acked packet is acked.
     uint64_t totalBytesSent;
     // Total acked bytes on this connection when last acked packet is acked,
@@ -42,10 +43,12 @@ struct OutstandingPacket {
     LastAckedPacketInfo(
         TimePoint sentTimeIn,
         TimePoint ackTimeIn,
+        TimePoint adjustedAckTimeIn,
         uint64_t totalBytesSentIn,
         uint64_t totalBytesAckedIn)
         : sentTime(sentTimeIn),
           ackTime(ackTimeIn),
+          adjustedAckTime(adjustedAckTimeIn),
           totalBytesSent(totalBytesSentIn),
           totalBytesAcked(totalBytesAckedIn) {}
   };

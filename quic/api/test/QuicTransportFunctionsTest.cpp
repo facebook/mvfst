@@ -937,6 +937,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalBytesAcked = 8642;
   auto currentTime = Clock::now();
   conn->lossState.lastAckedTime = currentTime - 123s;
+  conn->lossState.adjustedLastAckedTime = currentTime - 123s;
   conn->lossState.lastAckedPacketSentTime = currentTime - 234s;
   conn->lossState.totalBytesSentAtLastAck = 10000;
   conn->lossState.totalBytesAckedAtLastAck = 5000;

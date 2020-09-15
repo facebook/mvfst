@@ -252,6 +252,7 @@ struct CongestionController {
     bool largestAckedPacketAppLimited{false};
     uint64_t ackedBytes{0};
     TimePoint ackTime;
+    TimePoint adjustedAckTime;
     // The minimal RTT sample among packets acked by this AckEvent. This RTT
     // includes ack delay.
     folly::Optional<std::chrono::microseconds> mrttSample;
@@ -451,6 +452,8 @@ struct LossState {
   folly::Optional<TimePoint> lastAckedPacketSentTime;
   // The latest time a packet is acked
   folly::Optional<TimePoint> lastAckedTime;
+  // The latest time a packet is acked, minus ack delay
+  folly::Optional<TimePoint> adjustedLastAckedTime;
   // The time when last retranmittable packet is sent for every packet number
   // space
   TimePoint lastRetransmittablePacketSentTime;

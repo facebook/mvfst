@@ -61,11 +61,15 @@ void BbrBandwidthSampler::onPacketAcked(
       DCHECK_GE(
           conn_.lossState.totalBytesAcked,
           ackedPacket.lastAckedPacketInfo->totalBytesAcked);
+      auto ackDuration = (ackEvent.adjustedAckTime >
+                          ackedPacket.lastAckedPacketInfo->adjustedAckTime)
+          ? (ackEvent.adjustedAckTime -
+             ackedPacket.lastAckedPacketInfo->adjustedAckTime)
+          : (ackEvent.ackTime - ackedPacket.lastAckedPacketInfo->ackTime);
       ackRate = Bandwidth(
           conn_.lossState.totalBytesAcked -
               ackedPacket.lastAckedPacketInfo->totalBytesAcked,
-          std::chrono::duration_cast<std::chrono::microseconds>(
-              ackEvent.ackTime - ackedPacket.lastAckedPacketInfo->ackTime));
+          std::chrono::duration_cast<std::chrono::microseconds>(ackDuration));
     } else if (ackEvent.ackTime > ackedPacket.sentTime) {
       // No previous ack info from outstanding packet, fallback to units/lrtt.
       // This is a per packet delivery rate. Given there can be multiple packets

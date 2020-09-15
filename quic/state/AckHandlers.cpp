@@ -42,6 +42,7 @@ void processAckFrame(
   CongestionController::AckEvent ack;
   ack.ackTime = ackReceiveTime;
   ack.implicit = frame.implicit;
+  ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
   // Using kDefaultRxPacketsBeforeAckAfterInit to reseve for ackedPackets
   // container is a hueristic. Other quic implementations may have very
   // different acking policy. It's also possibly that all acked packets are pure
@@ -178,6 +179,7 @@ void processAckFrame(
         lastAckedPacketSentTime = rPacketIt->time;
       }
       conn.lossState.lastAckedTime = ackReceiveTime;
+      conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       ack.ackedPackets.push_back(
           CongestionController::AckEvent::AckPacket::Builder()
               .setSentTime(rPacketIt->time)

@@ -700,6 +700,7 @@ void updateConnection(
     pkt.lastAckedPacketInfo.emplace(
         *conn.lossState.lastAckedPacketSentTime,
         *conn.lossState.lastAckedTime,
+        *conn.lossState.adjustedLastAckedTime,
         conn.lossState.totalBytesSentAtLastAck,
         conn.lossState.totalBytesAckedAtLastAck);
   }
