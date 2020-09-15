@@ -11,6 +11,7 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/server/handshake/ServerHandshake.h>
 
+#include <fizz/server/FizzServer.h>
 #include <fizz/server/ServerProtocol.h>
 
 namespace quic {
@@ -55,6 +56,13 @@ class FizzServerHandshake : public ServerHandshake {
   void processAccept() override;
   bool processPendingCryptoEvent() override;
   void writeNewSessionTicketToCrypto(const AppToken& appToken) override;
+
+  class ActionMoveVisitor;
+  void processCryptoActions(
+      fizz::server::ServerStateMachine::CompletedActions actions) override;
+
+  fizz::server::State state_;
+  fizz::server::ServerStateMachine machine_;
 
   using PendingEvent = fizz::WriteNewSessionTicket;
   std::deque<PendingEvent> pendingEvents_;

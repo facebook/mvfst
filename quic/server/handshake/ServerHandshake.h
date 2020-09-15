@@ -194,7 +194,6 @@ class ServerHandshake : public Handshake {
   /**
    * Run the actions once they have been completed.
    */
-  class ActionMoveVisitor;
   void processActions(
       fizz::server::ServerStateMachine::CompletedActions actions);
 
@@ -222,8 +221,6 @@ class ServerHandshake : public Handshake {
 
   void computeCiphers(CipherKind kind, folly::ByteRange secret);
 
-  fizz::server::State state_;
-  fizz::server::ServerStateMachine machine_;
   QuicConnectionStateBase* conn_;
   folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
@@ -272,6 +269,9 @@ class ServerHandshake : public Handshake {
    */
   virtual bool processPendingCryptoEvent() = 0;
   virtual void writeNewSessionTicketToCrypto(const AppToken& appToken) = 0;
+
+  virtual void processCryptoActions(
+      fizz::server::ServerStateMachine::CompletedActions actions) = 0;
 }; // namespace quic
 
 } // namespace quic
