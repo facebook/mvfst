@@ -24,6 +24,8 @@
 using namespace quic;
 using namespace testing;
 
+enum PacketBuilderType { Regular, Inplace };
+
 namespace {
 
 PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
@@ -79,7 +81,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
 namespace quic {
 namespace test {
 
-class QuicPacketSchedulerTest : public Test {
+class QuicPacketSchedulerTest : public TestWithParam<PacketBuilderType> {
  public:
   QuicVersion version{QuicVersion::MVFST};
 };
@@ -460,6 +462,51 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
       std::move(builder), kDefaultUDPSendPacketLen);
   EXPECT_TRUE(result.packetEvent.has_value() && result.packet.has_value());
   EXPECT_EQ(packetNum, result.packetEvent->packetNumber);
+}
+
+TEST_P(QuicPacketSchedulerTest, D6DProbeSchedulerTest) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  uint64_t cipherOverhead = 2;
+  uint32_t probeSize = 1450;
+  auto connId = getTestConnectionId();
+  D6DProbeScheduler d6dProbeScheduler(
+      conn, "d6d probe", cipherOverhead, probeSize);
+  EXPECT_TRUE(d6dProbeScheduler.hasData());
+
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  auto param = GetParam();
+  size_t packetSize = 0;
+  if (param == PacketBuilderType::Regular) {
+    RegularQuicPacketBuilder builder(
+        conn.udpSendPacketLen,
+        std::move(shortHeader),
+        conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+    auto result = d6dProbeScheduler.scheduleFramesForPacket(
+        std::move(builder), kDefaultUDPSendPacketLen);
+    ASSERT_TRUE(result.packet.has_value());
+    packetSize = result.packet->header->computeChainDataLength() +
+        result.packet->body->computeChainDataLength() + cipherOverhead;
+  } else {
+    // Just enough to build the probe
+    auto simpleBufAccessor = std::make_unique<SimpleBufAccessor>(probeSize);
+    InplaceQuicPacketBuilder builder(
+        *simpleBufAccessor,
+        conn.udpSendPacketLen,
+        std::move(shortHeader),
+        conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+    auto result = d6dProbeScheduler.scheduleFramesForPacket(
+        std::move(builder), kDefaultUDPSendPacketLen);
+    ASSERT_TRUE(result.packet.has_value());
+    packetSize = result.packet->header->computeChainDataLength() +
+        result.packet->body->computeChainDataLength() + cipherOverhead;
+  }
+
+  EXPECT_FALSE(d6dProbeScheduler.hasData());
+  EXPECT_EQ(packetSize, probeSize);
 }
 
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
@@ -1386,6 +1433,11 @@ TEST_F(
   buf = bufAccessor.obtain();
   EXPECT_EQ(buf->length(), 0);
 }
+
+INSTANTIATE_TEST_CASE_P(
+    QuicPacketSchedulerTests,
+    QuicPacketSchedulerTest,
+    Values(PacketBuilderType::Regular, PacketBuilderType::Inplace));
 
 } // namespace test
 } // namespace quic
