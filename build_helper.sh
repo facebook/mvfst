@@ -196,6 +196,32 @@ function setup_fmt() {
   cd "$BWD" || exit
 }
 
+function setup_googletest() {
+  GTEST_DIR=$DEPS_DIR/googletest
+  GTEST_BUILD_DIR=$DEPS_DIR/googletest/build/
+
+  if [ ! -d "$GTEST_DIR" ] ; then
+    echo -e "${COLOR_GREEN}[ INFO ] Cloning googletest repo ${COLOR_OFF}"
+    git clone https://github.com/google/googletest.git  "$GTEST_DIR"
+  fi
+  cd "$GTEST_DIR"
+  git fetch --tags
+  git checkout release-1.8.0
+  echo -e "${COLOR_GREEN}Building googletest ${COLOR_OFF}"
+  mkdir -p "$GTEST_BUILD_DIR"
+  cd "$GTEST_BUILD_DIR" || exit
+
+  cmake                                           \
+    -DCMAKE_PREFIX_PATH="$DEPS_DIR"               \
+    -DCMAKE_INSTALL_PREFIX="$DEPS_DIR"            \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo             \
+    ..
+  make -j "$nproc"
+  make install
+  echo -e "${COLOR_GREEN}googletest is installed ${COLOR_OFF}"
+  cd "$BWD" || exit
+}
+
 function synch_dependency_to_commit() {
   # Utility function to synch a dependency to a specific commit. Takes two arguments:
   #   - $1: folder of the dependency's git repository
@@ -334,6 +360,7 @@ function setup_rust() {
 
 detect_platform
 setup_fmt
+setup_googletest
 setup_folly
 setup_fizz
 if [[ -n "${MVFST_ENABLE_CCP-}" ]]; then
