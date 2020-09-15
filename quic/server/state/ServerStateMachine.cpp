@@ -213,23 +213,31 @@ void processClientInitialParams(
 
   if (conn.transportSettings.d6dConfig.enabled) {
     // Sanity check
-    if (d6dBasePMTU && *d6dBasePMTU >= kMinMaxUDPPayload &&
-        *d6dBasePMTU <= kDefaultMaxUDPPayload) {
-      // The reason to take the max is because we don't want d6d to send probes
-      // with a smaller packet size than udpSendPacketLen, which would be
-      // useless and cause meaningless delay on finding the upper bound.
-      conn.d6d.basePMTU = std::max(*d6dBasePMTU, conn.udpSendPacketLen);
-      VLOG(10) << "conn.d6d.basePMTU=" << conn.d6d.basePMTU;
-    } else {
-      LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;
+    if (d6dBasePMTU) {
+      if (*d6dBasePMTU >= kMinMaxUDPPayload &&
+          *d6dBasePMTU <= kDefaultMaxUDPPayload) {
+        // The reason to take the max is because we don't want d6d to send
+        // probes with a smaller packet size than udpSendPacketLen, which would
+        // be useless and cause meaningless delay on finding the upper bound.
+        conn.d6d.basePMTU = std::max(*d6dBasePMTU, conn.udpSendPacketLen);
+        VLOG(10) << "conn.d6d.basePMTU=" << conn.d6d.basePMTU;
+      } else {
+        LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;
+        // We treat base pmtu transport param as client's swich to activate d6d,
+        // so not receiving that means there's no need to configure the rest d6d
+        // params
+        return;
+      }
     }
 
-    if (d6dRaiseTimeout && *d6dRaiseTimeout >= kMinD6DRaiseTimeout.count()) {
-      conn.d6d.raiseTimeout = std::chrono::seconds(*d6dRaiseTimeout);
-      VLOG(10) << "conn.d6d.raiseTimeout=" << conn.d6d.raiseTimeout.count();
-    } else {
-      LOG(ERROR) << "client d6dRaiseTimeout fails sanity check: "
-                 << *d6dRaiseTimeout;
+    if (d6dRaiseTimeout) {
+      if (*d6dRaiseTimeout >= kMinD6DRaiseTimeout.count()) {
+        conn.d6d.raiseTimeout = std::chrono::seconds(*d6dRaiseTimeout);
+        VLOG(10) << "conn.d6d.raiseTimeout=" << conn.d6d.raiseTimeout.count();
+      } else {
+        LOG(ERROR) << "client d6dRaiseTimeout fails sanity check: "
+                   << *d6dRaiseTimeout;
+      }
     }
   }
 }
