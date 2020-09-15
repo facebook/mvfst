@@ -24,6 +24,13 @@ class FizzServerHandshake : public ServerHandshake {
 
   const CryptoFactory& getCryptoFactory() const override;
 
+  void processAccept() override;
+
+  /**
+   * Returns the context used by the ServerHandshake.
+   */
+  const fizz::server::FizzServerContext* getContext() const;
+
  private:
   void initializeImpl(
       HandshakeCallback* callback,

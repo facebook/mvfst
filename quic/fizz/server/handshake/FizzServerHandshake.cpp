@@ -32,7 +32,7 @@ void FizzServerHandshake::initializeImpl(
   context->setVersionFallbackEnabled(false);
   // Since Draft-17, client won't sent EOED
   context->setOmitEarlyRecordLayer(true);
-  context_ = std::move(context);
+  state_.context() = std::move(context);
   callback_ = callback;
 
   if (validator) {
@@ -49,6 +49,15 @@ EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
 
 const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
   return cryptoFactory_;
+}
+
+void FizzServerHandshake::processAccept() {
+  addProcessingActions(machine_.processAccept(
+      state_, executor_, state_.context(), transportParams_));
+}
+
+const fizz::server::FizzServerContext* FizzServerHandshake::getContext() const {
+  return state_.context();
 }
 
 } // namespace quic

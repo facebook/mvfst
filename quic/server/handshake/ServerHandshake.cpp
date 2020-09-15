@@ -23,10 +23,9 @@ void ServerHandshake::accept(
   SCOPE_EXIT {
     inHandshakeStack_ = false;
   };
-  transportParams_ = transportParams;
+  transportParams_ = std::move(transportParams);
   inHandshakeStack_ = true;
-  addProcessingActions(machine_.processAccept(
-      state_, executor_, context_, std::move(transportParams)));
+  processAccept();
 }
 
 void ServerHandshake::initialize(
@@ -175,11 +174,6 @@ bool ServerHandshake::isHandshakeDone() {
 
 const fizz::server::State& ServerHandshake::getState() const {
   return state_;
-}
-
-const std::shared_ptr<const fizz::server::FizzServerContext>
-ServerHandshake::getContext() const {
-  return context_;
 }
 
 const folly::Optional<std::string>& ServerHandshake::getApplicationProtocol()

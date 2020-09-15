@@ -192,12 +192,6 @@ class ServerHandshake : public Handshake {
   const fizz::server::State& getState() const;
 
   /**
-   * Returns the context used by the ServerHandshake.
-   */
-  const std::shared_ptr<const fizz::server::FizzServerContext> getContext()
-      const;
-
-  /**
    * Retuns the negotiated ALPN from the handshake.
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
@@ -239,7 +233,6 @@ class ServerHandshake : public Handshake {
   QuicConnectionStateBase* conn_;
   folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
-  std::shared_ptr<const fizz::server::FizzServerContext> context_;
   using PendingEvent = fizz::WriteNewSessionTicket;
   std::deque<PendingEvent> pendingEvents_;
 
@@ -280,5 +273,8 @@ class ServerHandshake : public Handshake {
       std::unique_ptr<fizz::server::AppTokenValidator> validator) = 0;
 
   virtual EncryptionLevel getReadRecordLayerEncryptionLevel() = 0;
+
+  virtual void processAccept() = 0;
 }; // namespace quic
+
 } // namespace quic
