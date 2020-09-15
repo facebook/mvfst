@@ -1054,7 +1054,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
 
 TEST_P(AckHandlersTest, ImplictAckEventCreation) {
   QuicServerConnectionState conn(
-      std::make_shared<FizzServerQuicHandshakeContext>());
+      FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
