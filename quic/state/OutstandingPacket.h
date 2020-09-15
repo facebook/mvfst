@@ -13,7 +13,7 @@
 
 namespace quic {
 
-struct OutstandingPacketMetrics {
+struct OutstandingPacketMetadata {
   // Time that the packet was sent.
   TimePoint time;
   // Size of the packet sent on the wire.
@@ -29,7 +29,7 @@ struct OutstandingPacketMetrics {
   // packet is sent.
   uint64_t inflightBytes;
 
-  OutstandingPacketMetrics(
+  OutstandingPacketMetadata(
       TimePoint timeIn,
       uint32_t encodedSizeIn,
       bool isHandshakeIn,
@@ -49,8 +49,9 @@ struct OutstandingPacket {
   // Structure representing the frames that are outstanding including the header
   // that was sent.
   RegularQuicWritePacket packet;
-  // Structure representing a collection of metrics about the packet.
-  OutstandingPacketMetrics metrics;
+  // Structure representing a collection of metrics and important information
+  // about the packet.
+  OutstandingPacketMetadata metadata;
   // Information regarding the last acked packet on this connection when this
   // packet is sent.
   struct LastAckedPacketInfo {
@@ -92,36 +93,36 @@ struct OutstandingPacket {
   bool declaredLost{false};
 
   OutstandingPacket(
-      RegularQuicWritePacket packetIn, 
-      TimePoint timeIn, 
-      uint32_t encodedSizeIn, 
-      bool isHandshakeIn, 
-      uint64_t totalBytesSentIn, 
-      uint64_t inflightBytesIn) 
-    : packet(std::move(packetIn)), 
-      metrics(OutstandingPacketMetrics(
-          std::move(timeIn), 
-          encodedSizeIn, 
-          isHandshakeIn, 
-          false,
-          totalBytesSentIn, 
-          inflightBytesIn)) {}
+      RegularQuicWritePacket packetIn,
+      TimePoint timeIn,
+      uint32_t encodedSizeIn,
+      bool isHandshakeIn,
+      uint64_t totalBytesSentIn,
+      uint64_t inflightBytesIn)
+      : packet(std::move(packetIn)),
+        metadata(OutstandingPacketMetadata(
+            std::move(timeIn),
+            encodedSizeIn,
+            isHandshakeIn,
+            false,
+            totalBytesSentIn,
+            inflightBytesIn)) {}
 
   OutstandingPacket(
-      RegularQuicWritePacket packetIn, 
-      TimePoint timeIn, 
-      uint32_t encodedSizeIn, 
-      bool isHandshakeIn, 
+      RegularQuicWritePacket packetIn,
+      TimePoint timeIn,
+      uint32_t encodedSizeIn,
+      bool isHandshakeIn,
       bool isD6DProbeIn,
-      uint64_t totalBytesSentIn, 
-      uint64_t inflightBytesIn) 
-    : packet(std::move(packetIn)), 
-      metrics(OutstandingPacketMetrics(
-          std::move(timeIn), 
-          encodedSizeIn, 
-          isHandshakeIn, 
-          isD6DProbeIn,
-          totalBytesSentIn, 
-          inflightBytesIn)) {}
+      uint64_t totalBytesSentIn,
+      uint64_t inflightBytesIn)
+      : packet(std::move(packetIn)),
+        metadata(OutstandingPacketMetadata(
+            std::move(timeIn),
+            encodedSizeIn,
+            isHandshakeIn,
+            isD6DProbeIn,
+            totalBytesSentIn,
+            inflightBytesIn)) {}
 };
 } // namespace quic

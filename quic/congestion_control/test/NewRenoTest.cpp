@@ -50,12 +50,16 @@ CongestionController::AckEvent createAckEvent(
   return ack;
 }
 
-OutstandingPacket
-createPacket(PacketNum packetNum, uint32_t size, TimePoint sendTime, uint64_t inflight = 0) {
+OutstandingPacket createPacket(
+    PacketNum packetNum,
+    uint32_t size,
+    TimePoint sendTime,
+    uint64_t inflight = 0) {
   auto connId = getTestConnectionId();
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
-  return OutstandingPacket(std::move(packet), sendTime, size, false, size, inflight);
+  return OutstandingPacket(
+      std::move(packet), sendTime, size, false, size, inflight);
 }
 
 TEST_F(NewRenoTest, TestLoss) {
@@ -130,7 +134,8 @@ TEST_F(NewRenoTest, TestSlowStartAck) {
   reno.onPacketSent(packet);
   EXPECT_EQ(reno.getBytesInFlight(), ackedSize);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum1, ackedSize, packet.metrics.time), folly::none);
+      createAckEvent(ackPacketNum1, ackedSize, packet.metadata.time),
+      folly::none);
   EXPECT_TRUE(reno.inSlowStart());
   auto newWritableBytes = reno.getWritableBytes();
 
@@ -159,7 +164,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
       ackPacketNum1, ackedSize, Clock::now() - std::chrono::milliseconds(10));
   reno.onPacketSent(packet1);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum1, ackedSize, packet1.metrics.time), folly::none);
+      createAckEvent(ackPacketNum1, ackedSize, packet1.metadata.time),
+      folly::none);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes2 = reno.getWritableBytes();
@@ -169,7 +175,8 @@ TEST_F(NewRenoTest, TestSteadyStateAck) {
   auto packet2 = createPacket(ackPacketNum2, ackedSize, Clock::now());
   reno.onPacketSent(packet2);
   reno.onPacketAckOrLoss(
-      createAckEvent(ackPacketNum2, ackedSize, packet2.metrics.time), folly::none);
+      createAckEvent(ackPacketNum2, ackedSize, packet2.metadata.time),
+      folly::none);
   EXPECT_FALSE(reno.inSlowStart());
 
   auto newWritableBytes3 = reno.getWritableBytes();

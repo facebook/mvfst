@@ -35,7 +35,7 @@ TEST_F(CubicStateTest, HystartAck) {
   auto packet = makeTestingWritePacket(0, 0, 0);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 0, Clock::now(), packet.metrics.time), folly::none);
+      makeAck(0, 0, Clock::now(), packet.metadata.time), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 }
 
@@ -54,7 +54,7 @@ TEST_F(CubicStateTest, FastRecoveryAck) {
   loss.addLostPacket(packet);
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
   cubic.onPacketAckOrLoss(
-      makeAck(2, 1000, Clock::now(), packet1.metrics.time), folly::none);
+      makeAck(2, 1000, Clock::now(), packet1.metadata.time), folly::none);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }
 
@@ -71,7 +71,7 @@ TEST_F(CubicStateTest, FastRecoveryAckToSteady) {
   auto packet1 = makeTestingWritePacket(1, 1, 2);
   cubic.onPacketSent(packet1);
   cubic.onPacketAckOrLoss(
-      makeAck(1, 1, Clock::now(), packet1.metrics.time), folly::none);
+      makeAck(1, 1, Clock::now(), packet1.metadata.time), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 
@@ -95,7 +95,7 @@ TEST_F(CubicStateTest, SteadyAck) {
   auto packet = makeTestingWritePacket(0, 0, 0);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 0, Clock::now(), packet.metrics.time), folly::none);
+      makeAck(0, 0, Clock::now(), packet.metadata.time), folly::none);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 }
 

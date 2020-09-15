@@ -224,7 +224,7 @@ struct CongestionController {
 
     void addLostPacket(const OutstandingPacket& packet) {
       if (std::numeric_limits<uint64_t>::max() - lostBytes <
-          packet.metrics.encodedSize) {
+          packet.metadata.encodedSize) {
         throw QuicInternalException(
             "LossEvent: lostBytes overflow",
             LocalErrorCode::LOST_BYTES_OVERFLOW);
@@ -232,12 +232,14 @@ struct CongestionController {
       PacketNum packetNum = packet.packet.header.getPacketSequenceNum();
       largestLostPacketNum =
           std::max(packetNum, largestLostPacketNum.value_or(packetNum));
-      lostBytes += packet.metrics.encodedSize;
+      lostBytes += packet.metadata.encodedSize;
       lostPackets++;
-      largestLostSentTime =
-          std::max(packet.metrics.time, largestLostSentTime.value_or(packet.metrics.time));
-      smallestLostSentTime =
-          std::min(packet.metrics.time, smallestLostSentTime.value_or(packet.metrics.time));
+      largestLostSentTime = std::max(
+          packet.metadata.time,
+          largestLostSentTime.value_or(packet.metadata.time));
+      smallestLostSentTime = std::min(
+          packet.metadata.time,
+          smallestLostSentTime.value_or(packet.metadata.time));
     }
   };
 

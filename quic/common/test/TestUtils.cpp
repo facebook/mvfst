@@ -732,10 +732,10 @@ bool matchError(
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacket outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
-      .setSentTime(outstandingPacket.metrics.time)
-      .setEncodedSize(outstandingPacket.metrics.encodedSize)
+      .setSentTime(outstandingPacket.metadata.time)
+      .setEncodedSize(outstandingPacket.metadata.encodedSize)
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
-      .setTotalBytesSentThen(outstandingPacket.metrics.totalBytesSent)
+      .setTotalBytesSentThen(outstandingPacket.metadata.totalBytesSent)
       .setAppLimited(outstandingPacket.isAppLimited)
       .build();
 }

@@ -218,11 +218,11 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
-    if (currentPacketNumberSpace != pnSpace || pkt.metrics.isD6DProbe) {
+    if (currentPacketNumberSpace != pnSpace || pkt.metadata.isD6DProbe) {
       iter++;
       continue;
     }
-    bool lostByTimeout = (lossTime - pkt.metrics.time) > delayUntilLost;
+    bool lostByTimeout = (lossTime - pkt.metadata.time) > delayUntilLost;
     bool lostByReorder =
         (*largestAcked - currentPacketNum) > conn.lossState.reorderingThreshold;
 
@@ -248,7 +248,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     if (pkt.associatedEvent) {
       conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
     }
-    if (pkt.metrics.isHandshake && !processed) {
+    if (pkt.metadata.isHandshake && !processed) {
       if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
         CHECK(conn.outstandings.initialPacketsCount);
         --conn.outstandings.initialPacketsCount;
@@ -259,7 +259,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       }
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
-             << " handshake=" << pkt.metrics.isHandshake << " " << conn;
+             << " handshake=" << pkt.metadata.isHandshake << " " << conn;
     // Rather than erasing here, instead mark the packet as lost so we can
     // determine if this was spurious later.
     conn.outstandings.declaredLostCount++;
@@ -291,7 +291,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
              << conn.outstandings.packets.empty() << " delayUntilLost"
              << delayUntilLost.count() << "us"
              << " " << conn;
-    getLossTime(conn, pnSpace) = delayUntilLost + earliest->metrics.time;
+    getLossTime(conn, pnSpace) = delayUntilLost + earliest->metadata.time;
   }
   if (lossEvent.largestLostPacketNum.hasValue()) {
     DCHECK(lossEvent.largestLostSentTime && lossEvent.smallestLostSentTime);
@@ -422,7 +422,7 @@ void markZeroRttPacketsLost(
         iter->packet.header.getProtectionType() == ProtectionType::ZeroRtt;
     if (isZeroRttPacket) {
       auto& pkt = *iter;
-      DCHECK(!pkt.metrics.isHandshake);
+      DCHECK(!pkt.metadata.isHandshake);
       bool processed = pkt.associatedEvent &&
           !conn.outstandings.packetEvents.count(*pkt.associatedEvent);
       lossVisitor(conn, pkt.packet, processed);

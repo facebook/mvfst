@@ -575,24 +575,28 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       makeTestShortPacket(), Clock::now(), 6665, false, 0, 0);
   EXPECT_EQ(
       135,
-      getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)->metrics.encodedSize);
+      getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)
+          ->metadata.encodedSize);
   EXPECT_EQ(
       56,
-      getLastOutstandingPacket(conn, PacketNumberSpace::Initial)->metrics.encodedSize);
+      getLastOutstandingPacket(conn, PacketNumberSpace::Initial)
+          ->metadata.encodedSize);
   EXPECT_EQ(
       1217,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake)
-          ->metrics.encodedSize);
+          ->metadata.encodedSize);
   EXPECT_EQ(
       1217,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake)
-          ->metrics.encodedSize);
+          ->metadata.encodedSize);
   EXPECT_EQ(
       5556,
-      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->metrics.encodedSize);
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)
+          ->metadata.encodedSize);
   EXPECT_EQ(
       6665,
-      getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->metrics.encodedSize);
+      getLastOutstandingPacket(conn, PacketNumberSpace::AppData)
+          ->metadata.encodedSize);
 }
 
 TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {

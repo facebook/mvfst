@@ -29,12 +29,13 @@ class InstrumentationObserver {
         const quic::OutstandingPacket& pkt)
         : lostByTimeout(lostbytimeout),
           lostByReorderThreshold(lostbyreorder),
-          metrics(pkt.metrics),
+          metadata(pkt.metadata),
           lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
     bool lostByTimeout{false};
     bool lostByReorderThreshold{false};
-    const quic::OutstandingPacketMetrics metrics;
-    const folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
+    const quic::OutstandingPacketMetadata metadata;
+    const folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+        lastAckedPacketInfo;
   };
 
   struct ObserverLossEvent {
@@ -57,17 +58,18 @@ class InstrumentationObserver {
 
   struct PacketRTT {
     explicit PacketRTT(
-      std::chrono::microseconds rttsample,
-      std::chrono::microseconds ackdelay,
-      const quic::OutstandingPacket& pkt)
-      : rttSample(rttsample),
-        ackDelay(ackdelay),
-        metrics(pkt.metrics),
-        lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
+        std::chrono::microseconds rttsample,
+        std::chrono::microseconds ackdelay,
+        const quic::OutstandingPacket& pkt)
+        : rttSample(rttsample),
+          ackDelay(ackdelay),
+          metadata(pkt.metadata),
+          lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
     std::chrono::microseconds rttSample;
     std::chrono::microseconds ackDelay;
-    const quic::OutstandingPacketMetrics metrics;
-    const folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
+    const quic::OutstandingPacketMetadata metadata;
+    const folly::Optional<OutstandingPacket::LastAckedPacketInfo>
+        lastAckedPacketInfo;
   };
 
   virtual ~InstrumentationObserver() = default;
@@ -102,8 +104,7 @@ class InstrumentationObserver {
    *
    * @param packet   const reference to the packet with the RTT
    */
-  virtual void rttSampleGenerated(
-      const struct PacketRTT& /* RTT sample */) {}
+  virtual void rttSampleGenerated(const struct PacketRTT& /* RTT sample */) {}
 };
 
 // Container for instrumentation observers.

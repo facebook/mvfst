@@ -205,7 +205,13 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     encodedSize += packet.body->computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacket(
-      packet.packet, time, encodedSize, isHandshake, isD6DProbe, encodedSize, 0);
+      packet.packet,
+      time,
+      encodedSize,
+      isHandshake,
+      isD6DProbe,
+      encodedSize,
+      0);
   outstandingPacket.associatedEvent = associatedEvent;
   if (isHandshake) {
     conn.lossState.lastHandshakePacketSentTime = time;
@@ -755,7 +761,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
        iter <
        getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 5;
        iter++) {
-    if (iter->metrics.isHandshake) {
+    if (iter->metadata.isHandshake) {
       conn->outstandings.handshakePacketsCount--;
     }
   }

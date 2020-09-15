@@ -11,13 +11,13 @@
 
 #include <quic/common/test/TestUtils.h>
 
+#include <quic/api/test/Mocks.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/StateData.h>
 #include <quic/state/test/Mocks.h>
-#include <quic/api/test/Mocks.h>
 
 #include <numeric>
 
@@ -517,8 +517,8 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   conn.lossState.ptoCount = 1;
   PacketNum packetAfterRtoNum = 10;
   auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
-  conn.outstandings.packets.emplace_back(
-      OutstandingPacket(std::move(packetAfterRto), Clock::now(), 0, false, 0, 0));
+  conn.outstandings.packets.emplace_back(OutstandingPacket(
+      std::move(packetAfterRto), Clock::now(), 0, false, 0, 0));
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
@@ -602,7 +602,8 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         Clock::now(),
         0,
         packetNum % 2 && GetParam() != PacketNumberSpace::AppData,
-        packetNum / 2, 0);
+        packetNum / 2,
+        0);
     if (GetParam() == PacketNumberSpace::Initial) {
       conn.outstandings.initialPacketsCount += packetNum % 2;
     } else if (GetParam() == PacketNumberSpace::Handshake) {
@@ -684,8 +685,8 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   // We need to at least have one frame to trigger ackVisitor
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
-  conn.outstandings.packets.emplace_back(
-      OutstandingPacket(std::move(regularPacket), Clock::now(), 1, false, 1, 0));
+  conn.outstandings.packets.emplace_back(OutstandingPacket(
+      std::move(regularPacket), Clock::now(), 1, false, 1, 0));
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
   ackFrame.ackBlocks.emplace_back(0, 0);
@@ -1110,7 +1111,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       [](const auto&, const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
- }
+}
 
 TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   QuicServerConnectionState conn(
@@ -1166,16 +1167,16 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
       ackTime - largestSentTime);
   EXPECT_CALL(
-    ib,
-    rttSampleGenerated(
-      AllOf(
-        Field(&InstrumentationObserver::PacketRTT::rttSample, rttSample),
-        Field(&InstrumentationObserver::PacketRTT::ackDelay, 25ms),
-        Field(&InstrumentationObserver::PacketRTT::metrics, Field(&quic::OutstandingPacketMetrics::inflightBytes, 10))))
-      )
-    .Times(1);
+      ib,
+      rttSampleGenerated(AllOf(
+          Field(&InstrumentationObserver::PacketRTT::rttSample, rttSample),
+          Field(&InstrumentationObserver::PacketRTT::ackDelay, 25ms),
+          Field(
+              &InstrumentationObserver::PacketRTT::metadata,
+              Field(&quic::OutstandingPacketMetadata::inflightBytes, 10)))))
+      .Times(1);
 
-  for(auto& callback : conn.pendingCallbacks) {
+  for (auto& callback : conn.pendingCallbacks) {
     callback();
   }
 }

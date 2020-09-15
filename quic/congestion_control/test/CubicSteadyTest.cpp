@@ -29,7 +29,7 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   conn.lossState.largestSent = 0;
   cubic.onPacketSent(packet0);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet0.metrics.time), folly::none);
+      makeAck(0, 1000, Clock::now(), packet0.metadata.time), folly::none);
   EXPECT_EQ(3000, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 

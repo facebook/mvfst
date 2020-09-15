@@ -1371,7 +1371,8 @@ TEST_F(
   conn.outstandings.packets.back().packet.frames.push_back(
       MaxDataFrame(conn.flowControlState.advertisedMaxOffset));
   // Lie about the encodedSize to let the Cloner skip it:
-  conn.outstandings.packets.back().metrics.encodedSize = kDefaultUDPSendPacketLen * 2;
+  conn.outstandings.packets.back().metadata.encodedSize =
+      kDefaultUDPSendPacketLen * 2;
   EXPECT_TRUE(cloningScheduler.hasData());
 
   ASSERT_FALSE(noopScheduler.hasData());

@@ -892,7 +892,7 @@ void onServerReadDataFromOpen(
                     break;
                   }
                   case QuicWriteFrame::Type::PingFrame_E:
-                    if (!packet.metrics.isD6DProbe) {
+                    if (!packet.metadata.isD6DProbe) {
                       conn.pendingEvents.cancelPingTimeout = true;
                     }
                     return;
@@ -908,9 +908,7 @@ void onServerReadDataFromOpen(
                     }
                     break;
                   }
-                  default: {
-                    break;
-                  }
+                  default: { break; }
                 }
               },
               markPacketLoss,
@@ -1058,9 +1056,7 @@ void onServerReadDataFromOpen(
               conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
           break;
         }
-        default: {
-          break;
-        }
+        default: { break; }
       }
     }
 

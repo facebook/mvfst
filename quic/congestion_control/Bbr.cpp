@@ -8,10 +8,10 @@
 
 // Copyright 2004-present Facebook.  All rights reserved.
 
-#include <quic/congestion_control/Bbr.h>
 #include <folly/Random.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QuicLogger.h>
@@ -116,9 +116,10 @@ void BbrCongestionController::onPacketSent(const OutstandingPacket& packet) {
   if (!conn_.lossState.inflightBytes && isAppLimited()) {
     exitingQuiescene_ = true;
   }
-  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.metrics.encodedSize);
+  addAndCheckOverflow(
+      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
   if (!ackAggregationStartTime_) {
-    ackAggregationStartTime_ = packet.metrics.time;
+    ackAggregationStartTime_ = packet.metadata.time;
   }
 }
 

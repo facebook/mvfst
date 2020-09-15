@@ -6,8 +6,8 @@
  *
  */
 
-#include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <quic/congestion_control/NewReno.h>
 #include <quic/logging/QLoggerConstants.h>
 
 namespace quic {
@@ -37,7 +37,8 @@ void NewReno::onRemoveBytesFromInflight(uint64_t bytes) {
 }
 
 void NewReno::onPacketSent(const OutstandingPacket& packet) {
-  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.metrics.encodedSize);
+  addAndCheckOverflow(
+      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes

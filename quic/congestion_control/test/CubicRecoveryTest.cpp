@@ -57,7 +57,7 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   cubic.onPacketSent(packet);
   totalSent += 1000;
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet.metrics.time), folly::none);
+      makeAck(0, 1000, Clock::now(), packet.metadata.time), folly::none);
   EXPECT_EQ(CubicStates::Hystart, cubic.state());
 
   // Send three packets, lose second immediately.
@@ -83,9 +83,9 @@ TEST_F(CubicRecoveryTest, LossBeforeRecovery) {
   totalSent += 1000;
   conn.lossState.largestSent = 4;
   cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, Clock::now(), packet3.metrics.time), folly::none);
+      makeAck(3, 1000, Clock::now(), packet3.metadata.time), folly::none);
   cubic.onPacketAckOrLoss(
-      makeAck(4, 1000, Clock::now(), packet4.metrics.time), folly::none);
+      makeAck(4, 1000, Clock::now(), packet4.metadata.time), folly::none);
   auto cwndAfterRecovery = cubic.getCongestionWindow();
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
@@ -105,7 +105,7 @@ TEST_F(CubicRecoveryTest, LossAfterRecovery) {
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   cubic.onPacketSent(packet);
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet.metrics.time), folly::none);
+      makeAck(0, 1000, Clock::now(), packet.metadata.time), folly::none);
   // Lose one packet.
   auto packet1 = makeTestingWritePacket(1, 1000, 2000);
   cubic.onPacketSent(packet1);
@@ -152,13 +152,13 @@ TEST_F(CubicRecoveryTest, AckNotLargestNotChangeCwnd) {
 
   // the the rest are acked:
   cubic.onPacketAckOrLoss(
-      makeAck(0, 1000, Clock::now(), packet1.metrics.time), folly::none);
+      makeAck(0, 1000, Clock::now(), packet1.metadata.time), folly::none);
   cubic.onPacketAckOrLoss(
-      makeAck(1, 1000, Clock::now(), packet2.metrics.time), folly::none);
+      makeAck(1, 1000, Clock::now(), packet2.metadata.time), folly::none);
   cubic.onPacketAckOrLoss(
-      makeAck(2, 1000, Clock::now(), packet3.metrics.time), folly::none);
+      makeAck(2, 1000, Clock::now(), packet3.metadata.time), folly::none);
   cubic.onPacketAckOrLoss(
-      makeAck(3, 1000, Clock::now(), packet4.metrics.time), folly::none);
+      makeAck(3, 1000, Clock::now(), packet4.metadata.time), folly::none);
 
   // Still in recovery:
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
