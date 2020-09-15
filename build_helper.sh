@@ -299,7 +299,7 @@ function setup_fizz() {
   mkdir -p "$FIZZ_BUILD_DIR"
   cd "$FIZZ_BUILD_DIR" || exit
   cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
-    -DBUILD_TESTS=ON                                \
+    -DBUILD_TESTS=OFF                               \
     -DCMAKE_PREFIX_PATH="$FIZZ_INSTALL_DIR"         \
     -DCMAKE_INSTALL_PREFIX="$FIZZ_INSTALL_DIR"      \
     ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
@@ -334,7 +334,7 @@ function setup_libccp() {
   mkdir -p "$LIBCCP_BUILD_DIR"
   cd "$LIBCCP_BUILD_DIR" || exit
   cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo           \
-    -DBUILD_TESTS=ON                                \
+    -DBUILD_TESTS=OFF                               \
     -DCMAKE_PREFIX_PATH="$LIBCCP_INSTALL_DIR"       \
     -DCMAKE_INSTALL_PREFIX="$LIBCCP_INSTALL_DIR"    \
     -DCMAKE_CXX_FLAGS=\D__CPLUSPLUS__=1             \
