@@ -138,6 +138,7 @@ class QuicServerTransport
   void maybeNotifyConnectionIdBound();
   void maybeWriteNewSessionTicket();
   void maybeIssueConnectionIds();
+  bool hasReadCipher() const;
 
  private:
   RoutingCallback* routingCb_{nullptr};

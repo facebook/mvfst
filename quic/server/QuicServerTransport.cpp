@@ -304,6 +304,11 @@ bool QuicServerTransport::hasWriteCipher() const {
   return conn_->oneRttWriteCipher != nullptr;
 }
 
+bool QuicServerTransport::hasReadCipher() const {
+  return conn_->readCodec != nullptr &&
+      conn_->readCodec->getOneRttReadCipher() != nullptr;
+}
+
 std::shared_ptr<QuicTransportBase> QuicServerTransport::sharedGuard() {
   return shared_from_this();
 }
