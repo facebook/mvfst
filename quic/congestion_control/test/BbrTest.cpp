@@ -8,10 +8,10 @@
 
 // Copyright 2004-present Facebook.  All rights reserved.
 
-#include <quic/congestion_control/Bbr.h>
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/test/Mocks.h>
 #include <quic/state/test/Mocks.h>
@@ -141,7 +141,7 @@ TEST_F(BbrTest, StartupCwnd) {
   // Target cwnd will be 100 * 5000 * 2.885 = 1442500, but you haven't finished
   // STARTUP, too bad kiddo, you only grow a little today
   bbr.onPacketAckOrLoss(
-      makeAck(0, 3000, Clock::now(), packet.time), folly::none);
+      makeAck(0, 3000, Clock::now(), packet.metadata.time), folly::none);
   EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
 }
 
@@ -167,7 +167,7 @@ TEST_F(BbrTest, StartupCwndImplicit) {
           Bandwidth(5000ULL * 1000 * 1000, std::chrono::microseconds(1))));
   // Target cwnd will be 100 * 5000 * 2.885 = 1442500, but you haven't finished
   // STARTUP, too bad kiddo, you only grow a little today
-  auto ack = makeAck(0, 3000, Clock::now(), packet.time);
+  auto ack = makeAck(0, 3000, Clock::now(), packet.metadata.time);
   ack.implicit = true;
   bbr.onPacketAckOrLoss(ack, folly::none);
   EXPECT_EQ(startingCwnd + 3000, bbr.getCongestionWindow());
@@ -197,7 +197,8 @@ TEST_F(BbrTest, LeaveStartup) {
         .WillRepeatedly(Return(
             mockedBandwidth * (growFast ? kExpectedStartupGrowth : 1.0)));
     bbr.onPacketAckOrLoss(
-        makeAck(currentLatest, 1000, Clock::now(), packet.time), folly::none);
+        makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time),
+        folly::none);
     conn.lossState.totalBytesAcked += 1000;
     if (growFast) {
       mockedBandwidth = mockedBandwidth * kExpectedStartupGrowth;
@@ -263,7 +264,8 @@ TEST_F(BbrTest, ProbeRtt) {
         conn.udpSendPacketLen,
         totalSent + conn.udpSendPacketLen);
     bbr.onPacketSent(packet);
-    inflightPackets.push_back(std::make_pair(currentLatest, packet.time));
+    inflightPackets.push_back(
+        std::make_pair(currentLatest, packet.metadata.time));
     inflightBytes += conn.udpSendPacketLen;
     currentLatest++;
     totalSent += conn.udpSendPacketLen;
@@ -431,7 +433,8 @@ TEST_F(BbrTest, AckAggregation) {
         .WillRepeatedly(Return(
             mockedBandwidth * (growFast ? kExpectedStartupGrowth : 1.0)));
     bbr.onPacketAckOrLoss(
-        makeAck(currentLatest, 1000, Clock::now(), packet.time), folly::none);
+        makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time),
+        folly::none);
     conn.lossState.totalBytesAcked += 1000;
     if (growFast) {
       mockedBandwidth = mockedBandwidth * kExpectedStartupGrowth;
@@ -468,7 +471,8 @@ TEST_F(BbrTest, AckAggregation) {
       conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
   bbr.onPacketSent(packet);
   totalSent += 1000;
-  auto ackEvent = makeAck(currentLatest, 1000, Clock::now(), packet.time);
+  auto ackEvent =
+      makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time);
   ackEvent.ackTime = Clock::now();
   // use a real large bandwidth to clear accumulated ack aggregation during
   // startup
@@ -494,7 +498,10 @@ TEST_F(BbrTest, AckAggregation) {
   bbr.onPacketSent(packet1);
   totalSent += (currentMaxAckHeight * 2 + 100);
   auto ackEvent2 = makeAck(
-      currentLatest, currentMaxAckHeight * 2 + 100, Clock::now(), packet1.time);
+      currentLatest,
+      currentMaxAckHeight * 2 + 100,
+      Clock::now(),
+      packet1.metadata.time);
   // This will make the expected ack arrival rate very low:
   ackEvent2.ackTime = ackEvent.ackTime + 1us;
   bbr.onPacketAckOrLoss(ackEvent2, folly::none);
@@ -565,7 +572,7 @@ TEST_F(BbrTest, ExtendMinRttExpiration) {
           conn.lossState.largestSent.value_or(0),
           1000,
           Clock::now(),
-          packet.time),
+          packet.metadata.time),
       folly::none);
 }
 
