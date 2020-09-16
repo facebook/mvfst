@@ -59,6 +59,7 @@ quic_add_test(TARGET QuicCommonUtilTest SOURCES
   VariantTest.cpp
   BufAccessorTest.cpp
   BufUtilTest.cpp
+  WindowedCounterTest.cpp
   DEPENDS
   Folly::folly
   mvfst_buf_accessor
