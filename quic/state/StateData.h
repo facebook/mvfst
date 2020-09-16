@@ -773,6 +773,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // The raise timeout
     std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};
+
+    // The probe timeout
+    std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
   };
 
   D6DState d6d;

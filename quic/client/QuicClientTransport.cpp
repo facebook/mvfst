@@ -1570,6 +1570,29 @@ void QuicClientTransport::setD6DRaiseTimeoutTransportParameter() {
   }
 }
 
+void QuicClientTransport::setD6DProbeTimeoutTransportParameter() {
+  if (!conn_->transportSettings.d6dConfig.enabled) {
+    return;
+  }
+
+  std::chrono::seconds probeTimeoutSetting =
+      conn_->transportSettings.d6dConfig.advertisedProbeTimeout;
+
+  // Sanity check
+  if (probeTimeoutSetting < kMinD6DProbeTimeout) {
+    LOG(ERROR) << "d6d probe timeout below lower bound, skipping: "
+               << probeTimeoutSetting.count();
+  }
+
+  auto probeTimeoutCustomParam =
+      std::make_unique<CustomIntegralTransportParameter>(
+          kD6DProbeTimeoutParameterId, probeTimeoutSetting.count());
+
+  if (!setCustomTransportParameter(std::move(probeTimeoutCustomParam))) {
+    LOG(ERROR) << "failed to set D6D probe timeout transport parameter";
+  }
+}
+
 void QuicClientTransport::adjustGROBuffers() {
   if (socket_ && conn_) {
     if (conn_->transportSettings.numGROBuffers_ > kDefaultNumGROBuffers) {

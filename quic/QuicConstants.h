@@ -56,6 +56,12 @@ constexpr std::chrono::seconds kDefaultD6DRaiseTimeout = 600s;
 // The minimum d6d raise timeout
 constexpr std::chrono::seconds kMinD6DRaiseTimeout = 50s;
 
+// The default d6d probe timeout, recommended by the spec
+constexpr std::chrono::seconds kDefaultD6DProbeTimeout = 15s;
+
+// The minimum d6d probe timeout, recommended by the spec
+constexpr std::chrono::seconds kMinD6DProbeTimeout = 1s;
+
 // Number of GRO buffers to use
 // 1 means GRO is not enabled
 // 64 is the max possible value
@@ -226,6 +232,8 @@ constexpr uint16_t kPartialReliabilityParameterId = 0xFF00; // subject to change
 constexpr uint16_t kD6DBasePMTUParameterId = 0x0377;
 
 constexpr uint16_t kD6DRaiseTimeoutParameterId = 0xF695;
+
+constexpr uint16_t kD6DProbeTimeoutParameterId = 0x9012;
 
 constexpr uint32_t kDrainFactor = 3;
 

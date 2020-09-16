@@ -139,6 +139,9 @@ void processClientInitialParams(
   auto d6dRaiseTimeout = getIntegerParameter(
       static_cast<TransportParameterId>(kD6DRaiseTimeoutParameterId),
       clientParams.parameters);
+  auto d6dProbeTimeout = getIntegerParameter(
+      static_cast<TransportParameterId>(kD6DProbeTimeoutParameterId),
+      clientParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
@@ -237,6 +240,16 @@ void processClientInitialParams(
       } else {
         LOG(ERROR) << "client d6dRaiseTimeout fails sanity check: "
                    << *d6dRaiseTimeout;
+      }
+    }
+
+    if (d6dProbeTimeout) {
+      if (*d6dProbeTimeout >= kMinD6DProbeTimeout.count()) {
+        conn.d6d.probeTimeout = std::chrono::seconds(*d6dProbeTimeout);
+        VLOG(10) << "conn.d6d.probeTimeout=" << conn.d6d.probeTimeout.count();
+      } else {
+        LOG(ERROR) << "client d6dProbeTimeout fails sanity check: "
+                   << *d6dProbeTimeout;
       }
     }
   }

@@ -64,6 +64,16 @@ struct D6DConfig {
    * value, but should rely on the transport parameter.
    */
   std::chrono::seconds advertisedRaiseTimeout{kDefaultD6DRaiseTimeout};
+
+  /**
+   * The D6D probe timeout. When it expires, we either send another
+   * probe with the same size, or sleep for raise timeout, depending
+   * on the d6d state. There are other events (e.g. probe gets acked
+   * or probe is determined lost) that might cancel this timeout.
+   * Client sends this value as a transport parameter during
+   * handshake.
+   */
+  std::chrono::seconds advertisedProbeTimeout{kDefaultD6DProbeTimeout};
 };
 
 struct TransportSettings {
