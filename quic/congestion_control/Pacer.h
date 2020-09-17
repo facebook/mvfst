@@ -38,6 +38,8 @@ class DefaultPacer : public Pacer {
 
   void resetPacingTokens() override;
 
+  void setRttFactor(uint8_t numerator, uint8_t denominator) override;
+
   std::chrono::microseconds getTimeUntilNextWrite() const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;

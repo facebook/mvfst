@@ -31,6 +31,8 @@ class TokenlessPacer : public Pacer {
 
   void resetPacingTokens() override;
 
+  void setRttFactor(uint8_t numerator, uint8_t denominator) override;
+
   std::chrono::microseconds getTimeUntilNextWrite() const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;
@@ -49,5 +51,7 @@ class TokenlessPacer : public Pacer {
   std::chrono::microseconds writeInterval_{0};
   PacingRateCalculator pacingRateCalculator_;
   folly::Optional<TimePoint> lastWriteTime_;
+  uint8_t rttFactorNumerator_{1};
+  uint8_t rttFactorDenominator_{1};
 };
 } // namespace quic

@@ -38,6 +38,7 @@ class MockPacer : public Pacer {
       void(uint64_t, std::chrono::microseconds, TimePoint currentTime));
   MOCK_METHOD2(setPacingRate, void(QuicConnectionStateBase&, uint64_t));
   MOCK_METHOD0(resetPacingTokens, void());
+  MOCK_METHOD2(setRttFactor, void(uint8_t, uint8_t));
   MOCK_CONST_METHOD0(getTimeUntilNextWrite, std::chrono::microseconds());
   MOCK_METHOD1(updateAndGetWriteBatchSize, uint64_t(TimePoint));
   MOCK_CONST_METHOD0(getCachedWriteBatchSize, uint64_t());

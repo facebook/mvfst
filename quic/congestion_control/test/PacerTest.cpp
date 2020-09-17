@@ -140,6 +140,22 @@ TEST_F(TokenlessPacerTest, NextWriteTime) {
   EXPECT_NEAR(1000, pacer.getTimeUntilNextWrite().count(), 100);
 }
 
+TEST_F(TokenlessPacerTest, RttFactor) {
+  auto realRtt = 100ms;
+  bool calculatorCalled = false;
+  pacer.setRttFactor(1, 2);
+  pacer.setPacingRateCalculator([&](const QuicConnectionStateBase&,
+                                    uint64_t,
+                                    uint64_t,
+                                    std::chrono::microseconds rtt) {
+    EXPECT_EQ(rtt, realRtt / 2);
+    calculatorCalled = true;
+    return PacingRate::Builder().setInterval(rtt).setBurstSize(10).build();
+  });
+  pacer.refreshPacingRate(20, realRtt);
+  EXPECT_TRUE(calculatorCalled);
+}
+
 TEST_F(PacerTest, ImpossibleToPace) {
   conn.transportSettings.pacingTimerTickInterval = 1ms;
   pacer.setPacingRateCalculator([](const QuicConnectionStateBase& conn,

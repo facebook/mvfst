@@ -287,6 +287,13 @@ void BbrCongestionController::updatePacing() noexcept {
     pacingWindow_ = std::max(pacingWindow_, targetPacingWindow);
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
+  if (state_ == BbrState::Startup) {
+    // This essentially paces at a 200% rate.
+    conn_.pacer->setRttFactor(1, 2);
+  } else {
+    // Otherwise pace at a 120% rate.
+    conn_.pacer->setRttFactor(4, 5);
+  }
   conn_.pacer->refreshPacingRate(pacingWindow_, mrtt);
   if (state_ == BbrState::Drain) {
     conn_.pacer->resetPacingTokens();

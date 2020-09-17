@@ -85,6 +85,10 @@ void DefaultPacer::resetPacingTokens() {
   lastWriteTime_.reset();
 }
 
+void DefaultPacer::setRttFactor(uint8_t, uint8_t) {
+  // Not implemented for DefaultPacer, as we collect tokens instead.
+}
+
 void DefaultPacer::onPacketSent() {
   if (tokens_) {
     --tokens_;

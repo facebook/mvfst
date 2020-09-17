@@ -159,6 +159,13 @@ struct Pacer {
   virtual void resetPacingTokens() = 0;
 
   /**
+   * Set the factor by which to multiply the RTT before determining the
+   * inter-burst interval. E.g. a numerator of 1 and a denominator of 2
+   * would effectively double the pacing rate.
+   */
+  virtual void setRttFactor(uint8_t numerator, uint8_t denominator) = 0;
+
+  /**
    * API for Trnasport to query the interval before next write
    */
   virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;

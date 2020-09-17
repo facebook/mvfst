@@ -29,6 +29,8 @@ void TokenlessPacer::refreshPacingRate(
     writeInterval_ = 0us;
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
   } else {
+    rtt *= rttFactorNumerator_;
+    rtt /= rttFactorDenominator_;
     const PacingRate pacingRate =
         pacingRateCalculator_(conn_, cwndBytes, minCwndInMss_, rtt);
     writeInterval_ = pacingRate.interval;
@@ -56,6 +58,11 @@ void TokenlessPacer::setPacingRate(
 void TokenlessPacer::resetPacingTokens() {
   // We call this after idle, so we actually want to start writing immediately.
   lastWriteTime_.reset();
+}
+
+void TokenlessPacer::setRttFactor(uint8_t numerator, uint8_t denominator) {
+  rttFactorNumerator_ = numerator;
+  rttFactorDenominator_ = denominator;
 }
 
 void TokenlessPacer::onPacketSent() {}
