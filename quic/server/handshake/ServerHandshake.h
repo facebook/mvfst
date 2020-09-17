@@ -228,6 +228,18 @@ class ServerHandshake : public Handshake {
   void processPendingEvents();
 
  protected:
+  Phase phase_{Phase::Handshake};
+
+  enum class CipherKind {
+    HandshakeRead,
+    HandshakeWrite,
+    OneRttRead,
+    OneRttWrite,
+    ZeroRttRead,
+  };
+
+  void computeCiphers(CipherKind kind, folly::ByteRange secret);
+
   fizz::server::State state_;
   fizz::server::ServerStateMachine machine_;
   QuicConnectionStateBase* conn_;
@@ -263,8 +275,6 @@ class ServerHandshake : public Handshake {
   bool handshakeDone_{false};
   bool handshakeEventAvailable_{false};
 
-  Phase phase_{Phase::Handshake};
-
   std::shared_ptr<ServerTransportParametersExtension> transportParams_;
 
  private:
@@ -276,6 +286,8 @@ class ServerHandshake : public Handshake {
 
   virtual void processSocketData(folly::IOBufQueue& queue) = 0;
   virtual void processAccept() = 0;
+  virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+  buildCiphers(folly::ByteRange secret) = 0;
 }; // namespace quic
 
 } // namespace quic

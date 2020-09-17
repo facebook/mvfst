@@ -10,6 +10,8 @@
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
+#include <fizz/protocol/Protocol.h>
+
 // This is necessary for the conversion between QuicServerConnectionState and
 // QuicConnectionStateBase and can be removed once ServerHandshake accepts
 // QuicServerConnectionState.
@@ -45,6 +47,20 @@ void FizzServerHandshake::initializeImpl(
 EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
   return getEncryptionLevelFromFizz(
       state_.readRecordLayer()->getEncryptionLevel());
+}
+
+std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
+FizzServerHandshake::buildCiphers(folly::ByteRange secret) {
+  auto aead = FizzAead::wrap(fizz::Protocol::deriveRecordAeadWithLabel(
+      *state_.context()->getFactory(),
+      *state_.keyScheduler(),
+      *state_.cipher(),
+      secret,
+      kQuicKeyLabel,
+      kQuicIVLabel));
+  auto headerCipher = cryptoFactory_.makePacketNumberCipher(secret);
+
+  return {std::move(aead), std::move(headerCipher)};
 }
 
 const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {

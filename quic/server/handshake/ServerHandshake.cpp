@@ -12,8 +12,6 @@
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/state/QuicStreamFunctions.h>
 
-#include <fizz/protocol/Protocol.h>
-
 namespace quic {
 ServerHandshake::ServerHandshake(QuicConnectionStateBase* conn)
     : conn_(conn), actionGuard_(nullptr), cryptoState_(*conn->cryptoState) {}
@@ -347,21 +345,13 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::SecretAvailable& secretAvailable) {
-    auto aead = fizz::Protocol::deriveRecordAeadWithLabel(
-        *server_.state_.context()->getFactory(),
-        *server_.state_.keyScheduler(),
-        *server_.state_.cipher(),
-        folly::range(secretAvailable.secret.secret),
-        kQuicKeyLabel,
-        kQuicIVLabel);
-    auto headerCipher = server_.getCryptoFactory().makePacketNumberCipher(
-        folly::range(secretAvailable.secret.secret));
     switch (secretAvailable.secret.type.type()) {
       case fizz::SecretType::Type::EarlySecrets_E:
         switch (*secretAvailable.secret.type.asEarlySecrets()) {
           case fizz::EarlySecrets::ClientEarlyTraffic:
-            server_.zeroRttReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.zeroRttReadHeaderCipher_ = std::move(headerCipher);
+            server_.computeCiphers(
+                CipherKind::ZeroRttRead,
+                folly::range(secretAvailable.secret.secret));
             break;
           default:
             break;
@@ -370,24 +360,28 @@ class ServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
       case fizz::SecretType::Type::HandshakeSecrets_E:
         switch (*secretAvailable.secret.type.asHandshakeSecrets()) {
           case fizz::HandshakeSecrets::ClientHandshakeTraffic:
-            server_.handshakeReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.handshakeReadHeaderCipher_ = std::move(headerCipher);
+            server_.computeCiphers(
+                CipherKind::HandshakeRead,
+                folly::range(secretAvailable.secret.secret));
             break;
           case fizz::HandshakeSecrets::ServerHandshakeTraffic:
-            server_.handshakeWriteCipher_ = FizzAead::wrap(std::move(aead));
-            server_.handshakeWriteHeaderCipher_ = std::move(headerCipher);
+            server_.computeCiphers(
+                CipherKind::HandshakeWrite,
+                folly::range(secretAvailable.secret.secret));
             break;
         }
         break;
       case fizz::SecretType::Type::AppTrafficSecrets_E:
         switch (*secretAvailable.secret.type.asAppTrafficSecrets()) {
           case fizz::AppTrafficSecrets::ClientAppTraffic:
-            server_.oneRttReadCipher_ = FizzAead::wrap(std::move(aead));
-            server_.oneRttReadHeaderCipher_ = std::move(headerCipher);
+            server_.computeCiphers(
+                CipherKind::OneRttRead,
+                folly::range(secretAvailable.secret.secret));
             break;
           case fizz::AppTrafficSecrets::ServerAppTraffic:
-            server_.oneRttWriteCipher_ = FizzAead::wrap(std::move(aead));
-            server_.oneRttWriteHeaderCipher_ = std::move(headerCipher);
+            server_.computeCiphers(
+                CipherKind::OneRttWrite,
+                folly::range(secretAvailable.secret.secret));
             break;
         }
         break;
@@ -449,6 +443,37 @@ void ServerHandshake::processActions(
   }
   handshakeEventAvailable_ = false;
   processPendingEvents();
+}
+
+void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
+  std::unique_ptr<Aead> aead;
+  std::unique_ptr<PacketNumberCipher> headerCipher;
+  std::tie(aead, headerCipher) = buildCiphers(secret);
+  switch (kind) {
+    case CipherKind::HandshakeRead:
+      handshakeReadCipher_ = std::move(aead);
+      handshakeReadHeaderCipher_ = std::move(headerCipher);
+      break;
+    case CipherKind::HandshakeWrite:
+      handshakeWriteCipher_ = std::move(aead);
+      handshakeWriteHeaderCipher_ = std::move(headerCipher);
+      break;
+    case CipherKind::OneRttRead:
+      oneRttReadCipher_ = std::move(aead);
+      oneRttReadHeaderCipher_ = std::move(headerCipher);
+      break;
+    case CipherKind::OneRttWrite:
+      oneRttWriteCipher_ = std::move(aead);
+      oneRttWriteHeaderCipher_ = std::move(headerCipher);
+      break;
+    case CipherKind::ZeroRttRead:
+      zeroRttReadCipher_ = std::move(aead);
+      zeroRttReadHeaderCipher_ = std::move(headerCipher);
+      break;
+    default:
+      folly::assume_unreachable();
+  }
+  handshakeEventAvailable_ = true;
 }
 
 } // namespace quic
