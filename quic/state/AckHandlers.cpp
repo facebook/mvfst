@@ -145,7 +145,7 @@ void processAckFrame(
           ackReceiveTimeOrNow - rPacketIt->metadata.time);
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
         InstrumentationObserver::PacketRTT packetRTT(
-            rttSample, frame.ackDelay, *rPacketIt);
+            ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
         for (const auto& observer : conn.instrumentationObservers_) {
           conn.pendingCallbacks.emplace_back([observer, packetRTT] {
             observer->rttSampleGenerated(packetRTT);

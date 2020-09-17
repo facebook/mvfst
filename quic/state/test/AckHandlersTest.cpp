@@ -11,6 +11,7 @@
 
 #include <quic/common/test/TestUtils.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
@@ -1125,16 +1126,17 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
 
   PacketNum packetNum = 0;
   StreamId streamid = 0;
-  TimePoint largestSentTime;
-  while (packetNum < 10) {
+  TimePoint sentTime;
+  std::vector<TimePoint> packetRcvTime;
+  while (packetNum < 30) {
     auto regularPacket = createNewPacket(packetNum, GetParam());
     WriteStreamFrame frame(streamid++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
-    largestSentTime =
-        Clock::now() - 100ms + std::chrono::milliseconds(packetNum);
+    sentTime = Clock::now() - 100ms + std::chrono::milliseconds(packetNum);
+    packetRcvTime.emplace_back(sentTime);
     OutstandingPacket sentPacket(
         std::move(regularPacket),
-        largestSentTime,
+        sentTime,
         1,
         false /* handshake */,
         packetNum,
@@ -1144,37 +1146,76 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
     packetNum++;
   }
 
-  ReadAckFrame ackFrame;
-  ackFrame.largestAcked = 9;
-  ackFrame.ackDelay = 25ms;
-  ackFrame.ackBlocks.emplace_back(0, 9);
+  struct ackPacketData {
+    PacketNum startSeq, endSeq;
+    std::chrono::milliseconds ackDelay;
+    TimePoint ackTime;
+    ReadAckFrame ackFrame;
+
+    explicit ackPacketData(
+        PacketNum startSeqIn,
+        PacketNum endSeqIn,
+        std::chrono::milliseconds ackDelayIn)
+        : startSeq(startSeqIn),
+          endSeq(endSeqIn),
+          ackDelay(ackDelayIn),
+          ackTime(Clock::now() + 5ms) {
+      ackFrame.largestAcked = endSeq;
+      ackFrame.ackDelay = ackDelay;
+      ackFrame.ackBlocks.emplace_back(startSeq, endSeq);
+    }
+  };
+
+  // See each emplace as the ACK Block [X, Y] with size (Y-X+1)
+  std::vector<ackPacketData> ackVec;
+  // Sequential test
+  ackVec.emplace_back(0, 5, 4ms); // +1 callback
+  ackVec.emplace_back(6, 10, 5ms); // +1
+  ackVec.emplace_back(11, 15, 6ms); // +1
+  // Out-of-order test
+  //
+  // Its important to check the if
+  // largestAcked - currentPacketNum > reorderingThreshold (currently 3)
+  // else it can trigger InstrumentationObserver::packetLossDetected
+  // and increase the number of callbacks
+  ackVec.emplace_back(18, 18, 0ms); // +1
+  ackVec.emplace_back(16, 17, 2ms); // +1
+  ackVec.emplace_back(19, 29, 12ms); // +1 = 6 callbacks
 
   // 0 pending callbacks
   EXPECT_EQ(0, size(conn.pendingCallbacks));
 
-  auto ackTime = Clock::now() + 25ms;
-  processAckFrame(
-      conn,
-      GetParam(),
-      ackFrame,
-      [](const auto&, const auto&, const auto&) {},
-      [](auto&, auto&, bool) {},
-      ackTime);
+  for (const auto ackData : ackVec) {
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackData.ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackData.ackTime);
+  }
 
-  // 1 pending callbacks
-  EXPECT_EQ(1, size(conn.pendingCallbacks));
+  // see above
+  EXPECT_EQ(6, size(conn.pendingCallbacks));
 
-  auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
-      ackTime - largestSentTime);
-  EXPECT_CALL(
-      ib,
-      rttSampleGenerated(AllOf(
-          Field(&InstrumentationObserver::PacketRTT::rttSample, rttSample),
-          Field(&InstrumentationObserver::PacketRTT::ackDelay, 25ms),
-          Field(
-              &InstrumentationObserver::PacketRTT::metadata,
-              Field(&quic::OutstandingPacketMetadata::inflightBytes, 10)))))
-      .Times(1);
+  for (const auto ackData : ackVec) {
+    auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
+        ackData.ackTime - packetRcvTime[ackData.endSeq]);
+    EXPECT_CALL(
+        ib,
+        rttSampleGenerated(AllOf(
+            Field(
+                &InstrumentationObserver::PacketRTT::rcvTime, ackData.ackTime),
+            Field(&InstrumentationObserver::PacketRTT::rttSample, rttSample),
+            Field(
+                &InstrumentationObserver::PacketRTT::ackDelay,
+                ackData.ackDelay),
+            Field(
+                &InstrumentationObserver::PacketRTT::metadata,
+                Field(
+                    &quic::OutstandingPacketMetadata::inflightBytes,
+                    ackData.endSeq + 1)))));
+  }
 
   for (auto& callback : conn.pendingCallbacks) {
     callback();

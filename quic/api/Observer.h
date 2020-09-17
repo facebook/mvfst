@@ -58,13 +58,16 @@ class InstrumentationObserver {
 
   struct PacketRTT {
     explicit PacketRTT(
-        std::chrono::microseconds rttsample,
-        std::chrono::microseconds ackdelay,
+        TimePoint rcvTimeIn,
+        std::chrono::microseconds rttSampleIn,
+        std::chrono::microseconds ackDelayIn,
         const quic::OutstandingPacket& pkt)
-        : rttSample(rttsample),
-          ackDelay(ackdelay),
+        : rcvTime(rcvTimeIn),
+          rttSample(rttSampleIn),
+          ackDelay(ackDelayIn),
           metadata(pkt.metadata),
           lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
+    TimePoint rcvTime;
     std::chrono::microseconds rttSample;
     std::chrono::microseconds ackDelay;
     const quic::OutstandingPacketMetadata metadata;
@@ -104,7 +107,7 @@ class InstrumentationObserver {
    *
    * @param packet   const reference to the packet with the RTT
    */
-  virtual void rttSampleGenerated(const struct PacketRTT& /* RTT sample */) {}
+  virtual void rttSampleGenerated(const PacketRTT& /* RTT sample */) {}
 };
 
 // Container for instrumentation observers.
