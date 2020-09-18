@@ -16,6 +16,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/EnumArray.h>
+#include <quic/d6d/ProbeSizeRaiser.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
 #include <quic/state/AckStates.h>
@@ -783,6 +784,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // The probe timeout
     std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
+
+    // Probe size raiser
+    std::unique_ptr<ProbeSizeRaiser> raiser;
   };
 
   D6DState d6d;

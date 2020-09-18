@@ -74,6 +74,20 @@ struct D6DConfig {
    * handshake.
    */
   std::chrono::seconds advertisedProbeTimeout{kDefaultD6DProbeTimeout};
+
+  /**
+   * Two simple probe size raiser. Only server makes use of this value.
+   * ConstantSize: raise pmtu at constant step size
+   * BinarySearch: raise pmtu using binary search
+   */
+  enum class ProbeSizeRaiserType : uint8_t { ConstantStep, BinarySearch };
+
+  /**
+   * Default raiser is constant step , since overshot caused by binary
+   * search slows down convergence. Might change in the future when we
+   * have more context.
+   */
+  ProbeSizeRaiserType raiserType{ProbeSizeRaiserType::ConstantStep};
 };
 
 struct TransportSettings {
