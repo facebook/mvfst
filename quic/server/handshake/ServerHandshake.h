@@ -177,8 +177,6 @@ class ServerHandshake : public Handshake {
 
   void onError(std::pair<std::string, TransportErrorCode> error);
 
-  void onWriteData(fizz::WriteToSocket& write);
-
   void onHandshakeDone();
 
   /**
@@ -224,6 +222,12 @@ class ServerHandshake : public Handshake {
   QuicConnectionStateBase* conn_;
   folly::DelayedDestruction::DestructorGuard actionGuard_;
   folly::Executor* executor_;
+
+  /**
+   * Various utilities for concrete implementations to use.
+   */
+  bool isCancelled() const;
+  void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
 
   QuicCryptoState& cryptoState_;
   bool inProcessPendingEvents_{false};

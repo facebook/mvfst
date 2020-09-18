@@ -135,7 +135,22 @@ class FizzServerHandshake::ActionMoveVisitor : public boost::static_visitor<> {
   }
 
   void operator()(fizz::WriteToSocket& write) {
-    server_.onWriteData(write);
+    if (server_.isCancelled()) {
+      // We've been canceled, just return. If we're canceled it's possible that
+      // cryptoState_ has been deleted, so let's not refer to it.
+      return;
+    }
+
+    for (auto& content : write.contents) {
+      auto encryptionLevel =
+          getEncryptionLevelFromFizz(content.encryptionLevel);
+      if (content.contentType != fizz::ContentType::handshake) {
+        continue;
+      }
+      server_.writeDataToStream(encryptionLevel, std::move(content.data));
+    }
+
+    server_.handshakeEventAvailable_ = true;
   }
 
   void operator()(fizz::server::ReportEarlyHandshakeSuccess&) {

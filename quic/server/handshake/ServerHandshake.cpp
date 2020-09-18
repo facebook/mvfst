@@ -160,25 +160,6 @@ void ServerHandshake::onError(
   handshakeEventAvailable_ = true;
 }
 
-void ServerHandshake::onWriteData(fizz::WriteToSocket& write) {
-  if (!callback_) {
-    // We've been canceled, just return. If we're canceled it's possible that
-    // cryptoState_ has been deleted, so let's not refer to it.
-    return;
-  }
-  for (auto& content : write.contents) {
-    auto encryptionLevel = getEncryptionLevelFromFizz(content.encryptionLevel);
-    CHECK(encryptionLevel != EncryptionLevel::EarlyData)
-        << "Server cannot write early data";
-    if (content.contentType != fizz::ContentType::handshake) {
-      continue;
-    }
-    auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
-    writeDataToQuicStream(*cryptoStream, std::move(content.data));
-  }
-  handshakeEventAvailable_ = true;
-}
-
 void ServerHandshake::onHandshakeDone() {
   handshakeEventAvailable_ = true;
 }
@@ -284,6 +265,19 @@ void ServerHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       folly::assume_unreachable();
   }
   handshakeEventAvailable_ = true;
+}
+
+bool ServerHandshake::isCancelled() const {
+  return callback_ == nullptr;
+}
+
+void ServerHandshake::writeDataToStream(
+    EncryptionLevel encryptionLevel,
+    Buf data) {
+  CHECK(encryptionLevel != EncryptionLevel::EarlyData)
+      << "Server cannot write early data";
+  auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
+  writeDataToQuicStream(*cryptoStream, std::move(data));
 }
 
 } // namespace quic
