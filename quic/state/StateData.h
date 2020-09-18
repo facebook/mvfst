@@ -765,9 +765,24 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     uint32_t packetSize;
   };
 
-  struct D6DState {
-    // The <packet sequence number, udp payload size> of the last sent d6d probe
+  // States of d6d state machine, see
+  // https://tools.ietf.org/id/draft-ietf-tsvwg-datagram-plpmtud-21.html#name-state-machine
+  enum class D6DMachineState : uint8_t {
+    // Connection is not established yet
+    DISABLED,
+    // Probe using base pmtu
+    BASE,
+    // Incrementally probe using larger pmtu
+    SEARCHING,
+    // Sleep for raise timeout before going to SEARCHING
+    SEARCH_COMPLETE,
+    // Effective pmtu is less than base pmtu, continue probing with smaller
     // packet
+    ERROR
+  };
+
+  struct D6DState {
+    // The lastest d6d probe packet transmitted
     folly::Optional<D6DProbePacket> lastProbe;
 
     // The number of outstanding probe packets
@@ -776,7 +791,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The base PMTU to start probing with
     uint16_t basePMTU{kDefaultD6DBasePMTU};
 
-    // Current probe size
+    // Current probe size, dynamically adjusted by the probing algorithm
     uint32_t currentProbeSize{kDefaultD6DBasePMTU};
 
     // The raise timeout
@@ -784,6 +799,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // The probe timeout
     std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
+
+    // D6D Machine State
+    D6DMachineState state{D6DMachineState::DISABLED};
 
     // Probe size raiser
     std::unique_ptr<ProbeSizeRaiser> raiser;
