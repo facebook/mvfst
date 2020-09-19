@@ -14,7 +14,7 @@
 
 namespace quic {
 ServerHandshake::ServerHandshake(QuicConnectionStateBase* conn)
-    : conn_(conn), actionGuard_(nullptr), cryptoState_(*conn->cryptoState) {}
+    : conn_(conn), actionGuard_(nullptr) {}
 
 void ServerHandshake::accept(
     std::shared_ptr<ServerTransportParametersExtension> transportParams) {
@@ -276,7 +276,7 @@ void ServerHandshake::writeDataToStream(
     Buf data) {
   CHECK(encryptionLevel != EncryptionLevel::EarlyData)
       << "Server cannot write early data";
-  auto cryptoStream = getCryptoStream(cryptoState_, encryptionLevel);
+  auto cryptoStream = getCryptoStream(*conn_->cryptoState, encryptionLevel);
   writeDataToQuicStream(*cryptoStream, std::move(data));
 }
 

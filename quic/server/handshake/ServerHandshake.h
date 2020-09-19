@@ -229,7 +229,6 @@ class ServerHandshake : public Handshake {
   bool isCancelled() const;
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
 
-  QuicCryptoState& cryptoState_;
   bool inProcessPendingEvents_{false};
   bool waitForData_{false};
 
