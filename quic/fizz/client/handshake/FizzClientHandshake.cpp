@@ -57,7 +57,7 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
       fizzContext_->getCertificateVerifier(),
       std::move(hostname),
       std::move(cachedPsk),
-      std::make_shared<FizzClientExtensions>(transportParams_)));
+      std::make_shared<FizzClientExtensions>(getClientTransportParameters())));
 
   return transportParams;
 }
@@ -70,11 +70,12 @@ folly::Optional<QuicCachedPsk> FizzClientHandshake::getPsk(
   }
 
   // TODO T32658838 better API to disable early data for current connection
-  if (!conn_->transportSettings.attemptEarlyData) {
+  const QuicClientConnectionState* conn = getClientConn();
+  if (!conn->transportSettings.attemptEarlyData) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
   } else if (
-      conn_->earlyDataAppParamsValidator &&
-      !conn_->earlyDataAppParamsValidator(
+      conn->earlyDataAppParamsValidator &&
+      !conn->earlyDataAppParamsValidator(
           quicCachedPsk->cachedPsk.alpn,
           folly::IOBuf::copyBuffer(quicCachedPsk->appParams))) {
     quicCachedPsk->cachedPsk.maxEarlyDataSize = 0;
@@ -157,15 +158,16 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
 
 void FizzClientHandshake::onNewCachedPsk(
     fizz::client::NewCachedPsk& newCachedPsk) noexcept {
-  DCHECK(conn_->version.has_value());
-  DCHECK(conn_->serverInitialParamsSet_);
+  QuicClientConnectionState* conn = getClientConn();
+  DCHECK(conn->version.has_value());
+  DCHECK(conn->serverInitialParamsSet_);
 
   QuicCachedPsk quicCachedPsk;
   quicCachedPsk.cachedPsk = std::move(newCachedPsk.psk);
-  quicCachedPsk.transportParams = getServerCachedTransportParameters(*conn_);
+  quicCachedPsk.transportParams = getServerCachedTransportParameters(*conn);
 
-  if (conn_->earlyDataAppParamsGetter) {
-    auto appParams = conn_->earlyDataAppParamsGetter();
+  if (conn->earlyDataAppParamsGetter) {
+    auto appParams = conn->earlyDataAppParamsGetter();
     if (appParams) {
       quicCachedPsk.appParams = appParams->moveToFbString().toStdString();
     }
