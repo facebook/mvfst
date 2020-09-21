@@ -63,7 +63,7 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
-    originalVersion = QuicVersion::MVFST_D24;
+    originalVersion = QuicVersion::MVFST;
     DCHECK(handshakeFactory);
     auto tmpClientHandshake = handshakeFactory->makeClientHandshake(this);
     clientHandshakeLayer = tmpClientHandshake.get();
