@@ -156,11 +156,7 @@ void processClientInitialParams(
   }
 
   // TODO Validate active_connection_id_limit
-
-  if (!packetSize || *packetSize == 0) {
-    packetSize = kDefaultUDPSendPacketLen;
-  }
-  if (*packetSize < kMinMaxUDPPayload) {
+  if (packetSize && *packetSize < kMinMaxUDPPayload) {
     throw QuicTransportException(
         folly::to<std::string>(
             "Max packet size too small. received max_packetSize = ",
@@ -196,12 +192,24 @@ void processClientInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
-  // TODO: udpSendPacketLen should also be limited by PMTU
-  if (conn.transportSettings.canIgnorePathMTU) {
-    if (*packetSize > kDefaultMaxUDPPayload) {
-      *packetSize = kDefaultUDPSendPacketLen;
+
+  // Default to max because we can probe PMTU now, and this will be the upper
+  // limit
+  uint64_t maxUdpPayloadSize = kDefaultMaxUDPPayload;
+  if (packetSize) {
+    maxUdpPayloadSize = std::min(*packetSize, maxUdpPayloadSize);
+    if (conn.transportSettings.canIgnorePathMTU) {
+      if (*packetSize > kDefaultMaxUDPPayload) {
+        // A good peer should never set oversized limit, so to be safe we
+        // fallback to default
+        conn.udpSendPacketLen = kDefaultUDPSendPacketLen;
+      } else {
+        // Otherwise, canIgnorePathMTU forces us to immediately set
+        // udpSendPacketLen
+        // TODO: rename "canIgnorePathMTU" to "forciblySetPathMTU"
+        conn.udpSendPacketLen = maxUdpPayloadSize;
+      }
     }
-    conn.udpSendPacketLen = *packetSize;
   }
 
   conn.peerActiveConnectionIdLimit =
@@ -223,6 +231,7 @@ void processClientInitialParams(
         // probes with a smaller packet size than udpSendPacketLen, which would
         // be useless and cause meaningless delay on finding the upper bound.
         conn.d6d.basePMTU = std::max(*d6dBasePMTU, conn.udpSendPacketLen);
+        conn.d6d.maxPMTU = maxUdpPayloadSize;
         VLOG(10) << "conn.d6d.basePMTU=" << conn.d6d.basePMTU;
       } else {
         LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;

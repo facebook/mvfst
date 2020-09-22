@@ -800,6 +800,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The base PMTU to start probing with
     uint16_t basePMTU{kDefaultD6DBasePMTU};
 
+    // The max PMTU, determined by max_packet_size transport parameter
+    uint16_t maxPMTU{kDefaultMaxUDPPayload};
+
     // Current probe size, dynamically adjusted by the probing algorithm
     uint32_t currentProbeSize{kDefaultD6DBasePMTU};
 
