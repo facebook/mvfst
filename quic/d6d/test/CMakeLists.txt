@@ -14,3 +14,13 @@ quic_add_test(TARGET QuicD6DProbeSizeRaiserTest
   Folly::folly
   mvfst_d6d_probe_raiser
 )
+
+quic_add_test(TARGET QuicD6DStateFunctionTest
+  SOURCES
+  QuicD6DStateFunctionsTest.cpp
+  DEPENDS
+  Folly::folly
+  mvfst_d6d_probe_raiser
+  mvfst_d6d_state_functions
+  mvfst_test_utils
+)

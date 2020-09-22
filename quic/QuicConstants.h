@@ -47,8 +47,12 @@ constexpr uint16_t kDefaultMsgSizeBackOffSize = 50;
 // larger than this, unless configured otherwise.
 constexpr uint16_t kDefaultUDPReadBufferSize = 1500;
 
-// Default base PMTU used by D6D probing
+// Default base PMTU used by d6d probing
 constexpr uint16_t kDefaultD6DBasePMTU = kDefaultUDPSendPacketLen;
+
+// Default maximum number of consecutive d6d probe losses we can
+// tolerate
+constexpr uint16_t kDefaultD6DMaxOutstandingProbes = 2;
 
 // The default d6d raise timeout, recommended by the spec
 constexpr std::chrono::seconds kDefaultD6DRaiseTimeout = 600s;

@@ -13,6 +13,34 @@ target_include_directories(
   $<INSTALL_INTERFACE:include/>
 )
 
+add_library(
+  mvfst_d6d_state_functions STATIC
+  QuicD6DStateFunctions.cpp
+)
+
+target_include_directories(
+  mvfst_d6d_state_functions PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_d6d_state_functions
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_d6d_state_functions
+  mvfst_state_machine
+)
+
+target_link_libraries(
+  mvfst_d6d_state_functions PUBLIC
+  Folly::folly
+  mvfst_state_machine
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -28,6 +56,12 @@ endforeach()
 install(
   TARGETS mvfst_d6d_probe_raiser
   EXPORT mvfst-exports
+)
+
+install(
+  TARGETS mvfst_d6d_state_functions
+  EXPORT mvfst-exports
+  DESTINATION lib
 )
 
 add_subdirectory(test)

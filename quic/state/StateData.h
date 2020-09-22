@@ -617,6 +617,14 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // If we should schedule a new Ack timeout, if it's not already scheduled
     bool scheduleAckTimeout{false};
 
+    // If we should schedule/cancel d6d raise timeout, if it's not
+    // already scheduled/canceled
+    bool scheduleD6DRaiseTimeout{false};
+
+    // If we should schedule/cancel d6d probe timeout, if it's not
+    // already scheduled/canceled
+    bool scheduleD6DProbeTimeout{false};
+
     // Whether a connection level window update is due to send
     bool connWindowUpdate{false};
 
