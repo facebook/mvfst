@@ -34,7 +34,8 @@ template <
     typename TimeT,
     typename TimeDeltaT,
     typename = std::enable_if_t<
-        std::is_arithmetic_v<TimeT> && std::is_arithmetic_v<TimeDeltaT>>>
+        std::is_arithmetic<TimeT>::value &&
+        std::is_arithmetic<TimeDeltaT>::value>>
 class WindowedCounter {
  public:
   /**
