@@ -66,6 +66,12 @@ constexpr std::chrono::seconds kDefaultD6DProbeTimeout = 15s;
 // The minimum d6d probe timeout, recommended by the spec
 constexpr std::chrono::seconds kMinD6DProbeTimeout = 1s;
 
+// Default window of detecting blackhole caused by invalid pmtu
+constexpr std::chrono::seconds kDefaultD6DBlackholeDetectionWindow = 5s;
+
+// Default threshold for detecting blackhole caused by invalid pmtu
+constexpr uint64_t kDefaultD6DBlackholeDetectionThreshold = 5;
+
 // Number of GRO buffers to use
 // 1 means GRO is not enabled
 // 64 is the max possible value

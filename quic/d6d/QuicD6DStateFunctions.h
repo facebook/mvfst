@@ -19,4 +19,8 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn);
 
 void onD6DLastProbeLost(QuicConnectionStateBase& conn);
 
+void detectPMTUBlackhole(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacket& packet);
+
 } // namespace quic

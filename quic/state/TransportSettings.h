@@ -59,6 +59,12 @@ struct D6DConfig {
   uint16_t advertisedBasePMTU{kDefaultD6DBasePMTU};
 
   /**
+   * The number of "big" packet losses we can tolerate before signalling PMTU
+   * blackhole.
+   */
+  uint64_t blackholeDetectionThreshold{kDefaultD6DBlackholeDetectionThreshold};
+
+  /**
    * The D6D raise timeout that client advertises to server. We might need to
    * tune this value for different paths. Again, server makes no use of this
    * value, but should rely on the transport parameter.
@@ -74,6 +80,13 @@ struct D6DConfig {
    * handshake.
    */
   std::chrono::seconds advertisedProbeTimeout{kDefaultD6DProbeTimeout};
+
+  /**
+   * The moving window within which we check if the detection threshold has been
+   * crossed
+   */
+  std::chrono::seconds blackholeDetectionWindow{
+      kDefaultD6DBlackholeDetectionWindow};
 
   /**
    * Two simple probe size raiser. Only server makes use of this value.

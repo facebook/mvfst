@@ -16,6 +16,7 @@
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/d6d/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
@@ -32,6 +33,10 @@ using namespace folly;
 namespace quic {
 namespace test {
 
+namespace {
+using D6DMachineState = QuicConnectionStateBase::D6DMachineState;
+} // namespace
+
 class MockLossTimeout {
  public:
   MOCK_METHOD0(cancelLossTimeout, void());
@@ -45,6 +50,8 @@ enum class PacketType {
   ZeroRtt,
   OneRtt,
 };
+
+struct PMTUBlackholeDetectionTestFixture; // Forward declaration
 
 class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
  public:
@@ -60,7 +67,8 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       TimePoint time,
       folly::Optional<PacketEvent> associatedEvent,
       PacketType packetType,
-      bool isD6DProbe = false);
+      bool isD6DProbe = false,
+      folly::Optional<uint16_t> forcedSize = folly::none);
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
     auto conn = std::make_unique<QuicServerConnectionState>(
@@ -117,6 +125,10 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     return conn;
   }
 
+  void runDetectPMTUBlackholeTest(
+      QuicConnectionStateBase* conn,
+      PMTUBlackholeDetectionTestFixture fixture);
+
   EventBase evb;
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
@@ -144,7 +156,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     TimePoint time,
     folly::Optional<PacketEvent> associatedEvent,
     PacketType packetType,
-    bool isD6DProbe) {
+    bool isD6DProbe,
+    folly::Optional<uint16_t> forcedSize) {
   folly::Optional<PacketHeader> header;
   bool isHandshake = false;
   switch (packetType) {
@@ -197,6 +210,12 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   builder.encodePacketHeader();
   EXPECT_TRUE(builder.canBuildPacket());
   auto packet = std::move(builder).buildPacket();
+  if (forcedSize) {
+    RegularSizeEnforcedPacketBuilder sizeEnforcedBuilder(
+        std::move(packet), *forcedSize, aead->getCipherOverhead());
+    EXPECT_TRUE(sizeEnforcedBuilder.canBuildPacket());
+    packet = std::move(sizeEnforcedBuilder).buildPacket();
+  }
   uint32_t encodedSize = 0;
   if (packet.header) {
     encodedSize += packet.header->computeChainDataLength();
@@ -240,6 +259,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   conn.pendingEvents.setLossDetectionAlarm = true;
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
+    conn.d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+        encodedSize, conn.lossState.largestSent.value());
   }
   return conn.lossState.largestSent.value();
 }
@@ -308,6 +329,223 @@ TEST_F(QuicLossFunctionsTest, D6DProbeExcludedInLossEvent) {
   // We should not set loss timer for un-acked d6d probes
   ASSERT_FALSE(earliestLossTimer(*conn).first.has_value());
   ASSERT_FALSE(lossEvent);
+}
+
+TEST_F(QuicLossFunctionsTest, NonExclusiveD6DProbeLossIncludedInLossEvent) {
+  auto conn = createConn();
+  // 0 rtt means all packets are automatically lost upon sending
+  conn->lossState.srtt = 0s;
+  conn->lossState.lrtt = 0s;
+  conn->d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
+  auto currentTime = Clock::now();
+  auto firstPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::OneRtt, true);
+  auto secondPacketNum =
+      sendPacket(*conn, currentTime, folly::none, PacketType::OneRtt, false);
+  ASSERT_GT(secondPacketNum, firstPacketNum);
+  ASSERT_EQ(2, conn->outstandings.packets.size());
+  auto lossVisitor = [&](auto&, auto& packet, bool) {
+    EXPECT_EQ(packet.header.getPacketSequenceNum(), secondPacketNum);
+  };
+  auto lossEvent = detectLossPackets(
+      *conn,
+      secondPacketNum + 1,
+      lossVisitor,
+      Clock::now(),
+      PacketNumberSpace::AppData);
+  // We should not set loss timer for un-acked d6d probes
+  ASSERT_TRUE(lossEvent.hasValue());
+  ASSERT_FALSE(earliestLossTimer(*conn).first.has_value());
+  ASSERT_EQ(lossEvent->lostPackets, 1);
+}
+
+struct PMTUBlackholeDetectionTestFixture {
+  uint32_t beginPMTU;
+  uint32_t endPMTU;
+  size_t threshold;
+  bool hasLossEvent;
+  uint64_t lostBytes;
+  uint32_t lostPackets;
+  std::chrono::seconds window;
+  PacketNum largestAckedPacketNum;
+  std::chrono::microseconds detectLossTimeDelta;
+  std::chrono::microseconds largestLostTimeDelta;
+  std::chrono::microseconds smallestLostTimeDelta;
+  QuicConnectionStateBase::D6DMachineState beginState;
+  QuicConnectionStateBase::D6DMachineState endState;
+
+  struct PacketSpec {
+    std::chrono::microseconds timeDelta;
+    bool isD6DProbe;
+    uint32_t encodedSize;
+  };
+  std::vector<PacketSpec> packetSpecs;
+};
+
+void QuicLossFunctionsTest::runDetectPMTUBlackholeTest(
+    QuicConnectionStateBase* conn,
+    PMTUBlackholeDetectionTestFixture fixture) {
+  // 0 rtt means all packets are automatically lost upon sending
+  conn->lossState.srtt = 0s;
+  conn->lossState.lrtt = 0s;
+  conn->d6d.state = QuicConnectionStateBase::D6DMachineState::BASE;
+  conn->d6d.currentProbeSize = fixture.beginPMTU;
+  conn->udpSendPacketLen = fixture.beginPMTU;
+  conn->d6d.thresholdCounter =
+      std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
+          std::chrono::microseconds(fixture.window).count(), fixture.threshold);
+  conn->d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
+  conn->d6d.state = fixture.beginState;
+  auto currentTime = Clock::now();
+  for (auto& spec : fixture.packetSpecs) {
+    sendPacket(
+        *conn,
+        currentTime + spec.timeDelta,
+        folly::none,
+        PacketType::OneRtt,
+        spec.isD6DProbe,
+        spec.encodedSize);
+  }
+  auto lossVisitor = [](auto&, auto&, bool) {};
+  ASSERT_EQ(conn->outstandings.packets.size(), fixture.packetSpecs.size());
+  auto lossEvent = detectLossPackets(
+      *conn,
+      fixture.largestAckedPacketNum,
+      lossVisitor,
+      currentTime + fixture.detectLossTimeDelta,
+      PacketNumberSpace::AppData);
+  EXPECT_EQ(lossEvent.has_value(), fixture.hasLossEvent);
+  if (fixture.hasLossEvent) {
+    EXPECT_EQ(lossEvent->lostPackets, fixture.lostPackets);
+    EXPECT_EQ(lossEvent->lostBytes, fixture.lostBytes);
+    EXPECT_EQ(
+        lossEvent->largestLostSentTime.value(),
+        currentTime + fixture.largestLostTimeDelta);
+    EXPECT_EQ(
+        lossEvent->smallestLostSentTime.value(),
+        currentTime + fixture.smallestLostTimeDelta);
+    EXPECT_EQ(conn->d6d.state, fixture.endState);
+    EXPECT_EQ(conn->d6d.currentProbeSize, fixture.endPMTU);
+    EXPECT_EQ(conn->udpSendPacketLen, fixture.endPMTU);
+  }
+}
+
+TEST_F(QuicLossFunctionsTest, DetectPMTUBlackholeAllNonProbes) {
+  // clang-format off
+  PMTUBlackholeDetectionTestFixture fixture {
+    1400,                             // beginPMTU
+    kDefaultUDPSendPacketLen,         // endPMTU
+    3,                                // threshold
+    true,                             // hasLossEvent
+    1400 * 3,                         // lostBytes
+    3,                                // lostPackets
+    10s,                              // window
+    3 + kReorderingThreshold,         // largestAckedPacketNum
+    11s,                              // detectLossTimeDelta
+    10s,                              // largestLostTimeDelta
+    0s,                               // smallestLostTimeDelta
+    D6DMachineState::SEARCH_COMPLETE, // beginState
+    D6DMachineState::BASE,            // beginState
+    {                                 // packetSpecs
+      {0s, false, 1400},
+      {1s, false, 1400},
+      {10s, false, 1400},
+    }
+  };
+  // clang-format on
+  auto conn = createConn();
+  runDetectPMTUBlackholeTest(conn.get(), fixture);
+}
+
+TEST_F(QuicLossFunctionsTest, DetectPMTUBlackholeAllProbes) {
+  // clang-format off
+  PMTUBlackholeDetectionTestFixture fixture {
+    1400,                             // beginPMTU
+    1400,                             // endPMTU
+    3,                                // threshold
+    false,                            // hasLossEvent
+    0,                                // lostBytes
+    0,                                // lostPackets
+    10s,                              // window
+    3 + kReorderingThreshold,         // largestAckedPacketNum
+    11s,                              // detectLossTimeDelta
+    10s,                              // largestLostTimeDelta
+    0s,                               // smallestLostTimeDelta
+    D6DMachineState::SEARCH_COMPLETE, // beginState
+    D6DMachineState::SEARCH_COMPLETE, // beginState
+    {                                 // packetSpecs
+      {0s, true, 1400},
+      {1s, true, 1400},
+      {10s, true, 1400},
+    }
+  };
+  // clang-format on
+  auto conn = createConn();
+  runDetectPMTUBlackholeTest(conn.get(), fixture);
+}
+
+TEST_F(QuicLossFunctionsTest, DetectPMTUBlackholeSparseProbes) {
+  // clang-format off
+  PMTUBlackholeDetectionTestFixture fixture {
+    1400,                             // beginPMTU
+    1400,                             // endPMTU
+    3,                                // threshold
+    true,                             // hasLossEvent
+    1400 * 5 + 200,                   // lostBytes
+    6,                                // lostPackets
+    10s,                              // window
+    6 + kReorderingThreshold,         // largestAckedPacketNum
+    23s,                              // detectLossTimeDelta
+    22s,                              // largestLostTimeDelta
+    0s,                               // smallestLostTimeDelta
+    D6DMachineState::SEARCH_COMPLETE, // beginState
+    D6DMachineState::SEARCH_COMPLETE, // beginState
+    {                                 // packetSpecs
+      {0s, false, 1400},
+      {1s, false, 1400},
+      {11s, false, 1400},
+      {10s, false, 200},
+      {12s, false, 1400},
+      {22s, false, 1400}
+    }
+  };
+  // clang-format on
+  auto conn = createConn();
+  runDetectPMTUBlackholeTest(conn.get(), fixture);
+}
+
+TEST_F(QuicLossFunctionsTest, DetectPMTUBlackholeRandomData) {
+  // clang-format off
+  PMTUBlackholeDetectionTestFixture fixture {
+    1400,                                 // beginPMTU
+    1400,                                 // endPMTU
+    3,                                    // threshold
+    true,                                 // hasLossEvent
+    876 + 249 + 1291 + 1400 * 4 + 1109,   // lostBytes
+    8,                                    // lostPackets
+    10s,                                  // window
+    9 + kReorderingThreshold,             // largestAckedPacketNum
+    90s,                                  // detectLossTimeDelta
+    83s,                                  // largestLostTimeDelta
+    5s,                                   // smallestLostTimeDelta
+    D6DMachineState::SEARCHING,           // beginState
+    D6DMachineState::SEARCHING,           // beginState
+    {                                     // packetSpecs
+      { 5s, false, 876 },
+      { 15s, false, 249 },
+      { 19s, false, 1291 },
+      { 31s, false, 1400 },
+      { 40s, true, 1400 },
+      { 51s, false, 1400 },
+      { 61s, false, 1400 },
+      { 73s, false, 1400 },
+      { 83s, false, 1109 },
+      { 85s, true, 1400 }
+    }
+  };
+  // clang-format on
+  auto conn = createConn();
+  runDetectPMTUBlackholeTest(conn.get(), fixture);
 }
 
 TEST_F(QuicLossFunctionsTest, ClearEarlyRetranTimer) {

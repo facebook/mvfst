@@ -16,6 +16,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/EnumArray.h>
+#include <quic/common/WindowedCounter.h>
 #include <quic/d6d/ProbeSizeRaiser.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
@@ -813,6 +814,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Probe size raiser
     std::unique_ptr<ProbeSizeRaiser> raiser;
+
+    // ThresholdCounter to help detect PMTU blackhole
+    std::unique_ptr<WindowedCounter<uint64_t, uint64_t>> thresholdCounter{
+        nullptr};
   };
 
   D6DState d6d;

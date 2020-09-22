@@ -12,6 +12,7 @@
 #include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/logging/QuicLogger.h>
@@ -218,7 +219,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
-    if (currentPacketNumberSpace != pnSpace || pkt.isD6DProbe) {
+    if (currentPacketNumberSpace != pnSpace) {
       iter++;
       continue;
     }
@@ -232,6 +233,24 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       shouldSetTimer = true;
       break;
     }
+    if (pkt.isD6DProbe) {
+      // It's a D6D probe, we'll mark it as lost to avoid its stale
+      // ack from affecting PMTU. We don't add it to loss event to
+      // avoid affecting congestion control when there's probably no
+      // congestion
+      CHECK(conn.d6d.lastProbe.hasValue());
+      // Check the decalredLost field first, to avoid double counting
+      // the lost probe since we don't erase them from op list yet
+      if (!pkt.declaredLost &&
+          currentPacketNum == conn.d6d.lastProbe->packetNum) {
+        conn.outstandings.declaredLostCount++;
+        pkt.declaredLost = true;
+        onD6DLastProbeLost(conn);
+      }
+      iter++;
+      continue;
+    }
+    detectPMTUBlackhole(conn, pkt);
     lossEvent.addLostPacket(pkt);
     observerLossEvent.addLostPacket(lostByTimeout, lostByReorder, pkt);
 

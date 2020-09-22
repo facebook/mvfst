@@ -131,4 +131,38 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
   }
 }
 
+/**
+ * D6D blackhole detection mechanism for non-probe packets, which
+ * signals blackhole due to invalid PMTU by detetcing consecutive loss
+ * of big packets (i.e. packet size greater than base pmtu)
+ * https://tools.ietf.org/id/draft-ietf-tsvwg-datagram-plpmtud-21.html#name-black-hole-detection-and-re
+ */
+void detectPMTUBlackhole(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacket& packet) {
+  auto& d6d = conn.d6d;
+  // If d6d is not activated, or it's a d6d probe, or that the packet size is
+  // less than base pmtu, then the loss is not caused by pmtu blackhole
+  if (d6d.state == D6DMachineState::DISABLED || packet.isD6DProbe ||
+      packet.encodedSize <= d6d.basePMTU) {
+    return;
+  }
+
+  // We use a windowed threshold counter to detect excessive loss of
+  // large packets.
+  if (d6d.thresholdCounter &&
+      d6d.thresholdCounter->update(
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              packet.time.time_since_epoch())
+              .count())) {
+    LOG(ERROR)
+        << "PMTU blackhole detected on packet loss, reducing PMTU to base";
+    d6d.state = D6DMachineState::BASE;
+    d6d.currentProbeSize = d6d.basePMTU;
+    conn.udpSendPacketLen = d6d.basePMTU;
+
+    // Cancel existing raise timeout if any
+    conn.pendingEvents.scheduleD6DRaiseTimeout = false;
+  }
+}
 } // namespace quic
