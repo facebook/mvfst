@@ -66,6 +66,12 @@ constexpr std::chrono::seconds kDefaultD6DProbeTimeout = 15s;
 // The minimum d6d probe timeout, recommended by the spec
 constexpr std::chrono::seconds kMinD6DProbeTimeout = 1s;
 
+// The default d6d start delay
+constexpr std::chrono::milliseconds kDefaultD6DKickStartDelay = 1000ms;
+
+// The default pmtu step size, currently only useful for ConstantStep raiser
+constexpr uint16_t kDefaultD6DProbeStepSize = 10;
+
 // Default window of detecting blackhole caused by invalid pmtu
 constexpr std::chrono::seconds kDefaultD6DBlackholeDetectionWindow = 5s;
 

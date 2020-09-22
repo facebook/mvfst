@@ -65,6 +65,11 @@ struct D6DConfig {
   uint64_t blackholeDetectionThreshold{kDefaultD6DBlackholeDetectionThreshold};
 
   /**
+   * The constant pmtu step size used for ConstantStep probe size raiser
+   */
+  uint16_t probeRaiserConstantStepSize{kDefaultD6DProbeStepSize};
+
+  /**
    * The D6D raise timeout that client advertises to server. We might need to
    * tune this value for different paths. Again, server makes no use of this
    * value, but should rely on the transport parameter.

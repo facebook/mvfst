@@ -8,6 +8,9 @@
 
 #include <quic/server/QuicServerTransport.h>
 
+#include <quic/common/WindowedCounter.h>
+#include <quic/d6d/BinarySearchProbeSizeRaiser.h>
+#include <quic/d6d/ConstantStepProbeSizeRaiser.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
@@ -135,6 +138,7 @@ void QuicServerTransport::onReadData(
   maybeNotifyConnectionIdBound();
   maybeIssueConnectionIds();
   maybeNotifyTransportReady();
+  maybeStartD6DProbing();
 }
 
 void QuicServerTransport::accept() {
@@ -265,7 +269,7 @@ void QuicServerTransport::writeData() {
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
-    writeQuicDataToSocket(
+    packetLimit -= writeQuicDataToSocket(
         *socket_,
         *conn_,
         srcConnId /* src */,
@@ -274,6 +278,18 @@ void QuicServerTransport::writeData() {
         *conn_->oneRttWriteHeaderCipher,
         version,
         packetLimit);
+
+    // D6D probes should be paced
+    if (packetLimit && conn_->pendingEvents.sendD6DProbePacket) {
+      writeD6DProbeToSocket(
+          *socket_,
+          *conn_,
+          srcConnId,
+          destConnId,
+          *conn_->oneRttWriteCipher,
+          *conn_->oneRttWriteHeaderCipher,
+          version);
+    }
   }
 }
 
@@ -492,6 +508,41 @@ void QuicServerTransport::maybeNotifyTransportReady() {
     QUIC_TRACE(fst_trace, *conn_, "transport ready");
     transportReadyNotified_ = true;
     connCallback_->onTransportReady();
+  }
+}
+
+void QuicServerTransport::maybeStartD6DProbing() {
+  if (!d6dProbingStarted_ && hasReadCipher() &&
+      conn_->d6d.state == QuicConnectionStateBase::D6DMachineState::BASE) {
+    QUIC_TRACE(fst_trace, *conn_, "start d6d probing");
+    d6dProbingStarted_ = true;
+    auto& d6d = conn_->d6d;
+    switch (conn_->transportSettings.d6dConfig.raiserType) {
+      case D6DConfig::ProbeSizeRaiserType::ConstantStep:
+        d6d.raiser = std::make_unique<ConstantStepProbeSizeRaiser>(
+            conn_->transportSettings.d6dConfig.probeRaiserConstantStepSize);
+        break;
+      case D6DConfig::ProbeSizeRaiserType::BinarySearch:
+        d6d.raiser = std::make_unique<BinarySearchProbeSizeRaiser>(
+            kMinMaxUDPPayload, d6d.maxPMTU);
+    }
+    d6d.thresholdCounter =
+        std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
+            std::chrono::microseconds(kDefaultD6DBlackholeDetectionWindow)
+                .count(),
+            kDefaultD6DBlackholeDetectionThreshold);
+    d6d.currentProbeSize = d6d.basePMTU;
+    // Start probing after some delay. This filters out short-lived
+    // connections, for which probing is relatively expensive and less
+    // valuable
+    getEventBase()->runAfterDelay(
+        [self = this->shared_from_this()]() mutable {
+          if (self->closeState_ == CloseState::CLOSED) {
+            return;
+          }
+          self->conn_->pendingEvents.sendD6DProbePacket = true;
+        },
+        kDefaultD6DKickStartDelay.count());
   }
 }
 

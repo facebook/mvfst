@@ -67,8 +67,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
     case D6DMachineState::SEARCHING:
       CHECK_GT(lastProbeSize, conn.udpSendPacketLen);
       conn.udpSendPacketLen = lastProbeSize;
-      if (maybeNextProbeSize.hasValue() &&
-          *maybeNextProbeSize < kDefaultMaxUDPPayload) {
+      if (maybeNextProbeSize.hasValue() && *maybeNextProbeSize < d6d.maxPMTU) {
         d6d.currentProbeSize = *maybeNextProbeSize;
       } else {
         // We've reached either the PMTU upper bound or the probe size

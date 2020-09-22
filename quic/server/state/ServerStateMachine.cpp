@@ -233,6 +233,9 @@ void processClientInitialParams(
         conn.d6d.basePMTU = std::max(*d6dBasePMTU, conn.udpSendPacketLen);
         conn.d6d.maxPMTU = maxUdpPayloadSize;
         VLOG(10) << "conn.d6d.basePMTU=" << conn.d6d.basePMTU;
+
+        // Start from base
+        conn.d6d.state = QuicConnectionStateBase::D6DMachineState::BASE;
       } else {
         LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;
         // We treat base pmtu transport param as client's swich to activate d6d,

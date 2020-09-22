@@ -512,6 +512,36 @@ class QuicTransportBase : public QuicSocket {
     QuicTransportBase* transport_;
   };
 
+  class D6DProbeTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    ~D6DProbeTimeout() override = default;
+
+    explicit D6DProbeTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->d6dProbeTimeoutExpired();
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
+  class D6DRaiseTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    ~D6DRaiseTimeout() override = default;
+
+    explicit D6DRaiseTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->d6dRaiseTimeoutExpired();
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
   void cancelLossTimeout();
   bool isLossTimeoutScheduled() const;
@@ -667,6 +697,8 @@ class QuicTransportBase : public QuicSocket {
   void idleTimeoutExpired(bool drain) noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
+  void d6dProbeTimeoutExpired() noexcept;
+  void d6dRaiseTimeoutExpired() noexcept;
 
   void setIdleTimer();
   void scheduleAckTimeout();
@@ -674,6 +706,8 @@ class QuicTransportBase : public QuicSocket {
   void schedulePingTimeout(
       PingCallback* callback,
       std::chrono::milliseconds pingTimeout);
+  void scheduleD6DRaiseTimeout();
+  void scheduleD6DProbeTimeout();
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
@@ -757,6 +791,7 @@ class QuicTransportBase : public QuicSocket {
   std::map<StreamId, WriteCallback*> pendingWriteCallbacks_;
   CloseState closeState_{CloseState::OPEN};
   bool transportReadyNotified_{false};
+  bool d6dProbingStarted_{false};
 
   LossTimeout lossTimeout_;
   AckTimeout ackTimeout_;
@@ -764,6 +799,8 @@ class QuicTransportBase : public QuicSocket {
   IdleTimeout idleTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
+  D6DProbeTimeout d6dProbeTimeout_;
+  D6DRaiseTimeout d6dRaiseTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
   FunctionLooper::Ptr writeLooper_;

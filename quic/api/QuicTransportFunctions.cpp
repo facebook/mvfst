@@ -659,16 +659,7 @@ void updateConnection(
   if (!conn.pendingEvents.setLossDetectionAlarm) {
     conn.pendingEvents.setLossDetectionAlarm = retransmittable;
   }
-  if (!isD6DProbe) {
-    // two reasons for avoiding incrementing totalBytesSent for d6d probes:
-    // 1. in BBR totalBytesSent is compared against initCwnd and only when
-    // totalBytesSent >= initCwnd do we update pacing.
-    // 2. totalBytesSent is also used to calculate send rate, adding probe size
-    // will slighly increase the send rate.
-    // We don't want d6d probe to cause side effect on congestion control, so we
-    // don't count probe size.
-    conn.lossState.totalBytesSent += encodedSize;
-  }
+  conn.lossState.totalBytesSent += encodedSize;
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
@@ -693,7 +684,6 @@ void updateConnection(
       conn.lossState.totalBytesSent);
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
-    return;
   }
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()

@@ -144,11 +144,14 @@ void processAckFrame(
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
         updateRtt(conn, rttSample, frame.ackDelay);
       }
-      // D6D probe acked. Put it after updateRTT so that srtt update is
-      // reflected in the next timeout
+      // D6D probe acked. Only if it's for the last probe do we
+      // trigger state change
       if (rPacketIt->isD6DProbe) {
-        // Could be an ack for an old probe, but let the handler deal with it
-        // TODO(xtt): onD6DProbeAcked(conn, *rPacketIt);
+        CHECK(conn.d6d.lastProbe);
+        if (!rPacketIt->declaredLost &&
+            currentPacketNum == conn.d6d.lastProbe->packetNum) {
+          onD6DLastProbeAcked(conn);
+        }
       }
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
