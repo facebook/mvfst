@@ -29,13 +29,10 @@ class InstrumentationObserver {
         const quic::OutstandingPacket& pkt)
         : lostByTimeout(lostbytimeout),
           lostByReorderThreshold(lostbyreorder),
-          metadata(pkt.metadata),
-          lastAckedPacketInfo(pkt.lastAckedPacketInfo) {}
+          packet(pkt) {}
     bool lostByTimeout{false};
     bool lostByReorderThreshold{false};
-    const quic::OutstandingPacketMetadata metadata;
-    const folly::Optional<OutstandingPacket::LastAckedPacketInfo>
-        lastAckedPacketInfo;
+    const quic::OutstandingPacket packet;
   };
 
   struct ObserverLossEvent {
