@@ -116,9 +116,10 @@ void BbrCongestionController::onPacketSent(const OutstandingPacket& packet) {
   if (!conn_.lossState.inflightBytes && isAppLimited()) {
     exitingQuiescene_ = true;
   }
-  addAndCheckOverflow(conn_.lossState.inflightBytes, packet.encodedSize);
+  addAndCheckOverflow(
+      conn_.lossState.inflightBytes, packet.metadata.encodedSize);
   if (!ackAggregationStartTime_) {
-    ackAggregationStartTime_ = packet.time;
+    ackAggregationStartTime_ = packet.metadata.time;
   }
 }
 

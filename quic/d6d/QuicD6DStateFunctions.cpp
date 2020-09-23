@@ -142,8 +142,8 @@ void detectPMTUBlackhole(
   auto& d6d = conn.d6d;
   // If d6d is not activated, or it's a d6d probe, or that the packet size is
   // less than base pmtu, then the loss is not caused by pmtu blackhole
-  if (d6d.state == D6DMachineState::DISABLED || packet.isD6DProbe ||
-      packet.encodedSize <= d6d.basePMTU) {
+  if (d6d.state == D6DMachineState::DISABLED || packet.metadata.isD6DProbe ||
+      packet.metadata.encodedSize <= d6d.basePMTU) {
     return;
   }
 
@@ -152,7 +152,7 @@ void detectPMTUBlackhole(
   if (d6d.thresholdCounter &&
       d6d.thresholdCounter->update(
           std::chrono::duration_cast<std::chrono::microseconds>(
-              packet.time.time_since_epoch())
+              packet.metadata.time.time_since_epoch())
               .count())) {
     LOG(ERROR)
         << "PMTU blackhole detected on packet loss, reducing PMTU to base";

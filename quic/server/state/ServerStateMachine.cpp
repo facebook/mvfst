@@ -917,7 +917,7 @@ void onServerReadDataFromOpen(
                     break;
                   }
                   case QuicWriteFrame::Type::PingFrame_E:
-                    if (!packet.isD6DProbe) {
+                    if (!packet.metadata.isD6DProbe) {
                       conn.pendingEvents.cancelPingTimeout = true;
                     }
                     return;

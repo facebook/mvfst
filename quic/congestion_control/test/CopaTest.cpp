@@ -31,20 +31,23 @@ class CopaTest : public Test {
           ShortHeader(ProtectionType::KeyPhaseZero, connId, packetData.first));
       totalSentBytes += 10;
       loss.addLostPacket(OutstandingPacket(
-          std::move(packet), Clock::now(), 10, false, totalSentBytes));
+          std::move(packet), Clock::now(), 10, false, totalSentBytes, 0));
       loss.lostBytes = packetData.second;
     }
     loss.lostPackets = lostPackets.size();
     return loss;
   }
 
-  OutstandingPacket
-  createPacket(PacketNum packetNum, uint32_t size, uint64_t totalSent) {
+  OutstandingPacket createPacket(
+      PacketNum packetNum,
+      uint32_t size,
+      uint64_t totalSent,
+      uint64_t inflight = 0) {
     auto connId = getTestConnectionId();
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
     return OutstandingPacket(
-        std::move(packet), Clock::now(), size, false, totalSent);
+        std::move(packet), Clock::now(), size, false, totalSent, inflight);
   }
 
   CongestionController::AckEvent createAckEvent(

@@ -92,12 +92,12 @@ void Cubic::onPersistentCongestion() {
 
 void Cubic::onPacketSent(const OutstandingPacket& packet) {
   if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
-      packet.encodedSize) {
+      packet.metadata.encodedSize) {
     throw QuicInternalException(
         "Cubic: inflightBytes overflow",
         LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
   }
-  conn_.lossState.inflightBytes += packet.encodedSize;
+  conn_.lossState.inflightBytes += packet.metadata.encodedSize;
 }
 
 void Cubic::onPacketLoss(const LossEvent& loss) {

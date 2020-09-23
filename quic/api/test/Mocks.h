@@ -332,6 +332,7 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       packetLossDetected,
       void(const ObserverLossEvent&));
+  GMOCK_METHOD1_(, noexcept, , rttSampleGenerated, void(const PacketRTT&));
 
   static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
     return AllOf(

@@ -144,7 +144,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInBase) {
       true,
       d6d.currentProbeSize);
   d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
-      pkt.packet.header.getPacketSequenceNum(), pkt.encodedSize);
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
   EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
@@ -172,7 +172,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingOne) {
       true,
       d6d.currentProbeSize);
   d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
-      pkt.packet.header.getPacketSequenceNum(), pkt.encodedSize);
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
   EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
@@ -200,7 +200,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingMax) {
       true,
       d6d.currentProbeSize);
   d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
-      pkt.packet.header.getPacketSequenceNum(), pkt.encodedSize);
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
   EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
@@ -227,7 +227,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInError) {
       true,
       d6d.currentProbeSize);
   d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
-      pkt.packet.header.getPacketSequenceNum(), pkt.encodedSize);
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
   EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))

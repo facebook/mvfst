@@ -9,14 +9,19 @@ endif()
 
 quic_add_test(TARGET CongestionControllerTests
   SOURCES
+  BandwidthTest.cpp
+  BbrBandwidthSamplerTest.cpp
+  BbrRttSamplerTest.cpp
+  BbrTest.cpp
   CongestionControlFunctionsTest.cpp
+  CopaTest.cpp
   CubicHystartTest.cpp
   CubicRecoveryTest.cpp
   CubicStateTest.cpp
   CubicSteadyTest.cpp
   CubicTest.cpp
   NewRenoTest.cpp
-  CopaTest.cpp
+  PacerTest.cpp
   DEPENDS
   Folly::folly
   mvfst_cc_algo

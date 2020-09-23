@@ -681,7 +681,8 @@ void updateConnection(
       encodedSize,
       isHandshake,
       isD6DProbe,
-      conn.lossState.totalBytesSent);
+      conn.lossState.totalBytesSent,
+      conn.lossState.inflightBytes);
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
   }
@@ -722,9 +723,9 @@ void updateConnection(
   }
   if (conn.pathValidationLimiter &&
       (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {
-    conn.pathValidationLimiter->onPacketSent(pkt.encodedSize);
+    conn.pathValidationLimiter->onPacketSent(pkt.metadata.encodedSize);
   }
-  if (pkt.isHandshake) {
+  if (pkt.metadata.isHandshake) {
     if (!pkt.associatedEvent) {
       if (packetNumberSpace == PacketNumberSpace::Initial) {
         ++conn.outstandings.initialPacketsCount;
@@ -733,9 +734,9 @@ void updateConnection(
         ++conn.outstandings.handshakePacketsCount;
       }
     }
-    conn.lossState.lastHandshakePacketSentTime = pkt.time;
+    conn.lossState.lastHandshakePacketSentTime = pkt.metadata.time;
   }
-  conn.lossState.lastRetransmittablePacketSentTime = pkt.time;
+  conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
   if (pkt.associatedEvent) {
     ++conn.outstandings.clonedPacketsCount;
     ++conn.lossState.timeoutBasedRtxCount;
