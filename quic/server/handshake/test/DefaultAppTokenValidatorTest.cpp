@@ -10,6 +10,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 

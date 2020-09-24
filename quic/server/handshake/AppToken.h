@@ -11,18 +11,9 @@
 #include <quic/QuicConstants.h>
 #include <quic/handshake/TransportParameters.h>
 
-#include <fizz/server/State.h>
-#include <folly/IPAddress.h>
-#include <folly/Optional.h>
-
 #include <cstdint>
+#include <memory>
 #include <vector>
-
-namespace fizz {
-namespace server {
-struct ResumptionState;
-} // namespace server
-} // namespace fizz
 
 namespace folly {
 class IOBuf;
@@ -47,49 +38,4 @@ TicketTransportParameters createTicketTransportParameters(
     uint64_t initialMaxStreamsBidi,
     uint64_t initialMaxStreamsUni);
 
-std::unique_ptr<folly::IOBuf> encodeAppToken(const AppToken& appToken);
-
-folly::Optional<AppToken> decodeAppToken(const folly::IOBuf& buf);
-
-class FailingAppTokenValidator : public fizz::server::AppTokenValidator {
-  bool validate(const fizz::server::ResumptionState&) const override {
-    return false;
-  }
-};
-
 } // namespace quic
-
-namespace fizz {
-namespace detail {
-
-template <>
-struct Reader<folly::IPAddress> {
-  template <class T>
-  size_t read(folly::IPAddress& ipAddress, folly::io::Cursor& cursor) {
-    std::unique_ptr<folly::IOBuf> sourceAddressBuf;
-    size_t len = readBuf<uint8_t>(sourceAddressBuf, cursor);
-    ipAddress = folly::IPAddress::fromBinary(sourceAddressBuf->coalesce());
-    return len;
-  }
-};
-
-template <>
-struct Writer<folly::IPAddress> {
-  template <class T>
-  void write(const folly::IPAddress& ipAddress, folly::io::Appender& out) {
-    DCHECK(!ipAddress.empty());
-    auto buf =
-        folly::IOBuf::wrapBuffer(ipAddress.bytes(), ipAddress.byteCount());
-    writeBuf<uint8_t>(buf, out);
-  }
-};
-
-template <>
-struct Sizer<folly::IPAddress> {
-  template <class T>
-  size_t getSize(const folly::IPAddress& ipAddress) {
-    return sizeof(uint8_t) + ipAddress.byteCount();
-  }
-};
-} // namespace detail
-} // namespace fizz
