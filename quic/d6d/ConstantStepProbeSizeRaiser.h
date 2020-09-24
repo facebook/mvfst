@@ -19,18 +19,18 @@ namespace quic {
  **/
 class ConstantStepProbeSizeRaiser : public ProbeSizeRaiser {
  public:
-  explicit ConstantStepProbeSizeRaiser(uint16_t stepSizeIn)
-      : stepSize(stepSizeIn) {}
+  explicit ConstantStepProbeSizeRaiser(uint16_t stepSize)
+      : stepSize_(stepSize) {}
 
   // Do nothing
   void onProbeLost(uint16_t /* lastProbeSize */) override {}
 
   folly::Optional<uint16_t> raiseProbeSize(uint16_t lastProbeSize) override {
-    return lastProbeSize + stepSize;
+    return lastProbeSize + stepSize_;
   }
 
  private:
-  uint16_t stepSize;
+  uint16_t stepSize_;
 };
 
 } // namespace quic
