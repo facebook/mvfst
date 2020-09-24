@@ -108,6 +108,13 @@ struct D6DConfig {
   ProbeSizeRaiserType raiserType{ProbeSizeRaiserType::ConstantStep};
 };
 
+// JSON-serialized transoprt knobs
+struct SerializedKnob {
+  uint64_t space;
+  uint64_t id;
+  folly::StringPiece blob;
+};
+
 struct TransportSettings {
   // The initial connection window advertised to the peer.
   uint64_t advertisedInitialConnectionWindowSize{kDefaultConnectionWindowSize};
@@ -237,6 +244,8 @@ struct TransportSettings {
   bool orderedReadCallbacks{false};
   // Config struct for D6D
   D6DConfig d6dConfig;
+  // Quic knobs
+  std::vector<SerializedKnob> knobs;
 };
 
 } // namespace quic

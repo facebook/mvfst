@@ -103,6 +103,12 @@ constexpr uint64_t kDefaultBufferSpaceAvailable =
 constexpr std::chrono::microseconds kDefaultMinRtt =
     std::chrono::microseconds::max();
 
+// Default knob space for transport knobs
+constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
+
+// Default knob id for transport knobs
+constexpr uint64_t kDefaultQuicTransportKnobId = 1;
+
 enum class FrameType : uint64_t {
   PADDING = 0x00,
   PING = 0x01,
