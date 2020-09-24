@@ -1203,22 +1203,26 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
         ackData.ackTime - packetRcvTime[ackData.endSeq]);
     EXPECT_CALL(
         ib,
-        rttSampleGenerated(AllOf(
-            Field(
-                &InstrumentationObserver::PacketRTT::rcvTime, ackData.ackTime),
-            Field(&InstrumentationObserver::PacketRTT::rttSample, rttSample),
-            Field(
-                &InstrumentationObserver::PacketRTT::ackDelay,
-                ackData.ackDelay),
-            Field(
-                &InstrumentationObserver::PacketRTT::metadata,
+        rttSampleGenerated(
+            nullptr,
+            AllOf(
                 Field(
-                    &quic::OutstandingPacketMetadata::inflightBytes,
-                    ackData.endSeq + 1)))));
+                    &InstrumentationObserver::PacketRTT::rcvTime,
+                    ackData.ackTime),
+                Field(
+                    &InstrumentationObserver::PacketRTT::rttSample, rttSample),
+                Field(
+                    &InstrumentationObserver::PacketRTT::ackDelay,
+                    ackData.ackDelay),
+                Field(
+                    &InstrumentationObserver::PacketRTT::metadata,
+                    Field(
+                        &quic::OutstandingPacketMetadata::inflightBytes,
+                        ackData.endSeq + 1)))));
   }
 
   for (auto& callback : conn.pendingCallbacks) {
-    callback();
+    callback(nullptr);
   }
 }
 

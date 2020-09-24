@@ -1922,16 +1922,18 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
   // 1, 2 and 6 are "lost" due to reodering. None lost due to timeout
   EXPECT_CALL(
       ib,
-      packetLossDetected(Field(
-          &InstrumentationObserver::ObserverLossEvent::lostPackets,
-          UnorderedElementsAre(
-              getLossPacketMatcher(true, false),
-              getLossPacketMatcher(true, false),
-              getLossPacketMatcher(true, false)))))
+      packetLossDetected(
+          nullptr,
+          Field(
+              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              UnorderedElementsAre(
+                  getLossPacketMatcher(true, false),
+                  getLossPacketMatcher(true, false),
+                  getLossPacketMatcher(true, false)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
-    callback();
+    callback(nullptr);
   }
 }
 
@@ -1973,20 +1975,22 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
   // expecting all packets to be lost due to timeout
   EXPECT_CALL(
       ib,
-      packetLossDetected(Field(
-          &InstrumentationObserver::ObserverLossEvent::lostPackets,
-          UnorderedElementsAre(
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true),
-              getLossPacketMatcher(false, true)))))
+      packetLossDetected(
+          nullptr,
+          Field(
+              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              UnorderedElementsAre(
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true),
+                  getLossPacketMatcher(false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
-    callback();
+    callback(nullptr);
   }
 }
 
@@ -2034,17 +2038,19 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   // 7 just timed out
   EXPECT_CALL(
       ib,
-      packetLossDetected(Field(
-          &InstrumentationObserver::ObserverLossEvent::lostPackets,
-          UnorderedElementsAre(
-              getLossPacketMatcher(true, true),
-              getLossPacketMatcher(true, true),
-              getLossPacketMatcher(true, true),
-              getLossPacketMatcher(false, true)))))
+      packetLossDetected(
+          nullptr,
+          Field(
+              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              UnorderedElementsAre(
+                  getLossPacketMatcher(true, true),
+                  getLossPacketMatcher(true, true),
+                  getLossPacketMatcher(true, true),
+                  getLossPacketMatcher(false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
-    callback();
+    callback(nullptr);
   }
 }
 
