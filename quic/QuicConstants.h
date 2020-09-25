@@ -82,7 +82,7 @@ constexpr uint16_t kDefaultD6DProbeStepSize = 10;
 constexpr std::chrono::seconds kDefaultD6DBlackholeDetectionWindow = 5s;
 
 // Default threshold for detecting blackhole caused by invalid pmtu
-constexpr uint64_t kDefaultD6DBlackholeDetectionThreshold = 5;
+constexpr uint64_t kDefaultD6DBlackholeDetectionThreshold = 8;
 
 // Number of GRO buffers to use
 // 1 means GRO is not enabled

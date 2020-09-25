@@ -71,9 +71,15 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       break;
     case D6DMachineState::SEARCHING:
-      CHECK_GT(lastProbeSize, conn.udpSendPacketLen);
+      // Temporary mitigation
+      if (lastProbeSize <= conn.udpSendPacketLen) {
+        LOG(ERROR) << "D6D lastProbeSize <= udpSendPacketLen";
+        return;
+      }
       conn.udpSendPacketLen = lastProbeSize;
-      if (maybeNextProbeSize.hasValue() && *maybeNextProbeSize < d6d.maxPMTU) {
+      if (maybeNextProbeSize.hasValue() &&
+          *maybeNextProbeSize > conn.udpSendPacketLen &&
+          *maybeNextProbeSize < d6d.maxPMTU) {
         d6d.currentProbeSize = *maybeNextProbeSize;
         scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       } else {
@@ -151,7 +157,8 @@ void detectPMTUBlackhole(
   // If d6d is not activated, or it's a d6d probe, or that the packet size is
   // less than base pmtu, then the loss is not caused by pmtu blackhole
   if (d6d.state == D6DMachineState::DISABLED || packet.metadata.isD6DProbe ||
-      packet.metadata.encodedSize <= d6d.basePMTU) {
+      packet.metadata.encodedSize <= d6d.basePMTU ||
+      conn.udpSendPacketLen <= d6d.basePMTU) {
     return;
   }
 
@@ -162,8 +169,8 @@ void detectPMTUBlackhole(
           std::chrono::duration_cast<std::chrono::microseconds>(
               packet.metadata.time.time_since_epoch())
               .count())) {
-    LOG(ERROR)
-        << "PMTU blackhole detected on packet loss, reducing PMTU to base";
+    LOG(ERROR) << "PMTU blackhole detected on packet loss, reducing PMTU from "
+               << conn.udpSendPacketLen << " to base " << d6d.basePMTU;
     d6d.state = D6DMachineState::BASE;
     d6d.currentProbeSize = d6d.basePMTU;
     conn.udpSendPacketLen = d6d.basePMTU;
