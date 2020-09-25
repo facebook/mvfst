@@ -32,6 +32,12 @@ std::string toString(
 
 } // namespace
 
+inline void scheduleProbeAfterDelay(
+    QuicConnectionStateBase& conn,
+    std::chrono::milliseconds delay) {
+  conn.pendingEvents.d6d.sendProbeDelay = delay;
+}
+
 void onD6DProbeTimeoutExpired(QuicConnectionStateBase& conn) {
   onD6DLastProbeLost(conn);
 }
@@ -62,13 +68,14 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       CHECK(maybeNextProbeSize.hasValue());
       d6d.currentProbeSize = *maybeNextProbeSize;
       d6d.state = D6DMachineState::SEARCHING;
-      conn.pendingEvents.d6d.sendProbePacket = true;
+      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       break;
     case D6DMachineState::SEARCHING:
       CHECK_GT(lastProbeSize, conn.udpSendPacketLen);
       conn.udpSendPacketLen = lastProbeSize;
       if (maybeNextProbeSize.hasValue() && *maybeNextProbeSize < d6d.maxPMTU) {
         d6d.currentProbeSize = *maybeNextProbeSize;
+        scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       } else {
         // We've reached either the PMTU upper bound or the probe size
         // raiser's internal upper bound, in both cases the search is
@@ -83,6 +90,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       // We should try sending base pmtu-sized packet now.
       d6d.currentProbeSize = d6d.basePMTU;
       d6d.state = D6DMachineState::BASE;
+      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       break;
     default:
       LOG(ERROR) << "d6d: receive probe ack in state: " << toString(d6d.state);
@@ -104,7 +112,7 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
         // connection prior to this state.
       }
       // In both BASE and ERROR state, we need to keep sending probes
-      conn.pendingEvents.d6d.sendProbePacket = true;
+      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenLost);
       break;
     case D6DMachineState::SEARCHING:
       if (d6d.outstandingProbes >= kDefaultD6DMaxOutstandingProbes) {
@@ -117,11 +125,11 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
       // Otherwise, the loss could be due to congestion, so we keep
       // sending probe
       // TODO: pace d6d probing when there's congestion
-      conn.pendingEvents.d6d.sendProbePacket = true;
+      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenLost);
       break;
     case D6DMachineState::ERROR:
       // Keep probing with min probe size
-      conn.pendingEvents.d6d.sendProbePacket = true;
+      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenLost);
       break;
     default:
       LOG(ERROR) << "d6d: probe timeout expired in state: "

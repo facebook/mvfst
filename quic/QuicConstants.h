@@ -69,6 +69,12 @@ constexpr std::chrono::seconds kMinD6DProbeTimeout = 1s;
 // The default d6d start delay
 constexpr std::chrono::milliseconds kDefaultD6DKickStartDelay = 1000ms;
 
+// Default delay for the next probe when the last one is acked
+constexpr std::chrono::milliseconds kDefaultD6DProbeDelayWhenAcked = 500ms;
+
+// Default delay for the next probe when the last one is lost
+constexpr std::chrono::milliseconds kDefaultD6DProbeDelayWhenLost = 2000ms;
+
 // The default pmtu step size, currently only useful for ConstantStep raiser
 constexpr uint16_t kDefaultD6DProbeStepSize = 10;
 

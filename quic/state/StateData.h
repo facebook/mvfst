@@ -618,6 +618,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // To send a d6d probe packet
     bool sendProbePacket{false};
+
+    // The delay after which sendD6DProbePacket will be set
+    folly::Optional<std::chrono::milliseconds> sendProbeDelay;
   };
 
   struct PendingEvents {

@@ -27,7 +27,7 @@ struct D6DProbeLostTestFixture {
   D6DMachineState stateBegin;
   D6DMachineState stateEnd;
   bool sendProbeBegin;
-  bool sendProbeEnd;
+  folly::Optional<std::chrono::milliseconds> sendProbeDelayEnd;
   // probe loss doesn't change outstanding probes, so a begin value
   // is enough
   uint64_t outstandingProbes;
@@ -54,7 +54,13 @@ class QuicD6DStateFunctionsTest : public Test {
     onD6DLastProbeLost(conn);
     EXPECT_EQ(conn.d6d.state, fixture.stateEnd);
     EXPECT_EQ(conn.d6d.currentProbeSize, fixture.currentProbeSizeEnd);
-    EXPECT_EQ(conn.pendingEvents.d6d.sendProbePacket, fixture.sendProbeEnd);
+    if (fixture.sendProbeDelayEnd.hasValue()) {
+      ASSERT_TRUE(conn.pendingEvents.d6d.sendProbeDelay.hasValue());
+      EXPECT_EQ(
+          *conn.pendingEvents.d6d.sendProbeDelay, *fixture.sendProbeDelayEnd);
+    } else {
+      ASSERT_FALSE(conn.pendingEvents.d6d.sendProbeDelay.hasValue());
+    }
   }
 };
 
@@ -65,7 +71,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeTimeoutExpiredOneInBase) {
       D6DMachineState::BASE, // stateBegin
       D6DMachineState::BASE, // stateEnd
       false, // sendProbeBegin
-      true, // sendProbeEnd
+      kDefaultD6DProbeDelayWhenLost, // sendProbeEnd
       1, // outstandingProbes
       conn.d6d.basePMTU, // currentProbeSizeBegin
       conn.d6d.basePMTU // currentProbeSizeEnd
@@ -80,7 +86,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeTimeoutExpiredMaxInBase) {
       D6DMachineState::BASE,
       D6DMachineState::ERROR,
       false,
-      true,
+      kDefaultD6DProbeDelayWhenLost,
       kDefaultD6DMaxOutstandingProbes,
       conn.d6d.basePMTU,
       kMinMaxUDPPayload};
@@ -94,7 +100,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeTimeoutExpiredOneInSearching) {
       D6DMachineState::SEARCHING,
       D6DMachineState::SEARCHING,
       false,
-      true,
+      kDefaultD6DProbeDelayWhenLost,
       1,
       static_cast<uint32_t>(conn.d6d.basePMTU + 10),
       static_cast<uint32_t>(conn.d6d.basePMTU + 10)};
@@ -108,7 +114,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeTimeoutExpiredMaxInSearching) {
       D6DMachineState::SEARCHING,
       D6DMachineState::SEARCH_COMPLETE,
       false,
-      false,
+      folly::none,
       kDefaultD6DMaxOutstandingProbes,
       static_cast<uint32_t>(conn.d6d.basePMTU + 10),
       static_cast<uint32_t>(conn.d6d.basePMTU + 10)};
@@ -122,7 +128,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeTimeoutExpiredOneInError) {
       D6DMachineState::ERROR,
       D6DMachineState::ERROR,
       false,
-      true,
+      kDefaultD6DProbeDelayWhenLost,
       kDefaultD6DMaxOutstandingProbes + 1,
       kMinMaxUDPPayload,
       kMinMaxUDPPayload};

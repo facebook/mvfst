@@ -39,6 +39,7 @@ QuicTransportBase::QuicTransportBase(
       pingTimeout_(this),
       d6dProbeTimeout_(this),
       d6dRaiseTimeout_(this),
+      d6dTxTimeout_(this),
       readLooper_(new FunctionLooper(
           evb,
           [this](bool /* ignored */) { invokeReadDataAndCallbacks(); },
@@ -1844,9 +1845,10 @@ void QuicTransportBase::onNetworkData(
       // Received data could contain an ack to a d6d probe, in which case we
       // need to cancel the current d6d probe timeout. The ack might change d6d
       // state to SEARCH_COMPLETE, in which case we need to schedule d6d raise
-      // timeout
+      // timeout. We might also need to schedule the next probe.
       scheduleD6DProbeTimeout();
       scheduleD6DRaiseTimeout();
+      scheduleD6DTxTimeout();
     } else {
       // In the closed state, we would want to write a close if possible however
       // the write looper will not be set.
@@ -2372,8 +2374,10 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired);
     }
-    // loss detection might cancel d6d raise timeout
+    // loss detection might cancel d6d raise timeout, and might cause the next
+    // probe to be scheduled
     scheduleD6DRaiseTimeout();
+    scheduleD6DTxTimeout();
     pacedWriteDataToSocket(false);
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
@@ -2455,6 +2459,12 @@ void QuicTransportBase::d6dRaiseTimeoutExpired() noexcept {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   conn_->pendingEvents.d6d.scheduleRaiseTimeout = false;
   onD6DRaiseTimeoutExpired(*conn_);
+}
+
+void QuicTransportBase::d6dTxTimeoutExpired() noexcept {
+  VLOG(4) << __func__ << " " << *this;
+  conn_->pendingEvents.d6d.sendProbeDelay = folly::none;
+  conn_->pendingEvents.d6d.sendProbePacket = true;
 }
 
 void QuicTransportBase::scheduleLossTimeout(std::chrono::milliseconds timeout) {
@@ -2559,6 +2569,17 @@ void QuicTransportBase::scheduleD6DRaiseTimeout() {
     if (d6dRaiseTimeout_.isScheduled()) {
       VLOG(10) << __func__ << " cancel timeout " << *this;
       d6dRaiseTimeout_.cancelTimeout();
+    }
+  }
+}
+
+void QuicTransportBase::scheduleD6DTxTimeout() {
+  auto& delay = conn_->pendingEvents.d6d.sendProbeDelay;
+  if (delay) {
+    if (!d6dTxTimeout_.isScheduled()) {
+      VLOG(10) << __func__ << "timeout=" << conn_->d6d.raiseTimeout.count()
+               << "s " << *this;
+      getEventBase()->timer().scheduleTimeout(&d6dTxTimeout_, *delay);
     }
   }
 }

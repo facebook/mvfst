@@ -535,14 +535,7 @@ void QuicServerTransport::maybeStartD6DProbing() {
     // Start probing after some delay. This filters out short-lived
     // connections, for which probing is relatively expensive and less
     // valuable
-    getEventBase()->runAfterDelay(
-        [self = this->shared_from_this()]() mutable {
-          if (self->closeState_ == CloseState::CLOSED) {
-            return;
-          }
-          self->conn_->pendingEvents.d6d.sendProbePacket = true;
-        },
-        kDefaultD6DKickStartDelay.count());
+    conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
   }
 }
 

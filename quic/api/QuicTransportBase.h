@@ -542,6 +542,21 @@ class QuicTransportBase : public QuicSocket {
     QuicTransportBase* transport_;
   };
 
+  class D6DTxTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    ~D6DTxTimeout() override = default;
+
+    explicit D6DTxTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->d6dTxTimeoutExpired();
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
   void scheduleLossTimeout(std::chrono::milliseconds timeout);
   void cancelLossTimeout();
   bool isLossTimeoutScheduled() const;
@@ -699,6 +714,7 @@ class QuicTransportBase : public QuicSocket {
   void pingTimeoutExpired() noexcept;
   void d6dProbeTimeoutExpired() noexcept;
   void d6dRaiseTimeoutExpired() noexcept;
+  void d6dTxTimeoutExpired() noexcept;
 
   void setIdleTimer();
   void scheduleAckTimeout();
@@ -708,6 +724,7 @@ class QuicTransportBase : public QuicSocket {
       std::chrono::milliseconds pingTimeout);
   void scheduleD6DRaiseTimeout();
   void scheduleD6DProbeTimeout();
+  void scheduleD6DTxTimeout();
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
@@ -801,6 +818,7 @@ class QuicTransportBase : public QuicSocket {
   PingTimeout pingTimeout_;
   D6DProbeTimeout d6dProbeTimeout_;
   D6DRaiseTimeout d6dRaiseTimeout_;
+  D6DTxTimeout d6dTxTimeout_;
   FunctionLooper::Ptr readLooper_;
   FunctionLooper::Ptr peekLooper_;
   FunctionLooper::Ptr writeLooper_;
