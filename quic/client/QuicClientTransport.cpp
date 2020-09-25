@@ -262,8 +262,11 @@ void QuicClientTransport::processPacketData(
         "Invalid connection id", TransportErrorCode::PROTOCOL_VIOLATION);
   }
   auto& ackState = getAckState(*conn_, pnSpace);
-  auto outOfOrder =
+  bool outOfOrder =
       updateLargestReceivedPacketNum(ackState, packetNum, receiveTimePoint);
+  if (outOfOrder) {
+    QUIC_STATS(conn_->statsCallback, onOutOfOrderPacketReceived);
+  }
 
   bool pktHasRetransmittableData = false;
   bool pktHasCryptoData = false;

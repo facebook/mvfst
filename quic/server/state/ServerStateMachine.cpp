@@ -840,8 +840,11 @@ void onServerReadDataFromOpen(
     }
 
     auto& ackState = getAckState(conn, packetNumberSpace);
-    auto outOfOrder = updateLargestReceivedPacketNum(
+    bool outOfOrder = updateLargestReceivedPacketNum(
         ackState, packetNum, readData.networkData.receiveTimePoint);
+    if (outOfOrder) {
+      QUIC_STATS(conn.statsCallback, onOutOfOrderPacketReceived);
+    }
     DCHECK(hasReceivedPackets(conn));
 
     bool pktHasRetransmittableData = false;
