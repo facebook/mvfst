@@ -3657,7 +3657,7 @@ TEST_F(
 }
 
 TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksDeleted) {
-  auto noopCallback = [](void*) {};
+  auto noopCallback = [](QuicSocket*) {};
   transport->transportConn->pendingCallbacks.emplace_back(noopCallback);
   EXPECT_EQ(1, size(transport->transportConn->pendingCallbacks));
   transport->invokeProcessCallbacksAfterNetworkData();
@@ -3666,7 +3666,7 @@ TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksDeleted) {
 
 TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksInvoked) {
   uint32_t callbacksInvoked = 0;
-  auto countingCallback = [&](void*) { callbacksInvoked++; };
+  auto countingCallback = [&](QuicSocket*) { callbacksInvoked++; };
 
   for (int i = 0; i < 2; i++) {
     transport->transportConn->pendingCallbacks.emplace_back(countingCallback);
@@ -3681,7 +3681,7 @@ TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksInvoked) {
 TEST_F(
     QuicTransportImplTest,
     ImplementationObserverCallbacksCorrectQuicSocket) {
-  void* returnedSocket = nullptr;
+  QuicSocket* returnedSocket = nullptr;
   auto func = [&](QuicSocket* qSocket) { returnedSocket = qSocket; };
   auto ib = MockInstrumentationObserver();
 
