@@ -219,7 +219,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       break;
     }
     auto currentPacketNumberSpace = pkt.packet.header.getPacketNumberSpace();
-    if (currentPacketNumberSpace != pnSpace || pkt.metadata.isD6DProbe) {
+    if (currentPacketNumberSpace != pnSpace) {
       iter++;
       continue;
     }
