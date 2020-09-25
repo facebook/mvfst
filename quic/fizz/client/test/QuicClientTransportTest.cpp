@@ -1105,7 +1105,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
     connected_ = true;
     writeDataToQuicStream(
-        conn_->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
+        getClientConn()->cryptoState->initialStream, IOBuf::copyBuffer("CHLO"));
     createServerTransportParameters();
     return transportParams;
   }
@@ -1157,35 +1157,39 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   }
 
   void setOneRttReadCipher(std::unique_ptr<Aead> oneRttReadCipher) {
-    conn_->readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
+    getClientConn()->readCodec->setOneRttReadCipher(
+        std::move(oneRttReadCipher));
   }
 
   void setHandshakeReadCipher(std::unique_ptr<Aead> handshakeReadCipher) {
-    conn_->readCodec->setHandshakeReadCipher(std::move(handshakeReadCipher));
+    getClientConn()->readCodec->setHandshakeReadCipher(
+        std::move(handshakeReadCipher));
   }
 
   void setHandshakeWriteCipher(std::unique_ptr<Aead> handshakeWriteCipher) {
-    conn_->handshakeWriteCipher = std::move(handshakeWriteCipher);
+    getClientConn()->handshakeWriteCipher = std::move(handshakeWriteCipher);
   }
 
   void setZeroRttWriteCipher(std::unique_ptr<Aead> zeroRttWriteCipher) {
-    conn_->zeroRttWriteCipher = std::move(zeroRttWriteCipher);
+    getClientConn()->zeroRttWriteCipher = std::move(zeroRttWriteCipher);
   }
 
   void setZeroRttWriteHeaderCipher(
       std::unique_ptr<PacketNumberCipher> zeroRttWriteHeaderCipher) {
-    conn_->zeroRttWriteHeaderCipher = std::move(zeroRttWriteHeaderCipher);
+    getClientConn()->zeroRttWriteHeaderCipher =
+        std::move(zeroRttWriteHeaderCipher);
   }
 
   void setHandshakeReadHeaderCipher(
       std::unique_ptr<PacketNumberCipher> handshakeReadHeaderCipher) {
-    conn_->readCodec->setHandshakeHeaderCipher(
+    getClientConn()->readCodec->setHandshakeHeaderCipher(
         std::move(handshakeReadHeaderCipher));
   }
 
   void setHandshakeWriteHeaderCipher(
       std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher) {
-    conn_->handshakeWriteHeaderCipher = std::move(handshakeWriteHeaderCipher);
+    getClientConn()->handshakeWriteHeaderCipher =
+        std::move(handshakeWriteHeaderCipher);
   }
 
   void setOneRttWriteHeaderCipher(
@@ -1195,11 +1199,12 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   void setOneRttReadHeaderCipher(
       std::unique_ptr<PacketNumberCipher> oneRttReadHeaderCipher) {
-    conn_->readCodec->setOneRttHeaderCipher(std::move(oneRttReadHeaderCipher));
+    getClientConn()->readCodec->setOneRttHeaderCipher(
+        std::move(oneRttReadHeaderCipher));
   }
 
   void setZeroRttRejected(bool rejected) {
-    zeroRttRejected_ = rejected;
+    setZeroRttRejectedForTest(rejected);
     if (rejected) {
       createServerTransportParameters();
     }
@@ -1207,25 +1212,21 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
 
   void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
     EXPECT_EQ(writeBuf.get(), nullptr);
-    if (!conn_->oneRttWriteCipher) {
-      conn_->oneRttWriteCipher = std::move(oneRttWriteCipher_);
-      conn_->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher_);
+    QuicClientConnectionState* conn = getClientConn();
+    if (!conn->oneRttWriteCipher) {
+      conn->oneRttWriteCipher = std::move(oneRttWriteCipher_);
+      conn->oneRttWriteHeaderCipher = std::move(oneRttWriteHeaderCipher_);
     }
     if (getPhase() == Phase::Initial) {
-      conn_->handshakeWriteCipher = test::createNoOpAead();
-      conn_->handshakeWriteHeaderCipher = test::createNoOpHeaderCipher();
-      conn_->readCodec->setHandshakeReadCipher(test::createNoOpAead());
-      conn_->readCodec->setHandshakeHeaderCipher(
-          test::createNoOpHeaderCipher());
+      conn->handshakeWriteCipher = test::createNoOpAead();
+      conn->handshakeWriteHeaderCipher = test::createNoOpHeaderCipher();
+      conn->readCodec->setHandshakeReadCipher(test::createNoOpAead());
+      conn->readCodec->setHandshakeHeaderCipher(test::createNoOpHeaderCipher());
       writeDataToQuicStream(
-          conn_->cryptoState->handshakeStream,
+          conn->cryptoState->handshakeStream,
           IOBuf::copyBuffer("ClientFinished"));
-      phase_ = Phase::Handshake;
+      handshakeInitiated();
     }
-  }
-
-  void setPhase(Phase phase) {
-    phase_ = phase;
   }
 
   bool connectInvoked() {

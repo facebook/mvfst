@@ -63,7 +63,7 @@ void ClientHandshake::doHandshake(
   // dropping the alert and timing out instead.
   if (phase_ == Phase::Initial) {
     // This could be an HRR or a cleartext alert.
-    phase_ = Phase::Handshake;
+    handshakeInitiated();
   }
 
   // First add it to the right read buffer.
@@ -99,6 +99,15 @@ void ClientHandshake::doHandshake(
 }
 
 void ClientHandshake::handshakeConfirmed() {
+  if (phase_ != Phase::OneRttKeysDerived) {
+    if (phase_ == Phase::Established) {
+      LOG(WARNING) << "Handshake was already established";
+    } else {
+      LOG(WARNING)
+          << "Handshake was expected to be in the OneRttKeysDerived phase";
+    }
+  }
+
   phase_ = Phase::Established;
 }
 
@@ -223,6 +232,11 @@ void ClientHandshake::writeDataToStream(
   writeDataToQuicStream(*cryptoStream, std::move(data));
 }
 
+void ClientHandshake::handshakeInitiated() {
+  CHECK(phase_ == Phase::Initial);
+  phase_ = Phase::Handshake;
+}
+
 void ClientHandshake::computeZeroRttCipher() {
   VLOG(10) << "Computing Client zero rtt keys";
   earlyDataAttempted_ = true;
@@ -249,6 +263,25 @@ void ClientHandshake::computeOneRttCipher(bool earlyDataAccepted) {
   // After a successful handshake we should send packets with the type of
   // ClientCleartext. We assume that by the time we get the data for the QUIC
   // stream, the server would have also acked all the client initial packets.
+  CHECK(phase_ == Phase::Handshake);
   phase_ = Phase::OneRttKeysDerived;
 }
+
+QuicClientConnectionState* ClientHandshake::getClientConn() {
+  return conn_;
+}
+
+const QuicClientConnectionState* ClientHandshake::getClientConn() const {
+  return conn_;
+}
+
+const std::shared_ptr<ClientTransportParametersExtension>&
+ClientHandshake::getClientTransportParameters() const {
+  return transportParams_;
+}
+
+void ClientHandshake::setZeroRttRejectedForTest(bool rejected) {
+  zeroRttRejected_ = rejected;
+}
+
 } // namespace quic

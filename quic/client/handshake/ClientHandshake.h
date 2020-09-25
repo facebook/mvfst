@@ -99,10 +99,6 @@ class ClientHandshake : public Handshake {
   virtual ~ClientHandshake() = default;
 
  protected:
-  // Represents the packet type that should be used to write the data currently
-  // in the stream.
-  Phase phase_{Phase::Initial};
-
   enum class CipherKind {
     HandshakeWrite,
     HandshakeRead,
@@ -113,9 +109,6 @@ class ClientHandshake : public Handshake {
 
   void computeCiphers(CipherKind kind, folly::ByteRange secret);
 
-  folly::Optional<bool> zeroRttRejected_;
-  QuicClientConnectionState* conn_;
-
   /**
    * Various utilities for concrete implementations to use.
    */
@@ -123,8 +116,23 @@ class ClientHandshake : public Handshake {
   void throwOnError();
   void waitForData();
   void writeDataToStream(EncryptionLevel encryptionLevel, Buf data);
+  void handshakeInitiated();
   void computeZeroRttCipher();
   void computeOneRttCipher(bool earlyDataAccepted);
+
+  /**
+   * Accessor for the concrete implementation, so they can access data without
+   * being able to rebind it.
+   */
+  QuicClientConnectionState* getClientConn();
+  const QuicClientConnectionState* getClientConn() const;
+  const std::shared_ptr<ClientTransportParametersExtension>&
+  getClientTransportParameters() const;
+
+  /**
+   * Setters for the concrete implementation so that it can be tested.
+   */
+  void setZeroRttRejectedForTest(bool rejected);
 
  private:
   virtual folly::Optional<CachedServerTransportParameters> connectImpl(
@@ -136,19 +144,23 @@ class ClientHandshake : public Handshake {
   virtual std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>
   buildCiphers(CipherKind kind, folly::ByteRange secret) = 0;
 
-  // Whether or not to wait for more data.
+  // Represents the packet type that should be used to write the data currently
+  // in the stream.
+  Phase phase_{Phase::Initial};
+
+  QuicClientConnectionState* conn_;
+  std::shared_ptr<ClientTransportParametersExtension> transportParams_;
+
+  folly::Optional<bool> zeroRttRejected_;
+
   bool waitForData_{false};
+  bool earlyDataAttempted_{false};
 
   folly::IOBufQueue initialReadBuf_{folly::IOBufQueue::cacheChainLength()};
   folly::IOBufQueue handshakeReadBuf_{folly::IOBufQueue::cacheChainLength()};
   folly::IOBufQueue appDataReadBuf_{folly::IOBufQueue::cacheChainLength()};
 
   folly::exception_wrapper error_;
-
-  bool earlyDataAttempted_{false};
-
- protected:
-  std::shared_ptr<ClientTransportParametersExtension> transportParams_;
 };
 
 } // namespace quic
