@@ -350,15 +350,35 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       pmtuUpperBoundDetected,
       void(QuicSocket*, const PMTUUpperBoundEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      spuriousPacketDetected,
+      void(QuicSocket*, const ObserverSpuriousLossEvent&));
 
-  static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
+  static auto getLossPacketNum(PacketNum packetNum) {
+    return testing::Field(
+        &OutstandingPacket::packet,
+        testing::Field(
+            &RegularPacket::header,
+            testing::Property(&PacketHeader::getPacketSequenceNum, packetNum)));
+  }
+
+  static auto getLossPacketMatcher(
+      PacketNum packetNum,
+      bool reorderLoss,
+      bool timeoutLoss) {
     return AllOf(
         testing::Field(
             &InstrumentationObserver::LostPacket::lostByReorderThreshold,
             testing::Eq(reorderLoss)),
         testing::Field(
             &InstrumentationObserver::LostPacket::lostByTimeout,
-            testing::Eq(timeoutLoss)));
+            testing::Eq(timeoutLoss)),
+        testing::Field(
+            &InstrumentationObserver::LostPacket::packet,
+            getLossPacketNum(packetNum)));
   }
 };
 

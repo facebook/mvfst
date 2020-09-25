@@ -132,9 +132,12 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<MockQuicStats> transportInfoCb_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
 
-  auto getLossPacketMatcher(bool lossByReorder, bool lossByTimeout) {
+  auto getLossPacketMatcher(
+      PacketNum packetNum,
+      bool lossByReorder,
+      bool lossByTimeout) {
     return MockInstrumentationObserver::getLossPacketMatcher(
-        lossByReorder, lossByTimeout);
+        packetNum, lossByReorder, lossByTimeout);
   }
 };
 
@@ -1923,9 +1926,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
           Field(
               &InstrumentationObserver::ObserverLossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(true, false),
-                  getLossPacketMatcher(true, false),
-                  getLossPacketMatcher(true, false)))))
+                  getLossPacketMatcher(1, true, false),
+                  getLossPacketMatcher(2, true, false),
+                  getLossPacketMatcher(6, true, false)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
@@ -1976,13 +1979,13 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
           Field(
               &InstrumentationObserver::ObserverLossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true)))))
+                  getLossPacketMatcher(1, false, true),
+                  getLossPacketMatcher(2, false, true),
+                  getLossPacketMatcher(3, false, true),
+                  getLossPacketMatcher(4, false, true),
+                  getLossPacketMatcher(5, false, true),
+                  getLossPacketMatcher(6, false, true),
+                  getLossPacketMatcher(7, false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
@@ -2039,10 +2042,10 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
           Field(
               &InstrumentationObserver::ObserverLossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(false, true)))))
+                  getLossPacketMatcher(1, true, true),
+                  getLossPacketMatcher(2, true, true),
+                  getLossPacketMatcher(6, true, true),
+                  getLossPacketMatcher(7, false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {

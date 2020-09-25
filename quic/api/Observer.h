@@ -129,6 +129,21 @@ class InstrumentationObserver {
     ProbeSizeRaiserType probeSizeRaiserType;
   };
 
+  struct ObserverSpuriousLossEvent {
+    explicit ObserverSpuriousLossEvent(TimePoint rcvTimeIn)
+        : rcvTime(rcvTimeIn) {}
+    TimePoint rcvTime;
+
+    bool hasPackets() {
+      return spuriousPackets.size() > 0;
+    }
+
+    void addSpuriousPacket(quic::OutstandingPacket pkt) {
+      spuriousPackets.emplace_back(pkt);
+    }
+    std::vector<quic::OutstandingPacket> spuriousPackets;
+  };
+
   virtual ~InstrumentationObserver() = default;
 
   /**
@@ -185,6 +200,17 @@ class InstrumentationObserver {
   virtual void pmtuUpperBoundDetected(
       QuicSocket*, /* socket */
       const PMTUUpperBoundEvent& /* pmtuUpperBoundEvent */) {}
+
+  /**
+   * spuriousPacketDetected() is invoked when an ACK from a lost packet
+   * arrives.
+   *
+   * @param socket   Socket when the callback is processed.
+   * @param packet   const reference to the lost packet.
+   */
+  virtual void spuriousPacketDetected(
+      QuicSocket*, /* socket */
+      const ObserverSpuriousLossEvent& /* lost packet */) {}
 };
 
 // Container for instrumentation observers.
