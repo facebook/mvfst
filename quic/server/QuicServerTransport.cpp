@@ -280,7 +280,7 @@ void QuicServerTransport::writeData() {
         packetLimit);
 
     // D6D probes should be paced
-    if (packetLimit && conn_->pendingEvents.sendD6DProbePacket) {
+    if (packetLimit && conn_->pendingEvents.d6d.sendProbePacket) {
       writeD6DProbeToSocket(
           *socket_,
           *conn_,
@@ -540,7 +540,7 @@ void QuicServerTransport::maybeStartD6DProbing() {
           if (self->closeState_ == CloseState::CLOSED) {
             return;
           }
-          self->conn_->pendingEvents.sendD6DProbePacket = true;
+          self->conn_->pendingEvents.d6d.sendProbePacket = true;
         },
         kDefaultD6DKickStartDelay.count());
   }

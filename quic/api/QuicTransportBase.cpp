@@ -2446,12 +2446,14 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
 void QuicTransportBase::d6dProbeTimeoutExpired() noexcept {
   VLOG(4) << __func__ << " " << *this;
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  conn_->pendingEvents.d6d.scheduleProbeTimeout = false;
   onD6DProbeTimeoutExpired(*conn_);
 }
 
 void QuicTransportBase::d6dRaiseTimeoutExpired() noexcept {
   VLOG(4) << __func__ << " " << *this;
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  conn_->pendingEvents.d6d.scheduleRaiseTimeout = false;
   onD6DRaiseTimeoutExpired(*conn_);
 }
 
@@ -2530,7 +2532,7 @@ void QuicTransportBase::schedulePathValidationTimeout() {
 }
 
 void QuicTransportBase::scheduleD6DProbeTimeout() {
-  if (conn_->pendingEvents.scheduleD6DProbeTimeout) {
+  if (conn_->pendingEvents.d6d.scheduleProbeTimeout) {
     if (!d6dProbeTimeout_.isScheduled()) {
       VLOG(10) << __func__ << "timeout=" << conn_->d6d.probeTimeout.count()
                << "ms " << *this;
@@ -2546,7 +2548,7 @@ void QuicTransportBase::scheduleD6DProbeTimeout() {
 }
 
 void QuicTransportBase::scheduleD6DRaiseTimeout() {
-  if (conn_->pendingEvents.scheduleD6DRaiseTimeout) {
+  if (conn_->pendingEvents.d6d.scheduleRaiseTimeout) {
     if (!d6dRaiseTimeout_.isScheduled()) {
       VLOG(10) << __func__ << "timeout=" << conn_->d6d.raiseTimeout.count()
                << "s " << *this;

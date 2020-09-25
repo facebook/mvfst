@@ -2526,7 +2526,7 @@ TEST_F(QuicTransportFunctionsTest, WriteD6DProbesWithInplaceBuilder) {
   auto conn = createConn();
   conn->transportSettings.dataPathType = DataPathType::ContinuousMemory;
   conn->d6d.currentProbeSize = 1450;
-  conn->pendingEvents.sendD6DProbePacket = true;
+  conn->pendingEvents.d6d.sendProbePacket = true;
   auto simpleBufAccessor =
       std::make_unique<SimpleBufAccessor>(kDefaultMaxUDPPayload * 16);
   auto outputBuf = simpleBufAccessor->obtain();

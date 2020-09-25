@@ -1343,7 +1343,7 @@ uint64_t writeD6DProbeToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
-  if (!connection.pendingEvents.sendD6DProbePacket) {
+  if (!connection.pendingEvents.d6d.sendProbePacket) {
     return 0;
   }
   auto builder = ShortHeaderBuilder();
@@ -1373,7 +1373,7 @@ uint64_t writeD6DProbeToSocket(
                            << " writing d6d probes using scheduler=D6DScheduler"
                            << connection;
   if (written > 0) {
-    connection.pendingEvents.sendD6DProbePacket = false;
+    connection.pendingEvents.d6d.sendProbePacket = false;
   }
   return written;
 }

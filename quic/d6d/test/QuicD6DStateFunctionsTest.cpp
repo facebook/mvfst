@@ -50,11 +50,11 @@ class QuicD6DStateFunctionsTest : public Test {
     conn.d6d.state = fixture.stateBegin;
     conn.d6d.outstandingProbes = fixture.outstandingProbes;
     conn.d6d.currentProbeSize = fixture.currentProbeSizeBegin;
-    conn.pendingEvents.sendD6DProbePacket = fixture.sendProbeBegin;
+    conn.pendingEvents.d6d.sendProbePacket = fixture.sendProbeBegin;
     onD6DLastProbeLost(conn);
     EXPECT_EQ(conn.d6d.state, fixture.stateEnd);
     EXPECT_EQ(conn.d6d.currentProbeSize, fixture.currentProbeSizeEnd);
-    EXPECT_EQ(conn.pendingEvents.sendD6DProbePacket, fixture.sendProbeEnd);
+    EXPECT_EQ(conn.pendingEvents.d6d.sendProbePacket, fixture.sendProbeEnd);
   }
 };
 

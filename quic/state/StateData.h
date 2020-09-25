@@ -606,6 +606,20 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Whether or not we received a new packet before a write.
   bool receivedNewPacketBeforeWrite{false};
 
+  // D6D related events
+  struct PendingD6DEvents {
+    // If we should schedule/cancel d6d raise timeout, if it's not
+    // already scheduled/canceled
+    bool scheduleRaiseTimeout{false};
+
+    // If we should schedule/cancel d6d probe timeout, if it's not
+    // already scheduled/canceled
+    bool scheduleProbeTimeout{false};
+
+    // To send a d6d probe packet
+    bool sendProbePacket{false};
+  };
+
   struct PendingEvents {
     Resets resets;
 
@@ -619,14 +633,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // If we should schedule a new Ack timeout, if it's not already scheduled
     bool scheduleAckTimeout{false};
-
-    // If we should schedule/cancel d6d raise timeout, if it's not
-    // already scheduled/canceled
-    bool scheduleD6DRaiseTimeout{false};
-
-    // If we should schedule/cancel d6d probe timeout, if it's not
-    // already scheduled/canceled
-    bool scheduleD6DProbeTimeout{false};
 
     // Whether a connection level window update is due to send
     bool connWindowUpdate{false};
@@ -645,11 +651,11 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // To send a ping frame
     bool sendPing{false};
 
-    // To send a d6d probe packet
-    bool sendD6DProbePacket{false};
-
     // Do we need to send data blocked frame when connection is blocked.
     bool sendDataBlocked{false};
+
+    // D6D related events
+    PendingD6DEvents d6d;
 
     std::vector<KnobFrame> knobs;
   };

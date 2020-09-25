@@ -40,7 +40,7 @@ void onD6DRaiseTimeoutExpired(QuicConnectionStateBase& conn) {
   auto& d6d = conn.d6d;
   if (d6d.state == D6DMachineState::SEARCH_COMPLETE) {
     d6d.state = D6DMachineState::SEARCHING;
-    conn.pendingEvents.sendD6DProbePacket = true;
+    conn.pendingEvents.d6d.sendProbePacket = true;
   } else {
     LOG(ERROR) << "d6d: raise timeout expired in state: "
                << toString(d6d.state);
@@ -62,7 +62,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       CHECK(maybeNextProbeSize.hasValue());
       d6d.currentProbeSize = *maybeNextProbeSize;
       d6d.state = D6DMachineState::SEARCHING;
-      conn.pendingEvents.sendD6DProbePacket = true;
+      conn.pendingEvents.d6d.sendProbePacket = true;
       break;
     case D6DMachineState::SEARCHING:
       CHECK_GT(lastProbeSize, conn.udpSendPacketLen);
@@ -74,8 +74,8 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
         // raiser's internal upper bound, in both cases the search is
         // completed
         d6d.state = D6DMachineState::SEARCH_COMPLETE;
-        conn.pendingEvents.scheduleD6DRaiseTimeout = true;
-        conn.pendingEvents.scheduleD6DProbeTimeout = false;
+        conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
+        conn.pendingEvents.d6d.scheduleProbeTimeout = false;
       }
       break;
     case D6DMachineState::ERROR:
@@ -104,24 +104,24 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
         // connection prior to this state.
       }
       // In both BASE and ERROR state, we need to keep sending probes
-      conn.pendingEvents.sendD6DProbePacket = true;
+      conn.pendingEvents.d6d.sendProbePacket = true;
       break;
     case D6DMachineState::SEARCHING:
       if (d6d.outstandingProbes >= kDefaultD6DMaxOutstandingProbes) {
         // We've lost enough consecutive probes, which should indicate
         // that the upper bound is reached
         d6d.state = D6DMachineState::SEARCH_COMPLETE;
-        conn.pendingEvents.scheduleD6DRaiseTimeout = true;
+        conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
         return;
       }
       // Otherwise, the loss could be due to congestion, so we keep
       // sending probe
       // TODO: pace d6d probing when there's congestion
-      conn.pendingEvents.sendD6DProbePacket = true;
+      conn.pendingEvents.d6d.sendProbePacket = true;
       break;
     case D6DMachineState::ERROR:
       // Keep probing with min probe size
-      conn.pendingEvents.sendD6DProbePacket = true;
+      conn.pendingEvents.d6d.sendProbePacket = true;
       break;
     default:
       LOG(ERROR) << "d6d: probe timeout expired in state: "
@@ -161,7 +161,7 @@ void detectPMTUBlackhole(
     conn.udpSendPacketLen = d6d.basePMTU;
 
     // Cancel existing raise timeout if any
-    conn.pendingEvents.scheduleD6DRaiseTimeout = false;
+    conn.pendingEvents.d6d.scheduleRaiseTimeout = false;
   }
 }
 } // namespace quic
