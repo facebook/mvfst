@@ -10,7 +10,6 @@
 
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
-#include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -66,9 +65,7 @@ void ServerHandshake::writeNewSessionTicket(const AppToken& appToken) {
     inHandshakeStack_ = false;
   };
   inHandshakeStack_ = true;
-  fizz::WriteNewSessionTicket writeNST;
-  writeNST.appToken = encodeAppToken(appToken);
-  pendingEvents_.push_back(std::move(writeNST));
+  writeNewSessionTicketToCrypto(appToken);
   processPendingEvents();
   if (error_) {
     throw QuicTransportException(error_->first, error_->second);
@@ -244,12 +241,7 @@ void ServerHandshake::processPendingEvents() {
           processSocketData(appDataReadBuf_);
           break;
       }
-    } else if (!pendingEvents_.empty()) {
-      auto write = std::move(pendingEvents_.front());
-      pendingEvents_.pop_front();
-      startActions(
-          machine_.processWriteNewSessionTicket(state_, std::move(write)));
-    } else {
+    } else if (!processPendingCryptoEvent()) {
       actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);
       return;
     }
