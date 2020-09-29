@@ -184,14 +184,17 @@ void processAckFrame(
         ack.mrttSample =
             std::min(ack.mrttSample.value_or(rttSample), rttSample);
       }
-      conn.lossState.totalBytesAcked += rPacketIt->metadata.encodedSize;
-      conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
-      conn.lossState.totalBytesAckedAtLastAck = conn.lossState.totalBytesAcked;
-      if (!lastAckedPacketSentTime) {
-        lastAckedPacketSentTime = rPacketIt->metadata.time;
+      if (!ack.implicit) {
+        conn.lossState.totalBytesAcked += rPacketIt->metadata.encodedSize;
+        conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
+        conn.lossState.totalBytesAckedAtLastAck =
+            conn.lossState.totalBytesAcked;
+        if (!lastAckedPacketSentTime) {
+          lastAckedPacketSentTime = rPacketIt->metadata.time;
+        }
+        conn.lossState.lastAckedTime = ackReceiveTime;
+        conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       }
-      conn.lossState.lastAckedTime = ackReceiveTime;
-      conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       ack.ackedPackets.push_back(
           CongestionController::AckEvent::AckPacket::Builder()
               .setSentTime(rPacketIt->metadata.time)
