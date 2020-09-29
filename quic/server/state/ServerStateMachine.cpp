@@ -235,6 +235,9 @@ void processClientInitialParams(
 
         // Start from base
         conn.d6d.state = QuicConnectionStateBase::D6DMachineState::BASE;
+        conn.d6d.meta.lastNonSearchState =
+            QuicConnectionStateBase::D6DMachineState::DISABLED;
+        conn.d6d.meta.timeLastNonSearchState = Clock::now();
       } else {
         LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;
         // We treat base pmtu transport param as client's swich to activate d6d,

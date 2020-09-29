@@ -76,6 +76,20 @@ class WindowedCounter {
     return sampleTsVec_.size() == threshold_;
   }
 
+  /**
+   * Simple getter of window.
+   */
+  TimeDeltaT getWindow() {
+    return window_;
+  }
+
+  /**
+   * Simple getter of threshold
+   */
+  size_t getThreshold() {
+    return threshold_;
+  }
+
  private:
   /**
    * Insert the sampleTs to vector while maintaining order. Will add the

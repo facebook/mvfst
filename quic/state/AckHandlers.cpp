@@ -157,9 +157,11 @@ void processAckFrame(
       // trigger state change
       if (rPacketIt->metadata.isD6DProbe) {
         CHECK(conn.d6d.lastProbe);
-        if (!rPacketIt->declaredLost &&
-            currentPacketNum == conn.d6d.lastProbe->packetNum) {
-          onD6DLastProbeAcked(conn);
+        if (!rPacketIt->declaredLost) {
+          ++conn.d6d.meta.totalAckedProbes;
+          if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
+            onD6DLastProbeAcked(conn);
+          }
         }
       }
       // Only invoke AckVisitor if the packet doesn't have an associated

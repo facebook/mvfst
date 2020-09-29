@@ -685,6 +685,7 @@ void updateConnection(
       conn.lossState.inflightBytes);
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
+    ++conn.d6d.meta.totalTxedProbes;
   }
   pkt.isAppLimited = conn.congestionController
       ? conn.congestionController->isAppLimited()

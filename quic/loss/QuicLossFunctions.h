@@ -241,11 +241,13 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       CHECK(conn.d6d.lastProbe.hasValue());
       // Check the decalredLost field first, to avoid double counting
       // the lost probe since we don't erase them from op list yet
-      if (!pkt.declaredLost &&
-          currentPacketNum == conn.d6d.lastProbe->packetNum) {
-        conn.outstandings.declaredLostCount++;
+      if (!pkt.declaredLost) {
+        ++conn.outstandings.declaredLostCount;
         pkt.declaredLost = true;
-        onD6DLastProbeLost(conn);
+        ++conn.d6d.meta.totalLostProbes;
+        if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
+          onD6DLastProbeLost(conn);
+        }
       }
       iter++;
       continue;

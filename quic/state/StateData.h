@@ -789,16 +789,35 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // https://tools.ietf.org/id/draft-ietf-tsvwg-datagram-plpmtud-21.html#name-state-machine
   enum class D6DMachineState : uint8_t {
     // Connection is not established yet
-    DISABLED,
+    DISABLED = 0,
     // Probe using base pmtu
-    BASE,
+    BASE = 1,
     // Incrementally probe using larger pmtu
-    SEARCHING,
+    SEARCHING = 2,
     // Sleep for raise timeout before going to SEARCHING
-    SEARCH_COMPLETE,
+    SEARCH_COMPLETE = 3,
     // Effective pmtu is less than base pmtu, continue probing with smaller
     // packet
-    ERROR
+    ERROR = 4
+  };
+
+  // Meta state of d6d, mostly useful for analytics. D6D can operate without it.
+  struct D6DMetaState {
+    // Cumulative count of acked packets
+    uint64_t totalAckedProbes{0};
+
+    // Cumulative count of lost packets
+    uint64_t totalLostProbes{0};
+
+    // Cumulative count of transmitted packets
+    uint64_t totalTxedProbes{0};
+
+    // Timepoint of when d6d reaches a non-search state
+    // this helps us understand the convergence speed
+    TimePoint timeLastNonSearchState;
+
+    // Last non-search state
+    D6DMachineState lastNonSearchState;
   };
 
   struct D6DState {
@@ -832,6 +851,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // ThresholdCounter to help detect PMTU blackhole
     std::unique_ptr<WindowedCounter<uint64_t, uint64_t>> thresholdCounter{
         nullptr};
+
+    // Meta state
+    D6DMetaState meta;
   };
 
   D6DState d6d;
