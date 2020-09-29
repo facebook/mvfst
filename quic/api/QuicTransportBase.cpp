@@ -1621,8 +1621,13 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
 
 void QuicTransportBase::handleKnobCallbacks() {
   for (auto& knobFrame : conn_->pendingEvents.knobs) {
-    connCallback_->onKnob(
-        knobFrame.knobSpace, knobFrame.id, std::move(knobFrame.blob));
+    if (knobFrame.knobSpace != kDefaultQuicTransportKnobSpace) {
+      connCallback_->onKnob(
+          knobFrame.knobSpace, knobFrame.id, std::move(knobFrame.blob));
+    } else {
+      // KnobId is ignored
+      onTransportKnobs(std::move(knobFrame.blob));
+    }
   }
   conn_->pendingEvents.knobs.clear();
 }
@@ -3069,6 +3074,14 @@ const QuicTransportBase::ByteEventMap& QuicTransportBase::getByteEventMapConst(
   }
   LOG(FATAL) << "Unhandled case in getByteEventMapConst";
   folly::assume_unreachable();
+}
+
+void QuicTransportBase::onTransportKnobs(Buf knobBlob) {
+  // Not yet implemented,
+  VLOG(4) << "Received transport knobs: "
+          << std::string(
+                 reinterpret_cast<const char*>(knobBlob->data()),
+                 knobBlob->length());
 }
 
 } // namespace quic

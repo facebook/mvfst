@@ -213,6 +213,12 @@ class QuicClientTransport
   void adjustGROBuffers();
   void trackDatagramReceived(size_t len);
 
+  /**
+   * Send quic transport knobs defined by transportSettings.knobs to peer. This
+   * calls setKnobs() internally.
+   */
+  void maybeSendTransportKnobs();
+
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned
   // up when the caller invokes a terminal call to the transport.
@@ -227,5 +233,7 @@ class QuicClientTransport
   // supports GRO. otherwise kDefaultNumGROBuffers
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   RecvmmsgStorage recvmmsgStorage_;
+  // We will only send transport knobs once, this flag keeps track of it
+  bool transportKnobsSent_{false};
 };
 } // namespace quic

@@ -685,6 +685,8 @@ void QuicClientTransport::onReadData(
     socket_->setErrMessageCallback(nullptr);
     connCallback_->onReplaySafe();
   }
+
+  maybeSendTransportKnobs();
 }
 
 void QuicClientTransport::writeData() {
@@ -1684,6 +1686,23 @@ void QuicClientTransport::trackDatagramReceived(size_t len) {
   }
   QUIC_STATS(statsCallback_, onPacketReceived);
   QUIC_STATS(statsCallback_, onRead, len);
+}
+
+void QuicClientTransport::maybeSendTransportKnobs() {
+  if (!transportKnobsSent_ && hasWriteCipher()) {
+    for (const auto& knob : conn_->transportSettings.knobs) {
+      auto res =
+          setKnob(knob.space, knob.id, folly::IOBuf::copyBuffer(knob.blob));
+      if (res.hasError()) {
+        if (res.error() != LocalErrorCode::KNOB_FRAME_UNSUPPORTED) {
+          LOG(ERROR) << "Unexpected error while sending knob frames";
+        }
+        // No point in keep trying if transport does not support knob frame
+        break;
+      }
+    }
+    transportKnobsSent_ = true;
+  }
 }
 
 } // namespace quic

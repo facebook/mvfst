@@ -726,6 +726,11 @@ class QuicTransportBase : public QuicSocket {
   void scheduleD6DProbeTimeout();
   void scheduleD6DTxTimeout();
 
+  /**
+   * Callback when we receive a transport knob
+   */
+  void onTransportKnobs(Buf knobBlob);
+
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
         : offset(offsetIn), callback(callbackIn) {}
