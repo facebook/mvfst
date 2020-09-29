@@ -3988,7 +3988,6 @@ TEST_P(
   }
   EXPECT_EQ(
       server->getConn().qLogger->scid, server->getConn().serverConnectionId);
-  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 TEST_P(
@@ -4020,7 +4019,6 @@ TEST_P(
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
   EXPECT_EQ(
       server->getConn().qLogger->scid, server->getConn().serverConnectionId);
-  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 TEST_P(
@@ -4082,7 +4080,6 @@ TEST_P(
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
   EXPECT_EQ(
       server->getConn().qLogger->scid, server->getConn().serverConnectionId);
-  EXPECT_EQ(server->getConn().qLogger->dcid, clientConnectionId);
 }
 
 /**

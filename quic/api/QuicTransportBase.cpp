@@ -94,6 +94,12 @@ void QuicTransportBase::setQLogger(std::shared_ptr<QLogger> qLogger) {
 
   if (qLogger) {
     conn_->qLogger = std::move(qLogger);
+    conn_->qLogger->setDcid(conn_->clientChosenDestConnectionId);
+    if (conn_->nodeType == QuicNodeType::Server) {
+      conn_->qLogger->setScid(conn_->serverConnectionId);
+    } else {
+      conn_->qLogger->setScid(conn_->clientConnectionId);
+    }
     qlogRefcnt_++;
   } else {
     if (conn_->qLogger) {

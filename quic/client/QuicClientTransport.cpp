@@ -55,8 +55,13 @@ QuicClientTransport::QuicClientTransport(
   conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
   clientConn_->initialDestinationConnectionId =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
+  conn_->clientChosenDestConnectionId =
+      clientConn_->initialDestinationConnectionId;
   VLOG(4) << "initial dcid: "
           << clientConn_->initialDestinationConnectionId->hex();
+  if (conn_->qLogger) {
+    conn_->qLogger->setDcid(conn_->clientChosenDestConnectionId);
+  }
 
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent, conn_->originalVersion.value()));
@@ -1628,15 +1633,6 @@ void QuicClientTransport::setSupportedVersions(
   auto params = conn_->readCodec->getCodecParameters();
   params.version = conn_->originalVersion.value();
   conn_->readCodec->setCodecParameters(params);
-}
-
-void QuicClientTransport::setQLogger(std::shared_ptr<QLogger> qLogger) {
-  // TODO: For a client transport, client CID isn't dcid. But FileQLogger will
-  // use dcid as file name.
-  if (qLogger) {
-    qLogger->setDcid(conn_->clientConnectionId);
-  }
-  QuicTransportBase::setQLogger(std::move(qLogger));
 }
 
 void QuicClientTransport::onNetworkSwitch(

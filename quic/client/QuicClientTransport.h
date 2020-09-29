@@ -129,8 +129,6 @@ class QuicClientTransport
   bool setCustomTransportParameter(
       std::unique_ptr<CustomTransportParameter> customParam);
 
-  void setQLogger(std::shared_ptr<QLogger> qLogger) override;
-
   void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket> newSock) override;
 
   /**

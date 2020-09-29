@@ -1978,7 +1978,8 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
   client->setQLogger(nullptr);
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
 
-  EXPECT_CALL(*mockQLogger, setDcid(client->getConn().clientConnectionId));
+  EXPECT_CALL(
+      *mockQLogger, setDcid(client->getConn().clientChosenDestConnectionId));
   client->setQLogger(mockQLogger);
   client->closeNow(folly::none);
 }
@@ -1986,9 +1987,8 @@ TEST_F(QuicClientTransportTest, SetQLoggerDcid) {
 TEST_F(QuicClientTransportTest, CheckQLoggerRefCount) {
   auto mockQLogger1 = std::make_shared<MockQLogger>(VantagePoint::Client);
   auto mockQLogger2 = std::make_shared<MockQLogger>(VantagePoint::Client);
-  EXPECT_CALL(*mockQLogger1, setDcid(client->getConn().clientConnectionId))
-      .Times(AtLeast(1));
-  EXPECT_CALL(*mockQLogger2, setDcid(client->getConn().clientConnectionId))
+  EXPECT_CALL(
+      *mockQLogger2, setDcid(client->getConn().clientChosenDestConnectionId))
       .Times(AtLeast(1));
 
   // no-op
