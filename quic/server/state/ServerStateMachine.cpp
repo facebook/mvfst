@@ -234,9 +234,8 @@ void processClientInitialParams(
         VLOG(10) << "conn.d6d.basePMTU=" << conn.d6d.basePMTU;
 
         // Start from base
-        conn.d6d.state = QuicConnectionStateBase::D6DMachineState::BASE;
-        conn.d6d.meta.lastNonSearchState =
-            QuicConnectionStateBase::D6DMachineState::DISABLED;
+        conn.d6d.state = D6DMachineState::BASE;
+        conn.d6d.meta.lastNonSearchState = D6DMachineState::DISABLED;
         conn.d6d.meta.timeLastNonSearchState = Clock::now();
       } else {
         LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;

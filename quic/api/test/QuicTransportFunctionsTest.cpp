@@ -364,7 +364,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNotConsumeSendPing) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(PingFrame());
   auto packetNum = packet.packet.header.getPacketSequenceNum();
-  conn->d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(packetNum, 50);
+  conn->d6d.lastProbe = D6DProbePacket(packetNum, 50);
   updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(conn->outstandings.packets.front().metadata.isD6DProbe);

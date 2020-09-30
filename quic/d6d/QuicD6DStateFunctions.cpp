@@ -10,28 +10,6 @@
 
 namespace quic {
 
-namespace {
-using D6DMachineState = QuicConnectionStateBase::D6DMachineState;
-
-std::string toString(
-    const ::quic::QuicConnectionStateBase::D6DMachineState state) {
-  switch (state) {
-    case D6DMachineState::DISABLED:
-      return "DISABLED";
-    case D6DMachineState::BASE:
-      return "BASE";
-    case D6DMachineState::SEARCHING:
-      return "SEARCHING";
-    case D6DMachineState::SEARCH_COMPLETE:
-      return "SEARCH_COMPLETE";
-    case D6DMachineState::ERROR:
-      return "ERROR";
-  }
-  folly::assume_unreachable();
-}
-
-} // namespace
-
 inline void scheduleProbeAfterDelay(
     QuicConnectionStateBase& conn,
     std::chrono::milliseconds delay) {

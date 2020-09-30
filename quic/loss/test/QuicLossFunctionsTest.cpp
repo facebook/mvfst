@@ -33,10 +33,6 @@ using namespace folly;
 namespace quic {
 namespace test {
 
-namespace {
-using D6DMachineState = QuicConnectionStateBase::D6DMachineState;
-} // namespace
-
 class MockLossTimeout {
  public:
   MOCK_METHOD0(cancelLossTimeout, void());
@@ -265,8 +261,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   conn.pendingEvents.setLossDetectionAlarm = true;
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
-    conn.d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
-        encodedSize, conn.lossState.largestSent.value());
+    conn.d6d.lastProbe =
+        D6DProbePacket(encodedSize, conn.lossState.largestSent.value());
   }
   return conn.lossState.largestSent.value();
 }
@@ -377,8 +373,8 @@ struct PMTUBlackholeDetectionTestFixture {
   std::chrono::microseconds detectLossTimeDelta;
   std::chrono::microseconds largestLostTimeDelta;
   std::chrono::microseconds smallestLostTimeDelta;
-  QuicConnectionStateBase::D6DMachineState beginState;
-  QuicConnectionStateBase::D6DMachineState endState;
+  D6DMachineState beginState;
+  D6DMachineState endState;
 
   struct PacketSpec {
     std::chrono::microseconds timeDelta;
@@ -394,7 +390,7 @@ void QuicLossFunctionsTest::runDetectPMTUBlackholeTest(
   // 0 rtt means all packets are automatically lost upon sending
   conn->lossState.srtt = 0s;
   conn->lossState.lrtt = 0s;
-  conn->d6d.state = QuicConnectionStateBase::D6DMachineState::BASE;
+  conn->d6d.state = D6DMachineState::BASE;
   conn->d6d.currentProbeSize = fixture.beginPMTU;
   conn->udpSendPacketLen = fixture.beginPMTU;
   conn->d6d.thresholdCounter =

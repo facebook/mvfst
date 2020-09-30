@@ -727,7 +727,7 @@ SchedulingResult D6DProbeScheduler::scheduleFramesForPacket(
       << " seq: " << conn_.d6d.lastProbe->packetNum
       << " packet size: " << conn_.d6d.lastProbe->packetSize;
 
-  conn_.d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+  conn_.d6d.lastProbe = D6DProbePacket(
       resultPacket.packet.header.getPacketSequenceNum(), probeSize_);
 
   probeSent_ = true;

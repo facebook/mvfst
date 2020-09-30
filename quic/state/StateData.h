@@ -772,35 +772,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   HappyEyeballsState happyEyeballsState;
 
-  struct D6DProbePacket {
-    D6DProbePacket() = delete;
-
-    explicit D6DProbePacket(PacketNum packetNumIn, uint32_t packetSizeIn)
-        : packetNum(packetNumIn), packetSize(packetSizeIn) {}
-
-    // Packet num
-    PacketNum packetNum;
-
-    // Udp packet payload size
-    uint32_t packetSize;
-  };
-
-  // States of d6d state machine, see
-  // https://tools.ietf.org/id/draft-ietf-tsvwg-datagram-plpmtud-21.html#name-state-machine
-  enum class D6DMachineState : uint8_t {
-    // Connection is not established yet
-    DISABLED = 0,
-    // Probe using base pmtu
-    BASE = 1,
-    // Incrementally probe using larger pmtu
-    SEARCHING = 2,
-    // Sleep for raise timeout before going to SEARCHING
-    SEARCH_COMPLETE = 3,
-    // Effective pmtu is less than base pmtu, continue probing with smaller
-    // packet
-    ERROR = 4
-  };
-
   // Meta state of d6d, mostly useful for analytics. D6D can operate without it.
   struct D6DMetaState {
     // Cumulative count of acked packets

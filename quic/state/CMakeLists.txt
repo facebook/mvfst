@@ -32,6 +32,7 @@ add_dependencies(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
+  mvfst_d6d_types
   mvfst_d6d_probe_raiser
 )
 
@@ -44,6 +45,7 @@ target_link_libraries(
   mvfst_codec
   mvfst_codec_types
   mvfst_handshake
+  mvfst_d6d_types
   mvfst_d6d_probe_raiser
 )
 

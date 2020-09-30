@@ -513,16 +513,16 @@ void QuicServerTransport::maybeNotifyTransportReady() {
 
 void QuicServerTransport::maybeStartD6DProbing() {
   if (!d6dProbingStarted_ && hasReadCipher() &&
-      conn_->d6d.state == QuicConnectionStateBase::D6DMachineState::BASE) {
+      conn_->d6d.state == D6DMachineState::BASE) {
     QUIC_TRACE(fst_trace, *conn_, "start d6d probing");
     d6dProbingStarted_ = true;
     auto& d6d = conn_->d6d;
     switch (conn_->transportSettings.d6dConfig.raiserType) {
-      case D6DConfig::ProbeSizeRaiserType::ConstantStep:
+      case ProbeSizeRaiserType::ConstantStep:
         d6d.raiser = std::make_unique<ConstantStepProbeSizeRaiser>(
             conn_->transportSettings.d6dConfig.probeRaiserConstantStepSize);
         break;
-      case D6DConfig::ProbeSizeRaiserType::BinarySearch:
+      case ProbeSizeRaiserType::BinarySearch:
         d6d.raiser = std::make_unique<BinarySearchProbeSizeRaiser>(
             kMinMaxUDPPayload, d6d.maxPMTU);
     }

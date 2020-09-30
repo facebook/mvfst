@@ -19,10 +19,6 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-namespace {
-using D6DMachineState = QuicConnectionStateBase::D6DMachineState;
-} // namespace
-
 struct D6DProbeLostTestFixture {
   D6DMachineState stateBegin;
   D6DMachineState stateEnd;
@@ -149,7 +145,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInBase) {
       false,
       true,
       d6d.currentProbeSize);
-  d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+  d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
@@ -177,7 +173,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingOne) {
       false,
       true,
       d6d.currentProbeSize);
-  d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+  d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
@@ -205,7 +201,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingMax) {
       false,
       true,
       d6d.currentProbeSize);
-  d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+  d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
@@ -232,7 +228,7 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInError) {
       false,
       true,
       d6d.currentProbeSize);
-  d6d.lastProbe = QuicConnectionStateBase::D6DProbePacket(
+  d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
   auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
