@@ -147,9 +147,10 @@ void processAckFrame(
         InstrumentationObserver::PacketRTT packetRTT(
             ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
         for (const auto& observer : conn.instrumentationObservers_) {
-          conn.pendingCallbacks.emplace_back([observer, packetRTT] {
-            observer->rttSampleGenerated(packetRTT);
-          });
+          conn.pendingCallbacks.emplace_back(
+              [observer, packetRTT](QuicSocket* qSocket) {
+                observer->rttSampleGenerated(qSocket, packetRTT);
+              });
         }
         updateRtt(conn, rttSample, frame.ackDelay);
       }

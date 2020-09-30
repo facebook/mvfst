@@ -907,7 +907,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   InstrumentationObserverVec instrumentationObservers_;
 
   // queue of functions to be called in processCallbacksAfterNetworkData
-  std::vector<std::function<void()>> pendingCallbacks;
+  std::vector<std::function<void(QuicSocket*)>> pendingCallbacks;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

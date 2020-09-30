@@ -1662,7 +1662,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
 
   // to call any callbacks added for observers
   for (const auto& callback : conn_->pendingCallbacks) {
-    callback();
+    callback(this);
   }
   conn_->pendingCallbacks.clear();
 

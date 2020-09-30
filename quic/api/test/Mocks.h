@@ -326,13 +326,18 @@ class MockInstrumentationObserver : public InstrumentationObserver {
  public:
   GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , appRateLimited, void(QuicSocket*));
-  GMOCK_METHOD1_(
+  GMOCK_METHOD2_(
       ,
       noexcept,
       ,
       packetLossDetected,
-      void(const ObserverLossEvent&));
-  GMOCK_METHOD1_(, noexcept, , rttSampleGenerated, void(const PacketRTT&));
+      void(QuicSocket*, const ObserverLossEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      rttSampleGenerated,
+      void(QuicSocket*, const PacketRTT&));
 
   static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
     return AllOf(

@@ -93,18 +93,23 @@ class InstrumentationObserver {
   /**
    * packetLossDetected() is invoked when a packet loss is detected.
    *
+   * @param socket   Socket when the callback is processed.
    * @param packet   const reference to the packet that was determined to be
    * lost.
    */
   virtual void packetLossDetected(
+      QuicSocket*, /* socket */
       const struct ObserverLossEvent& /* lossEvent */) {}
 
   /**
    * rttSampleGenerated() is invoked when a RTT sample is made.
    *
-   * @param packet   const reference to the packet with the RTT
+   * @param socket   Socket when the callback is processed.
+   * @param packet   const reference to the packet with the RTT.
    */
-  virtual void rttSampleGenerated(const PacketRTT& /* RTT sample */) {}
+  virtual void rttSampleGenerated(
+      QuicSocket*, /* socket */
+      const PacketRTT& /* RTT sample */) {}
 };
 
 // Container for instrumentation observers.

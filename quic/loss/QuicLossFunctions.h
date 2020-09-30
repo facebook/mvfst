@@ -291,9 +291,10 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   // if there are observers, enqueue a function to call it
   if (observerLossEvent.hasPackets()) {
     for (const auto& observer : conn.instrumentationObservers_) {
-      conn.pendingCallbacks.emplace_back([observer, observerLossEvent] {
-        observer->packetLossDetected(observerLossEvent);
-      });
+      conn.pendingCallbacks.emplace_back(
+          [observer, observerLossEvent](QuicSocket* qSocket) {
+            observer->packetLossDetected(qSocket, observerLossEvent);
+          });
     }
   }
 
