@@ -86,6 +86,8 @@ class QuicTransportStatsCallback {
 
   virtual void onPacketSpuriousLoss() = 0;
 
+  virtual void onPersistentCongestion() = 0;
+
   virtual void onPacketDropped(PacketDropReason reason) = 0;
 
   virtual void onPacketForwarded() = 0;

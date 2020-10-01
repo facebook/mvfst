@@ -252,6 +252,9 @@ void processAckFrame(
           conn,
           *lossEvent->smallestLostSentTime,
           *lossEvent->largestLostSentTime);
+      if (lossEvent->persistentCongestion) {
+        QUIC_STATS(conn.statsCallback, onPersistentCongestion);
+      }
     }
     conn.congestionController->onPacketAckOrLoss(
         std::move(ack), std::move(lossEvent));
