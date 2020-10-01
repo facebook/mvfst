@@ -338,6 +338,18 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       rttSampleGenerated,
       void(QuicSocket*, const PacketRTT&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      pmtuBlackholeDetected,
+      void(QuicSocket*, const PMTUBlackholeEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      pmtuUpperBoundDetected,
+      void(QuicSocket*, const PMTUUpperBoundEvent&));
 
   static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
     return AllOf(

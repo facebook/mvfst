@@ -16,6 +16,67 @@ inline void scheduleProbeAfterDelay(
   conn.pendingEvents.d6d.sendProbeDelay = delay;
 }
 
+/**
+ * A helper function that reports PMTU Upper Bound event.
+ * Returns the event timestamp
+ */
+static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
+  auto& d6d = conn.d6d;
+  const auto lastProbeSize = d6d.lastProbe->packetSize;
+  const auto now = Clock::now();
+  if (conn.instrumentationObservers_.size() > 0) {
+    InstrumentationObserver::PMTUUpperBoundEvent upperBoundEvent(
+        now,
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            now - d6d.meta.timeLastNonSearchState),
+        d6d.meta.lastNonSearchState,
+        lastProbeSize,
+        d6d.meta.totalTxedProbes,
+        conn.transportSettings.d6dConfig.raiserType);
+    // enqueue a function for every observer to invoke callback
+    for (const auto& observer : conn.instrumentationObservers_) {
+      conn.pendingCallbacks.emplace_back(
+          [observer, upperBoundEvent](QuicSocket* qSocket) {
+            observer->pmtuUpperBoundDetected(qSocket, upperBoundEvent);
+          });
+    }
+  }
+  return now;
+}
+
+/**
+ * Helper function that reports PMTU blackhole event.
+ * Returns the event timestamp
+ */
+static TimePoint reportBlackhole(
+    QuicConnectionStateBase& conn,
+    const OutstandingPacket& packet) {
+  auto& d6d = conn.d6d;
+  const auto now = Clock::now();
+  if (conn.instrumentationObservers_.size() > 0) {
+    InstrumentationObserver::PMTUBlackholeEvent blackholeEvent(
+        now,
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            now - d6d.meta.timeLastNonSearchState),
+        d6d.meta.lastNonSearchState,
+        d6d.state,
+        conn.udpSendPacketLen,
+        d6d.lastProbe->packetSize,
+        d6d.thresholdCounter->getWindow(),
+        d6d.thresholdCounter->getThreshold(),
+        packet);
+
+    // If there are observers, enqueue a function to invoke callback
+    for (const auto& observer : conn.instrumentationObservers_) {
+      conn.pendingCallbacks.emplace_back(
+          [observer, blackholeEvent](QuicSocket* qSocket) {
+            observer->pmtuBlackholeDetected(qSocket, blackholeEvent);
+          });
+    }
+  }
+  return now;
+}
+
 void onD6DProbeTimeoutExpired(QuicConnectionStateBase& conn) {
   onD6DLastProbeLost(conn);
 }
@@ -46,6 +107,8 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       CHECK(maybeNextProbeSize.hasValue());
       d6d.currentProbeSize = *maybeNextProbeSize;
       d6d.state = D6DMachineState::SEARCHING;
+      d6d.meta.lastNonSearchState = D6DMachineState::BASE;
+      d6d.meta.timeLastNonSearchState = Clock::now();
       scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       break;
     case D6DMachineState::SEARCHING:
@@ -67,6 +130,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
         d6d.state = D6DMachineState::SEARCH_COMPLETE;
         conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
         conn.pendingEvents.d6d.scheduleProbeTimeout = false;
+        reportUpperBound(conn);
       }
       break;
     case D6DMachineState::ERROR:
@@ -74,6 +138,8 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       // We should try sending base pmtu-sized packet now.
       d6d.currentProbeSize = d6d.basePMTU;
       d6d.state = D6DMachineState::BASE;
+      d6d.meta.lastNonSearchState = D6DMachineState::ERROR;
+      d6d.meta.timeLastNonSearchState = Clock::now();
       scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       break;
     default:
@@ -90,6 +156,8 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
         // remedy is to probe much smaller
         d6d.state = D6DMachineState::ERROR;
         d6d.currentProbeSize = kMinMaxUDPPayload;
+        d6d.meta.lastNonSearchState = D6DMachineState::BASE;
+        d6d.meta.timeLastNonSearchState = Clock::now();
 
         // TODO: reduce udpSendPacketLen below base once we can trust
         // this signal. Currently assuming quic is going to terminate
@@ -104,6 +172,8 @@ void onD6DLastProbeLost(QuicConnectionStateBase& conn) {
         // that the upper bound is reached
         d6d.state = D6DMachineState::SEARCH_COMPLETE;
         conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
+        conn.pendingEvents.d6d.scheduleProbeTimeout = false;
+        reportUpperBound(conn);
         return;
       }
       // Otherwise, the loss could be due to congestion, so we keep
@@ -149,10 +219,15 @@ void detectPMTUBlackhole(
               .count())) {
     LOG(ERROR) << "PMTU blackhole detected on packet loss, reducing PMTU from "
                << conn.udpSendPacketLen << " to base " << d6d.basePMTU;
+
+    auto eventTime = reportBlackhole(conn, packet);
+    if (d6d.state != D6DMachineState::SEARCHING) {
+      d6d.meta.lastNonSearchState = d6d.state;
+      d6d.meta.timeLastNonSearchState = eventTime;
+    }
     d6d.state = D6DMachineState::BASE;
     d6d.currentProbeSize = d6d.basePMTU;
     conn.udpSendPacketLen = d6d.basePMTU;
-
     // Cancel existing raise timeout if any
     conn.pendingEvents.d6d.scheduleRaiseTimeout = false;
   }
