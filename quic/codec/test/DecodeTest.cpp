@@ -14,6 +14,7 @@
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
+#include <ctime>
 
 using namespace testing;
 
@@ -741,7 +742,12 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   ConnectionId odcid = getTestConnectionId();
   folly::IPAddress clientIp("109.115.3.49");
   uint16_t clientPort = 42069;
-  RetryToken retryToken(odcid, clientIp, clientPort);
+  uint64_t timestampInMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
+
+  RetryToken retryToken(odcid, clientIp, clientPort, timestampInMs);
   Buf plaintextRetryToken = retryToken.getPlaintextToken();
 
   folly::io::Cursor cursor(plaintextRetryToken.get());
@@ -751,6 +757,7 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   EXPECT_EQ(parseResult->originalDstConnId, odcid);
   EXPECT_EQ(parseResult->clientIp, clientIp);
   EXPECT_EQ(parseResult->clientPort, clientPort);
+  EXPECT_EQ(parseResult->timestampInMs, timestampInMs);
 }
 
 TEST_F(DecodeTest, ParsePlaintextRetryTokenMalformed) {

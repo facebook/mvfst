@@ -616,10 +616,12 @@ struct RetryToken {
   RetryToken(
       ConnectionId originalDstConnIdIn,
       folly::IPAddress clientIpIn,
-      uint16_t clientPortIn)
+      uint16_t clientPortIn,
+      uint64_t timestampInMsIn)
       : originalDstConnId(originalDstConnIdIn),
         clientIp(clientIpIn),
-        clientPort(clientPortIn) {}
+        clientPort(clientPortIn),
+        timestampInMs(timestampInMsIn) {}
 
   // We serialize the members to obtain a plaintext token.
   // This token is encrypted before it's placed in the outgoing
@@ -629,6 +631,7 @@ struct RetryToken {
   ConnectionId originalDstConnId;
   folly::IPAddress clientIp;
   uint16_t clientPort;
+  uint64_t timestampInMs;
 };
 
 #define QUIC_SIMPLE_FRAME(F, ...)         \

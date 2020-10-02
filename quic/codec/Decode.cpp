@@ -713,7 +713,13 @@ folly::Expected<RetryToken, TransportErrorCode> parsePlaintextRetryToken(
     return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
   }
 
-  return RetryToken(connId, *ipAddress, clientPort);
+  // Read in the timestamp
+  if (!cursor.canAdvance(sizeof(uint64_t))) {
+    return folly::makeUnexpected(TransportErrorCode::INVALID_TOKEN);
+  }
+  auto timestampInMs = cursor.readBE<uint64_t>();
+
+  return RetryToken(connId, *ipAddress, clientPort, timestampInMs);
 }
 
 QuicFrame parseFrame(

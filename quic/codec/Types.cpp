@@ -309,7 +309,7 @@ StreamTypeField StreamTypeField::Builder::build() {
 
 Buf RetryToken::getPlaintextToken() {
   // The plaintext token consists of the following:
-  // len(odcid) || odcid || port || ipaddr_len || ipaddr
+  // len(odcid) || odcid || port || ipaddr_len || ipaddr || timestamp
   auto buf = std::make_unique<folly::IOBuf>();
   folly::io::Appender appender(buf.get(), 20);
 
@@ -330,6 +330,9 @@ Buf RetryToken::getPlaintextToken() {
 
   // Write the ipaddr
   appender.push((const uint8_t*)clientIpStr.data(), clientIpStr.size());
+
+  // Write the timestamp
+  appender.writeBE<uint64_t>(timestampInMs);
 
   return buf;
 }
