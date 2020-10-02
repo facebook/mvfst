@@ -99,7 +99,8 @@ void ClientHandshake::doHandshake(
 }
 
 void ClientHandshake::handshakeConfirmed() {
-  if (phase_ != Phase::OneRttKeysDerived) {
+  if (phase_ != Phase::OneRttKeysDerived &&
+      *conn_->version != QuicVersion::MVFST_D24) {
     if (phase_ == Phase::Established) {
       LOG(WARNING) << "Handshake was already established";
     } else {
