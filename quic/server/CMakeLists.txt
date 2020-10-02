@@ -15,6 +15,7 @@ add_library(
   handshake/ServerHandshake.cpp
   handshake/AppToken.cpp
   handshake/DefaultAppTokenValidator.cpp
+  handshake/RetryTokenGenerator.cpp
   handshake/StatelessResetGenerator.cpp
   state/ServerStateMachine.cpp
 

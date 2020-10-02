@@ -11,6 +11,7 @@ quic_add_test(TARGET ServerHandshakeTest
   SOURCES
   AppTokenTest.cpp
   DefaultAppTokenValidatorTest.cpp
+  RetryTokenGeneratorTest.cpp
   ServerHandshakeTest.cpp
   ServerTransportParametersTest.cpp
   StatelessResetGeneratorTest.cpp
