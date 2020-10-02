@@ -210,6 +210,9 @@ struct TransportSettings {
   // default stateless reset secret for stateless reset token
   folly::Optional<std::array<uint8_t, kStatelessResetTokenSecretLength>>
       statelessResetTokenSecret;
+  // retry token secret used for encryption/decryption
+  folly::Optional<std::array<uint8_t, kRetryTokenSecretLength>>
+      retryTokenSecret;
   // Default initial RTT
   std::chrono::microseconds initialRtt{kDefaultInitialRtt};
   // The active_connection_id_limit that is sent to the peer.
