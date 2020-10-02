@@ -536,6 +536,7 @@ void QuicServerTransport::maybeStartD6DProbing() {
     // connections, for which probing is relatively expensive and less
     // valuable
     conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
+    QUIC_STATS(conn_->statsCallback, onConnectionD6DStarted);
   }
 }
 

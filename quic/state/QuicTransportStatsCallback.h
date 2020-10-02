@@ -136,6 +136,15 @@ class QuicTransportStatsCallback {
 
   virtual void onUDPSocketWriteError(SocketErrorType errorType) = 0;
 
+  virtual void onConnectionD6DStarted() = 0;
+
+  virtual void onConnectionPMTURaised() = 0;
+
+  virtual void onConnectionPMTUBlackholeDetected(
+      uint64_t pmtuAtBlackholeTime) = 0;
+
+  virtual void onConnectionPMTUUpperBoundDetected(uint64_t pmtuUpperBound) = 0;
+
   static const char* toString(ConnectionCloseReason reason) {
     switch (reason) {
       case ConnectionCloseReason::NONE:

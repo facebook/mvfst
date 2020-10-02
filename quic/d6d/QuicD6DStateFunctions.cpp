@@ -24,6 +24,9 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
   auto& d6d = conn.d6d;
   const auto lastProbeSize = d6d.lastProbe->packetSize;
   const auto now = Clock::now();
+
+  QUIC_STATS(
+      conn.statsCallback, onConnectionPMTUUpperBoundDetected, lastProbeSize);
   if (conn.instrumentationObservers_.size() > 0) {
     InstrumentationObserver::PMTUUpperBoundEvent upperBoundEvent(
         now,
@@ -51,6 +54,10 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
 static TimePoint reportBlackhole(
     QuicConnectionStateBase& conn,
     const OutstandingPacket& packet) {
+  QUIC_STATS(
+      conn.statsCallback,
+      onConnectionPMTUBlackholeDetected,
+      packet.metadata.encodedSize);
   auto& d6d = conn.d6d;
   const auto now = Clock::now();
   if (conn.instrumentationObservers_.size() > 0) {
@@ -117,6 +124,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
         LOG(ERROR) << "D6D lastProbeSize <= udpSendPacketLen";
         return;
       }
+      QUIC_STATS(conn.statsCallback, onConnectionPMTURaised);
       conn.udpSendPacketLen = lastProbeSize;
       if (maybeNextProbeSize.hasValue() &&
           *maybeNextProbeSize > conn.udpSendPacketLen &&

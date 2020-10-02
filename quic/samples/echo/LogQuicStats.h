@@ -149,6 +149,26 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
             << "onUDPSocketWriteError errorType=" << toString(errorType);
   }
 
+  void onConnectionD6DStarted() override {
+    VLOG(2) << prefix_ << "onConnectionD6DStarted";
+  }
+
+  void onConnectionPMTURaised() override {
+    VLOG(2) << prefix_ << "onConnectionPMTURaised";
+  }
+
+  void onConnectionPMTUBlackholeDetected(
+      uint64_t pmtuAtBlackholeTime) override {
+    VLOG(2) << prefix_
+            << "onConnectionPMTUBlackholeDetected pmtuAtBlackholeTime="
+            << pmtuAtBlackholeTime;
+  }
+
+  void onConnectionPMTUUpperBoundDetected(uint64_t pmtuUpperBound) override {
+    VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected pmtuUpperBound="
+            << pmtuUpperBound;
+  }
+
  private:
   std::string prefix_;
 };
