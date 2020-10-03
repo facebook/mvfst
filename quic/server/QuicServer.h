@@ -148,7 +148,13 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * Set the id of the host where this server is running.
    * It is used to make routing decision by setting this id in the ConnectionId
    */
-  void setHostId(uint16_t hostId) noexcept;
+  void setHostId(uint32_t hostId) noexcept;
+
+  /**
+   * Set version of connection ID used by quic server.
+   * Note that this function must be called before initialize(..)
+   */
+  void setConnectionIdVersion(ConnectionIdVersion cidVersion) noexcept;
 
   /**
    * Get transport settings.
@@ -418,7 +424,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   // vector of all the listening fds on each quic server worker
   std::vector<int> listeningFDs_;
   ProcessId processId_{ProcessId::ZERO};
-  uint16_t hostId_{0};
+  uint32_t hostId_{0};
+  ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   bool rejectNewConnections_{false};
   // factory to create per worker QuicTransportStatsCallback
   std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory_;

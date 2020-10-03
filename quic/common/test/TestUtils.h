@@ -23,6 +23,7 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 
 #include <folly/ssl/Init.h>
+#include "quic/codec/QuicConnectionId.h"
 
 namespace quic {
 namespace test {
@@ -168,7 +169,9 @@ bool matchError(
     std::pair<QuicErrorCode, std::string> errorCode,
     TransportErrorCode error);
 
-ConnectionId getTestConnectionId(uint16_t hostId = 0);
+ConnectionId getTestConnectionId(
+    uint32_t hostId = 0,
+    ConnectionIdVersion version = ConnectionIdVersion::V1);
 
 ProtectionType encryptionLevelToProtectionType(
     fizz::EncryptionLevel encryptionLevel);

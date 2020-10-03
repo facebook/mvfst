@@ -18,6 +18,7 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/stream/StreamSendHandlers.h>
+#include "quic/codec/QuicConnectionId.h"
 
 namespace quic {
 namespace test {
@@ -465,15 +466,27 @@ uint64_t computeExpectedDelay(
   return divide << ackDelayExponent;
 }
 
-ConnectionId getTestConnectionId(uint16_t hostId) {
-  ServerConnectionIdParams params(hostId, 0, 0);
+ConnectionId getTestConnectionId(uint32_t hostId, ConnectionIdVersion version) {
+  ServerConnectionIdParams params(version, hostId, 0, 0);
   DefaultConnectionIdAlgo connIdAlgo;
   auto connId = *connIdAlgo.encodeConnectionId(params);
-  connId.data()[3] = 3;
-  connId.data()[4] = 4;
-  connId.data()[5] = 5;
-  connId.data()[6] = 6;
-  connId.data()[7] = 7;
+  // Clear random part of CID, some existing tests expect same CID value
+  // when repeatedly calling with the same hostId.
+  if (version == ConnectionIdVersion::V1) {
+    connId.data()[3] = 3;
+    connId.data()[4] = 4;
+    connId.data()[5] = 5;
+    connId.data()[6] = 6;
+    connId.data()[7] = 7;
+  } else if (version == ConnectionIdVersion::V2) {
+    connId.data()[0] &= 0xC0;
+    connId.data()[5] = 5;
+    connId.data()[6] = 6;
+    connId.data()[7] = 7;
+  } else {
+    CHECK(false) << "Unsupported CID version";
+  }
+
   return connId;
 }
 

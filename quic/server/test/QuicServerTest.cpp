@@ -24,6 +24,7 @@
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
+#include "quic/codec/QuicConnectionId.h"
 
 using namespace testing;
 using namespace folly;
@@ -1548,6 +1549,7 @@ class QuicServerTest : public Test {
     server_->setQuicServerTransportFactory(std::move(factory));
     server_->setFizzContext(quic::test::createServerCtx());
     server_->setHostId(serverHostId_);
+    server_->setConnectionIdVersion(quic::ConnectionIdVersion::V2);
     transportSettings_.advertisedInitialConnectionWindowSize =
         kDefaultConnectionWindowSize * 2;
     transportSettings_.advertisedInitialBidiLocalStreamWindowSize =
@@ -1612,8 +1614,9 @@ class QuicServerTest : public Test {
       folly::SocketAddress serverAddr) {
     // create payload
     StreamId id = 1;
-    auto clientConnId = getTestConnectionId(clientHostId_),
-         serverConnId = getTestConnectionId(serverHostId_);
+    auto clientConnId = getTestConnectionId(clientHostId_);
+    auto serverConnId =
+        getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
     auto buf = createData(kMinInitialPacketSize);
     auto packet = createInitialStream(
         clientConnId, serverConnId, id, *buf, QuicVersion::MVFST);
@@ -1730,7 +1733,7 @@ class QuicServerTest : public Test {
   TransportSettings transportSettings_;
   MockQuicStatsFactory* transportStatsFactory_;
   folly::ThreadLocalPtr<MockQuicStats> mockStats_;
-  uint16_t clientHostId_{0}, serverHostId_{1};
+  uint32_t clientHostId_{0}, serverHostId_{0xAABBCC};
 }; // namespace test
 
 TEST_F(QuicServerTest, NetworkTest) {
@@ -1798,8 +1801,9 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
   EXPECT_CALL(*stats, onPacketDropped(PacketDropReason::SERVER_SHUTDOWN))
       .Times(0);
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   PacketNum packetNum = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
@@ -2200,8 +2204,9 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   };
 
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   auto buf = folly::IOBuf::copyBuffer("hello");
   auto packet =
       createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
@@ -2242,8 +2247,9 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   };
 
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   auto buf = folly::IOBuf::copyBuffer("hello");
   auto packet =
       createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
@@ -2337,8 +2343,9 @@ void QuicServerTest::testReset(Buf packet) {
 
 TEST_F(QuicServerTest, NetworkTestReset) {
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   PacketNum packetNum = 20;
   auto buf = folly::IOBuf::copyBuffer("hello");
   auto packet = packetToBuf(createStreamPacket(
@@ -2355,8 +2362,9 @@ TEST_F(QuicServerTest, NetworkTestReset) {
 
 TEST_F(QuicServerTest, NetworkTestResetLargePacket) {
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   PacketNum packetNum = 20;
   auto buf = folly::IOBuf::create(kDefaultUDPSendPacketLen + 3);
   buf->append(kDefaultUDPSendPacketLen + 3);
@@ -2373,8 +2381,9 @@ TEST_F(QuicServerTest, NetworkTestResetLargePacket) {
 
 TEST_F(QuicServerTest, NetworkTestResetLongHeader) {
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   PacketNum packetNum = 20;
   auto buf = folly::IOBuf::copyBuffer("hello");
   auto packet = packetToBuf(createStreamPacket(
@@ -2406,8 +2415,9 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   folly::Baton<> b;
   // create payload
   StreamId id = 1;
-  auto clientConnId = getTestConnectionId(clientHostId_),
-       serverConnId = getTestConnectionId(serverHostId_);
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
   auto buf = createData(kMinInitialPacketSize + 10);
   auto packet = createInitialStream(
       clientConnId, serverConnId, id, *buf, QuicVersion::MVFST);

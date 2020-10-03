@@ -611,7 +611,10 @@ void QuicServerWorker::dispatchPacketData(
           trans->setClientChosenDestConnectionId(routingData.destinationConnId);
           // parameters to create server chosen connection id
           ServerConnectionIdParams serverConnIdParams(
-              hostId_, static_cast<uint8_t>(processId_), workerId_);
+              cidVersion_,
+              hostId_,
+              static_cast<uint8_t>(processId_),
+              workerId_);
           trans->setServerConnectionIdParams(std::move(serverConnIdParams));
           if (statsCallback_) {
             trans->setTransportStatsCallback(statsCallback_.get());
@@ -827,8 +830,13 @@ uint8_t QuicServerWorker::getWorkerId() const noexcept {
   return workerId_;
 }
 
-void QuicServerWorker::setHostId(uint16_t hostId) noexcept {
+void QuicServerWorker::setHostId(uint32_t hostId) noexcept {
   hostId_ = hostId;
+}
+
+void QuicServerWorker::setConnectionIdVersion(
+    ConnectionIdVersion cidVersion) noexcept {
+  cidVersion_ = cidVersion;
 }
 
 CCPReader* QuicServerWorker::getCcpReader() const noexcept {
@@ -1051,11 +1059,12 @@ bool QuicServerWorker::rejectConnectionId(const ConnectionId& candidate) const
 
 std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
   folly::StringPiece base =
-      "CID={}, workerId={}, processId={}, hostId={}, threadId={}, ";
+      "CID={}, cidVersion={}, workerId={}, processId={}, hostId={}, threadId={}, ";
   if (!connIdAlgo_->canParse(connId)) {
     return folly::format(
                base,
                connId.hex(),
+               (uint32_t)cidVersion_,
                (uint32_t)workerId_,
                (uint32_t)processId_,
                (uint32_t)hostId_,
@@ -1067,6 +1076,7 @@ std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
     return folly::format(
                base,
                connId.hex(),
+               (uint32_t)cidVersion_,
                (uint32_t)workerId_,
                (uint32_t)processId_,
                (uint32_t)hostId_,
@@ -1074,14 +1084,16 @@ std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
         .str();
   }
   std::string extended = base.toString() +
-      "workerId in packet={}, processId in packet={}, hostId in packet={}, ";
+      "cidVersion in packet={}, workerId in packet={}, processId in packet={}, hostId in packet={}, ";
   return folly::format(
              extended,
              connId.hex(),
+             (uint32_t)cidVersion_,
              (uint32_t)workerId_,
              (uint32_t)processId_,
              (uint32_t)hostId_,
              folly::getCurrentThreadID(),
+             (uint32_t)connIdParam->version,
              (uint32_t)connIdParam->workerId,
              (uint32_t)connIdParam->processId,
              (uint32_t)connIdParam->hostId)

@@ -243,7 +243,12 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    * Set the id for the host where this server is running.
    * It is used to make routing decision by setting this id in the ConnectionId
    */
-  void setHostId(uint16_t hostId) noexcept;
+  void setHostId(uint32_t hostId) noexcept;
+
+  /**
+   * Set version of connection ID used by quic server.
+   */
+  void setConnectionIdVersion(ConnectionIdVersion cidVersion) noexcept;
 
   void setNewConnectionSocketFactory(QuicUDPSocketFactory* factory);
 
@@ -520,7 +525,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   bool rejectNewConnections_{false};
   uint8_t workerId_{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
-  uint16_t hostId_{0};
+  uint32_t hostId_{0};
+  ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   // QuicServerWorker maintains ownership of the info stats callback
   std::unique_ptr<QuicTransportStatsCallback> statsCallback_;
 

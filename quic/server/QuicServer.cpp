@@ -215,6 +215,7 @@ std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
   worker->rejectNewConnections(rejectNewConnections_);
   worker->setProcessId(processId_);
   worker->setHostId(hostId_);
+  worker->setConnectionIdVersion(cidVersion_);
   return worker;
 }
 
@@ -544,9 +545,16 @@ void QuicServer::runOnAllWorkersSync(
   }
 }
 
-void QuicServer::setHostId(uint16_t hostId) noexcept {
+void QuicServer::setHostId(uint32_t hostId) noexcept {
   CHECK(!initialized_) << "Host id must be set before initializing Quic server";
   hostId_ = hostId;
+}
+
+void QuicServer::setConnectionIdVersion(
+    ConnectionIdVersion cidVersion) noexcept {
+  CHECK(!initialized_)
+      << "ConnectionIdVersion must be set before initializing Quic server";
+  cidVersion_ = cidVersion;
 }
 
 void QuicServer::setTransportSettingsOverrideFn(
