@@ -354,8 +354,8 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       noexcept,
       ,
-      spuriousPacketDetected,
-      void(QuicSocket*, const ObserverSpuriousLossEvent&));
+      spuriousLossDetected,
+      void(QuicSocket*, const SpuriousLossEvent&));
 
   static auto getLossPacketNum(PacketNum packetNum) {
     return testing::Field(

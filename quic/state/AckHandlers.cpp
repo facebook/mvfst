@@ -54,7 +54,10 @@ void processAckFrame(
   uint64_t clonedPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
-  InstrumentationObserver::ObserverSpuriousLossEvent observerSpuriousLossEvent(ackReceiveTime);
+  folly::Optional<InstrumentationObserver::SpuriousLossEvent> spuriousLossEvent;
+  if (conn.instrumentationObservers_.size() > 0) {
+    spuriousLossEvent.emplace(ackReceiveTime);
+  }
   auto ackBlockIt = frame.ackBlocks.cbegin();
   while (ackBlockIt != frame.ackBlocks.cend() &&
          currentPacketIt != conn.outstandings.packets.rend()) {
@@ -121,7 +124,9 @@ void processAckFrame(
         // Decrement the counter, trust that we will erase this as part of
         // the bulk erase.
         conn.outstandings.declaredLostCount--;
-        observerSpuriousLossEvent.addSpuriousPacket(*rPacketIt);
+        if (spuriousLossEvent) {
+          spuriousLossEvent->addSpuriousPacket(*rPacketIt);
+        }
         rPacketIt++;
         continue;
       }
@@ -262,13 +267,12 @@ void processAckFrame(
         std::move(ack), std::move(lossEvent));
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
-  if(observerSpuriousLossEvent.hasPackets()) {
+  if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {
     for (const auto& observer : conn.instrumentationObservers_) {
       conn.pendingCallbacks.emplace_back(
-        [observer, observerSpuriousLossEvent](QuicSocket* qSocket) {
-          observer->spuriousPacketDetected(qSocket, observerSpuriousLossEvent);
-        }
-      );
+          [observer, spuriousLossEvent](QuicSocket* qSocket) {
+            observer->spuriousLossDetected(qSocket, *spuriousLossEvent);
+          });
     }
   }
 }

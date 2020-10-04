@@ -1321,15 +1321,17 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
 
   EXPECT_CALL(
       ib,
-      spuriousPacketDetected(
+      spuriousLossDetected(
           nullptr,
           Field(
-              &InstrumentationObserver::ObserverSpuriousLossEvent::
-                  spuriousPackets,
+              &InstrumentationObserver::SpuriousLossEvent::spuriousPackets,
               UnorderedElementsAre(
-                  MockInstrumentationObserver::getLossPacketNum(0),
-                  MockInstrumentationObserver::getLossPacketNum(1),
-                  MockInstrumentationObserver::getLossPacketNum(2)))))
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      0, true, false),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      1, true, false),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      2, true, false)))))
       .Times(1);
 
   for (auto& callback : conn.pendingCallbacks) {
@@ -1409,17 +1411,21 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
 
   EXPECT_CALL(
       ib,
-      spuriousPacketDetected(
+      spuriousLossDetected(
           nullptr,
           Field(
-              &InstrumentationObserver::ObserverSpuriousLossEvent::
-                  spuriousPackets,
+              &InstrumentationObserver::SpuriousLossEvent::spuriousPackets,
               UnorderedElementsAre(
-                  MockInstrumentationObserver::getLossPacketNum(5),
-                  MockInstrumentationObserver::getLossPacketNum(6),
-                  MockInstrumentationObserver::getLossPacketNum(7),
-                  MockInstrumentationObserver::getLossPacketNum(8),
-                  MockInstrumentationObserver::getLossPacketNum(9)))))
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      5, false, true),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      6, false, true),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      7, false, true),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      8, false, true),
+                  MockInstrumentationObserver::getLossPacketMatcher(
+                      9, false, true)))))
       .Times(1);
 
   for (auto& callback : conn.pendingCallbacks) {
