@@ -244,6 +244,12 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<QuicServer> createServer(ProcessId processId) {
     auto server = QuicServer::createQuicServer();
     auto transportSettings = server->getTransportSettings();
+    auto statsFactory = std::make_unique<NiceMock<MockQuicStatsFactory>>();
+    ON_CALL(*statsFactory, make()).WillByDefault(Invoke([&]() {
+      auto newStatsCallback = std::make_unique<NiceMock<MockQuicStats>>();
+      statsCallbacks_.push_back(newStatsCallback.get());
+      return newStatsCallback;
+    }));
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
     server->setTransportSettings(transportSettings);
@@ -251,6 +257,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
         std::make_unique<EchoServerTransportFactory>());
     server->setQuicUDPSocketFactory(
         std::make_unique<QuicSharedUDPSocketFactory>());
+    server->setTransportStatsCallbackFactory(std::move(statsFactory));
     server->setFizzContext(serverCtx);
     server->setSupportedVersion({getVersion(), MVFST1});
     folly::SocketAddress addr("::1", 0);
@@ -368,6 +375,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::shared_ptr<QuicServer> server_;
   bool connected_{false};
   std::shared_ptr<MockQuicStats> quicStats_;
+  std::vector<MockQuicStats*> statsCallbacks_;
 };
 
 class StreamData {
@@ -1018,6 +1026,29 @@ TEST_P(QuicClientTransportIntegrationTest, PartialReliabilityEnabledTest) {
   expected->prependChain(data->clone());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_TRUE(client->isPartiallyReliableTransport());
+}
+
+TEST_P(QuicClientTransportIntegrationTest, D6DEnabledTest) {
+  expectTransportCallbacks();
+  TransportSettings settings;
+  settings.d6dConfig.enabled = true;
+  client->setTransportSettings(settings);
+
+  TransportSettings serverSettings;
+  serverSettings.d6dConfig.enabled = true;
+  serverSettings.statelessResetTokenSecret = getRandSecret();
+  server_->setTransportSettings(serverSettings);
+
+  // we only use 1 worker in test
+  EXPECT_EQ(1, statsCallbacks_.size());
+  EXPECT_CALL(*statsCallbacks_[0], onConnectionD6DStarted()).Times(1);
+
+  client->start(&clientConnCallback);
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
 }
 
 TEST_P(

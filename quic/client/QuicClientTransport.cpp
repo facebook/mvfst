@@ -872,6 +872,9 @@ void QuicClientTransport::startCryptoHandshake() {
 
   // Add partial reliability parameter to customTransportParameters_.
   setPartialReliabilityTransportParameter();
+  setD6DBasePMTUTransportParameter();
+  setD6DRaiseTimeoutTransportParameter();
+  setD6DProbeTimeoutTransportParameter();
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),

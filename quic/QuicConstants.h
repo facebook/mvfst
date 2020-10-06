@@ -257,11 +257,11 @@ using TransportPartialReliabilitySetting = bool;
 
 constexpr uint16_t kPartialReliabilityParameterId = 0xFF00; // subject to change
 
-constexpr uint16_t kD6DBasePMTUParameterId = 0x0377;
+constexpr uint16_t kD6DBasePMTUParameterId = 0xFF77;
 
-constexpr uint16_t kD6DRaiseTimeoutParameterId = 0xF695;
+constexpr uint16_t kD6DRaiseTimeoutParameterId = 0xFF95;
 
-constexpr uint16_t kD6DProbeTimeoutParameterId = 0x9012;
+constexpr uint16_t kD6DProbeTimeoutParameterId = 0xFF12;
 
 constexpr uint32_t kDrainFactor = 3;
 
