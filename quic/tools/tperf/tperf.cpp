@@ -18,6 +18,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/server/AcceptObserver.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -73,9 +74,94 @@ DEFINE_uint32(
     num_server_worker,
     1,
     "Max number of mvfst server worker threads");
+DEFINE_bool(log_rtt_sample, false, "Log rtt sample events");
+DEFINE_bool(log_loss, false, "Log packet loss events");
+DEFINE_bool(log_app_rate_limited, false, "Log app rate limited events");
+DEFINE_bool(log_pmtu_upperbound, false, "Log pmtu upper bound events");
+DEFINE_bool(log_pmtu_blackhole, false, "Log pmtu blackbole events");
 
 namespace quic {
 namespace tperf {
+
+namespace {
+
+class TPerfInstrumentationObserver : public InstrumentationObserver {
+ public:
+  void observerDetach(QuicSocket* /* socket */) noexcept override {
+    // do nothing
+  }
+
+  void appRateLimited(QuicSocket* /* socket */) override {
+    if (FLAGS_log_app_rate_limited) {
+      LOG(INFO) << "appRateLimited detected";
+    }
+  }
+
+  void packetLossDetected(
+      QuicSocket*, /* socket */
+      const struct ObserverLossEvent& /* lossEvent */) override {
+    if (FLAGS_log_loss) {
+      LOG(INFO) << "packetLoss detected";
+    }
+  }
+
+  void rttSampleGenerated(
+      QuicSocket*, /* socket */
+      const PacketRTT& /* RTT sample */) override {
+    if (FLAGS_log_rtt_sample) {
+      LOG(INFO) << "rttSample generated";
+    }
+  }
+
+  void pmtuBlackholeDetected(
+      QuicSocket*, /* socket */
+      const PMTUBlackholeEvent& /* Blackhole event */) override {
+    if (FLAGS_log_pmtu_blackhole) {
+      LOG(INFO) << "pmtuBlackhole detected";
+    }
+  }
+
+  void pmtuUpperBoundDetected(
+      QuicSocket*, /* socket */
+      const PMTUUpperBoundEvent& event) override {
+    if (FLAGS_log_pmtu_upperbound) {
+      LOG(INFO) << "pmtuUpperBound detected after "
+                << event.cumulativeProbesSent << " d6d probes\n"
+                << "pmtu upperbound is " << event.upperBoundPMTU;
+    }
+  }
+};
+
+/**
+ * A helper accpetor observer that installs instrumentation observers to
+ * transport upon accpet
+ */
+class TPerfAcceptObserver : public AcceptObserver {
+ public:
+  TPerfAcceptObserver()
+      : tperfInstObserver_(std::make_unique<TPerfInstrumentationObserver>()) {}
+
+  void accept(QuicTransportBase* transport) noexcept override {
+    transport->addInstrumentationObserver(tperfInstObserver_.get());
+  }
+
+  void acceptorDestroy(QuicServerWorker* /* worker */) noexcept override {
+    LOG(INFO) << "quic server worker destroyed";
+  }
+
+  void observerAttach(QuicServerWorker* /* worker */) noexcept override {
+    LOG(INFO) << "TPerfAcceptObserver attached";
+  }
+
+  void observerDetach(QuicServerWorker* /* worker */) noexcept override {
+    LOG(INFO) << "TPerfAcceptObserver detached";
+  }
+
+ private:
+  std::unique_ptr<TPerfInstrumentationObserver> tperfInstObserver_;
+};
+
+} // namespace
 
 class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
                             public quic::QuicSocket::ReadCallback,
@@ -292,7 +378,10 @@ class TPerfServer {
       uint64_t maxBytesPerStream,
       uint32_t maxReceivePacketSize,
       bool useInplaceWrite)
-      : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
+      : host_(host),
+        port_(port),
+        acceptObserver_(std::make_unique<TPerfAcceptObserver>()),
+        server_(QuicServer::createQuicServer()) {
     eventBase_.setName("tperf_server");
     server_->setQuicServerTransportFactory(
         std::make_unique<TPerfServerTransportFactory>(
@@ -331,6 +420,10 @@ class TPerfServer {
     folly::SocketAddress addr1(host_.c_str(), port_);
     addr1.setFromHostPort(host_, port_);
     server_->start(addr1, FLAGS_num_server_worker);
+    auto workerEvbs = server_->getWorkerEvbs();
+    for (auto evb : workerEvbs) {
+      server_->addAcceptObserver(evb, acceptObserver_.get());
+    }
     LOG(INFO) << "tperf server started at: " << addr1.describe();
     eventBase_.loopForever();
   }
@@ -339,6 +432,7 @@ class TPerfServer {
   std::string host_;
   uint16_t port_;
   folly::EventBase eventBase_;
+  std::unique_ptr<TPerfAcceptObserver> acceptObserver_;
   std::shared_ptr<quic::QuicServer> server_;
 };
 
