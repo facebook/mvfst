@@ -79,11 +79,51 @@ DEFINE_bool(log_loss, false, "Log packet loss events");
 DEFINE_bool(log_app_rate_limited, false, "Log app rate limited events");
 DEFINE_bool(log_pmtu_upperbound, false, "Log pmtu upper bound events");
 DEFINE_bool(log_pmtu_blackhole, false, "Log pmtu blackbole events");
+DEFINE_bool(d6d_enabled, false, "Enable d6d");
+DEFINE_uint32(
+    d6d_probe_raiser_constant_step_size,
+    10,
+    "Server only. The constant step size used to increase PMTU, only meaningful to ConstantStep probe size raiser");
+DEFINE_uint32(
+    d6d_probe_raiser_type,
+    0,
+    "Server only. The type of probe size raiser. 0: ConstantStep, 1: BinarySearch");
+DEFINE_uint32(
+    d6d_blackhole_detection_window_secs,
+    5,
+    "Server only. PMTU blackhole detection window in secs");
+DEFINE_uint32(
+    d6d_blackhole_detection_threshold,
+    5,
+    "Server only. PMTU blackhole detection threshold, in # of packets");
+DEFINE_uint32(
+    d6d_base_pmtu,
+    1252,
+    "Client only. The base PMTU advertised to server");
+DEFINE_uint32(
+    d6d_raise_timeout_secs,
+    600,
+    "Client only. The raise timeout advertised to server");
+DEFINE_uint32(
+    d6d_probe_timeout_secs,
+    600,
+    "Client only. The probe timeout advertised to server");
 
 namespace quic {
 namespace tperf {
 
 namespace {
+
+ProbeSizeRaiserType parseRaiserType(uint32_t type) {
+  auto maybeRaiserType = static_cast<ProbeSizeRaiserType>(type);
+  switch (maybeRaiserType) {
+    case ProbeSizeRaiserType::ConstantStep:
+    case ProbeSizeRaiserType::BinarySearch:
+      return maybeRaiserType;
+    default:
+      throw std::runtime_error("Invalid raiser type, must be 0 or 1.");
+  }
+}
 
 class TPerfInstrumentationObserver : public InstrumentationObserver {
  public:
@@ -407,8 +447,17 @@ class TPerfServer {
       settings.maxBatchSize = 16;
     }
     settings.maxRecvPacketSize = maxReceivePacketSize;
-    settings.canIgnorePathMTU = true;
+    settings.canIgnorePathMTU = !FLAGS_d6d_enabled;
     settings.copaDeltaParam = FLAGS_latency_factor;
+    settings.d6dConfig.enabled = FLAGS_d6d_enabled;
+    settings.d6dConfig.probeRaiserConstantStepSize =
+        FLAGS_d6d_probe_raiser_constant_step_size;
+    settings.d6dConfig.raiserType =
+        parseRaiserType(FLAGS_d6d_probe_raiser_type);
+    settings.d6dConfig.blackholeDetectionWindow =
+        std::chrono::seconds(FLAGS_d6d_blackhole_detection_window_secs);
+    settings.d6dConfig.blackholeDetectionThreshold =
+        FLAGS_d6d_blackhole_detection_threshold;
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
@@ -601,7 +650,13 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
       settings.maxBatchSize = 16;
     }
     settings.maxRecvPacketSize = maxReceivePacketSize_;
-    settings.canIgnorePathMTU = true;
+    settings.canIgnorePathMTU = !FLAGS_d6d_enabled;
+    settings.d6dConfig.enabled = FLAGS_d6d_enabled;
+    settings.d6dConfig.advertisedBasePMTU = FLAGS_d6d_base_pmtu;
+    settings.d6dConfig.advertisedRaiseTimeout =
+        std::chrono::seconds(FLAGS_d6d_raise_timeout_secs);
+    settings.d6dConfig.advertisedProbeTimeout =
+        std::chrono::seconds(FLAGS_d6d_probe_timeout_secs);
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
