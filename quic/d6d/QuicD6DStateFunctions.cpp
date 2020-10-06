@@ -128,7 +128,7 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
       conn.udpSendPacketLen = lastProbeSize;
       if (maybeNextProbeSize.hasValue() &&
           *maybeNextProbeSize > conn.udpSendPacketLen &&
-          *maybeNextProbeSize < d6d.maxPMTU) {
+          *maybeNextProbeSize <= d6d.maxPMTU) {
         d6d.currentProbeSize = *maybeNextProbeSize;
         scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
       } else {

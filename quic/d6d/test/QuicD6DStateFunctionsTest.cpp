@@ -491,5 +491,43 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearchComplete) {
   EXPECT_GE(d6d.meta.timeLastNonSearchState, now);
 }
 
+TEST_F(QuicD6DStateFunctionsTest, ReachMaxPMTU) {
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+  auto& d6d = conn.d6d;
+  auto now = Clock::now();
+  auto mockInstrumentationObserver =
+      std::make_unique<StrictMock<MockInstrumentationObserver>>();
+  conn.instrumentationObservers_.push_back(mockInstrumentationObserver.get());
+  d6d.state = D6DMachineState::SEARCHING;
+  d6d.maxPMTU = 1452;
+  d6d.outstandingProbes = 1;
+  conn.udpSendPacketLen = 1400;
+  d6d.currentProbeSize = 1442;
+  d6d.meta.lastNonSearchState = D6DMachineState::BASE;
+  d6d.meta.timeLastNonSearchState = now;
+  d6d.meta.totalTxedProbes = 10;
+  auto pkt = OutstandingPacket(
+      makeTestShortPacket(),
+      Clock::now(),
+      d6d.currentProbeSize,
+      false,
+      true,
+      d6d.currentProbeSize,
+      d6d.currentProbeSize);
+  d6d.lastProbe = D6DProbePacket(
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
+  d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
+  auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
+  EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
+      .Times(1)
+      .WillOnce(Return(1452));
+  onD6DLastProbeAcked(conn);
+  EXPECT_EQ(d6d.state, D6DMachineState::SEARCHING);
+  EXPECT_EQ(d6d.currentProbeSize, 1452);
+  EXPECT_EQ(conn.udpSendPacketLen, 1442);
+  EXPECT_EQ(d6d.meta.lastNonSearchState, D6DMachineState::BASE);
+  EXPECT_EQ(d6d.meta.timeLastNonSearchState, now);
+}
+
 } // namespace test
 } // namespace quic
