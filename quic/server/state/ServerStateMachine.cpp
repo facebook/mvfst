@@ -96,6 +96,8 @@ void setExperimentalSettings(QuicServerConnectionState& conn) {
     conn.pacer = std::make_unique<TokenlessPacer>(
         conn,
         usingBbr ? kMinCwndInMssForBbr : conn.transportSettings.minCwndInMss);
+    // This doesn't actually change the tick, just the pacing calculation.
+    conn.transportSettings.pacingTimerTickInterval = 1ms;
   }
 }
 } // namespace
