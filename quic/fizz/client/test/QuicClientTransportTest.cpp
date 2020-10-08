@@ -1040,14 +1040,10 @@ TEST_P(QuicClientTransportIntegrationTest, D6DEnabledTest) {
   server_->setTransportSettings(serverSettings);
 
   // we only use 1 worker in test
-  EXPECT_EQ(1, statsCallbacks_.size());
-  EXPECT_CALL(*statsCallbacks_[0], onConnectionD6DStarted()).Times(1);
-
   client->start(&clientConnCallback);
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
-    CHECK(client->getConn().oneRttWriteCipher);
-    eventbase_.terminateLoopSoon();
-  }));
+  EXPECT_EQ(1, statsCallbacks_.size());
+  EXPECT_CALL(*statsCallbacks_[0], onConnectionD6DStarted())
+      .WillOnce(Invoke([&] { eventbase_.terminateLoopSoon(); }));
   eventbase_.loopForever();
 }
 

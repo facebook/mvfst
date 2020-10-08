@@ -137,8 +137,8 @@ void QuicServerTransport::onReadData(
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
   maybeIssueConnectionIds();
-  maybeNotifyTransportReady();
   maybeStartD6DProbing();
+  maybeNotifyTransportReady();
 }
 
 void QuicServerTransport::accept() {
