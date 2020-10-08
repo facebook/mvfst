@@ -165,9 +165,18 @@ void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
 bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     const folly::SocketAddress& client,
     bool isInitial,
-    LongHeaderInvariant& invariant) {
+    LongHeaderInvariant& invariant,
+    size_t datagramLen) {
   folly::Optional<std::pair<VersionNegotiationPacket, Buf>>
       versionNegotiationPacket;
+  if (isInitial && datagramLen < kMinInitialPacketSize) {
+    VLOG(3) << "Dropping initial packet due to invalid size";
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+    return true;
+  }
+  isInitial =
+      isInitial && invariant.version != QuicVersion::VERSION_NEGOTIATION;
   if (rejectNewConnections_ && isInitial) {
     VersionNegotiationPacketBuilder builder(
         invariant.dstConnId,
@@ -354,7 +363,10 @@ void QuicServerWorker::handleNetworkData(
     }
 
     if (maybeSendVersionNegotiationPacketOrDrop(
-            client, isInitial, parsedLongHeader->invariant)) {
+            client,
+            isInitial,
+            parsedLongHeader->invariant,
+            data->computeChainDataLength())) {
       return;
     }
 

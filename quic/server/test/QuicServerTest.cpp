@@ -730,6 +730,9 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   builder.encodePacketHeader();
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -793,6 +796,9 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
   builder.encodePacketHeader();
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
   eventbase_.loop();
@@ -1165,7 +1171,9 @@ std::unique_ptr<folly::IOBuf> writeTestDataOnWorkersBuf(
     QuicServerWorker* worker,
     LongHeader::Types pktHeaderType = LongHeader::Types::Initial) {
   StreamId id = 1;
-  auto buf = folly::IOBuf::copyBuffer("hello, world!");
+  auto buf = pktHeaderType == LongHeader::Types::Initial
+      ? createData(kMinInitialPacketSize)
+      : folly::IOBuf::copyBuffer("hello, world!");
   auto packet = createInitialStream(
       srcConnId, destConnId, id, *buf, MVFST1, pktHeaderType);
   packet->coalesce();
@@ -2207,13 +2215,13 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   auto clientConnId = getTestConnectionId(clientHostId_);
   auto serverConnId =
       getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
-  auto buf = folly::IOBuf::copyBuffer("hello");
+  auto buf = createData(kMinInitialPacketSize + 10);
   auto packet =
       createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
   auto data = std::move(packet);
   reader->getSocket().write(serverAddr, data->clone());
 
-  auto serverData = reader->readOne().get();
+  auto serverData = reader->readOne().get(200ms);
 
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   auto packetQueue = bufToQueue(std::move(serverData));
@@ -2222,6 +2230,68 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
 
   EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
   EXPECT_TRUE(testingObserver->observerCalled());
+}
+
+TEST_F(QuicServerTest, NetworkTestVersionNegotiationMinLength) {
+  folly::SocketAddress addr("::1", 0);
+  server_->start(addr, 2);
+  server_->waitUntilInitialized();
+  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
+  server_->setEventBaseObserver(testingObserver);
+  auto serverAddr = server_->getAddress();
+
+  folly::SocketAddress addr2("::1", 0);
+
+  std::unique_ptr<UDPReader> reader = std::make_unique<UDPReader>();
+  reader->start(evbThread_.getEventBase(), addr2);
+
+  SCOPE_EXIT {
+    server_->shutdown();
+    evbThread_.getEventBase()->runInEventBaseThreadAndWait(
+        [&] { reader->getSocket().close(); });
+  };
+
+  StreamId id = 1;
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
+  auto buf = createData(kMinInitialPacketSize - 100);
+  auto packet =
+      createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
+  auto data = std::move(packet);
+  reader->getSocket().write(serverAddr, data->clone());
+  EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);
+}
+
+TEST_F(QuicServerTest, NetworkTestNoVersionNegotiation) {
+  folly::SocketAddress addr("::1", 0);
+  server_->start(addr, 2);
+  server_->waitUntilInitialized();
+  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
+  server_->setEventBaseObserver(testingObserver);
+  auto serverAddr = server_->getAddress();
+
+  folly::SocketAddress addr2("::1", 0);
+
+  std::unique_ptr<UDPReader> reader = std::make_unique<UDPReader>();
+  reader->start(evbThread_.getEventBase(), addr2);
+
+  SCOPE_EXIT {
+    server_->shutdown();
+    evbThread_.getEventBase()->runInEventBaseThreadAndWait(
+        [&] { reader->getSocket().close(); });
+  };
+
+  StreamId id = 1;
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
+  auto buf = folly::IOBuf::copyBuffer("hello");
+  auto packet = createInitialStream(
+      clientConnId, serverConnId, id, *buf, QuicVersion::VERSION_NEGOTIATION);
+  auto data = std::move(packet);
+  reader->getSocket().write(serverAddr, data->clone());
+  EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);
 }
 
 TEST_F(QuicServerTest, TestRejectNewConnections) {
@@ -2250,13 +2320,13 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   auto clientConnId = getTestConnectionId(clientHostId_);
   auto serverConnId =
       getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
-  auto buf = folly::IOBuf::copyBuffer("hello");
+  auto buf = createData(kMinInitialPacketSize);
   auto packet =
       createInitialStream(clientConnId, serverConnId, id, *buf, MVFST1);
   auto data = std::move(packet);
   reader->getSocket().write(serverAddr, data->clone());
 
-  auto serverData = reader->readOne().get();
+  auto serverData = reader->readOne().get(200ms);
 
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
 
@@ -2297,7 +2367,7 @@ TEST_F(QuicServerTest, NetworkTestHealthCheck) {
   EXPECT_EQ(serverData->moveToFbString().toStdString(), std::string("OK"));
 
   reader->getSocket().write(serverAddr, IOBuf::copyBuffer(notHealthCheckToken));
-  EXPECT_THROW(reader->readOne().get(20ms), folly::FutureTimeout);
+  EXPECT_THROW(reader->readOne().get(200ms), folly::FutureTimeout);
 }
 
 void QuicServerTest::testReset(Buf packet) {
