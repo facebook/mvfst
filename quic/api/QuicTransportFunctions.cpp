@@ -984,7 +984,7 @@ void writeCloseCommon(
   PacketNum packetNum = header.getPacketSequenceNum();
   // TODO: This too needs to be switchable between regular and inplace builder.
   RegularQuicPacketBuilder packetBuilder(
-      connection.udpSendPacketLen,
+      kDefaultUDPSendPacketLen,
       std::move(header),
       getAckState(connection, pnSpace).largestAckedByPeer.value_or(0));
   packetBuilder.encodePacketHeader();
@@ -1022,6 +1022,12 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         break;
+    }
+  }
+  if (pnSpace == PacketNumberSpace::Initial &&
+      connection.nodeType == QuicNodeType::Client) {
+    while (packetBuilder.remainingSpaceInPkt() > 0) {
+      writeFrame(PaddingFrame(), packetBuilder);
     }
   }
   if (written == 0) {
