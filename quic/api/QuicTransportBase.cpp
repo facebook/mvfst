@@ -14,6 +14,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/Pacer.h>
+#include <quic/congestion_control/TokenlessPacer.h>
 #include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
@@ -2845,10 +2846,13 @@ void QuicTransportBase::setTransportSettings(
     if (writeLooper_->hasPacingTimer()) {
       bool usingBbr = conn_->congestionController &&
           (conn_->congestionController->type() == CongestionControlType::BBR);
-      conn_->pacer = std::make_unique<DefaultPacer>(
-          *conn_,
-          usingBbr ? kMinCwndInMssForBbr
-                   : conn_->transportSettings.minCwndInMss);
+      auto minCwnd = usingBbr ? kMinCwndInMssForBbr
+                              : conn_->transportSettings.minCwndInMss;
+      if (conn_->transportSettings.tokenlessPacer) {
+        conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
+      } else {
+        conn_->pacer = std::make_unique<DefaultPacer>(*conn_, minCwnd);
+      }
     } else {
       LOG(ERROR) << "Pacing cannot be enabled without a timer";
       conn_->transportSettings.pacingEnabled = false;

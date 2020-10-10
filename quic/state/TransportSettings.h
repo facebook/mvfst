@@ -243,6 +243,9 @@ struct TransportSettings {
   D6DConfig d6dConfig;
   // Quic knobs
   std::vector<SerializedKnob> knobs;
+  // Experimental: tokenless pacer. Server can also enable this via a
+  // QuicVersion.
+  bool tokenlessPacer{false};
 };
 
 } // namespace quic
