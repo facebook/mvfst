@@ -14,6 +14,7 @@
 #include <folly/portability/GFlags.h>
 #include <folly/stats/Histogram.h>
 
+#include <quic/QuicConstants.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
@@ -691,22 +692,13 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
 using namespace quic::tperf;
 
 quic::CongestionControlType flagsToCongestionControlType(
-    const std::string& congestionControlType) {
-  if (congestionControlType == "cubic") {
-    return quic::CongestionControlType::Cubic;
-  } else if (congestionControlType == "newreno") {
-    return quic::CongestionControlType::NewReno;
-  } else if (congestionControlType == "bbr") {
-    return quic::CongestionControlType::BBR;
-  } else if (congestionControlType == "copa") {
-    return quic::CongestionControlType::Copa;
-  } else if (congestionControlType == "ccp") {
-    return quic::CongestionControlType::CCP;
-  } else if (congestionControlType == "none") {
-    return quic::CongestionControlType::None;
+    const std::string& congestionControlFlag) {
+  auto ccType = quic::congestionControlStrToType(congestionControlFlag);
+  if (!ccType) {
+    throw std::invalid_argument(folly::to<std::string>(
+        "Unknown congestion controller ", congestionControlFlag));
   }
-  throw std::invalid_argument(folly::to<std::string>(
-      "Unknown congestion controller ", congestionControlType));
+  return *ccType;
 }
 
 int main(int argc, char* argv[]) {
