@@ -141,8 +141,7 @@ TEST_F(QuicReadCodecTest, LongHeaderPacketLenMismatch) {
       getTestConnectionId(90),
       321,
       QuicVersion::MVFST,
-      std::string("fluffydog"),
-      getTestConnectionId(110));
+      std::string("fluffydog"));
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(headerIn), 0 /* largestAcked */);

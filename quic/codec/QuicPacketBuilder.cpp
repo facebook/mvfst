@@ -18,35 +18,46 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     const LongHeader& longHeader,
     BufOp& bufop,
     uint32_t& spaceCounter,
-    PacketNum largestAckedPacketNum) {
+    PacketNum largestAckedPacketNum /* unused for retry packets */) {
+  bool isInitial = longHeader.getHeaderType() == LongHeader::Types::Initial;
+  bool isRetry = longHeader.getHeaderType() == LongHeader::Types::Retry;
+
   uint8_t initialByte = kHeaderFormMask | LongHeader::kFixedBitMask |
       (static_cast<uint8_t>(longHeader.getHeaderType())
        << LongHeader::kTypeShift);
+
   PacketNumEncodingResult encodedPacketNum = encodePacketNumber(
       longHeader.getPacketSequenceNum(), largestAckedPacketNum);
-  initialByte &= ~LongHeader::kReservedBitsMask;
-  initialByte |= (encodedPacketNum.length - 1);
 
-  if (longHeader.getHeaderType() == LongHeader::Types::Retry) {
-    initialByte &= 0xF0;
-    auto odcidSize = longHeader.getOriginalDstConnId()->size();
-    initialByte |= (odcidSize == 0 ? 0 : odcidSize - 3);
+  if (!isRetry) {
+    // The last 4 bits of the initial byte of a retry packet can be arbitrary.
+    // We therefore only set these bits for non-retry packets.
+    initialByte &= ~LongHeader::kReservedBitsMask;
+    initialByte |= (encodedPacketNum.length - 1);
   }
 
   bufop.template writeBE<uint8_t>(initialByte);
-  bool isInitial = longHeader.getHeaderType() == LongHeader::Types::Initial;
   uint64_t tokenHeaderLength = 0;
   const std::string& token = longHeader.getToken();
   if (isInitial) {
+    // For initial packets, we write both the token length and the token itself.
     uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
     tokenHeaderLength = tokenLengthInt.getSize() + tokenLength;
+  } else if (isRetry) {
+    // For retry packets, we write only the token.
+    tokenHeaderLength = token.size();
   }
   auto longHeaderSize = sizeof(uint8_t) /* initialByte */ +
       sizeof(QuicVersionType) + sizeof(uint8_t) +
       longHeader.getSourceConnId().size() + sizeof(uint8_t) +
-      longHeader.getDestinationConnId().size() + tokenHeaderLength +
-      kMaxPacketLenSize + encodedPacketNum.length;
+      longHeader.getDestinationConnId().size() + tokenHeaderLength;
+
+  if (!isRetry) {
+    // For retry packets, we don't write the packet length or the
+    // packet number.
+    longHeaderSize += kMaxPacketLenSize + encodedPacketNum.length;
+  }
   if (spaceCounter < longHeaderSize) {
     spaceCounter = 0;
   } else {
@@ -63,6 +74,7 @@ PacketNumEncodingResult encodeLongHeaderHelper(
       longHeader.getSourceConnId().data(), longHeader.getSourceConnId().size());
 
   if (isInitial) {
+    // Write the token length, followed by the token
     uint64_t tokenLength = token.size();
     QuicInteger tokenLengthInt(tokenLength);
     tokenLengthInt.encode([&](auto val) { bufop.writeBE(val); });
@@ -71,16 +83,13 @@ PacketNumEncodingResult encodeLongHeaderHelper(
     }
   }
 
-  if (longHeader.getHeaderType() == LongHeader::Types::Retry) {
-    auto& originalDstConnId = longHeader.getOriginalDstConnId();
-    bufop.template writeBE<uint8_t>(longHeader.getOriginalDstConnId()->size());
-    bufop.push(originalDstConnId->data(), originalDstConnId->size());
-
+  if (isRetry) {
     // Write the retry token
     CHECK(!token.empty()) << "Retry packet must contain a token";
     bufop.push((const uint8_t*)token.data(), token.size());
   }
   // defer write of the packet num and length till payload has been computed
+  // For a retry packet, the returned value is not relevant.
   return encodedPacketNum;
 }
 

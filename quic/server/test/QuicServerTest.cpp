@@ -1128,8 +1128,7 @@ auto createInitialStream(
       destConnId,
       packetNum,
       version,
-      std::string("this is a retry token :)"),
-      getTestConnectionId());
+      std::string("this is a retry token :)"));
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,
       pktHeaderType == LongHeader::Types::Retry ? std::move(headerRetry)

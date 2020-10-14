@@ -57,8 +57,7 @@ folly::Expected<ParsedLongHeaderResult, TransportErrorCode> makeLongHeader(
       getTestConnectionId(),
       321,
       QuicVersion::QUIC_DRAFT,
-      std::string("this is a retry token :)"),
-      getTestConnectionId());
+      std::string("this is a retry token :)"));
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen,

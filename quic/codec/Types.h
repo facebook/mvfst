@@ -746,14 +746,12 @@ struct LongHeader {
       const ConnectionId& dstConnId,
       PacketNum packetNum,
       QuicVersion version,
-      const std::string& token = std::string(),
-      folly::Optional<ConnectionId> originalDstConnId = folly::none);
+      std::string token = std::string());
 
   LongHeader(
       Types type,
       LongHeaderInvariant invariant,
-      const std::string& token = std::string(),
-      folly::Optional<ConnectionId> originalDstConnId = folly::none);
+      std::string token = std::string());
 
   LongHeader(const LongHeader& other) = default;
   LongHeader(LongHeader&& other) = default;
@@ -763,7 +761,6 @@ struct LongHeader {
   Types getHeaderType() const noexcept;
   const ConnectionId& getSourceConnId() const;
   const ConnectionId& getDestinationConnId() const;
-  const folly::Optional<ConnectionId>& getOriginalDstConnId() const;
   QuicVersion getVersion() const;
   // Note this is defined in the header so it is inlined for performance.
   PacketNumberSpace getPacketNumberSpace() const {
@@ -784,7 +781,6 @@ struct LongHeader {
   Types longHeaderType_;
   LongHeaderInvariant invariant_;
   std::string token_;
-  folly::Optional<ConnectionId> originalDstConnId_;
 };
 
 struct ShortHeaderInvariant {

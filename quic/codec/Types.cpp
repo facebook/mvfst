@@ -163,12 +163,8 @@ ProtectionType PacketHeader::getProtectionType() const {
 LongHeader::LongHeader(
     Types type,
     LongHeaderInvariant invariant,
-    const std::string& token,
-    folly::Optional<ConnectionId> originalDstConnId)
-    : longHeaderType_(type),
-      invariant_(std::move(invariant)),
-      token_(token),
-      originalDstConnId_(originalDstConnId) {}
+    std::string token)
+    : longHeaderType_(type), invariant_(std::move(invariant)), token_(std::move(token)) {}
 
 LongHeader::LongHeader(
     Types type,
@@ -176,12 +172,10 @@ LongHeader::LongHeader(
     const ConnectionId& dstConnId,
     PacketNum packetNum,
     QuicVersion version,
-    const std::string& token,
-    folly::Optional<ConnectionId> originalDstConnId)
+    std::string token)
     : longHeaderType_(type),
       invariant_(LongHeaderInvariant(version, srcConnId, dstConnId)),
-      token_(token),
-      originalDstConnId_(originalDstConnId) {
+      token_(std::move(token)) {
   setPacketNumber(packetNum);
 }
 
@@ -195,10 +189,6 @@ const ConnectionId& LongHeader::getSourceConnId() const {
 
 const ConnectionId& LongHeader::getDestinationConnId() const {
   return invariant_.dstConnId;
-}
-
-const folly::Optional<ConnectionId>& LongHeader::getOriginalDstConnId() const {
-  return originalDstConnId_;
 }
 
 QuicVersion LongHeader::getVersion() const {
