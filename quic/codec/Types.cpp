@@ -164,7 +164,9 @@ LongHeader::LongHeader(
     Types type,
     LongHeaderInvariant invariant,
     std::string token)
-    : longHeaderType_(type), invariant_(std::move(invariant)), token_(std::move(token)) {}
+    : longHeaderType_(type),
+      invariant_(std::move(invariant)),
+      token_(std::move(token)) {}
 
 LongHeader::LongHeader(
     Types type,
