@@ -487,6 +487,9 @@ constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;
 
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
 
+// Use up to 3 bytes for the initial packet number.
+constexpr uint32_t kMaxInitialPacketNum = 0xffffff;
+
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   REJECT_IF_NO_EXACT_MATCH = 0,
   LIMIT_IF_NO_EXACT_MATCH = 1,

@@ -8,8 +8,11 @@
 
 #pragma once
 
+#include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/IntervalSet.h>
+
+#include <folly/Random.h>
 
 namespace quic {
 
@@ -41,6 +44,13 @@ struct AckState {
 };
 
 struct AckStates {
+  AckStates() {
+    PacketNum randomizedPacketNum =
+        folly::Random::secureRand32(kMaxInitialPacketNum);
+    initialAckState.nextPacketNum = randomizedPacketNum;
+    handshakeAckState.nextPacketNum = randomizedPacketNum;
+    appDataAckState.nextPacketNum = randomizedPacketNum;
+  }
   // AckState for acks to peer packets in Initial packet number space.
   AckState initialAckState;
   // AckState for acks to peer packets in Handshake packet number space.

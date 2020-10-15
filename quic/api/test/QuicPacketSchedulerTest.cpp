@@ -344,7 +344,8 @@ TEST_F(QuicPacketSchedulerTest, CryptoWritePartialLossBuffer) {
   RegularQuicPacketBuilder builder(
       25,
       std::move(longHeader),
-      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(
+          conn.ackStates.initialAckState.nextPacketNum));
   FrameScheduler cryptoOnlyScheduler =
       std::move(
           FrameScheduler::Builder(

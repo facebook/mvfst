@@ -18,9 +18,6 @@ PacketNumEncodingResult::PacketNumEncodingResult(
 PacketNumEncodingResult encodePacketNumber(
     PacketNum packetNum,
     PacketNum largestAckedPacketNum) {
-  DCHECK(
-      (!packetNum && !largestAckedPacketNum) ||
-      packetNum > largestAckedPacketNum);
   PacketNum twiceDistance = (packetNum - largestAckedPacketNum) * 2;
   // The number of bits we need to mask all set bits in twiceDistance.
   // This is 1 + floor(log2(x)).
