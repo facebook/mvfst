@@ -8,6 +8,7 @@ add_library(
   FizzBridge.cpp
   FizzCryptoFactory.cpp
   FizzPacketNumberCipher.cpp
+  FizzRetryIntegrityTagGenerator.cpp
   QuicFizzFactory.cpp
 )
 
