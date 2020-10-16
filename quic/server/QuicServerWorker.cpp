@@ -1168,7 +1168,8 @@ void QuicServerWorker::getAllConnectionsStats(
     connStats.duration = now - conn->connectionTime;
     if (conn->congestionController) {
       connStats.congestionController =
-          congestionControlTypeToString(conn->congestionController->type()).str();
+          congestionControlTypeToString(conn->congestionController->type())
+              .str();
     }
     connStats.ptoCount = conn->lossState.ptoCount;
     connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(
