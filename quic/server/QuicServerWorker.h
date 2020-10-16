@@ -24,6 +24,7 @@
 #include <quic/server/QuicUDPSocketFactory.h>
 #include <quic/server/RateLimiter.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
+#include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
@@ -457,6 +458,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   virtual bool removeAcceptObserver(AcceptObserver* observer) {
     return observerList_.remove(observer);
   }
+
+  void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
 
  private:
   /**

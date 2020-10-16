@@ -12,6 +12,7 @@
 #include <folly/io/async/EventBaseManager.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
+#include <iterator>
 #ifdef CCP_ENABLED
 #include <quic/congestion_control/third_party/ccp/libstartccp.h>
 #endif
@@ -742,6 +743,12 @@ std::vector<int> QuicServer::getAllListeningSocketFDs() const noexcept {
     }
   }
   return sockets;
+}
+
+void QuicServer::getAllConnectionsStats(
+    std::vector<QuicConnectionStats>& stats) {
+  runOnAllWorkersSync(
+      [&stats](auto worker) mutable { worker->getAllConnectionsStats(stats); });
 }
 
 TakeoverProtocolVersion QuicServer::getTakeoverProtocolVersion() const

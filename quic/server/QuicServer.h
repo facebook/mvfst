@@ -23,6 +23,7 @@
 #include <quic/server/QuicServerTransportFactory.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/QuicUDPSocketFactory.h>
+#include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
@@ -354,6 +355,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
    * @return              Whether worker + observer found and observer removed.
    */
   bool removeAcceptObserver(folly::EventBase* evb, AcceptObserver* observer);
+
+  void getAllConnectionsStats(std::vector<QuicConnectionStats>& stats);
 
  private:
   QuicServer();

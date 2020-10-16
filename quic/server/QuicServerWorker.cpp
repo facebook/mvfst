@@ -18,6 +18,7 @@
 #include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
 
@@ -881,7 +882,7 @@ void QuicServerWorker::setTransportSettings(
   transportSettings_ = transportSettings;
   if (transportSettings_.batchingMode != QuicBatchingMode::BATCHING_MODE_GSO) {
     if (transportSettings_.dataPathType == DataPathType::ContinuousMemory) {
-      LOG(ERROR) << "Unsupported data path type and batching mode combinartoin";
+      LOG(ERROR) << "Unsupported data path type and batching mode combination";
     }
     transportSettings_.dataPathType = DataPathType::ChainedMemory;
   }
@@ -1139,6 +1140,45 @@ bool QuicServerWorker::AcceptObserverList::remove(AcceptObserver* observer) {
   }
   observers_.erase(eraseIt, observers_.end());
   return true;
+}
+
+void QuicServerWorker::getAllConnectionsStats(
+    std::vector<QuicConnectionStats>& stats) {
+  folly::F14FastMap<const QuicServerConnectionState*, uint32_t> uniqueConns;
+  for (const auto& conn : connectionIdMap_) {
+    if (!conn.second) {
+      continue;
+    }
+    auto connState =
+        static_cast<const QuicServerConnectionState*>(conn.second->getState());
+    if (!connState) {
+      continue;
+    }
+    uniqueConns[connState]++;
+  }
+  auto now = Clock::now();
+  stats.reserve(stats.size() + uniqueConns.size());
+  for (const auto& connEntry : uniqueConns) {
+    QuicConnectionStats connStats;
+    auto conn = connEntry.first;
+    connStats.workerID = workerId_;
+    connStats.numConnIDs = connEntry.second;
+    connStats.localAddress = conn->serverAddr.describe();
+    connStats.peerAddress = conn->peerAddress.describe();
+    connStats.duration = now - conn->connectionTime;
+    if (conn->congestionController) {
+      connStats.congestionController =
+          congestionControlTypeToString(conn->congestionController->type()).str();
+    }
+    connStats.ptoCount = conn->lossState.ptoCount;
+    connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(
+        conn->lossState.srtt);
+    connStats.rttvar = std::chrono::duration_cast<std::chrono::milliseconds>(
+        conn->lossState.rttvar);
+    connStats.peerAckDelayExponent = conn->peerAckDelayExponent;
+    connStats.udpSendPacketLen = conn->udpSendPacketLen;
+    stats.emplace_back(connStats);
+  }
 }
 
 } // namespace quic
