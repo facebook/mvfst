@@ -482,9 +482,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {}
 
-  // Type of node owning this connection (client or server).
-  QuicNodeType nodeType;
-
   // Accessor to output buffer for continuous memory GSO writes
   BufAccessor* bufAccessor{nullptr};
 
@@ -603,9 +600,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   uint64_t nextSelfConnectionIdSequence{0};
 
-  // Whether or not we received a new packet before a write.
-  bool receivedNewPacketBeforeWrite{false};
-
   // D6D related events
   struct PendingD6DEvents {
     // If we should schedule/cancel d6d raise timeout, if it's not
@@ -710,9 +704,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Settings for transports.
   TransportSettings transportSettings;
-
-  // Whether we've set the transporot parameters from transportSettings yet.
-  bool transportParametersEncoded{false};
 
   // Value of the negotiated ack delay exponent.
   uint64_t peerAckDelayExponent{kDefaultAckDelayExponent};
@@ -828,13 +819,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   D6DState d6d;
 
-  // Whether a connection can be paced based on its handshake and close states.
-  // For example, we may not want to pace a connection that's still handshaking.
-  bool canBePaced{false};
-
-  // Whether or not both ends agree to use partial reliability
-  bool partialReliabilityEnabled{false};
-
   // Debug information. Currently only used to debug busy loop of Transport
   // WriteLooper.
   struct WriteDebugState {
@@ -878,6 +862,22 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // queue of functions to be called in processCallbacksAfterNetworkData
   std::vector<std::function<void(QuicSocket*)>> pendingCallbacks;
+
+  // Type of node owning this connection (client or server).
+  QuicNodeType nodeType;
+
+  // Whether or not we received a new packet before a write.
+  bool receivedNewPacketBeforeWrite{false};
+
+  // Whether we've set the transporot parameters from transportSettings yet.
+  bool transportParametersEncoded{false};
+
+  // Whether a connection can be paced based on its handshake and close states.
+  // For example, we may not want to pace a connection that's still handshaking.
+  bool canBePaced{false};
+
+  // Whether or not both ends agree to use partial reliability
+  bool partialReliabilityEnabled{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);
