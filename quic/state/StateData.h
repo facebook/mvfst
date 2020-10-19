@@ -794,6 +794,12 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // The lastest d6d probe packet transmitted
     folly::Optional<D6DProbePacket> lastProbe;
 
+    // The raise timeout
+    std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};
+
+    // The probe timeout
+    std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
+
     // The number of outstanding probe packets
     uint64_t outstandingProbes{0};
 
@@ -806,15 +812,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // Current probe size, dynamically adjusted by the probing algorithm
     uint32_t currentProbeSize{kDefaultD6DBasePMTU};
 
-    // The raise timeout
-    std::chrono::seconds raiseTimeout{kDefaultD6DRaiseTimeout};
-
-    // The probe timeout
-    std::chrono::seconds probeTimeout{kDefaultD6DProbeTimeout};
-
-    // D6D Machine State
-    D6DMachineState state{D6DMachineState::DISABLED};
-
     // Probe size raiser
     std::unique_ptr<ProbeSizeRaiser> raiser;
 
@@ -824,6 +821,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Meta state
     D6DMetaState meta;
+
+    // D6D Machine State
+    D6DMachineState state{D6DMachineState::DISABLED};
   };
 
   D6DState d6d;
