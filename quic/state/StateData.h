@@ -406,36 +406,33 @@ using FrameList = std::vector<QuicSimpleFrame>;
 
 struct LossState {
   enum class AlarmMethod { EarlyRetransmitOrReordering, PTO };
-  // Smooth rtt
-  std::chrono::microseconds srtt{0us};
-  // Latest rtt
-  std::chrono::microseconds lrtt{0us};
-  // Rtt var
-  std::chrono::microseconds rttvar{0us};
-  // Number of packet loss timer fired before receiving an ack
-  uint32_t ptoCount{0};
   // The time when last handshake packet (including both Initial and Handshake
   // space) was sent
   TimePoint lastHandshakePacketSentTime;
   // Latest packet number sent
   // TODO: this also needs to be 3 numbers now...
   folly::Optional<PacketNum> largestSent;
-  // Reordering threshold used
-  uint32_t reorderingThreshold{kReorderingThreshold};
   // Timer for time reordering detection or early retransmit alarm.
   EnumArray<PacketNumberSpace, folly::Optional<TimePoint>> lossTimes;
-  // Current method by which the loss detection alarm is set.
-  AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
-  // Total number of packet retransmitted on this connection, including packet
-  // clones, retransmitted clones, handshake and rejected zero rtt packets.
-  uint32_t rtxCount{0};
-  // Total number of packets which were declared lost spuriously, i.e. we
-  // received an ACK for them later.
-  uint32_t spuriousLossCount{0};
-  // Total number of retransmission due to PTO
-  uint32_t timeoutBasedRtxCount{0};
-  // Total number of PTO count
-  uint32_t totalPTOCount{0};
+  // Max ack delay received from peer
+  std::chrono::microseconds maxAckDelay{0us};
+  // minimum rtt. AckDelay isn't excluded from this.
+  std::chrono::microseconds mrtt{kDefaultMinRtt};
+  // Smooth rtt
+  std::chrono::microseconds srtt{0us};
+  // Latest rtt
+  std::chrono::microseconds lrtt{0us};
+  // Rtt var
+  std::chrono::microseconds rttvar{0us};
+  // The sent time of the latest acked packet
+  folly::Optional<TimePoint> lastAckedPacketSentTime;
+  // The latest time a packet is acked
+  folly::Optional<TimePoint> lastAckedTime;
+  // The latest time a packet is acked, minus ack delay
+  folly::Optional<TimePoint> adjustedLastAckedTime;
+  // The time when last retranmittable packet is sent for every packet number
+  // space
+  TimePoint lastRetransmittablePacketSentTime;
   // Total number of bytes sent on this connection. This is after encoding.
   uint64_t totalBytesSent{0};
   // Total number of bytes received on this connection. This is before decoding.
@@ -455,21 +452,24 @@ struct LossState {
   // The total number of bytes acked on this connection when the last time a
   // packet is acked.
   uint64_t totalBytesAckedAtLastAck{0};
-  // Max ack delay received from peer
-  std::chrono::microseconds maxAckDelay{0us};
-  // minimum rtt. AckDelay isn't excluded from this.
-  std::chrono::microseconds mrtt{kDefaultMinRtt};
-  // The sent time of the latest acked packet
-  folly::Optional<TimePoint> lastAckedPacketSentTime;
-  // The latest time a packet is acked
-  folly::Optional<TimePoint> lastAckedTime;
-  // The latest time a packet is acked, minus ack delay
-  folly::Optional<TimePoint> adjustedLastAckedTime;
-  // The time when last retranmittable packet is sent for every packet number
-  // space
-  TimePoint lastRetransmittablePacketSentTime;
   // Inflight bytes
   uint64_t inflightBytes{0};
+  // Reordering threshold used
+  uint32_t reorderingThreshold{kReorderingThreshold};
+  // Number of packet loss timer fired before receiving an ack
+  uint32_t ptoCount{0};
+  // Total number of packet retransmitted on this connection, including packet
+  // clones, retransmitted clones, handshake and rejected zero rtt packets.
+  uint32_t rtxCount{0};
+  // Total number of packets which were declared lost spuriously, i.e. we
+  // received an ACK for them later.
+  uint32_t spuriousLossCount{0};
+  // Total number of retransmission due to PTO
+  uint32_t timeoutBasedRtxCount{0};
+  // Total number of PTO count
+  uint32_t totalPTOCount{0};
+  // Current method by which the loss detection alarm is set.
+  AlarmMethod currentAlarmMethod{AlarmMethod::EarlyRetransmitOrReordering};
 };
 
 class Logger;
