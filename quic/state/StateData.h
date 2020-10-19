@@ -625,10 +625,17 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   struct PendingEvents {
     Resets resets;
-
     folly::Optional<PathChallengeFrame> pathChallenge;
 
     FrameList frames;
+
+    // D6D related events
+    PendingD6DEvents d6d;
+
+    std::vector<KnobFrame> knobs;
+
+    // Number of probing packets to send after PTO
+    uint8_t numProbePackets{0};
 
     // true: schedule timeout if not scheduled
     // false: cancel scheduled timeout
@@ -643,9 +650,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // If there is a pending loss detection alarm update
     bool setLossDetectionAlarm{false};
 
-    // Number of probing packets to send after PTO
-    uint8_t numProbePackets{0};
-
     bool cancelPingTimeout{false};
 
     // close transport when the next packet number reaches kMaxPacketNum
@@ -656,11 +660,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Do we need to send data blocked frame when connection is blocked.
     bool sendDataBlocked{false};
-
-    // D6D related events
-    PendingD6DEvents d6d;
-
-    std::vector<KnobFrame> knobs;
   };
 
   PendingEvents pendingEvents;
