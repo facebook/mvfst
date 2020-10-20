@@ -529,5 +529,100 @@ TEST_F(QuicD6DStateFunctionsTest, ReachMaxPMTU) {
   EXPECT_EQ(d6d.meta.timeLastNonSearchState, now);
 }
 
+TEST_F(
+    QuicD6DStateFunctionsTest,
+    MaintainStateWhenFalsePositiveBlackholeDetected) {
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+  auto& d6d = conn.d6d;
+  auto now = Clock::now();
+  d6d.state = D6DMachineState::SEARCHING;
+  d6d.maxPMTU = 1452;
+  d6d.outstandingProbes = 1;
+  conn.udpSendPacketLen = 1400;
+  d6d.currentProbeSize = 1442;
+  d6d.meta.lastNonSearchState = D6DMachineState::BASE;
+  d6d.meta.timeLastNonSearchState = now;
+  d6d.meta.totalTxedProbes = 10;
+  auto pkt = OutstandingPacket(
+      makeTestShortPacket(),
+      Clock::now(),
+      d6d.currentProbeSize,
+      false,
+      true,
+      d6d.currentProbeSize,
+      d6d.currentProbeSize);
+  d6d.lastProbe = D6DProbePacket(
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
+  d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
+  auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
+  EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
+      .Times(1)
+      .WillOnce(Return(1452));
+  d6d.thresholdCounter = std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
+      std::chrono::microseconds(kDefaultD6DBlackholeDetectionWindow).count(),
+      1); // Threshold of 1 will cause window to be set to 0
+
+  auto lostPacket = OutstandingPacket(
+      makeTestShortPacket(),
+      Clock::now(),
+      d6d.currentProbeSize,
+      false,
+      false,
+      d6d.currentProbeSize,
+      d6d.currentProbeSize);
+  // Generate a false positive blackhole signal
+  detectPMTUBlackhole(conn, lostPacket);
+  EXPECT_EQ(d6d.state, D6DMachineState::BASE);
+  EXPECT_EQ(conn.udpSendPacketLen, d6d.basePMTU);
+
+  // The ack of a non-stale probe should bring us back to SEARCHING state and
+  // correct probe size
+  onD6DLastProbeAcked(conn);
+  EXPECT_EQ(d6d.state, D6DMachineState::SEARCHING);
+  EXPECT_EQ(d6d.currentProbeSize, 1452);
+  EXPECT_EQ(conn.udpSendPacketLen, 1442);
+  EXPECT_EQ(d6d.meta.lastNonSearchState, D6DMachineState::BASE);
+  EXPECT_EQ(d6d.meta.timeLastNonSearchState, now);
+}
+
+TEST_F(QuicD6DStateFunctionsTest, UpperboundIsBase) {
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+  auto& d6d = conn.d6d;
+  auto now = Clock::now();
+  d6d.state = D6DMachineState::BASE;
+  d6d.basePMTU = 1400;
+  d6d.maxPMTU = 1400;
+  d6d.outstandingProbes = 1;
+  conn.udpSendPacketLen = 1400;
+  d6d.currentProbeSize = 1400;
+  d6d.meta.lastNonSearchState = D6DMachineState::DISABLED;
+  d6d.meta.timeLastNonSearchState = now;
+  d6d.meta.totalTxedProbes = 10;
+  auto pkt = OutstandingPacket(
+      makeTestShortPacket(),
+      Clock::now(),
+      d6d.currentProbeSize,
+      false,
+      true,
+      d6d.currentProbeSize,
+      d6d.currentProbeSize);
+  d6d.lastProbe = D6DProbePacket(
+      pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
+  d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
+  auto mockRaiser = dynamic_cast<MockProbeSizeRaiser*>(d6d.raiser.get());
+  EXPECT_CALL(*mockRaiser, raiseProbeSize(d6d.currentProbeSize))
+      .Times(1)
+      .WillOnce(Return(1452));
+
+  // The ack of a non-stale probe should bring us back to SEARCHING state and
+  // correct probe size
+  onD6DLastProbeAcked(conn);
+  EXPECT_EQ(d6d.state, D6DMachineState::SEARCH_COMPLETE);
+  EXPECT_EQ(d6d.currentProbeSize, 1400);
+  EXPECT_EQ(conn.udpSendPacketLen, 1400);
+  EXPECT_EQ(d6d.meta.lastNonSearchState, D6DMachineState::BASE);
+  EXPECT_GT(d6d.meta.timeLastNonSearchState, now);
+}
+
 } // namespace test
 } // namespace quic

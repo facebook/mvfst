@@ -84,6 +84,34 @@ static TimePoint reportBlackhole(
   return now;
 }
 
+static void onD6DLastProbeAckedInSearching(
+    QuicConnectionStateBase& conn,
+    uint32_t lastProbeSize,
+    folly::Optional<uint16_t> maybeNextProbeSize) {
+  auto& d6d = conn.d6d;
+  // Temporary mitigation
+  if (lastProbeSize <= conn.udpSendPacketLen) {
+    LOG(ERROR) << "D6D lastProbeSize <= udpSendPacketLen";
+    return;
+  }
+  QUIC_STATS(conn.statsCallback, onConnectionPMTURaised);
+  conn.udpSendPacketLen = lastProbeSize;
+  if (maybeNextProbeSize.hasValue() &&
+      *maybeNextProbeSize > conn.udpSendPacketLen &&
+      *maybeNextProbeSize <= d6d.maxPMTU) {
+    d6d.currentProbeSize = *maybeNextProbeSize;
+    scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
+  } else {
+    // We've reached either the PMTU upper bound or the probe size
+    // raiser's internal upper bound, in both cases the search is
+    // completed
+    d6d.state = D6DMachineState::SEARCH_COMPLETE;
+    conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
+    conn.pendingEvents.d6d.scheduleProbeTimeout = false;
+    reportUpperBound(conn);
+  }
+}
+
 void onD6DProbeTimeoutExpired(QuicConnectionStateBase& conn) {
   onD6DLastProbeLost(conn);
 }
@@ -109,37 +137,42 @@ void onD6DLastProbeAcked(QuicConnectionStateBase& conn) {
 
   switch (d6d.state) {
     case D6DMachineState::BASE:
-      // From BASE -> SEARCHING we should have at least one next probe
-      // size
-      CHECK(maybeNextProbeSize.hasValue());
-      d6d.currentProbeSize = *maybeNextProbeSize;
-      d6d.state = D6DMachineState::SEARCHING;
-      d6d.meta.lastNonSearchState = D6DMachineState::BASE;
-      d6d.meta.timeLastNonSearchState = Clock::now();
-      scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
+      // There could be a series of events leading to receiving ack for probe of
+      // size larger basePMTU in BASE state:
+      // 1. the connection was in the SEARCHING state, sending probes of size
+      // larger than basePMTU
+      // 2. blackhole detection signals a false positive due to congestion,
+      // setting the state back to BASE
+      // 3. the ack for the probe sent prior to the blackhole is received, the
+      // next probe size will therefore exceed raiseProbeSize(basePMTU)
+      // In such situations, we can be certain that the previous blackhole is a
+      // false positive, and we should treat this ack as a valid ack.
+      if (lastProbeSize != d6d.basePMTU) {
+        // TODO(xtt) report false positive pmtu blackholes
+        d6d.state = D6DMachineState::SEARCHING;
+        onD6DLastProbeAckedInSearching(conn, lastProbeSize, maybeNextProbeSize);
+      } else {
+        if (maybeNextProbeSize.hasValue() &&
+            *maybeNextProbeSize > conn.udpSendPacketLen &&
+            *maybeNextProbeSize <= d6d.maxPMTU) {
+          d6d.currentProbeSize = *maybeNextProbeSize;
+          d6d.state = D6DMachineState::SEARCHING;
+          scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
+        } else {
+          // This means either the probe size raiser is poorly configured or we
+          // have a very small maxPMTU. In either case, we've reached the
+          // upperbound, which is sadly only basePMTU
+          d6d.state = D6DMachineState::SEARCH_COMPLETE;
+          conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
+          conn.pendingEvents.d6d.scheduleProbeTimeout = false;
+          reportUpperBound(conn);
+        }
+        d6d.meta.lastNonSearchState = D6DMachineState::BASE;
+        d6d.meta.timeLastNonSearchState = Clock::now();
+      }
       break;
     case D6DMachineState::SEARCHING:
-      // Temporary mitigation
-      if (lastProbeSize <= conn.udpSendPacketLen) {
-        LOG(ERROR) << "D6D lastProbeSize <= udpSendPacketLen";
-        return;
-      }
-      QUIC_STATS(conn.statsCallback, onConnectionPMTURaised);
-      conn.udpSendPacketLen = lastProbeSize;
-      if (maybeNextProbeSize.hasValue() &&
-          *maybeNextProbeSize > conn.udpSendPacketLen &&
-          *maybeNextProbeSize <= d6d.maxPMTU) {
-        d6d.currentProbeSize = *maybeNextProbeSize;
-        scheduleProbeAfterDelay(conn, kDefaultD6DProbeDelayWhenAcked);
-      } else {
-        // We've reached either the PMTU upper bound or the probe size
-        // raiser's internal upper bound, in both cases the search is
-        // completed
-        d6d.state = D6DMachineState::SEARCH_COMPLETE;
-        conn.pendingEvents.d6d.scheduleRaiseTimeout = true;
-        conn.pendingEvents.d6d.scheduleProbeTimeout = false;
-        reportUpperBound(conn);
-      }
+      onD6DLastProbeAckedInSearching(conn, lastProbeSize, maybeNextProbeSize);
       break;
     case D6DMachineState::ERROR:
       // This means that a smaller probe went through the network.
