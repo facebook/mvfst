@@ -157,16 +157,12 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onConnectionPMTURaised";
   }
 
-  void onConnectionPMTUBlackholeDetected(
-      uint64_t pmtuAtBlackholeTime) override {
-    VLOG(2) << prefix_
-            << "onConnectionPMTUBlackholeDetected pmtuAtBlackholeTime="
-            << pmtuAtBlackholeTime;
+  void onConnectionPMTUBlackholeDetected() override {
+    VLOG(2) << prefix_ << "onConnectionPMTUBlackholeDetected";
   }
 
-  void onConnectionPMTUUpperBoundDetected(uint64_t pmtuUpperBound) override {
-    VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected pmtuUpperBound="
-            << pmtuUpperBound;
+  void onConnectionPMTUUpperBoundDetected() override {
+    VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected";
   }
 
  private:

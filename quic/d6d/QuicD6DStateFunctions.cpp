@@ -25,8 +25,7 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
   const auto lastProbeSize = d6d.lastProbe->packetSize;
   const auto now = Clock::now();
 
-  QUIC_STATS(
-      conn.statsCallback, onConnectionPMTUUpperBoundDetected, lastProbeSize);
+  QUIC_STATS(conn.statsCallback, onConnectionPMTUUpperBoundDetected);
   if (conn.instrumentationObservers_.size() > 0) {
     InstrumentationObserver::PMTUUpperBoundEvent upperBoundEvent(
         now,
@@ -54,10 +53,7 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
 static TimePoint reportBlackhole(
     QuicConnectionStateBase& conn,
     const OutstandingPacket& packet) {
-  QUIC_STATS(
-      conn.statsCallback,
-      onConnectionPMTUBlackholeDetected,
-      packet.metadata.encodedSize);
+  QUIC_STATS(conn.statsCallback, onConnectionPMTUBlackholeDetected);
   auto& d6d = conn.d6d;
   const auto now = Clock::now();
   if (conn.instrumentationObservers_.size() > 0) {
