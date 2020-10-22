@@ -78,6 +78,7 @@ DEFINE_uint32(
 DEFINE_bool(log_rtt_sample, false, "Log rtt sample events");
 DEFINE_bool(log_loss, false, "Log packet loss events");
 DEFINE_bool(log_app_rate_limited, false, "Log app rate limited events");
+DEFINE_bool(log_pmtu_probing_started, false, "Log pmtu probing started events");
 DEFINE_bool(log_pmtu_upperbound, false, "Log pmtu upper bound events");
 DEFINE_bool(log_pmtu_blackhole, false, "Log pmtu blackbole events");
 DEFINE_bool(d6d_enabled, false, "Enable d6d");
@@ -151,6 +152,12 @@ class TPerfInstrumentationObserver : public InstrumentationObserver {
       const PacketRTT& /* RTT sample */) override {
     if (FLAGS_log_rtt_sample) {
       LOG(INFO) << "rttSample generated";
+    }
+  }
+
+  void pmtuProbingStarted(QuicSocket* /* socket */) override {
+    if (FLAGS_log_pmtu_probing_started) {
+      LOG(INFO) << "pmtu probing started";
     }
   }
 

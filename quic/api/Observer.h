@@ -169,6 +169,13 @@ class InstrumentationObserver {
       const PacketRTT& /* RTT sample */) {}
 
   /**
+   * pmtuProbingStarted() is invoked when server starts d6d.
+   *
+   * @param socket   Socket when the callback is processed.
+   */
+  virtual void pmtuProbingStarted(QuicSocket* /* socket */) {}
+
+  /**
    * pmtuBlackholeDetected() is invoked when a PMTU blackhole is detected.
    *
    * @param pmtuBlackholeEvent const reference to the PMTU blackhole event

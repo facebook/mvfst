@@ -338,6 +338,7 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       rttSampleGenerated,
       void(QuicSocket*, const PacketRTT&));
+  GMOCK_METHOD1_(, noexcept, , pmtuProbingStarted, void(QuicSocket*));
   GMOCK_METHOD2_(
       ,
       noexcept,
