@@ -80,7 +80,7 @@ class QuicStreamManager {
    * Return the stream state or create it if the state has not yet been created.
    * Note that this is only valid for streams that are currently open.
    */
-  QuicStreamState* getStream(StreamId streamId);
+  QuicStreamState* FOLLY_NULLABLE getStream(StreamId streamId);
 
   /*
    * Remove all the state for a stream that is being closed.
@@ -906,7 +906,7 @@ class QuicStreamManager {
   // Record whether or not we are app-idle.
   bool isAppIdle_{false};
 
-  const TransportSettings* transportSettings_;
+  const TransportSettings* FOLLY_NONNULL transportSettings_;
 
   bool maxLocalBidirectionalStreamIdIncreased_{false};
   bool maxLocalUnidirectionalStreamIdIncreased_{false};
