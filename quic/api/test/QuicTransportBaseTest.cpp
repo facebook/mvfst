@@ -3577,6 +3577,41 @@ TEST_F(QuicTransportImplTest, LifecycleObserverMultipleAttachDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb2.get());
 }
 
+TEST_F(QuicTransportImplTest, LifecycleObserverDetachAndAttachEvb) {
+  auto cb = std::make_unique<StrictMock<MockLifecycleObserver>>();
+  folly::EventBase evb2;
+
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addLifecycleObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // Detach the event base evb and attach a new event base evb2
+  EXPECT_CALL(*cb, evbDetach(transport.get(), evb.get()));
+  transport->detachEventBase();
+  EXPECT_EQ(nullptr, transport->getEventBase());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, evbAttach(transport.get(), &evb2));
+  transport->attachEventBase(&evb2);
+  EXPECT_EQ(&evb2, transport->getEventBase());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // Detach the event base evb and re-attach the old event base evb
+  EXPECT_CALL(*cb, evbDetach(transport.get(), &evb2));
+  transport->detachEventBase();
+  EXPECT_EQ(nullptr, transport->getEventBase());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, evbAttach(transport.get(), evb.get()));
+  transport->attachEventBase(evb.get());
+  EXPECT_EQ(evb.get(), transport->getEventBase());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeLifecycleObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
+}
+
 TEST_F(QuicTransportImplTest, InstrumentationObserverAttachRemove) {
   auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
   transport->addInstrumentationObserver(cb.get());

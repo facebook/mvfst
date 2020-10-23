@@ -2940,6 +2940,10 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   updateReadLooper();
   updatePeekLooper();
   updateWriteLooper(false);
+
+  for (const auto& cb : lifecycleObservers_) {
+    cb->evbAttach(this, evb_);
+  }
 }
 
 void QuicTransportBase::detachEventBase() {
@@ -2958,6 +2962,10 @@ void QuicTransportBase::detachEventBase() {
   readLooper_->detachEventBase();
   peekLooper_->detachEventBase();
   writeLooper_->detachEventBase();
+
+  for (const auto& cb : lifecycleObservers_) {
+    cb->evbDetach(this, evb_);
+  }
   evb_ = nullptr;
 }
 

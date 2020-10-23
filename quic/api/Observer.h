@@ -12,8 +12,13 @@
 #include <quic/d6d/Types.h>
 #include <quic/state/OutstandingPacket.h>
 
+namespace folly {
+class EventBase;
+}
+
 namespace quic {
 class QuicSocket;
+
 /**
  * ===== Instrumentation Observer API =====
  */
@@ -250,6 +255,32 @@ class LifecycleObserver {
       QuicSocket* /* socket */,
       const folly::Optional<
           std::pair<QuicErrorCode, std::string>>& /* errorOpt */) noexcept = 0;
+
+  /**
+   * evbAttach() will be invoked when a new event base is attached to this
+   * socket. This will be called from the new event base's thread.
+   *
+   * @param socket    Socket on which the new event base was attached.
+   * @param evb       The new event base that is getting attached.
+   */
+  virtual void evbAttach(
+      QuicSocket* /* socket */,
+      folly::EventBase* /* evb */) noexcept {
+    // do nothing
+  }
+
+  /**
+   * evbDetach() will be invoked when an existing event base is detached
+   * from the socket. This will be called from the existing event base's thread.
+   *
+   * @param socket    Socket on which the existing EVB is getting detached.
+   * @param evb       The existing event base that is getting detached.
+   */
+  virtual void evbDetach(
+      QuicSocket* /* socket */,
+      folly::EventBase* /* evb */) noexcept {
+    // do nothing
+  }
 };
 
 } // namespace quic

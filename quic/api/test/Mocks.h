@@ -312,6 +312,8 @@ class MockLifecycleObserver : public LifecycleObserver {
   GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , destroy, void(QuicSocket*));
+  GMOCK_METHOD2_(, noexcept, , evbAttach, void(QuicSocket*, folly::EventBase*));
+  GMOCK_METHOD2_(, noexcept, , evbDetach, void(QuicSocket*, folly::EventBase*));
   GMOCK_METHOD2_(
       ,
       noexcept,
