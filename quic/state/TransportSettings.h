@@ -129,8 +129,10 @@ struct TransportSettings {
   CongestionControlType defaultCongestionController{
       CongestionControlType::Cubic};
   // Param to determine sensitivity of CongestionController to latency. Only
-  // used by COPA.
+  // used by Copa.
   folly::Optional<double> copaDeltaParam;
+  // Whether to use Copa's RTT standing feature. Only used by Copa.
+  bool copaUseRttStanding{false};
   // The max UDP packet size we are willing to receive.
   uint64_t maxRecvPacketSize{kDefaultUDPReadBufferSize};
   // Number of buffers to allocate for GRO

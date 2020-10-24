@@ -96,5 +96,7 @@ class Copa : public CongestionController {
    * it will minimize delay at expense of throughput.
    */
   double deltaParam_{0.05};
+  // Whether we should use Copa's RTTstanding mechanism
+  bool useRttStanding_{false};
 };
 } // namespace quic

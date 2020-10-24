@@ -105,13 +105,15 @@ class CopaTest : public Test {
     numPacketsInFlight--;
     EXPECT_EQ(copa.getBytesInFlight(), numPacketsInFlight * packetSize);
 
-    now += 100ms;
+    now += 110ms;
     packetNumToAck++;
 
     EXPECT_TRUE(copa.inSlowStart());
 
     auto lastCwnd = copa.getCongestionWindow();
     // ack second packet
+    // Since now - first_ack_time > srtt, rttStanding includes only the latest
+    // measurement
     // update rtt measurements, current rate > target rate at this point, so it
     // exits slow start
     // target rate = 20 packets per sec, current rate = 10 packets / 100ms = 50
@@ -136,6 +138,7 @@ TEST_F(CopaTest, TestWritableBytes) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   EXPECT_TRUE(copa.inSlowStart());
 
@@ -153,6 +156,7 @@ TEST_F(CopaTest, PersistentCongestion) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -187,6 +191,7 @@ TEST_F(CopaTest, RemoveBytesWithoutLossOrAck) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -220,6 +225,9 @@ TEST_F(CopaTest, TestSlowStartAck) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  // tests assume we sent at least 10 packets in the initial burst
+  conn.transportSettings.initCwndInMss = 10;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -311,7 +319,20 @@ TEST_F(CopaTest, TestSlowStartAck) {
   // RTTmin = 280ms
   conn.lossState.srtt = 300ms;
 
-  // ack for 6th packet, at this point currentRate > targetRate, so it woudl
+  // ack for 6th packet, at this point even though lrtt has increased, standing
+  // rtt hasn't. Hence it will still not exit slow start
+  copa.onPacketAckOrLoss(
+      createAckEvent(packetNumToAck, packetSize, now), folly::none);
+  EXPECT_TRUE(copa.inSlowStart());
+  // cwnd = 40 packets
+  EXPECT_EQ(copa.getCongestionWindow(), lastCwnd);
+  lastCwnd = copa.getCongestionWindow();
+
+  now += 201ms;
+  conn.lossState.lrtt = 400ms;
+  conn.lossState.srtt = 300ms;
+
+  // ack for 7th packet, at this point currentRate > targetRate, so it would
   // exit slow start and reduce cwnd
   copa.onPacketAckOrLoss(
       createAckEvent(packetNumToAck, packetSize, now), folly::none);
@@ -323,6 +344,9 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
+  // Tests assume we have sent at least 10 packets in initial burst
+  conn.transportSettings.initCwndInMss = 9;
   Copa copa(conn);
   auto now = Clock::now();
   auto lastCwnd = exitSlowStart(copa, conn, now);
@@ -346,7 +370,7 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   now += 10ms;
   // target rate = 200 packets per sec, current rate = 9.6 packets / 100ms = ~50
   // packets per second
-  conn.lossState.lrtt = 60ms;
+  conn.lossState.lrtt = 50ms;
   // Rttmin = 60ms
   conn.lossState.srtt = 100ms;
   copa.onPacketAckOrLoss(
@@ -355,13 +379,38 @@ TEST_F(CopaTest, TestSteadyStateChanges) {
   cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
   // cwnd = 9.6 + 1 / (0.5 * 9.6) = 9.8 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
+  lastCwnd = copa.getCongestionWindow();
+
+  now += 10ms;
+  conn.lossState.lrtt = 100ms;
+  // Rttmin = 60ms
+  conn.lossState.srtt = 100ms;
+  // Though lrtt has increased, rtt standing has not.  Will still increase
+  copa.onPacketAckOrLoss(
+      createAckEvent(packetNumToAck, packetSize, now), folly::none);
+  packetNumToAck++;
+  cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
+  // cwnd = 9.8 + 1 / (0.5 * 9.8) = 10.0 packets
+  EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
+  lastCwnd = copa.getCongestionWindow();
+
+  // If sufficient time has elapsed, the increased rtt will be noted
+  now += 110ms;
+  copa.onPacketAckOrLoss(
+      createAckEvent(packetNumToAck, packetSize, now), folly::none);
+  packetNumToAck++;
+  cwndChange = cwndChangeSteadyState(lastCwnd, 1.0, packetSize, 0.5, conn);
+  // cwnd = 10 - 1 / (0.5 * 10) = 9.8
+  EXPECT_EQ(copa.getCongestionWindow(), lastCwnd - cwndChange);
 }
 
 TEST_F(CopaTest, TestVelocity) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   conn.transportSettings.pacingTimerTickInterval = 10ms;
+  conn.transportSettings.initCwndInMss = 11;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -375,8 +424,8 @@ TEST_F(CopaTest, TestVelocity) {
 
   // target rate = 200 packets per sec, current rate = 9.8 packets / 100ms = ~50
   // packets per second.
-  conn.lossState.lrtt = 60ms;
-  // Rttmin = 60ms
+  conn.lossState.lrtt = 50ms;
+  // Rttmin = 50ms
   conn.lossState.srtt = 100ms;
   now += 100ms;
   // velocity = 1, direction = 0
@@ -412,10 +461,18 @@ TEST_F(CopaTest, TestVelocity) {
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
   lastCwnd = copa.getCongestionWindow();
 
+  // another ack, velocity = 1, direction = 1
+  now += 100ms;
+  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), folly::none);
+  cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
+  // cwnd = 10.4 + 1 / (0.5 * 10.4) = 10.6 packets
+  EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
+  lastCwnd = copa.getCongestionWindow();
+
   // another ack, velocity = 2, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), folly::none);
+  copa.onPacketAckOrLoss(createAckEvent(55, packetSize, now), folly::none);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 10 + 2 / (0.5 * 10.6) = 11 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -424,7 +481,7 @@ TEST_F(CopaTest, TestVelocity) {
   // another ack, velocity = 4, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), folly::none);
+  copa.onPacketAckOrLoss(createAckEvent(60, packetSize, now), folly::none);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11 + 4 / (0.5 * 11) = 11.8 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -433,7 +490,7 @@ TEST_F(CopaTest, TestVelocity) {
   // another ack, velocity = 8, direction = 1
   velocity = 2 * velocity;
   now += 100ms;
-  copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), folly::none);
+  copa.onPacketAckOrLoss(createAckEvent(65, packetSize, now), folly::none);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11.8 + 8 / (0.5 * 11.8) = 13.4 packets
   EXPECT_EQ(copa.getCongestionWindow(), lastCwnd + cwndChange);
@@ -445,7 +502,8 @@ TEST_F(CopaTest, TestVelocity) {
   conn.lossState.srtt = 100ms;
 
   velocity = 1;
-  now += 100ms;
+  // give it some extra time for rtt standing to reset
+  now += 110ms;
   copa.onPacketAckOrLoss(createAckEvent(50, packetSize, now), folly::none);
   cwndChange = cwndChangeSteadyState(lastCwnd, velocity, packetSize, 0.5, conn);
   // cwnd = 11.8 + 8 / (0.5 * 11.8) = 13.4 packets
@@ -457,6 +515,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
@@ -479,6 +538,7 @@ TEST_F(CopaTest, PacketLossInvokesPacer) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.transportSettings.copaDeltaParam = 0.5;
+  conn.transportSettings.copaUseRttStanding = true;
   Copa copa(conn);
   auto mockPacer = std::make_unique<MockPacer>();
   auto rawPacer = mockPacer.get();

@@ -31,6 +31,7 @@ Copa::Copa(QuicConnectionStateBase& conn)
   if (conn_.transportSettings.copaDeltaParam.has_value()) {
     deltaParam_ = conn_.transportSettings.copaDeltaParam.value();
   }
+  useRttStanding_ = conn_.transportSettings.copaUseRttStanding;
   QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
 
@@ -97,7 +98,11 @@ void Copa::checkAndUpdateDirection(const TimePoint ackTime) {
       velocityState_.numTimesDirectionSame = 0;
     } else {
       velocityState_.numTimesDirectionSame++;
-      if (velocityState_.numTimesDirectionSame >= 3) {
+      uint64_t velocityDirectionThreshold = 3;
+      if (useRttStanding_) {
+        velocityDirectionThreshold = 4;
+      }
+      if (velocityState_.numTimesDirectionSame >= velocityDirectionThreshold) {
         velocityState_.velocity = 2 * velocityState_.velocity;
       }
     }
@@ -151,7 +156,13 @@ void Copa::onPacketAcked(const AckEvent& ack) {
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())
           .count());
   auto rttMin = minRTTFilter_.GetBest();
-  standingRTTFilter_.SetWindowLength(conn_.lossState.srtt.count() / 2);
+  if (useRttStanding_) {
+    standingRTTFilter_.SetWindowLength(
+        conn_.lossState.srtt.count());
+  } else {
+    standingRTTFilter_.SetWindowLength(
+        conn_.lossState.srtt.count() / 2);
+  }
   standingRTTFilter_.Update(
       conn_.lossState.lrtt,
       std::chrono::duration_cast<microseconds>(ack.ackTime.time_since_epoch())
@@ -179,16 +190,23 @@ void Copa::onPacketAcked(const AckEvent& ack) {
         kCongestionPacketAck);
   }
 
-  auto delayInMicroSec =
-      duration_cast<microseconds>(conn_.lossState.lrtt - rttMin).count();
-  if (delayInMicroSec < 0) {
-    LOG(ERROR) << __func__
-               << "delay negative, lrtt=" << conn_.lossState.lrtt.count()
+  if (rttStandingMicroSec < rttMin.count()) {
+    VLOG(3) << __func__
+               << "delay negative, rttStanding=" << rttStandingMicroSec
                << " rttMin=" << rttMin.count() << " " << conn_;
     return;
   }
+
+  uint64_t delayInMicroSec;
+  if (useRttStanding_) {
+    delayInMicroSec = rttStandingMicroSec - rttMin.count();
+  } else {
+    delayInMicroSec =
+        duration_cast<microseconds>(conn_.lossState.lrtt - rttMin).count();
+  }
+
   if (rttStandingMicroSec == 0) {
-    LOG(ERROR) << __func__ << "rttStandingMicroSec zero, lrtt = "
+    VLOG(3) << __func__ << "rttStandingMicroSec zero, lrtt = "
                << conn_.lossState.lrtt.count() << " rttMin=" << rttMin.count()
                << " " << conn_;
     return;
