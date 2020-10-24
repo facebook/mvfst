@@ -89,16 +89,8 @@ void recoverOrResetCongestionAndRttState(
   }
 }
 
-void setExperimentalSettings(QuicServerConnectionState& conn) {
-  if (conn.pacer) {
-    bool usingBbr = conn.congestionController &&
-        (conn.congestionController->type() == CongestionControlType::BBR);
-    conn.pacer = std::make_unique<TokenlessPacer>(
-        conn,
-        usingBbr ? kMinCwndInMssForBbr : conn.transportSettings.minCwndInMss);
-    // This doesn't actually change the tick, just the pacing calculation.
-    conn.transportSettings.pacingTimerTickInterval = 1ms;
-  }
+void setExperimentalSettings(QuicServerConnectionState& /*conn*/) {
+  // Currently nothing.
 }
 } // namespace
 
