@@ -192,8 +192,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 
   if (rttStandingMicroSec < rttMin.count()) {
     VLOG(3) << __func__
-               << "delay negative, rttStanding=" << rttStandingMicroSec
-               << " rttMin=" << rttMin.count() << " " << conn_;
+            << "delay negative, rttStanding=" << rttStandingMicroSec
+            << " rttMin=" << rttMin.count() << " " << conn_;
     return;
   }
 
@@ -207,8 +207,8 @@ void Copa::onPacketAcked(const AckEvent& ack) {
 
   if (rttStandingMicroSec == 0) {
     VLOG(3) << __func__ << "rttStandingMicroSec zero, lrtt = "
-               << conn_.lossState.lrtt.count() << " rttMin=" << rttMin.count()
-               << " " << conn_;
+            << conn_.lossState.lrtt.count() << " rttMin=" << rttMin.count()
+            << " " << conn_;
     return;
   }
 
