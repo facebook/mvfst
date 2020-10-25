@@ -157,11 +157,9 @@ void Copa::onPacketAcked(const AckEvent& ack) {
           .count());
   auto rttMin = minRTTFilter_.GetBest();
   if (useRttStanding_) {
-    standingRTTFilter_.SetWindowLength(
-        conn_.lossState.srtt.count());
+    standingRTTFilter_.SetWindowLength(conn_.lossState.srtt.count());
   } else {
-    standingRTTFilter_.SetWindowLength(
-        conn_.lossState.srtt.count() / 2);
+    standingRTTFilter_.SetWindowLength(conn_.lossState.srtt.count() / 2);
   }
   standingRTTFilter_.Update(
       conn_.lossState.lrtt,
@@ -191,8 +189,7 @@ void Copa::onPacketAcked(const AckEvent& ack) {
   }
 
   if (rttStandingMicroSec < rttMin.count()) {
-    VLOG(3) << __func__
-            << "delay negative, rttStanding=" << rttStandingMicroSec
+    VLOG(3) << __func__ << "delay negative, rttStanding=" << rttStandingMicroSec
             << " rttMin=" << rttMin.count() << " " << conn_;
     return;
   }
