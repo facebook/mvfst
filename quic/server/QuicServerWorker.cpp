@@ -234,7 +234,7 @@ void QuicServerWorker::onDataAvailable(
   // we've flushed it.
   Buf data = std::move(readBuffer_);
 
-  if (params.gro_ <= 0) {
+  if (params.gro <= 0) {
     if (truncated) {
       // This is an error, drop the packet.
       return;
@@ -249,7 +249,7 @@ void QuicServerWorker::onDataAvailable(
     // AsyncUDPSocket::handleRead() sets the len to be the
     // buffer size in case the data is truncated
     if (truncated) {
-      len -= len % params.gro_;
+      len -= len % params.gro;
     }
 
     data->append(len);
@@ -259,17 +259,17 @@ void QuicServerWorker::onDataAvailable(
     size_t remaining = len;
     size_t offset = 0;
     while (remaining) {
-      if (static_cast<int>(remaining) > params.gro_) {
+      if (static_cast<int>(remaining) > params.gro) {
         auto tmp = data->cloneOne();
         // start at offset
         tmp->trimStart(offset);
         // the actual len is len - offset now
         // leave params.gro_ bytes
-        tmp->trimEnd(len - offset - params.gro_);
-        DCHECK_EQ(tmp->length(), params.gro_);
+        tmp->trimEnd(len - offset - params.gro);
+        DCHECK_EQ(tmp->length(), params.gro);
 
-        offset += params.gro_;
-        remaining -= params.gro_;
+        offset += params.gro;
+        remaining -= params.gro;
         handleNetworkData(client, std::move(tmp), packetReceiveTime);
       } else {
         // do not clone the last packet
@@ -429,7 +429,7 @@ void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int res) {
         reinterpret_cast<sockaddr*>(msg.msg_name), msg.msg_namelen);
 
     OnDataAvailableParams params;
-    params.gro_ = gro;
+    params.gro = gro;
     onDataAvailable(addr, bytesRead, truncated, params);
   }
   msgHdr_.reset(msgHdr);
