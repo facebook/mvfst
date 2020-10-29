@@ -63,7 +63,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       ;
       data_.msg_namelen = sizeof(addrStorage_);
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-      if (hasGRO()) {
+      if (hasGRO() || hasTimestamping()) {
+        ::memset(control_, 0, sizeof(control_));
         data_.msg_control = control_;
         data_.msg_controllen = sizeof(control_);
       }
@@ -90,6 +91,11 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       return worker->numGROBuffers_ > 1;
     }
 
+    bool hasTimestamping() {
+      auto* worker = reinterpret_cast<QuicServerWorker*>(arg_);
+      return worker->hasTimestamping();
+    }
+
     // data
     Buf ioBuf_;
     struct iovec iov_;
@@ -97,7 +103,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
     // addr
     struct sockaddr_storage addrStorage_;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
-    char control_[CMSG_SPACE(sizeof(uint16_t))];
+    char control_[folly::AsyncUDPSocket::ReadCallback::OnDataAvailableParams::
+                      kCmsgSpace];
 #endif
   };
 
@@ -497,6 +504,10 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   std::string logRoutingInfo(const ConnectionId& connId) const;
 
   void eventRecvmsgCallback(MsgHdr* msgHdr, int res);
+
+  bool hasTimestamping() {
+    return (socket_ && (socket_->getTimestamping() > 0));
+  }
 
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};
