@@ -1178,6 +1178,27 @@ void QuicServerWorker::getAllConnectionsStats(
         conn->lossState.rttvar);
     connStats.peerAckDelayExponent = conn->peerAckDelayExponent;
     connStats.udpSendPacketLen = conn->udpSendPacketLen;
+    if (conn->streamManager) {
+      connStats.numStreams = conn->streamManager->streams().size();
+    }
+
+    if (conn->clientChosenDestConnectionId.hasValue()) {
+      connStats.clientChosenDestConnectionId =
+          conn->clientChosenDestConnectionId->hex();
+    }
+    if (conn->clientConnectionId.hasValue()) {
+      connStats.clientConnectionId = conn->clientConnectionId->hex();
+    }
+    if (conn->serverConnectionId.hasValue()) {
+      connStats.serverConnectionId = conn->serverConnectionId->hex();
+    }
+
+    connStats.totalBytesSent = conn->lossState.totalBytesSent;
+    connStats.totalBytesReceived = conn->lossState.totalBytesRecvd;
+    connStats.totalBytesRetransmitted = conn->lossState.totalBytesRetransmitted;
+    if (conn->version.hasValue()) {
+      connStats.version = static_cast<uint32_t>(*conn->version);
+    }
     stats.emplace_back(connStats);
   }
 }

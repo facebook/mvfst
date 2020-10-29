@@ -29,6 +29,14 @@ struct QuicConnectionStats {
   std::chrono::duration<float> rttvar{0ms};
   uint64_t peerAckDelayExponent{0};
   uint64_t udpSendPacketLen{0};
+  uint64_t numStreams{0};
+  std::string clientChosenDestConnectionId;
+  std::string clientConnectionId;
+  std::string serverConnectionId;
+  uint64_t totalBytesSent{0};
+  uint64_t totalBytesReceived{0};
+  uint64_t totalBytesRetransmitted{0};
+  uint32_t version;
 };
 
 } // namespace quic
