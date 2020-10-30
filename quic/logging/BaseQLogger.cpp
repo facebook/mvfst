@@ -82,7 +82,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
     uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   event->packetSize = packetSize;
   event->eventType = QLogEventType::PacketReceived;
   const ShortHeader* shortHeader = regularPacket.header.asShort();
@@ -194,7 +194,7 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
     uint64_t packetSize) {
   auto event = std::make_unique<QLogPacketEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   event->packetNum = writePacket.header.getPacketSequenceNum();
   event->packetSize = packetSize;
   event->eventType = QLogEventType::PacketSent;
@@ -296,7 +296,7 @@ std::unique_ptr<QLogVersionNegotiationEvent> BaseQLogger::createPacketEvent(
     bool isPacketRecvd) {
   auto event = std::make_unique<QLogVersionNegotiationEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   event->packetSize = packetSize;
   event->eventType =
       isPacketRecvd ? QLogEventType::PacketReceived : QLogEventType::PacketSent;
@@ -312,7 +312,7 @@ std::unique_ptr<QLogRetryEvent> BaseQLogger::createPacketEvent(
     bool isPacketRecvd) {
   auto event = std::make_unique<QLogRetryEvent>();
   event->refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   event->packetSize = packetSize;
   event->tokenSize = retryPacket.header.getToken().size();
   event->eventType =

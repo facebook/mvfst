@@ -167,7 +167,7 @@ void FileQLogger::addConnectionClose(
     bool drainConnection,
     bool sendCloseImmediately) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   handleEvent(std::make_unique<quic::QLogConnectionCloseEvent>(
       std::move(error),
       std::move(reason),
@@ -188,7 +188,7 @@ void FileQLogger::addTransportSummary(
     uint64_t totalCryptoDataWritten,
     uint64_t totalCryptoDataRecvd) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogTransportSummaryEvent>(
       totalBytesSent,
@@ -211,7 +211,7 @@ void FileQLogger::addCongestionMetricUpdate(
     std::string state,
     std::string recoveryState) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogCongestionMetricUpdateEvent>(
       bytesInFlight,
@@ -229,27 +229,27 @@ void FileQLogger::addBandwidthEstUpdate(
       bytes,
       interval,
       std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now() - refTimePoint)));
+          std::chrono::steady_clock::now().time_since_epoch())));
 }
 
 void FileQLogger::addAppLimitedUpdate() {
   handleEvent(std::make_unique<quic::QLogAppLimitedUpdateEvent>(
       true,
       std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now() - refTimePoint)));
+          std::chrono::steady_clock::now().time_since_epoch())));
 }
 
 void FileQLogger::addAppUnlimitedUpdate() {
   handleEvent(std::make_unique<quic::QLogAppLimitedUpdateEvent>(
       false,
       std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now() - refTimePoint)));
+          std::chrono::steady_clock::now().time_since_epoch())));
 }
 void FileQLogger::addPacingMetricUpdate(
     uint64_t pacingBurstSizeIn,
     std::chrono::microseconds pacingIntervalIn) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogPacingMetricUpdateEvent>(
       pacingBurstSizeIn, pacingIntervalIn, refTime));
@@ -260,14 +260,14 @@ void FileQLogger::addPacingObservation(
     std::string expect,
     std::string conclusion) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   handleEvent(std::make_unique<quic::QLogPacingObservationEvent>(
       std::move(actual), std::move(expect), std::move(conclusion), refTime));
 }
 
 void FileQLogger::addAppIdleUpdate(std::string idleEvent, bool idle) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogAppIdleUpdateEvent>(
       std::move(idleEvent), idle, refTime));
@@ -275,7 +275,7 @@ void FileQLogger::addAppIdleUpdate(std::string idleEvent, bool idle) {
 
 void FileQLogger::addPacketDrop(size_t packetSize, std::string dropReason) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogPacketDropEvent>(
       packetSize, std::move(dropReason), refTime));
@@ -283,7 +283,7 @@ void FileQLogger::addPacketDrop(size_t packetSize, std::string dropReason) {
 
 void FileQLogger::addDatagramReceived(uint64_t dataLen) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(
       std::make_unique<quic::QLogDatagramReceivedEvent>(dataLen, refTime));
@@ -295,7 +295,7 @@ void FileQLogger::addLossAlarm(
     uint64_t outstandingPackets,
     std::string type) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogLossAlarmEvent>(
       largestSent, alarmCount, outstandingPackets, std::move(type), refTime));
@@ -306,7 +306,7 @@ void FileQLogger::addPacketsLost(
     uint64_t lostBytes,
     uint64_t lostPackets) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogPacketsLostEvent>(
       largestLostPacketNum, lostBytes, lostPackets, refTime));
@@ -314,7 +314,7 @@ void FileQLogger::addPacketsLost(
 
 void FileQLogger::addTransportStateUpdate(std::string update) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogTransportStateUpdateEvent>(
       std::move(update), refTime));
@@ -325,7 +325,7 @@ void FileQLogger::addPacketBuffered(
     ProtectionType protectionType,
     uint64_t packetSize) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogPacketBufferedEvent>(
       packetNum, protectionType, packetSize, refTime));
@@ -337,7 +337,7 @@ void FileQLogger::addMetricUpdate(
     std::chrono::microseconds srtt,
     std::chrono::microseconds ackDelay) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogMetricUpdateEvent>(
       latestRtt, mrtt, srtt, ackDelay, refTime));
@@ -417,7 +417,7 @@ void FileQLogger::addStreamStateUpdate(
     std::string update,
     folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogStreamStateUpdateEvent>(
       id,
@@ -429,14 +429,14 @@ void FileQLogger::addStreamStateUpdate(
 
 void FileQLogger::addConnectionMigrationUpdate(bool intentionalMigration) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   handleEvent(std::make_unique<quic::QLogConnectionMigrationEvent>(
       intentionalMigration, vantagePoint, refTime));
 }
 
 void FileQLogger::addPathValidationEvent(bool success) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::steady_clock::now() - refTimePoint);
+      std::chrono::steady_clock::now().time_since_epoch());
   handleEvent(std::make_unique<quic::QLogPathValidationEvent>(
       success, vantagePoint, refTime));
 }

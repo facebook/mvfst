@@ -30,8 +30,6 @@ class QLogger {
 
   folly::Optional<ConnectionId> dcid;
   folly::Optional<ConnectionId> scid;
-  std::chrono::steady_clock::time_point refTimePoint{
-      std::chrono::steady_clock::now()};
   VantagePoint vantagePoint;
   std::string protocolType;
   QLogger() = delete;
