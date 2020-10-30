@@ -57,7 +57,8 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
       fizzContext_->getCertificateVerifier(),
       std::move(hostname),
       std::move(cachedPsk),
-      std::make_shared<FizzClientExtensions>(getClientTransportParameters())));
+      std::make_shared<FizzClientExtensions>(getClientTransportParameters()),
+      folly::none));
 
   return transportParams;
 }
