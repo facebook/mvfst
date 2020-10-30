@@ -138,6 +138,15 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   }
 
   /**
+   * Sets whether the underlying socket should set the IPV6_ONLY socket option
+   * or not. If set to false, IPv4-mapped IPv6 addresses will be enabled on the
+   * socket.
+   */
+  void setBindV6Only(bool bindV6Only) {
+    bindOptions_.bindV6Only = bindV6Only;
+  }
+
+  /**
    * Set the server id of the quic server.
    * Note that this function must be called before initialize(..)
    */
@@ -448,6 +457,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     std::chrono::seconds window;
   };
   folly::Optional<RateLimit> rateLimit_;
+
+  // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
+  folly::AsyncUDPSocket::BindOptions bindOptions_;
 };
 
 } // namespace quic

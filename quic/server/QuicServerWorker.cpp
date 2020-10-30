@@ -42,12 +42,16 @@ void QuicServerWorker::setSocket(
   evb_ = socket_->getEventBase();
 }
 
-void QuicServerWorker::bind(const folly::SocketAddress& address) {
+void QuicServerWorker::bind(
+    const folly::SocketAddress& address,
+    folly::AsyncUDPSocket::BindOptions bindOptions) {
   DCHECK(!supportedVersions_.empty());
   CHECK(socket_);
   if (setEventCallback_) {
     socket_->setEventCallback(this);
   }
+  // TODO this totally doesn't work, we can't apply socket options before
+  // bind, since bind creates the fd.
   if (socketOptions_) {
     applySocketOptions(
         *socket_.get(),
@@ -55,7 +59,7 @@ void QuicServerWorker::bind(const folly::SocketAddress& address) {
         address.getFamily(),
         folly::SocketOptionKey::ApplyPos::PRE_BIND);
   }
-  socket_->bind(address);
+  socket_->bind(address, bindOptions);
   if (socketOptions_) {
     applySocketOptions(
         *socket_.get(),

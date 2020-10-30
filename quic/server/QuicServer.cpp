@@ -270,7 +270,7 @@ void QuicServer::bindWorkersToSocket(
                 << " workerId=" << (int)worker->getWorkerId()
                 << " processId=" << (int)processId;
         worker->setSocket(std::move(workerSocket));
-        worker->bind(self->boundAddress_);
+        worker->bind(self->boundAddress_, self->bindOptions_);
         if (idx == 0) {
           self->boundAddress_ = worker->getAddress();
         }

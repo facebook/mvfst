@@ -159,7 +159,10 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   /**
    * Binds to the given address
    */
-  void bind(const folly::SocketAddress& address);
+  void bind(
+      const folly::SocketAddress& address,
+      folly::AsyncUDPSocket::BindOptions bindOptions =
+          folly::AsyncUDPSocket::BindOptions());
 
   /**
    * start reading data from the socket
