@@ -1431,7 +1431,7 @@ class QuicClientTransportTest : public Test {
 
   virtual void setUpSocketExpectations() {
     EXPECT_CALL(*sock, setReuseAddr(false));
-    EXPECT_CALL(*sock, bind(_));
+    EXPECT_CALL(*sock, bind(_, _));
     EXPECT_CALL(*sock, dontFragment(true));
     EXPECT_CALL(*sock, setErrMessageCallback(client.get()));
     EXPECT_CALL(*sock, resumeRead(client.get()));
@@ -1870,7 +1870,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceAfterHandshake) {
   auto newSocketPtr = newSocket.get();
   EXPECT_CALL(*sock, pauseRead());
   EXPECT_CALL(*sock, close());
-  EXPECT_CALL(*newSocketPtr, bind(_));
+  EXPECT_CALL(*newSocketPtr, bind(_, _));
   EXPECT_CALL(*newSocketPtr, close());
 
   client->setQLogger(mockQLogger);
@@ -1886,7 +1886,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
   auto newSocketPtr = newSocket.get();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Client);
   EXPECT_CALL(*mockQLogger, addConnectionMigrationUpdate(true)).Times(0);
-  EXPECT_CALL(*newSocketPtr, bind(_)).Times(0);
+  EXPECT_CALL(*newSocketPtr, bind(_, _)).Times(0);
   client->onNetworkSwitch(std::move(newSocket));
   client->closeNow(folly::none);
 }
@@ -2309,9 +2309,9 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     auto& conn = client->getConn();
 
     EXPECT_CALL(*sock, write(firstAddress, _));
-    EXPECT_CALL(*secondSock, bind(_))
+    EXPECT_CALL(*secondSock, bind(_, _))
         .WillOnce(Invoke(
-            [](const folly::SocketAddress&) { throw std::exception(); }));
+            [](const folly::SocketAddress&, auto) { throw std::exception(); }));
     client->start(&clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);

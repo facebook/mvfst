@@ -1221,7 +1221,7 @@ class QuicServerWorkerTakeoverTest : public Test {
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb_);
     takeoverSocket_ = takeoverSock.get();
     folly::SocketAddress takeoverAddr;
-    EXPECT_CALL(*takeoverSocket_, bind(_));
+    EXPECT_CALL(*takeoverSocket_, bind(_, _));
     EXPECT_CALL(*takeoverSocket_, resumeRead(_));
     takeoverWorker_->allowBeingTakenOver(std::move(takeoverSock), takeoverAddr);
   }
@@ -1250,7 +1250,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverReInitHandler) {
   folly::SocketAddress takeoverAddr;
   EXPECT_CALL(*takeoverSocket_, pauseRead());
 
-  EXPECT_CALL(*takeoverSock, bind(_));
+  EXPECT_CALL(*takeoverSock, bind(_, _));
   EXPECT_CALL(*takeoverSock, resumeRead(_));
   EXPECT_CALL(*takeoverSock, address()).WillOnce(Invoke([&]() {
     return takeoverAddr;
@@ -1381,7 +1381,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb_);
   EXPECT_CALL(*takeoverSocketFactory_, _make(_, _))
       .WillOnce(Return(writeSock.get()));
-  EXPECT_CALL(*writeSock, bind(_));
+  EXPECT_CALL(*writeSock, bind(_, _));
   EXPECT_CALL(*writeSock, write(_, _))
       .WillOnce(Invoke([&](const SocketAddress& /* unused */,
                            const std::unique_ptr<folly::IOBuf>& writtenData) {
@@ -1466,7 +1466,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb_);
   EXPECT_CALL(*takeoverSocketFactory_, _make(_, _))
       .WillOnce(Return(writeSock.get()));
-  EXPECT_CALL(*writeSock, bind(_));
+  EXPECT_CALL(*writeSock, bind(_, _));
   EXPECT_CALL(*writeSock, write(_, _))
       .WillOnce(Invoke([&](const SocketAddress& client,
                            const std::unique_ptr<folly::IOBuf>& writtenData) {
