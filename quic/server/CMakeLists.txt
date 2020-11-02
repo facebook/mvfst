@@ -49,6 +49,7 @@ add_dependencies(
   mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_transport
+  mvfst_transport_knobs
 )
 
 if(DEFINED CCP_ENABLED)
@@ -74,6 +75,7 @@ target_link_libraries(
   mvfst_qlogger
   mvfst_state_ack_handler
   mvfst_transport
+  mvfst_transport_knobs
   ${LIBCCP_LIBRARY}
   ${LIBSTARTCCP_LIBRARY}
 )

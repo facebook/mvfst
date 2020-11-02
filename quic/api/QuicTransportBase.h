@@ -729,7 +729,7 @@ class QuicTransportBase : public QuicSocket {
   /**
    * Callback when we receive a transport knob
    */
-  void onTransportKnobs(Buf knobBlob);
+  virtual void onTransportKnobs(Buf knobBlob);
 
   struct ByteEventDetail {
     ByteEventDetail(uint64_t offsetIn, ByteEventCallback* callbackIn)
