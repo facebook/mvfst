@@ -110,6 +110,10 @@ DEFINE_uint32(
     d6d_probe_timeout_secs,
     600,
     "Client only. The probe timeout advertised to server");
+DEFINE_string(
+    transport_knob_params,
+    "",
+    "JSON-serialized dictionary of transport knob params");
 
 namespace quic {
 namespace tperf {
@@ -665,6 +669,11 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
         std::chrono::seconds(FLAGS_d6d_raise_timeout_secs);
     settings.d6dConfig.advertisedProbeTimeout =
         std::chrono::seconds(FLAGS_d6d_probe_timeout_secs);
+    if (!FLAGS_transport_knob_params.empty()) {
+      settings.knobs.push_back({kDefaultQuicTransportKnobSpace,
+                                kDefaultQuicTransportKnobId,
+                                FLAGS_transport_knob_params});
+    }
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();

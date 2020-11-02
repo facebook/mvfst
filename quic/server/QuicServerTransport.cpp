@@ -375,6 +375,16 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
   }
 }
 
+void QuicServerTransport::handleTransportKnobParams(
+    const TransportKnobParams& params) {
+  for (const auto& param : params) {
+    auto maybeParamHandler = transportKnobParamHandlers_.find(param.id);
+    if (maybeParamHandler != transportKnobParamHandlers_.end()) {
+      (maybeParamHandler->second)(serverConn_, param.val);
+    }
+  }
+}
+
 void QuicServerTransport::processPendingData(bool async) {
   // The case when both 0-rtt and 1-rtt pending data are ready to be processed
   // but neither had been shouldn't happen
@@ -543,6 +553,12 @@ void QuicServerTransport::maybeStartD6DProbing() {
   }
 }
 
+void QuicServerTransport::registerTransportKnobParamHandler(
+    uint64_t paramId,
+    std::function<void(QuicServerConnectionState*, uint64_t)>&& handler) {
+  transportKnobParamHandlers_.emplace(paramId, std::move(handler));
+}
+
 void QuicServerTransport::setBufAccessor(BufAccessor* bufAccessor) {
   CHECK(bufAccessor);
   conn_->bufAccessor = bufAccessor;
@@ -568,7 +584,9 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
       reinterpret_cast<const char*>(knobBlob->data()), knobBlob->length());
   VLOG(4) << "Received transport knobs: " << serializedKnobs;
   auto params = parseTransportKnobs(serializedKnobs);
-  // Handling not yet implemented
+  if (params.hasValue()) {
+    handleTransportKnobParams(*params);
+  }
 }
 
 } // namespace quic

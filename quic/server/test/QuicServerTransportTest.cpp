@@ -280,6 +280,16 @@ class TestingQuicServerTransport : public QuicServerTransport {
   auto& readLooper() {
     return readLooper_;
   }
+
+  void registerKnobParamHandler(
+      uint64_t paramId,
+      std::function<void(QuicServerConnectionState*, uint64_t)>&& handler) {
+    registerTransportKnobParamHandler(paramId, std::move(handler));
+  }
+
+  void handleKnobParams(const TransportKnobParams& params) {
+    handleTransportKnobParams(params);
+  }
 };
 
 class QuicServerTransportTest : public Test {
@@ -4246,5 +4256,37 @@ TEST_P(QuicServerTransportHandshakeTest, TestD6DStartInstrumentationCallback) {
   server->removeInstrumentationObserver(mockObserver.get());
 }
 
+TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
+  int flag = 0;
+  server->registerKnobParamHandler(
+      199, [&](QuicServerConnectionState* /* server_conn */, uint64_t val) {
+        EXPECT_EQ(val, 10);
+        flag = 1;
+      });
+  server->registerKnobParamHandler(
+      200,
+      [&](QuicServerConnectionState* /* server_conn */, uint64_t /* val */) {
+        flag = 2;
+      });
+  server->handleKnobParams({
+      {199, 10},
+      {201, 20},
+  });
+
+  EXPECT_EQ(flag, 1);
+
+  // ovewrite will fail, the new handler won't be called
+  server->registerKnobParamHandler(
+      199, [&](QuicServerConnectionState* /* server_conn */, uint64_t val) {
+        EXPECT_EQ(val, 30);
+        flag = 3;
+      });
+
+  server->handleKnobParams({
+      {199, 10},
+      {201, 20},
+  });
+  EXPECT_EQ(flag, 1);
+}
 } // namespace test
 } // namespace quic

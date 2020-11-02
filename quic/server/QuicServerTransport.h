@@ -159,5 +159,9 @@ class QuicServerTransport
   bool newSessionTicketWritten_{false};
   bool connectionIdsIssued_{false};
   QuicServerConnectionState* serverConn_;
+  std::unordered_map<
+      uint64_t,
+      std::function<void(QuicServerConnectionState*, uint64_t)>>
+      transportKnobParamHandlers_;
 };
 } // namespace quic
