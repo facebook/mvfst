@@ -150,6 +150,7 @@ class QuicServerTransport
   void maybeIssueConnectionIds();
   bool hasReadCipher() const;
   void maybeStartD6DProbing();
+  void registerAllTransportKnobParamHandlers();
 
  private:
   RoutingCallback* routingCb_{nullptr};

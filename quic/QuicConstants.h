@@ -115,6 +115,9 @@ constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
 // Default knob id for transport knobs
 constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
+// Default transport knob param id for disabling pmtu blackhole detection
+constexpr uint64_t kTransportKnobParamIdZeroBlackholeDetection = 0x8830;
+
 enum class FrameType : uint64_t {
   PADDING = 0x00,
   PING = 0x01,

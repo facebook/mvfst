@@ -813,6 +813,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     // Meta state
     D6DMetaState meta;
 
+    // Turn off blackhole detection
+    bool noBlackholeDetection{false};
+
     // D6D Machine State
     D6DMachineState state{D6DMachineState::DISABLED};
   };

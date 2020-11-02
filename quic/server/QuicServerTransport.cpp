@@ -37,6 +37,7 @@ QuicServerTransport::QuicServerTransport(
   // correctly.
   // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();
   setConnectionCallback(&cb);
+  registerAllTransportKnobParamHandlers();
 }
 
 QuicServerTransport::~QuicServerTransport() {
@@ -587,6 +588,19 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
   if (params.hasValue()) {
     handleTransportKnobParams(*params);
   }
+}
+
+void QuicServerTransport::registerAllTransportKnobParamHandlers() {
+  registerTransportKnobParamHandler(
+      kTransportKnobParamIdZeroBlackholeDetection,
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        if (static_cast<bool>(val)) {
+          server_conn->d6d.noBlackholeDetection = true;
+          LOG(INFO)
+              << "Knob param received, pmtu blackhole detection is turned off";
+        }
+      });
 }
 
 } // namespace quic

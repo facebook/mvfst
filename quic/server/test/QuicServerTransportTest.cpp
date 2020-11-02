@@ -4288,5 +4288,10 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   });
   EXPECT_EQ(flag, 1);
 }
+
+TEST_F(QuicServerTransportTest, TestRegisterPMTUZeroBlackholeDetection) {
+  server->handleKnobParams({{kTransportKnobParamIdZeroBlackholeDetection, 1}});
+  EXPECT_TRUE(server->getConn().d6d.noBlackholeDetection);
+}
 } // namespace test
 } // namespace quic

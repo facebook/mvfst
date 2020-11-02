@@ -243,7 +243,7 @@ void detectPMTUBlackhole(
   // less than base pmtu, then the loss is not caused by pmtu blackhole
   if (d6d.state == D6DMachineState::DISABLED || packet.metadata.isD6DProbe ||
       packet.metadata.encodedSize <= d6d.basePMTU ||
-      conn.udpSendPacketLen <= d6d.basePMTU) {
+      conn.udpSendPacketLen <= d6d.basePMTU || d6d.noBlackholeDetection) {
     return;
   }
 
