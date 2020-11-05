@@ -581,12 +581,14 @@ QuicServerTransport::getPeerCertificate() const {
 }
 
 void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
-  std::string serializedKnobs = std::string(
-      reinterpret_cast<const char*>(knobBlob->data()), knobBlob->length());
-  VLOG(4) << "Received transport knobs: " << serializedKnobs;
-  auto params = parseTransportKnobs(serializedKnobs);
-  if (params.hasValue()) {
-    handleTransportKnobParams(*params);
+  if (knobBlob->length() > 0) {
+    std::string serializedKnobs = std::string(
+        reinterpret_cast<const char*>(knobBlob->data()), knobBlob->length());
+    VLOG(4) << "Received transport knobs: " << serializedKnobs;
+    auto params = parseTransportKnobs(serializedKnobs);
+    if (params.hasValue()) {
+      handleTransportKnobParams(*params);
+    }
   }
 }
 
