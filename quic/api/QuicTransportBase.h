@@ -254,6 +254,11 @@ class QuicTransportBase : public QuicSocket {
   setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override;
 
   /**
+   * Can Knob Frames be exchanged with the peer on this connection?
+   */
+  FOLLY_NODISCARD bool isKnobSupported() const override;
+
+  /**
    * Set factory to create specific congestion controller instances
    * for a given connection
    */

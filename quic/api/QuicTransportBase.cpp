@@ -2878,15 +2878,23 @@ void QuicTransportBase::updateCongestionControlSettings(
 
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) {
-  // TODO: If we decide to support Knob frame on non-MVFST Quic versions,
-  // we have to implement it as a TransportParameter
-  if (conn_->version && *(conn_->version) == QuicVersion::MVFST) {
+  if (isKnobSupported()) {
     sendSimpleFrame(*conn_, KnobFrame(knobSpace, knobId, std::move(knobBlob)));
     return folly::unit;
   }
   LOG(ERROR)
       << "Cannot set Knob Frame. QUIC negotiation not complete or negotiated version is not MVFST";
   return folly::makeUnexpected(LocalErrorCode::KNOB_FRAME_UNSUPPORTED);
+}
+
+bool QuicTransportBase::isKnobSupported() const {
+  // We determine that the peer supports knob frames by looking at the
+  // negotiated QUIC version.
+  // TODO: This is temporary. Soon, we will add a transport parameter for knob
+  // support and incorporate it into the check, such that if the QUIC version
+  // increases/changes, this method will still continue to work, based on the
+  // transport parameter setting.
+  return (conn_->version && (*(conn_->version) == QuicVersion::MVFST));
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {

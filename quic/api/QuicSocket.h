@@ -19,6 +19,7 @@
 #include <quic/state/StateData.h>
 
 #include <chrono>
+#include "folly/Portability.h"
 
 namespace folly {
 class EventBase;
@@ -433,6 +434,11 @@ class QuicSocket {
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) = 0;
+
+  /**
+   * Can Knob Frames be exchanged with the peer on this connection?
+   */
+  FOLLY_NODISCARD virtual bool isKnobSupported() const = 0;
 
   /**
    * Is partial reliability supported.

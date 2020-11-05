@@ -94,6 +94,7 @@ class MockQuicSocket : public QuicSocket {
           uint64_t,
           uint64_t,
           SharedBuf));
+  MOCK_CONST_METHOD0(isKnobSupported, bool());
   MOCK_CONST_METHOD0(isPartiallyReliableTransport, bool());
   MOCK_METHOD3(
       setReadCallback,
