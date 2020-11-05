@@ -15,6 +15,7 @@
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 #include <quic/handshake/HandshakeLayer.h>
 
 using namespace quic;
@@ -583,6 +584,40 @@ TEST_F(QuicPacketBuilderTest, InplaceBuilderLongHeaderBytes) {
       9 /* initial + version + cid + cid + token length */ + srcConnId.size() +
           destConnId.size() + kMaxPacketLenSize,
       inplaceBuilder->getHeaderBytes());
+}
+
+TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
+  // The values used in this test case are based on Appendix-A.4 of the
+  // QUIC-TLS draft v29.
+
+  uint8_t initialByte = 0xff;
+  ConnectionId sourceConnectionId(
+      {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
+  ConnectionId destinationConnectionId((std::vector<uint8_t>()));
+  ConnectionId originalDestinationConnectionId(
+      {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
+  auto quicVersion = static_cast<QuicVersion>(0xff00001d);
+  Buf token = folly::IOBuf::copyBuffer(R"(token)");
+
+  PseudoRetryPacketBuilder builder(
+      initialByte,
+      sourceConnectionId,
+      destinationConnectionId,
+      originalDestinationConnectionId,
+      quicVersion,
+      std::move(token));
+
+  Buf pseudoRetryPacketBuf = std::move(builder).buildPacket();
+  FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
+  auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
+      pseudoRetryPacketBuf.get());
+  Buf expectedIntegrityTag = folly::IOBuf::copyBuffer(
+      "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49");
+
+  folly::io::Cursor cursorActual(integrityTag.get());
+  folly::io::Cursor cursorExpected(expectedIntegrityTag.get());
+
+  EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
 }
 
 TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {

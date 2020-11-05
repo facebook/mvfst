@@ -276,6 +276,71 @@ void RegularQuicPacketBuilder::accountForCipherOverhead(
   remainingBytes_ -= overhead;
 }
 
+PseudoRetryPacketBuilder::PseudoRetryPacketBuilder(
+    uint8_t initialByte,
+    ConnectionId sourceConnectionId,
+    ConnectionId destinationConnectionId,
+    ConnectionId originalDestinationConnectionId,
+    QuicVersion quicVersion,
+    Buf&& token)
+    : initialByte_(initialByte),
+      sourceConnectionId_(sourceConnectionId),
+      destinationConnectionId_(destinationConnectionId),
+      originalDestinationConnectionId_(originalDestinationConnectionId),
+      quicVersion_(quicVersion),
+      token_(std::move(token)) {
+  writePseudoRetryPacket();
+}
+
+void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
+  uint8_t packetLength = sizeof(uint8_t) /* ODCID length */ +
+      originalDestinationConnectionId_.size() /* ODCID */ +
+      sizeof(uint8_t) /* Initial byte */ +
+      sizeof(QuicVersionType) /* Version */ +
+      sizeof(uint8_t) /* DCID length */ +
+      destinationConnectionId_.size() /* DCID */ +
+      sizeof(uint8_t) /* SCID length */ +
+      sourceConnectionId_.size() /* SCID */ + token_->length() /* Token */;
+
+  packetBuf_ = folly::IOBuf::create(packetLength);
+  BufWriter bufWriter(*packetBuf_, packetLength);
+
+  // ODCID length
+  bufWriter.writeBE<uint8_t>(originalDestinationConnectionId_.size());
+
+  // ODCID
+  bufWriter.push(
+      originalDestinationConnectionId_.data(),
+      originalDestinationConnectionId_.size());
+
+  // Initial byte
+  bufWriter.writeBE<uint8_t>(initialByte_);
+
+  // Version
+  bufWriter.writeBE<QuicVersionType>(
+      static_cast<QuicVersionType>(quicVersion_));
+
+  // DCID length
+  bufWriter.writeBE<uint8_t>(destinationConnectionId_.size());
+
+  // DCID
+  bufWriter.push(
+      destinationConnectionId_.data(), destinationConnectionId_.size());
+
+  // SCID length
+  bufWriter.writeBE<uint8_t>(sourceConnectionId_.size());
+
+  // SCID
+  bufWriter.push(sourceConnectionId_.data(), sourceConnectionId_.size());
+
+  // Token
+  bufWriter.push((const uint8_t*)token_->data(), token_->length());
+}
+
+Buf PseudoRetryPacketBuilder::buildPacket() && {
+  return std::move(packetBuf_);
+}
+
 StatelessResetPacketBuilder::StatelessResetPacketBuilder(
     uint16_t maxPacketSize,
     const StatelessResetToken& resetToken)
