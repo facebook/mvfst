@@ -592,13 +592,26 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
 
 void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
-      kTransportKnobParamIdZeroBlackholeDetection,
+      static_cast<uint64_t>(
+          TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
       [](QuicServerConnectionState* server_conn, uint64_t val) {
         CHECK(server_conn);
         if (static_cast<bool>(val)) {
           server_conn->d6d.noBlackholeDetection = true;
           LOG(INFO)
               << "Knob param received, pmtu blackhole detection is turned off";
+        }
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        if (static_cast<bool>(val)) {
+          server_conn->udpSendPacketLen = server_conn->peerMaxUdpPayloadSize;
+          LOG(INFO)
+              << "Knob param received, udpSendPacketLen is forcibly set to max UDP payload size advertised by peer";
         }
       });
 }

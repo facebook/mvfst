@@ -716,6 +716,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // max_packet_size in Transport Parameters and PMTU
   uint64_t udpSendPacketLen{kDefaultUDPSendPacketLen};
 
+  // Peer-advertised max UDP payload size, stored as an opportunistic value to
+  // use when receiving the forciblySetUdpPayloadSize transport knob param
+  uint64_t peerMaxUdpPayloadSize{kDefaultUDPSendPacketLen};
+
   struct PacketSchedulingState {
     StreamId nextScheduledStream{0};
     StreamId nextScheduledControlStream{0};

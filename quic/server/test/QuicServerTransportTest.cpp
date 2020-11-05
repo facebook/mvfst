@@ -333,7 +333,8 @@ class QuicServerTransportTest : public Test {
     server->getNonConstConn().handshakeLayer.reset(fakeHandshake);
     server->getNonConstConn().serverHandshakeLayer = fakeHandshake;
     // Allow ignoring path mtu for testing negotiation.
-    server->getNonConstConn().transportSettings.canIgnorePathMTU = true;
+    server->getNonConstConn().transportSettings.canIgnorePathMTU =
+        getCanIgnorePathMTU();
     server->getNonConstConn().transportSettings.disableMigration =
         getDisableMigration();
     server->setConnectionIdAlgo(connIdAlgo_.get());
@@ -369,6 +370,10 @@ class QuicServerTransportTest : public Test {
   }
 
   virtual bool getDisableMigration() {
+    return true;
+  }
+
+  virtual bool getCanIgnorePathMTU() {
     return true;
   }
 
@@ -584,8 +589,10 @@ class QuicServerTransportTest : public Test {
 
   void verifyTransportParameters(std::chrono::milliseconds idleTimeout) {
     EXPECT_EQ(server->getConn().peerIdleTimeout, idleTimeout);
-    EXPECT_EQ(
-        server->getConn().udpSendPacketLen, fakeHandshake->maxRecvPacketSize);
+    if (getCanIgnorePathMTU()) {
+      EXPECT_EQ(
+          server->getConn().udpSendPacketLen, fakeHandshake->maxRecvPacketSize);
+    }
   }
 
   void deliverDataWithoutErrorCheck(
@@ -4290,8 +4297,31 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
 }
 
 TEST_F(QuicServerTransportTest, TestRegisterPMTUZeroBlackholeDetection) {
-  server->handleKnobParams({{kTransportKnobParamIdZeroBlackholeDetection, 1}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
+        1}});
   EXPECT_TRUE(server->getConn().d6d.noBlackholeDetection);
 }
+
+class QuicServerTransportForciblySetUDUPayloadSizeTest
+    : public QuicServerTransportTest {
+ public:
+  bool getCanIgnorePathMTU() override {
+    return false;
+  }
+};
+
+TEST_F(
+    QuicServerTransportForciblySetUDUPayloadSizeTest,
+    TestHandleTransportKnobParamForciblySetUDPPayloadSize) {
+  EXPECT_LT(server->getConn().udpSendPacketLen, 1452);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
+        1}});
+  EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
+}
+
 } // namespace test
 } // namespace quic

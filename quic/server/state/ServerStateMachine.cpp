@@ -192,6 +192,7 @@ void processClientInitialParams(
   uint64_t maxUdpPayloadSize = kDefaultMaxUDPPayload;
   if (packetSize) {
     maxUdpPayloadSize = std::min(*packetSize, maxUdpPayloadSize);
+    conn.peerMaxUdpPayloadSize = maxUdpPayloadSize;
     if (conn.transportSettings.canIgnorePathMTU) {
       if (*packetSize > kDefaultMaxUDPPayload) {
         // A good peer should never set oversized limit, so to be safe we
