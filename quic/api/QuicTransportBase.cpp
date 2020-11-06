@@ -2874,6 +2874,8 @@ void QuicTransportBase::updateCongestionControlSettings(
       transportSettings.pacingTimerTickInterval;
   conn_->transportSettings.minBurstPackets = transportSettings.minBurstPackets;
   conn_->transportSettings.copaDeltaParam = transportSettings.copaDeltaParam;
+  conn_->transportSettings.copaUseRttStanding =
+      transportSettings.copaUseRttStanding;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
