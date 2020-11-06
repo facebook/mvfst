@@ -4449,6 +4449,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   client->getNonConstConn().qLogger = qLogger;
   client->getNonConstConn().readCodec->setClientConnectionId(clientConnId);
   client->getNonConstConn().initialDestinationConnectionId = initialDstConnId;
+  client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
 
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");

@@ -30,6 +30,8 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->clientConnectionId = conn->clientConnectionId;
   newConn->initialDestinationConnectionId =
       conn->initialDestinationConnectionId;
+  newConn->originalDestinationConnectionId =
+      conn->originalDestinationConnectionId;
   // TODO: don't carry server connection id over to the new connection.
   newConn->serverConnectionId = conn->serverConnectionId;
   newConn->ackStates.initialAckState.nextPacketNum =
@@ -100,7 +102,7 @@ void processServerInitialParams(
         initialSourceConnId.value() !=
             conn.readCodec->getServerConnectionId() ||
         originalDestinationConnId.value() !=
-            conn.initialDestinationConnectionId) {
+            conn.originalDestinationConnectionId) {
       throw QuicTransportException(
           "Initial CID does not match.",
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR);

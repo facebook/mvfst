@@ -30,8 +30,15 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // The retry token sent by the server.
   std::string retryToken;
 
-  // Initial destination connection id.
+  // This is the destination connection id that will be sent in the outgoing
+  // client initial packet. It is modified in the event of a retry.
   folly::Optional<ConnectionId> initialDestinationConnectionId;
+
+  // This is the original destination connection id. It is the same as the
+  // initialDestinationConnectionId when there is no retry involved. When
+  // there is retry involved, this is the value of the destination connection
+  // id sent in the very first initial packet.
+  folly::Optional<ConnectionId> originalDestinationConnectionId;
 
   std::shared_ptr<ClientHandshakeFactory> handshakeFactory;
   ClientHandshake* clientHandshakeLayer;

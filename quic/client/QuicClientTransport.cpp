@@ -55,6 +55,8 @@ QuicClientTransport::QuicClientTransport(
   conn_->selfConnectionIds.emplace_back(srcConnId, kInitialSequenceNumber);
   clientConn_->initialDestinationConnectionId =
       ConnectionId::createRandom(kMinInitialDestinationConnIdLength);
+  clientConn_->originalDestinationConnectionId =
+      clientConn_->initialDestinationConnectionId;
   conn_->clientChosenDestConnectionId =
       clientConn_->initialDestinationConnectionId;
   VLOG(4) << "initial dcid: "
@@ -159,7 +161,7 @@ void QuicClientTransport::processPacketData(
     }
 
     const ConnectionId* originalDstConnId =
-        &(*clientConn_->initialDestinationConnectionId);
+        &(*clientConn_->originalDestinationConnectionId);
 
     if (!clientConn_->clientHandshakeLayer->verifyRetryIntegrityTag(
             *originalDstConnId, *retryPacket)) {
