@@ -9,10 +9,12 @@
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/codec/QuicPacketBuilder.h>
 #include <quic/fizz/client/handshake/FizzClientExtensions.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/client/handshake/QuicPskCache.h>
 #include <quic/fizz/handshake/FizzBridge.h>
+#include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 
 #include <fizz/client/EarlyDataRejectionPolicy.h>
 #include <fizz/protocol/Protocol.h>
@@ -20,11 +22,6 @@
 #include <fizz/crypto/aead/AESGCM128.h>
 
 namespace quic {
-
-constexpr folly::StringPiece retryPacketKey =
-    "\x4d\x32\xec\xdb\x2a\x21\x33\xc8\x41\xe4\x04\x3d\xf2\x7d\x44\x30";
-constexpr folly::StringPiece retryPacketNonce =
-    "\x4d\x16\x11\xd0\x55\x13\xa5\x52\xc5\x87\xd5\x75";
 
 FizzClientHandshake::FizzClientHandshake(
     QuicClientConnectionState* conn,
@@ -105,14 +102,25 @@ FizzClientHandshake::getApplicationProtocol() const {
   }
 }
 
-std::unique_ptr<Aead> FizzClientHandshake::getRetryPacketCipher() {
-  std::unique_ptr<fizz::Aead> aead =
-      fizz::OpenSSLEVPCipher::makeCipher<fizz::AESGCM128>();
-  fizz::TrafficKey trafficKey;
-  trafficKey.key = folly::IOBuf::copyBuffer(retryPacketKey);
-  trafficKey.iv = folly::IOBuf::copyBuffer(retryPacketNonce);
-  aead->setKey(std::move(trafficKey));
-  return FizzAead::wrap(std::move(aead));
+bool FizzClientHandshake::verifyRetryIntegrityTag(
+    const ConnectionId& originalDstConnId,
+    const RetryPacket& retryPacket) {
+  PseudoRetryPacketBuilder pseudoRetryPacketBuilder(
+      retryPacket.initialByte,
+      retryPacket.header.getSourceConnId(),
+      retryPacket.header.getDestinationConnId(),
+      originalDstConnId,
+      retryPacket.header.getVersion(),
+      folly::IOBuf::copyBuffer(retryPacket.header.getToken()));
+
+  Buf pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
+
+  FizzRetryIntegrityTagGenerator retryIntegrityTagGenerator;
+  auto expectedIntegrityTag =
+      retryIntegrityTagGenerator.getRetryIntegrityTag(pseudoRetryPacket.get());
+
+  return folly::IOBufEqualTo()(
+      *expectedIntegrityTag, *retryPacket.integrityTag);
 }
 
 bool FizzClientHandshake::isTLSResumed() const {

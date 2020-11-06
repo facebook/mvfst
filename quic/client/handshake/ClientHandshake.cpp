@@ -125,58 +125,6 @@ folly::Optional<bool> ClientHandshake::getZeroRttRejected() {
   return zeroRttRejected_;
 }
 
-bool ClientHandshake::verifyRetryIntegrityTag(
-    const ConnectionId& originalDstConnId,
-    const RetryPacket& retryPacket) {
-  // We construct the pseudo-retry packet, as described in the QUIC-TLS draft
-  folly::IOBuf pseudoRetryPacket;
-  BufAppender appender(&pseudoRetryPacket, 100);
-
-  // ODCID Len
-  appender.writeBE<uint8_t>(originalDstConnId.size());
-
-  // ODCID
-  appender.push(originalDstConnId.data(), originalDstConnId.size());
-
-  // initial byte
-  appender.writeBE<uint8_t>(retryPacket.initialByte);
-
-  // QUIC version
-  appender.writeBE<QuicVersionType>(
-      static_cast<QuicVersionType>(retryPacket.header.getVersion()));
-
-  // DCID len
-  appender.writeBE<uint8_t>(retryPacket.header.getDestinationConnId().size());
-
-  // DCID
-  appender.push(
-      retryPacket.header.getDestinationConnId().data(),
-      retryPacket.header.getDestinationConnId().size());
-
-  // SCID len
-  appender.writeBE<uint8_t>(retryPacket.header.getSourceConnId().size());
-
-  // SCID
-  appender.push(
-      retryPacket.header.getSourceConnId().data(),
-      retryPacket.header.getSourceConnId().size());
-
-  // Retry Token
-  appender.push(
-      (const uint8_t*)retryPacket.header.getToken().data(),
-      retryPacket.header.getToken().size());
-
-  pseudoRetryPacket.coalesce();
-
-  auto retryCipher = getRetryPacketCipher();
-  auto emptyPlaintext = folly::IOBuf::create(retryCipher->getCipherOverhead());
-  auto expectedIntegrityTag = retryCipher->inplaceEncrypt(
-      std::move(emptyPlaintext), &pseudoRetryPacket, 0);
-
-  return folly::IOBufEqualTo()(
-      *expectedIntegrityTag, *retryPacket.integrityTag);
-}
-
 void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> packetNumberCipher;

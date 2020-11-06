@@ -313,9 +313,9 @@ TEST_F(ClientHandshakeTest, TestHandshakeSuccess) {
 }
 
 TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
-  // Example obtained from https://github.com/quicwg/base-drafts/pull/3394
+  // Example obtained from Appendix-A.4 of the QUIC-TLS draft v29.
 
-  auto version = static_cast<QuicVersion>(0xFF000019);
+  auto version = static_cast<QuicVersion>(0xff00001d);
   uint8_t initialByte = 0xff;
 
   std::vector<uint8_t> dcidVec = {};
@@ -330,7 +330,7 @@ TEST_F(ClientHandshakeTest, TestRetryIntegrityVerification) {
       LongHeader::Types::Retry, scid, dcid, 0, version, retryToken);
 
   std::string integrityTag =
-      "\x1e\x5e\xc5\xb0\x14\xcb\xb1\xf0\xfd\x93\xdf\x40\x48\xc4\x46\xa6";
+      "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
 
   RetryPacket retryPacket(
       std::move(header), folly::IOBuf::copyBuffer(integrityTag), initialByte);

@@ -48,12 +48,6 @@ class ClientHandshake : public Handshake {
       EncryptionLevel encryptionLevel);
 
   /**
-   * An API to get the retry packet cipher, which can be used to verify the
-   * retry integrity tag present in a retry packet.
-   */
-  virtual std::unique_ptr<Aead> getRetryPacketCipher() = 0;
-
-  /**
    * Provides facilities to get, put and remove a PSK from the cache in case the
    * handshake supports a PSK cache.
    */
@@ -87,9 +81,9 @@ class ClientHandshake : public Handshake {
    * API used to verify that the integrity token present in the retry packet
    * matches what we would expect
    */
-  bool verifyRetryIntegrityTag(
+  virtual bool verifyRetryIntegrityTag(
       const ConnectionId& originalDstConnId,
-      const RetryPacket& retryPacket);
+      const RetryPacket& retryPacket) = 0;
 
   /**
    * Returns the negotiated transport parameters chosen by the server

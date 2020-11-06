@@ -39,7 +39,9 @@ class MockClientHandshake : public ClientHandshake {
     doHandshakeImpl(data.get(), encryptionLevel);
   }
   MOCK_METHOD2(doHandshakeImpl, void(folly::IOBuf*, EncryptionLevel));
-  MOCK_METHOD0(getRetryPacketCipher, std::unique_ptr<Aead>());
+  MOCK_METHOD2(
+      verifyRetryIntegrityTag,
+      bool(const ConnectionId&, const RetryPacket&));
   MOCK_METHOD1(removePsk, void(const folly::Optional<std::string>&));
   MOCK_CONST_METHOD0(getCryptoFactory, const CryptoFactory&());
   MOCK_CONST_METHOD0(isTLSResumed, bool());

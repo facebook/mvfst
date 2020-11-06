@@ -1300,10 +1300,6 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   const folly::Optional<std::string>& getApplicationProtocol() const override {
     throw std::runtime_error("getApplicationProtocol not implemented");
   }
-  std::unique_ptr<Aead> getRetryPacketCipher() override {
-    FizzClientHandshake fizzClientHandshake(nullptr, nullptr);
-    return fizzClientHandshake.getRetryPacketCipher();
-  }
   void processSocketData(folly::IOBufQueue&) override {
     throw std::runtime_error("processSocketData not implemented");
   }
@@ -4476,12 +4472,12 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   std::string retryToken = "token";
   std::string integrityTag =
-      "\x1e\x5e\xc5\xb0\x14\xcb\xb1\xf0\xfd\x93\xdf\x40\x48\xc4\x46\xa6";
+      "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
 
   folly::IOBuf retryPacketBuf;
   BufAppender appender(&retryPacketBuf, 100);
   appender.writeBE<uint8_t>(0xFF);
-  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF000019));
+  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF00001D));
   appender.writeBE<uint8_t>(clientConnId.size());
   appender.writeBE<uint8_t>(serverConnIdVec.size());
   appender.push(serverConnIdVec.data(), serverConnIdVec.size());
