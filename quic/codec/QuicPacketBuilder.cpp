@@ -7,6 +7,7 @@
  */
 
 #include <quic/codec/QuicPacketBuilder.h>
+#include <algorithm>
 
 #include <folly/Random.h>
 #include <quic/codec/PacketNumber.h>
@@ -512,6 +513,56 @@ uint8_t VersionNegotiationPacketBuilder::generateRandomPacketType() const {
 
 bool VersionNegotiationPacketBuilder::canBuildPacket() const noexcept {
   return remainingBytes_ != 0;
+}
+
+RetryPacketBuilder::RetryPacketBuilder(
+    ConnectionId sourceConnectionId,
+    ConnectionId destinationConnectionId,
+    QuicVersion quicVersion,
+    std::string&& retryToken,
+    Buf&& integrityTag)
+    : sourceConnectionId_(sourceConnectionId),
+      destinationConnectionId_(destinationConnectionId),
+      quicVersion_(quicVersion),
+      retryToken_(std::move(retryToken)),
+      integrityTag_(std::move(integrityTag)),
+      remainingBytes_(kDefaultUDPSendPacketLen) {
+  writeRetryPacket();
+}
+
+void RetryPacketBuilder::writeRetryPacket() {
+  packetBuf_ = folly::IOBuf::create(kAppenderGrowthSize);
+
+  // Encode the portion of the retry packet that comes before the
+  // integrity tag.
+  BufAppender appender(packetBuf_.get(), kAppenderGrowthSize);
+  LongHeader header(
+      LongHeader::Types::Retry,
+      sourceConnectionId_,
+      destinationConnectionId_,
+      0 /* packet number, can be arbitrary for retry packets */,
+      quicVersion_,
+      retryToken_);
+  encodeLongHeaderHelper(header, appender, remainingBytes_, 0);
+  packetBuf_->coalesce();
+
+  // Encode the integrity tag.
+  if (remainingBytes_ <= kRetryIntegrityTagLen) {
+    // Not enough space to write the integrity tag
+    remainingBytes_ = 0;
+  } else {
+    remainingBytes_ -= kRetryIntegrityTagLen;
+    BufAppender appender2(packetBuf_.get(), kRetryIntegrityTagLen);
+    appender2.insert(std::move(integrityTag_));
+  }
+}
+
+bool RetryPacketBuilder::canBuildPacket() const noexcept {
+  return remainingBytes_ != 0;
+}
+
+Buf RetryPacketBuilder::buildPacket() && {
+  return std::move(packetBuf_);
 }
 
 InplaceQuicPacketBuilder::InplaceQuicPacketBuilder(

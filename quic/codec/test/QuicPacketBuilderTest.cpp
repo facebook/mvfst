@@ -9,6 +9,8 @@
 #include <folly/portability/GTest.h>
 
 #include <folly/Random.h>
+#include <folly/io/Cursor.h>
+#include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/Types.h>
@@ -618,6 +620,88 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   folly::io::Cursor cursorExpected(expectedIntegrityTag.get());
 
   EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
+}
+
+TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
+  auto srcConnId = getTestConnectionId(0), dstConnId = getTestConnectionId(1);
+  auto quicVersion = static_cast<QuicVersion>(0xff00001d);
+  std::string retryToken = "token";
+  Buf integrityTag = folly::IOBuf::copyBuffer(
+      "\xaa\xbb\xcc\xdd\xee\xff\x11\x22\x33\x44\x55\x66\x77\x88\x99\x11");
+
+  RetryPacketBuilder builder(
+      srcConnId,
+      dstConnId,
+      quicVersion,
+      std::string(retryToken),
+      integrityTag->clone());
+
+  EXPECT_TRUE(builder.canBuildPacket());
+  Buf retryPacket = std::move(builder).buildPacket();
+
+  uint32_t expectedPacketLen = 1 /* initial byte */ + 4 /* version */ +
+      1 /* dcid length */ + dstConnId.size() + 1 /* scid length */ +
+      srcConnId.size() + retryToken.size() + kRetryIntegrityTagLen;
+
+  // Check that the buffer containing the packet is of the correct length
+  EXPECT_EQ(retryPacket->computeChainDataLength(), expectedPacketLen);
+
+  // initial byte
+  folly::io::Cursor cursor(retryPacket.get());
+  auto initialByte = cursor.readBE<uint8_t>();
+  EXPECT_EQ(initialByte & 0xf0, 0xf0);
+
+  // version
+  EXPECT_EQ(cursor.readBE<uint32_t>(), 0xff00001d);
+
+  // dcid length
+  auto dcidLen = cursor.readBE<uint8_t>();
+  EXPECT_EQ(dcidLen, dstConnId.size());
+
+  // dcid
+  ConnectionId dcidObtained(cursor, dcidLen);
+  EXPECT_EQ(dcidObtained, dstConnId);
+
+  // scid length
+  auto scidLen = cursor.readBE<uint8_t>();
+  EXPECT_EQ(scidLen, srcConnId.size());
+
+  // scid
+  ConnectionId scidObtained(cursor, scidLen);
+  EXPECT_EQ(scidObtained, srcConnId);
+
+  // retry token
+  Buf retryTokenObtained;
+  cursor.clone(
+      retryTokenObtained, cursor.totalLength() - kRetryIntegrityTagLen);
+  std::string retryTokenObtainedString =
+      retryTokenObtained->moveToFbString().toStdString();
+  EXPECT_EQ(retryTokenObtainedString, retryToken);
+
+  // integrity tag
+  Buf integrityTagObtained;
+  cursor.clone(integrityTagObtained, kRetryIntegrityTagLen);
+  EXPECT_TRUE(folly::IOBufEqualTo()(integrityTagObtained, integrityTag));
+}
+
+TEST_F(QuicPacketBuilderTest, RetryPacketGiganticToken) {
+  auto srcConnId = getTestConnectionId(0), dstConnId = getTestConnectionId(1);
+  auto quicVersion = static_cast<QuicVersion>(0xff00001d);
+  std::string retryToken;
+  for (uint32_t i = 0; i < 500; i++) {
+    retryToken += "aaaaaaaaaa";
+  }
+  Buf integrityTag = folly::IOBuf::copyBuffer(
+      "\xaa\xbb\xcc\xdd\xee\xff\x11\x22\x33\x44\x55\x66\x77\x88\x99\x11");
+
+  RetryPacketBuilder builder(
+      srcConnId,
+      dstConnId,
+      quicVersion,
+      std::string(retryToken),
+      integrityTag->clone());
+
+  EXPECT_FALSE(builder.canBuildPacket());
 }
 
 TEST_P(QuicPacketBuilderTest, PadUpLongHeaderPacket) {
