@@ -160,16 +160,21 @@ TEST_F(StreamStateFunctionsTests, IsAllDataReceivedAllDataRead) {
 TEST_F(StreamStateFunctionsTests, SendReset) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
+  // Set an initial flow control.
+  conn.flowControlState.peerAdvertisedMaxOffset = 1024;
   StreamId id = 1;
   QuicStreamState stream(id, conn);
+  auto initialConnWindow = getSendConnFlowControlBytesAPI(conn);
+  EXPECT_EQ(initialConnWindow, 1024);
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("hello"), true);
-  EXPECT_GT(conn.flowControlState.sumCurStreamBufferLen, 0);
+  EXPECT_EQ(conn.flowControlState.sumCurStreamBufferLen, 5);
+  EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow - 5);
   appendDataToReadBuffer(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("hi"), 0));
   EXPECT_FALSE(stream.writeBuffer.empty());
   EXPECT_FALSE(stream.readBuffer.empty());
   resetQuicStream(stream, GenericApplicationErrorCode::UNKNOWN);
-
+  EXPECT_EQ(getSendConnFlowControlBytesAPI(conn), initialConnWindow);
   EXPECT_TRUE(stream.writeBuffer.empty());
 }
 

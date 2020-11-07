@@ -12,8 +12,7 @@
 namespace quic {
 
 void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
-  auto writeBufferLen = stream.writeBuffer.chainLength();
-  updateFlowControlOnWriteToSocket(stream, writeBufferLen);
+  updateFlowControlOnResetStream(stream);
   stream.retransmissionBuffer.clear();
   stream.writeBuffer.move();
   stream.readBuffer.clear();

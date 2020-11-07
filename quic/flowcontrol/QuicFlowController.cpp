@@ -54,6 +54,15 @@ inline void incrementWithOverFlowCheck(T& num, T diff) {
   num += diff;
 }
 
+template <typename T>
+inline void decrementWithOverFlowCheck(T& num, T diff) {
+  if (num < std::numeric_limits<T>::min() + diff) {
+    throw QuicInternalException(
+        "flow control state overflow", LocalErrorCode::INTERNAL_ERROR);
+  }
+  num -= diff;
+}
+
 inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
   return std::max(
       stream.currentReadOffset + stream.flowControlState.windowSize,
@@ -195,6 +204,12 @@ void updateFlowControlOnWriteToStream(
     uint64_t length) {
   incrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurStreamBufferLen, length);
+}
+
+void updateFlowControlOnResetStream(QuicStreamState& stream) {
+  decrementWithOverFlowCheck(
+      stream.conn.flowControlState.sumCurStreamBufferLen,
+      static_cast<uint64_t>(stream.writeBuffer.chainLength()));
 }
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {

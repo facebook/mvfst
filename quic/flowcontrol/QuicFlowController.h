@@ -38,6 +38,8 @@ void updateFlowControlOnWriteToSocket(QuicStreamState& stream, uint64_t length);
 
 void updateFlowControlOnWriteToStream(QuicStreamState& stream, uint64_t length);
 
+void updateFlowControlOnResetStream(QuicStreamState& stream);
+
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream);
 
 void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn);
