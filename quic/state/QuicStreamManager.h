@@ -195,17 +195,23 @@ class QuicStreamManager {
     }
   }
 
-  const auto& lossStreams() const {
+  auto& lossStreams() const {
     return lossStreams_;
   }
 
+  // This should be only used in testing code.
   void addLoss(StreamId streamId) {
-    lossStreams_.insert(streamId);
+    auto stream = findStream(streamId);
+    if (stream) {
+      lossStreams_.insertOrUpdate(streamId, stream->priority);
+    }
   }
 
   bool hasLoss() const {
     return !lossStreams_.empty();
   }
+
+  void setStreamPriority(StreamId id, PriorityLevel level, bool incremental);
 
   // TODO figure out a better interface here.
   /*
@@ -247,7 +253,7 @@ class QuicStreamManager {
     if (stream.isControl) {
       writableControlStreams_.insert(stream.id);
     } else {
-      writableStreams_.insert(stream.id);
+      writableStreams_.insertOrUpdate(stream.id, stream.priority);
     }
   }
 
@@ -880,7 +886,7 @@ class QuicStreamManager {
   folly::F14FastSet<StreamId> flowControlUpdated_;
 
   // Data structure to keep track of stream that have detected lost data
-  folly::F14FastSet<StreamId> lossStreams_;
+  PriorityQueue lossStreams_;
 
   // Set of streams that have pending reads
   folly::F14FastSet<StreamId> readableStreams_;
@@ -889,7 +895,7 @@ class QuicStreamManager {
   folly::F14FastSet<StreamId> peekableStreams_;
 
   // Set of !control streams that have writable data
-  std::set<StreamId> writableStreams_;
+  PriorityQueue writableStreams_;
 
   // Set of control streams that have writable data
   std::set<StreamId> writableControlStreams_;

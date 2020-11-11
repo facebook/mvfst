@@ -97,6 +97,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(isKnobSupported, bool());
   MOCK_CONST_METHOD0(isPartiallyReliableTransport, bool());
   MOCK_METHOD3(
+      setStreamPriority,
+      folly::Expected<folly::Unit, LocalErrorCode>(StreamId, uint8_t, bool));
+  MOCK_METHOD3(
       setReadCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(
           StreamId,

@@ -4734,14 +4734,10 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
       CHECK_NOTNULL(findPacketWithStream(client->getNonConstConn(), streamId));
   markPacketLoss(client->getNonConstConn(), *forceLossPacket, false);
   auto& pendingLossStreams = client->getConn().streamManager->lossStreams();
-  auto it =
-      std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
-  ASSERT_TRUE(it != pendingLossStreams.end());
+  ASSERT_TRUE(pendingLossStreams.count(streamId) > 0);
 
   client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
-  it =
-      std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
-  ASSERT_TRUE(it == pendingLossStreams.end());
+  ASSERT_TRUE(pendingLossStreams.count(streamId) == 0);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
@@ -4763,9 +4759,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
       client->getNonConstConn().streamManager->getStream(streamId));
   ASSERT_TRUE(stream->lossBuffer.empty());
   auto& pendingLossStreams = client->getConn().streamManager->lossStreams();
-  auto it =
-      std::find(pendingLossStreams.begin(), pendingLossStreams.end(), streamId);
-  ASSERT_TRUE(it == pendingLossStreams.end());
+  ASSERT_TRUE(pendingLossStreams.count(streamId) == 0);
 }
 
 TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {

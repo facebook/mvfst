@@ -9,6 +9,109 @@
 #include <quic/api/QuicPacketScheduler.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 
+namespace {
+using namespace quic;
+
+/**
+ * A helper iterator adaptor class that starts iteration of streams from a
+ * specific stream id.
+ */
+class MiddleStartingIterationWrapper {
+ public:
+  using MapType = std::set<StreamId>;
+
+  class MiddleStartingIterator
+      : public boost::iterator_facade<
+            MiddleStartingIterator,
+            const MiddleStartingIterationWrapper::MapType::value_type,
+            boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+
+   public:
+    using MapType = MiddleStartingIterationWrapper::MapType;
+
+    MiddleStartingIterator() = delete;
+
+    MiddleStartingIterator(
+        const MapType* streams,
+        const MapType::key_type& start)
+        : streams_(streams) {
+      itr_ = streams_->lower_bound(start);
+      checkForWrapAround();
+      // We don't want to mark it as wrapped around initially, instead just
+      // act as if start was the first element.
+      wrappedAround_ = false;
+    }
+
+    MiddleStartingIterator(const MapType* streams, MapType::const_iterator itr)
+        : streams_(streams), itr_(itr) {
+      checkForWrapAround();
+      // We don't want to mark it as wrapped around initially, instead just
+      // act as if start was the first element.
+      wrappedAround_ = false;
+    }
+
+    FOLLY_NODISCARD const MapType::value_type& dereference() const {
+      return *itr_;
+    }
+
+    FOLLY_NODISCARD MapType::const_iterator rawIterator() const {
+      return itr_;
+    }
+
+    FOLLY_NODISCARD bool equal(const MiddleStartingIterator& other) const {
+      return wrappedAround_ == other.wrappedAround_ && itr_ == other.itr_;
+    }
+
+    void increment() {
+      ++itr_;
+      checkForWrapAround();
+    }
+
+    void checkForWrapAround() {
+      if (itr_ == streams_->cend()) {
+        wrappedAround_ = true;
+        itr_ = streams_->cbegin();
+      }
+    }
+
+   private:
+    friend class MiddleStartingIterationWrapper;
+    bool wrappedAround_{false};
+    const MapType* streams_{nullptr};
+    MapType::const_iterator itr_;
+  };
+
+  MiddleStartingIterationWrapper(
+      const MapType& streams,
+      const MapType::key_type& start)
+      : streams_(streams), start_(&streams_, start) {}
+
+  MiddleStartingIterationWrapper(
+      const MapType& streams,
+      const MapType::const_iterator& start)
+      : streams_(streams), start_(&streams_, start) {}
+
+  FOLLY_NODISCARD MiddleStartingIterator cbegin() const {
+    return start_;
+  }
+
+  FOLLY_NODISCARD MiddleStartingIterator cend() const {
+    MiddleStartingIterator itr(start_);
+    itr.wrappedAround_ = true;
+    return itr;
+  }
+
+ private:
+  const MapType& streams_;
+  const MiddleStartingIterator start_;
+};
+
+using WritableStreamItr =
+    MiddleStartingIterationWrapper::MiddleStartingIterator;
+
+} // namespace
+
 namespace quic {
 
 bool hasAcksToSchedule(const AckState& ackState) {
@@ -225,31 +328,70 @@ RetransmissionScheduler::RetransmissionScheduler(
     const QuicConnectionStateBase& conn)
     : conn_(conn) {}
 
+// Return true if this stream wrote some data
+bool RetransmissionScheduler::writeStreamLossBuffers(
+    PacketBuilderInterface& builder,
+    StreamId id) {
+  auto stream = conn_.streamManager->findStream(id);
+  CHECK(stream);
+  bool wroteStreamFrame = false;
+  for (auto buffer = stream->lossBuffer.cbegin();
+       buffer != stream->lossBuffer.cend();
+       ++buffer) {
+    auto bufferLen = buffer->data.chainLength();
+    auto dataLen = writeStreamFrameHeader(
+        builder,
+        stream->id,
+        buffer->offset,
+        bufferLen, // writeBufferLen -- only the len of the single buffer.
+        bufferLen, // flowControlLen -- not relevant, already flow controlled.
+        buffer->eof,
+        folly::none /* skipLenHint */);
+    if (dataLen) {
+      wroteStreamFrame = true;
+      writeStreamFrameData(builder, buffer->data, *dataLen);
+      VLOG(4) << "Wrote retransmitted stream=" << stream->id
+              << " offset=" << buffer->offset << " bytes=" << *dataLen
+              << " fin=" << (buffer->eof && *dataLen == bufferLen) << " "
+              << conn_;
+    } else {
+      // Either we filled the packet or ran out of data for this stream (EOF?)
+      break;
+    }
+  }
+  return wroteStreamFrame;
+}
+
 void RetransmissionScheduler::writeRetransmissionStreams(
     PacketBuilderInterface& builder) {
-  for (auto streamId : conn_.streamManager->lossStreams()) {
-    auto stream = conn_.streamManager->findStream(streamId);
-    CHECK(stream);
-    for (auto buffer = stream->lossBuffer.cbegin();
-         buffer != stream->lossBuffer.cend();
-         ++buffer) {
-      auto bufferLen = buffer->data.chainLength();
-      auto dataLen = writeStreamFrameHeader(
-          builder,
-          stream->id,
-          buffer->offset,
-          bufferLen, // writeBufferLen -- only the len of the single buffer.
-          bufferLen, // flowControlLen -- not relevant, already flow controlled.
-          buffer->eof,
-          folly::none /* skipLenHint */);
-      if (dataLen) {
-        writeStreamFrameData(builder, buffer->data, *dataLen);
-        VLOG(4) << "Wrote retransmitted stream=" << stream->id
-                << " offset=" << buffer->offset << " bytes=" << *dataLen
-                << " fin=" << (buffer->eof && *dataLen == bufferLen) << " "
-                << conn_;
-      } else {
-        return;
+  auto& lossStreams = conn_.streamManager->lossStreams();
+  for (size_t index = 0;
+       index < lossStreams.levels.size() && builder.remainingSpaceInPkt() > 0;
+       index++) {
+    auto& level = lossStreams.levels[index];
+    if (level.streams.empty()) {
+      // No data here, keep going
+      continue;
+    }
+    if (level.incremental) {
+      // Round robin the streams at this level
+      MiddleStartingIterationWrapper wrapper(level.streams, level.next);
+      auto writableStreamItr = wrapper.cbegin();
+      while (writableStreamItr != wrapper.cend()) {
+        if (writeStreamLossBuffers(builder, *writableStreamItr)) {
+          writableStreamItr++;
+        } else {
+          // We didn't write anything
+          break;
+        }
+      }
+      level.next = writableStreamItr.rawIterator();
+    } else {
+      // walk the sequential streams in order until we run out of space
+      for (auto stream : level.streams) {
+        if (!writeStreamLossBuffers(builder, stream)) {
+          break;
+        }
       }
     }
   }
@@ -288,6 +430,54 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
   return *writableStreamItr;
 }
 
+void StreamFrameScheduler::writeStreamsHelper(
+    PacketBuilderInterface& builder,
+    PriorityQueue& writableStreams,
+    uint64_t& connWritableBytes,
+    bool streamPerPacket) {
+  // Fill a packet with non-control stream data, in priority order
+  for (size_t index = 0; index < writableStreams.levels.size() &&
+       builder.remainingSpaceInPkt() > 0 && connWritableBytes > 0;
+       index++) {
+    PriorityQueue::Level& level = writableStreams.levels[index];
+    if (level.streams.empty()) {
+      // No data here, keep going
+      continue;
+    }
+    if (level.incremental) {
+      // Round robin the streams at this level
+      MiddleStartingIterationWrapper wrapper(level.streams, level.next);
+      auto writableStreamItr = wrapper.cbegin();
+      while (writableStreamItr != wrapper.cend() && connWritableBytes > 0) {
+        if (writeNextStreamFrame(
+                builder, *writableStreamItr, connWritableBytes)) {
+          writableStreamItr++;
+          if (streamPerPacket) {
+            level.next = writableStreamItr.rawIterator();
+            return;
+          }
+        } else {
+          // Either we filled the packet, ran out of flow control,
+          // or ran out of data at this level
+          break;
+        }
+      }
+      level.next = writableStreamItr.rawIterator();
+    } else {
+      // walk the sequential streams in order until we run out of space
+      for (auto streamIt = level.streams.begin();
+           streamIt != level.streams.end() && connWritableBytes > 0;
+           ++streamIt) {
+        if (!writeNextStreamFrame(builder, *streamIt, connWritableBytes)) {
+          break;
+        } else if (streamPerPacket) {
+          return;
+        }
+      }
+    }
+  }
+}
+
 void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
   DCHECK(conn_.streamManager->hasWritable());
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
@@ -308,12 +498,11 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
   if (connWritableBytes == 0) {
     return;
   }
-  const auto& writableStreams = conn_.streamManager->writableStreams();
+  auto& writableStreams = conn_.streamManager->writableStreams();
   if (!writableStreams.empty()) {
-    conn_.schedulingState.nextScheduledStream = writeStreamsHelper(
+    writeStreamsHelper(
         builder,
         writableStreams,
-        conn_.schedulingState.nextScheduledStream,
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
   }

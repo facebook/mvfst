@@ -721,7 +721,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   uint64_t peerMaxUdpPayloadSize{kDefaultUDPSendPacketLen};
 
   struct PacketSchedulingState {
-    StreamId nextScheduledStream{0};
     StreamId nextScheduledControlStream{0};
   };
 

@@ -446,6 +446,13 @@ class QuicSocket {
   virtual bool isPartiallyReliableTransport() const = 0;
 
   /**
+   * Set stream priority.
+   * level: can only be in [0, 7].
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode>
+  setStreamPriority(StreamId id, PriorityLevel level, bool incremental) = 0;
+
+  /**
    * ===== Read API ====
    */
 

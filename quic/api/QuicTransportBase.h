@@ -317,6 +317,11 @@ class QuicTransportBase : public QuicSocket {
 
   bool isPartiallyReliableTransport() const override;
 
+  folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
+      StreamId id,
+      PriorityLevel level,
+      bool incremental) override;
+
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */

@@ -68,6 +68,8 @@ class RetransmissionScheduler {
   bool hasPendingData() const;
 
  private:
+  bool writeStreamLossBuffers(PacketBuilderInterface& builder, StreamId id);
+
   const QuicConnectionStateBase& conn_;
 };
 
@@ -84,84 +86,6 @@ class StreamFrameScheduler {
   bool hasPendingData() const;
 
  private:
-  /**
-   * A helper iterator adaptor class that starts iteration of streams from a
-   * specific stream id.
-   */
-  class MiddleStartingIterationWrapper {
-   public:
-    using MapType = std::set<StreamId>;
-
-    class MiddleStartingIterator
-        : public boost::iterator_facade<
-              MiddleStartingIterator,
-              const MiddleStartingIterationWrapper::MapType::value_type,
-              boost::forward_traversal_tag> {
-      friend class boost::iterator_core_access;
-
-     public:
-      using MapType = MiddleStartingIterationWrapper::MapType;
-
-      MiddleStartingIterator() = default;
-
-      MiddleStartingIterator(
-          const MapType* streams,
-          const MapType::key_type& start)
-          : streams_(streams) {
-        itr_ = streams_->lower_bound(start);
-        checkForWrapAround();
-        // We don't want to mark it as wrapped around initially, instead just
-        // act as if start was the first element.
-        wrappedAround_ = false;
-      }
-
-      const MapType::value_type& dereference() const {
-        return *itr_;
-      }
-
-      bool equal(const MiddleStartingIterator& other) const {
-        return wrappedAround_ == other.wrappedAround_ && itr_ == other.itr_;
-      }
-
-      void increment() {
-        ++itr_;
-        checkForWrapAround();
-      }
-
-      void checkForWrapAround() {
-        if (itr_ == streams_->cend()) {
-          wrappedAround_ = true;
-          itr_ = streams_->cbegin();
-        }
-      }
-
-     private:
-      friend class MiddleStartingIterationWrapper;
-      bool wrappedAround_{false};
-      const MapType* streams_{nullptr};
-      MapType::const_iterator itr_;
-    };
-
-    MiddleStartingIterationWrapper(
-        const MapType& streams,
-        const MapType::key_type& start)
-        : streams_(streams), start_(start) {}
-
-    MiddleStartingIterator cbegin() const {
-      return MiddleStartingIterator(&streams_, start_);
-    }
-
-    MiddleStartingIterator cend() const {
-      MiddleStartingIterator itr(&streams_, start_);
-      itr.wrappedAround_ = true;
-      return itr;
-    }
-
-   private:
-    const MapType& streams_;
-    const MapType::key_type& start_;
-  };
-
   StreamId writeStreamsHelper(
       PacketBuilderInterface& builder,
       const std::set<StreamId>& writableStreams,
@@ -169,8 +93,11 @@ class StreamFrameScheduler {
       uint64_t& connWritableBytes,
       bool streamPerPacket);
 
-  using WritableStreamItr =
-      MiddleStartingIterationWrapper::MiddleStartingIterator;
+  void writeStreamsHelper(
+      PacketBuilderInterface& builder,
+      PriorityQueue& writableStreams,
+      uint64_t& connWritableBytes,
+      bool streamPerPacket);
 
   /**
    * Helper function to write either stream data if stream is not flow

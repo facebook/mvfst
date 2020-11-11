@@ -2907,6 +2907,27 @@ bool QuicTransportBase::isPartiallyReliableTransport() const {
   return conn_->partialReliabilityEnabled;
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setStreamPriority(
+    StreamId id,
+    PriorityLevel level,
+    bool incremental) {
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (level > kDefaultMaxPriority) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  if (!conn_->streamManager->streamExists(id)) {
+    // It's not an error to try to prioritize a non-existent stream.
+    return folly::unit;
+  }
+  // It's not an error to prioritize a stream after it's sent its FIN - this
+  // can reprioritize retransmissions.
+  conn_->streamManager->setStreamPriority(id, level, incremental);
+  return folly::unit;
+}
+
 void QuicTransportBase::setCongestionControl(CongestionControlType type) {
   DCHECK(conn_);
   if (!conn_->congestionController ||

@@ -225,6 +225,20 @@ bool QuicStreamManager::consumeMaxLocalUnidirectionalStreamIdIncreased() {
   return res;
 }
 
+void QuicStreamManager::setStreamPriority(
+    StreamId id,
+    PriorityLevel level,
+    bool incremental) {
+  auto stream = findStream(id);
+  if (stream) {
+    stream->priority = Priority(level, incremental);
+    // If this stream is already in the writable or loss queus, update the
+    // priority there.
+    writableStreams_.updateIfExist(id, stream->priority);
+    lossStreams_.updateIfExist(id, stream->priority);
+  }
+}
+
 void QuicStreamManager::refreshTransportSettings(
     const TransportSettings& settings) {
   transportSettings_ = &settings;
@@ -480,9 +494,11 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
 
 void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
   if (stream.lossBuffer.empty()) {
+    // No-op if not present
     lossStreams_.erase(stream.id);
   } else {
-    lossStreams_.emplace(stream.id);
+    // No-op if already inserted
+    lossStreams_.insertOrUpdate(stream.id, stream.priority);
   }
 }
 

@@ -595,4 +595,8 @@ enum class DataPathType : uint8_t {
   ContinuousMemory = 1,
 };
 
+// Stream priority level, can only be in [0, 7]
+using PriorityLevel = uint8_t;
+constexpr uint8_t kDefaultMaxPriority = 7;
+
 } // namespace quic

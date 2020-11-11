@@ -147,11 +147,7 @@ void dropPackets(QuicServerConnectionState& conn) {
               }),
           std::move(*itr->second));
       stream->retransmissionBuffer.erase(itr);
-      if (std::find(
-              conn.streamManager->lossStreams().begin(),
-              conn.streamManager->lossStreams().end(),
-              streamFrame->streamId) ==
-          conn.streamManager->lossStreams().end()) {
+      if (conn.streamManager->lossStreams().count(streamFrame->streamId) == 0) {
         conn.streamManager->addLoss(streamFrame->streamId);
       }
     }
@@ -462,6 +458,7 @@ TEST_F(QuicTransportTest, WriteSmall) {
 
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   transport_->writeChain(stream, buf->clone(), false, false);
+  transport_->setStreamPriority(stream, 0, false);
   loopForWrites();
   auto& conn = transport_->getConnectionState();
   verifyCorrectness(conn, 0, stream, *buf);
@@ -1594,6 +1591,8 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
   EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res1.error());
   auto res2 = transport_->notifyPendingWriteOnStream(streamId, &writeCallback_);
   EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res2.error());
+  auto res3 = transport_->setStreamPriority(streamId, 0, false);
+  EXPECT_FALSE(res3.hasError());
 }
 
 TEST_F(QuicTransportTest, RstWrittenStream) {
@@ -2880,7 +2879,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandings.packets.clear();
 
   // Start from stream2 instead of stream1
-  conn.schedulingState.nextScheduledStream = s2;
+  conn.streamManager->writableStreams().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen - 100;
 
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
@@ -2903,7 +2902,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   conn.outstandings.packets.clear();
 
   // Test wrap around
-  conn.schedulingState.nextScheduledStream = s2;
+  conn.streamManager->writableStreams().setNextScheduledStream(s2);
   writableBytes = kDefaultUDPSendPacketLen;
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
   writeQuicDataToSocket(

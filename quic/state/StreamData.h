@@ -12,6 +12,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
+#include <quic/state/QuicPriorityQueue.h>
 
 namespace quic {
 
@@ -208,6 +209,8 @@ struct QuicStreamState : public QuicStreamLike {
   // Number of times the stream has entered the HOLB state
   // lastHolbTime indicates whether the stream is HOL blocked at the moment.
   uint32_t holbCount{0};
+
+  Priority priority{kDefaultPriority};
 
   // Returns true if both send and receive state machines are in a terminal
   // state
