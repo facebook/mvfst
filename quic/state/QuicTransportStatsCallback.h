@@ -67,6 +67,13 @@ class QuicTransportStatsCallback {
     MAX
   };
 
+  enum class TransportKnobType : uint8_t {
+    ZERO_PMTU_BLACKHOLE,
+    FORCIBLY_SET_UDP_PAYLOAD_SIZE,
+    UNKNOWN,
+    MAX
+  };
+
   virtual ~QuicTransportStatsCallback() = default;
 
   // packet level metrics
@@ -143,6 +150,10 @@ class QuicTransportStatsCallback {
   virtual void onConnectionPMTUBlackholeDetected() = 0;
 
   virtual void onConnectionPMTUUpperBoundDetected() = 0;
+
+  virtual void onTransportKnobApplied(TransportKnobType knobType) = 0;
+
+  virtual void onTransportKnobError(TransportKnobType knobType) = 0;
 
   static const char* toString(ConnectionCloseReason reason) {
     switch (reason) {
@@ -235,6 +246,34 @@ class QuicTransportStatsCallback {
         return SocketErrorType::NOMEM;
       default:
         return SocketErrorType::OTHER;
+    }
+  }
+
+  static const char* toString(TransportKnobType knobType) {
+    switch (knobType) {
+      case TransportKnobType::ZERO_PMTU_BLACKHOLE:
+        return "ZERO_PMTU_BLACKHOLE";
+      case TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
+        return "FORCIBLY_SET_UDP_PAYLOAD_SIZE";
+      case TransportKnobType::UNKNOWN:
+        return "UNKNOWN";
+      case TransportKnobType::MAX:
+        return "MAX";
+      default:
+        throw std::runtime_error("Undefined TransportKnobType passed");
+    }
+  }
+
+  static TransportKnobType paramIdToTransportKnobType(uint64_t paramId) {
+    switch (paramId) {
+      case static_cast<uint64_t>(
+          TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION):
+        return TransportKnobType::ZERO_PMTU_BLACKHOLE;
+      case static_cast<uint64_t>(
+          TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE):
+        return TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE;
+      default:
+        return TransportKnobType::UNKNOWN;
     }
   }
 };

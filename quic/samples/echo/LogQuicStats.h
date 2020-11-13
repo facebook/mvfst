@@ -165,6 +165,16 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected";
   }
 
+  void onTransportKnobApplied(TransportKnobType knobType) override {
+    VLOG(2) << prefix_
+            << "onTransportKnobApplied knobType=" << toString(knobType);
+  }
+
+  void onTransportKnobError(TransportKnobType knobType) override {
+    VLOG(2) << prefix_
+            << "onTransportKnboError knobType=" << toString(knobType);
+  }
+
  private:
   std::string prefix_;
 };

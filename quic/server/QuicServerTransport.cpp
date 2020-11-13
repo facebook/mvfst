@@ -382,6 +382,15 @@ void QuicServerTransport::handleTransportKnobParams(
     auto maybeParamHandler = transportKnobParamHandlers_.find(param.id);
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
       (maybeParamHandler->second)(serverConn_, param.val);
+      QUIC_STATS(
+          conn_->statsCallback,
+          onTransportKnobApplied,
+          QuicTransportStatsCallback::paramIdToTransportKnobType(param.id));
+    } else {
+      QUIC_STATS(
+          conn_->statsCallback,
+          onTransportKnobError,
+          QuicTransportStatsCallback::paramIdToTransportKnobType(param.id));
     }
   }
 }
@@ -588,6 +597,11 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
     auto params = parseTransportKnobs(serializedKnobs);
     if (params.hasValue()) {
       handleTransportKnobParams(*params);
+    } else {
+      QUIC_STATS(
+          conn_->statsCallback,
+          onTransportKnobError,
+          QuicTransportStatsCallback::TransportKnobType::UNKNOWN);
     }
   }
 }
