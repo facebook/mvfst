@@ -102,11 +102,11 @@ struct D6DConfig {
   ProbeSizeRaiserType raiserType{ProbeSizeRaiserType::ConstantStep};
 };
 
-// JSON-serialized transoprt knobs
+// JSON-serialized transport knobs
 struct SerializedKnob {
   uint64_t space;
   uint64_t id;
-  folly::StringPiece blob;
+  std::string blob;
 };
 
 struct TransportSettings {
