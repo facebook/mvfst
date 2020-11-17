@@ -233,6 +233,9 @@ void processClientInitialParams(
         conn.d6d.state = D6DMachineState::BASE;
         conn.d6d.meta.lastNonSearchState = D6DMachineState::DISABLED;
         conn.d6d.meta.timeLastNonSearchState = Clock::now();
+
+        // Temporary, should be removed after transport knob pipeline works
+        conn.d6d.noBlackholeDetection = true;
       } else {
         LOG(ERROR) << "client d6dBasePMTU fails sanity check: " << *d6dBasePMTU;
         // We treat base pmtu transport param as client's swich to activate d6d,
