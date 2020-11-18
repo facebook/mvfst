@@ -441,6 +441,16 @@ void FileQLogger::addPathValidationEvent(bool success) {
       success, vantagePoint, refTime));
 }
 
+void FileQLogger::addPriorityUpdate(
+    quic::StreamId streamId,
+    uint8_t urgency,
+    bool incremental) {
+  auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::steady_clock::now().time_since_epoch());
+  handleEvent(std::make_unique<quic::QLogPriorityUpdateEvent>(
+      streamId, urgency, incremental, refTime));
+}
+
 void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
   if (streaming_) {
     return;

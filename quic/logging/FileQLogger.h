@@ -112,6 +112,10 @@ class FileQLogger : public BaseQLogger {
       override;
   virtual void addConnectionMigrationUpdate(bool intentionalMigration) override;
   virtual void addPathValidationEvent(bool success) override;
+  void addPriorityUpdate(
+      quic::StreamId streamId,
+      uint8_t urgency,
+      bool incremental) override;
 
   void outputLogsToFile(const std::string& path, bool prettyJson);
   folly::dynamic toDynamic() const;

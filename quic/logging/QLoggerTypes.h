@@ -334,7 +334,8 @@ enum class QLogEventType : uint32_t {
   AppLimitedUpdate,
   BandwidthEstUpdate,
   ConnectionMigration,
-  PathValidation
+  PathValidation,
+  PriorityUpdate
 };
 
 folly::StringPiece toString(QLogEventType type);
@@ -668,6 +669,23 @@ class QLogPathValidationEvent : public QLogEvent {
   folly::dynamic toDynamic() const override;
   bool success_;
   VantagePoint vantagePoint_;
+};
+
+class QLogPriorityUpdateEvent : public QLogEvent {
+ public:
+  explicit QLogPriorityUpdateEvent(
+      StreamId id,
+      uint8_t urgency,
+      bool incremental,
+      std::chrono::microseconds refTimeIn);
+  ~QLogPriorityUpdateEvent() override = default;
+
+  folly::dynamic toDynamic() const override;
+
+ private:
+  StreamId streamId_;
+  uint8_t urgency_;
+  bool incremental_;
 };
 
 } // namespace quic

@@ -839,6 +839,28 @@ folly::dynamic QLogPathValidationEvent::toDynamic() const {
   return d;
 }
 
+QLogPriorityUpdateEvent::QLogPriorityUpdateEvent(
+    StreamId streamId,
+    uint8_t urgency,
+    bool incremental,
+    std::chrono::microseconds refTimeIn)
+    : streamId_(streamId), urgency_(urgency), incremental_(incremental) {
+  eventType = QLogEventType::PriorityUpdate;
+  refTime = refTimeIn;
+}
+
+folly::dynamic QLogPriorityUpdateEvent::toDynamic() const {
+  folly::dynamic d = folly::dynamic::array(
+      folly::to<std::string>(refTime.count()), "HTTP3", toString(eventType));
+  folly::dynamic data = folly::dynamic::object();
+
+  data["id"] = streamId_;
+  data["urgency"] = urgency_;
+  data["incremental"] = incremental_;
+  d.push_back(std::move(data));
+  return d;
+}
+
 folly::StringPiece toString(QLogEventType type) {
   switch (type) {
     case QLogEventType::PacketSent:
@@ -883,6 +905,8 @@ folly::StringPiece toString(QLogEventType type) {
       return "connection_migration";
     case QLogEventType::PathValidation:
       return "path_validation";
+    case QLogEventType::PriorityUpdate:
+      return "priority";
   }
   folly::assume_unreachable();
 }

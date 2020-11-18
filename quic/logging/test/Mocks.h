@@ -75,5 +75,6 @@ class MockQLogger : public QLogger {
   MOCK_METHOD1(addPathValidationEvent, void(bool));
   MOCK_METHOD1(setDcid, void(folly::Optional<ConnectionId>));
   MOCK_METHOD1(setScid, void(folly::Optional<ConnectionId>));
+  MOCK_METHOD3(addPriorityUpdate, void(quic::StreamId, uint8_t, bool));
 };
 } // namespace quic::test
