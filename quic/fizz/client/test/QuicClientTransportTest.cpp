@@ -429,7 +429,7 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
       .WillByDefault(Invoke([streamData](auto, auto err) mutable {
         streamData->setException(err);
       }));
-  return streamData->promise.getFuture().within(10s);
+  return streamData->promise.getFuture().within(20s);
 }
 
 void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(

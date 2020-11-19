@@ -138,7 +138,7 @@ void QuicClientTransport::processPacketData(
       packetQueue, conn_->ackStates, conn_->clientConnectionId->size());
   StatelessReset* statelessReset = parsedPacket.statelessReset();
   if (statelessReset) {
-    auto& token = clientConn_->statelessResetToken;
+    const auto& token = clientConn_->statelessResetToken;
     if (statelessReset->token == token) {
       VLOG(4) << "Received Stateless Reset " << *this;
       conn_->peerConnectionError = std::make_pair(
@@ -582,7 +582,7 @@ void QuicClientTransport::processPacketData(
             maxStreamsBidi.value_or(0),
             maxStreamsUni.value_or(0));
 
-        auto& statelessResetToken = clientConn_->statelessResetToken;
+        const auto& statelessResetToken = clientConn_->statelessResetToken;
         if (statelessResetToken) {
           conn_->readCodec->setStatelessResetToken(*statelessResetToken);
         }
