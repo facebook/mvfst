@@ -42,7 +42,15 @@ void processAckFrame(
   CongestionController::AckEvent ack;
   ack.ackTime = ackReceiveTime;
   ack.implicit = frame.implicit;
-  ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
+  if (UNLIKELY(frame.ackDelay < 0us)) {
+    LOG(ERROR) << "Quic received negative ack delay=" << frame.ackDelay.count();
+    ack.adjustedAckTime = ackReceiveTime;
+  } else if (UNLIKELY(frame.ackDelay > 1000s)) {
+    LOG(ERROR) << "Quic very long ack delay=" << frame.ackDelay.count();
+    ack.adjustedAckTime = ackReceiveTime;
+  } else {
+    ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
+  }
   // Using kDefaultRxPacketsBeforeAckAfterInit to reseve for ackedPackets
   // container is a hueristic. Other quic implementations may have very
   // different acking policy. It's also possibly that all acked packets are pure
