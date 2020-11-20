@@ -7,12 +7,19 @@
  */
 
 #include <folly/Format.h>
+#include <folly/chrono/Conv.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/system/ThreadId.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/SocketUtil.h>
 #include <quic/common/Timers.h>
+
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
+#include <linux/net_tstamp.h>
+#else
+#define SOF_TIMESTAMPING_SOFTWARE 0
+#endif
 
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/CCPReader.h>
@@ -77,6 +84,7 @@ void QuicServerWorker::bind(
           : kMaxNumGROBuffers;
     }
   }
+  socket_->setTimestamping(SOF_TIMESTAMPING_SOFTWARE);
 }
 
 void QuicServerWorker::applyAllSocketOptions() {
@@ -225,9 +233,27 @@ void QuicServerWorker::onDataAvailable(
     size_t len,
     bool truncated,
     OnDataAvailableParams params) noexcept {
-  // TODO: we can get better receive time accuracy than this, with
-  // SO_TIMESTAMP or SIOCGSTAMP.
   auto packetReceiveTime = Clock::now();
+  auto originalPacketReceiveTime = packetReceiveTime;
+  if (params.ts) {
+    // This is the software system time from the datagram.
+    auto packetNowDuration =
+        folly::to<std::chrono::microseconds>(params.ts.value()[0]);
+    auto wallNowDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::system_clock::now().time_since_epoch());
+    auto durationSincePacketNow = wallNowDuration - packetNowDuration;
+    if (packetNowDuration != 0us && durationSincePacketNow > 0us) {
+      packetReceiveTime -= durationSincePacketNow;
+    }
+  }
+  // System time can move backwards, so we want to make sure that the receive
+  // time we are using is monotonic relative to itself.
+  if (packetReceiveTime < largestPacketReceiveTime_) {
+    packetReceiveTime = originalPacketReceiveTime;
+  }
+  largestPacketReceiveTime_ =
+      std::max(largestPacketReceiveTime_, packetReceiveTime);
   VLOG(10) << folly::format(
       "Worker={}, Received data on thread={}, processId={}",
       this,

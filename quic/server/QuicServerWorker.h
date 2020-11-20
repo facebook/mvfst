@@ -604,6 +604,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   AcceptObserverList observerList_;
 
   std::unique_ptr<CCPReader> ccpReader_;
+
+  TimePoint largestPacketReceiveTime_{TimePoint::min()};
 };
 
 } // namespace quic
