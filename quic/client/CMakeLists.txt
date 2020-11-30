@@ -6,6 +6,7 @@
 add_library(
   mvfst_client STATIC
   QuicClientTransport.cpp
+  QuicClientAsyncTransport.cpp
   handshake/ClientHandshake.cpp
   state/ClientStateMachine.cpp
 )

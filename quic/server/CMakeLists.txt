@@ -86,6 +86,7 @@ file(
   *.h
 )
 list(FILTER QUIC_API_HEADERS_TOINSTALL EXCLUDE REGEX test/)
+list(FILTER QUIC_API_HEADERS_TOINSTALL EXCLUDE REGEX async_tran/)
 foreach(header ${QUIC_API_HEADERS_TOINSTALL})
   get_filename_component(header_dir ${header} DIRECTORY)
   install(FILES ${header} DESTINATION include/quic/server/${header_dir})

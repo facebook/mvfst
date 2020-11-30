@@ -7,7 +7,6 @@
  */
 
 #include <quic/api/QuicStreamAsyncTransport.h>
-
 #include <folly/io/Cursor.h>
 
 namespace quic {
@@ -19,34 +18,75 @@ QuicStreamAsyncTransport::createWithNewStream(
   if (!streamId) {
     return nullptr;
   }
-  UniquePtr ptr(
-      new QuicStreamAsyncTransport(std::move(sock), streamId.value()));
-  return ptr;
+  return createWithExistingStream(std::move(sock), *streamId);
 }
 
 QuicStreamAsyncTransport::UniquePtr
 QuicStreamAsyncTransport::createWithExistingStream(
     std::shared_ptr<quic::QuicSocket> sock,
     quic::StreamId streamId) {
-  UniquePtr ptr(new QuicStreamAsyncTransport(std::move(sock), streamId));
+  UniquePtr ptr(new QuicStreamAsyncTransport());
+  ptr->setSocket(std::move(sock));
+  ptr->setStreamId(streamId);
   return ptr;
 }
 
-QuicStreamAsyncTransport::QuicStreamAsyncTransport(
-    std::shared_ptr<quic::QuicSocket> sock,
-    quic::StreamId id)
-    : sock_(std::move(sock)), id_(id) {}
+void QuicStreamAsyncTransport::setSocket(
+    std::shared_ptr<quic::QuicSocket> sock) {
+  sock_ = std::move(sock);
+}
 
-QuicStreamAsyncTransport::~QuicStreamAsyncTransport() {
-  sock_->setReadCallback(id_, nullptr);
-  closeWithReset();
+void QuicStreamAsyncTransport::setStreamId(quic::StreamId id) {
+  CHECK(!id_.hasValue()) << "stream id can only be set once";
+  CHECK(state_ == CloseState::OPEN) << "Current state: " << (int)state_;
+
+  id_ = id;
+
+  // TODO: handle timeout for assigning stream id
+
+  sock_->setReadCallback(*id_, this);
+  handleRead();
+
+  if (!writeCallbacks_.empty()) {
+    // adjust offsets of buffered writes
+    auto streamWriteOffset = sock_->getStreamWriteOffset(*id_);
+    if (streamWriteOffset.hasError()) {
+      folly::AsyncSocketException ex(
+          folly::AsyncSocketException::UNKNOWN,
+          folly::to<std::string>(
+              "Quic write error: ", toString(streamWriteOffset.error())));
+      closeNowImpl(std::move(ex));
+      return;
+    }
+    for (auto& p : writeCallbacks_) {
+      p.first += *streamWriteOffset;
+    }
+    sock_->notifyPendingWriteOnStream(*id_, this);
+  }
+}
+
+void QuicStreamAsyncTransport::destroy() {
+  if (state_ != CloseState::CLOSED) {
+    state_ = CloseState::CLOSED;
+    sock_->closeNow(folly::none);
+  }
+  // Then call DelayedDestruction::destroy() to take care of
+  // whether or not we need immediate or delayed destruction
+  DelayedDestruction::destroy();
 }
 
 void QuicStreamAsyncTransport::setReadCB(
     AsyncTransport::ReadCallback* callback) {
   readCb_ = callback;
-  // It should be ok to do this immediately, rather than in the loop
-  handleRead();
+  if (id_) {
+    if (readCb_) {
+      sock_->setReadCallback(*id_, this);
+      // It should be ok to do this immediately, rather than in the loop
+      handleRead();
+    } else {
+      sock_->setReadCallback(*id_, nullptr);
+    }
+  }
 }
 
 folly::AsyncTransport::ReadCallback* QuicStreamAsyncTransport::getReadCallback()
@@ -56,13 +96,15 @@ folly::AsyncTransport::ReadCallback* QuicStreamAsyncTransport::getReadCallback()
 
 void QuicStreamAsyncTransport::addWriteCallback(
     AsyncTransport::WriteCallback* callback,
-    size_t offset,
-    size_t size) {
+    size_t offset) {
+  size_t size = writeBuf_.chainLength();
   writeCallbacks_.emplace_back(offset + size, callback);
-  sock_->notifyPendingWriteOnStream(id_, this);
+  if (id_) {
+    sock_->notifyPendingWriteOnStream(*id_, this);
+  }
 }
 
-void QuicStreamAsyncTransport::handleOffsetError(
+void QuicStreamAsyncTransport::handleWriteOffsetError(
     AsyncTransport::WriteCallback* callback,
     LocalErrorCode error) {
   folly::AsyncSocketException ex(
@@ -71,18 +113,50 @@ void QuicStreamAsyncTransport::handleOffsetError(
   callback->writeErr(0, ex);
 }
 
+bool QuicStreamAsyncTransport::handleWriteStateError(
+    AsyncTransport::WriteCallback* callback) {
+  if (writeEOF_ != EOFState::NOT_SEEN) {
+    folly::AsyncSocketException ex(
+        folly::AsyncSocketException::UNKNOWN,
+        "Quic write error: bad EOF state");
+    callback->writeErr(0, ex);
+    return true;
+  } else if (state_ == CloseState::CLOSED) {
+    folly::AsyncSocketException ex(
+        folly::AsyncSocketException::UNKNOWN, "Quic write error: closed state");
+    callback->writeErr(0, ex);
+    return true;
+  } else if (ex_) {
+    callback->writeErr(0, *ex_);
+    return true;
+  } else {
+    return false;
+  }
+}
+
+folly::Expected<size_t, LocalErrorCode>
+QuicStreamAsyncTransport::getStreamWriteOffset() const {
+  if (!id_) {
+    return 0;
+  }
+  return sock_->getStreamWriteOffset(*id_);
+}
+
 void QuicStreamAsyncTransport::write(
     AsyncTransport::WriteCallback* callback,
     const void* buf,
     size_t bytes,
     folly::WriteFlags /*flags*/) {
-  auto streamWriteOffset = sock_->getStreamWriteOffset(id_);
+  if (handleWriteStateError(callback)) {
+    return;
+  }
+  auto streamWriteOffset = getStreamWriteOffset();
   if (streamWriteOffset.hasError()) {
-    handleOffsetError(callback, streamWriteOffset.error());
+    handleWriteOffsetError(callback, streamWriteOffset.error());
     return;
   }
   writeBuf_.append(folly::IOBuf::wrapBuffer(buf, bytes));
-  addWriteCallback(callback, *streamWriteOffset, bytes);
+  addWriteCallback(callback, *streamWriteOffset);
 }
 
 void QuicStreamAsyncTransport::writev(
@@ -90,35 +164,41 @@ void QuicStreamAsyncTransport::writev(
     const iovec* vec,
     size_t count,
     folly::WriteFlags /*flags*/) {
-  auto streamWriteOffset = sock_->getStreamWriteOffset(id_);
-  if (streamWriteOffset.hasError()) {
-    handleOffsetError(callback, streamWriteOffset.error());
+  if (handleWriteStateError(callback)) {
     return;
   }
-  size_t totalBytes = 0;
+  auto streamWriteOffset = getStreamWriteOffset();
+  if (streamWriteOffset.hasError()) {
+    handleWriteOffsetError(callback, streamWriteOffset.error());
+    return;
+  }
   for (size_t i = 0; i < count; i++) {
     writeBuf_.append(folly::IOBuf::wrapBuffer(vec[i].iov_base, vec[i].iov_len));
-    totalBytes += vec[i].iov_len;
   }
-  addWriteCallback(callback, *streamWriteOffset, totalBytes);
+  addWriteCallback(callback, *streamWriteOffset);
 }
 
 void QuicStreamAsyncTransport::writeChain(
     AsyncTransport::WriteCallback* callback,
     std::unique_ptr<folly::IOBuf>&& buf,
     folly::WriteFlags /*flags*/) {
-  auto streamWriteOffset = sock_->getStreamWriteOffset(id_);
-  if (streamWriteOffset.hasError()) {
-    handleOffsetError(callback, streamWriteOffset.error());
+  if (handleWriteStateError(callback)) {
     return;
   }
-  size_t len = buf->computeChainDataLength();
+  auto streamWriteOffset = getStreamWriteOffset();
+  if (streamWriteOffset.hasError()) {
+    handleWriteOffsetError(callback, streamWriteOffset.error());
+    return;
+  }
   writeBuf_.append(std::move(buf));
-  addWriteCallback(callback, *streamWriteOffset, len);
+  addWriteCallback(callback, *streamWriteOffset);
 }
 
 void QuicStreamAsyncTransport::close() {
-  sock_->stopSending(id_, quic::GenericApplicationErrorCode::UNKNOWN);
+  state_ = CloseState::CLOSING;
+  if (id_) {
+    sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+  }
   shutdownWrite();
   if (readCb_ && readEOF_ != EOFState::DELIVERED) {
     // This is such a bizarre operation.  I almost think if we haven't seen
@@ -127,41 +207,46 @@ void QuicStreamAsyncTransport::close() {
     readEOF_ = EOFState::QUEUED;
     handleRead();
   }
+  sock_->closeGracefully();
 }
 
 void QuicStreamAsyncTransport::closeNow() {
-  if (writeBuf_.empty()) {
-    close();
-  } else {
-    sock_->stopSending(id_, quic::GenericApplicationErrorCode::UNKNOWN);
-    sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
-    VLOG(4) << "Reset stream from closeNow";
-  }
+  folly::AsyncSocketException ex(
+      folly::AsyncSocketException::UNKNOWN, "Quic closeNow");
+  closeNowImpl(std::move(ex));
 }
 
 void QuicStreamAsyncTransport::closeWithReset() {
-  sock_->stopSending(id_, quic::GenericApplicationErrorCode::UNKNOWN);
-  sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
-  VLOG(4) << "Reset stream from closeWithReset";
+  if (id_) {
+    sock_->stopSending(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+    sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+  }
+  folly::AsyncSocketException ex(
+      folly::AsyncSocketException::UNKNOWN, "Quic closeNow");
+  closeNowImpl(std::move(ex));
 }
 
 void QuicStreamAsyncTransport::shutdownWrite() {
   if (writeEOF_ == EOFState::NOT_SEEN) {
     writeEOF_ = EOFState::QUEUED;
-    sock_->notifyPendingWriteOnStream(id_, this);
+    if (id_) {
+      sock_->notifyPendingWriteOnStream(*id_, this);
+    }
   }
 }
 
 void QuicStreamAsyncTransport::shutdownWriteNow() {
-  if (readEOF_ == EOFState::DELIVERED) {
+  if (writeEOF_ == EOFState::DELIVERED) {
     // writes already shutdown
     return;
   }
   if (writeBuf_.empty()) {
     shutdownWrite();
   } else {
-    sock_->resetStream(id_, quic::GenericApplicationErrorCode::UNKNOWN);
-    VLOG(4) << "Reset stream from shutdownWriteNow";
+    if (id_) {
+      sock_->resetStream(*id_, quic::GenericApplicationErrorCode::UNKNOWN);
+      VLOG(4) << "Reset stream from shutdownWriteNow";
+    }
   }
 }
 
@@ -184,7 +269,7 @@ bool QuicStreamAsyncTransport::isPending() const {
 }
 
 bool QuicStreamAsyncTransport::connecting() const {
-  return false;
+  return !id_.hasValue() && (state_ == CloseState::OPEN);
 }
 
 bool QuicStreamAsyncTransport::error() const {
@@ -205,7 +290,7 @@ void QuicStreamAsyncTransport::detachEventBase() {
 }
 
 bool QuicStreamAsyncTransport::isDetachable() const {
-  return false; // ?
+  return false;
 }
 
 void QuicStreamAsyncTransport::setSendTimeout(uint32_t /*milliseconds*/) {
@@ -235,27 +320,22 @@ bool QuicStreamAsyncTransport::isEorTrackingEnabled() const {
 void QuicStreamAsyncTransport::setEorTracking(bool /*track*/) {}
 
 size_t QuicStreamAsyncTransport::getAppBytesWritten() const {
-  auto res = sock_->getStreamWriteOffset(id_);
+  auto res = getStreamWriteOffset();
   // TODO: track written bytes to have it available after QUIC stream closure
   return res.hasError() ? 0 : res.value();
 }
 
 size_t QuicStreamAsyncTransport::getRawBytesWritten() const {
-  auto res = sock_->getStreamWriteOffset(id_);
-  // TODO: track written bytes to have it available after QUIC stream closure
-  return res.hasError() ? 0 : res.value();
+  return getAppBytesWritten();
 }
 
 size_t QuicStreamAsyncTransport::getAppBytesReceived() const {
-  auto res = sock_->getStreamReadOffset(id_);
   // TODO: track read bytes to have it available after QUIC stream closure
-  return res.hasError() ? 0 : res.value();
+  return 0;
 }
 
 size_t QuicStreamAsyncTransport::getRawBytesReceived() const {
-  auto res = sock_->getStreamReadOffset(id_);
-  // TODO: track read bytes to have it available after QUIC stream closure
-  return res.hasError() ? 0 : res.value();
+  return getAppBytesReceived();
 }
 
 std::string QuicStreamAsyncTransport::getApplicationProtocol() const noexcept {
@@ -293,8 +373,8 @@ void QuicStreamAsyncTransport::handleRead() {
   folly::DelayedDestruction::DestructorGuard dg(this);
   bool emptyRead = false;
   size_t numReads = 0;
-  while (readCb_ && !ex_ && readEOF_ == EOFState::NOT_SEEN && !emptyRead &&
-         ++numReads < 16 /* max reads per event */) {
+  while (readCb_ && id_ && !ex_ && readEOF_ == EOFState::NOT_SEEN &&
+         !emptyRead && ++numReads < 16 /* max reads per event */) {
     void* buf = nullptr;
     size_t len = 0;
     if (readCb_->isBufferMovable()) {
@@ -308,7 +388,7 @@ void QuicStreamAsyncTransport::handleRead() {
         break;
       }
     }
-    auto readData = sock_->read(id_, len);
+    auto readData = sock_->read(*id_, len);
     if (readData.hasError()) {
       ex_ = folly::AsyncSocketException(
           folly::AsyncSocketException::UNKNOWN,
@@ -332,31 +412,37 @@ void QuicStreamAsyncTransport::handleRead() {
       }
     }
   }
-  if (readCb_) {
-    if (ex_) {
-      auto cb = readCb_;
-      readCb_ = nullptr;
-      cb->readErr(*ex_);
-    } else if (readEOF_ == EOFState::QUEUED) {
-      auto cb = readCb_;
-      readCb_ = nullptr;
-      cb->readEOF();
-      readEOF_ = EOFState::DELIVERED;
-    }
+
+  // in case readCb_ got reset from read callbacks
+  if (!readCb_) {
+    return;
   }
-  if (readCb_ && readEOF_ == EOFState::NOT_SEEN && !ex_) {
-    sock_->setReadCallback(id_, this);
-  } else {
-    sock_->setReadCallback(id_, nullptr);
+
+  if (ex_) {
+    auto cb = readCb_;
+    readCb_ = nullptr;
+    cb->readErr(*ex_);
+  } else if (readEOF_ == EOFState::QUEUED) {
+    auto cb = readCb_;
+    readCb_ = nullptr;
+    cb->readEOF();
+    readEOF_ = EOFState::DELIVERED;
+  }
+
+  if (id_) {
+    if (!readCb_ || readEOF_ != EOFState::NOT_SEEN) {
+      sock_->setReadCallback(*id_, nullptr);
+    }
   }
 }
 
 void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
+  CHECK(id_);
   // overkill until there are delivery cbs
   folly::DelayedDestruction::DestructorGuard dg(this);
   uint64_t toSend =
       std::min(maxToSend, folly::to<uint64_t>(writeBuf_.chainLength()));
-  auto streamWriteOffset = sock_->getStreamWriteOffset(id_);
+  auto streamWriteOffset = sock_->getStreamWriteOffset(*id_);
   if (streamWriteOffset.hasError()) {
     // handle error
     folly::AsyncSocketException ex(
@@ -370,7 +456,7 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
   uint64_t sentOffset = *streamWriteOffset + toSend;
   bool writeEOF = (writeEOF_ == EOFState::QUEUED);
   auto res = sock_->writeChain(
-      id_,
+      *id_,
       writeBuf_.split(toSend),
       writeEOF,
       false,
@@ -380,15 +466,16 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
         folly::AsyncSocketException::UNKNOWN,
         folly::to<std::string>("Quic write error: ", toString(res.error())));
     failWrites(ex);
-  } else {
-    if (writeEOF) {
-      writeEOF_ = EOFState::DELIVERED;
-      VLOG(4) << "Closed stream id_=" << id_;
-    }
-    // not actually sent.  Mirrors AsyncSocket and invokes when data is in
-    // transport buffers
-    invokeWriteCallbacks(sentOffset);
+    return;
   }
+  if (writeEOF) {
+    writeEOF_ = EOFState::DELIVERED;
+  } else if (writeBuf_.chainLength()) {
+    sock_->notifyPendingWriteOnStream(*id_, this);
+  }
+  // not actually sent.  Mirrors AsyncSocket and invokes when data is in
+  // transport buffers
+  invokeWriteCallbacks(sentOffset);
 }
 
 void QuicStreamAsyncTransport::invokeWriteCallbacks(size_t sentOffset) {
@@ -398,9 +485,13 @@ void QuicStreamAsyncTransport::invokeWriteCallbacks(size_t sentOffset) {
     writeCallbacks_.pop_front();
     wcb->writeSuccess();
   }
+  if (writeEOF_ == EOFState::DELIVERED) {
+    CHECK(writeCallbacks_.empty());
+  }
 }
 
-void QuicStreamAsyncTransport::failWrites(folly::AsyncSocketException& ex) {
+void QuicStreamAsyncTransport::failWrites(
+    const folly::AsyncSocketException& ex) {
   while (!writeCallbacks_.empty()) {
     auto& front = writeCallbacks_.front();
     auto wcb = front.second;
@@ -411,8 +502,9 @@ void QuicStreamAsyncTransport::failWrites(folly::AsyncSocketException& ex) {
 }
 
 void QuicStreamAsyncTransport::onStreamWriteReady(
-    quic::StreamId /*id*/,
+    quic::StreamId id,
     uint64_t maxToSend) noexcept {
+  CHECK(id == *id_);
   if (writeEOF_ == EOFState::DELIVERED && writeBuf_.empty()) {
     // nothing left to write
     return;
@@ -424,10 +516,26 @@ void QuicStreamAsyncTransport::onStreamWriteError(
     StreamId /*id*/,
     std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
         error) noexcept {
-  folly::AsyncSocketException ex(
+  closeNowImpl(folly::AsyncSocketException(
       folly::AsyncSocketException::UNKNOWN,
-      folly::to<std::string>("Quic write error: ", toString(error)));
-  failWrites(ex);
+      folly::to<std::string>("Quic write error: ", toString(error))));
+}
+
+void QuicStreamAsyncTransport::closeNowImpl(folly::AsyncSocketException&& ex) {
+  folly::DelayedDestruction::DestructorGuard dg(this);
+  if (state_ == CloseState::CLOSED) {
+    return;
+  }
+  state_ = CloseState::CLOSED;
+  ex_ = ex;
+  readCb_ = nullptr;
+  if (id_) {
+    sock_->setReadCallback(*id_, nullptr);
+    sock_->unregisterStreamWriteCallback(*id_);
+    id_.reset();
+  }
+  sock_->closeNow(folly::none);
+  failWrites(*ex_);
 }
 
 } // namespace quic

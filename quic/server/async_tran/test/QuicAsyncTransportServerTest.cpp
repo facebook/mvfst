@@ -11,21 +11,44 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
-#include <quic/api/QuicStreamAsyncTransport.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/client/QuicClientAsyncTransport.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
+#include <quic/server/async_tran/QuicAsyncTransportServer.h>
+#include <quic/server/async_tran/QuicServerAsyncTransport.h>
 #include <quic/server/test/Mocks.h>
+#include "folly/io/async/AsyncTransport.h"
 
 using namespace testing;
 
 namespace quic::test {
 
-class QuicStreamAsyncTransportTest : public Test {
+class MockConnection : public wangle::ManagedConnection {
+ public:
+  explicit MockConnection(folly::AsyncTransport::UniquePtr sock)
+      : sock_(std::move(sock)) {}
+  void timeoutExpired() noexcept final {}
+  void describe(std::ostream&) const final {}
+  bool isBusy() const final {
+    return true;
+  }
+  void notifyPendingShutdown() final {}
+  void closeWhenIdle() final {}
+  void dropConnection(const std::string& /*errorMsg*/ = "") final {
+    destroy();
+  }
+  void dumpConnectionState(uint8_t) final {}
+
+ private:
+  folly::AsyncTransport::UniquePtr sock_;
+};
+
+class QuicAsyncTransportServerTest : public Test {
  public:
   void SetUp() override {
     folly::ssl::init();
@@ -34,29 +57,6 @@ class QuicStreamAsyncTransportTest : public Test {
   }
 
   void createServer() {
-    auto serverTransportFactory =
-        std::make_unique<MockQuicServerTransportFactory>();
-    EXPECT_CALL(*serverTransportFactory, _make(_, _, _, _))
-        .WillOnce(Invoke(
-            [&](folly::EventBase* evb,
-                std::unique_ptr<folly::AsyncUDPSocket>& socket,
-                const folly::SocketAddress& /*addr*/,
-                std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-              auto transport = quic::QuicServerTransport::make(
-                  evb, std::move(socket), serverConnectionCB_, std::move(ctx));
-              CHECK(serverSocket_.get() == nullptr);
-              serverSocket_ = transport;
-              return transport;
-            }));
-
-    EXPECT_CALL(serverConnectionCB_, onNewBidirectionalStream(_))
-        .WillOnce(Invoke([&](StreamId id) {
-          serverAsyncWrapper_ =
-              QuicStreamAsyncTransport::createWithExistingStream(
-                  serverSocket_, id);
-          serverAsyncWrapper_->setReadCB(&serverReadCB_);
-        }));
-
     EXPECT_CALL(serverReadCB_, isBufferMovable_())
         .WillRepeatedly(Return(false));
     EXPECT_CALL(serverReadCB_, getReadBuffer(_, _))
@@ -66,38 +66,27 @@ class QuicStreamAsyncTransportTest : public Test {
         }));
     EXPECT_CALL(serverReadCB_, readDataAvailable_(_))
         .WillOnce(Invoke([&](auto len) {
-          auto echoData = folly::IOBuf::copyBuffer("echo ");
-          echoData->appendChain(
-              folly::IOBuf::wrapBuffer(serverBuf_.data(), len));
+          auto echoData = folly::IOBuf::wrapBuffer(serverBuf_.data(), len);
+          echoData->appendChain(folly::IOBuf::copyBuffer(" ding dong"));
           serverAsyncWrapper_->writeChain(&serverWriteCB_, std::move(echoData));
           serverAsyncWrapper_->shutdownWrite();
         }));
     EXPECT_CALL(serverReadCB_, readEOF_()).WillOnce(Return());
-
     EXPECT_CALL(serverWriteCB_, writeSuccess_()).WillOnce(Return());
 
-    server_ = QuicServer::createQuicServer();
-    auto serverCtx = test::createServerCtx();
-    server_->setFizzContext(serverCtx);
-
-    server_->setQuicServerTransportFactory(std::move(serverTransportFactory));
-
+    server_ = std::make_shared<QuicAsyncTransportServer>([this](auto sock) {
+      sock->setReadCB(&serverReadCB_);
+      serverAsyncWrapper_ = std::move(sock);
+      return new MockConnection(nullptr);
+    });
+    server_->setFizzContext(test::createServerCtx());
     folly::SocketAddress addr("::1", 0);
     server_->start(addr, 1);
-    server_->waitUntilInitialized();
-    serverAddr_ = server_->getAddress();
+    serverAddr_ = server_->quicServer().getAddress();
   }
 
   void createClient() {
     clientEvbThread_ = std::thread([&]() { clientEvb_.loopForever(); });
-
-    EXPECT_CALL(clientConnectionCB_, onTransportReady()).WillOnce(Invoke([&]() {
-      clientAsyncWrapper_ =
-          QuicStreamAsyncTransport::createWithNewStream(client_);
-      ASSERT_TRUE(clientAsyncWrapper_);
-      clientAsyncWrapper_->setReadCB(&clientReadCB_);
-      startPromise_.setValue();
-    }));
 
     EXPECT_CALL(clientReadCB_, isBufferMovable_())
         .WillRepeatedly(Return(false));
@@ -112,11 +101,7 @@ class QuicStreamAsyncTransportTest : public Test {
               std::string(reinterpret_cast<char*>(clientBuf_.data()), len));
         }));
     EXPECT_CALL(clientReadCB_, readEOF_()).WillOnce(Return());
-
     EXPECT_CALL(clientWriteCB_, writeSuccess_()).WillOnce(Return());
-
-    auto [promise, future] = folly::makePromiseContract<folly::Unit>();
-    startPromise_ = std::move(promise);
 
     clientEvb_.runInEventBaseThreadAndWait([&]() {
       auto sock = std::make_unique<folly::AsyncUDPSocket>(&clientEvb_);
@@ -128,17 +113,12 @@ class QuicStreamAsyncTransportTest : public Test {
           &clientEvb_, std::move(sock), std::move(fizzClientContext));
       client_->setHostname("echo.com");
       client_->addNewPeerAddress(serverAddr_);
-      client_->start(&clientConnectionCB_);
+      clientAsyncWrapper_.reset(new QuicClientAsyncTransport(client_));
+      clientAsyncWrapper_->setReadCB(&clientReadCB_);
     });
-
-    std::move(future).get(1s);
   }
 
   void TearDown() override {
-    if (serverAsyncWrapper_) {
-      serverAsyncWrapper_->getEventBase()->runInEventBaseThreadAndWait(
-          [&]() { serverAsyncWrapper_.reset(); });
-    }
     server_->shutdown();
     server_ = nullptr;
     clientEvb_.runInEventBaseThreadAndWait([&] {
@@ -150,11 +130,9 @@ class QuicStreamAsyncTransportTest : public Test {
   }
 
  protected:
-  std::shared_ptr<QuicServer> server_;
+  std::shared_ptr<QuicAsyncTransportServer> server_;
   folly::SocketAddress serverAddr_;
-  NiceMock<MockConnectionCallback> serverConnectionCB_;
-  std::shared_ptr<quic::QuicSocket> serverSocket_;
-  QuicStreamAsyncTransport::UniquePtr serverAsyncWrapper_;
+  folly::AsyncTransport::UniquePtr serverAsyncWrapper_;
   folly::test::MockWriteCallback serverWriteCB_;
   folly::test::MockReadCallback serverReadCB_;
   std::array<uint8_t, 1024> serverBuf_;
@@ -162,27 +140,25 @@ class QuicStreamAsyncTransportTest : public Test {
   std::shared_ptr<QuicClientTransport> client_;
   folly::EventBase clientEvb_;
   std::thread clientEvbThread_;
-  NiceMock<MockConnectionCallback> clientConnectionCB_;
-  QuicStreamAsyncTransport::UniquePtr clientAsyncWrapper_;
-  folly::Promise<folly::Unit> startPromise_;
+  QuicClientAsyncTransport::UniquePtr clientAsyncWrapper_;
   folly::test::MockWriteCallback clientWriteCB_;
   folly::test::MockReadCallback clientReadCB_;
   std::array<uint8_t, 1024> clientBuf_;
   folly::Promise<std::string> clientReadPromise_;
 };
 
-TEST_F(QuicStreamAsyncTransportTest, ReadWrite) {
+TEST_F(QuicAsyncTransportServerTest, ReadWrite) {
   auto [promise, future] = folly::makePromiseContract<std::string>();
   clientReadPromise_ = std::move(promise);
 
-  std::string msg = "yo yo!";
+  std::string msg = "jaja";
   clientEvb_.runInEventBaseThreadAndWait([&] {
     clientAsyncWrapper_->write(&clientWriteCB_, msg.data(), msg.size());
     clientAsyncWrapper_->shutdownWrite();
   });
 
   std::string clientReadString = std::move(future).get(1s);
-  EXPECT_EQ(clientReadString, "echo yo yo!");
+  EXPECT_EQ(clientReadString, "jaja ding dong");
 }
 
 } // namespace quic::test

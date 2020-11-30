@@ -8,7 +8,6 @@
 
 #pragma once
 
-// #include <folly/io/Cursor.h>
 #include <folly/io/async/AsyncTransport.h>
 #include <quic/api/QuicSocket.h>
 
@@ -34,25 +33,26 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
       quic::StreamId streamId);
 
  protected:
-  QuicStreamAsyncTransport(
-      std::shared_ptr<quic::QuicSocket> sock,
-      quic::StreamId id);
+  QuicStreamAsyncTransport() = default;
+  ~QuicStreamAsyncTransport() override = default;
+
+  void setSocket(std::shared_ptr<QuicSocket> sock);
+
+  // While stream id is not set, all writes are buffered.
+  void setStreamId(StreamId id);
 
  public:
-  ~QuicStreamAsyncTransport() override;
+  //
+  // folly::DelayedDestruction
+  //
+  void destroy() override;
 
+  //
+  // folly::AsyncTransport overrides
+  //
   void setReadCB(AsyncTransport::ReadCallback* callback) override;
 
   AsyncTransport::ReadCallback* getReadCallback() const override;
-
-  void addWriteCallback(
-      AsyncTransport::WriteCallback* callback,
-      size_t offset,
-      size_t size);
-
-  void handleOffsetError(
-      AsyncTransport::WriteCallback* callback,
-      LocalErrorCode error);
 
   void write(
       AsyncTransport::WriteCallback* callback,
@@ -123,34 +123,49 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
 
   std::string getSecurityProtocol() const override;
 
- private:
+ protected:
+  //
+  // QucSocket::ReadCallback overrides
+  //
   void readAvailable(quic::StreamId /*streamId*/) noexcept override;
-
   void readError(
       quic::StreamId /*streamId*/,
       std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
           error) noexcept override;
 
-  void runLoopCallback() noexcept override;
-
-  void handleRead();
-  void send(uint64_t maxToSend);
-
-  void invokeWriteCallbacks(size_t sentOffset);
-
-  void failWrites(folly::AsyncSocketException& ex);
-
+  //
+  // QucSocket::WriteCallback overrides
+  //
   void onStreamWriteReady(
       quic::StreamId /*id*/,
       uint64_t maxToSend) noexcept override;
-
   void onStreamWriteError(
       StreamId /*id*/,
       std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
           error) noexcept override;
 
+  //
+  // folly::EventBase::LoopCallback overrides
+  //
+  void runLoopCallback() noexcept override;
+
+  // Utils
+  void addWriteCallback(AsyncTransport::WriteCallback* callback, size_t offset);
+  void handleWriteOffsetError(
+      AsyncTransport::WriteCallback* callback,
+      LocalErrorCode error);
+  bool handleWriteStateError(AsyncTransport::WriteCallback* callback);
+  void handleRead();
+  void send(uint64_t maxToSend);
+  folly::Expected<size_t, LocalErrorCode> getStreamWriteOffset() const;
+  void invokeWriteCallbacks(size_t sentOffset);
+  void failWrites(const folly::AsyncSocketException& ex);
+  void closeNowImpl(folly::AsyncSocketException&& ex);
+
+  enum class CloseState { OPEN, CLOSING, CLOSED };
+  CloseState state_{CloseState::OPEN};
   std::shared_ptr<quic::QuicSocket> sock_;
-  quic::StreamId id_;
+  folly::Optional<quic::StreamId> id_;
   enum class EOFState { NOT_SEEN, QUEUED, DELIVERED };
   EOFState readEOF_{EOFState::NOT_SEEN};
   EOFState writeEOF_{EOFState::NOT_SEEN};
