@@ -146,6 +146,7 @@ class ServerHandshakeTest : public Test {
         verifier,
         hostname,
         cachedPsk,
+        folly::Optional<std::vector<fizz::ech::ECHConfig>>(folly::none),
         std::make_shared<FizzClientExtensions>(clientExtensions));
   }
 
