@@ -430,20 +430,12 @@ void QuicServerWorker::handleNetworkData(
 
 void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int res) {
   auto bytesRead = res;
-  int gro = -1;
   auto& msg = msgHdr->data_;
   if (bytesRead > 0) {
+    OnDataAvailableParams params;
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
     if (msgHdr->data_.msg_control) {
-      struct cmsghdr* cmsg;
-      for (cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;
-           cmsg = CMSG_NXTHDR(&msg, cmsg)) {
-        if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
-          auto grosizeptr = (uint16_t*)CMSG_DATA(cmsg);
-          gro = *grosizeptr;
-          break;
-        }
-      }
+      folly::AsyncUDPSocket::fromMsg(params, msg);
     }
 #endif
     bool truncated = false;
@@ -458,8 +450,6 @@ void QuicServerWorker::eventRecvmsgCallback(MsgHdr* msgHdr, int res) {
     addr.setFromSockaddr(
         reinterpret_cast<sockaddr*>(msg.msg_name), msg.msg_namelen);
 
-    OnDataAvailableParams params;
-    params.gro = gro;
     onDataAvailable(addr, bytesRead, truncated, params);
   }
   msgHdr_.reset(msgHdr);
