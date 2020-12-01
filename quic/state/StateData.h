@@ -406,9 +406,6 @@ using FrameList = std::vector<QuicSimpleFrame>;
 
 struct LossState {
   enum class AlarmMethod { EarlyRetransmitOrReordering, PTO };
-  // The time when last handshake packet (including both Initial and Handshake
-  // space) was sent
-  TimePoint lastHandshakePacketSentTime;
   // Latest packet number sent
   // TODO: this also needs to be 3 numbers now...
   folly::Optional<PacketNum> largestSent;

@@ -735,7 +735,6 @@ void updateConnection(
         ++conn.outstandings.handshakePacketsCount;
       }
     }
-    conn.lossState.lastHandshakePacketSentTime = pkt.metadata.time;
   }
   conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
   if (pkt.associatedEvent) {

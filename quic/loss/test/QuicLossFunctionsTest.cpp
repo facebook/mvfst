@@ -228,9 +228,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       encodedSize,
       0);
   outstandingPacket.associatedEvent = associatedEvent;
-  if (isHandshake) {
-    conn.lossState.lastHandshakePacketSentTime = time;
-  }
   conn.lossState.lastRetransmittablePacketSentTime = time;
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(outstandingPacket);
