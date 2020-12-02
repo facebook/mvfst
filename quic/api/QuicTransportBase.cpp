@@ -1336,7 +1336,8 @@ void QuicTransportBase::cancelByteEventCallbacksForStream(
         conn_->streamManager->removeTx(id);
         break;
     }
-    byteEventMap.erase(byteEventMapIt);
+    // The callback could have changed the map so erase by id.
+    byteEventMap.erase(id);
   }
 }
 
