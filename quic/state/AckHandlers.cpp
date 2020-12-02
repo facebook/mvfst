@@ -175,15 +175,14 @@ void processAckFrame(
       }
       // Only invoke AckVisitor if the packet doesn't have an associated
       // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
-      if (needsProcess /*!rPacketIt->associatedEvent ||
-          conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent)*/) {
+      if (needsProcess) {
         for (auto& packetFrame : rPacketIt->packet.frames) {
           ackVisitor(*rPacketIt, packetFrame, frame);
         }
-        // Remove this PacketEvent from the outstandings.packetEvents set
-        if (rPacketIt->associatedEvent) {
-          conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
-        }
+      }
+      // Remove this PacketEvent from the outstandings.packetEvents set
+      if (rPacketIt->associatedEvent) {
+        conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
       }
       if (!ack.largestAckedPacket ||
           *ack.largestAckedPacket < currentPacketNum) {
