@@ -56,7 +56,7 @@ class QuicPacketScheduler {
   /**
    * Returns the name of the scheduler.
    */
-  virtual std::string name() const = 0;
+  virtual folly::StringPiece name() const = 0;
 };
 
 class RetransmissionScheduler {
@@ -217,14 +217,13 @@ class CryptoStreamScheduler {
 
   bool hasData() const;
 
-  std::string name() const {
+  folly::StringPiece name() const {
     return "CryptoScheduler";
   }
 
  private:
   const QuicConnectionStateBase& conn_;
   const QuicCryptoStream& cryptoStream_;
-  std::string name_;
 };
 
 class FrameScheduler : public QuicPacketScheduler {
@@ -236,7 +235,7 @@ class FrameScheduler : public QuicPacketScheduler {
         QuicConnectionStateBase& conn,
         EncryptionLevel encryptionLevel,
         PacketNumberSpace packetNumberSpace,
-        std::string name);
+        folly::StringPiece name);
 
     Builder& streamRetransmissions();
     Builder& streamFrames();
@@ -254,7 +253,7 @@ class FrameScheduler : public QuicPacketScheduler {
     QuicConnectionStateBase& conn_;
     EncryptionLevel encryptionLevel_;
     PacketNumberSpace packetNumberSpace_;
-    std::string name_;
+    folly::StringPiece name_;
 
     // schedulers
     bool retransmissionScheduler_{false};
@@ -268,19 +267,19 @@ class FrameScheduler : public QuicPacketScheduler {
     bool pingFrameScheduler_{false};
   };
 
-  explicit FrameScheduler(std::string name);
+  explicit FrameScheduler(folly::StringPiece name);
 
   SchedulingResult scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
   // If any scheduler, including AckScheduler, has pending data to send
-  virtual bool hasData() const override;
+  FOLLY_NODISCARD bool hasData() const override;
 
   // If any of the non-Ack scheduler has pending data to send
-  virtual bool hasImmediateData() const;
+  FOLLY_NODISCARD virtual bool hasImmediateData() const;
 
-  virtual std::string name() const override;
+  FOLLY_NODISCARD folly::StringPiece name() const override;
 
  private:
   folly::Optional<RetransmissionScheduler> retransmissionScheduler_;
@@ -292,7 +291,7 @@ class FrameScheduler : public QuicPacketScheduler {
   folly::Optional<CryptoStreamScheduler> cryptoStreamScheduler_;
   folly::Optional<SimpleFrameScheduler> simpleFrameScheduler_;
   folly::Optional<PingFrameScheduler> pingFrameScheduler_;
-  std::string name_;
+  folly::StringPiece name_;
 };
 
 /**
@@ -313,7 +312,7 @@ class CloningScheduler : public QuicPacketScheduler {
   CloningScheduler(
       FrameScheduler& scheduler,
       QuicConnectionStateBase& conn,
-      const std::string& name,
+      const folly::StringPiece name,
       uint64_t cipherOverhead);
 
   bool hasData() const override;
@@ -326,12 +325,12 @@ class CloningScheduler : public QuicPacketScheduler {
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
-  std::string name() const override;
+  folly::StringPiece name() const override;
 
  private:
   FrameScheduler& frameScheduler_;
   QuicConnectionStateBase& conn_;
-  std::string name_;
+  folly::StringPiece name_;
   uint64_t cipherOverhead_;
 };
 
@@ -343,7 +342,7 @@ class D6DProbeScheduler : public QuicPacketScheduler {
  public:
   D6DProbeScheduler(
       QuicConnectionStateBase& conn,
-      std::string name,
+      folly::StringPiece name,
       uint64_t cipherOverhead,
       uint32_t probSize);
 
@@ -353,11 +352,11 @@ class D6DProbeScheduler : public QuicPacketScheduler {
       PacketBuilderInterface&& builder,
       uint32_t writableBytes) override;
 
-  FOLLY_NODISCARD std::string name() const override;
+  FOLLY_NODISCARD folly::StringPiece name() const override;
 
  private:
   QuicConnectionStateBase& conn_;
-  std::string name_;
+  folly::StringPiece name_;
   uint64_t cipherOverhead_;
   uint32_t probeSize_;
   bool probeSent_{false};

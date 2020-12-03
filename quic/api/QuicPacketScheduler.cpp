@@ -139,7 +139,7 @@ FrameScheduler::Builder::Builder(
     QuicConnectionStateBase& conn,
     EncryptionLevel encryptionLevel,
     PacketNumberSpace packetNumberSpace,
-    std::string name)
+    folly::StringPiece name)
     : conn_(conn),
       encryptionLevel_(encryptionLevel),
       packetNumberSpace_(packetNumberSpace),
@@ -224,7 +224,7 @@ FrameScheduler FrameScheduler::Builder::build() && {
   return scheduler;
 }
 
-FrameScheduler::FrameScheduler(std::string name) : name_(std::move(name)) {}
+FrameScheduler::FrameScheduler(folly::StringPiece name) : name_(name) {}
 
 SchedulingResult FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
@@ -320,7 +320,7 @@ bool FrameScheduler::hasImmediateData() const {
       (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame());
 }
 
-std::string FrameScheduler::name() const {
+folly::StringPiece FrameScheduler::name() const {
   return name_;
 }
 
@@ -727,11 +727,11 @@ bool CryptoStreamScheduler::hasData() const {
 CloningScheduler::CloningScheduler(
     FrameScheduler& scheduler,
     QuicConnectionStateBase& conn,
-    const std::string& name,
+    const folly::StringPiece name,
     uint64_t cipherOverhead)
     : frameScheduler_(scheduler),
       conn_(conn),
-      name_(std::move(name)),
+      name_(name),
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
@@ -845,17 +845,17 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   return SchedulingResult(folly::none, folly::none);
 }
 
-std::string CloningScheduler::name() const {
+folly::StringPiece CloningScheduler::name() const {
   return name_;
 }
 
 D6DProbeScheduler::D6DProbeScheduler(
     QuicConnectionStateBase& conn,
-    std::string name,
+    folly::StringPiece name,
     uint64_t cipherOverhead,
     uint32_t probeSize)
     : conn_(conn),
-      name_(std::move(name)),
+      name_(name),
       cipherOverhead_(cipherOverhead),
       probeSize_(probeSize) {}
 
@@ -923,7 +923,7 @@ SchedulingResult D6DProbeScheduler::scheduleFramesForPacket(
   return SchedulingResult(folly::none, std::move(resultPacket));
 }
 
-std::string D6DProbeScheduler::name() const {
+folly::StringPiece D6DProbeScheduler::name() const {
   return name_;
 }
 

@@ -1192,7 +1192,7 @@ uint64_t writeConnectionDataToSocket(
       connection.happyEyeballsState);
 
   if (connection.loopDetectorCallback) {
-    connection.writeDebugState.schedulerName = scheduler.name();
+    connection.writeDebugState.schedulerName = scheduler.name().str();
     connection.writeDebugState.noWriteReason = NoWriteReason::WRITE_OK;
     if (!scheduler.hasData()) {
       connection.writeDebugState.noWriteReason = NoWriteReason::EMPTY_SCHEDULER;
