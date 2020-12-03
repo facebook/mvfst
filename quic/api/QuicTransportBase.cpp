@@ -1029,11 +1029,11 @@ QuicTransportBase::setDataExpiredCallback(
 }
 
 void QuicTransportBase::invokeDataExpiredCallbacks() {
-  auto self = sharedGuard();
-  if (closeState_ != CloseState::OPEN) {
+  if (!conn_->partialReliabilityEnabled || closeState_ != CloseState::OPEN) {
     return;
   }
 
+  auto self = sharedGuard();
   for (auto streamId : self->conn_->streamManager->dataExpiredStreams()) {
     auto callbackData = self->dataExpiredCallbacks_.find(streamId);
     // Data expired is edge-triggered (nag only once on arrival), unlike read
@@ -1120,11 +1120,11 @@ QuicTransportBase::setDataRejectedCallback(
 }
 
 void QuicTransportBase::invokeDataRejectedCallbacks() {
-  auto self = sharedGuard();
-  if (closeState_ != CloseState::OPEN) {
+  if (!conn_->partialReliabilityEnabled || closeState_ != CloseState::OPEN) {
     return;
   }
 
+  auto self = sharedGuard();
   for (auto streamId : self->conn_->streamManager->dataRejectedStreams()) {
     auto callbackData = self->dataRejectedCallbacks_.find(streamId);
     // Data rejected is edge-triggered (nag only once on arrival), unlike read
