@@ -26,12 +26,12 @@ namespace quic {
  * it can fallback to default routing
  * Depending on version following mappings:
  * Version 1:
- *    Next 16 bits (3 - 17)  are reserved for host id (L4 LB use)
+ *    Next 16 bits (2 - 17)  are reserved for host id (L4 LB use)
  *    Next 8 bits (18 - 25) are reserved for worker id
  *    Next bit 26 is reserved for the Quic server id: server id is used to
  *    distinguish between the takeover instance and the taken over one
-   0     1 2 3 4 5 .. 17 18    19 20 .. 25 26          27 28 ... 63
-  |VERSION|   For L4 LB       | WORKER_ID  | SERVER_ID |  ..
+   0     1   2 3 4 .. 17    18 .. 25        26        27 28 .. 63
+  |VERSION|  For L4 LB    | WORKER_ID  | SERVER_ID |  ..
  *
  * Version 2:
  *    Next 6 bits (2 - 7) are not used (random)
