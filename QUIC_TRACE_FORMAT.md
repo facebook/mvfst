@@ -30,6 +30,8 @@ reltime ||    client_conn_id ||     server_conn_id ||     event ||              
 | conn_close | Drain, SendCloseFrame, CloseReason, Error | |
 | copa_ack | CwndBytes, InflightBytes | |
 | copa_loss | CwndBytes, InflightBytes | |
+| copa2_ack | CwndBytes, InflightBytes | |
+| copa2_loss | CwndBytes, InflightBytes | |
 | cubic_appidle | IsAppIdle, EventTimeSinceEpoch, LastCwndReductionTimeSinceEpoch | |
 | cubic_ack | CubicState, CwndBytes, InflightBytes, LastMaxCwndBytes | |
 | cubic_loss | CubicState, CwndBytes, InflightBytes, LastMaxCwndBytes | |
