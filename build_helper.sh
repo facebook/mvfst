@@ -27,11 +27,13 @@ Usage ${0##*/} [-h|?] [-p PATH] [-i INSTALL_PREFIX]
   -s                                     (optional): Skip installing system package dependencies
   -c                                     (optional): Use ccache
   -z                                     (optional): enable CCP support
+  -f                                     (optional): Skip fetching dependencies (to test local changes)
   -h|?                                               Show this help message
 EOF
 }
 
-while getopts ":hp:i:mscz" arg; do
+FETCH_DEPENDENCIES=true
+while getopts ":hp:i:msczf" arg; do
   case $arg in
     p)
       BUILD_DIR="${OPTARG}"
@@ -50,6 +52,9 @@ while getopts ":hp:i:mscz" arg; do
       ;;
     z)
       MVFST_ENABLE_CCP=true
+      ;;
+    f)
+      FETCH_DEPENDENCIES=false
       ;;
     h | *) # Display help.
       usage
@@ -226,6 +231,9 @@ function synch_dependency_to_commit() {
   # Utility function to synch a dependency to a specific commit. Takes two arguments:
   #   - $1: folder of the dependency's git repository
   #   - $2: path to the text file containing the desired commit hash
+  if [ "$FETCH_DEPENDENCIES" = false ] ; then
+    return
+  fi
   DEP_REV=$(sed 's/Subproject commit //' "$2")
   pushd "$1"
   git fetch
