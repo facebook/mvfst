@@ -582,7 +582,24 @@ void QuicServerWorker::dispatchPacketData(
           return;
         }
 
-        if (newConnRateLimiter_ &&
+        // If there is a retry token, validate it
+        folly::io::Cursor cursor(networkData.packets.front().get());
+        auto maybeEncryptedRetryToken = maybeGetEncryptedRetryToken(cursor);
+        if (maybeEncryptedRetryToken &&
+            !validateRetryToken(
+                *maybeEncryptedRetryToken,
+                routingData.destinationConnId,
+                client.getIPAddress())) {
+          QUIC_STATS(
+              statsCallback_,
+              onPacketDropped,
+              PacketDropReason::INVALID_PACKET);
+          return;
+        }
+
+        // If rate-limiting is configured and there is no retry token,
+        // send a retry packet back to the client
+        if (!maybeEncryptedRetryToken && newConnRateLimiter_ &&
             newConnRateLimiter_->check(networkData.receiveTimePoint)) {
           sendRetryPacket(
               client,
@@ -593,6 +610,7 @@ void QuicServerWorker::dispatchPacketData(
           QUIC_STATS(statsCallback_, onConnectionRateLimited);
           return;
         }
+
         // create 'accepting' transport
         auto sock = makeSocket(getEventBase());
         auto trans = transportFactory_->make(
@@ -794,6 +812,57 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
+folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedRetryToken(
+    folly::io::Cursor& cursor) {
+  // Move cursor to the byte right after the initial byte
+  if (!cursor.canAdvance(1)) {
+    return folly::none;
+  }
+  auto initialByte = cursor.readBE<uint8_t>();
+
+  // We already know this is an initial packet, which uses a long header
+  auto parsedLongHeader = parseLongHeader(initialByte, cursor);
+  if (!parsedLongHeader || !parsedLongHeader->parsedLongHeader.has_value()) {
+    return folly::none;
+  }
+
+  auto header = parsedLongHeader->parsedLongHeader.value().header;
+  if (!header.hasToken()) {
+    return folly::none;
+  }
+  return header.getToken();
+}
+
+bool QuicServerWorker::validateRetryToken(
+    std::string& encryptedToken,
+    const ConnectionId& dstConnId,
+    const folly::IPAddress& clientIp) {
+  // Try to decode the token
+  CHECK(transportSettings_.retryTokenSecret.has_value());
+  RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
+  auto buf = folly::IOBuf::copyBuffer(encryptedToken);
+
+  auto maybeDecryptedToken = generator.decryptToken(std::move(buf));
+  if (!maybeDecryptedToken) {
+    return false;
+  }
+
+  // Validate that the client IP address matches what is stored in the retry
+  // token
+  auto decryptedToken = maybeDecryptedToken.value();
+  if (decryptedToken.originalDstConnId != dstConnId) {
+    VLOG(4) << "Dst conn id doesn't match original dst conn id in retry token";
+    return false;
+  }
+
+  if (decryptedToken.clientIp != clientIp) {
+    VLOG(4) << "Client IP doesn't match the IP stored in the retry token";
+    return false;
+  }
+
+  return true;
+}
+
 void QuicServerWorker::sendRetryPacket(
     const folly::SocketAddress& client,
     const ConnectionId& dstConnId,
@@ -802,7 +871,7 @@ void QuicServerWorker::sendRetryPacket(
   CHECK(transportSettings_.retryTokenSecret.has_value());
   RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
   auto encryptedToken = generator.encryptToken(
-      srcConnId, client.getIPAddress(), client.getPort());
+      dstConnId, client.getIPAddress(), client.getPort());
   CHECK(encryptedToken.has_value());
   std::string encryptedTokenStr =
       encryptedToken.value()->moveToFbString().toStdString();
@@ -813,11 +882,14 @@ void QuicServerWorker::sendRetryPacket(
   uint8_t initialByte = kHeaderFormMask | LongHeader::kFixedBitMask |
       (static_cast<uint8_t>(LongHeader::Types::Retry)
        << LongHeader::kTypeShift);
+
+  // Flip the src conn ID and dst conn ID as per section 7.3 of QUIC draft
+  // for both pseudo retry builder and the actual retry packet builder
   PseudoRetryPacketBuilder pseudoBuilder(
       initialByte,
-      srcConnId,
-      dstConnId,
-      dstConnId,
+      dstConnId, /* src conn id */
+      srcConnId, /* dst conn id */
+      dstConnId, /* orginal dst conn id */
       QuicVersion::MVFST_INVALID,
       folly::IOBuf::copyBuffer(encryptedTokenStr));
   Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
@@ -827,8 +899,8 @@ void QuicServerWorker::sendRetryPacket(
 
   // Create the actual retry packet
   RetryPacketBuilder builder(
-      srcConnId,
-      dstConnId,
+      dstConnId, /* src conn id */
+      srcConnId, /* dst conn id */
       QuicVersion::MVFST_INVALID,
       std::move(encryptedTokenStr),
       std::move(integrityTag));

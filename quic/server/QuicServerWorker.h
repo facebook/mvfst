@@ -489,6 +489,17 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       folly::EventBase* evb,
       int fd) const;
 
+  /**
+   * Tries to get the encrypted retry token from a client initial packet
+   */
+  folly::Optional<std::string> maybeGetEncryptedRetryToken(
+      folly::io::Cursor& cursor);
+
+  bool validateRetryToken(
+      std::string& encryptedToken,
+      const ConnectionId& dstConnId,
+      const folly::IPAddress& clientIp);
+
   void sendRetryPacket(
       const folly::SocketAddress& client,
       const ConnectionId& dstConnId,
