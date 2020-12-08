@@ -489,6 +489,11 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       folly::EventBase* evb,
       int fd) const;
 
+  void sendRetryPacket(
+      const folly::SocketAddress& client,
+      const ConnectionId& dstConnId,
+      const ConnectionId& srcConnId);
+
   void sendResetPacket(
       const HeaderForm& headerForm,
       const folly::SocketAddress& client,

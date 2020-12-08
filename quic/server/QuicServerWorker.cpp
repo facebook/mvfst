@@ -21,9 +21,11 @@
 #define SOF_TIMESTAMPING_SOFTWARE 0
 #endif
 
+#include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerWorker.h>
+#include <quic/server/handshake/RetryTokenGenerator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/QuicConnectionStats.h>
 
@@ -579,16 +581,15 @@ void QuicServerWorker::dispatchPacketData(
               PacketDropReason::INVALID_PACKET);
           return;
         }
+
         if (newConnRateLimiter_ &&
             newConnRateLimiter_->check(networkData.receiveTimePoint)) {
-          // TODO RETRY
-          VersionNegotiationPacketBuilder builder(
+          sendRetryPacket(
+              client,
               routingData.destinationConnId,
               routingData.sourceConnId.value_or(
-                  ConnectionId(std::vector<uint8_t>())),
-              std::vector<QuicVersion>{QuicVersion::MVFST_INVALID});
-          auto versionNegotiationPacket = std::move(builder).buildPacket();
-          socket_->write(client, versionNegotiationPacket.second);
+                  ConnectionId(std::vector<uint8_t>())));
+
           QUIC_STATS(statsCallback_, onConnectionRateLimited);
           return;
         }
@@ -791,6 +792,53 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onWrite, resetDataLen);
   QUIC_STATS(statsCallback_, onPacketSent);
   QUIC_STATS(statsCallback_, onStatelessReset);
+}
+
+void QuicServerWorker::sendRetryPacket(
+    const folly::SocketAddress& client,
+    const ConnectionId& dstConnId,
+    const ConnectionId& srcConnId) {
+  // Create the encrypted retry token
+  CHECK(transportSettings_.retryTokenSecret.has_value());
+  RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
+  auto encryptedToken = generator.encryptToken(
+      srcConnId, client.getIPAddress(), client.getPort());
+  CHECK(encryptedToken.has_value());
+  std::string encryptedTokenStr =
+      encryptedToken.value()->moveToFbString().toStdString();
+
+  // Create the integrity tag
+  // For the tag to be correctly validated by the client, the initalByte
+  // needs to match the initialByte in the retry packet
+  uint8_t initialByte = kHeaderFormMask | LongHeader::kFixedBitMask |
+      (static_cast<uint8_t>(LongHeader::Types::Retry)
+       << LongHeader::kTypeShift);
+  PseudoRetryPacketBuilder pseudoBuilder(
+      initialByte,
+      srcConnId,
+      dstConnId,
+      dstConnId,
+      QuicVersion::MVFST_INVALID,
+      folly::IOBuf::copyBuffer(encryptedTokenStr));
+  Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
+  FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
+  auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
+      pseudoRetryPacketBuf.get());
+
+  // Create the actual retry packet
+  RetryPacketBuilder builder(
+      srcConnId,
+      dstConnId,
+      QuicVersion::MVFST_INVALID,
+      std::move(encryptedTokenStr),
+      std::move(integrityTag));
+
+  auto retryData = std::move(builder).buildPacket();
+  auto retryDataLen = retryData->computeChainDataLength();
+
+  socket_->write(client, retryData);
+  QUIC_STATS(statsCallback_, onWrite, retryDataLen);
+  QUIC_STATS(statsCallback_, onPacketSent);
 }
 
 void QuicServerWorker::allowBeingTakenOver(

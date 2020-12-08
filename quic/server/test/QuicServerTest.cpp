@@ -149,6 +149,7 @@ class QuicServerWorkerTest : public Test {
     auto transportInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
     TransportSettings settings;
     settings.statelessResetTokenSecret = getRandSecret();
+    settings.retryTokenSecret = getRandSecret();
     worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
     worker_->setWorkerId(42);
