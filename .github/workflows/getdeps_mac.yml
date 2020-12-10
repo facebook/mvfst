@@ -25,8 +25,6 @@ jobs:
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests ninja
     - name: Fetch cmake
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests cmake
-    - name: Fetch googletest_1_8
-      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests googletest_1_8
     - name: Fetch double-conversion
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests double-conversion
     - name: Fetch fmt
@@ -65,8 +63,6 @@ jobs:
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --no-tests ninja
     - name: Build cmake
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --no-tests cmake
-    - name: Build googletest_1_8
-      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --no-tests googletest_1_8
     - name: Build double-conversion
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --no-tests double-conversion
     - name: Build fmt
@@ -99,11 +95,11 @@ jobs:
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --no-tests fizz
     - name: Build mvfst
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
-#    - name: Copy artifacts
-#      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fixup-dyn-deps --src-dir=. mvfst _artifacts/mac  --project-install-prefix mvfst:/usr/local --final-install-prefix /usr/local
-#    - uses: actions/upload-artifact@master
-#      with:
-#        name: mvfst
-#        path: _artifacts
-#    - name: Test mvfst
-#      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages test --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
+    - name: Copy artifacts
+      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fixup-dyn-deps --src-dir=. mvfst _artifacts/mac  --project-install-prefix mvfst:/usr/local --final-install-prefix /usr/local
+    - uses: actions/upload-artifact@master
+      with:
+        name: mvfst
+        path: _artifacts
+    - name: Test mvfst
+      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages test --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
