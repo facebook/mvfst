@@ -211,7 +211,12 @@ class QuicStreamManager {
     return !lossStreams_.empty();
   }
 
-  void setStreamPriority(StreamId id, PriorityLevel level, bool incremental);
+  /**
+   * Update stream priority if the stream indicated by id exists, and the
+   * passed in values are different from current priority. Return true if
+   * stream priority is update, false otherwise.
+   */
+  bool setStreamPriority(StreamId id, PriorityLevel level, bool incremental);
 
   // TODO figure out a better interface here.
   /*

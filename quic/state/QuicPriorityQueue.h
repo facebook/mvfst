@@ -18,6 +18,10 @@ struct Priority {
   bool incremental : 1;
 
   Priority(uint8_t l, bool i) : level(l), incremental(i) {}
+
+  bool operator==(Priority other) {
+    return level == other.level && incremental == other.incremental;
+  }
 };
 
 /**

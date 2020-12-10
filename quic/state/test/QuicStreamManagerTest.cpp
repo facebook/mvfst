@@ -46,6 +46,21 @@ class QuicStreamManagerTest : public Test {
   MockCongestionController* mockController;
 };
 
+TEST_F(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
+  auto& manager = *conn.streamManager;
+  auto stream = manager.createNextBidirectionalStream();
+  auto streamId = stream.value()->id;
+  Priority currentPriority = stream.value()->priority;
+  EXPECT_TRUE(manager.setStreamPriority(
+      streamId,
+      (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
+      ~currentPriority.incremental));
+  EXPECT_FALSE(manager.setStreamPriority(
+      streamId,
+      (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
+      ~currentPriority.incremental));
+}
+
 TEST_F(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
