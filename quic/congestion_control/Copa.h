@@ -46,6 +46,8 @@ class Copa : public CongestionController {
   void setAppLimited() override;
   bool isAppLimited() const noexcept override;
 
+  void getStats(CongestionControllerStats& stats) const override;
+
  private:
   void onPacketAcked(const AckEvent&);
   void onPacketLoss(const LossEvent&);

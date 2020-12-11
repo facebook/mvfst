@@ -24,6 +24,7 @@
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/PacketEvent.h>
 #include <quic/state/PendingPathRateLimiter.h>
+#include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicStreamManager.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 #include <quic/state/StreamData.h>
@@ -368,6 +369,8 @@ struct CongestionController {
    * state.
    */
   virtual bool isAppLimited() const = 0;
+
+  virtual void getStats(CongestionControllerStats& stats) const = 0;
 };
 
 struct QuicCryptoStream : public QuicStreamLike {

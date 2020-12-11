@@ -560,6 +560,10 @@ bool BbrCongestionController::isAppLimited() const noexcept {
   return bandwidthSampler_ ? bandwidthSampler_->isAppLimited() : false;
 }
 
+void BbrCongestionController::getStats(CongestionControllerStats& stats) const {
+  stats.bbrStats.state = static_cast<uint8_t>(state_);
+}
+
 uint64_t BbrCongestionController::getCongestionWindow() const noexcept {
   if (state_ == BbrCongestionController::BbrState::ProbeRtt) {
     if (conn_.transportSettings.bbrConfig.largeProbeRttCwnd) {

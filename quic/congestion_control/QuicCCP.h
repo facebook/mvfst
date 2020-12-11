@@ -79,6 +79,8 @@ class CCP : public CongestionController {
 
   FOLLY_NODISCARD bool isAppLimited() const noexcept override;
 
+  void getStats(CongestionControllerStats& /*stats*/) const override {}
+
  private:
   void onLossEvent(const LossEvent&);
   void onAckEvent(const AckEvent&);

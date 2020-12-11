@@ -36,6 +36,8 @@ class NewReno : public CongestionController {
 
   bool isAppLimited() const noexcept override;
 
+  void getStats(CongestionControllerStats& /*stats*/) const override {}
+
  private:
   void onPacketLoss(const LossEvent&);
   void onAckEvent(const AckEvent&);

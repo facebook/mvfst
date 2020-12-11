@@ -21,6 +21,8 @@
 #define SOF_TIMESTAMPING_SOFTWARE 0
 #endif
 
+#include <quic/congestion_control/Bbr.h>
+#include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/CCPReader.h>
@@ -1307,9 +1309,11 @@ void QuicServerWorker::getAllConnectionsStats(
     connStats.peerAddress = conn->peerAddress.describe();
     connStats.duration = now - conn->connectionTime;
     if (conn->congestionController) {
+      connStats.cwnd_bytes = conn->congestionController->getCongestionWindow();
       connStats.congestionController =
           congestionControlTypeToString(conn->congestionController->type())
               .str();
+      conn->congestionController->getStats(connStats.congestionControllerStats);
     }
     connStats.ptoCount = conn->lossState.ptoCount;
     connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(

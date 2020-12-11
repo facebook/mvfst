@@ -354,4 +354,9 @@ bool Copa::isAppLimited() const noexcept {
   return false; // not supported
 }
 
+void Copa::getStats(CongestionControllerStats& stats) const {
+  stats.copaStats.deltaParam = deltaParam_;
+  stats.copaStats.useRttStanding = useRttStanding_;
+}
+
 } // namespace quic

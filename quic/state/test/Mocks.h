@@ -29,6 +29,7 @@ class MockCongestionController : public CongestionController {
   GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
   MOCK_METHOD0(setAppLimited, void());
   MOCK_CONST_METHOD0(isAppLimited, bool());
+  MOCK_CONST_METHOD1(getStats, void(CongestionControllerStats&));
 };
 
 class MockPacer : public Pacer {

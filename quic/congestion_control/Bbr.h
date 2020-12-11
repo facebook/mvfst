@@ -126,6 +126,8 @@ class BbrCongestionController : public CongestionController {
 
   bool isAppLimited() const noexcept override;
 
+  void getStats(CongestionControllerStats& stats) const override;
+
   // TODO: some of these do not have to be in public API.
   bool inRecovery() const noexcept;
   BbrState state() const noexcept;
