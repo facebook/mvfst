@@ -15,7 +15,6 @@ add_library(
   NewReno.cpp
   QuicCubic.cpp
   QuicCCP.cpp
-  Pacer.cpp
   ServerCongestionControllerFactory.cpp
   TokenlessPacer.cpp
 )

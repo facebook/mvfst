@@ -55,7 +55,7 @@ void TokenlessPacer::setPacingRate(
       conn.transportSettings.pacingTimerTickInterval);
 }
 
-void TokenlessPacer::resetPacingTokens() {
+void TokenlessPacer::reset() {
   // We call this after idle, so we actually want to start writing immediately.
   lastWriteTime_.reset();
 }

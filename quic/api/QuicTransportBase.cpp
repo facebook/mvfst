@@ -2111,10 +2111,9 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
       wasAppLimitedOrIdle |= conn_->streamManager->isAppIdle();
     }
     writeDataToQuicStream(*stream, std::move(data), eof);
-    // If we were previously app limited, drop whatever tokens we have
-    // collected while idle and restart pacing with the current rate.
+    // If we were previously app limited restart pacing with the current rate.
     if (wasAppLimitedOrIdle && conn_->pacer) {
-      conn_->pacer->resetPacingTokens();
+      conn_->pacer->reset();
     }
     updateWriteLooper(true);
   } catch (const QuicTransportException& ex) {
@@ -2849,11 +2848,7 @@ void QuicTransportBase::setTransportSettings(
           (conn_->congestionController->type() == CongestionControlType::BBR);
       auto minCwnd = usingBbr ? kMinCwndInMssForBbr
                               : conn_->transportSettings.minCwndInMss;
-      if (conn_->transportSettings.tokenlessPacer) {
-        conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
-      } else {
-        conn_->pacer = std::make_unique<DefaultPacer>(*conn_, minCwnd);
-      }
+      conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
     } else {
       LOG(ERROR) << "Pacing cannot be enabled without a timer";
       conn_->transportSettings.pacingEnabled = false;

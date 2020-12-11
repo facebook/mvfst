@@ -29,7 +29,7 @@ class TokenlessPacer : public Pacer {
 
   void setPacingRate(QuicConnectionStateBase& conn, uint64_t rate_bps) override;
 
-  void resetPacingTokens() override;
+  void reset() override;
 
   void setRttFactor(uint8_t numerator, uint8_t denominator) override;
 

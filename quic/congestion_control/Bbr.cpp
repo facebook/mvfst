@@ -297,7 +297,7 @@ void BbrCongestionController::updatePacing() noexcept {
   }
   conn_.pacer->refreshPacingRate(pacingWindow_, mrtt);
   if (state_ == BbrState::Drain) {
-    conn_.pacer->resetPacingTokens();
+    conn_.pacer->reset();
   }
 }
 

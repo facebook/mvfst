@@ -156,10 +156,10 @@ struct Pacer {
       uint64_t rate_bps) = 0;
 
   /**
-   * Resets the collected tokens, effectively restarting pacing with the current
-   * rate.
+   * Resets the pacer, which should have the effect of the next write
+   * happening immediately.
    */
-  virtual void resetPacingTokens() = 0;
+  virtual void reset() = 0;
 
   /**
    * Set the factor by which to multiply the RTT before determining the
