@@ -283,7 +283,8 @@ ssize_t GSOInplacePacketBatchWriter::write(
   CHECK(!buf->isChained());
   CHECK(lastPacketEnd_ >= buf->data() && lastPacketEnd_ <= buf->tail())
       << "lastPacketEnd_=" << (long)lastPacketEnd_
-      << " data=" << (long)buf->data() << " tail=" << (long)buf->tail();
+      << " data=" << (long long)buf->data()
+      << " tail=" << (long long)buf->tail();
   uint64_t diffToEnd = buf->tail() - lastPacketEnd_;
   CHECK(
       diffToEnd <= conn_.udpSendPacketLen ||
