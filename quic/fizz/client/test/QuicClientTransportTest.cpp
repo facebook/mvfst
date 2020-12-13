@@ -1910,9 +1910,9 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
         ,
         onStopSending,
         void(StreamId, ApplicationErrorCode));
-    GMOCK_METHOD0_(, noexcept, , onTransportReadyMock, void());
-    GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
-    GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
+    MOCK_METHOD(void, onTransportReadyMock, (), (noexcept));
+    MOCK_METHOD(void, onReplaySafe, (), (noexcept));
+    MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
     GMOCK_METHOD1_(
         ,
         noexcept,

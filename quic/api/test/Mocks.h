@@ -100,16 +100,16 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       ,
       onStopSending,
       void(StreamId, ApplicationErrorCode));
-  GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
+  MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
   GMOCK_METHOD1_(
       ,
       noexcept,
       ,
       onConnectionError,
       void(std::pair<QuicErrorCode, std::string>));
-  GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
-  GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
-  GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
+  MOCK_METHOD(void, onReplaySafe, (), (noexcept));
+  MOCK_METHOD(void, onTransportReady, (), (noexcept));
+  MOCK_METHOD(void, onFirstPeerPacketProcessed, (), (noexcept));
   MOCK_METHOD(void, onBidirectionalStreamsAvailable, (uint64_t), (noexcept));
   GMOCK_METHOD1_(
       ,
@@ -117,7 +117,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       ,
       onUnidirectionalStreamsAvailable,
       void(uint64_t));
-  GMOCK_METHOD0_(, noexcept, , onAppRateLimited, void());
+  MOCK_METHOD(void, onAppRateLimited, (), (noexcept));
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {

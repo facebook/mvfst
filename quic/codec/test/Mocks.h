@@ -67,7 +67,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD3(appendBytesWithAppender, void(BufAppender&, PacketNum, uint8_t));
   MOCK_METHOD3(appendBytesWithBufWriter, void(BufWriter&, PacketNum, uint8_t));
   MOCK_METHOD(void, accountForCipherOverhead, (uint8_t), (noexcept));
-  GMOCK_METHOD0_(, noexcept, , canBuildPacketNonConst, bool());
+  MOCK_METHOD(bool, canBuildPacketNonConst, (), (noexcept));
   GMOCK_METHOD0_(, const, , getHeaderBytes, uint32_t());
   GMOCK_METHOD0_(, const, , hasFramesPending, bool());
   MOCK_METHOD0(releaseOutputBufferMock, void());
