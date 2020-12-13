@@ -26,7 +26,7 @@ class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
       ,
       newRttSample,
       bool(std::chrono::microseconds, TimePoint));
-  GMOCK_METHOD1_(, noexcept, , timestampMinRtt, void(TimePoint));
+  MOCK_METHOD(void, timestampMinRtt, (TimePoint), (noexcept));
 };
 
 class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {

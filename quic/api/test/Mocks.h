@@ -43,7 +43,7 @@ class MockFrameScheduler : public FrameScheduler {
 class MockReadCallback : public QuicSocket::ReadCallback {
  public:
   ~MockReadCallback() override = default;
-  GMOCK_METHOD1_(, noexcept, , readAvailable, void(StreamId));
+  MOCK_METHOD(void, readAvailable, (StreamId), (noexcept));
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -70,7 +70,7 @@ class MockWriteCallback : public QuicSocket::WriteCallback {
   ~MockWriteCallback() override = default;
 
   GMOCK_METHOD2_(, noexcept, , onStreamWriteReady, void(StreamId, uint64_t));
-  GMOCK_METHOD1_(, noexcept, , onConnectionWriteReady, void(uint64_t));
+  MOCK_METHOD(void, onConnectionWriteReady, (uint64_t), (noexcept));
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -91,9 +91,9 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
  public:
   ~MockConnectionCallback() override = default;
 
-  GMOCK_METHOD1_(, noexcept, , onFlowControlUpdate, void(StreamId));
-  GMOCK_METHOD1_(, noexcept, , onNewBidirectionalStream, void(StreamId));
-  GMOCK_METHOD1_(, noexcept, , onNewUnidirectionalStream, void(StreamId));
+  MOCK_METHOD(void, onFlowControlUpdate, (StreamId), (noexcept));
+  MOCK_METHOD(void, onNewBidirectionalStream, (StreamId), (noexcept));
+  MOCK_METHOD(void, onNewUnidirectionalStream, (StreamId), (noexcept));
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -110,7 +110,7 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
   GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
   GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
   GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
-  GMOCK_METHOD1_(, noexcept, , onBidirectionalStreamsAvailable, void(uint64_t));
+  MOCK_METHOD(void, onBidirectionalStreamsAvailable, (uint64_t), (noexcept));
   GMOCK_METHOD1_(
       ,
       noexcept,
@@ -221,7 +221,7 @@ class MockQuicTransport : public QuicServerTransport {
 
   GMOCK_METHOD1_(, , , setTransportSettings, void(TransportSettings));
 
-  GMOCK_METHOD1_(, noexcept, , setPacingTimer, void(TimerHighRes::SharedPtr));
+  MOCK_METHOD(void, setPacingTimer, (TimerHighRes::SharedPtr), (noexcept));
 
   void onNetworkData(
       const folly::SocketAddress& peer,
@@ -293,7 +293,7 @@ class MockQuicTransport : public QuicServerTransport {
       setTransportStatsCallback,
       void(QuicTransportStatsCallback*));
 
-  GMOCK_METHOD1_(, noexcept, , setConnectionIdAlgo, void(ConnectionIdAlgo*));
+  MOCK_METHOD(void, setConnectionIdAlgo, (ConnectionIdAlgo*), (noexcept));
 
   MOCK_METHOD1(setBufAccessor, void(BufAccessor*));
 };
@@ -309,9 +309,9 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
 
 class MockLifecycleObserver : public LifecycleObserver {
  public:
-  GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicSocket*));
-  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
-  GMOCK_METHOD1_(, noexcept, , destroy, void(QuicSocket*));
+  MOCK_METHOD(void, observerAttach, (QuicSocket*), (noexcept));
+  MOCK_METHOD(void, observerDetach, (QuicSocket*), (noexcept));
+  MOCK_METHOD(void, destroy, (QuicSocket*), (noexcept));
   GMOCK_METHOD2_(, noexcept, , evbAttach, void(QuicSocket*, folly::EventBase*));
   GMOCK_METHOD2_(, noexcept, , evbDetach, void(QuicSocket*, folly::EventBase*));
   GMOCK_METHOD2_(
@@ -326,8 +326,8 @@ class MockLifecycleObserver : public LifecycleObserver {
 
 class MockInstrumentationObserver : public InstrumentationObserver {
  public:
-  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
-  GMOCK_METHOD1_(, noexcept, , appRateLimited, void(QuicSocket*));
+  MOCK_METHOD(void, observerDetach, (QuicSocket*), (noexcept));
+  MOCK_METHOD(void, appRateLimited, (QuicSocket*), (noexcept));
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -340,7 +340,7 @@ class MockInstrumentationObserver : public InstrumentationObserver {
       ,
       rttSampleGenerated,
       void(QuicSocket*, const PacketRTT&));
-  GMOCK_METHOD1_(, noexcept, , pmtuProbingStarted, void(QuicSocket*));
+  MOCK_METHOD(void, pmtuProbingStarted, (QuicSocket*), (noexcept));
   GMOCK_METHOD2_(
       ,
       noexcept,

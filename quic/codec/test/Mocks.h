@@ -18,7 +18,7 @@ namespace test {
 
 class MockConnectionIdAlgo : public ConnectionIdAlgo {
  public:
-  GMOCK_METHOD1_(, noexcept, , canParseNonConst, bool(const ConnectionId& id));
+  MOCK_METHOD(bool, canParseNonConst, (const ConnectionId& id), (noexcept));
   GMOCK_METHOD1_(
       ,
       noexcept,
@@ -66,7 +66,7 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   MOCK_METHOD2(appendBytes, void(PacketNum, uint8_t));
   MOCK_METHOD3(appendBytesWithAppender, void(BufAppender&, PacketNum, uint8_t));
   MOCK_METHOD3(appendBytesWithBufWriter, void(BufWriter&, PacketNum, uint8_t));
-  GMOCK_METHOD1_(, noexcept, , accountForCipherOverhead, void(uint8_t));
+  MOCK_METHOD(void, accountForCipherOverhead, (uint8_t), (noexcept));
   GMOCK_METHOD0_(, noexcept, , canBuildPacketNonConst, bool());
   GMOCK_METHOD0_(, const, , getHeaderBytes, uint32_t());
   GMOCK_METHOD0_(, const, , hasFramesPending, bool());

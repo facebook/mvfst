@@ -1901,9 +1901,9 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
       onTransportReadyMock();
     }
 
-    GMOCK_METHOD1_(, noexcept, , onFlowControlUpdate, void(StreamId));
-    GMOCK_METHOD1_(, noexcept, , onNewBidirectionalStream, void(StreamId));
-    GMOCK_METHOD1_(, noexcept, , onNewUnidirectionalStream, void(StreamId));
+    MOCK_METHOD(void, onFlowControlUpdate, (StreamId), (noexcept));
+    MOCK_METHOD(void, onNewBidirectionalStream, (StreamId), (noexcept));
+    MOCK_METHOD(void, onNewUnidirectionalStream, (StreamId), (noexcept));
     GMOCK_METHOD2_(
         ,
         noexcept,
