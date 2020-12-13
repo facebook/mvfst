@@ -1904,21 +1904,13 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
     MOCK_METHOD(void, onFlowControlUpdate, (StreamId), (noexcept));
     MOCK_METHOD(void, onNewBidirectionalStream, (StreamId), (noexcept));
     MOCK_METHOD(void, onNewUnidirectionalStream, (StreamId), (noexcept));
-    GMOCK_METHOD2_(
-        ,
-        noexcept,
-        ,
-        onStopSending,
-        void(StreamId, ApplicationErrorCode));
+    MOCK_METHOD(void, onStopSending, (StreamId, ApplicationErrorCode),
+                (noexcept));
     MOCK_METHOD(void, onTransportReadyMock, (), (noexcept));
     MOCK_METHOD(void, onReplaySafe, (), (noexcept));
     MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
-    GMOCK_METHOD1_(
-        ,
-        noexcept,
-        ,
-        onConnectionError,
-        void(std::pair<QuicErrorCode, std::string>));
+    MOCK_METHOD(void, onConnectionError,
+                ((std::pair<QuicErrorCode, std::string>)), (noexcept));
 
    private:
     std::shared_ptr<QuicSocket> socket_;
