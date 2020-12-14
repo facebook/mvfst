@@ -757,7 +757,8 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   std::move(builder).releaseOutputBuffer();
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
-    if (outstandingPacket.declaredLost) {
+    if (outstandingPacket.declaredLost ||
+        outstandingPacket.metadata.isD6DProbe) {
       continue;
     }
     auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();
