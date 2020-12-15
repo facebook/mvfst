@@ -283,10 +283,17 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
              << " handshake=" << pkt.metadata.isHandshake << " " << conn;
     // Rather than erasing here, instead mark the packet as lost so we can
     // determine if this was spurious later.
+    conn.lossState.totalPacketsMarkedLost++;
+    if (lostByTimeout) {
+      conn.lossState.totalPacketsMarkedLostByPto++;
+    }
+    if (lostByReorder) {
+      conn.lossState.totalPacketsMarkedLostByReorderingThreshold++;
+    }
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
     iter++;
-  }
+  } // while (iter != conn.outstandings.packets.end()) {
 
   // if there are observers, enqueue a function to call it
   if (observerLossEvent.hasPackets()) {

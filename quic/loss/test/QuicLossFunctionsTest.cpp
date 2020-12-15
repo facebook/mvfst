@@ -2084,6 +2084,163 @@ TEST_F(QuicLossFunctionsTest, TestNoInstrumentationObserverCallback) {
   EXPECT_EQ(0, size(conn->pendingCallbacks));
 }
 
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByReordering) {
+  auto conn = createConn();
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  // send 7 packets
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn->lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(200ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
+  // 0, 1, and 5 should be marked lost due to reordering, none due to timeout
+  // 6 is outstanding / on the wire still (no determination made)
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+}
+
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPto) {
+  auto conn = createConn();
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  // send 7 packets
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // setting a very high reordering threshold to force loss by timeout only
+  conn->lossState.reorderingThreshold = 100;
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // All 7 packets should be marked as lost by PTO
+  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(7, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+}
+
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoPartial) {
+  auto conn = createConn();
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  // send 7 packets
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a very high reordering threshold to force loss by timeout only
+  conn->lossState.reorderingThreshold = 100;
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
+  // 0, 1, 5, and 6 should be marked lost due to timeout, none due to reordering
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(0, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+}
+
+TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoAndReordering) {
+  auto conn = createConn();
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  // send 7 packets
+  PacketNum largestSent = 0;
+  for (int i = 0; i < 7; ++i) {
+    largestSent =
+        sendPacket(*conn, TimePoint(i * 10ms), folly::none, PacketType::OneRtt);
+  }
+
+  // Some packets are already acked
+  conn->outstandings.packets.erase(
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 2,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData) + 5);
+
+  // setting a low reorder threshold
+  conn->lossState.reorderingThreshold = 1;
+
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn->lossState.srtt = 400ms;
+  conn->lossState.lrtt = 350ms;
+  conn->transportSettings.timeReorderingThreshDividend = 1.0;
+  conn->transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = TimePoint(500ms);
+
+  detectLossPackets(
+      *conn,
+      largestSent + 1,
+      noopLossVisitor,
+      checkTime,
+      PacketNumberSpace::AppData);
+
+  // Sent 7 packets, out of 0, 1, 2, 3, 4, 5, 6 -- we deleted (acked) 2,3,4
+  // 0, 1, and 5 should be marked lost due to reordering AND timeout
+  // 6 should be marked as lost due to timeout only
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLost);
+  EXPECT_EQ(4, conn->lossState.totalPacketsMarkedLostByPto);
+  EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicLossFunctionsTests,
     QuicLossFunctionsTest,

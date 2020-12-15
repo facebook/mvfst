@@ -660,6 +660,7 @@ void updateConnection(
     conn.pendingEvents.setLossDetectionAlarm = retransmittable;
   }
   conn.lossState.totalBytesSent += encodedSize;
+  conn.lossState.totalPacketsSent++;
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);

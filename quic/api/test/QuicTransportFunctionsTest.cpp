@@ -2129,6 +2129,15 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
   EXPECT_EQ(5555, conn->lossState.totalBytesSent);
 }
 
+TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
+  const auto startTotalPacketsSent = 1234;
+  auto conn = createConn();
+  conn->lossState.totalPacketsSent = startTotalPacketsSent;
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  updateConnection(*conn, folly::none, packet.packet, TimePoint{}, 4321);
+  EXPECT_EQ(startTotalPacketsSent + 1, conn->lossState.totalPacketsSent);
+}
+
 TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();

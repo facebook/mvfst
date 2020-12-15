@@ -452,6 +452,17 @@ struct LossState {
   // The total number of bytes acked on this connection when the last time a
   // packet is acked.
   uint64_t totalBytesAckedAtLastAck{0};
+  // Total number of packets sent on this connection, including retransmissions.
+  uint32_t totalPacketsSent{0};
+  // Total number of packets which were declared lost, including losses that
+  // we later detected were spurious (see spuriousLossCount below).
+  uint32_t totalPacketsMarkedLost{0};
+  // Total number of packets which were declared lost due to PTO; a packet can
+  // marked as lost by multiple detection mechanisms.
+  uint32_t totalPacketsMarkedLostByPto{0};
+  // Total number of packets which were declared lost based on the reordering
+  // threshold; a packet can marked as lost by multiple detection mechanisms.
+  uint32_t totalPacketsMarkedLostByReorderingThreshold{0};
   // Inflight bytes
   uint64_t inflightBytes{0};
   // Reordering threshold used
