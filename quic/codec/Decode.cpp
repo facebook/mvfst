@@ -159,6 +159,9 @@ ReadAckFrame decodeAckFrame(
         "Bad ack delay",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK);
+  } else if (UNLIKELY(adjustedAckDelay > 1000 * 1000 * 1000 /* 1000s */)) {
+    LOG(ERROR) << "Quic recvd long ack delay=" << adjustedAckDelay;
+    adjustedAckDelay = 0;
   }
   PacketNum currentPacketNum =
       nextAckedPacketLen(largestAcked, firstAckBlockLen->first);
