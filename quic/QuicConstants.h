@@ -109,10 +109,10 @@ constexpr uint64_t kDefaultBufferSpaceAvailable =
 constexpr std::chrono::microseconds kDefaultMinRtt =
     std::chrono::microseconds::max();
 
-// Default knob space for transport knobs
+// Default knob space for transport knobs (used for internal use-cases only)
 constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
 
-// Default knob id for transport knobs
+// Default knob id for transport knobs (used for internal use-cases only)
 constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
 enum class TransportKnobParamId : uint64_t {
