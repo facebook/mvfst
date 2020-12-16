@@ -946,6 +946,9 @@ void onServerReadDataFromOpen(
           if (!stream) {
             break;
           }
+          if (getSendStreamFlowControlBytesWire(*stream) == 0) {
+            VLOG(2) << "Client gives up a flow control blocked stream";
+          }
           receiveRstStreamSMHandler(*stream, std::move(frame));
           break;
         }
@@ -1058,6 +1061,9 @@ void onServerReadDataFromOpen(
           }
           conn.peerConnectionError = std::make_pair(
               QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+          if (getSendConnFlowControlBytesWire(conn) == 0) {
+            VLOG(2) << "Client gives up flow control blocked connection";
+          }
           throw QuicTransportException(
               "Peer closed", TransportErrorCode::NO_ERROR);
           break;
