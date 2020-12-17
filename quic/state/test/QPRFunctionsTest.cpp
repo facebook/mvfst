@@ -203,8 +203,8 @@ TEST_F(QPRFunctionsTest, RecvMinStreamDataFrameShrinkBuffer) {
 
 TEST_F(QPRFunctionsTest, RecvMinStreamDataFrameOnUnidirectionalStream) {
   auto stream = conn.streamManager->createNextUnidirectionalStream().value();
-  stream->sendState = StreamSendState::Closed_E;
-  stream->recvState = StreamRecvState::Closed_E;
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
   PacketNum packetNum(10);
   MinStreamDataFrame frame(
       stream->id, stream->flowControlState.peerAdvertisedMaxOffset + 100, 100);

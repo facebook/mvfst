@@ -493,7 +493,7 @@ void updateConnection(
   }
   for (const auto& frame : packet.frames) {
     switch (frame.type()) {
-      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+      case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& writeStreamFrame = *frame.asWriteStreamFrame();
         retransmittable = true;
         auto stream = CHECK_NOTNULL(
@@ -516,7 +516,7 @@ void updateConnection(
         conn.streamManager->updateLossStreams(*stream);
         break;
       }
-      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+      case QuicWriteFrame::Type::WriteCryptoFrame: {
         const WriteCryptoFrame& writeCryptoFrame = *frame.asWriteCryptoFrame();
         retransmittable = true;
         auto protectionType = packet.header.getProtectionType();
@@ -536,7 +536,7 @@ void updateConnection(
             packetNumberSpace);
         break;
       }
-      case QuicWriteFrame::Type::WriteAckFrame_E: {
+      case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& writeAckFrame = *frame.asWriteAckFrame();
         DCHECK(!ackFrameCounter++)
             << "Send more than one WriteAckFrame " << conn;
@@ -551,7 +551,7 @@ void updateConnection(
             largestAckedPacketWritten);
         break;
       }
-      case QuicWriteFrame::Type::RstStreamFrame_E: {
+      case QuicWriteFrame::Type::RstStreamFrame: {
         const RstStreamFrame& rstStreamFrame = *frame.asRstStreamFrame();
         retransmittable = true;
         VLOG(10) << nodeToString(conn.nodeType)
@@ -569,7 +569,7 @@ void updateConnection(
         }
         break;
       }
-      case QuicWriteFrame::Type::MaxDataFrame_E: {
+      case QuicWriteFrame::Type::MaxDataFrame: {
         const MaxDataFrame& maxDataFrame = *frame.asMaxDataFrame();
         CHECK(!connWindowUpdateSent++)
             << "Send more than one connection window update " << conn;
@@ -583,7 +583,7 @@ void updateConnection(
         onConnWindowUpdateSent(conn, maxDataFrame.maximumData, sentTime);
         break;
       }
-      case QuicWriteFrame::Type::DataBlockedFrame_E: {
+      case QuicWriteFrame::Type::DataBlockedFrame: {
         VLOG(10) << nodeToString(conn.nodeType)
                  << " sent conn data blocked frame=" << packetNum << " "
                  << conn;
@@ -591,7 +591,7 @@ void updateConnection(
         conn.pendingEvents.sendDataBlocked = false;
         break;
       }
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+      case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& maxStreamDataFrame =
             *frame.asMaxStreamDataFrame();
         auto stream = CHECK_NOTNULL(
@@ -604,7 +604,7 @@ void updateConnection(
             *stream, maxStreamDataFrame.maximumData, sentTime);
         break;
       }
-      case QuicWriteFrame::Type::StreamDataBlockedFrame_E: {
+      case QuicWriteFrame::Type::StreamDataBlockedFrame: {
         const StreamDataBlockedFrame& streamBlockedFrame =
             *frame.asStreamDataBlockedFrame();
         VLOG(10) << nodeToString(conn.nodeType)
@@ -614,7 +614,7 @@ void updateConnection(
         conn.streamManager->removeBlocked(streamBlockedFrame.streamId);
         break;
       }
-      case QuicWriteFrame::Type::PingFrame_E:
+      case QuicWriteFrame::Type::PingFrame:
         // If this is a d6d probe, the it does not consume the sendPing request
         // from application, because this packet, albeit containing a ping
         // frame, is larger than the current PMTU and will potentially get
@@ -626,7 +626,7 @@ void updateConnection(
         }
         isPing = true;
         break;
-      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+      case QuicWriteFrame::Type::QuicSimpleFrame: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         retransmittable = true;
         // We don't want this triggered for cloned frames.
@@ -635,7 +635,7 @@ void updateConnection(
         }
         break;
       }
-      case QuicWriteFrame::Type::PaddingFrame_E: {
+      case QuicWriteFrame::Type::PaddingFrame: {
         // do not mark padding as retransmittable. There are several reasons
         // for this:
         // 1. We might need to pad ACK packets to make it so that we can
@@ -998,7 +998,7 @@ void writeCloseCommon(
         packetBuilder);
   } else {
     switch (closeDetails->first.type()) {
-      case QuicErrorCode::Type::ApplicationErrorCode_E:
+      case QuicErrorCode::Type::ApplicationErrorCode:
         written = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(*closeDetails->first.asApplicationErrorCode()),
@@ -1006,7 +1006,7 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE_APP_ERR),
             packetBuilder);
         break;
-      case QuicErrorCode::Type::TransportErrorCode_E:
+      case QuicErrorCode::Type::TransportErrorCode:
         written = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(*closeDetails->first.asTransportErrorCode()),
@@ -1014,7 +1014,7 @@ void writeCloseCommon(
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         break;
-      case QuicErrorCode::Type::LocalErrorCode_E:
+      case QuicErrorCode::Type::LocalErrorCode:
         written = writeFrame(
             ConnectionCloseFrame(
                 QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
@@ -1509,14 +1509,14 @@ void implicitAckCryptoStream(
       implicitAck,
       [&](auto&, auto& packetFrame, auto&) {
         switch (packetFrame.type()) {
-          case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+          case QuicWriteFrame::Type::WriteCryptoFrame: {
             const WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
             auto cryptoStream =
                 getCryptoStream(*conn.cryptoState, encryptionLevel);
             processCryptoStreamAck(*cryptoStream, frame.offset, frame.len);
             break;
           }
-          case QuicWriteFrame::Type::WriteAckFrame_E: {
+          case QuicWriteFrame::Type::WriteAckFrame: {
             const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
             commonAckVisitorForAckFrame(ackState, frame);
             break;

@@ -430,19 +430,19 @@ void QuicTransportBase::closeImpl(
   if (connCallback_) {
     bool noError = false;
     switch (cancelCode.first.type()) {
-      case QuicErrorCode::Type::LocalErrorCode_E: {
+      case QuicErrorCode::Type::LocalErrorCode: {
         LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
         noError = localErrorCode == LocalErrorCode::NO_ERROR ||
             localErrorCode == LocalErrorCode::IDLE_TIMEOUT;
         break;
       }
-      case QuicErrorCode::Type::TransportErrorCode_E: {
+      case QuicErrorCode::Type::TransportErrorCode: {
         TransportErrorCode transportErrorCode =
             *cancelCode.first.asTransportErrorCode();
         noError = transportErrorCode == TransportErrorCode::NO_ERROR;
         break;
       }
-      case QuicErrorCode::Type::ApplicationErrorCode_E:
+      case QuicErrorCode::Type::ApplicationErrorCode:
         auto appErrorCode = *cancelCode.first.asApplicationErrorCode();
         noError = appErrorCode == GenericApplicationErrorCode::NO_ERROR;
     }
@@ -1467,7 +1467,7 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::peek(
 
   if (stream->streamReadError) {
     switch (stream->streamReadError->type()) {
-      case QuicErrorCode::Type::LocalErrorCode_E:
+      case QuicErrorCode::Type::LocalErrorCode:
         return folly::makeUnexpected(
             *stream->streamReadError->asLocalErrorCode());
       default:
@@ -1525,7 +1525,7 @@ folly::
 
     if (stream->streamReadError) {
       switch (stream->streamReadError->type()) {
-        case QuicErrorCode::Type::LocalErrorCode_E:
+        case QuicErrorCode::Type::LocalErrorCode:
           return folly::makeUnexpected(ConsumeError{
               *stream->streamReadError->asLocalErrorCode(), folly::none});
         default:

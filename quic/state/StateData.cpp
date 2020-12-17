@@ -33,9 +33,9 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
           : conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal;
   if (isUnidirectionalStream(idIn)) {
     if (isLocalStream(connIn.nodeType, idIn)) {
-      recvState = StreamRecvState::Invalid_E;
+      recvState = StreamRecvState::Invalid;
     } else {
-      sendState = StreamSendState::Invalid_E;
+      sendState = StreamSendState::Invalid;
     }
   }
 }

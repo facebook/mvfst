@@ -1546,8 +1546,8 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   conn.streamManager->queueFlowControlUpdated(streamId);
   conn.streamManager->addDataRejected(streamId);
   conn.streamManager->addDataExpired(streamId);
-  stream->sendState = StreamSendState::Closed_E;
-  stream->recvState = StreamRecvState::Closed_E;
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
   conn.streamManager->removeClosedStream(streamId);
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(conn.streamManager->readableStreams().empty());
@@ -1639,7 +1639,7 @@ TEST_F(QuicServerStreamFunctionsTest, ServerGetCloseBothDirections) {
   EXPECT_EQ(conn.streamManager->getStream(serverBiStream)->id, serverBiStream);
   StreamId serverUniStream = 0x0B;
   auto stream = conn.streamManager->createStream(serverUniStream).value();
-  stream->sendState = StreamSendState::Closed_E;
+  stream->sendState = StreamSendState::Closed;
 
   conn.streamManager->removeClosedStream(serverUniStream);
   EXPECT_TRUE(
@@ -1736,9 +1736,9 @@ TEST_F(QuicStreamFunctionsTest, StreamExists) {
   EXPECT_FALSE(conn.streamManager->streamExists(peerAutoOpened));
 
   conn.streamManager->getStream(peerStream)->sendState =
-      StreamSendState::Closed_E;
+      StreamSendState::Closed;
   conn.streamManager->getStream(peerStream)->recvState =
-      StreamRecvState::Closed_E;
+      StreamRecvState::Closed;
   EXPECT_TRUE(conn.streamManager->streamExists(localStream));
   EXPECT_TRUE(conn.streamManager->streamExists(localAutoOpened));
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedLocal));
@@ -1768,9 +1768,9 @@ TEST_F(QuicStreamFunctionsTest, StreamLimitUpdates) {
   conn.streamManager->setStreamLimitWindowingFraction(
       conn.transportSettings.advertisedInitialMaxStreamsBidi);
   conn.streamManager->getStream(peerStream)->sendState =
-      StreamSendState::Closed_E;
+      StreamSendState::Closed;
   conn.streamManager->getStream(peerStream)->recvState =
-      StreamRecvState::Closed_E;
+      StreamRecvState::Closed;
   EXPECT_FALSE(conn.streamManager->streamExists(notOpenedPeer));
   EXPECT_TRUE(conn.streamManager->streamExists(peerStream));
   EXPECT_TRUE(conn.streamManager->streamExists(peerAutoOpened));

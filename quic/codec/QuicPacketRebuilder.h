@@ -43,7 +43,7 @@ class PacketRebuilder {
   PacketEvent cloneOutstandingPacket(OutstandingPacket& packet);
 
   bool retransmittable(const QuicStreamState& stream) const {
-    return stream.sendState == StreamSendState::Open_E;
+    return stream.sendState == StreamSendState::Open;
   }
 
   const BufQueue* cloneCryptoRetransmissionBuffer(

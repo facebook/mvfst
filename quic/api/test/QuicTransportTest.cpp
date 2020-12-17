@@ -882,7 +882,7 @@ TEST_F(QuicTransportTest, RstStream) {
   auto stream =
       transport_->getConnectionState().streamManager->findStream(streamId);
   ASSERT_TRUE(stream);
-  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1126,7 +1126,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1135,7 +1135,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
   numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
 
   EXPECT_EQ(numPathChallengePackets, 2);
 }
@@ -1159,7 +1159,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 
   // Reset outstandingPathValidation
@@ -1172,7 +1172,7 @@ TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   numPathChallengePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathChallengeFrame>());
   EXPECT_EQ(numPathChallengePackets, 1);
 }
 
@@ -1302,7 +1302,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   auto numPathResponsePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame>());
   EXPECT_EQ(numPathResponsePackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1310,7 +1310,7 @@ TEST_F(QuicTransportTest, ClonePathResponse) {
   numPathResponsePackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::PathResponseFrame>());
   EXPECT_EQ(numPathResponsePackets, 1);
 }
 
@@ -1385,7 +1385,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto numNewConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame>());
   EXPECT_EQ(numNewConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1394,7 +1394,7 @@ TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   numNewConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame>());
   EXPECT_EQ(numNewConnIdPackets, 2);
 }
 
@@ -1524,8 +1524,7 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto numRetireConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<
-          QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::RetireConnectionIdFrame>());
   EXPECT_EQ(numRetireConnIdPackets, 1);
 
   // Force a timeout with no data so that it clones the packet
@@ -1534,8 +1533,7 @@ TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   numRetireConnIdPackets = std::count_if(
       conn.outstandings.packets.begin(),
       conn.outstandings.packets.end(),
-      findFrameInPacketFunc<
-          QuicSimpleFrame::Type::RetireConnectionIdFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::RetireConnectionIdFrame>());
   EXPECT_EQ(numRetireConnIdPackets, 2);
 }
 
@@ -1629,7 +1627,7 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   }
   EXPECT_TRUE(foundReset);
 
-  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
@@ -1699,7 +1697,7 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
 
-  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::ResetSent);
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());

@@ -755,18 +755,18 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
   int32_t verifyConnWindowUpdate = 1, verifyStreamWindowUpdate = 1;
   for (const auto& frame : packetResult.packet->packet.frames) {
     switch (frame.type()) {
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+      case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& maxStreamDataFrame =
             *frame.asMaxStreamDataFrame();
         EXPECT_EQ(stream->id, maxStreamDataFrame.streamId);
         verifyStreamWindowUpdate--;
         break;
       }
-      case QuicWriteFrame::Type::MaxDataFrame_E: {
+      case QuicWriteFrame::Type::MaxDataFrame: {
         verifyConnWindowUpdate--;
         break;
       }
-      case QuicWriteFrame::Type::PaddingFrame_E: {
+      case QuicWriteFrame::Type::PaddingFrame: {
         break;
       }
       default:

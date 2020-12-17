@@ -1461,7 +1461,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   EXPECT_GT(conn->ackStates.appDataAckState.nextPacketNum, originalNextSeq);
   auto blocked = *getFirstFrameInOutstandingPackets(
                       conn->outstandings.packets,
-                      QuicWriteFrame::Type::StreamDataBlockedFrame_E)
+                      QuicWriteFrame::Type::StreamDataBlockedFrame)
                       .asStreamDataBlockedFrame();
   EXPECT_EQ(blocked.streamId, stream1->id);
 
@@ -2321,7 +2321,7 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
   EXPECT_EQ(2, conn->outstandings.packets.size());
   EXPECT_EQ(1, conn->outstandings.packets[1].packet.frames.size());
   EXPECT_EQ(
-      QuicWriteFrame::Type::MaxDataFrame_E,
+      QuicWriteFrame::Type::MaxDataFrame,
       conn->outstandings.packets[1].packet.frames[0].type());
 }
 

@@ -129,7 +129,7 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
       stream->flowControlState.advertisedMaxOffset);
   for (const auto& frame : packet2.packet.frames) {
     switch (frame.type()) {
-      case QuicWriteFrame::Type::ConnectionCloseFrame_E: {
+      case QuicWriteFrame::Type::ConnectionCloseFrame: {
         const ConnectionCloseFrame& closeFrame =
             *frame.asConnectionCloseFrame();
         const TransportErrorCode* transportErrorCode =
@@ -140,13 +140,13 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
         EXPECT_EQ(FrameType::ACK, closeFrame.closingFrameType);
         break;
       }
-      case QuicWriteFrame::Type::PingFrame_E:
+      case QuicWriteFrame::Type::PingFrame:
         EXPECT_NE(frame.asPingFrame(), nullptr);
         break;
-      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+      case QuicWriteFrame::Type::QuicSimpleFrame: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         switch (simpleFrame.type()) {
-          case QuicSimpleFrame::Type::MaxStreamsFrame_E: {
+          case QuicSimpleFrame::Type::MaxStreamsFrame: {
             const MaxStreamsFrame* maxStreamFrame =
                 simpleFrame.asMaxStreamsFrame();
             EXPECT_NE(maxStreamFrame, nullptr);
@@ -158,13 +158,13 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
         }
         break;
       }
-      case QuicWriteFrame::Type::WriteAckFrame_E: {
+      case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& ack = *frame.asWriteAckFrame();
         EXPECT_EQ(Interval<PacketNum>(10, 100), ack.ackBlocks.back());
         EXPECT_EQ(Interval<PacketNum>(200, 1000), ack.ackBlocks.front());
         break;
       }
-      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+      case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();
         EXPECT_EQ(streamId, streamFrame.streamId);
         EXPECT_EQ(0, streamFrame.offset);
@@ -172,18 +172,18 @@ TEST_F(QuicPacketRebuilderTest, RebuildPacket) {
         EXPECT_EQ(true, streamFrame.fin);
         break;
       }
-      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+      case QuicWriteFrame::Type::WriteCryptoFrame: {
         const WriteCryptoFrame& cryptoFrame = *frame.asWriteCryptoFrame();
         EXPECT_EQ(cryptoFrame.offset, cryptoOffset);
         EXPECT_EQ(cryptoFrame.len, cryptoBuf->computeChainDataLength());
         break;
       }
-      case QuicWriteFrame::Type::MaxDataFrame_E: {
+      case QuicWriteFrame::Type::MaxDataFrame: {
         const MaxDataFrame& maxData = *frame.asMaxDataFrame();
         EXPECT_EQ(expectedConnFlowControlValue, maxData.maximumData);
         break;
       }
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+      case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& maxStreamData = *frame.asMaxStreamDataFrame();
         EXPECT_EQ(streamId, maxStreamData.streamId);
         EXPECT_EQ(expectedStreamFlowControlValue, maxStreamData.maximumData);

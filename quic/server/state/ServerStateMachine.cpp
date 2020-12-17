@@ -855,7 +855,7 @@ void onServerReadDataFromOpen(
     // what we've already processed is difficult.
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
-        case QuicFrame::Type::ReadAckFrame_E: {
+        case QuicFrame::Type::ReadAckFrame: {
           VLOG(10) << "Server received ack frame packet=" << packetNum << " "
                    << conn;
           isNonProbingPacket = true;
@@ -868,7 +868,7 @@ void onServerReadDataFromOpen(
                   const QuicWriteFrame& packetFrame,
                   const ReadAckFrame&) {
                 switch (packetFrame.type()) {
-                  case QuicWriteFrame::Type::WriteStreamFrame_E: {
+                  case QuicWriteFrame::Type::WriteStreamFrame: {
                     const WriteStreamFrame& frame =
                         *packetFrame.asWriteStreamFrame();
                     VLOG(4)
@@ -882,7 +882,7 @@ void onServerReadDataFromOpen(
                     }
                     break;
                   }
-                  case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+                  case QuicWriteFrame::Type::WriteCryptoFrame: {
                     const WriteCryptoFrame& frame =
                         *packetFrame.asWriteCryptoFrame();
                     auto cryptoStream =
@@ -891,7 +891,7 @@ void onServerReadDataFromOpen(
                         *cryptoStream, frame.offset, frame.len);
                     break;
                   }
-                  case QuicWriteFrame::Type::RstStreamFrame_E: {
+                  case QuicWriteFrame::Type::RstStreamFrame: {
                     const RstStreamFrame& frame =
                         *packetFrame.asRstStreamFrame();
                     VLOG(4) << "Server received ack for reset stream="
@@ -902,7 +902,7 @@ void onServerReadDataFromOpen(
                     }
                     break;
                   }
-                  case QuicWriteFrame::Type::WriteAckFrame_E: {
+                  case QuicWriteFrame::Type::WriteAckFrame: {
                     const WriteAckFrame& frame = *packetFrame.asWriteAckFrame();
                     DCHECK(!frame.ackBlocks.empty());
                     VLOG(4) << "Server received ack for largestAcked="
@@ -910,12 +910,12 @@ void onServerReadDataFromOpen(
                     commonAckVisitorForAckFrame(ackState, frame);
                     break;
                   }
-                  case QuicWriteFrame::Type::PingFrame_E:
+                  case QuicWriteFrame::Type::PingFrame:
                     if (!packet.metadata.isD6DProbe) {
                       conn.pendingEvents.cancelPingTimeout = true;
                     }
                     return;
-                  case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+                  case QuicWriteFrame::Type::QuicSimpleFrame: {
                     const QuicSimpleFrame& frame =
                         *packetFrame.asQuicSimpleFrame();
                     // ACK of HandshakeDone is a server-specific behavior.
@@ -936,7 +936,7 @@ void onServerReadDataFromOpen(
               readData.networkData.receiveTimePoint);
           break;
         }
-        case QuicFrame::Type::RstStreamFrame_E: {
+        case QuicFrame::Type::RstStreamFrame: {
           RstStreamFrame& frame = *quicFrame.asRstStreamFrame();
           VLOG(10) << "Server received reset stream=" << frame.streamId << " "
                    << conn;
@@ -952,7 +952,7 @@ void onServerReadDataFromOpen(
           receiveRstStreamSMHandler(*stream, std::move(frame));
           break;
         }
-        case QuicFrame::Type::ReadCryptoFrame_E: {
+        case QuicFrame::Type::ReadCryptoFrame: {
           pktHasRetransmittableData = true;
           pktHasCryptoData = true;
           isNonProbingPacket = true;
@@ -970,7 +970,7 @@ void onServerReadDataFromOpen(
                   std::move(cryptoFrame.data), cryptoFrame.offset, false));
           break;
         }
-        case QuicFrame::Type::ReadStreamFrame_E: {
+        case QuicFrame::Type::ReadStreamFrame: {
           ReadStreamFrame& frame = *quicFrame.asReadStreamFrame();
           VLOG(10) << "Server received stream data for stream="
                    << frame.streamId << ", offset=" << frame.offset
@@ -986,7 +986,7 @@ void onServerReadDataFromOpen(
           }
           break;
         }
-        case QuicFrame::Type::MaxDataFrame_E: {
+        case QuicFrame::Type::MaxDataFrame: {
           MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
           VLOG(10) << "Server received max data offset="
                    << connWindowUpdate.maximumData << " " << conn;
@@ -995,7 +995,7 @@ void onServerReadDataFromOpen(
           handleConnWindowUpdate(conn, connWindowUpdate, packetNum);
           break;
         }
-        case QuicFrame::Type::MaxStreamDataFrame_E: {
+        case QuicFrame::Type::MaxStreamDataFrame: {
           MaxStreamDataFrame& streamWindowUpdate =
               *quicFrame.asMaxStreamDataFrame();
           VLOG(10) << "Server received max stream data stream="
@@ -1017,14 +1017,14 @@ void onServerReadDataFromOpen(
           }
           break;
         }
-        case QuicFrame::Type::DataBlockedFrame_E: {
+        case QuicFrame::Type::DataBlockedFrame: {
           VLOG(10) << "Server received blocked " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
           handleConnBlocked(conn);
           break;
         }
-        case QuicFrame::Type::StreamDataBlockedFrame_E: {
+        case QuicFrame::Type::StreamDataBlockedFrame: {
           StreamDataBlockedFrame& blocked =
               *quicFrame.asStreamDataBlockedFrame();
           VLOG(10) << "Server received blocked stream=" << blocked.streamId
@@ -1037,7 +1037,7 @@ void onServerReadDataFromOpen(
           }
           break;
         }
-        case QuicFrame::Type::StreamsBlockedFrame_E: {
+        case QuicFrame::Type::StreamsBlockedFrame: {
           StreamsBlockedFrame& blocked = *quicFrame.asStreamsBlockedFrame();
           // peer wishes to open a stream, but is unable to due to the maximum
           // stream limit set by us
@@ -1047,7 +1047,7 @@ void onServerReadDataFromOpen(
                    << blocked.streamLimit << ", " << conn;
           break;
         }
-        case QuicFrame::Type::ConnectionCloseFrame_E: {
+        case QuicFrame::Type::ConnectionCloseFrame: {
           isNonProbingPacket = true;
           ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
           auto errMsg = folly::to<std::string>(
@@ -1068,15 +1068,15 @@ void onServerReadDataFromOpen(
               "Peer closed", TransportErrorCode::NO_ERROR);
           break;
         }
-        case QuicFrame::Type::PingFrame_E:
+        case QuicFrame::Type::PingFrame:
           isNonProbingPacket = true;
           // Ping isn't retransmittable data. But we would like to ack them
           // early.
           pktHasRetransmittableData = true;
           break;
-        case QuicFrame::Type::PaddingFrame_E:
+        case QuicFrame::Type::PaddingFrame:
           break;
-        case QuicFrame::Type::QuicSimpleFrame_E: {
+        case QuicFrame::Type::QuicSimpleFrame: {
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
           isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
@@ -1273,7 +1273,7 @@ void onServerReadDataFromClosed(
   // Only process the close frames in the packet
   for (auto& quicFrame : regularPacket.frames) {
     switch (quicFrame.type()) {
-      case QuicFrame::Type::ConnectionCloseFrame_E: {
+      case QuicFrame::Type::ConnectionCloseFrame: {
         ConnectionCloseFrame& connFrame = *quicFrame.asConnectionCloseFrame();
         auto errMsg = folly::to<std::string>(
             "Server closed by peer reason=", connFrame.reasonPhrase);

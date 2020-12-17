@@ -1594,13 +1594,13 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
        getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
            ->packet.frames) {
     switch (frame.type()) {
-      case QuicWriteFrame::Type::WriteStreamFrame_E:
+      case QuicWriteFrame::Type::WriteStreamFrame:
         streamDataCounter++;
         break;
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E:
+      case QuicWriteFrame::Type::MaxStreamDataFrame:
         streamWindowUpdateCounter++;
         break;
-      case QuicWriteFrame::Type::MaxDataFrame_E:
+      case QuicWriteFrame::Type::MaxDataFrame:
         connWindowUpdateCounter++;
         break;
       default:

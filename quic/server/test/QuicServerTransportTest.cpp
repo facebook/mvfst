@@ -542,10 +542,10 @@ class QuicServerTransportTest : public Test {
     for (const auto& packet : server->getConn().outstandings.packets) {
       for (const auto& frame : packet.packet.frames) {
         switch (frame.type()) {
-          case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+          case QuicWriteFrame::Type::QuicSimpleFrame: {
             const auto writeFrame = frame.asQuicSimpleFrame();
             if (writeFrame->type() ==
-                QuicSimpleFrame::Type::NewConnectionIdFrame_E) {
+                QuicSimpleFrame::Type::NewConnectionIdFrame) {
               ++numNewConnIdFrames;
             }
             break;
@@ -640,7 +640,7 @@ class QuicServerTransportTest : public Test {
       auto result = clientReadCodec->parsePacket(packetQueue, ackStates);
       auto& parsedPacket = *result.regularPacket();
       for (auto& frame : parsedPacket.frames) {
-        if (frame.type() != QuicFrame::Type::ReadCryptoFrame_E) {
+        if (frame.type() != QuicFrame::Type::ReadCryptoFrame) {
           continue;
         }
         cryptoBuf->prependChain(frame.asReadCryptoFrame()->data->clone());
@@ -935,9 +935,9 @@ TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
   EXPECT_TRUE(server->isClosed());
   auto serverReadCodec = makeClientEncryptedCodec();
   EXPECT_FALSE(verifyFramePresent(
-      serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
+      serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_FALSE(verifyFramePresent(
-      serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame_E));
+      serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
@@ -954,7 +954,7 @@ TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(true),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
@@ -964,7 +964,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
@@ -974,7 +974,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
@@ -988,7 +988,7 @@ TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
@@ -1031,7 +1031,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
@@ -1055,7 +1055,7 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   serverWrites.clear();
 
   ShortHeader header2(
@@ -1075,7 +1075,7 @@ TEST_F(QuicServerTransportTest, ReceivePacketAfterLocalError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
 }
 
 TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
@@ -1102,7 +1102,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   serverWrites.clear();
 
   auto currLargestReceivedPacketNum =
@@ -1128,7 +1128,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_GT(
       server->getConn().ackStates.appDataAckState.largestReceivedPacketNum,
       currLargestReceivedPacketNum);
@@ -1143,7 +1143,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   checkTransportStateUpdate(
       qLogger, "Server closed by peer reason=Mind the gap");
 }
@@ -1184,7 +1184,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_TRUE(hasNotReceivedNewPacketsSinceLastCloseSent(server->getConn()));
   serverWrites.clear();
 
@@ -1197,11 +1197,11 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
 }
 
@@ -1270,8 +1270,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(
       stream->retransmissionBuffer.size(),
       originalRetransSize - buffersInPacket1);
-  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
-  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   // Dup ack
   auto packet2 = createAckPacket(
@@ -1284,8 +1284,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(
       stream->retransmissionBuffer.size(),
       originalRetransSize - buffersInPacket1);
-  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
-  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   AckBlocks acks2 = {{packetNum1, lastPacketNum}};
   auto packet3 = createAckPacket(
@@ -1296,8 +1296,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   deliverData(packetToBuf(packet3));
 
   EXPECT_EQ(stream->retransmissionBuffer.size(), 0);
-  EXPECT_EQ(stream->sendState, StreamSendState::Open_E);
-  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   auto empty = IOBuf::create(0);
   server->writeChain(streamId, std::move(empty), true, false);
@@ -1316,8 +1316,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
       acks3,
       PacketNumberSpace::AppData);
   deliverData(packetToBuf(packet4));
-  EXPECT_EQ(stream->sendState, StreamSendState::Closed_E);
-  EXPECT_EQ(stream->recvState, StreamRecvState::Open_E);
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
+  EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 }
 
 TEST_F(QuicServerTransportTest, RecvRstStreamFrameNonexistClientStream) {
@@ -1820,7 +1820,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto packetItr = std::find_if(
       server->getNonConstConn().outstandings.packets.begin(),
       server->getNonConstConn().outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>());
 
   ASSERT_TRUE(
       packetItr != server->getNonConstConn().outstandings.packets.end());
@@ -1830,7 +1830,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   auto numStopSendingPackets = std::count_if(
       server->getNonConstConn().outstandings.packets.begin(),
       server->getNonConstConn().outstandings.packets.end(),
-      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>());
+      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>());
 
   EXPECT_GT(numStopSendingPackets, 1);
 
@@ -1847,8 +1847,7 @@ TEST_F(QuicServerTransportTest, TestAckStopSending) {
   server->getNonConstConn().streamManager->getStream(streamId);
   server->stopSending(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
-  auto match =
-      findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame_E>();
+  auto match = findFrameInPacketFunc<QuicSimpleFrame::Type::StopSendingFrame>();
 
   auto op = findOutstandingPacket(server->getNonConstConn(), match);
   ASSERT_TRUE(op != nullptr);
@@ -1947,7 +1946,7 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
@@ -1989,7 +1988,7 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
@@ -2026,13 +2025,13 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   serverWrites.clear();
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_FALSE(verifyFramePresent(
       serverWrites,
       *makeClientEncryptedCodec(),
-      QuicFrame::Type::ConnectionCloseFrame_E));
+      QuicFrame::Type::ConnectionCloseFrame));
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);

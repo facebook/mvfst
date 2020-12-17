@@ -58,7 +58,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     bool lastFrame = iter == packet.packet.frames.cend() - 1;
     const QuicWriteFrame& frame = *iter;
     switch (frame.type()) {
-      case QuicWriteFrame::Type::WriteAckFrame_E: {
+      case QuicWriteFrame::Type::WriteAckFrame: {
         const WriteAckFrame& ackFrame = *frame.asWriteAckFrame();
         auto& packetHeader = builder_.getPacketHeader();
         uint64_t ackDelayExponent =
@@ -74,7 +74,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = ackWriteResult.has_value();
         break;
       }
-      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+      case QuicWriteFrame::Type::WriteStreamFrame: {
         const WriteStreamFrame& streamFrame = *frame.asWriteStreamFrame();
         auto stream = conn_.streamManager->getStream(streamFrame.streamId);
         if (stream && retransmittable(*stream)) {
@@ -110,7 +110,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = true;
         break;
       }
-      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+      case QuicWriteFrame::Type::WriteCryptoFrame: {
         const WriteCryptoFrame& cryptoFrame = *frame.asWriteCryptoFrame();
         auto stream = getCryptoStream(*conn_.cryptoState, encryptionLevel);
         auto buf = cloneCryptoRetransmissionBuffer(cryptoFrame, *stream);
@@ -129,7 +129,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = ret;
         break;
       }
-      case QuicWriteFrame::Type::MaxDataFrame_E: {
+      case QuicWriteFrame::Type::MaxDataFrame: {
         shouldWriteWindowUpdate = true;
         auto ret = 0 != writeFrame(generateMaxDataFrame(conn_), builder_);
         windowUpdateWritten |= ret;
@@ -137,7 +137,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = true;
         break;
       }
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+      case QuicWriteFrame::Type::MaxStreamDataFrame: {
         const MaxStreamDataFrame& maxStreamDataFrame =
             *frame.asMaxStreamDataFrame();
         auto stream =
@@ -154,17 +154,17 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = true;
         break;
       }
-      case QuicWriteFrame::Type::PaddingFrame_E: {
+      case QuicWriteFrame::Type::PaddingFrame: {
         const PaddingFrame& paddingFrame = *frame.asPaddingFrame();
         writeSuccess = writeFrame(paddingFrame, builder_) != 0;
         break;
       }
-      case QuicWriteFrame::Type::PingFrame_E: {
+      case QuicWriteFrame::Type::PingFrame: {
         const PingFrame& pingFrame = *frame.asPingFrame();
         writeSuccess = writeFrame(pingFrame, builder_) != 0;
         break;
       }
-      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+      case QuicWriteFrame::Type::QuicSimpleFrame: {
         const QuicSimpleFrame& simpleFrame = *frame.asQuicSimpleFrame();
         auto updatedSimpleFrame =
             updateSimpleFrameOnPacketClone(conn_, simpleFrame);

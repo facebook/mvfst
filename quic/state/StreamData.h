@@ -122,24 +122,19 @@ struct QuicStreamLike {
 
 struct QuicConnectionStateBase;
 
-enum class StreamSendState : uint8_t {
-  Open_E,
-  ResetSent_E,
-  Closed_E,
-  Invalid_E
-};
+enum class StreamSendState : uint8_t { Open, ResetSent, Closed, Invalid };
 
-enum class StreamRecvState : uint8_t { Open_E, Closed_E, Invalid_E };
+enum class StreamRecvState : uint8_t { Open, Closed, Invalid };
 
 inline folly::StringPiece streamStateToString(StreamSendState state) {
   switch (state) {
-    case StreamSendState::Open_E:
+    case StreamSendState::Open:
       return "Open";
-    case StreamSendState::ResetSent_E:
+    case StreamSendState::ResetSent:
       return "ResetSent";
-    case StreamSendState::Closed_E:
+    case StreamSendState::Closed:
       return "Closed";
-    case StreamSendState::Invalid_E:
+    case StreamSendState::Invalid:
       return "Invalid";
   }
   return "Unknown";
@@ -147,11 +142,11 @@ inline folly::StringPiece streamStateToString(StreamSendState state) {
 
 inline folly::StringPiece streamStateToString(StreamRecvState state) {
   switch (state) {
-    case StreamRecvState::Open_E:
+    case StreamRecvState::Open:
       return "Open";
-    case StreamRecvState::Closed_E:
+    case StreamRecvState::Closed:
       return "Closed";
-    case StreamRecvState::Invalid_E:
+    case StreamRecvState::Invalid:
       return "Invalid";
   }
   return "Unknown";
@@ -189,10 +184,10 @@ struct QuicStreamState : public QuicStreamLike {
   folly::Optional<QuicErrorCode> streamWriteError;
 
   // State machine data
-  StreamSendState sendState{StreamSendState::Open_E};
+  StreamSendState sendState{StreamSendState::Open};
 
   // State machine data
-  StreamRecvState recvState{StreamRecvState::Open_E};
+  StreamRecvState recvState{StreamRecvState::Open};
 
   // Tells whether this stream is a control stream.
   // It is set by the app via setControlStream and the transport can use this
@@ -215,23 +210,22 @@ struct QuicStreamState : public QuicStreamLike {
   // Returns true if both send and receive state machines are in a terminal
   // state
   bool inTerminalStates() const {
-    bool sendInTerminalState = sendState == StreamSendState::Closed_E ||
-        sendState == StreamSendState::Invalid_E;
+    bool sendInTerminalState = sendState == StreamSendState::Closed ||
+        sendState == StreamSendState::Invalid;
 
-    bool recvInTerminalState = recvState == StreamRecvState::Closed_E ||
-        recvState == StreamRecvState::Invalid_E;
+    bool recvInTerminalState = recvState == StreamRecvState::Closed ||
+        recvState == StreamRecvState::Invalid;
 
     return sendInTerminalState && recvInTerminalState;
   }
 
   // If the stream is still writable.
   bool writable() const {
-    return sendState == StreamSendState::Open_E &&
-        !finalWriteOffset.has_value();
+    return sendState == StreamSendState::Open && !finalWriteOffset.has_value();
   }
 
   bool shouldSendFlowControl() const {
-    return recvState == StreamRecvState::Open_E;
+    return recvState == StreamRecvState::Open;
   }
 
   bool hasWritableData() const {

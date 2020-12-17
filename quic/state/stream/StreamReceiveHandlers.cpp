@@ -32,7 +32,7 @@ void receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
     ReadStreamFrame&& frame) {
   switch (stream.recvState) {
-    case StreamRecvState::Open_E: {
+    case StreamRecvState::Open: {
       VLOG_IF(10, frame.fin) << "Open: Received data with fin"
                              << " stream=" << stream.id << " " << stream.conn;
       appendDataToReadBuffer(
@@ -40,7 +40,7 @@ void receiveReadStreamFrameSMHandler(
       if (isAllDataReceived(stream)) {
         VLOG(10) << "Open: Transition to Closed"
                  << " stream=" << stream.id << " " << stream.conn;
-        stream.recvState = StreamRecvState::Closed_E;
+        stream.recvState = StreamRecvState::Closed;
         if (stream.inTerminalStates()) {
           stream.conn.streamManager->addClosed(stream.id);
         }
@@ -50,7 +50,7 @@ void receiveReadStreamFrameSMHandler(
       stream.conn.streamManager->updatePeekableStreams(stream);
       break;
     }
-    case StreamRecvState::Closed_E: {
+    case StreamRecvState::Closed: {
       CHECK(!isSendingStream(stream.conn.nodeType, stream.id));
       VLOG_IF(10, frame.fin) << "Closed: Received data with fin"
                              << " stream=" << stream.id << " " << stream.conn;
@@ -58,7 +58,7 @@ void receiveReadStreamFrameSMHandler(
           stream, StreamBuffer(std::move(frame.data), frame.offset, frame.fin));
       break;
     }
-    case StreamRecvState::Invalid_E: {
+    case StreamRecvState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",
@@ -70,23 +70,23 @@ void receiveReadStreamFrameSMHandler(
 
 void receiveRstStreamSMHandler(QuicStreamState& stream, RstStreamFrame&& rst) {
   switch (stream.recvState) {
-    case StreamRecvState::Closed_E: {
+    case StreamRecvState::Closed: {
       // This will check whether the reset is still consistent with the stream.
       onResetQuicStream(stream, std::move(rst));
       break;
     }
-    case StreamRecvState::Open_E: {
+    case StreamRecvState::Open: {
       // We transit the receive state machine to Closed before invoking
       // onResetQuicStream because it will check the state of the stream for
       // flow control.
-      stream.recvState = StreamRecvState::Closed_E;
+      stream.recvState = StreamRecvState::Closed;
       if (stream.inTerminalStates()) {
         stream.conn.streamManager->addClosed(stream.id);
       }
       onResetQuicStream(stream, std::move(rst));
       break;
     }
-    case StreamRecvState::Invalid_E: {
+    case StreamRecvState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",

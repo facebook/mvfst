@@ -709,37 +709,35 @@ std::vector<int> getQLogEventIndices(
 bool matchError(
     std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
     LocalErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::LocalErrorCode_E &&
+  return errorCode.first.type() == QuicErrorCode::Type::LocalErrorCode &&
       *errorCode.first.asLocalErrorCode() == error;
 }
 
 bool matchError(
     std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
     TransportErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode_E &&
+  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode &&
       *errorCode.first.asTransportErrorCode() == error;
 }
 
 bool matchError(
     std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
     ApplicationErrorCode error) {
-  return errorCode.first.type() ==
-      QuicErrorCode::Type::ApplicationErrorCode_E &&
+  return errorCode.first.type() == QuicErrorCode::Type::ApplicationErrorCode &&
       *errorCode.first.asApplicationErrorCode() == error;
 }
 
 bool matchError(
     std::pair<QuicErrorCode, std::string> errorCode,
     ApplicationErrorCode error) {
-  return errorCode.first.type() ==
-      QuicErrorCode::Type::ApplicationErrorCode_E &&
+  return errorCode.first.type() == QuicErrorCode::Type::ApplicationErrorCode &&
       *errorCode.first.asApplicationErrorCode() == error;
 }
 
 bool matchError(
     std::pair<QuicErrorCode, std::string> errorCode,
     TransportErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode_E &&
+  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode &&
       *errorCode.first.asTransportErrorCode() == error;
 }
 

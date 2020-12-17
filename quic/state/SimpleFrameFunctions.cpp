@@ -22,25 +22,25 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::StopSendingFrame_E:
+    case QuicSimpleFrame::Type::StopSendingFrame:
       if (!conn.streamManager->streamExists(
               frame.asStopSendingFrame()->streamId)) {
         return folly::none;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::MinStreamDataFrame_E:
+    case QuicSimpleFrame::Type::MinStreamDataFrame:
       if (!conn.streamManager->streamExists(
               frame.asMinStreamDataFrame()->streamId)) {
         return folly::none;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame_E:
+    case QuicSimpleFrame::Type::ExpiredStreamDataFrame:
       if (!conn.streamManager->streamExists(
               frame.asExpiredStreamDataFrame()->streamId)) {
         return folly::none;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::PathChallengeFrame_E:
+    case QuicSimpleFrame::Type::PathChallengeFrame:
       // Path validation timer expired, path validation failed;
       // or a different path validation was scheduled
       if (!conn.outstandingPathValidation ||
@@ -48,14 +48,14 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
         return folly::none;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::PathResponseFrame_E:
+    case QuicSimpleFrame::Type::PathResponseFrame:
       // Do not clone PATH_RESPONSE to avoid buffering
       return folly::none;
-    case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
-    case QuicSimpleFrame::Type::MaxStreamsFrame_E:
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E:
-    case QuicSimpleFrame::Type::KnobFrame_E:
-    case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
+    case QuicSimpleFrame::Type::NewConnectionIdFrame:
+    case QuicSimpleFrame::Type::MaxStreamsFrame:
+    case QuicSimpleFrame::Type::HandshakeDoneFrame:
+    case QuicSimpleFrame::Type::KnobFrame:
+    case QuicSimpleFrame::Type::RetireConnectionIdFrame:
       // TODO junqiw
       return QuicSimpleFrame(frame);
   }
@@ -66,7 +66,7 @@ void updateSimpleFrameOnPacketSent(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& simpleFrame) {
   switch (simpleFrame.type()) {
-    case QuicSimpleFrame::Type::PathChallengeFrame_E:
+    case QuicSimpleFrame::Type::PathChallengeFrame:
       conn.outstandingPathValidation =
           std::move(conn.pendingEvents.pathChallenge);
       conn.pendingEvents.schedulePathValidationTimeout = true;
@@ -87,14 +87,14 @@ void updateSimpleFrameOnPacketLoss(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::StopSendingFrame_E: {
+    case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSendingFrame = *frame.asStopSendingFrame();
       if (conn.streamManager->streamExists(stopSendingFrame.streamId)) {
         conn.pendingEvents.frames.push_back(stopSendingFrame);
       }
       break;
     }
-    case QuicSimpleFrame::Type::MinStreamDataFrame_E: {
+    case QuicSimpleFrame::Type::MinStreamDataFrame: {
       const MinStreamDataFrame& minStreamData = *frame.asMinStreamDataFrame();
       auto stream = conn.streamManager->getStream(minStreamData.streamId);
       if (stream && stream->conn.partialReliabilityEnabled) {
@@ -102,7 +102,7 @@ void updateSimpleFrameOnPacketLoss(
       }
       break;
     }
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame_E: {
+    case QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
       const ExpiredStreamDataFrame& expiredFrame =
           *frame.asExpiredStreamDataFrame();
       auto stream = conn.streamManager->getStream(expiredFrame.streamId);
@@ -112,7 +112,7 @@ void updateSimpleFrameOnPacketLoss(
       }
       break;
     }
-    case QuicSimpleFrame::Type::PathChallengeFrame_E: {
+    case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
       if (conn.outstandingPathValidation &&
           pathChallenge == *conn.outstandingPathValidation) {
@@ -120,18 +120,18 @@ void updateSimpleFrameOnPacketLoss(
       }
       break;
     }
-    case QuicSimpleFrame::Type::PathResponseFrame_E: {
+    case QuicSimpleFrame::Type::PathResponseFrame: {
       // Do not retransmit PATH_RESPONSE to avoid buffering
       break;
     }
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
+    case QuicSimpleFrame::Type::HandshakeDoneFrame: {
       const auto& handshakeDoneFrame = *frame.asHandshakeDoneFrame();
       conn.pendingEvents.frames.push_back(handshakeDoneFrame);
     }
-    case QuicSimpleFrame::Type::NewConnectionIdFrame_E:
-    case QuicSimpleFrame::Type::MaxStreamsFrame_E:
-    case QuicSimpleFrame::Type::RetireConnectionIdFrame_E:
-    case QuicSimpleFrame::Type::KnobFrame_E:
+    case QuicSimpleFrame::Type::NewConnectionIdFrame:
+    case QuicSimpleFrame::Type::MaxStreamsFrame:
+    case QuicSimpleFrame::Type::RetireConnectionIdFrame:
+    case QuicSimpleFrame::Type::KnobFrame:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -143,7 +143,7 @@ bool updateSimpleFrameOnPacketReceived(
     PacketNum packetNum,
     bool fromChangedPeerAddress) {
   switch (frame.type()) {
-    case QuicSimpleFrame::Type::StopSendingFrame_E: {
+    case QuicSimpleFrame::Type::StopSendingFrame: {
       const StopSendingFrame& stopSending = *frame.asStopSendingFrame();
       auto stream = conn.streamManager->getStream(stopSending.streamId);
       if (stream) {
@@ -151,7 +151,7 @@ bool updateSimpleFrameOnPacketReceived(
       }
       return true;
     }
-    case QuicSimpleFrame::Type::MinStreamDataFrame_E: {
+    case QuicSimpleFrame::Type::MinStreamDataFrame: {
       const MinStreamDataFrame& minStreamData = *frame.asMinStreamDataFrame();
       auto stream = conn.streamManager->getStream(minStreamData.streamId);
       if (stream && stream->conn.partialReliabilityEnabled) {
@@ -159,7 +159,7 @@ bool updateSimpleFrameOnPacketReceived(
       }
       return true;
     }
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame_E: {
+    case QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
       const ExpiredStreamDataFrame& expiredStreamData =
           *frame.asExpiredStreamDataFrame();
       auto stream = conn.streamManager->getStream(expiredStreamData.streamId);
@@ -168,7 +168,7 @@ bool updateSimpleFrameOnPacketReceived(
       }
       return true;
     }
-    case QuicSimpleFrame::Type::PathChallengeFrame_E: {
+    case QuicSimpleFrame::Type::PathChallengeFrame: {
       bool rotatedId = conn.retireAndSwitchPeerConnectionIds();
       if (!rotatedId) {
         throw QuicTransportException(
@@ -181,7 +181,7 @@ bool updateSimpleFrameOnPacketReceived(
           PathResponseFrame(pathChallenge.pathData));
       return false;
     }
-    case QuicSimpleFrame::Type::PathResponseFrame_E: {
+    case QuicSimpleFrame::Type::PathResponseFrame: {
       const PathResponseFrame& pathResponse = *frame.asPathResponseFrame();
       // Ignore the response if outstandingPathValidation is none or
       // the path data doesn't match what's in outstandingPathValidation
@@ -204,7 +204,7 @@ bool updateSimpleFrameOnPacketReceived(
 
       return false;
     }
-    case QuicSimpleFrame::Type::NewConnectionIdFrame_E: {
+    case QuicSimpleFrame::Type::NewConnectionIdFrame: {
       const NewConnectionIdFrame& newConnectionId =
           *frame.asNewConnectionIdFrame();
 
@@ -259,7 +259,7 @@ bool updateSimpleFrameOnPacketReceived(
           newConnectionId.token);
       return false;
     }
-    case QuicSimpleFrame::Type::MaxStreamsFrame_E: {
+    case QuicSimpleFrame::Type::MaxStreamsFrame: {
       const MaxStreamsFrame& maxStreamsFrame = *frame.asMaxStreamsFrame();
       if (maxStreamsFrame.isForBidirectionalStream()) {
         conn.streamManager->setMaxLocalBidirectionalStreams(
@@ -270,10 +270,10 @@ bool updateSimpleFrameOnPacketReceived(
       }
       return true;
     }
-    case QuicSimpleFrame::Type::RetireConnectionIdFrame_E: {
+    case QuicSimpleFrame::Type::RetireConnectionIdFrame: {
       return true;
     }
-    case QuicSimpleFrame::Type::HandshakeDoneFrame_E: {
+    case QuicSimpleFrame::Type::HandshakeDoneFrame: {
       if (conn.nodeType == QuicNodeType::Server) {
         throw QuicTransportException(
             "Received HANDSHAKE_DONE from client.",
@@ -286,7 +286,7 @@ bool updateSimpleFrameOnPacketReceived(
       conn.handshakeLayer->handshakeConfirmed();
       return true;
     }
-    case QuicSimpleFrame::Type::KnobFrame_E: {
+    case QuicSimpleFrame::Type::KnobFrame: {
       // TODO it's const so we have to copy it
       const KnobFrame& knobFrame = *frame.asKnobFrame();
       conn.pendingEvents.knobs.emplace_back(

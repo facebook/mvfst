@@ -35,21 +35,21 @@ void sendStopSendingSMHandler(
     QuicStreamState& stream,
     const StopSendingFrame& frame) {
   switch (stream.sendState) {
-    case StreamSendState::Open_E: {
+    case StreamSendState::Open: {
       CHECK(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
       stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
       break;
     }
-    case StreamSendState::Closed_E: {
+    case StreamSendState::Closed: {
       break;
     }
-    case StreamSendState::ResetSent_E: {
+    case StreamSendState::ResetSent: {
       // no-op, we already sent a reset
       break;
     }
-    case StreamSendState::Invalid_E: {
+    case StreamSendState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",
@@ -61,21 +61,21 @@ void sendStopSendingSMHandler(
 
 void sendRstSMHandler(QuicStreamState& stream, ApplicationErrorCode errorCode) {
   switch (stream.sendState) {
-    case StreamSendState::Open_E: {
+    case StreamSendState::Open: {
       resetQuicStream(stream, errorCode);
       appendPendingStreamReset(stream.conn, stream, errorCode);
-      stream.sendState = StreamSendState::ResetSent_E;
+      stream.sendState = StreamSendState::ResetSent;
       break;
     }
-    case StreamSendState::Closed_E: {
+    case StreamSendState::Closed: {
       VLOG(4) << "Ignoring SendReset from closed state.";
       break;
     }
-    case StreamSendState::ResetSent_E: {
+    case StreamSendState::ResetSent: {
       // do nothing
       break;
     }
-    case StreamSendState::Invalid_E: {
+    case StreamSendState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",
@@ -89,7 +89,7 @@ void sendAckSMHandler(
     QuicStreamState& stream,
     const WriteStreamFrame& ackedFrame) {
   switch (stream.sendState) {
-    case StreamSendState::Open_E: {
+    case StreamSendState::Open: {
       // Clean up the acked buffers from the retransmissionBuffer.
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
@@ -118,20 +118,20 @@ void sendAckSMHandler(
 
       // Check for whether or not we have ACKed all bytes until our FIN.
       if (allBytesTillFinAcked(stream)) {
-        stream.sendState = StreamSendState::Closed_E;
+        stream.sendState = StreamSendState::Closed;
         if (stream.inTerminalStates()) {
           stream.conn.streamManager->addClosed(stream.id);
         }
       }
       break;
     }
-    case StreamSendState::Closed_E:
-    case StreamSendState::ResetSent_E: {
+    case StreamSendState::Closed:
+    case StreamSendState::ResetSent: {
       DCHECK(stream.retransmissionBuffer.empty());
       DCHECK(stream.writeBuffer.empty());
       break;
     }
-    case StreamSendState::Invalid_E: {
+    case StreamSendState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",
@@ -144,21 +144,21 @@ void sendAckSMHandler(
 
 void sendRstAckSMHandler(QuicStreamState& stream) {
   switch (stream.sendState) {
-    case StreamSendState::ResetSent_E: {
+    case StreamSendState::ResetSent: {
       VLOG(10) << "ResetSent: Transition to closed stream=" << stream.id << " "
                << stream.conn;
-      stream.sendState = StreamSendState::Closed_E;
+      stream.sendState = StreamSendState::Closed;
       if (stream.inTerminalStates()) {
         stream.conn.streamManager->addClosed(stream.id);
       }
       break;
     }
-    case StreamSendState::Closed_E: {
+    case StreamSendState::Closed: {
       // Just discard the ack if we are already in Closed state.
       break;
     }
-    case StreamSendState::Open_E:
-    case StreamSendState::Invalid_E: {
+    case StreamSendState::Open:
+    case StreamSendState::Invalid: {
       throw QuicTransportException(
           folly::to<std::string>(
               "Invalid transition from state=",

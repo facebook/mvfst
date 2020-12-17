@@ -86,9 +86,9 @@ TEST(Variant, TestCreateVariant) {
   TestVariant variantB{B()};
   TestVariant variantC{C()};
 
-  EXPECT_EQ(variantA.type(), TestVariant::Type::A_E);
-  EXPECT_EQ(variantB.type(), TestVariant::Type::B_E);
-  EXPECT_EQ(variantC.type(), TestVariant::Type::C_E);
+  EXPECT_EQ(variantA.type(), TestVariant::Type::A);
+  EXPECT_EQ(variantB.type(), TestVariant::Type::B);
+  EXPECT_EQ(variantC.type(), TestVariant::Type::C);
 
   EXPECT_NE(variantA.asA(), nullptr);
   EXPECT_NE(variantB.asB(), nullptr);

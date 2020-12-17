@@ -181,15 +181,15 @@ std::string cryptoErrorToString(TransportErrorCode code) {
 
 std::string toString(QuicErrorCode code) {
   switch (code.type()) {
-    case QuicErrorCode::Type::ApplicationErrorCode_E:
+    case QuicErrorCode::Type::ApplicationErrorCode:
       if (*code.asApplicationErrorCode() ==
           GenericApplicationErrorCode::NO_ERROR) {
         return "No Error";
       }
       return folly::to<std::string>(*code.asApplicationErrorCode());
-    case QuicErrorCode::Type::LocalErrorCode_E:
+    case QuicErrorCode::Type::LocalErrorCode:
       return toString(*code.asLocalErrorCode()).str();
-    case QuicErrorCode::Type::TransportErrorCode_E:
+    case QuicErrorCode::Type::TransportErrorCode:
       return toString(*code.asTransportErrorCode());
   }
   folly::assume_unreachable();
@@ -200,16 +200,16 @@ std::string toString(
         error) {
   std::string err;
   switch (error.first.type()) {
-    case QuicErrorCode::Type::ApplicationErrorCode_E:
+    case QuicErrorCode::Type::ApplicationErrorCode:
       err = "ApplicationError: " +
           toString(*error.first.asApplicationErrorCode()) + ", ";
       break;
-    case QuicErrorCode::Type::LocalErrorCode_E:
+    case QuicErrorCode::Type::LocalErrorCode:
       err = "LocalError: " +
           folly::to<std::string>(toString(*error.first.asLocalErrorCode())) +
           ", ";
       break;
-    case QuicErrorCode::Type::TransportErrorCode_E:
+    case QuicErrorCode::Type::TransportErrorCode:
       err = "TransportError: " + toString(*error.first.asTransportErrorCode()) +
           ", ";
   }

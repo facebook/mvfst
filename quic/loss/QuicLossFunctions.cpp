@@ -67,7 +67,7 @@ void markPacketLoss(
   QUIC_STATS(conn.statsCallback, onPacketLoss);
   for (auto& packetFrame : packet.frames) {
     switch (packetFrame.type()) {
-      case QuicWriteFrame::Type::MaxStreamDataFrame_E: {
+      case QuicWriteFrame::Type::MaxStreamDataFrame: {
         MaxStreamDataFrame& frame = *packetFrame.asMaxStreamDataFrame();
         // For all other frames, we process it if it's not from a clone
         // packet, or if the clone and its siblings have never been processed.
@@ -82,20 +82,20 @@ void markPacketLoss(
         onStreamWindowUpdateLost(*stream);
         break;
       }
-      case QuicWriteFrame::Type::MaxDataFrame_E: {
+      case QuicWriteFrame::Type::MaxDataFrame: {
         onConnWindowUpdateLost(conn);
         break;
       }
       // For other frame types, we only process them if the packet is not a
       // processed clone.
-      case QuicWriteFrame::Type::DataBlockedFrame_E: {
+      case QuicWriteFrame::Type::DataBlockedFrame: {
         if (processed) {
           break;
         }
         onDataBlockedLost(conn);
         break;
       }
-      case QuicWriteFrame::Type::WriteStreamFrame_E: {
+      case QuicWriteFrame::Type::WriteStreamFrame: {
         WriteStreamFrame frame = *packetFrame.asWriteStreamFrame();
         if (processed) {
           break;
@@ -122,7 +122,7 @@ void markPacketLoss(
         conn.streamManager->updateLossStreams(*stream);
         break;
       }
-      case QuicWriteFrame::Type::WriteCryptoFrame_E: {
+      case QuicWriteFrame::Type::WriteCryptoFrame: {
         WriteCryptoFrame& frame = *packetFrame.asWriteCryptoFrame();
         if (processed) {
           break;
@@ -142,7 +142,7 @@ void markPacketLoss(
         cryptoStream->retransmissionBuffer.erase(bufferItr);
         break;
       }
-      case QuicWriteFrame::Type::RstStreamFrame_E: {
+      case QuicWriteFrame::Type::RstStreamFrame: {
         RstStreamFrame& frame = *packetFrame.asRstStreamFrame();
         if (processed) {
           break;
@@ -157,7 +157,7 @@ void markPacketLoss(
         conn.pendingEvents.resets.insert({frame.streamId, frame});
         break;
       }
-      case QuicWriteFrame::Type::StreamDataBlockedFrame_E: {
+      case QuicWriteFrame::Type::StreamDataBlockedFrame: {
         StreamDataBlockedFrame& frame = *packetFrame.asStreamDataBlockedFrame();
         if (processed) {
           break;
@@ -170,7 +170,7 @@ void markPacketLoss(
         onBlockedLost(*stream);
         break;
       }
-      case QuicWriteFrame::Type::QuicSimpleFrame_E: {
+      case QuicWriteFrame::Type::QuicSimpleFrame: {
         QuicSimpleFrame& frame = *packetFrame.asQuicSimpleFrame();
         if (processed) {
           break;
