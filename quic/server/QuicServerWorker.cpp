@@ -864,6 +864,22 @@ bool QuicServerWorker::validateRetryToken(
     return false;
   }
 
+  uint64_t nowInMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::system_clock::now().time_since_epoch())
+                         .count();
+
+  // Retry timestamps can also come from the future as the system clock can
+  // move both forwards and backwards due to it being synchronized by NTP
+  auto retryTokenAgeMs = nowInMs > decryptedToken.timestampInMs
+      ? nowInMs - decryptedToken.timestampInMs
+      : decryptedToken.timestampInMs - nowInMs;
+
+  if (retryTokenAgeMs > kMaxRetryTokenValidMs) {
+    VLOG(4) << "Retry token was created more than " << kMaxRetryTokenValidMs
+            << " ms ago";
+    return false;
+  }
+
   return true;
 }
 

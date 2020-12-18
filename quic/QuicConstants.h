@@ -491,6 +491,10 @@ constexpr auto kStatelessResetTokenSecretLength = 32;
 
 constexpr auto kRetryTokenSecretLength = 32;
 
+// Number of milliseconds the retry token is valid for
+// Set it to 5 minutes
+constexpr uint64_t kMaxRetryTokenValidMs = 1000 * 60 * 5;
+
 constexpr uint64_t kDefaultActiveConnectionIdLimit = 2;
 
 // default capability of QUIC partial reliability
