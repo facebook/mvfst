@@ -53,6 +53,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onConnectionPMTUUpperBoundDetected, void());
   MOCK_METHOD1(onTransportKnobApplied, void(TransportKnobType));
   MOCK_METHOD1(onTransportKnobError, void(TransportKnobType));
+  MOCK_METHOD0(onServerUnfinishedHandshake, void());
 };
 
 class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {

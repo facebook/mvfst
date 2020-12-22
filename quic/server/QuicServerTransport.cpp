@@ -295,6 +295,9 @@ void QuicServerTransport::writeData() {
 }
 
 void QuicServerTransport::closeTransport() {
+  if (!serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    QUIC_STATS(conn_->statsCallback, onServerUnfinishedHandshake);
+  }
   serverConn_->serverHandshakeLayer->cancel();
   // Clear out pending data.
   serverConn_->pendingZeroRttData.reset();

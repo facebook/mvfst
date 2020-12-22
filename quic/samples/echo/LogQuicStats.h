@@ -175,6 +175,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
             << "onTransportKnboError knobType=" << toString(knobType);
   }
 
+  void onServerUnfinishedHandshake() override {
+    VLOG(2) << prefix_ << "onServerUnfinishedHandshake";
+  }
+
  private:
   std::string prefix_;
 };

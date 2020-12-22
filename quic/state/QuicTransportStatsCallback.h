@@ -155,6 +155,8 @@ class QuicTransportStatsCallback {
 
   virtual void onTransportKnobError(TransportKnobType knobType) = 0;
 
+  virtual void onServerUnfinishedHandshake() = 0;
+
   static const char* toString(ConnectionCloseReason reason) {
     switch (reason) {
       case ConnectionCloseReason::NONE:
