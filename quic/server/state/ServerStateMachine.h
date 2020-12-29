@@ -195,7 +195,7 @@ void onServerCloseOpenState(QuicServerConnectionState& conn);
 
 void processClientInitialParams(
     QuicServerConnectionState& conn,
-    ClientTransportParameters clientParams);
+    const ClientTransportParameters& clientParams);
 
 void updateHandshakeState(QuicServerConnectionState& conn);
 

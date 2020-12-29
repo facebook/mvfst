@@ -16,7 +16,7 @@ namespace quic {
 void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error);
 
 // Comon operations to conduct on QuicStreamState when receive reset on it
-void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame);
+void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame);
 
 bool isAllDataReceived(const QuicStreamState& stream);
 } // namespace quic

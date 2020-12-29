@@ -17,6 +17,8 @@ void receiveReadStreamFrameSMHandler(
     QuicStreamState& stream,
     ReadStreamFrame&& frame);
 
-void receiveRstStreamSMHandler(QuicStreamState& stream, RstStreamFrame&& rst);
+void receiveRstStreamSMHandler(
+    QuicStreamState& stream,
+    const RstStreamFrame& rst);
 
 } // namespace quic

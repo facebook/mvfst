@@ -97,7 +97,7 @@ void setExperimentalSettings(QuicServerConnectionState& conn) {
 
 void processClientInitialParams(
     QuicServerConnectionState& conn,
-    ClientTransportParameters clientParams) {
+    const ClientTransportParameters& clientParams) {
   // TODO validate that we didn't receive original connection ID, stateless
   // reset token, or preferred address.
   auto maxData = getIntegerParameter(
@@ -949,7 +949,7 @@ void onServerReadDataFromOpen(
           if (getSendStreamFlowControlBytesWire(*stream) == 0) {
             VLOG(2) << "Client gives up a flow control blocked stream";
           }
-          receiveRstStreamSMHandler(*stream, std::move(frame));
+          receiveRstStreamSMHandler(*stream, frame);
           break;
         }
         case QuicFrame::Type::ReadCryptoFrame: {
@@ -1342,7 +1342,7 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
     return folly::none;
   }
   auto newConnIdData =
-      ConnectionIdData{std::move(*encodedCid), nextSelfConnectionIdSequence++};
+      ConnectionIdData{*encodedCid, nextSelfConnectionIdSequence++};
   newConnIdData.token = generator.generateToken(newConnIdData.connId);
   selfConnectionIds.push_back(newConnIdData);
   return newConnIdData;

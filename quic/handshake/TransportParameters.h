@@ -38,7 +38,7 @@ struct TransportParameter {
   TransportParameterId parameter;
   Buf value;
 
-  TransportParameter() {}
+  TransportParameter() = default;
 
   TransportParameter(TransportParameterId p, Buf v)
       : parameter(p), value(v ? std::move(v) : nullptr) {}

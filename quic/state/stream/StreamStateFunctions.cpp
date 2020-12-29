@@ -23,7 +23,7 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   stream.conn.streamManager->updateLossStreams(stream);
 }
 
-void onResetQuicStream(QuicStreamState& stream, RstStreamFrame&& frame) {
+void onResetQuicStream(QuicStreamState& stream, const RstStreamFrame& frame) {
   if (stream.finalReadOffset &&
       stream.finalReadOffset.value() != frame.offset) {
     throw QuicTransportException(

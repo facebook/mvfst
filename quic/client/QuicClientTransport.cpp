@@ -256,12 +256,10 @@ void QuicClientTransport::processPacketData(
   // Error out if the connection id on the packet is not the one that is
   // expected.
   bool connidMatched = true;
-  if (longHeader &&
-      longHeader->getDestinationConnId() != *conn_->clientConnectionId) {
-    connidMatched = false;
-  } else if (
-      shortHeader &&
-      shortHeader->getConnectionId() != *conn_->clientConnectionId) {
+  if ((longHeader &&
+       longHeader->getDestinationConnId() != *conn_->clientConnectionId) ||
+      (shortHeader &&
+       shortHeader->getConnectionId() != *conn_->clientConnectionId)) {
     connidMatched = false;
   }
   if (!connidMatched) {
@@ -379,7 +377,7 @@ void QuicClientTransport::processPacketData(
         if (!stream) {
           break;
         }
-        receiveRstStreamSMHandler(*stream, std::move(frame));
+        receiveRstStreamSMHandler(*stream, frame);
         break;
       }
       case QuicFrame::Type::ReadCryptoFrame: {

@@ -68,11 +68,13 @@ void receiveReadStreamFrameSMHandler(
   }
 }
 
-void receiveRstStreamSMHandler(QuicStreamState& stream, RstStreamFrame&& rst) {
+void receiveRstStreamSMHandler(
+    QuicStreamState& stream,
+    const RstStreamFrame& rst) {
   switch (stream.recvState) {
     case StreamRecvState::Closed: {
       // This will check whether the reset is still consistent with the stream.
-      onResetQuicStream(stream, std::move(rst));
+      onResetQuicStream(stream, rst);
       break;
     }
     case StreamRecvState::Open: {
@@ -83,7 +85,7 @@ void receiveRstStreamSMHandler(QuicStreamState& stream, RstStreamFrame&& rst) {
       if (stream.inTerminalStates()) {
         stream.conn.streamManager->addClosed(stream.id);
       }
-      onResetQuicStream(stream, std::move(rst));
+      onResetQuicStream(stream, rst);
       break;
     }
     case StreamRecvState::Invalid: {
