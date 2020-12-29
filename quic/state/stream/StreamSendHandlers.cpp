@@ -1,6 +1,7 @@
 // Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 #include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
@@ -39,6 +40,10 @@ void sendStopSendingSMHandler(
       CHECK(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
+      if (stream.conn.nodeType == QuicNodeType::Server &&
+          getSendStreamFlowControlBytesWire(stream) == 0) {
+        VLOG(2) << "Client gives up a flow control blocked stream";
+      }
       stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
       break;
     }
