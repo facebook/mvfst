@@ -193,6 +193,7 @@ void happyEyeballsOnDataReceived(
   connection.happyEyeballsState.shouldWriteToSecondSocket = false;
   // If second socket won, update main socket and peerAddress
   if (connection.peerAddress.getFamily() != peerAddress.getFamily()) {
+    CHECK(connection.happyEyeballsState.secondSocket);
     socket.swap(connection.happyEyeballsState.secondSocket);
     connection.originalPeerAddress = peerAddress;
     connection.peerAddress = peerAddress;

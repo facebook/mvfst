@@ -202,6 +202,7 @@ void QuicClientTransport::processPacketData(
     return;
   }
   if (happyEyeballsEnabled_) {
+    CHECK(socket_);
     happyEyeballsOnDataReceived(
         *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
   }
