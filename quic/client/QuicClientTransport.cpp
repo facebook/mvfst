@@ -170,6 +170,10 @@ void QuicClientTransport::processPacketData(
       return;
     }
 
+    if (happyEyeballsEnabled_) {
+      happyEyeballsOnDataReceived(
+          *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
+    }
     // Set the destination connection ID to be the value from the source
     // connection id of the retry packet
     clientConn_->initialDestinationConnectionId =

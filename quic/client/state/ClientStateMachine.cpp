@@ -55,6 +55,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   newConn->earlyDataAppParamsValidator =
       std::move(conn->earlyDataAppParamsValidator);
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
+  newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
   return newConn;
 }
 

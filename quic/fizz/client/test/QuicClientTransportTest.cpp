@@ -44,6 +44,11 @@ using namespace quic::samples;
 namespace quic {
 namespace test {
 
+namespace {
+std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
+    {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
+}
+
 MATCHER_P(BufMatches, buf, "") {
   folly::IOBufEqualTo eq;
   return eq(*arg, buf);
@@ -1479,6 +1484,30 @@ class QuicClientTransportTest : public Test {
     deliverData(addr, packet->coalesce());
   }
 
+  ConnectionId recvServerRetry(const folly::SocketAddress& addr) {
+    // Make the server send a retry packet to the client. The server chooses a
+    // connection id that the client must use in all future initial packets.
+    std::vector<uint8_t> serverConnIdVec = {
+        0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
+    ConnectionId serverCid(serverConnIdVec);
+
+    std::string retryToken = "token";
+    std::string integrityTag =
+        "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
+
+    folly::IOBuf retryPacketBuf;
+    BufAppender appender(&retryPacketBuf, 100);
+    appender.writeBE<uint8_t>(0xFF);
+    appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF00001D));
+    appender.writeBE<uint8_t>(0);
+    appender.writeBE<uint8_t>(serverConnIdVec.size());
+    appender.push(serverConnIdVec.data(), serverConnIdVec.size());
+    appender.push((const uint8_t*)retryToken.data(), retryToken.size());
+    appender.push((const uint8_t*)integrityTag.data(), integrityTag.size());
+    deliverData(addr, retryPacketBuf.coalesce());
+    return serverCid;
+  }
+
   void recvServerHello() {
     recvServerHello(serverAddr);
   }
@@ -2106,7 +2135,11 @@ TEST_F(QuicClientTransportTest, SwitchServerCidsMultipleCids) {
   client->closeNow(folly::none);
 }
 
-class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
+enum class ServerFirstPacketType : uint8_t { ServerHello, Retry };
+
+class QuicClientTransportHappyEyeballsTest
+    : public QuicClientTransportTest,
+      public testing::WithParamInterface<ServerFirstPacketType> {
  public:
   void SetUpChild() override {
     auto secondSocket =
@@ -2126,11 +2159,20 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
   }
 
  protected:
+  void setupInitialDcidForRetry() {
+    if (GetParam() == ServerFirstPacketType::Retry) {
+      ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+      client->getNonConstConn().originalDestinationConnectionId =
+          initialDstConnId;
+    }
+  }
+
   void firstWinBeforeSecondStart(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
-
+    setupInitialDcidForRetry();
+    auto firstPacketType = GetParam();
     EXPECT_CALL(*sock, write(firstAddress, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -2152,22 +2194,30 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     socketWrites.clear();
 
     EXPECT_FALSE(conn.happyEyeballsState.finished);
-    EXPECT_CALL(clientConnCallback, onTransportReady());
-    EXPECT_CALL(clientConnCallback, onReplaySafe());
+    if (firstPacketType == ServerFirstPacketType::ServerHello) {
+      EXPECT_CALL(clientConnCallback, onTransportReady());
+      EXPECT_CALL(clientConnCallback, onReplaySafe());
+    }
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, pauseRead());
     EXPECT_CALL(*secondSock, close());
-    performFakeHandshake(firstAddress);
+    if (firstPacketType == ServerFirstPacketType::Retry) {
+      recvServerRetry(firstAddress);
+    } else {
+      performFakeHandshake(firstAddress);
+    }
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
-    EXPECT_TRUE(conn.happyEyeballsState.finished);
-    EXPECT_EQ(conn.originalPeerAddress, firstAddress);
-    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_TRUE(client->getConn().happyEyeballsState.finished);
+    EXPECT_EQ(client->getConn().originalPeerAddress, firstAddress);
+    EXPECT_EQ(client->getConn().peerAddress, firstAddress);
   }
 
   void firstWinAfterSecondStart(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
+    auto firstPacketType = GetParam();
+    setupInitialDcidForRetry();
 
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -2212,8 +2262,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
 
     socketWrites.clear();
     EXPECT_FALSE(conn.happyEyeballsState.finished);
-    EXPECT_CALL(clientConnCallback, onTransportReady());
-    EXPECT_CALL(clientConnCallback, onReplaySafe());
+    if (firstPacketType == ServerFirstPacketType::ServerHello) {
+      EXPECT_CALL(clientConnCallback, onTransportReady());
+      EXPECT_CALL(clientConnCallback, onReplaySafe());
+    }
     EXPECT_CALL(*sock, write(firstAddress, _))
         .Times(AtLeast(1))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -2224,17 +2276,24 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, pauseRead());
     EXPECT_CALL(*secondSock, close());
-    performFakeHandshake(firstAddress);
-    EXPECT_TRUE(conn.happyEyeballsState.finished);
-    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_EQ(conn.originalPeerAddress, firstAddress);
-    EXPECT_EQ(conn.peerAddress, firstAddress);
+    if (firstPacketType == ServerFirstPacketType::Retry) {
+      recvServerRetry(firstAddress);
+    } else {
+      performFakeHandshake(firstAddress);
+    }
+    EXPECT_TRUE(client->getConn().happyEyeballsState.finished);
+    EXPECT_FALSE(
+        client->getConn().happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_EQ(client->getConn().originalPeerAddress, firstAddress);
+    EXPECT_EQ(client->getConn().peerAddress, firstAddress);
   }
 
   void secondWin(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
+    auto firstPacketType = GetParam();
+    setupInitialDcidForRetry();
 
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillRepeatedly(Invoke([&](const SocketAddress&,
@@ -2280,8 +2339,10 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
     socketWrites.clear();
 
     EXPECT_FALSE(conn.happyEyeballsState.finished);
-    EXPECT_CALL(clientConnCallback, onTransportReady());
-    EXPECT_CALL(clientConnCallback, onReplaySafe());
+    if (firstPacketType == ServerFirstPacketType::ServerHello) {
+      EXPECT_CALL(clientConnCallback, onTransportReady());
+      EXPECT_CALL(clientConnCallback, onReplaySafe());
+    }
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*sock, pauseRead());
     EXPECT_CALL(*sock, close());
@@ -2292,17 +2353,23 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
           socketWrites.push_back(buf->clone());
           return buf->computeChainDataLength();
         }));
-    performFakeHandshake(secondAddress);
-    EXPECT_TRUE(conn.happyEyeballsState.finished);
-    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
-    EXPECT_EQ(conn.originalPeerAddress, secondAddress);
-    EXPECT_EQ(conn.peerAddress, secondAddress);
+    if (firstPacketType == ServerFirstPacketType::Retry) {
+      recvServerRetry(secondAddress);
+    } else {
+      performFakeHandshake(secondAddress);
+    }
+    EXPECT_TRUE(client->getConn().happyEyeballsState.finished);
+    EXPECT_FALSE(
+        client->getConn().happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_EQ(client->getConn().originalPeerAddress, secondAddress);
+    EXPECT_EQ(client->getConn().peerAddress, secondAddress);
   }
 
   void secondBindFailure(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
     auto& conn = client->getConn();
+    setupInitialDcidForRetry();
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, bind(_, _))
@@ -2592,19 +2659,26 @@ class QuicClientTransportHappyEyeballsTest : public QuicClientTransportTest {
   SocketAddress serverAddrV6{"::1", 443};
 };
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV6WinBeforeV4Start) {
+INSTANTIATE_TEST_CASE_P(
+    QuicClientTransportHappyEyeballsTests,
+    QuicClientTransportHappyEyeballsTest,
+    ::testing::Values(
+        ServerFirstPacketType::ServerHello,
+        ServerFirstPacketType::Retry));
+
+TEST_P(QuicClientTransportHappyEyeballsTest, V6FirstAndV6WinBeforeV4Start) {
   firstWinBeforeSecondStart(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV6WinAfterV4Start) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V6FirstAndV6WinAfterV4Start) {
   firstWinAfterSecondStart(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV4Win) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V6FirstAndV4Win) {
   secondWin(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V6FirstAndV4BindFailure) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V6FirstAndV4BindFailure) {
   secondBindFailure(serverAddrV6, serverAddrV4);
 }
 
@@ -2656,76 +2730,76 @@ TEST_F(
   fatalWriteErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinBeforeV6Start) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinBeforeV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   firstWinBeforeSecondStart(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinAfterV6Start) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   firstWinAfterSecondStart(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV6Win) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV6Win) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   secondWin(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(QuicClientTransportHappyEyeballsTest, V4FirstAndV6BindFailure) {
+TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV6BindFailure) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   secondBindFailure(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4NonFatalErrorBeforeV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   nonFatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4FatalErrorBeforeV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   fatalWriteErrorOnFirstBeforeSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4NonFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   nonFatalWriteErrorOnFirstAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV4FatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   fatalWriteErrorOnFirstAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV6NonFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   nonFatalWriteErrorOnSecondAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndV6FatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   fatalWriteErrorOnSecondAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndBothNonFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
   nonFatalWriteErrorOnBothAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
 
-TEST_F(
+TEST_P(
     QuicClientTransportHappyEyeballsTest,
     V4FirstAndBothFatalErrorAfterV6Start) {
   client->setHappyEyeballsCachedFamily(AF_INET);
@@ -4440,9 +4514,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   std::vector<uint8_t> clientConnIdVec = {};
   ConnectionId clientConnId(clientConnIdVec);
 
-  std::vector<uint8_t> initialDstConnIdVec = {
-      0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
-  ConnectionId initialDstConnId(initialDstConnIdVec);
+  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
 
   // Create a stream and attempt to send some data to the server
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
@@ -4465,27 +4537,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
             return buf->computeChainDataLength();
           }));
 
-  // Make the server send a retry packet to the client. The server chooses a
-  // connection id that the client must use in all future initial packets.
-  std::vector<uint8_t> serverConnIdVec = {
-      0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5};
-  ConnectionId serverChosenConnId(serverConnIdVec);
-
-  std::string retryToken = "token";
-  std::string integrityTag =
-      "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49";
-
-  folly::IOBuf retryPacketBuf;
-  BufAppender appender(&retryPacketBuf, 100);
-  appender.writeBE<uint8_t>(0xFF);
-  appender.writeBE<QuicVersionType>(static_cast<QuicVersionType>(0xFF00001D));
-  appender.writeBE<uint8_t>(clientConnId.size());
-  appender.writeBE<uint8_t>(serverConnIdVec.size());
-  appender.push(serverConnIdVec.data(), serverConnIdVec.size());
-  appender.push((const uint8_t*)retryToken.data(), retryToken.size());
-  appender.push((const uint8_t*)integrityTag.data(), integrityTag.size());
-  deliverData(retryPacketBuf.coalesce());
-
+  auto serverCid = recvServerRetry(serverAddr);
   ASSERT_TRUE(bytesWrittenToNetwork);
 
   // Check to see that the server receives an initial packet with the following
@@ -4505,7 +4557,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   EXPECT_EQ(header.getHeaderType(), LongHeader::Types::Initial);
   EXPECT_TRUE(header.hasToken());
   EXPECT_EQ(header.getToken(), std::string("token"));
-  EXPECT_EQ(header.getDestinationConnId(), serverChosenConnId);
+  EXPECT_EQ(header.getDestinationConnId(), serverCid);
 
   eventbase_->loopOnce();
   client->close(folly::none);
