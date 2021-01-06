@@ -41,7 +41,8 @@ void sendStopSendingSMHandler(
           isBidirectionalStream(stream.id) ||
           isSendingStream(stream.conn.nodeType, stream.id));
       if (stream.conn.nodeType == QuicNodeType::Server &&
-          getSendStreamFlowControlBytesWire(stream) == 0) {
+          getSendStreamFlowControlBytesWire(stream) == 0 &&
+          stream.writeBuffer.chainLength() != 0) {
         VLOG_EVERY_N(2, 1000)
             << "Client gives up a flow control blocked stream";
       }

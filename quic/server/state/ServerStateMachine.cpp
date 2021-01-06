@@ -1058,7 +1058,8 @@ void onServerReadDataFromOpen(
           }
           conn.peerConnectionError = std::make_pair(
               QuicErrorCode(connFrame.errorCode), std::move(errMsg));
-          if (getSendConnFlowControlBytesWire(conn) == 0) {
+          if (getSendConnFlowControlBytesWire(conn) == 0 &&
+              conn.flowControlState.sumCurStreamBufferLen) {
             VLOG_EVERY_N(2, 1000)
                 << "Client gives up a flow control blocked connection";
           }
