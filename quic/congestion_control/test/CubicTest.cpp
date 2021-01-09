@@ -80,15 +80,16 @@ TEST_F(CubicTest, PersistentCongestion) {
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
   EXPECT_EQ(indices.size(), 9);
-  std::array<std::string, 9> congestionEventArr = {kRemoveInflight,
-                                                   kCubicLoss,
-                                                   kPersistentCongestion,
-                                                   kCongestionPacketAck,
-                                                   kResetTimeToOrigin,
-                                                   kResetLastReductionTime,
-                                                   kCubicSteadyCwnd,
-                                                   kCwndNoChange,
-                                                   kCongestionPacketAck};
+  std::array<std::string, 9> congestionEventArr = {
+      kRemoveInflight,
+      kCubicLoss,
+      kPersistentCongestion,
+      kCongestionPacketAck,
+      kResetTimeToOrigin,
+      kResetLastReductionTime,
+      kCubicSteadyCwnd,
+      kCwndNoChange,
+      kCongestionPacketAck};
 
   std::array<folly::StringPiece, 9> stateArr = {
       cubicStateToString(CubicStates::Hystart),

@@ -7,6 +7,7 @@
  */
 
 #include <quic/server/QuicServer.h>
+
 #include <folly/futures/Promise.h>
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
@@ -701,8 +702,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->onConnectionUnbound(
       transport_.get(),
       std::make_pair(kClientAddr, connId),
-      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0},
-                                    ConnectionIdData{connId2, 1}});
+      std::vector<ConnectionIdData>{
+          ConnectionIdData{connId, 0}, ConnectionIdData{connId2, 1}});
   EXPECT_EQ(connIdMap.count(connId), 0);
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
 
@@ -1781,45 +1782,49 @@ class QuicServerTest : public Test {
           eventBase, std::move(mockSock), cb, quic::test::createServerCtx());
     });
 
-    auto makeTransport = [&](
-        folly::EventBase * evb,
-        std::unique_ptr<folly::AsyncUDPSocket>& /* socket */,
-        const folly::SocketAddress&,
-        std::shared_ptr<const fizz::server::FizzServerContext>) noexcept {
-      // set proper expectations for the transport after its creation
-      EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(evb));
-      EXPECT_CALL(*transport, setTransportStatsCallback(_))
-          .WillOnce(Invoke([&](QuicTransportStatsCallback* statsCallback) {
-            CHECK(statsCallback);
-          }));
-      EXPECT_CALL(*transport, setTransportSettings(_))
-          .WillRepeatedly(Invoke([&](auto transportSettings) {
-            EXPECT_EQ(
-                transportSettings_.advertisedInitialBidiLocalStreamWindowSize,
-                transportSettings.advertisedInitialBidiLocalStreamWindowSize);
-            EXPECT_EQ(
-                transportSettings_.advertisedInitialBidiRemoteStreamWindowSize,
-                transportSettings.advertisedInitialBidiRemoteStreamWindowSize);
-            EXPECT_EQ(
-                transportSettings_.advertisedInitialUniStreamWindowSize,
-                transportSettings.advertisedInitialUniStreamWindowSize);
-            EXPECT_EQ(
-                transportSettings_.advertisedInitialConnectionWindowSize,
-                transportSettings.advertisedInitialConnectionWindowSize);
-          }));
-      ON_CALL(*transport, onNetworkData(_, _))
-          .WillByDefault(Invoke(
-              [&, expected = std::shared_ptr<folly::IOBuf>(data->clone())](
-                  auto, const auto& networkData) mutable {
-                EXPECT_GT(networkData.packets.size(), 0);
-                EXPECT_TRUE(
-                    folly::IOBufEqualTo()(*networkData.packets[0], *expected));
-                std::unique_lock<std::mutex> lg(m);
-                calledOnNetworkData = true;
-                cv.notify_one();
+    auto makeTransport =
+        [&](folly::EventBase* evb,
+            std::unique_ptr<folly::AsyncUDPSocket>& /* socket */,
+            const folly::SocketAddress&,
+            std::shared_ptr<const fizz::server::FizzServerContext>) noexcept {
+          // set proper expectations for the transport after its creation
+          EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(evb));
+          EXPECT_CALL(*transport, setTransportStatsCallback(_))
+              .WillOnce(Invoke([&](QuicTransportStatsCallback* statsCallback) {
+                CHECK(statsCallback);
               }));
-      return transport;
-    };
+          EXPECT_CALL(*transport, setTransportSettings(_))
+              .WillRepeatedly(Invoke([&](auto transportSettings) {
+                EXPECT_EQ(
+                    transportSettings_
+                        .advertisedInitialBidiLocalStreamWindowSize,
+                    transportSettings
+                        .advertisedInitialBidiLocalStreamWindowSize);
+                EXPECT_EQ(
+                    transportSettings_
+                        .advertisedInitialBidiRemoteStreamWindowSize,
+                    transportSettings
+                        .advertisedInitialBidiRemoteStreamWindowSize);
+                EXPECT_EQ(
+                    transportSettings_.advertisedInitialUniStreamWindowSize,
+                    transportSettings.advertisedInitialUniStreamWindowSize);
+                EXPECT_EQ(
+                    transportSettings_.advertisedInitialConnectionWindowSize,
+                    transportSettings.advertisedInitialConnectionWindowSize);
+              }));
+          ON_CALL(*transport, onNetworkData(_, _))
+              .WillByDefault(Invoke(
+                  [&, expected = std::shared_ptr<folly::IOBuf>(data->clone())](
+                      auto, const auto& networkData) mutable {
+                    EXPECT_GT(networkData.packets.size(), 0);
+                    EXPECT_TRUE(folly::IOBufEqualTo()(
+                        *networkData.packets[0], *expected));
+                    std::unique_lock<std::mutex> lg(m);
+                    calledOnNetworkData = true;
+                    cv.notify_one();
+                  }));
+          return transport;
+        };
     EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
     // send packets to the server
     std::unique_lock<std::mutex> lg(m);
@@ -2040,37 +2045,39 @@ class QuicServerTakeoverTest : public Test {
       folly::Baton<>& baton) {
     std::shared_ptr<MockQuicTransport> transport;
     NiceMock<MockConnectionCallback> cb;
-    auto makeTransport = [&](
-        folly::EventBase * eventBase,
-        std::unique_ptr<folly::AsyncUDPSocket> & socket,
-        const folly::SocketAddress&,
-        std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
-      transport = std::make_shared<MockQuicTransport>(
-          eventBase, std::move(socket), cb, ctx);
-      transport->setClientConnectionId(clientConnId);
-      // setup expectations
-      EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(eventBase));
-      EXPECT_CALL(*transport, setTransportSettings(_));
-      EXPECT_CALL(*transport, accept());
-      EXPECT_CALL(*transport, setSupportedVersions(_));
-      EXPECT_CALL(*transport, setRoutingCallback(_));
-      EXPECT_CALL(*transport, setOriginalPeerAddress(_));
-      EXPECT_CALL(*transport, setTransportStatsCallback(_));
-      EXPECT_CALL(*transport, setServerConnectionIdParams(_))
-          .WillOnce(Invoke([&](ServerConnectionIdParams params) {
-            EXPECT_EQ(params.processId, 0);
-            EXPECT_EQ(params.workerId, 0);
-          }));
-      EXPECT_CALL(*transport, onNetworkData(_, _))
-          .WillOnce(
-              Invoke([&, expected = data.get()](auto, const auto& networkData) {
-                EXPECT_GT(networkData.packets.size(), 0);
-                EXPECT_TRUE(
-                    folly::IOBufEqualTo()(*networkData.packets[0], *expected));
-                baton.post();
+    auto makeTransport =
+        [&](folly::EventBase* eventBase,
+            std::unique_ptr<folly::AsyncUDPSocket>& socket,
+            const folly::SocketAddress&,
+            std::shared_ptr<const fizz::server::FizzServerContext>
+                ctx) noexcept {
+          transport = std::make_shared<MockQuicTransport>(
+              eventBase, std::move(socket), cb, ctx);
+          transport->setClientConnectionId(clientConnId);
+          // setup expectations
+          EXPECT_CALL(*transport, getEventBase())
+              .WillRepeatedly(Return(eventBase));
+          EXPECT_CALL(*transport, setTransportSettings(_));
+          EXPECT_CALL(*transport, accept());
+          EXPECT_CALL(*transport, setSupportedVersions(_));
+          EXPECT_CALL(*transport, setRoutingCallback(_));
+          EXPECT_CALL(*transport, setOriginalPeerAddress(_));
+          EXPECT_CALL(*transport, setTransportStatsCallback(_));
+          EXPECT_CALL(*transport, setServerConnectionIdParams(_))
+              .WillOnce(Invoke([&](ServerConnectionIdParams params) {
+                EXPECT_EQ(params.processId, 0);
+                EXPECT_EQ(params.workerId, 0);
               }));
-      return transport;
-    };
+          EXPECT_CALL(*transport, onNetworkData(_, _))
+              .WillOnce(Invoke(
+                  [&, expected = data.get()](auto, const auto& networkData) {
+                    EXPECT_GT(networkData.packets.size(), 0);
+                    EXPECT_TRUE(folly::IOBufEqualTo()(
+                        *networkData.packets[0], *expected));
+                    baton.post();
+                  }));
+          return transport;
+        };
     EXPECT_CALL(*factory, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
     return transport;
   }
@@ -2629,30 +2636,31 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
       clientConnId, serverConnId, id, *buf, QuicVersion::MVFST);
   auto data = std::move(packet);
 
-  auto makeTransport = [&](
-      folly::EventBase * eventBase,
-      std::unique_ptr<folly::AsyncUDPSocket> & socket,
-      const folly::SocketAddress&,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
-    transport = std::make_shared<MockQuicTransport>(
-        eventBase, std::move(socket), cb, ctx);
-    EXPECT_CALL(*transport, getEventBase()).WillRepeatedly(Return(eventBase));
-    EXPECT_CALL(*transport, setSupportedVersions(_));
-    EXPECT_CALL(*transport, setOriginalPeerAddress(_));
-    EXPECT_CALL(*transport, setTransportSettings(_));
-    EXPECT_CALL(*transport, setServerConnectionIdParams(_));
-    EXPECT_CALL(*transport, accept());
-    // post baton upon receiving the data
-    EXPECT_CALL(*transport, onNetworkData(_, _))
-        .WillOnce(
-            Invoke([&, expected = data.get()](auto, const auto& networkData) {
-              EXPECT_GT(networkData.packets.size(), 0);
-              EXPECT_TRUE(
-                  folly::IOBufEqualTo()(*networkData.packets[0], *expected));
-              b.post();
-            }));
-    return transport;
-  };
+  auto makeTransport =
+      [&](folly::EventBase* eventBase,
+          std::unique_ptr<folly::AsyncUDPSocket>& socket,
+          const folly::SocketAddress&,
+          std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
+        transport = std::make_shared<MockQuicTransport>(
+            eventBase, std::move(socket), cb, ctx);
+        EXPECT_CALL(*transport, getEventBase())
+            .WillRepeatedly(Return(eventBase));
+        EXPECT_CALL(*transport, setSupportedVersions(_));
+        EXPECT_CALL(*transport, setOriginalPeerAddress(_));
+        EXPECT_CALL(*transport, setTransportSettings(_));
+        EXPECT_CALL(*transport, setServerConnectionIdParams(_));
+        EXPECT_CALL(*transport, accept());
+        // post baton upon receiving the data
+        EXPECT_CALL(*transport, onNetworkData(_, _))
+            .WillOnce(Invoke(
+                [&, expected = data.get()](auto, const auto& networkData) {
+                  EXPECT_GT(networkData.packets.size(), 0);
+                  EXPECT_TRUE(folly::IOBufEqualTo()(
+                      *networkData.packets[0], *expected));
+                  b.post();
+                }));
+        return transport;
+      };
   EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
 
   auto serverAddr = server_->getAddress();
@@ -2687,9 +2695,8 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
       std::make_pair(LongHeader::Types::ZeroRtt, QuicVersion::MVFST)));
   data = std::move(packet);
   folly::Baton<> b1;
-  auto verifyZeroRtt = [&](
-      const folly::SocketAddress& peer,
-      const NetworkData& networkData) noexcept {
+  auto verifyZeroRtt = [&](const folly::SocketAddress& peer,
+                           const NetworkData& networkData) noexcept {
     EXPECT_GT(networkData.packets.size(), 0);
     EXPECT_EQ(peer, reader->getSocket().address());
     EXPECT_TRUE(folly::IOBufEqualTo()(*data, *networkData.packets[0]));

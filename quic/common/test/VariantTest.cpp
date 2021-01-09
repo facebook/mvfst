@@ -7,6 +7,7 @@
  */
 
 #include <quic/common/Variant.h>
+
 #include <gtest/gtest.h>
 
 bool& destructor_called() {

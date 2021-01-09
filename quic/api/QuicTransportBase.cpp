@@ -863,7 +863,7 @@ void QuicTransportBase::updateReadLooper() {
   auto iter = std::find_if(
       conn_->streamManager->readableStreams().begin(),
       conn_->streamManager->readableStreams().end(),
-      [& readCallbacks = readCallbacks_](StreamId s) {
+      [&readCallbacks = readCallbacks_](StreamId s) {
         auto readCb = readCallbacks.find(s);
         if (readCb == readCallbacks.end()) {
           return false;
@@ -1210,7 +1210,7 @@ void QuicTransportBase::updatePeekLooper() {
   auto iter = std::find_if(
       conn_->streamManager->peekableStreams().begin(),
       conn_->streamManager->peekableStreams().end(),
-      [& peekCallbacks = peekCallbacks_](StreamId s) {
+      [&peekCallbacks = peekCallbacks_](StreamId s) {
         VLOG(10) << "Checking stream=" << s;
         auto peekCb = peekCallbacks.find(s);
         if (peekCb == peekCallbacks.end()) {
@@ -3064,10 +3064,11 @@ QuicTransportBase::getStreamTransportInfo(StreamId id) const {
   }
   auto stream = conn_->streamManager->getStream(id);
   auto packets = getNumPacketsTxWithNewData(*stream);
-  return StreamTransportInfo{stream->totalHolbTime,
-                             stream->holbCount,
-                             bool(stream->lastHolbTime),
-                             packets};
+  return StreamTransportInfo{
+      stream->totalHolbTime,
+      stream->holbCount,
+      bool(stream->lastHolbTime),
+      packets};
 }
 
 void QuicTransportBase::describe(std::ostream& os) const {

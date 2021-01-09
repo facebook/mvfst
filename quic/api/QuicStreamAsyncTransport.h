@@ -136,9 +136,8 @@ class QuicStreamAsyncTransport : public folly::AsyncTransport,
   //
   // QucSocket::WriteCallback overrides
   //
-  void onStreamWriteReady(
-      quic::StreamId /*id*/,
-      uint64_t maxToSend) noexcept override;
+  void onStreamWriteReady(quic::StreamId /*id*/, uint64_t maxToSend) noexcept
+      override;
   void onStreamWriteError(
       StreamId /*id*/,
       std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>

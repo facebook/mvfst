@@ -7,6 +7,7 @@
  */
 
 #include <quic/common/FunctionLooper.h>
+
 #include <gtest/gtest.h>
 
 using namespace std;
@@ -234,8 +235,8 @@ TEST(FunctionLooperTest, KeepPacing) {
 TEST(FunctionLooperTest, TimerTickSize) {
   EventBase evb;
   TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
-  FunctionLooper::Ptr looper(
-      new FunctionLooper(&evb, [&](bool) {}, LooperType::ReadLooper));
+  FunctionLooper::Ptr looper(new FunctionLooper(
+      &evb, [&](bool) {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
 }
@@ -243,8 +244,8 @@ TEST(FunctionLooperTest, TimerTickSize) {
 TEST(FunctionLooperTest, TimerTickSizeAfterNewEvb) {
   EventBase evb;
   TimerHighRes::SharedPtr pacingTimer(TimerHighRes::newTimer(&evb, 123ms));
-  FunctionLooper::Ptr looper(
-      new FunctionLooper(&evb, [&](bool) {}, LooperType::ReadLooper));
+  FunctionLooper::Ptr looper(new FunctionLooper(
+      &evb, [&](bool) {}, LooperType::ReadLooper));
   looper->setPacingTimer(std::move(pacingTimer));
   EXPECT_EQ(123ms, looper->getTimerTickInterval());
   looper->detachEventBase();

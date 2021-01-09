@@ -3735,10 +3735,11 @@ TEST_F(
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::TransportStateUpdate, qLogger);
   EXPECT_EQ(indices.size(), 4);
-  std::array<::std::string, 4> updateArray = {kDerivedZeroRttReadCipher,
-                                              kDerivedOneRttWriteCipher,
-                                              kTransportReady,
-                                              kDerivedOneRttReadCipher};
+  std::array<::std::string, 4> updateArray = {
+      kDerivedZeroRttReadCipher,
+      kDerivedOneRttWriteCipher,
+      kTransportReady,
+      kDerivedOneRttReadCipher};
   for (int i = 0; i < 4; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogTransportStateUpdateEvent*>(tmp.get());

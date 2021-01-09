@@ -7,6 +7,7 @@
  */
 
 #include <quic/state/PacketEvent.h>
+
 #include <folly/hash/Hash.h>
 #include <functional>
 
@@ -25,8 +26,8 @@ bool operator==(const PacketEvent& lhs, const PacketEvent& rhs) {
       lhs.packetNumber == rhs.packetNumber;
 }
 
-size_t PacketEventHash::operator()(const PacketEvent& packetEvent) const
-    noexcept {
+size_t PacketEventHash::operator()(
+    const PacketEvent& packetEvent) const noexcept {
   return folly::hash::hash_combine(
       static_cast<std::underlying_type_t<PacketNumberSpace>>(
           packetEvent.packetNumberSpace),

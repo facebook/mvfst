@@ -57,8 +57,8 @@ class QuicPlaintextWriteRecordLayer : public fizz::PlaintextWriteRecordLayer {
 
   fizz::TLSContent writeInitialClientHello(
       std::unique_ptr<folly::IOBuf> encodedClientHello) const override {
-    return write(fizz::TLSMessage{fizz::ContentType::handshake,
-                                  std::move(encodedClientHello)});
+    return write(fizz::TLSMessage{
+        fizz::ContentType::handshake, std::move(encodedClientHello)});
   }
 };
 

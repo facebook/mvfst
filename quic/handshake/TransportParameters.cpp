@@ -7,6 +7,7 @@
  */
 
 #include <quic/handshake/TransportParameters.h>
+
 #include <quic/common/BufUtil.h>
 
 namespace quic {
@@ -90,8 +91,8 @@ CustomStringTransportParameter::CustomStringTransportParameter(
     : CustomTransportParameter(id), value_(value) {}
 
 TransportParameter CustomStringTransportParameter::encode() const {
-  return {static_cast<TransportParameterId>(id_),
-          folly::IOBuf::copyBuffer(value_)};
+  return {
+      static_cast<TransportParameterId>(id_), folly::IOBuf::copyBuffer(value_)};
 }
 
 CustomBlobTransportParameter::CustomBlobTransportParameter(

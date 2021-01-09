@@ -118,8 +118,8 @@ void QuicServerWorker::setTransportStatsCallback(
   statsCallback_ = std::move(statsCallback);
 }
 
-QuicTransportStatsCallback* QuicServerWorker::getTransportStatsCallback() const
-    noexcept {
+QuicTransportStatsCallback* QuicServerWorker::getTransportStatsCallback()
+    const noexcept {
   return statsCallback_.get();
 }
 
@@ -982,8 +982,8 @@ int QuicServerWorker::getTakeoverHandlerSocketFD() {
   return takeoverCB_->getSocketFD();
 }
 
-TakeoverProtocolVersion QuicServerWorker::getTakeoverProtocolVersion() const
-    noexcept {
+TakeoverProtocolVersion QuicServerWorker::getTakeoverProtocolVersion()
+    const noexcept {
   return takeoverPktHandler_.getTakeoverProtocolVersion();
 }
 
@@ -1225,8 +1225,8 @@ QuicServerWorker::~QuicServerWorker() {
   shutdownAllConnections(LocalErrorCode::SHUTTING_DOWN);
 }
 
-bool QuicServerWorker::rejectConnectionId(const ConnectionId& candidate) const
-    noexcept {
+bool QuicServerWorker::rejectConnectionId(
+    const ConnectionId& candidate) const noexcept {
   return connectionIdMap_.find(candidate) != connectionIdMap_.end();
 }
 

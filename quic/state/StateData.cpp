@@ -7,6 +7,7 @@
  */
 
 #include <quic/state/StateData.h>
+
 #include <quic/state/QuicStreamUtilities.h>
 
 namespace quic {
@@ -17,20 +18,20 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
   flowControlState.windowSize = isUnidirectionalStream(idIn)
       ? conn.transportSettings.advertisedInitialUniStreamWindowSize
       : isLocalStream(connIn.nodeType, idIn)
-          ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
-          : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
+      ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
+      : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
   flowControlState.advertisedMaxOffset = isUnidirectionalStream(idIn)
       ? conn.transportSettings.advertisedInitialUniStreamWindowSize
       : isLocalStream(connIn.nodeType, idIn)
-          ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
-          : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
+      ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
+      : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
   // Note: this will set a peerAdvertisedMaxOffset for a peer-initiated
   // unidirectional stream even though that value is meaningless.
   flowControlState.peerAdvertisedMaxOffset = isUnidirectionalStream(idIn)
       ? conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni
       : isLocalStream(connIn.nodeType, idIn)
-          ? conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote
-          : conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal;
+      ? conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote
+      : conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal;
   if (isUnidirectionalStream(idIn)) {
     if (isLocalStream(connIn.nodeType, idIn)) {
       recvState = StreamRecvState::Invalid;

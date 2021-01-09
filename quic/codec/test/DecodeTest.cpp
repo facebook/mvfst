@@ -7,6 +7,7 @@
  */
 
 #include <quic/codec/Decode.h>
+
 #include <folly/Random.h>
 #include <folly/container/Array.h>
 #include <folly/io/IOBuf.h>
@@ -130,11 +131,12 @@ std::unique_ptr<folly::IOBuf> createCryptoFrame(
 TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
   ConnectionId srcCid = getTestConnectionId(0),
                destCid = getTestConnectionId(1);
-  std::vector<QuicVersion> versions{{static_cast<QuicVersion>(1234),
-                                     static_cast<QuicVersion>(4321),
-                                     static_cast<QuicVersion>(2341),
-                                     static_cast<QuicVersion>(3412),
-                                     static_cast<QuicVersion>(4123)}};
+  std::vector<QuicVersion> versions{
+      {static_cast<QuicVersion>(1234),
+       static_cast<QuicVersion>(4321),
+       static_cast<QuicVersion>(2341),
+       static_cast<QuicVersion>(3412),
+       static_cast<QuicVersion>(4123)}};
   auto packet =
       VersionNegotiationPacketBuilder(srcCid, destCid, versions).buildPacket();
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
@@ -151,11 +153,12 @@ TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
 TEST_F(DecodeTest, DifferentCIDLength) {
   ConnectionId sourceConnectionId = getTestConnectionId();
   ConnectionId destinationConnectionId({1, 2, 3, 4, 5, 6});
-  std::vector<QuicVersion> versions{{static_cast<QuicVersion>(1234),
-                                     static_cast<QuicVersion>(4321),
-                                     static_cast<QuicVersion>(2341),
-                                     static_cast<QuicVersion>(3412),
-                                     static_cast<QuicVersion>(4123)}};
+  std::vector<QuicVersion> versions{
+      {static_cast<QuicVersion>(1234),
+       static_cast<QuicVersion>(4321),
+       static_cast<QuicVersion>(2341),
+       static_cast<QuicVersion>(3412),
+       static_cast<QuicVersion>(4123)}};
   auto packet = VersionNegotiationPacketBuilder(
                     sourceConnectionId, destinationConnectionId, versions)
                     .buildPacket();

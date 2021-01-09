@@ -175,9 +175,10 @@ TEST(AppTokenTest, TestEncodeAndDecodeThreeIPv4Addresses) {
       kDefaultStreamWindowSize,
       std::numeric_limits<uint32_t>::max(),
       std::numeric_limits<uint32_t>::max());
-  appToken.sourceAddresses = {folly::IPAddress("1.2.3.4"),
-                              folly::IPAddress("1.2.3.5"),
-                              folly::IPAddress("1.2.3.6")};
+  appToken.sourceAddresses = {
+      folly::IPAddress("1.2.3.4"),
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.6")};
   appToken.version = QuicVersion::MVFST;
   Buf buf = encodeAppToken(appToken);
 

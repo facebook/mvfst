@@ -7,6 +7,7 @@
  */
 
 #include <quic/congestion_control/Copa.h>
+
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>

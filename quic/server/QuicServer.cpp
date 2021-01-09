@@ -751,8 +751,8 @@ void QuicServer::getAllConnectionsStats(
       [&stats](auto worker) mutable { worker->getAllConnectionsStats(stats); });
 }
 
-TakeoverProtocolVersion QuicServer::getTakeoverProtocolVersion() const
-    noexcept {
+TakeoverProtocolVersion QuicServer::getTakeoverProtocolVersion()
+    const noexcept {
   return workers_[0]->getTakeoverProtocolVersion();
 }
 

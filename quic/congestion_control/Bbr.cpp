@@ -9,6 +9,7 @@
 // Copyright 2004-present Facebook.  All rights reserved.
 
 #include <quic/congestion_control/Bbr.h>
+
 #include <folly/Random.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/TimeUtil.h>
@@ -464,8 +465,8 @@ bool BbrCongestionController::inRecovery() const noexcept {
   return recoveryState_ != BbrCongestionController::RecoveryState::NOT_RECOVERY;
 }
 
-BbrCongestionController::BbrState BbrCongestionController::state() const
-    noexcept {
+BbrCongestionController::BbrState BbrCongestionController::state()
+    const noexcept {
   return state_;
 }
 
@@ -483,8 +484,8 @@ Bandwidth BbrCongestionController::bandwidth() const noexcept {
   return bandwidthSampler_ ? bandwidthSampler_->getBandwidth() : Bandwidth();
 }
 
-uint64_t BbrCongestionController::calculateTargetCwnd(float gain) const
-    noexcept {
+uint64_t BbrCongestionController::calculateTargetCwnd(
+    float gain) const noexcept {
   auto bandwidthEst = bandwidth();
   auto minRttEst = minRtt();
   if (!bandwidthEst || minRttEst == 0us) {

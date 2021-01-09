@@ -6,6 +6,7 @@
  *
  */
 #include <quic/logging/QLoggerTypes.h>
+
 #include <quic/QuicException.h>
 #include <quic/logging/QLoggerConstants.h>
 

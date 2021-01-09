@@ -307,9 +307,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
     // resetStream
   }
 
-  void onStreamWriteReady(
-      quic::StreamId id,
-      uint64_t maxToSend) noexcept override {
+  void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
+      override {
     bool eof = false;
     uint64_t toSend = maxToSend;
     if (maxBytesPerStream_ > 0) {
@@ -375,8 +374,8 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       const folly::SocketAddress&,
-      std::shared_ptr<const fizz::server::FizzServerContext>
-          ctx) noexcept override {
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
+      override {
     CHECK_EQ(evb, sock->getEventBase());
     auto serverHandler = std::make_unique<ServerStreamHandler>(
         evb, blockSize_, numStreams_, maxBytesPerStream_);
@@ -615,9 +614,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     eventBase_.terminateLoopSoon();
   }
 
-  void onStreamWriteReady(
-      quic::StreamId id,
-      uint64_t maxToSend) noexcept override {
+  void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
+      override {
     LOG(INFO) << "TPerfClient stream" << id
               << " is write ready with maxToSend=" << maxToSend;
   }
@@ -670,9 +668,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     settings.d6dConfig.advertisedProbeTimeout =
         std::chrono::seconds(FLAGS_d6d_probe_timeout_secs);
     if (!FLAGS_transport_knob_params.empty()) {
-      settings.knobs.push_back({kDefaultQuicTransportKnobSpace,
-                                kDefaultQuicTransportKnobId,
-                                FLAGS_transport_knob_params});
+      settings.knobs.push_back(
+          {kDefaultQuicTransportKnobSpace,
+           kDefaultQuicTransportKnobId,
+           FLAGS_transport_knob_params});
     }
     quicClient_->setTransportSettings(settings);
 
@@ -692,9 +691,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
   uint64_t receivedBytes_{0};
   uint64_t receivedStreams_{0};
   std::map<quic::StreamId, uint64_t> bytesPerStream_;
-  folly::Histogram<uint64_t> bytesPerStreamHistogram_{1024,
-                                                      0,
-                                                      1024 * 1024 * 1024};
+  folly::Histogram<uint64_t> bytesPerStreamHistogram_{
+      1024,
+      0,
+      1024 * 1024 * 1024};
   std::chrono::seconds duration_;
   uint64_t window_;
   bool gso_;

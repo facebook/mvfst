@@ -7,6 +7,7 @@
  */
 
 #include <quic/common/TimeUtil.h>
+
 #include <gtest/gtest.h>
 
 namespace quic {

@@ -363,8 +363,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       const std::vector<ConnectionIdData>& connectionIdData) noexcept override;
 
   // From ServerConnectionIdRejector:
-  bool rejectConnectionId(const ConnectionId& candidate) const
-      noexcept override;
+  bool rejectConnectionId(
+      const ConnectionId& candidate) const noexcept override;
 
   void onReadError(const folly::AsyncSocketException& ex) noexcept override;
 

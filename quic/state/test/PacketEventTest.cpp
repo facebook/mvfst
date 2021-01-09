@@ -7,6 +7,7 @@
  */
 
 #include <quic/state/PacketEvent.h>
+
 #include <gtest/gtest.h>
 
 namespace quic {

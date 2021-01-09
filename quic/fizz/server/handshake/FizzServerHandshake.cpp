@@ -7,6 +7,7 @@
  */
 
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
+
 #include <quic/fizz/handshake/FizzBridge.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>

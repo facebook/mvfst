@@ -7,6 +7,7 @@
  */
 
 #include <quic/codec/Types.h>
+
 #include <quic/QuicException.h>
 
 namespace quic {

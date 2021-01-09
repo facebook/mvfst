@@ -7,6 +7,7 @@
  */
 
 #include <quic/codec/QuicReadCodec.h>
+
 #include <folly/io/Cursor.h>
 #include <folly/portability/GTest.h>
 #include <quic/QuicException.h>
@@ -79,13 +80,14 @@ TEST_F(QuicReadCodecTest, TooSmallBuffer) {
 
 TEST_F(QuicReadCodecTest, VersionNegotiationPacketTest) {
   auto srcConnId = getTestConnectionId(0), destConnId = getTestConnectionId(1);
-  std::vector<QuicVersion> versions({static_cast<QuicVersion>(1),
-                                     static_cast<QuicVersion>(2),
-                                     static_cast<QuicVersion>(3),
-                                     static_cast<QuicVersion>(4),
-                                     static_cast<QuicVersion>(567),
-                                     static_cast<QuicVersion>(76543),
-                                     static_cast<QuicVersion>(0xffff)});
+  std::vector<QuicVersion> versions(
+      {static_cast<QuicVersion>(1),
+       static_cast<QuicVersion>(2),
+       static_cast<QuicVersion>(3),
+       static_cast<QuicVersion>(4),
+       static_cast<QuicVersion>(567),
+       static_cast<QuicVersion>(76543),
+       static_cast<QuicVersion>(0xffff)});
   VersionNegotiationPacketBuilder builder(srcConnId, destConnId, versions);
   auto packet = std::move(builder).buildPacket();
   auto packetQueue = bufToQueue(std::move(packet.second));

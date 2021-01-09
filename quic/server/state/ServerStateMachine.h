@@ -152,12 +152,12 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     // TODO: this is wrong, it should be the handshake finish time. But i need
     // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
-    supportedVersions =
-        std::vector<QuicVersion>{{QuicVersion::MVFST,
-                                  QuicVersion::MVFST_D24,
-                                  QuicVersion::MVFST_EXPERIMENTAL,
-                                  QuicVersion::QUIC_DRAFT,
-                                  QuicVersion::QUIC_DRAFT_LEGACY}};
+    supportedVersions = std::vector<QuicVersion>{
+        {QuicVersion::MVFST,
+         QuicVersion::MVFST_D24,
+         QuicVersion::MVFST_EXPERIMENTAL,
+         QuicVersion::QUIC_DRAFT,
+         QuicVersion::QUIC_DRAFT_LEGACY}};
     originalVersion = QuicVersion::MVFST;
     DCHECK(handshakeFactory);
     auto tmpServerHandshake = handshakeFactory->makeServerHandshake(this);

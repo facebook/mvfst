@@ -41,8 +41,8 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       const folly::SocketAddress& addr,
-      std::shared_ptr<const fizz::server::FizzServerContext>
-          ctx) noexcept override {
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
+      override {
     return _make(evb, socket, addr, ctx);
   }
 

@@ -393,11 +393,12 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       const folly::SocketAddress& address,
       const std::vector<folly::EventBase*>& evbs);
 
-  std::vector<QuicVersion> supportedVersions_{{QuicVersion::MVFST,
-                                               QuicVersion::MVFST_D24,
-                                               QuicVersion::MVFST_EXPERIMENTAL,
-                                               QuicVersion::QUIC_DRAFT,
-                                               QuicVersion::QUIC_DRAFT_LEGACY}};
+  std::vector<QuicVersion> supportedVersions_{
+      {QuicVersion::MVFST,
+       QuicVersion::MVFST_D24,
+       QuicVersion::MVFST_EXPERIMENTAL,
+       QuicVersion::QUIC_DRAFT,
+       QuicVersion::QUIC_DRAFT_LEGACY}};
 
   bool isUsingCCP();
 

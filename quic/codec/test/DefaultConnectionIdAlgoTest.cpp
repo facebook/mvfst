@@ -7,6 +7,7 @@
  */
 
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+
 #include <folly/Random.h>
 #include <folly/portability/GTest.h>
 #include <bitset>
@@ -49,12 +50,13 @@ TEST(DefaultConnectionIdAlgoTest, decodeV1) {
 
 TEST(DefaultConnectionIdAlgoTest, decodeV2) {
   DefaultConnectionIdAlgo al;
-  ConnectionId cid1({/*version*/ 0x80,
-                     /*host*/ 0xAA,
-                     0xBB,
-                     0xCC,
-                     /*worker*/ 0xFF,
-                     /*process*/ 0x80});
+  ConnectionId cid1(
+      {/*version*/ 0x80,
+       /*host*/ 0xAA,
+       0xBB,
+       0xCC,
+       /*worker*/ 0xFF,
+       /*process*/ 0x80});
   EXPECT_TRUE(al.canParse(cid1));
   auto params1 = al.parseConnectionId(cid1);
   EXPECT_EQ(params1->version, ConnectionIdVersion::V2);

@@ -30,8 +30,8 @@ class QuicAsyncTransportAcceptor : public wangle::Acceptor,
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       const folly::SocketAddress&,
-      std::shared_ptr<const fizz::server::FizzServerContext>
-          ctx) noexcept override;
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
+      override;
 
  private:
   ManagedConnectionFactory connectionFactory_;

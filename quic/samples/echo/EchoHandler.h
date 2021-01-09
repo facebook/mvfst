@@ -150,9 +150,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     }
   }
 
-  void onStreamWriteReady(
-      quic::StreamId id,
-      uint64_t maxToSend) noexcept override {
+  void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
+      override {
     LOG(INFO) << "socket is write ready with maxToSend=" << maxToSend;
     echo(id, input_[id]);
   }

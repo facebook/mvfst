@@ -182,9 +182,8 @@ void processServerInitialParams(
     auto windowSize = isUnidirectionalStream(s.id)
         ? conn.transportSettings.advertisedInitialUniStreamWindowSize
         : isLocalStream(conn.nodeType, s.id)
-            ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
-            : conn.transportSettings
-                  .advertisedInitialBidiRemoteStreamWindowSize;
+        ? conn.transportSettings.advertisedInitialBidiLocalStreamWindowSize
+        : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
     handleStreamWindowUpdate(s, windowSize, packetNum);
   });
 }

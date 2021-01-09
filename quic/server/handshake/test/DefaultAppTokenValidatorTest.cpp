@@ -366,9 +366,10 @@ TEST_F(SourceAddressTokenTest, OneSourceTokensNoMatch) {
 }
 
 TEST_F(SourceAddressTokenTest, MaxNumSourceTokensNoMatch) {
-  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.5"),
-                               folly::IPAddress("1.2.3.6"),
-                               folly::IPAddress("1.2.3.7")};
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.6"),
+      folly::IPAddress("1.2.3.7")};
   encodeAndValidate();
 
   EXPECT_EQ(
@@ -393,9 +394,10 @@ TEST_F(SourceAddressTokenTest, OneSourceTokensMatch) {
 }
 
 TEST_F(SourceAddressTokenTest, ThreeSourceTokensMatch) {
-  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.5"),
-                               folly::IPAddress("1.2.3.4"),
-                               folly::IPAddress("1.2.3.7")};
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.4"),
+      folly::IPAddress("1.2.3.7")};
   encodeAndValidate();
 
   EXPECT_FALSE(conn_.writableBytesLimit);
