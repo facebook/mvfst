@@ -309,6 +309,9 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
 
 class MockObserver : public Observer {
  public:
+  MockObserver() : Observer(Observer::Config()) {}
+  MockObserver(const Observer::Config& observerConfig)
+      : Observer(observerConfig) {}
   GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , destroy, void(QuicSocket*));

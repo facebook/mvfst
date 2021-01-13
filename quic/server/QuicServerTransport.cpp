@@ -563,7 +563,9 @@ void QuicServerTransport::maybeStartD6DProbing() {
     conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
     QUIC_STATS(conn_->statsCallback, onConnectionD6DStarted);
     for (const auto& cb : *(conn_->observers)) {
-      cb->pmtuProbingStarted(this);
+      if (cb->getConfig().pmtuEvents) {
+        cb->pmtuProbingStarted(this);
+      }
     }
   }
 }

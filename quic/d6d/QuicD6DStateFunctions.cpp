@@ -39,7 +39,9 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
     for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, upperBoundEvent](QuicSocket* qSocket) {
-            observer->pmtuUpperBoundDetected(qSocket, upperBoundEvent);
+            if (observer->getConfig().pmtuEvents) {
+              observer->pmtuUpperBoundDetected(qSocket, upperBoundEvent);
+            }
           });
     }
   }
@@ -73,7 +75,9 @@ static TimePoint reportBlackhole(
     for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, blackholeEvent](QuicSocket* qSocket) {
-            observer->pmtuBlackholeDetected(qSocket, blackholeEvent);
+            if (observer->getConfig().pmtuEvents) {
+              observer->pmtuBlackholeDetected(qSocket, blackholeEvent);
+            }
           });
     }
   }

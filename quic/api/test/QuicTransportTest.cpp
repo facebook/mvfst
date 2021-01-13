@@ -370,7 +370,10 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
         return 0;
       }));
 
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.appLimitedEvents = true;
+  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+
   EXPECT_CALL(*cb, observerAttach(transport_.get()));
   transport_->addObserver(cb.get());
 
@@ -401,7 +404,10 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(5000));
 
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.appLimitedEvents = true;
+  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+
   EXPECT_CALL(*cb, observerAttach(transport_.get()));
   transport_->addObserver(cb.get());
 
@@ -419,8 +425,10 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
 }
 
 TEST_F(QuicTransportTest, AppLimitedWithObservers) {
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.appLimitedEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());

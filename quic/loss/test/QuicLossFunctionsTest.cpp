@@ -1876,7 +1876,9 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
 
 TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  auto ib = MockObserver();
+  Observer::Config config = {};
+  config.lossEvents = true;
+  auto ib = MockObserver(config);
   auto conn = createConn();
   // Register 1 life cycle observer
   observers->emplace_back(&ib);
@@ -1934,7 +1936,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  auto ib = MockObserver();
+  Observer::Config config = {};
+  config.lossEvents = true;
+  auto ib = MockObserver(config);
   auto conn = createConn();
   // Register 1 life cycle observer
   observers->emplace_back(&ib);
@@ -1993,7 +1997,9 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  auto ib = MockObserver();
+  Observer::Config config = {};
+  config.lossEvents = true;
+  auto ib = MockObserver(config);
   auto conn = createConn();
   // Register 1 life cycle observer
   observers->emplace_back(&ib);

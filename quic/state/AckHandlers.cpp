@@ -149,7 +149,9 @@ void processAckFrame(
         for (const auto& observer : *(conn.observers)) {
           conn.pendingCallbacks.emplace_back(
               [observer, packetRTT](QuicSocket* qSocket) {
-                observer->rttSampleGenerated(qSocket, packetRTT);
+                if (observer->getConfig().rttSamples) {
+                  observer->rttSampleGenerated(qSocket, packetRTT);
+                }
               });
         }
         updateRtt(conn, rttSample, frame.ackDelay);

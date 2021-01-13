@@ -191,7 +191,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInBase) {
   const uint16_t expectPMTU = 1400;
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -232,7 +234,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingOne) {
   const uint16_t expectPMTU = 1400;
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -274,7 +278,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingMax) {
   const uint16_t oversize = 1500;
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -326,7 +332,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInError) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -367,7 +375,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearching) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -431,7 +441,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearchComplete) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;
@@ -494,7 +506,9 @@ TEST_F(QuicD6DStateFunctionsTest, ReachMaxPMTU) {
   QuicConnectionStateBase conn(QuicNodeType::Server);
   auto& d6d = conn.d6d;
   auto now = Clock::now();
-  auto mockObserver = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<StrictMock<MockObserver>>(config);
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(mockObserver.get());
   conn.observers = observers;

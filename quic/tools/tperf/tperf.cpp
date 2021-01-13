@@ -133,6 +133,7 @@ ProbeSizeRaiserType parseRaiserType(uint32_t type) {
 
 class TPerfObserver : public Observer {
  public:
+  TPerfObserver(const Observer::Config& config) : Observer(config) {}
   void appRateLimited(QuicSocket* /* socket */) override {
     if (FLAGS_log_app_rate_limited) {
       LOG(INFO) << "appRateLimited detected";
@@ -186,7 +187,16 @@ class TPerfObserver : public Observer {
  */
 class TPerfAcceptObserver : public AcceptObserver {
  public:
-  TPerfAcceptObserver() : tperfObserver_(std::make_unique<TPerfObserver>()) {}
+  TPerfAcceptObserver() {
+    // Create an observer config, only enabling events we are interested in
+    // receiving.
+    Observer::Config config = {};
+    config.appLimitedEvents = true;
+    config.pmtuEvents = true;
+    config.rttSamples = true;
+    config.lossEvents = true;
+    tperfObserver_ = std::make_unique<TPerfObserver>(config);
+  }
 
   void accept(QuicTransportBase* transport) noexcept override {
     transport->addObserver(tperfObserver_.get());

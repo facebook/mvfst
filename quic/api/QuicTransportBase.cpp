@@ -2742,7 +2742,9 @@ void QuicTransportBase::writeSocketData() {
         // notify via connection call and any observer callbacks
         connCallback_->onAppRateLimited();
         for (const auto& cb : *observers_) {
-          cb->appRateLimited(this);
+          if (cb->getConfig().appLimitedEvents) {
+            cb->appRateLimited(this);
+          }
         }
       }
     }
@@ -2948,7 +2950,9 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   updateWriteLooper(false);
 
   for (const auto& cb : *observers_) {
-    cb->evbAttach(this, evb_);
+    if (cb->getConfig().evbEvents) {
+      cb->evbAttach(this, evb_);
+    }
   }
 }
 
@@ -2970,7 +2974,9 @@ void QuicTransportBase::detachEventBase() {
   writeLooper_->detachEventBase();
 
   for (const auto& cb : *observers_) {
-    cb->evbDetach(this, evb_);
+    if (cb->getConfig().evbEvents) {
+      cb->evbDetach(this, evb_);
+    }
   }
   evb_ = nullptr;
 }

@@ -28,6 +28,56 @@ class QuicSocket;
  */
 class Observer {
  public:
+  /**
+   * Observer configuration.
+   *
+   * Specifies events observer wants to receive.
+   */
+  struct Config {
+    // following flags enable support for various callbacks.
+    // observer and socket lifecycle callbacks are always enabled.
+    bool evbEvents{false};
+    bool appLimitedEvents{false};
+    bool lossEvents{false};
+    bool pmtuEvents{false};
+    bool rttSamples{false};
+
+    /**
+     * Returns a config where all events are enabled.
+     */
+    static Config getConfigAllEventsEnabled() {
+      Config config = {};
+      config.evbEvents = true;
+      config.appLimitedEvents = true;
+      config.rttSamples = true;
+      config.lossEvents = true;
+      config.pmtuEvents = true;
+      return config;
+    }
+  };
+
+  /**
+   * Constructor for observer, uses default config (all callbacks disabled).
+   */
+  Observer() : Observer(Config()) {}
+
+  /**
+   * Constructor for observer.
+   *
+   * @param config      Config, defaults to auxilary instrumentaton disabled.
+   */
+  explicit Observer(const Config& observerConfig)
+      : observerConfig_(observerConfig) {}
+
+  virtual ~Observer() = default;
+
+  /**
+   * Returns observers configuration.
+   */
+  const Config& getConfig() {
+    return observerConfig_;
+  }
+
   struct LostPacket {
     explicit LostPacket(
         bool lostbytimeout,
@@ -132,8 +182,6 @@ class Observer {
     uint64_t cumulativeProbesSent;
     ProbeSizeRaiserType probeSizeRaiserType;
   };
-
-  virtual ~Observer() = default;
 
   /**
    * observerAttach() will be invoked when an observer is added.
@@ -251,6 +299,10 @@ class Observer {
   virtual void pmtuUpperBoundDetected(
       QuicSocket*, /* socket */
       const PMTUUpperBoundEvent& /* pmtuUpperBoundEvent */) {}
+
+ protected:
+  // observer configuration; cannot be changed post instantiation
+  const Config observerConfig_;
 };
 
 // Container for instrumentation observers.

@@ -300,7 +300,9 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, observerLossEvent](QuicSocket* qSocket) {
-            observer->packetLossDetected(qSocket, observerLossEvent);
+            if (observer->getConfig().lossEvents) {
+              observer->packetLossDetected(qSocket, observerLossEvent);
+            }
           });
     }
   }

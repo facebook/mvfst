@@ -3560,7 +3560,9 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverDetachAndAttachEvb) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  Observer::Config config = {};
+  config.evbEvents = true;
+  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
   folly::EventBase evb2;
 
   EXPECT_CALL(*cb, observerAttach(transport.get()));

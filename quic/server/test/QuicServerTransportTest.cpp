@@ -4249,7 +4249,9 @@ TEST_P(
 }
 
 TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
-  auto mockObserver = std::make_unique<MockObserver>();
+  Observer::Config config = {};
+  config.pmtuEvents = true;
+  auto mockObserver = std::make_unique<MockObserver>(config);
   server->addObserver(mockObserver.get());
   // Set oneRttReader so that maybeStartD6DPriobing passes its check
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);

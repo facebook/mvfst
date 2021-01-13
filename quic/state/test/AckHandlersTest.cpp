@@ -1121,7 +1121,10 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   conn.congestionController = std::move(mockCongestionController);
 
   // Register 1 observer
-  auto ib = MockObserver();
+  Observer::Config config = {};
+  config.rttSamples = true;
+  auto ib = MockObserver(config);
+
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(&ib);
   conn.observers = observers;
