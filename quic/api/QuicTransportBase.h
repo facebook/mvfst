@@ -590,7 +590,7 @@ class QuicTransportBase : public QuicSocket {
       const std::pair<QuicErrorCode, folly::StringPiece>& error) noexcept;
 
   /**
-   * Adds a lifecycle observer.
+   * Adds an observer.
    *
    * Observers can tie their lifetime to aspects of this socket's lifecycle /
    * lifetime and perform inspection at various states.
@@ -598,51 +598,24 @@ class QuicTransportBase : public QuicSocket {
    * This enables instrumentation to be added without changing / interfering
    * with how the application uses the socket.
    *
-   * @param observer     Observer to add (implements LifecycleObserver).
+   * @param observer     Observer to add (implements Observer).
    */
-  void addLifecycleObserver(LifecycleObserver* observer) override;
+  void addObserver(Observer* observer) override;
 
   /**
-   * Removes a lifecycle observer.
+   * Removes an observer.
    *
    * @param observer     Observer to remove.
    * @return             Whether observer found and removed from list.
    */
-  bool removeLifecycleObserver(LifecycleObserver* observer) override;
+  bool removeObserver(Observer* observer) override;
 
   /**
-   * Returns installed lifecycle observers.
+   * Returns installed observers.
    *
    * @return             Reference to const vector with installed observers.
    */
-  FOLLY_NODISCARD const LifecycleObserverVec& getLifecycleObservers()
-      const override;
-
-  /**
-   * Adds a instrumentation observer.
-   *
-   * Instrumentation observers get notified of various socket events.
-   *
-   * @param observer     Observer to add (implements InstrumentationObserver).
-   */
-  void addInstrumentationObserver(InstrumentationObserver* observer) override;
-
-  /**
-   * Removes a instrumentation observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether observer found and removed from list.
-   */
-  bool removeInstrumentationObserver(
-      InstrumentationObserver* observer) override;
-
-  /**
-   * Returns installed instrumentation observers.
-   *
-   * @return             Reference to const vector with installed observers.
-   */
-  FOLLY_NODISCARD const InstrumentationObserverVec&
-  getInstrumentationObservers() const override;
+  FOLLY_NODISCARD const ObserverVec& getObservers() const override;
 
  protected:
   void updateCongestionControlSettings(
@@ -846,11 +819,9 @@ class QuicTransportBase : public QuicSocket {
 
   folly::Optional<std::string> exceptionCloseWhat_;
 
-  // Lifecycle observers
-  LifecycleObserverVec lifecycleObservers_;
+  // Observers
 
-  // Instrumentation observers
-  InstrumentationObserverVec instrumentationObservers_;
+  std::shared_ptr<ObserverVec> observers_{std::make_shared<ObserverVec>()};
 
   uint64_t qlogRefcnt_{0};
 };

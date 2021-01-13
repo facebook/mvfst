@@ -4248,9 +4248,9 @@ TEST_P(
   testSetupConnection();
 }
 
-TEST_P(QuicServerTransportHandshakeTest, TestD6DStartInstrumentationCallback) {
-  auto mockObserver = std::make_unique<MockInstrumentationObserver>();
-  server->addInstrumentationObserver(mockObserver.get());
+TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
+  auto mockObserver = std::make_unique<MockObserver>();
+  server->addObserver(mockObserver.get());
   // Set oneRttReader so that maybeStartD6DPriobing passes its check
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   codec->setOneRttReadCipher(createNoOpAead());
@@ -4260,7 +4260,7 @@ TEST_P(QuicServerTransportHandshakeTest, TestD6DStartInstrumentationCallback) {
   EXPECT_CALL(*mockObserver, pmtuProbingStarted(_)).Times(1);
   // CHLO should be enough to trigger probing
   recvClientHello();
-  server->removeInstrumentationObserver(mockObserver.get());
+  server->removeObserver(mockObserver.get());
 }
 
 TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {

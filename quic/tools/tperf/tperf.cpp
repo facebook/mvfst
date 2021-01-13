@@ -131,12 +131,8 @@ ProbeSizeRaiserType parseRaiserType(uint32_t type) {
   }
 }
 
-class TPerfInstrumentationObserver : public InstrumentationObserver {
+class TPerfObserver : public Observer {
  public:
-  void observerDetach(QuicSocket* /* socket */) noexcept override {
-    // do nothing
-  }
-
   void appRateLimited(QuicSocket* /* socket */) override {
     if (FLAGS_log_app_rate_limited) {
       LOG(INFO) << "appRateLimited detected";
@@ -145,7 +141,7 @@ class TPerfInstrumentationObserver : public InstrumentationObserver {
 
   void packetLossDetected(
       QuicSocket*, /* socket */
-      const struct ObserverLossEvent& /* lossEvent */) override {
+      const struct LossEvent& /* lossEvent */) override {
     if (FLAGS_log_loss) {
       LOG(INFO) << "packetLoss detected";
     }
@@ -185,16 +181,15 @@ class TPerfInstrumentationObserver : public InstrumentationObserver {
 };
 
 /**
- * A helper accpetor observer that installs instrumentation observers to
+ * A helper accpetor observer that installs life cycle observers to
  * transport upon accpet
  */
 class TPerfAcceptObserver : public AcceptObserver {
  public:
-  TPerfAcceptObserver()
-      : tperfInstObserver_(std::make_unique<TPerfInstrumentationObserver>()) {}
+  TPerfAcceptObserver() : tperfObserver_(std::make_unique<TPerfObserver>()) {}
 
   void accept(QuicTransportBase* transport) noexcept override {
-    transport->addInstrumentationObserver(tperfInstObserver_.get());
+    transport->addObserver(tperfObserver_.get());
   }
 
   void acceptorDestroy(QuicServerWorker* /* worker */) noexcept override {
@@ -210,7 +205,7 @@ class TPerfAcceptObserver : public AcceptObserver {
   }
 
  private:
-  std::unique_ptr<TPerfInstrumentationObserver> tperfInstObserver_;
+  std::unique_ptr<TPerfObserver> tperfObserver_;
 };
 
 } // namespace

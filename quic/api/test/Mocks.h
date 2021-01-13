@@ -307,7 +307,7 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD2(onSuspiciousReadLoops, void(uint64_t, NoReadReason));
 };
 
-class MockLifecycleObserver : public LifecycleObserver {
+class MockObserver : public Observer {
  public:
   GMOCK_METHOD1_(, noexcept, , observerAttach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
@@ -322,18 +322,13 @@ class MockLifecycleObserver : public LifecycleObserver {
       void(
           QuicSocket*,
           const folly::Optional<std::pair<QuicErrorCode, std::string>>&));
-};
-
-class MockInstrumentationObserver : public InstrumentationObserver {
- public:
-  GMOCK_METHOD1_(, noexcept, , observerDetach, void(QuicSocket*));
   GMOCK_METHOD1_(, noexcept, , appRateLimited, void(QuicSocket*));
   GMOCK_METHOD2_(
       ,
       noexcept,
       ,
       packetLossDetected,
-      void(QuicSocket*, const ObserverLossEvent&));
+      void(QuicSocket*, const LossEvent&));
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -357,11 +352,10 @@ class MockInstrumentationObserver : public InstrumentationObserver {
   static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
     return AllOf(
         testing::Field(
-            &InstrumentationObserver::LostPacket::lostByReorderThreshold,
+            &Observer::LostPacket::lostByReorderThreshold,
             testing::Eq(reorderLoss)),
         testing::Field(
-            &InstrumentationObserver::LostPacket::lostByTimeout,
-            testing::Eq(timeoutLoss)));
+            &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)));
   }
 };
 

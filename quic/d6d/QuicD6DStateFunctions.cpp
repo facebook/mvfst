@@ -26,8 +26,8 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
   const auto now = Clock::now();
 
   QUIC_STATS(conn.statsCallback, onConnectionPMTUUpperBoundDetected);
-  if (conn.instrumentationObservers_.size() > 0) {
-    InstrumentationObserver::PMTUUpperBoundEvent upperBoundEvent(
+  if (conn.observers->size() > 0) {
+    Observer::PMTUUpperBoundEvent upperBoundEvent(
         now,
         std::chrono::duration_cast<std::chrono::microseconds>(
             now - d6d.meta.timeLastNonSearchState),
@@ -36,7 +36,7 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
         d6d.meta.totalTxedProbes,
         conn.transportSettings.d6dConfig.raiserType);
     // enqueue a function for every observer to invoke callback
-    for (const auto& observer : conn.instrumentationObservers_) {
+    for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, upperBoundEvent](QuicSocket* qSocket) {
             observer->pmtuUpperBoundDetected(qSocket, upperBoundEvent);
@@ -56,8 +56,8 @@ static TimePoint reportBlackhole(
   QUIC_STATS(conn.statsCallback, onConnectionPMTUBlackholeDetected);
   auto& d6d = conn.d6d;
   const auto now = Clock::now();
-  if (conn.instrumentationObservers_.size() > 0) {
-    InstrumentationObserver::PMTUBlackholeEvent blackholeEvent(
+  if (conn.observers->size() > 0) {
+    Observer::PMTUBlackholeEvent blackholeEvent(
         now,
         std::chrono::duration_cast<std::chrono::microseconds>(
             now - d6d.meta.timeLastNonSearchState),
@@ -70,7 +70,7 @@ static TimePoint reportBlackhole(
         packet);
 
     // If there are observers, enqueue a function to invoke callback
-    for (const auto& observer : conn.instrumentationObservers_) {
+    for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, blackholeEvent](QuicSocket* qSocket) {
             observer->pmtuBlackholeDetected(qSocket, blackholeEvent);

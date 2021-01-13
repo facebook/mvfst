@@ -33,6 +33,8 @@ QuicServerTransport::QuicServerTransport(
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
+  conn_->observers = observers_;
+
   // TODO: generate this when we can encode the packet sequence number
   // correctly.
   // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();
@@ -560,7 +562,7 @@ void QuicServerTransport::maybeStartD6DProbing() {
     // valuable
     conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
     QUIC_STATS(conn_->statsCallback, onConnectionD6DStarted);
-    for (const auto& cb : conn_->instrumentationObservers_) {
+    for (const auto& cb : *(conn_->observers)) {
       cb->pmtuProbingStarted(this);
     }
   }

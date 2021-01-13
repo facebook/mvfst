@@ -253,6 +253,10 @@ class Observer {
       const PMTUUpperBoundEvent& /* pmtuUpperBoundEvent */) {}
 };
 
+// Container for instrumentation observers.
+// Avoids heap allocation for up to 2 observers being installed.
+using ObserverVec = SmallVec<Observer*, 2>;
+
 /**
  * ===== Instrumentation Observer API =====
  */

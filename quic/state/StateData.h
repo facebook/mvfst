@@ -491,7 +491,9 @@ class PendingPathRateLimiter;
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
   virtual ~QuicConnectionStateBase() = default;
 
-  explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {}
+  explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {
+    observers = std::make_shared<ObserverVec>();
+  }
 
   // Accessor to output buffer for continuous memory GSO writes
   BufAccessor* bufAccessor{nullptr};
@@ -874,11 +876,11 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
    */
   bool retireAndSwitchPeerConnectionIds();
 
-  // instrumentation observers
-  InstrumentationObserverVec instrumentationObservers_;
-
   // queue of functions to be called in processCallbacksAfterNetworkData
   std::vector<std::function<void(QuicSocket*)>> pendingCallbacks;
+
+  // Vector of Observers that are attached to this socket.
+  std::shared_ptr<const ObserverVec> observers;
 
   // Type of node owning this connection (client or server).
   QuicNodeType nodeType;

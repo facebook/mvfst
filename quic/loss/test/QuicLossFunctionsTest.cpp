@@ -94,6 +94,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
     conn->serverConnectionId = *connIdAlgo_->encodeConnectionId(params);
     // for canSetLossTimerForAppData()
     conn->oneRttWriteCipher = createNoOpAead();
+    conn->observers = std::make_shared<ObserverVec>();
     return conn;
   }
 
@@ -133,8 +134,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
 
   auto getLossPacketMatcher(bool lossByReorder, bool lossByTimeout) {
-    return MockInstrumentationObserver::getLossPacketMatcher(
-        lossByReorder, lossByTimeout);
+    return MockObserver::getLossPacketMatcher(lossByReorder, lossByTimeout);
   }
 };
 
@@ -1875,10 +1875,12 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
 }
 
 TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
-  auto ib = MockInstrumentationObserver();
+  auto observers = std::make_shared<ObserverVec>();
+  auto ib = MockObserver();
   auto conn = createConn();
-  // Register 1 instrumentation observer
-  conn->instrumentationObservers_.emplace_back(&ib);
+  // Register 1 life cycle observer
+  observers->emplace_back(&ib);
+  conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
   PacketNum largestSent = 0;
@@ -1918,7 +1920,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(true, false),
                   getLossPacketMatcher(true, false),
@@ -1931,10 +1933,12 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
 }
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
-  auto ib = MockInstrumentationObserver();
+  auto observers = std::make_shared<ObserverVec>();
+  auto ib = MockObserver();
   auto conn = createConn();
-  // Register 1 instrumentation observer
-  conn->instrumentationObservers_.emplace_back(&ib);
+  // Register 1 life cycle observer
+  observers->emplace_back(&ib);
+  conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
   PacketNum largestSent = 0;
@@ -1971,7 +1975,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(false, true),
                   getLossPacketMatcher(false, true),
@@ -1988,10 +1992,12 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
 }
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
-  auto ib = MockInstrumentationObserver();
+  auto observers = std::make_shared<ObserverVec>();
+  auto ib = MockObserver();
   auto conn = createConn();
-  // Register 1 instrumentation observer
-  conn->instrumentationObservers_.emplace_back(&ib);
+  // Register 1 life cycle observer
+  observers->emplace_back(&ib);
+  conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 
   PacketNum largestSent = 0;
@@ -2034,7 +2040,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &InstrumentationObserver::ObserverLossEvent::lostPackets,
+              &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(true, true),
                   getLossPacketMatcher(true, true),
@@ -2047,7 +2053,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   }
 }
 
-TEST_F(QuicLossFunctionsTest, TestNoInstrumentationObserverCallback) {
+TEST_F(QuicLossFunctionsTest, TestNoObserverCallback) {
   auto conn = createConn();
   auto noopLossVisitor = [](auto&, auto&, bool) {};
 

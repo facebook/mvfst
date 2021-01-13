@@ -1120,9 +1120,11 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
 
-  // Register 1 instrumentation observer
-  auto ib = MockInstrumentationObserver();
-  conn.instrumentationObservers_.emplace_back(&ib);
+  // Register 1 observer
+  auto ib = MockObserver();
+  auto observers = std::make_shared<ObserverVec>();
+  observers->emplace_back(&ib);
+  conn.observers = observers;
 
   PacketNum packetNum = 0;
   StreamId streamid = 0;
@@ -1176,7 +1178,7 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   //
   // Its important to check the if
   // largestAcked - currentPacketNum > reorderingThreshold (currently 3)
-  // else it can trigger InstrumentationObserver::packetLossDetected
+  // else it can trigger Observer::packetLossDetected
   // and increase the number of callbacks
   ackVec.emplace_back(18, 18, 0ms); // +1
   ackVec.emplace_back(16, 17, 2ms); // +1
@@ -1206,16 +1208,11 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
         rttSampleGenerated(
             nullptr,
             AllOf(
+                Field(&Observer::PacketRTT::rcvTime, ackData.ackTime),
+                Field(&Observer::PacketRTT::rttSample, rttSample),
+                Field(&Observer::PacketRTT::ackDelay, ackData.ackDelay),
                 Field(
-                    &InstrumentationObserver::PacketRTT::rcvTime,
-                    ackData.ackTime),
-                Field(
-                    &InstrumentationObserver::PacketRTT::rttSample, rttSample),
-                Field(
-                    &InstrumentationObserver::PacketRTT::ackDelay,
-                    ackData.ackDelay),
-                Field(
-                    &InstrumentationObserver::PacketRTT::metadata,
+                    &Observer::PacketRTT::metadata,
                     Field(
                         &quic::OutstandingPacketMetadata::inflightBytes,
                         ackData.endSeq + 1)))));

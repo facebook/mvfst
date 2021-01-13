@@ -355,9 +355,7 @@ TEST_F(QuicTransportTest, AppLimited) {
   transport_->close(folly::none);
 }
 
-TEST_F(
-    QuicTransportTest,
-    NotAppLimitedWithNoWritableBytesWithInstrumentationObservers) {
+TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
   auto mockCongestionController =
@@ -372,8 +370,9 @@ TEST_F(
         return 0;
       }));
 
-  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
-  transport_->addInstrumentationObserver(cb.get());
+  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport_.get()));
+  transport_->addObserver(cb.get());
 
   auto stream = transport_->createBidirectionalStream().value();
   transport_->writeChain(
@@ -385,14 +384,14 @@ TEST_F(
   EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, observerDetach(transport_.get()));
+  EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb, destroy(transport_.get()));
   transport_->close(folly::none);
+  transport_ = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(
-    QuicTransportTest,
-    NotAppLimitedWithLargeBufferWithInstrumentationObservers) {
+TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
   auto mockCongestionController =
@@ -402,8 +401,9 @@ TEST_F(
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(5000));
 
-  auto cb = std::make_unique<StrictMock<MockInstrumentationObserver>>();
-  transport_->addInstrumentationObserver(cb.get());
+  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb, observerAttach(transport_.get()));
+  transport_->addObserver(cb.get());
 
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100 * 2000);
@@ -411,16 +411,20 @@ TEST_F(
   EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, observerDetach(transport_.get()));
+  EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb, destroy(transport_.get()));
   transport_->close(folly::none);
+  transport_ = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportTest, AppLimitedWithInstrumentationObservers) {
-  auto cb1 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
-  auto cb2 = std::make_unique<StrictMock<MockInstrumentationObserver>>();
-  transport_->addInstrumentationObserver(cb1.get());
-  transport_->addInstrumentationObserver(cb2.get());
+TEST_F(QuicTransportTest, AppLimitedWithObservers) {
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  transport_->addObserver(cb2.get());
 
   auto& conn = transport_->getConnectionState();
   // Replace with MockConnectionCallback:
@@ -444,9 +448,12 @@ TEST_F(QuicTransportTest, AppLimitedWithInstrumentationObservers) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
-  EXPECT_CALL(*cb1, observerDetach(transport_.get()));
-  EXPECT_CALL(*cb2, observerDetach(transport_.get()));
+  EXPECT_CALL(*cb1, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb2, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_->close(folly::none);
+  transport_ = nullptr;
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
 }

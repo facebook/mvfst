@@ -144,9 +144,9 @@ void processAckFrame(
       auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
           ackReceiveTimeOrNow - rPacketIt->metadata.time);
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
-        InstrumentationObserver::PacketRTT packetRTT(
+        Observer::PacketRTT packetRTT(
             ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
-        for (const auto& observer : conn.instrumentationObservers_) {
+        for (const auto& observer : *(conn.observers)) {
           conn.pendingCallbacks.emplace_back(
               [observer, packetRTT](QuicSocket* qSocket) {
                 observer->rttSampleGenerated(qSocket, packetRTT);

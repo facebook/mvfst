@@ -208,7 +208,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
-  InstrumentationObserver::ObserverLossEvent observerLossEvent(lossTime);
+  Observer::LossEvent observerLossEvent(lossTime);
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   bool shouldSetTimer = false;
@@ -297,7 +297,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
 
   // if there are observers, enqueue a function to call it
   if (observerLossEvent.hasPackets()) {
-    for (const auto& observer : conn.instrumentationObservers_) {
+    for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, observerLossEvent](QuicSocket* qSocket) {
             observer->packetLossDetected(qSocket, observerLossEvent);

@@ -140,6 +140,7 @@ const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
 
 QuicTransportBase::~QuicTransportBase() {
   connCallback_ = nullptr;
+
   QUIC_TRACE(
       conn_close,
       *conn_,
@@ -161,7 +162,7 @@ QuicTransportBase::~QuicTransportBase() {
     sock->pauseRead();
     sock->close();
   }
-  for (const auto& cb : lifecycleObservers_) {
+  for (const auto& cb : *observers_) {
     cb->destroy(this);
   }
 }
@@ -257,13 +258,9 @@ void QuicTransportBase::closeImpl(
     folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode,
     bool drainConnection,
     bool sendCloseImmediately) {
-  for (const auto& cb : lifecycleObservers_) {
+  for (const auto& cb : *observers_) {
     cb->close(this, errorCode);
   }
-  for (const auto& cb : conn_->instrumentationObservers_) {
-    cb->observerDetach(this);
-  }
-  conn_->instrumentationObservers_.clear();
 
   if (closeState_ == CloseState::CLOSED) {
     return;
@@ -2673,56 +2670,27 @@ void QuicTransportBase::cancelAllAppCallbacks(
   }
 }
 
-void QuicTransportBase::addLifecycleObserver(LifecycleObserver* observer) {
-  lifecycleObservers_.push_back(CHECK_NOTNULL(observer));
+void QuicTransportBase::addObserver(Observer* observer) {
+  observers_->push_back(CHECK_NOTNULL(observer));
   observer->observerAttach(this);
 }
 
-bool QuicTransportBase::removeLifecycleObserver(LifecycleObserver* observer) {
-  const auto eraseIt = std::remove(
-      lifecycleObservers_.begin(), lifecycleObservers_.end(), observer);
-  if (eraseIt == lifecycleObservers_.end()) {
+bool QuicTransportBase::removeObserver(Observer* observer) {
+  const auto eraseIt =
+      std::remove(observers_->begin(), observers_->end(), observer);
+  if (eraseIt == observers_->end()) {
     return false;
   }
 
-  for (auto it = eraseIt; it != lifecycleObservers_.end(); it++) {
+  for (auto it = eraseIt; it != observers_->end(); it++) {
     (*it)->observerDetach(this);
   }
-  lifecycleObservers_.erase(eraseIt, lifecycleObservers_.end());
+  observers_->erase(eraseIt, observers_->end());
   return true;
 }
 
-const QuicTransportBase::LifecycleObserverVec&
-QuicTransportBase::getLifecycleObservers() const {
-  return lifecycleObservers_;
-}
-
-void QuicTransportBase::addInstrumentationObserver(
-    InstrumentationObserver* observer) {
-  conn_->instrumentationObservers_.push_back(CHECK_NOTNULL(observer));
-}
-
-bool QuicTransportBase::removeInstrumentationObserver(
-    InstrumentationObserver* observer) {
-  const auto eraseIt = std::remove(
-      conn_->instrumentationObservers_.begin(),
-      conn_->instrumentationObservers_.end(),
-      observer);
-  if (eraseIt == conn_->instrumentationObservers_.end()) {
-    return false;
-  }
-
-  for (auto it = eraseIt; it != conn_->instrumentationObservers_.end(); it++) {
-    (*it)->observerDetach(this);
-  }
-  conn_->instrumentationObservers_.erase(
-      eraseIt, conn_->instrumentationObservers_.end());
-  return true;
-}
-
-const InstrumentationObserverVec&
-QuicTransportBase::getInstrumentationObservers() const {
-  return conn_->instrumentationObservers_;
+const ObserverVec& QuicTransportBase::getObservers() const {
+  return *observers_;
 }
 
 void QuicTransportBase::writeSocketData() {
@@ -2771,9 +2739,9 @@ void QuicTransportBase::writeSocketData() {
           currentSendBufLen < conn_->udpSendPacketLen && lossBufferEmpty &&
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
-        // notify via connection call and any instrumentation callbacks
+        // notify via connection call and any observer callbacks
         connCallback_->onAppRateLimited();
-        for (const auto& cb : conn_->instrumentationObservers_) {
+        for (const auto& cb : *observers_) {
           cb->appRateLimited(this);
         }
       }
@@ -2979,7 +2947,7 @@ void QuicTransportBase::attachEventBase(folly::EventBase* evb) {
   updatePeekLooper();
   updateWriteLooper(false);
 
-  for (const auto& cb : lifecycleObservers_) {
+  for (const auto& cb : *observers_) {
     cb->evbAttach(this, evb_);
   }
 }
@@ -3001,7 +2969,7 @@ void QuicTransportBase::detachEventBase() {
   peekLooper_->detachEventBase();
   writeLooper_->detachEventBase();
 
-  for (const auto& cb : lifecycleObservers_) {
+  for (const auto& cb : *observers_) {
     cb->evbDetach(this, evb_);
   }
   evb_ = nullptr;

@@ -16,7 +16,7 @@ class QuicServerWorker;
 /**
  * Observer of events related to connection acceptance.
  *
- * This observer can be combined with QuicSocket::LifecycleObserver and other
+ * This observer can be combined with QuicSocket::Observer and other
  * observers to enable instrumentation to be installed when a connection is
  * accepted. For instance, a sampling algorithm can be executed in accept() to
  * sample and install instrumentation on a subset of connections.

@@ -285,14 +285,8 @@ class MockQuicSocket : public QuicSocket {
       earlyDataAppParamsValidator_;
   folly::Function<Buf()> earlyDataAppParamsGetter_;
 
-  MOCK_METHOD1(addLifecycleObserver, void(LifecycleObserver*));
-  MOCK_METHOD1(removeLifecycleObserver, bool(LifecycleObserver*));
-  MOCK_CONST_METHOD0(getLifecycleObservers, const LifecycleObserverVec&());
-
-  MOCK_METHOD1(addInstrumentationObserver, void(InstrumentationObserver*));
-  MOCK_METHOD1(removeInstrumentationObserver, bool(InstrumentationObserver*));
-  MOCK_CONST_METHOD0(
-      getInstrumentationObservers,
-      const InstrumentationObserverVec&());
+  MOCK_METHOD1(addObserver, void(Observer*));
+  MOCK_METHOD1(removeObserver, bool(Observer*));
+  MOCK_CONST_METHOD0(getObservers, const ObserverVec&());
 };
 } // namespace quic

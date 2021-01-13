@@ -1112,64 +1112,32 @@ class QuicSocket {
    */
   virtual void setCongestionControl(CongestionControlType type) = 0;
 
-  // Container for lifecycle observers.
-  // Avoids heap allocation for up to 2 observers being installed.
-  using LifecycleObserverVec = SmallVec<LifecycleObserver*, 2>;
-
   /**
-   * Adds a lifecycle observer.
+   * Adds an observer.
    *
-   * Observers can tie their lifetime to aspects of this socket's lifecycle /
+   * Observers can tie their lifetime to aspects of this socket's  /
    * lifetime and perform inspection at various states.
    *
    * This enables instrumentation to be added without changing / interfering
    * with how the application uses the socket.
    *
-   * @param observer     Observer to add (implements LifecycleObserver).
+   * @param observer     Observer to add (implements Observer).
    */
-  virtual void addLifecycleObserver(LifecycleObserver* observer) = 0;
+  virtual void addObserver(Observer* observer) = 0;
 
   /**
-   * Removes a lifecycle observer.
+   * Removes an observer.
    *
    * @param observer     Observer to remove.
    * @return             Whether observer found and removed from list.
    */
-  virtual bool removeLifecycleObserver(LifecycleObserver* observer) = 0;
+  virtual bool removeObserver(Observer* observer) = 0;
 
   /**
-   * Returns installed lifecycle observers.
+   * Returns installed observers.
    *
    * @return             Reference to const vector with installed observers.
    */
-  FOLLY_NODISCARD virtual const LifecycleObserverVec& getLifecycleObservers()
-      const = 0;
-
-  /**
-   * Adds a instrumentation observer.
-   *
-   * Instrumentation observers get notified of various socket events.
-   *
-   * @param observer     Observer to add (implements InstrumentationObserver).
-   */
-  virtual void addInstrumentationObserver(
-      InstrumentationObserver* observer) = 0;
-
-  /**
-   * Removes a instrumentation observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether observer found and removed from list.
-   */
-  virtual bool removeInstrumentationObserver(
-      InstrumentationObserver* observer) = 0;
-
-  /**
-   * Returns installed instrumentation observers.
-   *
-   * @return             Reference to const vector with installed observers.
-   */
-  FOLLY_NODISCARD virtual const InstrumentationObserverVec&
-  getInstrumentationObservers() const = 0;
+  FOLLY_NODISCARD virtual const ObserverVec& getObservers() const = 0;
 };
 } // namespace quic
