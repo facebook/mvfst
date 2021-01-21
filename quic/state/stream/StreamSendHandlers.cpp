@@ -44,8 +44,7 @@ void sendStopSendingSMHandler(
       if (stream.conn.nodeType == QuicNodeType::Server &&
           getSendStreamFlowControlBytesWire(stream) == 0 &&
           stream.writeBuffer.chainLength() != 0) {
-        VLOG_EVERY_N(2, 1000)
-            << "Client gives up a flow control blocked stream";
+        VLOG(2) << "Client gives up a flow control blocked stream";
       }
       stream.conn.streamManager->addStopSending(stream.id, frame.errorCode);
       break;
