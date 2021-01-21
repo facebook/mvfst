@@ -16,6 +16,7 @@
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckStates.h>
+#include <quic/state/QuicStreamManager.h>
 #include <quic/state/StateData.h>
 
 #include <fizz/client/FizzClientContext.h>
@@ -290,5 +291,11 @@ void overridePacketWithToken(
 void overridePacketWithToken(
     folly::IOBuf& bodyBuf,
     const StatelessResetToken& token);
+
+/*
+ * Returns if the current writable streams contains the given id.
+ */
+bool writableContains(QuicStreamManager& streamManager, StreamId streamId);
+
 } // namespace test
 } // namespace quic

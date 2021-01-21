@@ -902,8 +902,8 @@ TEST_F(QuicTransportTest, RstStream) {
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
   EXPECT_TRUE(stream->writeBuffer.empty());
-  EXPECT_FALSE(transport_->getConnectionState().streamManager->writableContains(
-      stream->id));
+  EXPECT_FALSE(writableContains(
+      *transport_->getConnectionState().streamManager, stream->id));
 }
 
 TEST_F(QuicTransportTest, StopSending) {
@@ -1646,8 +1646,8 @@ TEST_F(QuicTransportTest, RstWrittenStream) {
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
-  EXPECT_FALSE(transport_->getConnectionState().streamManager->writableContains(
-      stream->id));
+  EXPECT_FALSE(writableContains(
+      *transport_->getConnectionState().streamManager, stream->id));
 }
 
 TEST_F(QuicTransportTest, RstStreamUDPWriteFailNonFatal) {
@@ -1716,8 +1716,8 @@ TEST_F(QuicTransportTest, WriteAfterSendRst) {
   EXPECT_TRUE(stream->retransmissionBuffer.empty());
   EXPECT_TRUE(stream->writeBuffer.empty());
   EXPECT_FALSE(stream->writable());
-  EXPECT_FALSE(transport_->getConnectionState().streamManager->writableContains(
-      stream->id));
+  EXPECT_FALSE(writableContains(
+      *transport_->getConnectionState().streamManager, stream->id));
 
   // Write again:
   buf = buildRandomInputData(50);

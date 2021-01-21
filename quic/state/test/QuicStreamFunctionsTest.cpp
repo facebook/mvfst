@@ -1552,7 +1552,7 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   EXPECT_FALSE(conn.streamManager->streamExists(streamId));
   EXPECT_TRUE(conn.streamManager->readableStreams().empty());
   EXPECT_TRUE(conn.streamManager->peekableStreams().empty());
-  EXPECT_FALSE(conn.streamManager->writableContains(streamId));
+  EXPECT_FALSE(writableContains(*conn.streamManager, streamId));
   EXPECT_FALSE(conn.streamManager->hasBlocked());
   EXPECT_FALSE(conn.streamManager->deliverableContains(streamId));
   EXPECT_FALSE(conn.streamManager->hasLoss());
@@ -1970,18 +1970,18 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
   stream.flowControlState.peerAdvertisedMaxOffset = 200;
 
   conn.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(stream.conn.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*stream.conn.streamManager, id));
 
   auto buf = IOBuf::create(100);
   buf->append(100);
   writeDataToQuicStream(stream, std::move(buf), false);
   conn.streamManager->updateWritableStreams(stream);
-  EXPECT_TRUE(stream.conn.streamManager->writableContains(id));
+  EXPECT_TRUE(writableContains(*stream.conn.streamManager, id));
 
   // Flow control
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(stream.conn.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*stream.conn.streamManager, id));
 
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
@@ -1989,12 +1989,12 @@ TEST_F(QuicStreamFunctionsTest, WritableList) {
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn.streamManager->updateWritableStreams(stream);
-  EXPECT_TRUE(stream.conn.streamManager->writableContains(id));
+  EXPECT_TRUE(writableContains(*stream.conn.streamManager, id));
 
   // After Fin
   stream.currentWriteOffset++;
   conn.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(stream.conn.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*stream.conn.streamManager, id));
 }
 
 TEST_F(QuicStreamFunctionsTest, AckCryptoStream) {

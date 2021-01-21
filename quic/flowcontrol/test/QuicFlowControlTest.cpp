@@ -689,18 +689,18 @@ TEST_F(QuicFlowControlTest, WritableList) {
   stream.flowControlState.peerAdvertisedMaxOffset = 200;
 
   conn_.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(conn_.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*conn_.streamManager, id));
 
   auto buf = IOBuf::create(100);
   buf->append(100);
   writeDataToQuicStream(stream, std::move(buf), false);
   conn_.streamManager->updateWritableStreams(stream);
-  EXPECT_TRUE(conn_.streamManager->writableContains(id));
+  EXPECT_TRUE(writableContains(*conn_.streamManager, id));
 
   // Flow control
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn_.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(conn_.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*conn_.streamManager, id));
 
   // Fin
   writeDataToQuicStream(stream, nullptr, true);
@@ -708,12 +708,12 @@ TEST_F(QuicFlowControlTest, WritableList) {
   stream.currentWriteOffset += 100;
   stream.flowControlState.peerAdvertisedMaxOffset = stream.currentWriteOffset;
   conn_.streamManager->updateWritableStreams(stream);
-  EXPECT_TRUE(conn_.streamManager->writableContains(id));
+  EXPECT_TRUE(writableContains(*conn_.streamManager, id));
 
   // After Fin
   stream.currentWriteOffset++;
   conn_.streamManager->updateWritableStreams(stream);
-  EXPECT_FALSE(conn_.streamManager->writableContains(id));
+  EXPECT_FALSE(writableContains(*conn_.streamManager, id));
 }
 
 TEST_F(QuicFlowControlTest, GetSendStreamFlowControlBytes) {

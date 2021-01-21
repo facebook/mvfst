@@ -775,5 +775,10 @@ void overridePacketWithToken(
       token.size());
 }
 
+bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
+  return streamManager.writableStreams().count(streamId) > 0 ||
+      streamManager.writableControlStreams().count(streamId) > 0;
+}
+
 } // namespace test
 } // namespace quic

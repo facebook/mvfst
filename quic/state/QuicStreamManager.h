@@ -244,14 +244,6 @@ class QuicStreamManager {
   }
 
   /*
-   * Returns if the current writable streams contains the given id.
-   */
-  bool writableContains(StreamId streamId) const {
-    return writableStreams_.count(streamId) > 0 ||
-        writableControlStreams_.count(streamId) > 0;
-  }
-
-  /*
    * Add a writable stream id.
    */
   void addWritable(const QuicStreamState& stream) {
