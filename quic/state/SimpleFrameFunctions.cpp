@@ -127,6 +127,7 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {
       const auto& handshakeDoneFrame = *frame.asHandshakeDoneFrame();
       conn.pendingEvents.frames.push_back(handshakeDoneFrame);
+      break;
     }
     case QuicSimpleFrame::Type::NewConnectionIdFrame:
     case QuicSimpleFrame::Type::MaxStreamsFrame:
