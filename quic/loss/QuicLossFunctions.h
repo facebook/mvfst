@@ -244,6 +244,8 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       if (!pkt.declaredLost) {
         ++conn.outstandings.declaredLostCount;
         pkt.declaredLost = true;
+        pkt.lostByTimeout = lostByTimeout;
+        pkt.lostByReorder = lostByReorder;
         ++conn.d6d.meta.totalLostProbes;
         if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
           onD6DLastProbeLost(conn);
@@ -292,6 +294,8 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
+    iter->lostByTimeout = lostByTimeout;
+    iter->lostByReorder = lostByReorder;
     iter++;
   } // while (iter != conn.outstandings.packets.end()) {
 

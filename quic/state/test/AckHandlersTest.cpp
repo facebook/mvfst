@@ -36,6 +36,33 @@ auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
   };
 }
 
+auto emplacePackets(
+    QuicServerConnectionState& conn,
+    PacketNum lastPacketNum,
+    TimePoint startTime,
+    PacketNumberSpace pnSpace) {
+  PacketNum packetNum = 0;
+  StreamId streamid = 0;
+  TimePoint sentTime;
+  std::vector<TimePoint> packetRcvTime;
+  while (packetNum < lastPacketNum) {
+    auto regularPacket = createNewPacket(packetNum, pnSpace);
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(frame);
+    sentTime = startTime + std::chrono::milliseconds(packetNum);
+    packetRcvTime.emplace_back(sentTime);
+    OutstandingPacket sentPacket(
+        std::move(regularPacket),
+        sentTime,
+        1,
+        false /* handshake */,
+        packetNum,
+        packetNum + 1);
+    conn.outstandings.packets.emplace_back(sentPacket);
+    packetNum++;
+  }
+}
+
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -1220,6 +1247,182 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
                         &quic::OutstandingPacketMetadata::inflightBytes,
                         ackData.endSeq + 1)))));
   }
+
+  for (auto& callback : conn.pendingCallbacks) {
+    callback(nullptr);
+  }
+}
+
+TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // Register 1 observer
+  Observer::Config config = {};
+  config.spuriousLossEvents = true;
+  config.lossEvents = true;
+  auto ib = MockObserver(config);
+
+  auto observers = std::make_shared<ObserverVec>();
+  observers->emplace_back(&ib);
+  conn.observers = observers;
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  TimePoint startTime = Clock::now();
+  emplacePackets(conn, 10, startTime, GetParam());
+
+  // from [0, 9], [3, 4] already acked
+  auto beginPacket = getFirstOutstandingPacket(conn, GetParam());
+  conn.outstandings.packets.erase(beginPacket + 3, beginPacket + 5);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 20ms;
+
+  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
+
+  // expecting 1 callback to be stacked
+  EXPECT_EQ(1, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      packetLossDetected(
+          nullptr,
+          Field(
+              &Observer::LossEvent::lostPackets,
+              UnorderedElementsAre(
+                  MockObserver::getLossPacketMatcher(0, true, false),
+                  MockObserver::getLossPacketMatcher(1, true, false),
+                  MockObserver::getLossPacketMatcher(2, true, false)))))
+      .Times(1);
+
+  // Here we receive the spurious loss packets in a late ack
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 2;
+    ackFrame.ackBlocks.emplace_back(0, 2);
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        startTime + 30ms);
+  }
+
+  // Spurious loss observer call added
+  EXPECT_EQ(2, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      spuriousLossDetected(
+          nullptr,
+          Field(
+              &Observer::SpuriousLossEvent::spuriousPackets,
+              UnorderedElementsAre(
+                  MockObserver::getLossPacketMatcher(0, true, false),
+                  MockObserver::getLossPacketMatcher(1, true, false),
+                  MockObserver::getLossPacketMatcher(2, true, false)))))
+      .Times(1);
+
+  for (auto& callback : conn.pendingCallbacks) {
+    callback(nullptr);
+  }
+}
+
+TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // Register 1 observer
+  Observer::Config config = {};
+  config.spuriousLossEvents = true;
+  config.lossEvents = true;
+  auto ib = MockObserver(config);
+
+  auto observers = std::make_shared<ObserverVec>();
+  observers->emplace_back(&ib);
+  conn.observers = observers;
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  TimePoint startTime = Clock::now();
+  emplacePackets(conn, 10, startTime, GetParam());
+
+  // from [0, 9], [0, 4] already acked
+  auto beginPacket = getFirstOutstandingPacket(conn, GetParam());
+  conn.outstandings.packets.erase(beginPacket, beginPacket + 5);
+
+  // setting a very high reordering threshold to force loss by timeout only
+  conn.lossState.reorderingThreshold = 100;
+  // setting time out parameters lower than the time at which detectLossPackets
+  // is called to make sure all packets timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 500ms;
+
+  detectLossPackets(conn, 10, noopLossVisitor, checkTime, GetParam());
+
+  // expecting 1 callback to be stacked
+  EXPECT_EQ(1, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      packetLossDetected(
+          nullptr,
+          Field(
+              &Observer::LossEvent::lostPackets,
+              UnorderedElementsAre(
+                  MockObserver::getLossPacketMatcher(5, false, true),
+                  MockObserver::getLossPacketMatcher(6, false, true),
+                  MockObserver::getLossPacketMatcher(7, false, true),
+                  MockObserver::getLossPacketMatcher(8, false, true),
+                  MockObserver::getLossPacketMatcher(9, false, true)))))
+      .Times(1);
+
+  // Here we receive the spurious loss packets in a late ack
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 9;
+    ackFrame.ackBlocks.emplace_back(5, 9);
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        startTime + 510ms);
+  }
+
+  // Spurious loss observer call added
+  EXPECT_EQ(2, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      spuriousLossDetected(
+          nullptr,
+          Field(
+              &Observer::SpuriousLossEvent::spuriousPackets,
+              UnorderedElementsAre(
+                  MockObserver::getLossPacketMatcher(5, false, true),
+                  MockObserver::getLossPacketMatcher(6, false, true),
+                  MockObserver::getLossPacketMatcher(7, false, true),
+                  MockObserver::getLossPacketMatcher(8, false, true),
+                  MockObserver::getLossPacketMatcher(9, false, true)))))
+      .Times(1);
 
   for (auto& callback : conn.pendingCallbacks) {
     callback(nullptr);

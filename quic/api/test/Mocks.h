@@ -351,14 +351,33 @@ class MockObserver : public Observer {
       ,
       pmtuUpperBoundDetected,
       void(QuicSocket*, const PMTUUpperBoundEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      spuriousLossDetected,
+      void(QuicSocket*, const SpuriousLossEvent&));
 
-  static auto getLossPacketMatcher(bool reorderLoss, bool timeoutLoss) {
+  static auto getLossPacketNum(PacketNum packetNum) {
+    return testing::Field(
+        &OutstandingPacket::packet,
+        testing::Field(
+            &RegularPacket::header,
+            testing::Property(&PacketHeader::getPacketSequenceNum, packetNum)));
+  }
+
+  static auto getLossPacketMatcher(
+      PacketNum packetNum,
+      bool reorderLoss,
+      bool timeoutLoss) {
     return AllOf(
         testing::Field(
             &Observer::LostPacket::lostByReorderThreshold,
             testing::Eq(reorderLoss)),
         testing::Field(
-            &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)));
+            &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)),
+        testing::Field(
+            &Observer::LostPacket::packet, getLossPacketNum(packetNum)));
   }
 };
 

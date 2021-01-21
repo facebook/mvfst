@@ -30,6 +30,25 @@ using namespace folly::test;
 using namespace testing;
 using namespace folly;
 
+namespace {
+auto getOutstandingPacketMatcher(
+    quic::PacketNum packetNum,
+    bool lostByReorder,
+    bool lostByTimeout) {
+  return AllOf(
+      testing::Field(
+          &quic::OutstandingPacket::lostByReorder, testing::Eq(lostByReorder)),
+      testing::Field(
+          &quic::OutstandingPacket::lostByTimeout, testing::Eq(lostByTimeout)),
+      testing::Field(
+          &quic::OutstandingPacket::packet,
+          testing::Field(
+              &quic::RegularPacket::header,
+              testing::Property(
+                  &quic::PacketHeader::getPacketSequenceNum, packetNum))));
+}
+} // namespace
+
 namespace quic {
 namespace test {
 
@@ -133,8 +152,12 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<MockQuicStats> transportInfoCb_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
 
-  auto getLossPacketMatcher(bool lossByReorder, bool lossByTimeout) {
-    return MockObserver::getLossPacketMatcher(lossByReorder, lossByTimeout);
+  auto getLossPacketMatcher(
+      PacketNum packetNum,
+      bool lossByReorder,
+      bool lossByTimeout) {
+    return MockObserver::getLossPacketMatcher(
+        packetNum, lossByReorder, lossByTimeout);
   }
 };
 
@@ -1880,7 +1903,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
   config.lossEvents = true;
   auto ib = MockObserver(config);
   auto conn = createConn();
-  // Register 1 life cycle observer
+  // Register 1 observer
   observers->emplace_back(&ib);
   conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
@@ -1917,6 +1940,13 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
 
   // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
   // 1, 2 and 6 are "lost" due to reodering. None lost due to timeout
+  EXPECT_THAT(
+      conn->outstandings.packets,
+      UnorderedElementsAre(
+          getOutstandingPacketMatcher(1, true, false),
+          getOutstandingPacketMatcher(2, true, false),
+          getOutstandingPacketMatcher(6, true, false),
+          getOutstandingPacketMatcher(7, false, false)));
   EXPECT_CALL(
       ib,
       packetLossDetected(
@@ -1924,9 +1954,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
           Field(
               &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(true, false),
-                  getLossPacketMatcher(true, false),
-                  getLossPacketMatcher(true, false)))))
+                  getLossPacketMatcher(1, true, false),
+                  getLossPacketMatcher(2, true, false),
+                  getLossPacketMatcher(6, true, false)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
@@ -1940,7 +1970,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
   config.lossEvents = true;
   auto ib = MockObserver(config);
   auto conn = createConn();
-  // Register 1 life cycle observer
+  // Register 1 observer
   observers->emplace_back(&ib);
   conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
@@ -1974,6 +2004,17 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
   EXPECT_EQ(1, size(conn->pendingCallbacks));
 
   // expecting all packets to be lost due to timeout
+  EXPECT_THAT(
+      conn->outstandings.packets,
+      UnorderedElementsAre(
+          getOutstandingPacketMatcher(1, false, true),
+          getOutstandingPacketMatcher(2, false, true),
+          getOutstandingPacketMatcher(3, false, true),
+          getOutstandingPacketMatcher(4, false, true),
+          getOutstandingPacketMatcher(5, false, true),
+          getOutstandingPacketMatcher(6, false, true),
+          getOutstandingPacketMatcher(7, false, true)));
+
   EXPECT_CALL(
       ib,
       packetLossDetected(
@@ -1981,13 +2022,13 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
           Field(
               &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true),
-                  getLossPacketMatcher(false, true)))))
+                  getLossPacketMatcher(1, false, true),
+                  getLossPacketMatcher(2, false, true),
+                  getLossPacketMatcher(3, false, true),
+                  getLossPacketMatcher(4, false, true),
+                  getLossPacketMatcher(5, false, true),
+                  getLossPacketMatcher(6, false, true),
+                  getLossPacketMatcher(7, false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {
@@ -2001,7 +2042,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   config.lossEvents = true;
   auto ib = MockObserver(config);
   auto conn = createConn();
-  // Register 1 life cycle observer
+  // Register 1 observer
   observers->emplace_back(&ib);
   conn->observers = observers;
   auto noopLossVisitor = [](auto&, auto&, bool) {};
@@ -2041,6 +2082,13 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   // Out of 1, 2, 3, 4, 5, 6, 7 -- we deleted (acked) 3,4,5.
   // 1, 2, 6 are lost due to reodering and timeout.
   // 7 just timed out
+  EXPECT_THAT(
+      conn->outstandings.packets,
+      UnorderedElementsAre(
+          getOutstandingPacketMatcher(1, true, true),
+          getOutstandingPacketMatcher(2, true, true),
+          getOutstandingPacketMatcher(6, true, true),
+          getOutstandingPacketMatcher(7, false, true)));
   EXPECT_CALL(
       ib,
       packetLossDetected(
@@ -2048,10 +2096,10 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
           Field(
               &Observer::LossEvent::lostPackets,
               UnorderedElementsAre(
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(true, true),
-                  getLossPacketMatcher(false, true)))))
+                  getLossPacketMatcher(1, true, true),
+                  getLossPacketMatcher(2, true, true),
+                  getLossPacketMatcher(6, true, true),
+                  getLossPacketMatcher(7, false, true)))))
       .Times(1);
 
   for (auto& callback : conn->pendingCallbacks) {

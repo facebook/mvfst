@@ -92,6 +92,12 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost{false};
 
+  // True if packet was declared lost due to timeout.
+  bool lostByTimeout{false};
+
+  // True if packet was declared lost due to reordering.
+  bool lostByReorder{false};
+
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,

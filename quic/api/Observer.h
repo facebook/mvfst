@@ -39,6 +39,7 @@ class Observer {
     bool evbEvents{false};
     bool appLimitedEvents{false};
     bool lossEvents{false};
+    bool spuriousLossEvents{false};
     bool pmtuEvents{false};
     bool rttSamples{false};
 
@@ -51,6 +52,7 @@ class Observer {
       config.appLimitedEvents = true;
       config.rttSamples = true;
       config.lossEvents = true;
+      config.spuriousLossEvents = true;
       config.pmtuEvents = true;
       return config;
     }
@@ -183,6 +185,21 @@ class Observer {
     ProbeSizeRaiserType probeSizeRaiserType;
   };
 
+  struct SpuriousLossEvent {
+    explicit SpuriousLossEvent(const TimePoint rcvTimeIn = Clock::now())
+        : rcvTime(rcvTimeIn) {}
+
+    bool hasPackets() {
+      return spuriousPackets.size() > 0;
+    }
+
+    void addSpuriousPacket(const quic::OutstandingPacket& pkt) {
+      spuriousPackets.emplace_back(pkt.lostByTimeout, pkt.lostByReorder, pkt);
+    }
+    const TimePoint rcvTime;
+    std::vector<LostPacket> spuriousPackets;
+  };
+
   /**
    * observerAttach() will be invoked when an observer is added.
    *
@@ -299,6 +316,17 @@ class Observer {
   virtual void pmtuUpperBoundDetected(
       QuicSocket*, /* socket */
       const PMTUUpperBoundEvent& /* pmtuUpperBoundEvent */) {}
+
+  /**
+   * spuriousLossDetected() is invoked when an ACK arrives for a packet that is
+   * declared lost
+   *
+   * @param socket   Socket when the callback is processed.
+   * @param packet   const reference to the lost packet.
+   */
+  virtual void spuriousLossDetected(
+      QuicSocket*, /* socket */
+      const SpuriousLossEvent& /* lost packet */) {}
 
  protected:
   // observer configuration; cannot be changed post instantiation
