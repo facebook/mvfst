@@ -136,7 +136,7 @@ class QuicSocket {
     uint32_t totalPacketsMarkedLost{0};
     uint32_t totalPacketsMarkedLostByPto{0};
     uint32_t totalPacketsMarkedLostByReorderingThreshold{0};
-    uint32_t packetsSpuriouslyLost{0};
+    uint32_t totalPacketsSpuriouslyMarkedLost{0};
     uint32_t timeoutBasedLoss{0};
     std::chrono::microseconds pto{0us};
     uint64_t bytesSent{0};

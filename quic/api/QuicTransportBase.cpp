@@ -589,6 +589,8 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
       conn_->lossState.totalPacketsMarkedLostByPto;
   transportInfo.totalPacketsMarkedLostByReorderingThreshold =
       conn_->lossState.totalPacketsMarkedLostByReorderingThreshold;
+  transportInfo.totalPacketsSpuriouslyMarkedLost =
+      conn_->lossState.totalPacketsSpuriouslyMarkedLost;
   transportInfo.timeoutBasedLoss = conn_->lossState.timeoutBasedRtxCount;
   transportInfo.totalBytesRetransmitted =
       conn_->lossState.totalBytesRetransmitted;

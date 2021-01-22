@@ -119,7 +119,7 @@ void processAckFrame(
       // TODO also remove any stream data from the loss buffer.
       if (rPacketIt->declaredLost) {
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
-        conn.lossState.spuriousLossCount++;
+        conn.lossState.totalPacketsSpuriouslyMarkedLost++;
         QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
         // Decrement the counter, trust that we will erase this as part of
         // the bulk erase.

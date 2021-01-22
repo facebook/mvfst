@@ -455,7 +455,7 @@ struct LossState {
   // Total number of packets sent on this connection, including retransmissions.
   uint32_t totalPacketsSent{0};
   // Total number of packets which were declared lost, including losses that
-  // we later detected were spurious (see spuriousLossCount below).
+  // we later detected were spurious (see totalPacketsSpuriouslyMarkedLost).
   uint32_t totalPacketsMarkedLost{0};
   // Total number of packets which were declared lost due to PTO; a packet can
   // marked as lost by multiple detection mechanisms.
@@ -463,6 +463,9 @@ struct LossState {
   // Total number of packets which were declared lost based on the reordering
   // threshold; a packet can marked as lost by multiple detection mechanisms.
   uint32_t totalPacketsMarkedLostByReorderingThreshold{0};
+  // Total number of packets which were declared lost spuriously, i.e. we
+  // received an ACK for them later.
+  uint32_t totalPacketsSpuriouslyMarkedLost{0};
   // Inflight bytes
   uint64_t inflightBytes{0};
   // Reordering threshold used
@@ -472,9 +475,6 @@ struct LossState {
   // Total number of packet retransmitted on this connection, including packet
   // clones, retransmitted clones, handshake and rejected zero rtt packets.
   uint32_t rtxCount{0};
-  // Total number of packets which were declared lost spuriously, i.e. we
-  // received an ACK for them later.
-  uint32_t spuriousLossCount{0};
   // Total number of retransmission due to PTO
   uint32_t timeoutBasedRtxCount{0};
   // Total number of PTO count

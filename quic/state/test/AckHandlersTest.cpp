@@ -235,7 +235,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   EXPECT_TRUE(itr != conn.outstandings.packets.end());
   EXPECT_FALSE(itr->declaredLost);
   EXPECT_EQ(itr->packet.header.getPacketSequenceNum(), 16);
-  EXPECT_EQ(conn.lossState.spuriousLossCount, 0);
+  EXPECT_EQ(conn.lossState.totalPacketsSpuriouslyMarkedLost, 0);
   ackFrame.ackBlocks.emplace_back(15, 16);
   processAckFrame(
       conn,
@@ -268,7 +268,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       [](auto& op) { return op.declaredLost; });
   EXPECT_EQ(numDeclaredLost, 0);
   EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
-  EXPECT_EQ(conn.lossState.spuriousLossCount, 1);
+  EXPECT_EQ(conn.lossState.totalPacketsSpuriouslyMarkedLost, 1);
 }
 
 TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
