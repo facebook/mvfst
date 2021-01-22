@@ -908,6 +908,9 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
+  EXPECT_EQ(0, conn->lossState.totalPacketsSent);
+  EXPECT_EQ(0, conn->lossState.totalAckElicitingPacketsSent);
+  EXPECT_EQ(0, conn->outstandings.packets.size());
   ASSERT_EQ(0, conn->lossState.totalBytesAcked);
   WriteAckFrame ackFrame;
   ackFrame.ackBlocks.emplace_back(0, 10);
@@ -916,6 +919,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   updateConnection(
       *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+  EXPECT_EQ(1, conn->lossState.totalPacketsSent);
+  EXPECT_EQ(0, conn->lossState.totalAckElicitingPacketsSent);
   EXPECT_EQ(0, conn->outstandings.packets.size());
   EXPECT_EQ(0, conn->lossState.totalBytesAcked);
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -947,13 +952,18 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   conn->lossState.totalBytesSent = 13579;
   conn->lossState.totalBytesAcked = 8642;
+  conn->lossState.inflightBytes = 16000;
   auto currentTime = Clock::now();
   conn->lossState.lastAckedTime = currentTime - 123s;
   conn->lossState.adjustedLastAckedTime = currentTime - 123s;
   conn->lossState.lastAckedPacketSentTime = currentTime - 234s;
   conn->lossState.totalBytesSentAtLastAck = 10000;
   conn->lossState.totalBytesAckedAtLastAck = 5000;
+  conn->lossState.totalPacketsSent = 20;
+  conn->lossState.totalAckElicitingPacketsSent = 15;
   updateConnection(*conn, folly::none, packet.packet, TimePoint(), 555);
+  EXPECT_EQ(21, conn->lossState.totalPacketsSent);
+  EXPECT_EQ(16, conn->lossState.totalAckElicitingPacketsSent);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -972,6 +982,27 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
       13579 + 555,
       getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
           ->metadata.totalBytesSent);
+  EXPECT_EQ(
+      16000 + 555,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.inflightBytes);
+  EXPECT_EQ(
+      1,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.packetsInflight);
+  EXPECT_EQ(
+      555,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.encodedSize);
+  EXPECT_EQ(
+      20 + 1,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.totalPacketsSent);
+  EXPECT_EQ(
+      15 + 1,
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
+          ->metadata.totalAckElicitingPacketsSent);
+
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake)
                   ->lastAckedPacketInfo.has_value());
   EXPECT_EQ(

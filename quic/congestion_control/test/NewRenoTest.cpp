@@ -26,8 +26,8 @@ CongestionController::LossEvent createLossEvent(
   for (auto packetData : lostPackets) {
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetData.first));
-    loss.addLostPacket(
-        OutstandingPacket(std::move(packet), Clock::now(), 10, false, 10, 0));
+    loss.addLostPacket(OutstandingPacket(
+        std::move(packet), Clock::now(), 10, false, 10, 0, 0, LossState()));
     loss.lostBytes = packetData.second;
   }
   loss.lostPackets = lostPackets.size();
@@ -46,7 +46,14 @@ CongestionController::AckEvent createAckEvent(
   ack.ackedBytes = ackedSize;
   ack.ackedPackets.push_back(
       makeAckPacketFromOutstandingPacket(OutstandingPacket(
-          std::move(packet), packetSentTime, ackedSize, false, ackedSize, 0)));
+          std::move(packet),
+          packetSentTime,
+          ackedSize,
+          false,
+          ackedSize,
+          0,
+          0,
+          LossState())));
   return ack;
 }
 
@@ -59,7 +66,7 @@ OutstandingPacket createPacket(
   RegularQuicWritePacket packet(
       ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
   return OutstandingPacket(
-      std::move(packet), sendTime, size, false, size, inflight);
+      std::move(packet), sendTime, size, false, size, inflight, 0, LossState());
 }
 
 TEST_F(NewRenoTest, TestLoss) {

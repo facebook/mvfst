@@ -209,7 +209,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInBase) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -253,7 +255,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingOne) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -298,7 +302,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInSearchingMax) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -351,7 +357,9 @@ TEST_F(QuicD6DStateFunctionsTest, D6DProbeAckedInError) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -394,7 +402,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearching) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
 
@@ -404,7 +414,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearching) {
       conn.udpSendPacketLen,
       false,
       conn.udpSendPacketLen + d6d.currentProbeSize,
-      conn.udpSendPacketLen + d6d.currentProbeSize);
+      conn.udpSendPacketLen + d6d.currentProbeSize,
+      0,
+      LossState());
 
   d6d.thresholdCounter = std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
       std::chrono::microseconds(kDefaultD6DBlackholeDetectionWindow).count(),
@@ -459,7 +471,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearchComplete) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
 
@@ -469,7 +483,9 @@ TEST_F(QuicD6DStateFunctionsTest, BlackholeInSearchComplete) {
       conn.udpSendPacketLen,
       false,
       conn.udpSendPacketLen + d6d.currentProbeSize,
-      conn.udpSendPacketLen + d6d.currentProbeSize);
+      conn.udpSendPacketLen + d6d.currentProbeSize,
+      0,
+      LossState());
 
   d6d.thresholdCounter = std::make_unique<WindowedCounter<uint64_t, uint64_t>>(
       std::chrono::microseconds(kDefaultD6DBlackholeDetectionWindow).count(),
@@ -527,7 +543,9 @@ TEST_F(QuicD6DStateFunctionsTest, ReachMaxPMTU) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -564,7 +582,9 @@ TEST_F(
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();
@@ -583,7 +603,9 @@ TEST_F(
       false,
       false,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   // Generate a false positive blackhole signal
   detectPMTUBlackhole(conn, lostPacket);
   EXPECT_EQ(d6d.state, D6DMachineState::BASE);
@@ -619,7 +641,9 @@ TEST_F(QuicD6DStateFunctionsTest, UpperboundIsBase) {
       false,
       true,
       d6d.currentProbeSize,
-      d6d.currentProbeSize);
+      d6d.currentProbeSize,
+      0,
+      LossState());
   d6d.lastProbe = D6DProbePacket(
       pkt.packet.header.getPacketSequenceNum(), pkt.metadata.encodedSize);
   d6d.raiser = std::make_unique<MockProbeSizeRaiser>();

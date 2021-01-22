@@ -249,7 +249,9 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       isHandshake,
       isD6DProbe,
       encodedSize,
-      0);
+      0,
+      0,
+      LossState());
   outstandingPacket.associatedEvent = associatedEvent;
   conn.lossState.lastRetransmittablePacketSentTime = time;
   if (conn.congestionController) {
@@ -1066,8 +1068,8 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
       conn->version.value());
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
-  conn->outstandings.packets.emplace_back(
-      OutstandingPacket(outstandingRegularPacket, now, 0, false, 0, 0));
+  conn->outstandings.packets.emplace_back(OutstandingPacket(
+      outstandingRegularPacket, now, 0, false, 0, 0, 0, LossState()));
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool) {

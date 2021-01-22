@@ -571,7 +571,14 @@ OutstandingPacket makeTestingWritePacket(
       QuicVersion::MVFST);
   RegularQuicWritePacket packet(std::move(longHeader));
   return OutstandingPacket(
-      packet, sentTime, desiredSize, false, totalBytesSent, inflightBytes);
+      packet,
+      sentTime,
+      desiredSize,
+      false,
+      totalBytesSent,
+      inflightBytes,
+      0,
+      LossState());
 }
 
 CongestionController::AckEvent makeAck(

@@ -40,7 +40,8 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0, 0);
+  conn.outstandings.packets.emplace_back(
+      packet, Clock::now(), 0, true, 0, 0, 0, LossState());
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -58,7 +59,8 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum,
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, true, 0, 0);
+  conn.outstandings.packets.emplace_back(
+      packet, Clock::now(), 0, true, 0, 0, 0, LossState());
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -71,7 +73,8 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
-  conn.outstandings.packets.emplace_back(packet, Clock::now(), 0, false, 0, 0);
+  conn.outstandings.packets.emplace_back(
+      packet, Clock::now(), 0, false, 0, 0, 0, LossState());
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }

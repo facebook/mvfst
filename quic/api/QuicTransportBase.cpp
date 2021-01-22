@@ -583,6 +583,8 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.pacingInterval = pacingInterval;
   transportInfo.packetsRetransmitted = conn_->lossState.rtxCount;
   transportInfo.totalPacketsSent = conn_->lossState.totalPacketsSent;
+  transportInfo.totalAckElicitingPacketsSent =
+      conn_->lossState.totalAckElicitingPacketsSent;
   transportInfo.totalPacketsMarkedLost =
       conn_->lossState.totalPacketsMarkedLost;
   transportInfo.totalPacketsMarkedLostByPto =

@@ -28,7 +28,14 @@ class Copa2Test : public Test {
     RegularQuicWritePacket packet(
         ShortHeader(ProtectionType::KeyPhaseZero, connId, packetNum));
     return OutstandingPacket(
-        std::move(packet), Clock::now(), size, false, totalSent, inflight);
+        std::move(packet),
+        Clock::now(),
+        size,
+        false,
+        totalSent,
+        inflight,
+        0,
+        LossState());
   }
 
   CongestionController::AckEvent createAckEvent(

@@ -667,6 +667,7 @@ void updateConnection(
     DCHECK(!packetEvent);
     return;
   }
+  conn.lossState.totalAckElicitingPacketsSent++;
   auto packetIt =
       std::find_if(
           conn.outstandings.packets.rbegin(),
@@ -679,12 +680,18 @@ void updateConnection(
   auto& pkt = *conn.outstandings.packets.emplace(
       packetIt,
       std::move(packet),
-      std::move(sentTime),
+      sentTime,
       encodedSize,
       isHandshake,
       isD6DProbe,
+      // these numbers should all _include_ the current packet
+      // conn.lossState.inflightBytes isn't updated until below
+      // conn.outstandings.numOutstanding() + 1 since we're emplacing here
       conn.lossState.totalBytesSent,
-      conn.lossState.inflightBytes);
+      conn.lossState.inflightBytes + encodedSize,
+      conn.outstandings.numOutstanding() + 1,
+      conn.lossState);
+
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
     ++conn.d6d.meta.totalTxedProbes;

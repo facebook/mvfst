@@ -133,6 +133,7 @@ class QuicSocket {
     std::chrono::microseconds pacingInterval{0us};
     uint32_t packetsRetransmitted{0};
     uint32_t totalPacketsSent{0};
+    uint32_t totalAckElicitingPacketsSent{0};
     uint32_t totalPacketsMarkedLost{0};
     uint32_t totalPacketsMarkedLostByPto{0};
     uint32_t totalPacketsMarkedLostByReorderingThreshold{0};

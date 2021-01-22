@@ -9,6 +9,7 @@
 #pragma once
 
 #include <quic/codec/Types.h>
+#include <quic/state/LossState.h>
 #include <quic/state/PacketEvent.h>
 
 namespace quic {
@@ -28,6 +29,12 @@ struct OutstandingPacketMetadata {
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
   uint64_t inflightBytes;
+  // Packets in flight on this connection including this packet itself.
+  uint64_t packetsInflight;
+  // Total number of packets sent on this connection.
+  uint32_t totalPacketsSent{0};
+  // Total number of ack-eliciting packets sent on this connection.
+  uint32_t totalAckElicitingPacketsSent{0};
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
@@ -35,13 +42,19 @@ struct OutstandingPacketMetadata {
       bool isHandshakeIn,
       bool isD6DProbeIn,
       uint64_t totalBytesSentIn,
-      uint64_t inflightBytesIn)
-      : time(std::move(timeIn)),
+      uint64_t inflightBytesIn,
+      uint64_t packetsInflightIn,
+      const LossState& lossStateIn)
+      : time(timeIn),
         encodedSize(encodedSizeIn),
         isHandshake(isHandshakeIn),
         isD6DProbe(isD6DProbeIn),
         totalBytesSent(totalBytesSentIn),
-        inflightBytes(inflightBytesIn) {}
+        inflightBytes(inflightBytesIn),
+        packetsInflight(packetsInflightIn),
+        totalPacketsSent(lossStateIn.totalPacketsSent),
+        totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent) {
+  }
 };
 
 // Data structure to represent outstanding retransmittable packets
@@ -104,15 +117,19 @@ struct OutstandingPacket {
       uint32_t encodedSizeIn,
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
-      uint64_t inflightBytesIn)
+      uint64_t inflightBytesIn,
+      uint64_t packetsInflightIn,
+      const LossState& lossStateIn)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
-            std::move(timeIn),
+            timeIn,
             encodedSizeIn,
             isHandshakeIn,
             false,
             totalBytesSentIn,
-            inflightBytesIn)) {}
+            inflightBytesIn,
+            packetsInflightIn,
+            lossStateIn)) {}
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -121,14 +138,18 @@ struct OutstandingPacket {
       bool isHandshakeIn,
       bool isD6DProbeIn,
       uint64_t totalBytesSentIn,
-      uint64_t inflightBytesIn)
+      uint64_t inflightBytesIn,
+      uint64_t packetsInflightIn,
+      const LossState& lossStateIn)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
-            std::move(timeIn),
+            timeIn,
             encodedSizeIn,
             isHandshakeIn,
             isD6DProbeIn,
             totalBytesSentIn,
-            inflightBytesIn)) {}
+            inflightBytesIn,
+            packetsInflightIn,
+            lossStateIn)) {}
 };
 } // namespace quic

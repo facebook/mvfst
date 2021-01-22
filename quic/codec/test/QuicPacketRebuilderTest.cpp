@@ -29,7 +29,14 @@ OutstandingPacket makeDummyOutstandingPacket(
     const RegularQuicWritePacket& writePacket,
     uint64_t totalBytesSentOnConnection) {
   OutstandingPacket packet(
-      writePacket, Clock::now(), 1000, false, totalBytesSentOnConnection, 0);
+      writePacket,
+      Clock::now(),
+      1000,
+      false,
+      totalBytesSentOnConnection,
+      0,
+      0,
+      LossState());
   return packet;
 }
 
