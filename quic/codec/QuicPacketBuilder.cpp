@@ -294,7 +294,7 @@ PseudoRetryPacketBuilder::PseudoRetryPacketBuilder(
 }
 
 void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
-  uint8_t packetLength = sizeof(uint8_t) /* ODCID length */ +
+  uint64_t packetLength = sizeof(uint8_t) /* ODCID length */ +
       originalDestinationConnectionId_.size() /* ODCID */ +
       sizeof(uint8_t) /* Initial byte */ +
       sizeof(QuicVersionType) /* Version */ +
@@ -303,6 +303,8 @@ void PseudoRetryPacketBuilder::writePseudoRetryPacket() {
       sizeof(uint8_t) /* SCID length */ +
       sourceConnectionId_.size() /* SCID */ + token_->length() /* Token */;
 
+  LOG_IF(ERROR, packetLength > kDefaultUDPSendPacketLen)
+      << "Retry packet length exceeds default packet length";
   packetBuf_ = folly::IOBuf::create(packetLength);
   BufWriter bufWriter(*packetBuf_, packetLength);
 

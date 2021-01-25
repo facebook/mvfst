@@ -622,6 +622,27 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   EXPECT_TRUE(folly::IOBufEqualTo()(*expectedIntegrityTag, *integrityTag));
 }
 
+TEST_F(QuicPacketBuilderTest, PseudoRetryPacketLarge) {
+  uint8_t initialByte = 0xff;
+  ConnectionId sourceConnectionId(
+      {0xf0, 0x67, 0xa5, 0x50, 0x2a, 0x42, 0x62, 0xb5});
+  ConnectionId destinationConnectionId((std::vector<uint8_t>()));
+  ConnectionId originalDestinationConnectionId(
+      {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08});
+  auto quicVersion = static_cast<QuicVersion>(0xff00001d);
+  Buf token = folly::IOBuf::create(500);
+  token->append(500);
+
+  PseudoRetryPacketBuilder builder(
+      initialByte,
+      sourceConnectionId,
+      destinationConnectionId,
+      originalDestinationConnectionId,
+      quicVersion,
+      std::move(token));
+  Buf pseudoRetryPacketBuf = std::move(builder).buildPacket();
+}
+
 TEST_F(QuicPacketBuilderTest, RetryPacketValid) {
   auto srcConnId = getTestConnectionId(0), dstConnId = getTestConnectionId(1);
   auto quicVersion = static_cast<QuicVersion>(0xff00001d);
