@@ -48,7 +48,7 @@ TEST_F(QuicSocketTest, simple) {
 
   EXPECT_CALL(*socket_, readNaked(3, _))
       .WillOnce(Return(readResult("hello world", true)));
-  EXPECT_CALL(*socket_, writeChain(3, _, true, false, nullptr))
+  EXPECT_CALL(*socket_, writeChain(3, _, true, nullptr))
       .WillOnce(Return(folly::unit));
   handler_.readAvailable(3);
 }
@@ -63,7 +63,7 @@ TEST_F(QuicSocketTest, multiple_reads) {
 
   EXPECT_CALL(*socket_, readNaked(3, _))
       .WillOnce(Return(readResult("world", true)));
-  EXPECT_CALL(*socket_, writeChain(3, _, true, false, nullptr))
+  EXPECT_CALL(*socket_, writeChain(3, _, true, nullptr))
       .WillOnce(Return(folly::unit));
   handler_.readAvailable(3);
 }

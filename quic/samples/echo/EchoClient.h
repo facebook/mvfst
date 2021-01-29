@@ -169,7 +169,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
  private:
   void sendMessage(quic::StreamId id, BufQueue& data) {
     auto message = data.move();
-    auto res = quicClient_->writeChain(id, message->clone(), true, false);
+    auto res = quicClient_->writeChain(id, message->clone(), true);
     if (res.hasError()) {
       LOG(ERROR) << "EchoClient writeChain error=" << uint32_t(res.error());
     } else {

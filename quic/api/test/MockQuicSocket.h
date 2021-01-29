@@ -188,18 +188,14 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD2(
       getNumByteEventCallbacksForStream,
       size_t(const ByteEvent::Type, const StreamId));
-  folly::Expected<folly::Unit, LocalErrorCode> writeChain(
-      StreamId id,
-      Buf data,
-      bool eof,
-      bool cork,
-      DeliveryCallback* cb) override {
+  folly::Expected<folly::Unit, LocalErrorCode>
+  writeChain(StreamId id, Buf data, bool eof, DeliveryCallback* cb) override {
     SharedBuf sharedData(data.release());
-    return writeChain(id, sharedData, eof, cork, cb);
+    return writeChain(id, sharedData, eof, cb);
   }
-  MOCK_METHOD5(
+  MOCK_METHOD4(
       writeChain,
-      WriteResult(StreamId, SharedBuf, bool, bool, DeliveryCallback*));
+      WriteResult(StreamId, SharedBuf, bool, DeliveryCallback*));
   MOCK_METHOD3(
       registerDeliveryCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(

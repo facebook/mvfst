@@ -460,7 +460,6 @@ void QuicStreamAsyncTransport::send(uint64_t maxToSend) {
       *id_,
       writeBuf_.split(toSend),
       writeEOF,
-      false,
       nullptr); // no delivery callbacks right now
   if (res.hasError()) {
     folly::AsyncSocketException ex(

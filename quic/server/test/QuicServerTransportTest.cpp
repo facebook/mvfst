@@ -859,7 +859,6 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the darkness is to keep us apart"),
-      false,
       false);
   loopForWrites();
   // It was the first packet
@@ -871,7 +870,6 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   server->writeChain(
       streamId,
       IOBuf::copyBuffer("And if the daylight feels like it's a long way off"),
-      false,
       false);
   loopForWrites();
   EXPECT_FALSE(server->idleTimeout().isScheduled());
@@ -1005,7 +1003,7 @@ TEST_F(QuicServerTransportTest, TestClientAddressChanges) {
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
   auto streamId = server->createBidirectionalStream().value();
 
-  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
 
   AckBlocks acks;
@@ -1214,10 +1212,10 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   server->getNonConstConn().outstandings.packets.clear();
   server->getNonConstConn().outstandings.initialPacketsCount = 0;
   server->getNonConstConn().outstandings.handshakePacketsCount = 0;
-  server->writeChain(streamId, data->clone(), false, false);
+  server->writeChain(streamId, data->clone(), false);
   loopForWrites();
-  server->writeChain(streamId, data->clone(), false, false);
-  server->writeChain(streamId, data->clone(), false, false);
+  server->writeChain(streamId, data->clone(), false);
+  server->writeChain(streamId, data->clone(), false);
   loopForWrites();
 
   auto stream = server->getNonConstConn().streamManager->getStream(streamId);
@@ -1300,7 +1298,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   EXPECT_EQ(stream->recvState, StreamRecvState::Open);
 
   auto empty = IOBuf::create(0);
-  server->writeChain(streamId, std::move(empty), true, false);
+  server->writeChain(streamId, std::move(empty), true);
   loopForWrites();
   ASSERT_FALSE(server->getConn().outstandings.packets.empty());
 
@@ -2070,7 +2068,7 @@ TEST_F(QuicServerTransportTest, DestroyWithoutClosing) {
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   MockDeliveryCallback deliveryCallback;
   auto write = IOBuf::copyBuffer("no");
-  server->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
+  server->writeChain(streamId, write->clone(), true, &deliveryCallback);
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
   EXPECT_CALL(readCb, readError(_, _));
@@ -2087,7 +2085,7 @@ TEST_F(QuicServerTransportTest, DestroyWithoutClosingCancelByteEvents) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   auto write = IOBuf::copyBuffer("no");
-  server->writeChain(streamId, write->clone(), true, false);
+  server->writeChain(streamId, write->clone(), true);
 
   MockByteEventCallback txCallback;
   MockByteEventCallback deliveryCallback;
@@ -3093,7 +3091,7 @@ TEST_F(QuicServerTransportTest, ClientPortChangeNATRebinding) {
 
   StreamId streamId = server->createBidirectionalStream().value();
   auto data1 = IOBuf::copyBuffer("Aloha");
-  server->writeChain(streamId, data1->clone(), false, false);
+  server->writeChain(streamId, data1->clone(), false);
   loopForWrites();
   PacketNum packetNum1 =
       getFirstOutstandingPacket(
@@ -3140,7 +3138,7 @@ TEST_F(QuicServerTransportTest, ClientAddressChangeNATRebinding) {
   server->getNonConstConn().transportSettings.disableMigration = false;
   StreamId streamId = server->createBidirectionalStream().value();
   auto data1 = IOBuf::copyBuffer("Aloha");
-  server->writeChain(streamId, data1->clone(), false, false);
+  server->writeChain(streamId, data1->clone(), false);
   loopForWrites();
   PacketNum packetNum1 =
       getFirstOutstandingPacket(
@@ -3663,7 +3661,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
   recvClientHello();
 
   auto streamId = server->createBidirectionalStream().value();
-  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  server->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   auto clientCodec = makeClientEncryptedCodec(true);
 

@@ -2084,7 +2084,6 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
     StreamId id,
     Buf data,
     bool eof,
-    bool /*cork*/,
     DeliveryCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);

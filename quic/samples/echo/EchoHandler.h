@@ -101,8 +101,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     }
     auto echoedData = folly::IOBuf::copyBuffer("echo ");
     echoedData->prependChain(data.first.move());
-    auto res =
-        sock->writeChain(id, std::move(echoedData), true, false, nullptr);
+    auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
     } else {
@@ -141,7 +140,7 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
 
     originalData.splitAtMost(toSplit);
 
-    auto res = sock->writeChain(id, originalData.move(), true, false, nullptr);
+    auto res = sock->writeChain(id, originalData.move(), true, nullptr);
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
     } else {

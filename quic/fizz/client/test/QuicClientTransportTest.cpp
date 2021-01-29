@@ -414,7 +414,7 @@ QuicClientTransportIntegrationTest::sendRequestAndResponse(
     StreamId streamId,
     MockReadCallback* readCallback) {
   client->setReadCallback(streamId, readCallback);
-  client->writeChain(streamId, data->clone(), true, false);
+  client->writeChain(streamId, data->clone(), true);
   auto streamData = new StreamData(streamId);
   auto dataCopy = std::shared_ptr<folly::IOBuf>(std::move(data));
   EXPECT_CALL(*readCallback, readAvailable(streamId))
@@ -3545,7 +3545,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithStreamPending) {
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true, false);
+  client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
   // ack all the packets
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
@@ -3618,7 +3618,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseConnectionWithNoStreamPending) {
 
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true, false);
+  client->writeChain(streamId, expected->clone(), true);
 
   loopForWrites();
 
@@ -3680,7 +3680,7 @@ TEST_P(
   client->getNonConstConn().qLogger = qLogger;
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true, false);
+  client->writeChain(streamId, expected->clone(), true);
 
   loopForWrites();
   socketWrites.clear();
@@ -3809,7 +3809,7 @@ TEST_F(QuicClientTransportAfterStartTest, RecvOneRttAck) {
 
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true, false);
+  client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
 
   AckBlocks sentPackets;
@@ -3838,7 +3838,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
 
   auto expected = IOBuf::copyBuffer("hello");
   client->setReadCallback(streamId, &readCb);
-  client->writeChain(streamId, expected->clone(), true, false);
+  client->writeChain(streamId, expected->clone(), true);
   loopForWrites();
   auto packet = packetToBuf(createStreamPacket(
       *serverChosenConnId /* src */,
@@ -4026,7 +4026,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerNotResetOnWritingOldData) {
   auto expected = IOBuf::copyBuffer("hello");
   client->idleTimeout().cancelTimeout();
   ASSERT_FALSE(client->idleTimeout().isScheduled());
-  client->writeChain(streamId, expected->clone(), false, false);
+  client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
 
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
@@ -4056,7 +4056,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   client->idleTimeout().cancelTimeout();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");
-  client->writeChain(streamId, expected->clone(), false, false);
+  client->writeChain(streamId, expected->clone(), false);
   loopForWrites();
   ASSERT_TRUE(client->idleTimeout().isScheduled());
 }
@@ -4292,7 +4292,7 @@ TEST_F(
 
   AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, writeData->clone(), true, false);
+  client->writeChain(streamId, writeData->clone(), true);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -4316,7 +4316,7 @@ TEST_F(QuicClientTransportAfterStartTest, StreamClosedIfReadCallbackNull) {
 
   AckBlocks sentPackets;
   auto writeData = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, writeData->clone(), true, false);
+  client->writeChain(streamId, writeData->clone(), true);
   loopForWrites();
   verifyShortPackets(sentPackets);
 
@@ -4353,7 +4353,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveAckInvokesDeliveryCallback) {
   client->registerDeliveryCallback(streamId, 0, &deliveryCallback);
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, data->clone(), true, false);
+  client->writeChain(streamId, data->clone(), true);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -4376,7 +4376,7 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
       client->createBidirectionalStream(false /* replaySafe */).value();
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, nullptr, true, false, &deliveryCallback);
+  client->writeChain(streamId, nullptr, true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -4403,7 +4403,7 @@ TEST_F(
       client->createBidirectionalStream(false /* replaySafe */).value();
 
   auto data = IOBuf::copyBuffer("some data");
-  client->writeChain(streamId, data->clone(), true, false);
+  client->writeChain(streamId, data->clone(), true);
 
   loopForWrites();
   verifyShortPackets(sentPackets);
@@ -4432,7 +4432,7 @@ TEST_F(QuicClientTransportAfterStartTest, DeliveryCallbackFromWriteChain) {
   // Write 10 bytes of data, and write EOF on an empty stream. So EOF offset is
   // 10
   auto data = test::buildRandomInputData(10);
-  client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
 
   loopForWrites();
   verifyShortPackets(sentPackets);
@@ -4525,7 +4525,7 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");
-  client->writeChain(streamId, write->clone(), true, false, nullptr);
+  client->writeChain(streamId, write->clone(), true, nullptr);
   loopForWrites();
 
   std::unique_ptr<IOBuf> bytesWrittenToNetwork = nullptr;
@@ -4571,7 +4571,7 @@ TEST_F(
   client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
   auto packet = VersionNegotiationPacketBuilder(
                     *client->getConn().initialDestinationConnectionId,
@@ -4598,7 +4598,7 @@ TEST_F(
   client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
 
   auto packet = VersionNegotiationPacketBuilder(
@@ -4778,7 +4778,7 @@ TEST_F(QuicClientTransportAfterStartTest, ResetClearsPendingLoss) {
   SCOPE_EXIT {
     client->close(folly::none);
   };
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
@@ -4798,7 +4798,7 @@ TEST_F(QuicClientTransportAfterStartTest, LossAfterResetStream) {
   SCOPE_EXIT {
     client->close(folly::none);
   };
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   ASSERT_FALSE(client->getConn().outstandings.packets.empty());
 
@@ -4820,7 +4820,7 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetAfterEom) {
   client->setReadCallback(streamId, &readCb);
   client->registerDeliveryCallback(streamId, 100, &deliveryCallback);
   EXPECT_CALL(deliveryCallback, onCanceled(streamId, 100));
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
 
   client->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
   loopForWrites();
@@ -4849,7 +4849,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedLocalToClosed) {
   StreamId streamId = client->createBidirectionalStream().value();
   client->setReadCallback(streamId, &readCb);
   auto data = test::buildRandomInputData(10);
-  client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -4899,8 +4899,8 @@ TEST_F(QuicClientTransportAfterStartTest, SendResetSyncOnAck) {
 
   NiceMock<MockDeliveryCallback> deliveryCallback2;
   auto data = IOBuf::copyBuffer("hello");
-  client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
-  client->writeChain(streamId2, data->clone(), true, false, &deliveryCallback2);
+  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
+  client->writeChain(streamId2, data->clone(), true, &deliveryCallback2);
 
   EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, _, _))
       .WillOnce(Invoke([&](auto, auto, auto) {
@@ -4976,7 +4976,7 @@ TEST_F(QuicClientTransportAfterStartTest, HalfClosedRemoteToClosed) {
   EXPECT_EQ(conn.streamManager->readableStreams().count(streamId), 0);
 
   AckBlocks sentPackets;
-  client->writeChain(streamId, data->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, data->clone(), true, &deliveryCallback);
   loopForWrites();
 
   verifyShortPackets(sentPackets);
@@ -5097,7 +5097,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWithoutClosing) {
   EXPECT_CALL(clientConnCallback, onConnectionEnd());
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
   loopForWrites();
 
   EXPECT_CALL(deliveryCallback, onCanceled(_, _));
@@ -5110,7 +5110,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWhileDraining) {
   client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false, &deliveryCallback);
+  client->writeChain(streamId, write->clone(), true, &deliveryCallback);
 
   loopForWrites();
   EXPECT_CALL(clientConnCallback, onConnectionError(_)).Times(0);
@@ -5163,7 +5163,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyEvbWhileLossTimeoutActive) {
   client->setReadCallback(streamId, &readCb);
 
   auto write = IOBuf::copyBuffer("no");
-  client->writeChain(streamId, write->clone(), true, false);
+  client->writeChain(streamId, write->clone(), true);
   loopForWrites();
   EXPECT_TRUE(client->lossTimeout().isScheduled());
   eventbase_.reset();
@@ -5440,7 +5440,7 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
@@ -5511,7 +5511,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
 
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
@@ -5563,7 +5563,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejectionWithSmallerFlowControl) {
   mockClientHandshake->maxInitialStreamData = 10;
   socketWrites.clear();
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   mockClientHandshake->setZeroRttRejected(true);
@@ -5651,7 +5651,7 @@ TEST_F(
   client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
 
   auto streamId = client->createBidirectionalStream().value();
-  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true, false);
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);

@@ -1210,7 +1210,7 @@ TEST_F(QuicTransportImplTest, onUniStreamsAvailableCallbackAfterExausted) {
 TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
-  transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, false);
+  transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true);
   // Artificially stop the write looper so that the read can trigger it.
   transport->writeLooper()->stop();
   transport->addDataToStream(
@@ -1227,8 +1227,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
-  transport->writeChain(
-      stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
+  transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
   evb->loopOnce();
@@ -1262,7 +1261,6 @@ TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
       stream,
       folly::IOBuf::copyBuffer("You are being too loud."),
       true,
-      false,
       nullptr);
   evb->loopOnce();
 
@@ -1281,8 +1279,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
     throw std::runtime_error("Well there's your problem");
     return 0;
   }));
-  transport->writeChain(
-      stream, folly::IOBuf::copyBuffer("Hey"), true, false, nullptr);
+  transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(folly::IOBuf::copyBuffer("Data"), 0));
   evb->loopOnce();
@@ -2110,8 +2107,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   transport->setReadCallback(stream, &rcb);
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
   EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
   transport->closeGracefully();
@@ -2162,8 +2158,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
   transport->setReadCallback(stream, &rcb);
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
   EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
 
@@ -2217,8 +2212,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   transport->setReadCallback(stream, &rcb);
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
-  transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, false, &deliveryCb);
+  transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
   EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
   transport->close(std::make_pair(
@@ -2309,8 +2303,7 @@ TEST_F(QuicTransportImplTest, AsyncStreamFlowControlWrite) {
 TEST_F(QuicTransportImplTest, ExceptionInWriteLooperDoesNotCrash) {
   auto stream = transport->createBidirectionalStream().value();
   transport->setReadCallback(stream, nullptr);
-  transport->writeChain(
-      stream, IOBuf::copyBuffer("hello"), true, false, nullptr);
+  transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, nullptr);
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
   EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
@@ -2430,8 +2423,7 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(
-      transport
-          ->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), false, false)
+      transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), false)
           .thenOrThrow([&](auto) {}),
       folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
   EXPECT_THROW(

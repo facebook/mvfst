@@ -993,10 +993,8 @@ class QuicSocket {
   /**
    * Write data/eof to the given stream.
    *
-   * cork indicates to the transport that the application expects to write
-   * more data soon.  Passing a delivery callback registers a callback from the
-   * transport when the peer has acknowledged the receipt of all the data/eof
-   * passed to write.
+   * Passing a delivery callback registers a callback from the transport when
+   * the peer has acknowledged the receipt of all the data/eof passed to write.
    *
    * An error code is present if there was an error with the write.
    */
@@ -1005,7 +1003,6 @@ class QuicSocket {
       StreamId id,
       Buf data,
       bool eof,
-      bool cork,
       DeliveryCallback* cb = nullptr) = 0;
 
   /**

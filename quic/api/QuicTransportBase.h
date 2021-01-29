@@ -192,7 +192,6 @@ class QuicTransportBase : public QuicSocket {
       StreamId id,
       Buf data,
       bool eof,
-      bool cork,
       DeliveryCallback* cb = nullptr) override;
 
   folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(

@@ -330,7 +330,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
       curBuf->append(curBuf->capacity());
       curBuf = curBuf->next();
     } while (curBuf != buf.get());
-    auto res = sock_->writeChain(id, std::move(buf), eof, true, nullptr);
+    auto res = sock_->writeChain(id, std::move(buf), eof, nullptr);
     if (res.hasError()) {
       LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
     }
