@@ -445,33 +445,6 @@ CongestionControlType Cubic::type() const noexcept {
   return CongestionControlType::Cubic;
 }
 
-std::unique_ptr<Cubic> Cubic::CubicBuilder::build(
-    QuicConnectionStateBase& conn) {
-  return std::make_unique<Cubic>(
-      conn,
-      std::numeric_limits<uint64_t>::max(),
-      tcpFriendly_,
-      ackTrain_,
-      spreadAcrossRtt_);
-}
-
-Cubic::CubicBuilder& Cubic::CubicBuilder::setAckTrain(bool ackTrain) noexcept {
-  ackTrain_ = ackTrain;
-  return *this;
-}
-
-Cubic::CubicBuilder& Cubic::CubicBuilder::setTcpFriendly(
-    bool tcpFriendly) noexcept {
-  tcpFriendly_ = tcpFriendly;
-  return *this;
-}
-
-Cubic::CubicBuilder& Cubic::CubicBuilder::setPacingSpreadAcrossRtt(
-    bool spreadAcrossRtt) noexcept {
-  spreadAcrossRtt_ = spreadAcrossRtt;
-  return *this;
-}
-
 float Cubic::pacingGain() const noexcept {
   double pacingGain = 1.0f;
   if (state_ == CubicStates::Hystart) {

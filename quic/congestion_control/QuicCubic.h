@@ -61,19 +61,6 @@ class Cubic : public CongestionController {
       bool ackTrain = false,
       bool spreadAcrossRtt = false);
 
-  class CubicBuilder {
-   public:
-    std::unique_ptr<Cubic> build(QuicConnectionStateBase& conn);
-    CubicBuilder& setAckTrain(bool ackTrain) noexcept;
-    CubicBuilder& setTcpFriendly(bool tcpFriendly) noexcept;
-    CubicBuilder& setPacingSpreadAcrossRtt(bool spreadAcrossRtt) noexcept;
-
-   private:
-    bool tcpFriendly_{true};
-    bool ackTrain_{false};
-    bool spreadAcrossRtt_{false};
-  };
-
   CubicStates state() const noexcept;
 
   enum class ExitReason : uint8_t {
