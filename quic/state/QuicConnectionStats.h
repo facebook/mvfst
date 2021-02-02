@@ -26,9 +26,15 @@ struct CopaStats {
   bool useRttStanding;
 };
 
+struct CubicStats {
+  ~CubicStats() = default;
+  uint8_t state;
+};
+
 union CongestionControllerStats {
   struct BbrStats bbrStats;
   struct CopaStats copaStats;
+  struct CubicStats cubicStats;
 };
 
 struct QuicConnectionStats {

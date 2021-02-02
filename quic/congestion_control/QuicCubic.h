@@ -87,7 +87,7 @@ class Cubic : public CongestionController {
 
   bool isAppLimited() const noexcept override;
 
-  void getStats(CongestionControllerStats& /*stats*/) const override {}
+  void getStats(CongestionControllerStats& stats) const override;
 
   void handoff(uint64_t newCwnd, uint64_t newInflight) noexcept;
 

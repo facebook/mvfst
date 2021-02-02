@@ -705,6 +705,10 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
   }
 }
 
+void Cubic::getStats(CongestionControllerStats& stats) const {
+  stats.cubicStats.state = static_cast<uint8_t>(state_);
+}
+
 folly::StringPiece cubicStateToString(CubicStates state) {
   switch (state) {
     case CubicStates::Steady:
