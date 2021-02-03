@@ -510,6 +510,27 @@ size_t writeSimpleFrame(
       // no space left in packet
       return size_t(0);
     }
+    case QuicSimpleFrame::Type::AckFrequencyFrame: {
+      const auto ackFrequencyFrame = frame.asAckFrequencyFrame();
+      QuicInteger intFrameType(static_cast<uint64_t>(FrameType::ACK_FREQUENCY));
+      QuicInteger intSequenceNumber(ackFrequencyFrame->sequenceNumber);
+      QuicInteger intPacketTolerance(ackFrequencyFrame->packetTolerance);
+      QuicInteger intUpdateMaxAckDelay(ackFrequencyFrame->updateMaxAckDelay);
+      size_t ackFrequencyFrameLen = intFrameType.getSize() +
+          intSequenceNumber.getSize() + intPacketTolerance.getSize() +
+          intUpdateMaxAckDelay.getSize() + 1 /* ignoreOrder */;
+      if (packetSpaceCheck(spaceLeft, ackFrequencyFrameLen)) {
+        builder.write(intFrameType);
+        builder.write(intSequenceNumber);
+        builder.write(intPacketTolerance);
+        builder.write(intUpdateMaxAckDelay);
+        builder.writeBE(ackFrequencyFrame->ignoreOrder);
+        builder.appendFrame(QuicSimpleFrame(*ackFrequencyFrame));
+        return ackFrequencyFrameLen;
+      }
+      // no space left in packet
+      return size_t(0);
+    }
   }
   folly::assume_unreachable();
 }

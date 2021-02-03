@@ -110,6 +110,16 @@ folly::dynamic KnobFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic AckFrequencyFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["frame_type"] = toQlogString(FrameType::ACK_FREQUENCY);
+  d["sequence_number"] = sequenceNumber;
+  d["packet_tolerance"] = packetTolerance;
+  d["update_max_ack_delay"] = updateMaxAckDelay;
+  d["ignore_order"] = ignoreOrder;
+  return d;
+}
+
 folly::dynamic StreamDataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::STREAM_DATA_BLOCKED);

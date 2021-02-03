@@ -71,6 +71,15 @@ void addQuicSimpleFrameToEvent(
           frame.knobSpace, frame.id, frame.blob->length()));
       break;
     }
+    case quic::QuicSimpleFrame::Type::AckFrequencyFrame: {
+      const quic::AckFrequencyFrame& frame = *simpleFrame.asAckFrequencyFrame();
+      event->frames.push_back(std::make_unique<quic::AckFrequencyFrameLog>(
+          frame.sequenceNumber,
+          frame.packetTolerance,
+          frame.updateMaxAckDelay,
+          frame.ignoreOrder));
+      break;
+    }
   }
 }
 } // namespace

@@ -55,6 +55,7 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     case QuicSimpleFrame::Type::MaxStreamsFrame:
     case QuicSimpleFrame::Type::HandshakeDoneFrame:
     case QuicSimpleFrame::Type::KnobFrame:
+    case QuicSimpleFrame::Type::AckFrequencyFrame:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame:
       // TODO junqiw
       return QuicSimpleFrame(frame);
@@ -133,6 +134,7 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::MaxStreamsFrame:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame:
     case QuicSimpleFrame::Type::KnobFrame:
+    case QuicSimpleFrame::Type::AckFrequencyFrame:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -292,6 +294,24 @@ bool updateSimpleFrameOnPacketReceived(
       const KnobFrame& knobFrame = *frame.asKnobFrame();
       conn.pendingEvents.knobs.emplace_back(
           knobFrame.knobSpace, knobFrame.id, knobFrame.blob->clone());
+      return true;
+    }
+    case QuicSimpleFrame::Type::AckFrequencyFrame: {
+      if (!conn.transportSettings.minAckDelay.hasValue()) {
+        return true;
+      }
+      const auto ackFrequencyFrame = frame.asAckFrequencyFrame();
+      auto& ackState = conn.ackStates.appDataAckState;
+      if (!ackState.ackFrequencySequenceNumber ||
+          ackFrequencyFrame->sequenceNumber >
+              ackState.ackFrequencySequenceNumber.value()) {
+        ackState.tolerance = ackFrequencyFrame->packetTolerance;
+        ackState.ignoreReorder = ackFrequencyFrame->ignoreOrder;
+        conn.ackStates.maxAckDelay =
+            std::chrono::microseconds(std::max<uint64_t>(
+                conn.transportSettings.minAckDelay->count(),
+                ackFrequencyFrame->updateMaxAckDelay));
+      }
       return true;
     }
   }

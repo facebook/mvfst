@@ -90,10 +90,17 @@ void updateAckSendStateOnRecvPacket(
   DCHECK(!pktHasCryptoData || pktHasRetransmittableData);
   auto thresh = kNonRtxRxPacketsPendingBeforeAck;
   if (pktHasRetransmittableData || ackState.numRxPacketsRecvd) {
-    thresh = ackState.largestReceivedPacketNum.value_or(0) >
-            conn.transportSettings.rxPacketsBeforeAckInitThreshold
-        ? conn.transportSettings.rxPacketsBeforeAckAfterInit
-        : conn.transportSettings.rxPacketsBeforeAckBeforeInit;
+    if (ackState.tolerance.hasValue()) {
+      thresh = ackState.tolerance.value();
+    } else {
+      thresh = ackState.largestReceivedPacketNum.value_or(0) >
+              conn.transportSettings.rxPacketsBeforeAckInitThreshold
+          ? conn.transportSettings.rxPacketsBeforeAckAfterInit
+          : conn.transportSettings.rxPacketsBeforeAckBeforeInit;
+    }
+  }
+  if (ackState.ignoreReorder) {
+    pktOutOfOrder = false;
   }
   if (pktHasRetransmittableData) {
     if (pktHasCryptoData || pktOutOfOrder ||

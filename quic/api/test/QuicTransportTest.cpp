@@ -2942,6 +2942,20 @@ TEST_F(QuicTransportTest, ScheduleAckTimeout) {
   EXPECT_NEAR(transport_->getAckTimeout()->getTimeRemaining().count(), 25, 5);
 }
 
+TEST_F(QuicTransportTest, ScheduleAckTimeoutFromMaxAckDelay) {
+  // Make srtt large so we will use maxAckDelay
+  transport_->getConnectionState().lossState.srtt = 25000000us;
+  transport_->getConnectionState().ackStates.maxAckDelay = 10ms;
+  EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());
+  transport_->getConnectionState().pendingEvents.scheduleAckTimeout = true;
+  transport_->onNetworkData(
+      SocketAddress("::1", 10003),
+      NetworkData(
+          IOBuf::copyBuffer("Never on time, always timeout"), Clock::now()));
+  EXPECT_TRUE(transport_->getAckTimeout()->isScheduled());
+  EXPECT_NEAR(transport_->getAckTimeout()->getTimeRemaining().count(), 10, 5);
+}
+
 TEST_F(QuicTransportTest, CloseTransportCancelsAckTimeout) {
   transport_->getConnectionState().lossState.srtt = 25000000us;
   EXPECT_FALSE(transport_->getAckTimeout()->isScheduled());

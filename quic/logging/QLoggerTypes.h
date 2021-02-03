@@ -145,6 +145,26 @@ class KnobFrameLog : public QLogFrame {
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
+class AckFrequencyFrameLog : public QLogFrame {
+ public:
+  uint64_t sequenceNumber;
+  uint64_t packetTolerance;
+  uint64_t updateMaxAckDelay;
+  bool ignoreOrder;
+
+  explicit AckFrequencyFrameLog(
+      uint64_t sequenceNumberIn,
+      uint64_t packetToleranceIn,
+      uint64_t updateMaxAckDelayIn,
+      bool ignoreOrderIn)
+      : sequenceNumber(sequenceNumberIn),
+        packetTolerance(packetToleranceIn),
+        updateMaxAckDelay(updateMaxAckDelayIn),
+        ignoreOrder(ignoreOrderIn) {}
+  ~AckFrequencyFrameLog() override = default;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
+};
+
 class StreamDataBlockedFrameLog : public QLogFrame {
  public:
   StreamId streamId;

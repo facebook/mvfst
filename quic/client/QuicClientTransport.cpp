@@ -881,6 +881,7 @@ void QuicClientTransport::startCryptoHandshake() {
   setD6DBasePMTUTransportParameter();
   setD6DRaiseTimeoutTransportParameter();
   setD6DProbeTimeoutTransportParameter();
+  setSupportedExtensionTransportParameters();
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
@@ -1501,6 +1502,7 @@ bool QuicClientTransport::setCustomTransportParameter(
   // described by the spec.
   if (static_cast<uint16_t>(customParam->getParameterId()) <
       kCustomTransportParameterThreshold) {
+    LOG(ERROR) << "invalid parameter id";
     return false;
   }
 
@@ -1515,6 +1517,7 @@ bool QuicClientTransport::setCustomTransportParameter(
 
   // if a match has been found, we return failure
   if (it != customTransportParameters_.end()) {
+    LOG(ERROR) << "transport parameter already present";
     return false;
   }
 
@@ -1602,6 +1605,15 @@ void QuicClientTransport::setD6DProbeTimeoutTransportParameter() {
 
   if (!setCustomTransportParameter(std::move(probeTimeoutCustomParam))) {
     LOG(ERROR) << "failed to set D6D probe timeout transport parameter";
+  }
+}
+
+void QuicClientTransport::setSupportedExtensionTransportParameters() {
+  if (conn_->transportSettings.minAckDelay.hasValue()) {
+    auto minAckDelayParam = std::make_unique<CustomIntegralTransportParameter>(
+        static_cast<uint64_t>(TransportParameterId::min_ack_delay),
+        conn_->transportSettings.minAckDelay.value().count());
+    customTransportParameters_.push_back(minAckDelayParam->encode());
   }
 }
 

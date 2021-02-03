@@ -423,6 +423,8 @@ std::string toString(FrameType frame) {
       return "HANDSHAKE_DONE";
     case FrameType::KNOB:
       return "KNOB";
+    case FrameType::ACK_FREQUENCY:
+      return "ACK_FREQUENCY";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";

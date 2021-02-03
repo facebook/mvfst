@@ -136,6 +136,8 @@ void processClientInitialParams(
   auto d6dProbeTimeout = getIntegerParameter(
       static_cast<TransportParameterId>(kD6DProbeTimeoutParameterId),
       clientParams.parameters);
+  auto minAckDelay = getIntegerParameter(
+      TransportParameterId::min_ack_delay, clientParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
@@ -186,6 +188,9 @@ void processClientInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
+  if (minAckDelay.hasValue()) {
+    conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
+  }
 
   // Default to max because we can probe PMTU now, and this will be the upper
   // limit

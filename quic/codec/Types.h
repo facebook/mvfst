@@ -109,6 +109,20 @@ struct KnobFrame {
   Buf blob;
 };
 
+struct AckFrequencyFrame {
+  uint64_t sequenceNumber; // Used to identify newest.
+  uint64_t packetTolerance; // How many packets before ACKing.
+  uint64_t updateMaxAckDelay; // New max_ack_delay to use.
+  uint8_t ignoreOrder; // Whether to ignore reordering ACKs.
+
+  bool operator==(const AckFrequencyFrame& other) const {
+    return other.sequenceNumber == sequenceNumber &&
+        other.packetTolerance == packetTolerance &&
+        other.updateMaxAckDelay == updateMaxAckDelay &&
+        other.ignoreOrder == ignoreOrder;
+  }
+};
+
 /**
  * AckBlock represents a series of continuous packet sequences from
  * [startPacket, endPacket]
@@ -644,7 +658,8 @@ struct RetryToken {
   F(MaxStreamsFrame, __VA_ARGS__)         \
   F(RetireConnectionIdFrame, __VA_ARGS__) \
   F(HandshakeDoneFrame, __VA_ARGS__)      \
-  F(KnobFrame, __VA_ARGS__)
+  F(KnobFrame, __VA_ARGS__)               \
+  F(AckFrequencyFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 

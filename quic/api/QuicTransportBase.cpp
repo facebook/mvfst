@@ -2507,7 +2507,7 @@ void QuicTransportBase::scheduleAckTimeout() {
       auto timeout = timeMax(
           std::chrono::duration_cast<std::chrono::microseconds>(
               wheelTimer.getTickInterval()),
-          timeMin(kMaxAckTimeout, factoredRtt));
+          timeMin(conn_->ackStates.maxAckDelay, factoredRtt));
       auto timeoutMs = folly::chrono::ceil<std::chrono::milliseconds>(timeout);
       VLOG(10) << __func__ << " timeout=" << timeoutMs.count() << "ms"
                << " factoredRtt=" << factoredRtt.count() << "us"

@@ -220,6 +220,38 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequency) {
   EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
 }
 
+TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequencyFromTolerance) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  PacketNum nextPacketNum = 1;
+  auto& ackState = getAckState(conn, GetParam());
+  ackState.largestReceivedPacketNum = nextPacketNum - 1;
+  ackState.tolerance = 2;
+  for (nextPacketNum; nextPacketNum <= 10; nextPacketNum++) {
+    updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
+    if (nextPacketNum % 2 == 0) {
+      EXPECT_TRUE(ackState.needsToSendAckImmediately);
+      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+    } else {
+      EXPECT_FALSE(ackState.needsToSendAckImmediately);
+      EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+    }
+    EXPECT_EQ(ackState.numRxPacketsRecvd, nextPacketNum % 2);
+  }
+  ackState.tolerance = 10;
+  for (nextPacketNum; nextPacketNum <= 40; nextPacketNum++) {
+    updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
+    if (nextPacketNum % 10 == 0) {
+      EXPECT_TRUE(ackState.needsToSendAckImmediately);
+      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+    } else {
+      EXPECT_FALSE(ackState.needsToSendAckImmediately);
+      EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+    }
+    EXPECT_EQ(ackState.numRxPacketsRecvd, nextPacketNum % 10);
+  }
+}
+
 TEST_F(UpdateAckStateTest, UpdateAckStateOnAckTimeout) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& initialAckState = getAckState(conn, PacketNumberSpace::Initial);
@@ -350,6 +382,16 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxOutOfOrder) {
   updateAckSendStateOnRecvPacket(conn, ackState, true, true, false);
   EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+}
+
+TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxOutOfOrderIgnore) {
+  // Retransmittable & out of order: don't ack immediately if ignoring order.
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& ackState = getAckState(conn, GetParam());
+  ackState.ignoreReorder = true;
+  updateAckSendStateOnRecvPacket(conn, ackState, true, true, false);
+  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
 }
 
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsNonRxOutOfOrder) {

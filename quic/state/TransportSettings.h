@@ -198,6 +198,7 @@ struct TransportSettings {
       kDefaultRxPacketsBeforeAckInitThreshold};
   uint16_t rxPacketsBeforeAckBeforeInit{kDefaultRxPacketsBeforeAckBeforeInit};
   uint16_t rxPacketsBeforeAckAfterInit{kDefaultRxPacketsBeforeAckAfterInit};
+  folly::Optional<std::chrono::microseconds> minAckDelay;
   // Limits the amount of data that should be buffered in a QuicSocket.
   // If the amount of data in the buffer equals or exceeds this amount, then
   // the callback registered through notifyPendingWriteOnConnection() will

@@ -33,6 +33,9 @@ struct AckState {
   // Next PacketNum we will send for packet in this packet number space
   PacketNum nextPacketNum{0};
   AckBlocks acks;
+  bool ignoreReorder{false};
+  folly::Optional<uint64_t> tolerance;
+  folly::Optional<uint64_t> ackFrequencySequenceNumber;
   // Flag indicating that if we need to send ack immediately. This will be set
   // to true if we got packets with retransmittable data and haven't sent the
   // ack for the first time.
@@ -57,6 +60,7 @@ struct AckStates {
   AckState handshakeAckState;
   // AckState for acks to peer packets in AppData packet number space.
   AckState appDataAckState;
+  std::chrono::microseconds maxAckDelay{kMaxAckTimeout};
 };
 
 } // namespace quic

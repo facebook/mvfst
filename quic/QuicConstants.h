@@ -161,6 +161,7 @@ enum class FrameType : uint64_t {
   MIN_STREAM_DATA = 0xFE, // subject to change
   EXPIRED_STREAM_DATA = 0xFF, // subject to change
   KNOB = 0x1550,
+  ACK_FREQUENCY = 0xAF,
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {

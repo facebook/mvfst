@@ -645,6 +645,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Value of the negotiated ack delay exponent.
   uint64_t peerAckDelayExponent{kDefaultAckDelayExponent};
 
+  // The value of the peer's min_ack_delay, for creating ACK_FREQUENCY frames.
+  folly::Optional<std::chrono::microseconds> peerMinAckDelay;
+
   // Idle timeout advertised by the peer. Initially sets it to the maximum value
   // until the handshake sets the timeout.
   std::chrono::milliseconds peerIdleTimeout{kMaxIdleTimeout};

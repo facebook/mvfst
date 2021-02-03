@@ -32,6 +32,7 @@ enum class TransportParameterId : uint64_t {
   active_connection_id_limit = 0x000e,
   initial_source_connection_id = 0x000f,
   retry_source_connection_id = 0x0010,
+  min_ack_delay = 0xff02de1a,
 };
 
 struct TransportParameter {

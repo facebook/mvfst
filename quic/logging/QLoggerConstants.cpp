@@ -79,6 +79,8 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "handshake_done";
     case FrameType::KNOB:
       return "knob";
+    case FrameType::ACK_FREQUENCY:
+      return "ack_frequency";
   }
   folly::assume_unreachable();
 }

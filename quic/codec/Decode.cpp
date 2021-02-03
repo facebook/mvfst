@@ -99,6 +99,44 @@ KnobFrame decodeKnobFrame(folly::io::Cursor& cursor) {
   return KnobFrame(knobSpace->first, knobId->first, std::move(knobBlob));
 }
 
+AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
+  auto sequenceNumber = decodeQuicInteger(cursor);
+  if (!sequenceNumber) {
+    throw QuicTransportException(
+        "Bad sequence number",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::ACK_FREQUENCY);
+  }
+  auto packetTolerance = decodeQuicInteger(cursor);
+  if (!packetTolerance) {
+    throw QuicTransportException(
+        "Bad packet tolerance",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::ACK_FREQUENCY);
+  }
+  auto updateMaxAckDelay = decodeQuicInteger(cursor);
+  if (!updateMaxAckDelay) {
+    throw QuicTransportException(
+        "Bad update max ack delay",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::ACK_FREQUENCY);
+  }
+  if (cursor.isAtEnd()) {
+    throw QuicTransportException(
+        "Bad ignore order",
+        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+        quic::FrameType::ACK_FREQUENCY);
+  }
+  auto ignoreOrder = cursor.readBE<uint8_t>();
+
+  AckFrequencyFrame frame;
+  frame.sequenceNumber = sequenceNumber->first;
+  frame.packetTolerance = packetTolerance->first;
+  frame.updateMaxAckDelay = updateMaxAckDelay->first;
+  frame.ignoreOrder = ignoreOrder;
+  return frame;
+}
+
 ReadAckFrame decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
@@ -813,6 +851,8 @@ QuicFrame parseFrame(
         return QuicFrame(decodeHandshakeDoneFrame(cursor));
       case FrameType::KNOB:
         return QuicFrame(decodeKnobFrame(cursor));
+      case FrameType::ACK_FREQUENCY:
+        return QuicFrame(decodeAckFrequencyFrame(cursor));
     }
   } catch (const std::exception&) {
     error = true;
