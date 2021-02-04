@@ -841,8 +841,14 @@ bool QuicServerWorker::validateRetryToken(
     std::string& encryptedToken,
     const ConnectionId& dstConnId,
     const folly::IPAddress& clientIp) {
+  // If for some reason there is a retry token, but no retry token
+  // secret, then just allow the packet
+  if (!transportSettings_.retryTokenSecret.hasValue()) {
+    VLOG(4) << "Received a retry token, but there is no retry token secret";
+    return true;
+  }
+
   // Try to decode the token
-  CHECK(transportSettings_.retryTokenSecret.has_value());
   RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
   auto buf = folly::IOBuf::copyBuffer(encryptedToken);
 
