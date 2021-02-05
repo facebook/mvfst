@@ -16,7 +16,7 @@ trap 'cd $start_dir' EXIT
 # Must execute from the directory containing this script
 cd "$(dirname "$0")"
 
-cd _build
+cd _build/build
 # Uninstall is expected to fail the first time
 sudo make uninstall || true
 sudo make install
