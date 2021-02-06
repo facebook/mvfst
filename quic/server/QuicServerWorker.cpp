@@ -603,14 +603,18 @@ void QuicServerWorker::dispatchPacketData(
         // send a retry packet back to the client
         if (!maybeEncryptedRetryToken && newConnRateLimiter_ &&
             newConnRateLimiter_->check(networkData.receiveTimePoint)) {
-          sendRetryPacket(
-              client,
-              routingData.destinationConnId,
-              routingData.sourceConnId.value_or(
-                  ConnectionId(std::vector<uint8_t>())));
-
-          QUIC_STATS(statsCallback_, onConnectionRateLimited);
-          return;
+          if (transportSettings_.retryTokenSecret.hasValue()) {
+            sendRetryPacket(
+                client,
+                routingData.destinationConnId,
+                routingData.sourceConnId.value_or(
+                    ConnectionId(std::vector<uint8_t>())));
+            QUIC_STATS(statsCallback_, onConnectionRateLimited);
+            return;
+          } else {
+            VLOG(4)
+                << "Not sending retry packet since retry token secret is not set";
+          }
         }
 
         // create 'accepting' transport
@@ -894,7 +898,6 @@ void QuicServerWorker::sendRetryPacket(
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
   // Create the encrypted retry token
-  CHECK(transportSettings_.retryTokenSecret.has_value());
   RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
   auto encryptedToken = generator.encryptToken(
       dstConnId, client.getIPAddress(), client.getPort());
