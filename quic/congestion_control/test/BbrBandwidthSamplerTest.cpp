@@ -50,7 +50,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacketFallback) {
       makeTestingWritePacket(0, 1000, 1000, sentTime)));
   ackEvent.ackTime = sentTime + 50ms;
   sampler.onPacketAcked(ackEvent, 0);
-  EXPECT_EQ(1000, sampler.getBandwidth().units);
+  EXPECT_EQ(5000, sampler.getBandwidth().units);
   EXPECT_EQ(50ms, sampler.getBandwidth().interval);
 }
 
