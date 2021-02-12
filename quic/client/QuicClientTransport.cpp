@@ -1178,9 +1178,7 @@ void QuicClientTransport::recvMsg(
     } else {
       networkData.packets.emplace_back(std::move(readBuffer));
     }
-    if (conn_->qLogger) {
-      conn_->qLogger->addDatagramReceived(bytesRead);
-    }
+    trackDatagramReceived(bytesRead);
   }
 }
 
