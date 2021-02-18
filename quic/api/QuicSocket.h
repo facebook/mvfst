@@ -978,6 +978,15 @@ class QuicSocket {
   virtual void cancelByteEventCallbacks(const ByteEvent::Type type) = 0;
 
   /**
+   * Reset or send a stop sending on all non-control streams. Leaves the
+   * connection otherwise unmodified. Note this will also trigger the
+   * onStreamWriteError and readError callbacks immediately.
+   */
+  virtual void resetNonControlStreams(
+      ApplicationErrorCode error,
+      folly::StringPiece errorMsg) = 0;
+
+  /**
    * Get the number of pending byte events for the given stream.
    */
   FOLLY_NODISCARD virtual size_t getNumByteEventCallbacksForStream(

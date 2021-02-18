@@ -284,5 +284,8 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(addObserver, void(Observer*));
   MOCK_METHOD1(removeObserver, bool(Observer*));
   MOCK_CONST_METHOD0(getObservers, const ObserverVec&());
+  MOCK_METHOD2(
+      resetNonControlStreams,
+      void(ApplicationErrorCode, folly::StringPiece));
 };
 } // namespace quic

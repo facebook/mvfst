@@ -2673,6 +2673,42 @@ void QuicTransportBase::cancelAllAppCallbacks(
   }
 }
 
+void QuicTransportBase::resetNonControlStreams(
+    ApplicationErrorCode error,
+    folly::StringPiece errorMsg) {
+  std::vector<StreamId> nonControlStreamIds;
+  nonControlStreamIds.reserve(conn_->streamManager->streamCount());
+  conn_->streamManager->streamStateForEach(
+      [&nonControlStreamIds](const auto& stream) {
+        if (!stream.isControl) {
+          nonControlStreamIds.push_back(stream.id);
+        }
+      });
+  for (auto id : nonControlStreamIds) {
+    if (isSendingStream(conn_->nodeType, id) || isBidirectionalStream(id)) {
+      auto writeCallbackIt = pendingWriteCallbacks_.find(id);
+      if (writeCallbackIt != pendingWriteCallbacks_.end()) {
+        writeCallbackIt->second->onStreamWriteError(id, {error, errorMsg});
+      }
+      if (conn_->partialReliabilityEnabled) {
+        dataRejectedCallbacks_.erase(id);
+      }
+      resetStream(id, error);
+    }
+    if (isReceivingStream(conn_->nodeType, id) || isBidirectionalStream(id)) {
+      auto readCallbackIt = readCallbacks_.find(id);
+      if (readCallbackIt != readCallbacks_.end()) {
+        readCallbackIt->second.readCb->readError(id, {error, errorMsg});
+      }
+      if (conn_->partialReliabilityEnabled) {
+        dataExpiredCallbacks_.erase(id);
+      }
+      peekCallbacks_.erase(id);
+      stopSending(id, error);
+    }
+  }
+}
+
 void QuicTransportBase::addObserver(Observer* observer) {
   observers_->push_back(CHECK_NOTNULL(observer));
   observer->observerAttach(this);

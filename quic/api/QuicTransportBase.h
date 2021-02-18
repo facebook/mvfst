@@ -387,6 +387,15 @@ class QuicTransportBase : public QuicSocket {
   void cancelByteEventCallbacks(const ByteEvent::Type type) override;
 
   /**
+   * Reset or send a stop sending on all non-control streams. Leaves the
+   * connection otherwise unmodified. Note this will also trigger the
+   * onStreamWriteError and readError callbacks immediately.
+   */
+  void resetNonControlStreams(
+      ApplicationErrorCode error,
+      folly::StringPiece errorMsg) override;
+
+  /**
    * Get the number of pending byte events for the given stream.
    */
   FOLLY_NODISCARD size_t

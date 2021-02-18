@@ -2250,6 +2250,37 @@ TEST_F(QuicTransportImplTest, ResetStreamUnsetWriteCallback) {
   evb->loopOnce();
 }
 
+TEST_F(QuicTransportImplTest, ResetAllNonControlStreams) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  ASSERT_FALSE(transport->setControlStream(stream1));
+  NiceMock<MockWriteCallback> wcb1;
+  NiceMock<MockReadCallback> rcb1;
+  EXPECT_CALL(wcb1, onStreamWriteError(stream1, _)).Times(0);
+  EXPECT_CALL(rcb1, readError(stream1, _)).Times(0);
+  transport->notifyPendingWriteOnStream(stream1, &wcb1);
+  transport->setReadCallback(stream1, &rcb1);
+
+  auto stream2 = transport->createBidirectionalStream().value();
+  NiceMock<MockWriteCallback> wcb2;
+  NiceMock<MockReadCallback> rcb2;
+  EXPECT_CALL(wcb2, onStreamWriteError(stream2, _)).Times(1);
+  EXPECT_CALL(rcb2, readError(stream2, _)).Times(1);
+  transport->notifyPendingWriteOnStream(stream2, &wcb2);
+  transport->setReadCallback(stream2, &rcb2);
+
+  auto stream3 = transport->createUnidirectionalStream().value();
+  NiceMock<MockWriteCallback> wcb3;
+  transport->notifyPendingWriteOnStream(stream3, &wcb3);
+  EXPECT_CALL(wcb3, onStreamWriteError(stream3, _)).Times(1);
+
+  transport->resetNonControlStreams(
+      GenericApplicationErrorCode::UNKNOWN, "bye bye");
+  evb->loopOnce();
+
+  // Have to manually unset the read callbacks so they aren't use-after-freed.
+  transport->unsetAllReadCallbacks();
+}
+
 TEST_F(QuicTransportImplTest, DestroyWithoutClosing) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
