@@ -47,18 +47,18 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   }
   StreamTypeField::Builder streamTypeBuilder;
   QuicInteger idInt(id);
-  QuicInteger offsetInt(offset);
   // First account for the things that are non-optional: frame type and stream
   // id.
   uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
-  if (offset != 0) {
-    streamTypeBuilder.setOffset();
-    headerSize += offsetInt.getSize();
-  }
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
     return folly::none;
+  }
+  QuicInteger offsetInt(offset);
+  if (offset != 0) {
+    streamTypeBuilder.setOffset();
+    headerSize += offsetInt.getSize();
   }
   // Next we have to deal with the data length. This is trickier. The length of
   // data we are able to send depends on 3 things: how much we have in the
