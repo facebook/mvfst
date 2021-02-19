@@ -108,6 +108,7 @@ class QuicServerTransport
   void unbindConnection() override;
   bool hasWriteCipher() const override;
   std::shared_ptr<QuicTransportBase> sharedGuard() override;
+  QuicConnectionStats getConnectionsStats() const override;
 
   const fizz::server::FizzServerContext& getCtx() {
     return *ctx_;

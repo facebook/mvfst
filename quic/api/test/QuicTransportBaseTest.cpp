@@ -3657,5 +3657,11 @@ TEST_F(
   EXPECT_EQ(transport.get(), returnedSocket);
 }
 
+TEST_F(QuicTransportImplTest, GetConnectionStatsSmoke) {
+  auto stats = transport->getConnectionsStats();
+  EXPECT_EQ(stats.congestionController, kCongestionControlCubicStr);
+  EXPECT_EQ(stats.clientConnectionId, "0a090807");
+}
+
 } // namespace test
 } // namespace quic

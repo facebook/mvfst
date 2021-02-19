@@ -625,6 +625,8 @@ class QuicTransportBase : public QuicSocket {
    */
   FOLLY_NODISCARD const ObserverVec& getObservers() const override;
 
+  FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
+
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);

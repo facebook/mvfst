@@ -2732,6 +2732,51 @@ const ObserverVec& QuicTransportBase::getObservers() const {
   return *observers_;
 }
 
+QuicConnectionStats QuicTransportBase::getConnectionsStats() const {
+  QuicConnectionStats connStats;
+  if (!conn_) {
+    return connStats;
+  }
+  connStats.peerAddress = conn_->peerAddress.describe();
+  connStats.duration = Clock::now() - conn_->connectionTime;
+  if (conn_->congestionController) {
+    connStats.cwnd_bytes = conn_->congestionController->getCongestionWindow();
+    connStats.congestionController =
+        congestionControlTypeToString(conn_->congestionController->type())
+            .str();
+    conn_->congestionController->getStats(connStats.congestionControllerStats);
+  }
+  connStats.ptoCount = conn_->lossState.ptoCount;
+  connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(
+      conn_->lossState.srtt);
+  connStats.rttvar = std::chrono::duration_cast<std::chrono::milliseconds>(
+      conn_->lossState.rttvar);
+  connStats.peerAckDelayExponent = conn_->peerAckDelayExponent;
+  connStats.udpSendPacketLen = conn_->udpSendPacketLen;
+  if (conn_->streamManager) {
+    connStats.numStreams = conn_->streamManager->streams().size();
+  }
+
+  if (conn_->clientChosenDestConnectionId.hasValue()) {
+    connStats.clientChosenDestConnectionId =
+        conn_->clientChosenDestConnectionId->hex();
+  }
+  if (conn_->clientConnectionId.hasValue()) {
+    connStats.clientConnectionId = conn_->clientConnectionId->hex();
+  }
+  if (conn_->serverConnectionId.hasValue()) {
+    connStats.serverConnectionId = conn_->serverConnectionId->hex();
+  }
+
+  connStats.totalBytesSent = conn_->lossState.totalBytesSent;
+  connStats.totalBytesReceived = conn_->lossState.totalBytesRecvd;
+  connStats.totalBytesRetransmitted = conn_->lossState.totalBytesRetransmitted;
+  if (conn_->version.hasValue()) {
+    connStats.version = static_cast<uint32_t>(*conn_->version);
+  }
+  return connStats;
+}
+
 void QuicTransportBase::writeSocketData() {
   if (socket_) {
     auto packetsBefore = conn_->outstandings.numOutstanding();

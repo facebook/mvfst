@@ -16,18 +16,15 @@ using namespace std::chrono_literals;
 namespace quic {
 
 struct BbrStats {
-  ~BbrStats() = default;
   uint8_t state;
 };
 
 struct CopaStats {
-  ~CopaStats() = default;
   double deltaParam;
   bool useRttStanding;
 };
 
 struct CubicStats {
-  ~CubicStats() = default;
   uint8_t state;
 };
 
@@ -38,14 +35,12 @@ union CongestionControllerStats {
 };
 
 struct QuicConnectionStats {
- public:
-  ~QuicConnectionStats() = default;
-  uint8_t workerID;
-  uint32_t numConnIDs;
+  uint8_t workerID{0};
+  uint32_t numConnIDs{0};
   std::string localAddress;
   std::string peerAddress;
-  std::chrono::duration<float> duration;
-  uint64_t cwnd_bytes;
+  std::chrono::duration<float> duration{0};
+  uint64_t cwnd_bytes{0};
   std::string congestionController;
   CongestionControllerStats congestionControllerStats;
   uint32_t ptoCount{0};
@@ -60,7 +55,7 @@ struct QuicConnectionStats {
   uint64_t totalBytesSent{0};
   uint64_t totalBytesReceived{0};
   uint64_t totalBytesRetransmitted{0};
-  uint32_t version;
+  uint32_t version{0};
 };
 
 } // namespace quic

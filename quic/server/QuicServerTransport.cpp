@@ -639,4 +639,12 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
 }
 
+QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
+  QuicConnectionStats connStats = QuicTransportBase::getConnectionsStats();
+  if (serverConn_) {
+    connStats.localAddress = serverConn_->serverAddr.describe();
+  }
+  return connStats;
+}
+
 } // namespace quic

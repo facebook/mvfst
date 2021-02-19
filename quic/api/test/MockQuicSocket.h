@@ -287,5 +287,6 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD2(
       resetNonControlStreams,
       void(ApplicationErrorCode, folly::StringPiece));
+  MOCK_CONST_METHOD0(getConnectionsStats, QuicConnectionStats());
 };
 } // namespace quic

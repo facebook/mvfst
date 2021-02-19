@@ -16,6 +16,7 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/client/state/ClientStateMachine.h>
 #include <quic/common/BufUtil.h>
+#include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
 

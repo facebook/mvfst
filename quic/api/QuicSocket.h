@@ -16,6 +16,7 @@
 #include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
+#include <quic/state/QuicConnectionStats.h>
 #include <quic/state/StateData.h>
 
 #include <chrono>
@@ -1146,5 +1147,10 @@ class QuicSocket {
    * @return             Reference to const vector with installed observers.
    */
   FOLLY_NODISCARD virtual const ObserverVec& getObservers() const = 0;
+
+  /**
+   * Returns varios stats of the connection.
+   */
+  FOLLY_NODISCARD virtual QuicConnectionStats getConnectionsStats() const = 0;
 };
 } // namespace quic

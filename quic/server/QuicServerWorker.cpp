@@ -1313,7 +1313,7 @@ bool QuicServerWorker::AcceptObserverList::remove(AcceptObserver* observer) {
 
 void QuicServerWorker::getAllConnectionsStats(
     std::vector<QuicConnectionStats>& stats) {
-  folly::F14FastMap<const QuicServerConnectionState*, uint32_t> uniqueConns;
+  folly::F14FastMap<QuicServerTransport::Ptr, uint32_t> uniqueConns;
   for (const auto& conn : connectionIdMap_) {
     if (!conn.second) {
       continue;
@@ -1323,53 +1323,13 @@ void QuicServerWorker::getAllConnectionsStats(
     if (!connState) {
       continue;
     }
-    uniqueConns[connState]++;
+    uniqueConns[conn.second]++;
   }
-  auto now = Clock::now();
   stats.reserve(stats.size() + uniqueConns.size());
   for (const auto& connEntry : uniqueConns) {
-    QuicConnectionStats connStats;
-    auto conn = connEntry.first;
+    QuicConnectionStats connStats = connEntry.first->getConnectionsStats();
     connStats.workerID = workerId_;
     connStats.numConnIDs = connEntry.second;
-    connStats.localAddress = conn->serverAddr.describe();
-    connStats.peerAddress = conn->peerAddress.describe();
-    connStats.duration = now - conn->connectionTime;
-    if (conn->congestionController) {
-      connStats.cwnd_bytes = conn->congestionController->getCongestionWindow();
-      connStats.congestionController =
-          congestionControlTypeToString(conn->congestionController->type())
-              .str();
-      conn->congestionController->getStats(connStats.congestionControllerStats);
-    }
-    connStats.ptoCount = conn->lossState.ptoCount;
-    connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(
-        conn->lossState.srtt);
-    connStats.rttvar = std::chrono::duration_cast<std::chrono::milliseconds>(
-        conn->lossState.rttvar);
-    connStats.peerAckDelayExponent = conn->peerAckDelayExponent;
-    connStats.udpSendPacketLen = conn->udpSendPacketLen;
-    if (conn->streamManager) {
-      connStats.numStreams = conn->streamManager->streams().size();
-    }
-
-    if (conn->clientChosenDestConnectionId.hasValue()) {
-      connStats.clientChosenDestConnectionId =
-          conn->clientChosenDestConnectionId->hex();
-    }
-    if (conn->clientConnectionId.hasValue()) {
-      connStats.clientConnectionId = conn->clientConnectionId->hex();
-    }
-    if (conn->serverConnectionId.hasValue()) {
-      connStats.serverConnectionId = conn->serverConnectionId->hex();
-    }
-
-    connStats.totalBytesSent = conn->lossState.totalBytesSent;
-    connStats.totalBytesReceived = conn->lossState.totalBytesRecvd;
-    connStats.totalBytesRetransmitted = conn->lossState.totalBytesRetransmitted;
-    if (conn->version.hasValue()) {
-      connStats.version = static_cast<uint32_t>(*conn->version);
-    }
     stats.emplace_back(connStats);
   }
 }
