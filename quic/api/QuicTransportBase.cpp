@@ -2737,20 +2737,16 @@ QuicConnectionStats QuicTransportBase::getConnectionsStats() const {
   if (!conn_) {
     return connStats;
   }
-  connStats.peerAddress = conn_->peerAddress.describe();
+  connStats.peerAddress = conn_->peerAddress;
   connStats.duration = Clock::now() - conn_->connectionTime;
   if (conn_->congestionController) {
     connStats.cwnd_bytes = conn_->congestionController->getCongestionWindow();
-    connStats.congestionController =
-        congestionControlTypeToString(conn_->congestionController->type())
-            .str();
+    connStats.congestionController = conn_->congestionController->type();
     conn_->congestionController->getStats(connStats.congestionControllerStats);
   }
   connStats.ptoCount = conn_->lossState.ptoCount;
-  connStats.srtt = std::chrono::duration_cast<std::chrono::milliseconds>(
-      conn_->lossState.srtt);
-  connStats.rttvar = std::chrono::duration_cast<std::chrono::milliseconds>(
-      conn_->lossState.rttvar);
+  connStats.srtt = conn_->lossState.srtt;
+  connStats.rttvar = conn_->lossState.rttvar;
   connStats.peerAckDelayExponent = conn_->peerAckDelayExponent;
   connStats.udpSendPacketLen = conn_->udpSendPacketLen;
   if (conn_->streamManager) {

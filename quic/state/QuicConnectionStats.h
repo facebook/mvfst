@@ -8,8 +8,11 @@
 
 #pragma once
 
+#include <folly/SocketAddress.h>
 #include <chrono>
 #include <string>
+
+#include <quic/QuicConstants.h>
 
 using namespace std::chrono_literals;
 
@@ -26,6 +29,7 @@ struct CopaStats {
 
 struct CubicStats {
   uint8_t state;
+  uint64_t ssthresh;
 };
 
 union CongestionControllerStats {
@@ -37,15 +41,15 @@ union CongestionControllerStats {
 struct QuicConnectionStats {
   uint8_t workerID{0};
   uint32_t numConnIDs{0};
-  std::string localAddress;
-  std::string peerAddress;
+  folly::SocketAddress localAddress;
+  folly::SocketAddress peerAddress;
   std::chrono::duration<float> duration{0};
   uint64_t cwnd_bytes{0};
-  std::string congestionController;
+  CongestionControlType congestionController;
   CongestionControllerStats congestionControllerStats;
   uint32_t ptoCount{0};
-  std::chrono::duration<float> srtt{0ms};
-  std::chrono::duration<float> rttvar{0ms};
+  std::chrono::microseconds srtt{0us};
+  std::chrono::microseconds rttvar{0us};
   uint64_t peerAckDelayExponent{0};
   uint64_t udpSendPacketLen{0};
   uint64_t numStreams{0};

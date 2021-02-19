@@ -642,7 +642,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
   QuicConnectionStats connStats = QuicTransportBase::getConnectionsStats();
   if (serverConn_) {
-    connStats.localAddress = serverConn_->serverAddr.describe();
+    connStats.localAddress = serverConn_->serverAddr;
   }
   return connStats;
 }
