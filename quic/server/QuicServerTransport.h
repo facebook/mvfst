@@ -87,14 +87,6 @@ class QuicServerTransport
   void setServerConnectionIdRejector(
       ServerConnectionIdRejector* connIdRejector) noexcept;
 
-  /**
-   * Set factory to create specific congestion controller instances
-   * for a given connection
-   * This must be set before the server is started.
-   */
-  void setCongestionControllerFactory(
-      std::shared_ptr<CongestionControllerFactory> factory) override;
-
   virtual void setClientConnectionId(const ConnectionId& clientConnectionId);
 
   void setClientChosenDestConnectionId(const ConnectionId& serverCid);

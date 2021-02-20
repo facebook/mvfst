@@ -71,7 +71,9 @@ void QuicTransportBase::setPacingTimer(
 void QuicTransportBase::setCongestionControllerFactory(
     std::shared_ptr<CongestionControllerFactory> ccFactory) {
   CHECK(ccFactory);
-  ccFactory_ = ccFactory;
+  CHECK(conn_);
+  conn_->congestionControllerFactory = ccFactory;
+  conn_->congestionController.reset();
 }
 
 folly::EventBase* QuicTransportBase::getEventBase() const {
@@ -3004,10 +3006,11 @@ void QuicTransportBase::setCongestionControl(CongestionControlType type) {
   DCHECK(conn_);
   if (!conn_->congestionController ||
       type != conn_->congestionController->type()) {
-    CHECK(ccFactory_);
+    CHECK(conn_->congestionControllerFactory);
     validateCongestionAndPacing(type);
     conn_->congestionController =
-        ccFactory_->makeCongestionController(*conn_, type);
+        conn_->congestionControllerFactory->makeCongestionController(
+            *conn_, type);
   }
 }
 

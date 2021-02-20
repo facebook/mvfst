@@ -11,6 +11,7 @@
 #include <folly/io/async/AsyncSocketException.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/handshake/TransportParameters.h>
@@ -56,6 +57,16 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       std::move(conn->earlyDataAppParamsValidator);
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
   newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
+  if (conn->congestionControllerFactory) {
+    newConn->congestionControllerFactory = conn->congestionControllerFactory;
+    if (conn->congestionController) {
+      // we have to recreate congestion controler
+      // because it holds referencs to the old state
+      newConn->congestionController =
+          newConn->congestionControllerFactory->makeCongestionController(
+              *newConn, conn->congestionController->type());
+    }
+  }
   return newConn;
 }
 

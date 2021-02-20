@@ -105,15 +105,6 @@ void QuicServerTransport::setServerConnectionIdRejector(
   }
 }
 
-void QuicServerTransport::setCongestionControllerFactory(
-    std::shared_ptr<CongestionControllerFactory> ccFactory) {
-  CHECK(ccFactory);
-  ccFactory_ = ccFactory;
-  if (conn_) {
-    conn_->congestionControllerFactory = ccFactory_;
-  }
-}
-
 void QuicServerTransport::onReadData(
     const folly::SocketAddress& peer,
     NetworkDataSingle&& networkData) {

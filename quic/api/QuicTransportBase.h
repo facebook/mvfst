@@ -259,7 +259,9 @@ class QuicTransportBase : public QuicSocket {
 
   /**
    * Set factory to create specific congestion controller instances
-   * for a given connection
+   * for a given connection.
+   * Deletes current congestion controller instance, to create new controller
+   * call setCongestionControl() or setTransportSettings().
    */
   virtual void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> factory);
@@ -826,8 +828,6 @@ class QuicTransportBase : public QuicSocket {
   // TODO: This is silly. We need a better solution.
   // Uninitialied local address as a fallback answer when socket isn't bound.
   folly::SocketAddress localFallbackAddress;
-  // CongestionController factory
-  std::shared_ptr<CongestionControllerFactory> ccFactory_{nullptr};
 
   folly::Optional<std::string> exceptionCloseWhat_;
 

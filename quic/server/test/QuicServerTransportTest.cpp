@@ -322,6 +322,7 @@ class QuicServerTransportTest : public Test {
     server = std::make_shared<TestingQuicServerTransport>(
         &evb, std::move(sock), connCallback, serverCtx);
     server->setCongestionControllerFactory(ccFactory_);
+    server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
     server->setSupportedVersions(supportedVersions);
     server->setOriginalPeerAddress(clientAddr);

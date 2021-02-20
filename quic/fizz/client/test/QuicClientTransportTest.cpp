@@ -2811,8 +2811,6 @@ class QuicClientTransportAfterStartTestBase : public QuicClientTransportTest {
   void SetUpChild() override {
     client->addNewPeerAddress(serverAddr);
     client->setHostname(hostname_);
-    client->setCongestionControllerFactory(
-        std::make_shared<DefaultCongestionControllerFactory>());
     ON_CALL(*sock, write(_, _))
         .WillByDefault(Invoke([&](const SocketAddress&,
                                   const std::unique_ptr<folly::IOBuf>& buf) {
@@ -4523,6 +4521,10 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
   client->getNonConstConn().initialDestinationConnectionId = initialDstConnId;
   client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
 
+  client->setCongestionControllerFactory(
+      std::make_shared<DefaultCongestionControllerFactory>());
+  client->setCongestionControl(CongestionControlType::NewReno);
+
   StreamId streamId = *client->createBidirectionalStream();
   auto write = IOBuf::copyBuffer("ice cream");
   client->writeChain(streamId, write->clone(), true, nullptr);
@@ -4539,6 +4541,12 @@ TEST_F(QuicClientTransportVersionAndRetryTest, RetryPacket) {
 
   auto serverCid = recvServerRetry(serverAddr);
   ASSERT_TRUE(bytesWrittenToNetwork);
+
+  // Check CC is kept after retry recreates QuicClientConnectionState
+  EXPECT_TRUE(client->getConn().congestionControllerFactory);
+  EXPECT_EQ(
+      client->getConn().congestionController->type(),
+      CongestionControlType::NewReno);
 
   // Check to see that the server receives an initial packet with the following
   // properties:
@@ -5169,9 +5177,47 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyEvbWhileLossTimeoutActive) {
   eventbase_.reset();
 }
 
+class TestCCFactory : public CongestionControllerFactory {
+ public:
+  std::unique_ptr<CongestionController> makeCongestionController(
+      QuicConnectionStateBase& conn,
+      CongestionControlType type) override {
+    EXPECT_EQ(type, CongestionControlType::Cubic);
+    createdControllers++;
+    return std::make_unique<Cubic>(conn);
+  }
+  int createdControllers{0};
+};
+
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    CongestionControlRecreatedWithNewFactory) {
+  // Default: Cubic
+  auto cc = client->getConn().congestionController.get();
+  EXPECT_EQ(CongestionControlType::Cubic, cc->type());
+
+  // Check Cubic CC instance is recreated with new CC factory
+  auto factory = std::make_shared<TestCCFactory>();
+  client->setCongestionControllerFactory(factory);
+  client->setCongestionControl(CongestionControlType::Cubic);
+  auto newCC = client->getConn().congestionController.get();
+  EXPECT_NE(cc, newCC);
+  EXPECT_EQ(factory->createdControllers, 1);
+}
+
 TEST_F(QuicClientTransportAfterStartTest, SetCongestionControl) {
   // Default: Cubic
   auto cc = client->getConn().congestionController.get();
+  EXPECT_EQ(CongestionControlType::Cubic, cc->type());
+
+  // Setting CC factory resets CC controller
+  client->setCongestionControllerFactory(
+      std::make_shared<DefaultCongestionControllerFactory>());
+  EXPECT_FALSE(client->getConn().congestionController);
+
+  // Set to Cubic explicitly this time
+  client->setCongestionControl(CongestionControlType::Cubic);
+  cc = client->getConn().congestionController.get();
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 
   // Change to Reno
@@ -5191,6 +5237,8 @@ TEST_F(QuicClientTransportAfterStartTest, SetCongestionControlBbr) {
   EXPECT_EQ(CongestionControlType::Cubic, cc->type());
 
   // Change to BBR, which requires enable pacing first
+  client->setCongestionControllerFactory(
+      std::make_shared<DefaultCongestionControllerFactory>());
   client->setPacingTimer(TimerHighRes::newTimer(eventbase_.get(), 1ms));
   client->getNonConstConn().transportSettings.pacingEnabled = true;
   client->setCongestionControl(CongestionControlType::BBR);
