@@ -5199,9 +5199,11 @@ TEST_F(
   // Check Cubic CC instance is recreated with new CC factory
   auto factory = std::make_shared<TestCCFactory>();
   client->setCongestionControllerFactory(factory);
-  client->setCongestionControl(CongestionControlType::Cubic);
   auto newCC = client->getConn().congestionController.get();
-  EXPECT_NE(cc, newCC);
+  EXPECT_EQ(nullptr, newCC);
+  client->setCongestionControl(CongestionControlType::Cubic);
+  newCC = client->getConn().congestionController.get();
+  EXPECT_NE(nullptr, newCC);
   EXPECT_EQ(factory->createdControllers, 1);
 }
 
