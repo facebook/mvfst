@@ -38,7 +38,7 @@ TEST_F(CubicHystartTest, SendAndAck) {
 
 TEST_F(CubicHystartTest, CwndLargerThanSSThresh) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(conn, 0);
+  Cubic cubic(conn, 0, 0);
   auto initCwnd = cubic.getWritableBytes();
   // Packet 0 is sent:
   conn.lossState.largestSent = 0;
@@ -74,7 +74,7 @@ TEST_F(CubicHystartTest, NoDelayIncrease) {
 
 TEST_F(CubicHystartTest, AckTrain) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), true, true);
+  Cubic cubic(conn, 0, std::numeric_limits<uint64_t>::max(), true, true);
   auto initCwnd = cubic.getWritableBytes();
   // srtt will be assigned to delayMin:
   conn.lossState.srtt = 2us;
@@ -113,7 +113,7 @@ TEST_F(CubicHystartTest, AckTrain) {
 
 TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), true, true);
+  Cubic cubic(conn, 0, std::numeric_limits<uint64_t>::max(), true, true);
   auto initCwnd = cubic.getWritableBytes();
   // Packet 0 is sent:
   conn.lossState.largestSent = 0;
@@ -299,7 +299,7 @@ TEST_F(CubicHystartTest, DelayIncreaseCwndTooSmall) {
 
 TEST_F(CubicHystartTest, ReduceByCubicReductionFactor) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  Cubic cubic(conn, std::numeric_limits<uint64_t>::max());
+  Cubic cubic(conn, 0, std::numeric_limits<uint64_t>::max());
   auto initCwnd = cubic.getWritableBytes();
   conn.lossState.largestSent = 0;
   auto packet = makeTestingWritePacket(0, 1000, 1000);

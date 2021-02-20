@@ -15,11 +15,18 @@ class TestingCubic : public Cubic {
  public:
   TestingCubic(
       QuicConnectionStateBase& conn,
+      uint64_t initCwndBytes = 0,
       uint64_t initSsthresh = std::numeric_limits<uint64_t>::max(),
       bool tcpFriendly = true,
       bool ackTrain = false,
       bool spreadAcrossRtt = false)
-      : Cubic(conn, initSsthresh, tcpFriendly, ackTrain, spreadAcrossRtt) {}
+      : Cubic(
+            conn,
+            initCwndBytes,
+            initSsthresh,
+            tcpFriendly,
+            ackTrain,
+            spreadAcrossRtt) {}
 
   void setStateForTest(CubicStates state) {
     state_ = state;

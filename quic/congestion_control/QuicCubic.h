@@ -56,6 +56,7 @@ class Cubic : public CongestionController {
   // TODO: We haven't experimented with setting ackTrain and tcpFriendly
   explicit Cubic(
       QuicConnectionStateBase& conn,
+      uint64_t initCwndBytes = 0,
       uint64_t initSsthresh = std::numeric_limits<uint64_t>::max(),
       bool tcpFriendly = true,
       bool ackTrain = false,

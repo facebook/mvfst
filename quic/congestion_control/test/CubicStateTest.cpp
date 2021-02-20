@@ -60,8 +60,7 @@ TEST_F(CubicStateTest, FastRecoveryAck) {
 
 TEST_F(CubicStateTest, FastRecoveryAckToSteady) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
-  TestingCubic cubic(
-      conn, 10000 /* initCwnd */, 10000 /* minCwnd */, 1000 /* ssthresh */);
+  TestingCubic cubic(conn);
   auto packet = makeTestingWritePacket(0, 1, 1);
   // This moves the state machine to recovery, and mark endOfRecovery = 0
   cubic.onPacketSent(packet);

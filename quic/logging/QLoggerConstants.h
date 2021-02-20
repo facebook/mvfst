@@ -24,6 +24,7 @@ constexpr auto kCubicSkipLoss = "cubic skip loss";
 constexpr auto kCubicLoss = "cubic loss";
 constexpr auto kCubicSteadyCwnd = "cubic steady cwnd";
 constexpr auto kCubicSkipAck = "cubic skip ack";
+constexpr auto kCubicInit = "cubic init";
 constexpr auto kCongestionPacketAck = "congestion packet ack";
 constexpr auto kCwndNoChange = "cwnd no change";
 constexpr auto kAckInQuiescence = "ack in quiescence";

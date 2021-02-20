@@ -18,6 +18,7 @@ namespace quic {
 
 Cubic::Cubic(
     QuicConnectionStateBase& conn,
+    uint64_t initCwndBytes,
     uint64_t initSsthresh,
     bool tcpFriendly,
     bool ackTrain,
@@ -25,11 +26,20 @@ Cubic::Cubic(
     : conn_(conn), ssthresh_(initSsthresh), spreadAcrossRtt_(spreadAcrossRtt) {
   cwndBytes_ = std::min(
       conn.transportSettings.maxCwndInMss * conn.udpSendPacketLen,
-      conn.transportSettings.initCwndInMss * conn.udpSendPacketLen);
+      std::max(
+          initCwndBytes,
+          conn.transportSettings.initCwndInMss * conn.udpSendPacketLen));
   steadyState_.tcpFriendly = tcpFriendly;
   steadyState_.estRenoCwnd = cwndBytes_;
   hystartState_.ackTrain = ackTrain;
   QUIC_TRACE(initcwnd, conn_, cwndBytes_);
+  if (conn_.qLogger) {
+    conn_.qLogger->addCongestionMetricUpdate(
+        conn_.lossState.inflightBytes,
+        cwndBytes_,
+        kCubicInit,
+        cubicStateToString(state_).str());
+  }
 }
 
 CubicStates Cubic::state() const noexcept {
@@ -721,4 +731,5 @@ folly::StringPiece cubicStateToString(CubicStates state) {
   }
   folly::assume_unreachable();
 }
+
 } // namespace quic

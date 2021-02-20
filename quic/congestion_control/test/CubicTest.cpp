@@ -44,7 +44,7 @@ TEST_F(CubicTest, PersistentCongestion) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  Cubic cubic(conn, std::numeric_limits<uint64_t>::max(), false);
+  Cubic cubic(conn, 0, std::numeric_limits<uint64_t>::max(), false);
   auto initCwnd = cubic.getWritableBytes();
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   // Sent and lost, inflight = 0
@@ -79,8 +79,9 @@ TEST_F(CubicTest, PersistentCongestion) {
 
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::CongestionMetricUpdate, qLogger);
-  EXPECT_EQ(indices.size(), 9);
-  std::array<std::string, 9> congestionEventArr = {
+  EXPECT_EQ(indices.size(), 10);
+  std::array<std::string, 10> congestionEventArr = {
+      kCubicInit,
       kRemoveInflight,
       kCubicLoss,
       kPersistentCongestion,
@@ -91,7 +92,8 @@ TEST_F(CubicTest, PersistentCongestion) {
       kCwndNoChange,
       kCongestionPacketAck};
 
-  std::array<folly::StringPiece, 9> stateArr = {
+  std::array<folly::StringPiece, 10> stateArr = {
+      cubicStateToString(CubicStates::Hystart),
       cubicStateToString(CubicStates::Hystart),
       cubicStateToString(CubicStates::FastRecovery),
       cubicStateToString(CubicStates::Hystart),
@@ -102,7 +104,7 @@ TEST_F(CubicTest, PersistentCongestion) {
       cubicStateToString(CubicStates::Steady),
       cubicStateToString(CubicStates::Steady)};
 
-  for (int i = 0; i < 9; ++i) {
+  for (int i = 0; i < 10; ++i) {
     auto tmp = std::move(qLogger->logs[indices[i]]);
     auto event = dynamic_cast<QLogCongestionMetricUpdateEvent*>(tmp.get());
     EXPECT_EQ(event->bytesInFlight, 0);
@@ -120,7 +122,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   conn.udpSendPacketLen = 200;
   // initCwnd > initSsthresh: an ack will immediately make the state machine
   // transit to Steady state:
-  Cubic cubic(conn, 1000);
+  Cubic cubic(conn, 0, 1000);
 
   // Send one and get acked, this moves the state machine to steady
   auto packet0 = makeTestingWritePacket(0, 1000, 1000);
@@ -315,5 +317,12 @@ TEST_F(CubicTest, PacetLossInvokesPacer) {
   lossEvent.addLostPacket(packet);
   cubic.onPacketAckOrLoss(folly::none, lossEvent);
 }
+
+TEST_F(CubicTest, InitCwnd) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  Cubic cubic(conn, 123456);
+  EXPECT_EQ(cubic.getWritableBytes(), 123456);
+}
+
 } // namespace test
 } // namespace quic
