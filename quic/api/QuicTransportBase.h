@@ -719,6 +719,8 @@ class QuicTransportBase : public QuicSocket {
   void scheduleD6DProbeTimeout();
   void scheduleD6DTxTimeout();
 
+  void validateCongestionAndPacing(CongestionControlType& type);
+
   /**
    * Callback when we receive a transport knob
    */
