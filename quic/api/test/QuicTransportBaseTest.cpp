@@ -2273,6 +2273,16 @@ TEST_F(QuicTransportImplTest, ResetAllNonControlStreams) {
   transport->notifyPendingWriteOnStream(stream3, &wcb3);
   EXPECT_CALL(wcb3, onStreamWriteError(stream3, _)).Times(1);
 
+  auto stream4 = transport->createBidirectionalStream().value();
+  NiceMock<MockWriteCallback> wcb4;
+  NiceMock<MockReadCallback> rcb4;
+  EXPECT_CALL(wcb4, onStreamWriteError(stream4, _))
+      .WillOnce(Invoke(
+          [&](auto, auto) { transport->setReadCallback(stream4, nullptr); }));
+  EXPECT_CALL(rcb4, readError(_, _)).Times(0);
+  transport->notifyPendingWriteOnStream(stream4, &wcb4);
+  transport->setReadCallback(stream4, &rcb4);
+
   transport->resetNonControlStreams(
       GenericApplicationErrorCode::UNKNOWN, "bye bye");
   evb->loopOnce();

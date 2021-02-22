@@ -2699,7 +2699,8 @@ void QuicTransportBase::resetNonControlStreams(
     }
     if (isReceivingStream(conn_->nodeType, id) || isBidirectionalStream(id)) {
       auto readCallbackIt = readCallbacks_.find(id);
-      if (readCallbackIt != readCallbacks_.end()) {
+      if (readCallbackIt != readCallbacks_.end() &&
+          readCallbackIt->second.readCb) {
         readCallbackIt->second.readCb->readError(id, {error, errorMsg});
       }
       if (conn_->partialReliabilityEnabled) {
