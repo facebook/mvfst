@@ -8,13 +8,11 @@
 
 #pragma once
 
-#include <folly/SocketAddress.h>
 #include <chrono>
 #include <string>
 
+#include <folly/SocketAddress.h>
 #include <quic/QuicConstants.h>
-
-using namespace std::chrono_literals;
 
 namespace quic {
 
@@ -48,8 +46,8 @@ struct QuicConnectionStats {
   CongestionControlType congestionController;
   CongestionControllerStats congestionControllerStats;
   uint32_t ptoCount{0};
-  std::chrono::microseconds srtt{0us};
-  std::chrono::microseconds rttvar{0us};
+  std::chrono::microseconds srtt{0};
+  std::chrono::microseconds rttvar{0};
   uint64_t peerAckDelayExponent{0};
   uint64_t udpSendPacketLen{0};
   uint64_t numStreams{0};

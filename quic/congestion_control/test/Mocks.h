@@ -9,8 +9,6 @@
 #include <folly/portability/GMock.h>
 #include <quic/congestion_control/Bbr.h>
 
-using namespace testing;
-
 namespace quic {
 namespace test {
 

@@ -12,9 +12,6 @@
 #include <quic/codec/PacketNumberCipher.h>
 #include <quic/handshake/Aead.h>
 
-/* using override */
-using namespace testing;
-
 namespace quic {
 namespace test {
 
@@ -71,6 +68,7 @@ class MockAead : public Aead {
   }
 
   void setDefaults() {
+    using namespace testing;
     ON_CALL(*this, _inplaceEncrypt(_, _, _))
         .WillByDefault(InvokeWithoutArgs(
             []() { return folly::IOBuf::copyBuffer("ciphertext"); }));
