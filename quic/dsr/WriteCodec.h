@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <quic/dsr/PacketBuilder.h>
 #include <quic/dsr/Types.h>
 #include <optional>
 
@@ -22,13 +23,13 @@ struct DSRStreamFrameWriteResult {
 };
 
 std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
-    size_t packetSizeLimit,
+    DSRPacketBuilderBase& packetBuilder,
     StreamId id,
     uint64_t offset,
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
     bool fin) {
-  if (packetSizeLimit == 0) {
+  if (packetBuilder.remainingSpace() == 0) {
     return std::nullopt;
   }
   if (writeBufferLen == 0 && !fin) {
@@ -40,9 +41,9 @@ std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
   StreamTypeField::Builder streamTypeBuilder;
   QuicInteger idInt(id);
   uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
-  if (packetSizeLimit < headerSize) {
+  if (packetBuilder.remainingSpace() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
-            << " limit=" << packetSizeLimit;
+            << " limit=" << packetBuilder.remainingSpace();
     return std::nullopt;
   }
 
@@ -55,17 +56,17 @@ std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
   builder.setOffset(offset);
 
   uint64_t dataLen = std::min(writeBufferLen, flowControlLen);
-  dataLen = std::min(dataLen, packetSizeLimit - headerSize);
+  dataLen = std::min(dataLen, packetBuilder.remainingSpace() - headerSize);
   bool shouldSetFin = fin && dataLen == writeBufferLen;
   if (dataLen == 0 && !shouldSetFin) {
     return std::nullopt;
   }
-  if (packetSizeLimit < headerSize) {
+  if (packetBuilder.remainingSpace() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
-            << " limit=" << packetSizeLimit;
+            << " limit=" << packetBuilder.remainingSpace();
     return std::nullopt;
   }
-  DCHECK(dataLen + headerSize <= packetSizeLimit);
+  DCHECK(dataLen + headerSize <= packetBuilder.remainingSpace());
   builder.setLength(dataLen);
   builder.setFin(shouldSetFin);
   return DSRStreamFrameWriteResult(builder.build(), dataLen + headerSize);

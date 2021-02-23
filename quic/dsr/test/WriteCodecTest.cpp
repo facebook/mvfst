@@ -10,28 +10,43 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/QuicConstants.h>
+#include <quic/dsr/test/Mocks.h>
 
 using namespace testing;
 
 namespace quic {
 namespace test {
 
-TEST(WriteCodecTest, NoPacketSize) {
-  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(0, 0, 0, 100, 100, true));
+class WriteCodecTest : public Test {
+ public:
+  void SetUp() override {
+    EXPECT_CALL(builder_, remainingSpaceNonConst())
+        .WillRepeatedly(Invoke([&]() { return packetSize_; }));
+  }
+
+ protected:
+  size_t packetSize_{kDefaultUDPSendPacketLen};
+  MockDSRPacketBuilder builder_;
+};
+
+TEST_F(WriteCodecTest, NoPacketSize) {
+  packetSize_ = 0;
+  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
 }
 
-TEST(WriteCodecTest, TooSmallPacketSize) {
-  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(1, 0, 0, 100, 100, true));
+TEST_F(WriteCodecTest, TooSmallPacketSize) {
+  packetSize_ = 1;
+  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
 }
 
-TEST(WriteCodecTest, RegularWrite) {
+TEST_F(WriteCodecTest, RegularWrite) {
   StreamId stream = 1;
   uint64_t offset = 65535;
   bool fin = false;
   uint64_t dataLen = 1000;
   uint64_t flowControlLen = 1000;
   auto result = writeDSRStreamFrame(
-      kDefaultUDPSendPacketLen, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -40,33 +55,30 @@ TEST(WriteCodecTest, RegularWrite) {
   EXPECT_EQ(fin, result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, PacketSizeLimit) {
+TEST_F(WriteCodecTest, PacketSizeLimit) {
   StreamId stream = 1;
   uint64_t offset = 65535;
   bool fin = false;
   uint64_t dataLen = 1000 * 1000;
   uint64_t flowControlLen = 1000 * 1000;
-  auto packetSizeLimit = kDefaultUDPSendPacketLen;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
   EXPECT_EQ(offset, result->sendInstruction.offset);
   EXPECT_GT(dataLen, result->sendInstruction.len);
-  EXPECT_GT(packetSizeLimit, result->sendInstruction.len);
   EXPECT_EQ(fin, result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, FlowControlLimit) {
+TEST_F(WriteCodecTest, FlowControlLimit) {
   StreamId stream = 1;
   uint64_t offset = 65535;
   bool fin = false;
   uint64_t dataLen = 1000 * 1000;
   uint64_t flowControlLen = 500;
-  auto packetSizeLimit = kDefaultUDPSendPacketLen;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -75,27 +87,27 @@ TEST(WriteCodecTest, FlowControlLimit) {
   EXPECT_EQ(fin, result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, NoSpaceForData) {
+TEST_F(WriteCodecTest, NoSpaceForData) {
   StreamId stream = 1;
   uint64_t offset = 1;
   bool fin = false;
   uint64_t dataLen = 1000;
   uint64_t flowControlLen = 1000;
-  auto packetSizeLimit = 3;
+  packetSize_ = 3;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_FALSE(result.has_value());
 }
 
-TEST(WriteCodecTest, CanHaveOneByteData) {
+TEST_F(WriteCodecTest, CanHaveOneByteData) {
   StreamId stream = 1;
   uint64_t offset = 1;
   bool fin = false;
   uint64_t dataLen = 10;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = 4;
+  packetSize_ = 4;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -104,27 +116,27 @@ TEST(WriteCodecTest, CanHaveOneByteData) {
   EXPECT_EQ(fin, result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, PacketSpaceEqStreamHeaderSize) {
+TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSize) {
   StreamId stream = 1;
   uint64_t offset = 0;
   bool fin = true;
   uint64_t dataLen = 10;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = 2;
+  packetSize_ = 2;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_FALSE(result.has_value());
 }
 
-TEST(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
+TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
   StreamId stream = 1;
   uint64_t offset = 0;
   bool fin = true;
   uint64_t dataLen = 0;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = 2;
+  packetSize_ = 2;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -133,15 +145,14 @@ TEST(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
   EXPECT_TRUE(result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, WriteFIN) {
+TEST_F(WriteCodecTest, WriteFIN) {
   StreamId stream = 1;
   uint64_t offset = 1;
   bool fin = true;
   uint64_t dataLen = 10;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = kDefaultUDPSendPacketLen;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -150,15 +161,14 @@ TEST(WriteCodecTest, WriteFIN) {
   EXPECT_TRUE(result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, FINWithoutData) {
+TEST_F(WriteCodecTest, FINWithoutData) {
   StreamId stream = 1;
   uint64_t offset = 1;
   bool fin = true;
   uint64_t dataLen = 0;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = kDefaultUDPSendPacketLen;
   auto result = writeDSRStreamFrame(
-      packetSizeLimit, stream, offset, dataLen, flowControlLen, fin);
+      builder_, stream, offset, dataLen, flowControlLen, fin);
   EXPECT_TRUE(result.has_value());
   EXPECT_GT(result->encodedSize, 0);
   EXPECT_EQ(stream, result->sendInstruction.streamId);
@@ -167,16 +177,15 @@ TEST(WriteCodecTest, FINWithoutData) {
   EXPECT_TRUE(result->sendInstruction.fin);
 }
 
-TEST(WriteCodecTest, NoFINNoData) {
+TEST_F(WriteCodecTest, NoFINNoData) {
   StreamId stream = 1;
   uint64_t offset = 1;
   bool fin = false;
   uint64_t dataLen = 0;
   uint64_t flowControlLen = 10;
-  auto packetSizeLimit = kDefaultUDPSendPacketLen;
   EXPECT_THROW(
       writeDSRStreamFrame(
-          packetSizeLimit, stream, offset, dataLen, flowControlLen, fin),
+          builder_, stream, offset, dataLen, flowControlLen, fin),
       QuicInternalException);
 }
 } // namespace test

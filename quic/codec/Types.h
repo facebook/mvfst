@@ -319,6 +319,10 @@ struct WriteStreamFrame {
   uint64_t len;
   bool fin;
 
+  // Whether this WriteStreamFrame is created from a BufMeta, instead of real
+  // write buffer data.
+  bool fromBufMeta{false};
+
   WriteStreamFrame(
       StreamId streamIdIn,
       uint64_t offsetIn,
