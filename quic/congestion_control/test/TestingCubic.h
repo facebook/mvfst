@@ -16,7 +16,7 @@ class TestingCubic : public Cubic {
   TestingCubic(
       QuicConnectionStateBase& conn,
       uint64_t initCwndBytes = 0,
-      uint64_t initSsthresh = std::numeric_limits<uint64_t>::max(),
+      uint64_t initSsthresh = Cubic::INIT_SSTHRESH,
       bool tcpFriendly = true,
       bool ackTrain = false,
       bool spreadAcrossRtt = false)

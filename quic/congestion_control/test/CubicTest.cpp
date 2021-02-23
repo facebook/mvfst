@@ -44,7 +44,7 @@ TEST_F(CubicTest, PersistentCongestion) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
-  Cubic cubic(conn, 0, std::numeric_limits<uint64_t>::max(), false);
+  Cubic cubic(conn, 0, Cubic::INIT_SSTHRESH, false);
   auto initCwnd = cubic.getWritableBytes();
   auto packet = makeTestingWritePacket(0, 1000, 1000);
   // Sent and lost, inflight = 0
