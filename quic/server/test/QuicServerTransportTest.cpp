@@ -4265,6 +4265,21 @@ TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
   server->removeObserver(mockObserver.get());
 }
 
+TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {
+  setupClientReadCodec();
+  recvClientHello();
+  recvClientFinished();
+  loopForWrites();
+  try {
+    recvClientHello();
+    recvClientFinished();
+    FAIL();
+  } catch (const std::runtime_error& ex) {
+    EXPECT_THAT(ex.what(), HasSubstr("Crypto error"));
+  }
+  EXPECT_TRUE(server->isClosed());
+}
+
 TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   int flag = 0;
   server->registerKnobParamHandler(

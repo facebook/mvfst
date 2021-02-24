@@ -311,7 +311,10 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
       conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher);
     }
     QUIC_TRACE(fst_trace, conn, "derived 1-rtt write cipher");
-    CHECK(!conn.oneRttWriteCipher.get());
+    if (conn.oneRttWriteCipher) {
+      throw QuicTransportException(
+          "Duplicate 1-rtt write cipher", TransportErrorCode::CRYPTO_ERROR);
+    }
     conn.oneRttWriteCipher = std::move(oneRttWriteCipher);
 
     updatePacingOnKeyEstablished(conn);
