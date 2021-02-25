@@ -848,7 +848,7 @@ bool QuicServerWorker::validateRetryToken(
   // If for some reason there is a retry token, but no retry token
   // secret, then just allow the packet
   if (!transportSettings_.retryTokenSecret.hasValue()) {
-    VLOG(4) << "Received a retry token, but there is no retry token secret";
+    LOG(ERROR) << "Received a retry token, but there is no retry token secret!";
     return true;
   }
 
