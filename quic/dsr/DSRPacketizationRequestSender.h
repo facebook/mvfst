@@ -25,6 +25,13 @@ class DSRPacketizationRequestSender {
 
   // flush() tells the sender that it can send out packetization requests
   virtual bool flush() = 0;
+
+  /**
+   * release() tells the sender that it should release resources.
+   * After release() is called, the sender should not receive any additional
+   * instructions
+   */
+  virtual void release() = 0;
 };
 
 } // namespace quic
