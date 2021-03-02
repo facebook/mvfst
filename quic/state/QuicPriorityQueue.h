@@ -24,11 +24,7 @@ struct Priority {
   }
 };
 
-/**
- * Default priority, urgency = 3, incremental = true
- * Note this is different from the priority draft where default incremental = 0
- */
-const Priority kDefaultPriority(3, true);
+extern const Priority kDefaultPriority;
 
 /**
  * Priority queue for Quic streams.  It represents each level/incremental bucket

@@ -10,6 +10,7 @@ add_library(
   StateData.cpp
   PacketEvent.cpp
   PendingPathRateLimiter.cpp
+  QuicPriorityQueue.cpp
 )
 
 target_include_directories(
