@@ -118,6 +118,16 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       onUnidirectionalStreamsAvailable,
       void(uint64_t));
   GMOCK_METHOD0_(, noexcept, , onAppRateLimited, void());
+  GMOCK_METHOD3_(
+      ,
+      noexcept,
+      ,
+      onKnobMock,
+      void(uint64_t, uint64_t, folly::IOBuf*));
+
+  void onKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override {
+    onKnobMock(knobSpace, knobId, knobBlob.get());
+  }
 };
 
 class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
@@ -357,6 +367,12 @@ class MockObserver : public Observer {
       ,
       spuriousLossDetected,
       void(QuicSocket*, const SpuriousLossEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      knobFrameReceived,
+      void(QuicSocket*, const KnobFrameEvent&));
 
   static auto getLossPacketNum(PacketNum packetNum) {
     return testing::Field(

@@ -42,6 +42,7 @@ class Observer {
     bool spuriousLossEvents{false};
     bool pmtuEvents{false};
     bool rttSamples{false};
+    bool knobFrameEvents{false};
 
     /**
      * Returns a config where all events are enabled.
@@ -54,6 +55,7 @@ class Observer {
       config.lossEvents = true;
       config.spuriousLossEvents = true;
       config.pmtuEvents = true;
+      config.knobFrameEvents = true;
       return config;
     }
   };
@@ -200,6 +202,13 @@ class Observer {
     std::vector<LostPacket> spuriousPackets;
   };
 
+  struct KnobFrameEvent {
+    explicit KnobFrameEvent(TimePoint rcvTimeIn, quic::KnobFrame knobFrame)
+        : rcvTime(rcvTimeIn), knobFrame(std::move(knobFrame)) {}
+    const TimePoint rcvTime;
+    const quic::KnobFrame knobFrame;
+  };
+
   /**
    * observerAttach() will be invoked when an observer is added.
    *
@@ -327,6 +336,16 @@ class Observer {
   virtual void spuriousLossDetected(
       QuicSocket*, /* socket */
       const SpuriousLossEvent& /* lost packet */) {}
+
+  /**
+   * knobFrameReceived() is invoked when a knob frame is received.
+   *
+   * @param socket   Socket when the callback is processed.
+   * @param event    const reference to the KnobFrameEvent.
+   */
+  virtual void knobFrameReceived(
+      QuicSocket*, /* socket */
+      const KnobFrameEvent& /* event */) {}
 
  protected:
   // observer configuration; cannot be changed post instantiation

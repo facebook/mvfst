@@ -294,6 +294,10 @@ class TestQuicTransport
     handlePingCallback();
   }
 
+  void invokeHandleKnobCallbacks() {
+    handleKnobCallbacks();
+  }
+
   bool isPingTimeoutScheduled() {
     if (pingTimeout_.isScheduled()) {
       return true;
@@ -3383,6 +3387,40 @@ TEST_F(QuicTransportImplTest, FailedPing) {
   transport->invokeCancelPingTimeout();
   transport->invokeHandlePingCallback();
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
+}
+
+TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
+  auto conn = transport->transportConn;
+
+  // attach an observer to the socket
+  Observer::Config config = {};
+  config.knobFrameEvents = true;
+  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+  EXPECT_CALL(*cb, observerAttach(transport.get()));
+  transport->addObserver(cb.get());
+  Mock::VerifyAndClearExpectations(cb.get());
+
+  // set test knob frame
+  uint64_t knobSpace = 0xfaceb00c;
+  uint64_t knobId = 42;
+  folly::StringPiece data = "test knob data";
+  Buf buf(folly::IOBuf::create(data.size()));
+  memcpy(buf->writableData(), data.data(), data.size());
+  buf->append(data.size());
+  conn->pendingEvents.knobs.emplace_back(
+      KnobFrame(knobSpace, knobId, std::move(buf)));
+
+  EXPECT_CALL(connCallback, onKnobMock(knobSpace, knobId, _))
+      .WillOnce(Invoke([](Unused, Unused, Unused) { /* do nothing */ }));
+  EXPECT_CALL(*cb, knobFrameReceived(transport.get(), _)).Times(1);
+  transport->invokeHandleKnobCallbacks();
+  evb->loopOnce();
+  EXPECT_EQ(conn->pendingEvents.knobs.size(), 0);
+
+  // detach the observer from the socket
+  EXPECT_CALL(*cb, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeObserver(cb.get()));
+  Mock::VerifyAndClearExpectations(cb.get());
 }
 
 TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {

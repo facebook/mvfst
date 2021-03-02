@@ -1640,6 +1640,13 @@ void QuicTransportBase::processCallbacksAfterWriteData() {
 void QuicTransportBase::handleKnobCallbacks() {
   for (auto& knobFrame : conn_->pendingEvents.knobs) {
     if (knobFrame.knobSpace != kDefaultQuicTransportKnobSpace) {
+      for (const auto& cb : *observers_) {
+        if (cb->getConfig().knobFrameEvents) {
+          cb->knobFrameReceived(
+              this, quic::Observer::KnobFrameEvent(Clock::now(), knobFrame));
+        }
+      }
+
       connCallback_->onKnob(
           knobFrame.knobSpace, knobFrame.id, std::move(knobFrame.blob));
     } else {
