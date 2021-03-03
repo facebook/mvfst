@@ -17,6 +17,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
 #include <quic/state/QuicConnectionStats.h>
+#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/StateData.h>
 
 #include <chrono>
@@ -457,6 +458,12 @@ class QuicSocket {
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   setStreamPriority(StreamId id, PriorityLevel level, bool incremental) = 0;
+
+  /**
+   * Get stream priority.
+   */
+  virtual folly::Expected<Priority, LocalErrorCode> getStreamPriority(
+      StreamId id) = 0;
 
   /**
    * ===== Read API ====

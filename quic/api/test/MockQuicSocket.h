@@ -99,6 +99,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD3(
       setStreamPriority,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, uint8_t, bool));
+  MOCK_METHOD1(
+      getStreamPriority,
+      folly::Expected<Priority, LocalErrorCode>(StreamId));
   MOCK_METHOD3(
       setReadCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(

@@ -2999,6 +2999,18 @@ QuicTransportBase::setStreamPriority(
   return folly::unit;
 }
 
+folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
+    StreamId id) {
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  auto stream = conn_->streamManager->findStream(id);
+  if (!stream) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  return stream->priority;
+}
+
 void QuicTransportBase::validateCongestionAndPacing(
     CongestionControlType& type) {
   // Fallback to Cubic if Pacing isn't enabled with BBR together

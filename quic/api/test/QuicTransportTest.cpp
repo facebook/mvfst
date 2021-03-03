@@ -3265,5 +3265,19 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
 }
 
+TEST_F(QuicTransportTest, PrioritySetAndGet) {
+  auto stream = transport_->createBidirectionalStream().value();
+  EXPECT_EQ(kDefaultPriority, transport_->getStreamPriority(stream).value());
+  transport_->setStreamPriority(stream, 0, false);
+  EXPECT_EQ(Priority(0, false), transport_->getStreamPriority(stream).value());
+  auto nonExistStreamPri = transport_->getStreamPriority(stream + 4);
+  EXPECT_TRUE(nonExistStreamPri.hasError());
+  EXPECT_EQ(LocalErrorCode::STREAM_NOT_EXISTS, nonExistStreamPri.error());
+  transport_->close(folly::none);
+  auto closedConnStreamPri = transport_->getStreamPriority(stream);
+  EXPECT_TRUE(closedConnStreamPri.hasError());
+  EXPECT_EQ(LocalErrorCode::CONNECTION_CLOSED, closedConnStreamPri.error());
+}
+
 } // namespace test
 } // namespace quic

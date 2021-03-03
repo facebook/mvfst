@@ -19,7 +19,7 @@ struct Priority {
 
   Priority(uint8_t l, bool i) : level(l), incremental(i) {}
 
-  bool operator==(Priority other) {
+  bool operator==(Priority other) const noexcept {
     return level == other.level && incremental == other.incremental;
   }
 };

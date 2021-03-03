@@ -323,6 +323,9 @@ class QuicTransportBase : public QuicSocket {
       PriorityLevel level,
       bool incremental) override;
 
+  folly::Expected<Priority, LocalErrorCode> getStreamPriority(
+      StreamId id) override;
+
   /**
    * Invoke onCanceled on all the delivery callbacks registered for streamId.
    */
