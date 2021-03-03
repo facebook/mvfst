@@ -35,7 +35,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     }
   }
 
-  EchoServerTransportFactory(bool prEnabled = false) : prEnabled_(prEnabled) {}
+  EchoServerTransportFactory() = default;
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -44,7 +44,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
     CHECK_EQ(evb, sock->getEventBase());
-    auto echoHandler = std::make_unique<EchoHandler>(evb, prEnabled_);
+    auto echoHandler = std::make_unique<EchoHandler>(evb);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), *echoHandler, ctx);
     echoHandler->setQuicSocket(transport);
@@ -55,31 +55,19 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
   std::vector<std::unique_ptr<EchoHandler>> echoHandlers_;
 
  private:
-  bool prEnabled_;
 };
 
 class EchoServer {
  public:
-  explicit EchoServer(
-      const std::string& host = "::1",
-      uint16_t port = 6666,
-      bool prEnabled = false)
-      : host_(host),
-        port_(port),
-        prEnabled_(prEnabled),
-        server_(QuicServer::createQuicServer()) {
+  explicit EchoServer(const std::string& host = "::1", uint16_t port = 6666)
+      : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>(prEnabled_));
+        std::make_unique<EchoServerTransportFactory>());
     server_->setTransportStatsCallbackFactory(
         std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
-    if (prEnabled_) {
-      TransportSettings settings;
-      settings.partialReliabilityEnabled = true;
-      server_->setTransportSettings(settings);
-    }
   }
 
   void start() {
@@ -94,7 +82,6 @@ class EchoServer {
  private:
   std::string host_;
   uint16_t port_;
-  bool prEnabled_;
   folly::EventBase eventbase_;
   std::shared_ptr<quic::QuicServer> server_;
 };

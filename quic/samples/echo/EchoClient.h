@@ -28,11 +28,10 @@ namespace quic {
 namespace samples {
 class EchoClient : public quic::QuicSocket::ConnectionCallback,
                    public quic::QuicSocket::ReadCallback,
-                   public quic::QuicSocket::WriteCallback,
-                   public quic::QuicSocket::DataExpiredCallback {
+                   public quic::QuicSocket::WriteCallback {
  public:
-  EchoClient(const std::string& host, uint16_t port, bool prEnabled = false)
-      : host_(host), port_(port), prEnabled_(prEnabled) {}
+  EchoClient(const std::string& host, uint16_t port)
+      : host_(host), port_(port) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -106,12 +105,6 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
                << " error=" << toString(error);
   }
 
-  void onDataExpired(StreamId streamId, uint64_t newOffset) noexcept override {
-    LOG(INFO) << "Client received skipData; "
-              << newOffset - recvOffsets_[streamId]
-              << " bytes skipped on stream=" << streamId;
-  }
-
   void start() {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
@@ -129,9 +122,6 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
       quicClient_->addNewPeerAddress(addr);
 
       TransportSettings settings;
-      if (prEnabled_) {
-        settings.partialReliabilityEnabled = true;
-      }
       quicClient_->setTransportSettings(settings);
 
       quicClient_->setTransportStatsCallback(
@@ -154,9 +144,6 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
         // create new stream for each message
         auto streamId = client->createBidirectionalStream().value();
         client->setReadCallback(streamId, this);
-        if (prEnabled_) {
-          client->setDataExpiredCallback(streamId, this);
-        }
         pendingOutput_[streamId].append(folly::IOBuf::copyBuffer(message));
         sendMessage(streamId, pendingOutput_[streamId]);
       });
@@ -183,7 +170,6 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
 
   std::string host_;
   uint16_t port_;
-  bool prEnabled_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;

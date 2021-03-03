@@ -151,22 +151,6 @@ class QuicTransportBase : public QuicSocket {
       std::pair<LocalErrorCode, folly::Optional<uint64_t>>>
   consume(StreamId id, uint64_t offset, size_t amount) override;
 
-  folly::Expected<folly::Unit, LocalErrorCode> setDataExpiredCallback(
-      StreamId id,
-      DataExpiredCallback* cb) override;
-
-  folly::Expected<folly::Optional<uint64_t>, LocalErrorCode> sendDataExpired(
-      StreamId id,
-      uint64_t offset) override;
-
-  folly::Expected<folly::Unit, LocalErrorCode> setDataRejectedCallback(
-      StreamId id,
-      DataRejectedCallback* cb) override;
-
-  folly::Expected<folly::Optional<uint64_t>, LocalErrorCode> sendDataRejected(
-      StreamId id,
-      uint64_t offset) override;
-
   folly::Expected<StreamId, LocalErrorCode> createBidirectionalStream(
       bool replaySafe = true) override;
   folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
@@ -315,8 +299,6 @@ class QuicTransportBase : public QuicSocket {
    * object alive.
    */
   virtual std::shared_ptr<QuicTransportBase> sharedGuard() = 0;
-
-  bool isPartiallyReliableTransport() const override;
 
   folly::Expected<folly::Unit, LocalErrorCode> setStreamPriority(
       StreamId id,
@@ -639,8 +621,6 @@ class QuicTransportBase : public QuicSocket {
   void processCallbacksAfterNetworkData();
   void invokeReadDataAndCallbacks();
   void invokePeekDataAndCallbacks();
-  void invokeDataExpiredCallbacks();
-  void invokeDataRejectedCallbacks();
   void invokeStreamsAvailableCallbacks();
   void updateReadLooper();
   void updatePeekLooper();
@@ -785,28 +765,12 @@ class QuicTransportBase : public QuicSocket {
     PeekCallbackData(PeekCallback* peekCallback) : peekCb(peekCallback) {}
   };
 
-  struct DataExpiredCallbackData {
-    DataExpiredCallback* dataExpiredCb;
-    bool resumed{true};
-
-    DataExpiredCallbackData(DataExpiredCallback* cb) : dataExpiredCb(cb) {}
-  };
-
-  struct DataRejectedCallbackData {
-    DataRejectedCallback* dataRejectedCb;
-    bool resumed{true};
-
-    DataRejectedCallbackData(DataRejectedCallback* cb) : dataRejectedCb(cb) {}
-  };
-
   folly::F14FastMap<StreamId, ReadCallbackData> readCallbacks_;
   folly::F14FastMap<StreamId, PeekCallbackData> peekCallbacks_;
 
   ByteEventMap deliveryCallbacks_;
   ByteEventMap txCallbacks_;
 
-  folly::F14FastMap<StreamId, DataExpiredCallbackData> dataExpiredCallbacks_;
-  folly::F14FastMap<StreamId, DataRejectedCallbackData> dataRejectedCallbacks_;
   PingCallback* pingCallback_;
 
   WriteCallback* connWriteCallback_{nullptr};

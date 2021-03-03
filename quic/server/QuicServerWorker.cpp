@@ -1069,10 +1069,6 @@ void QuicServerWorker::rejectNewConnections(bool rejectNewConnections) {
   rejectNewConnections_ = rejectNewConnections;
 }
 
-void QuicServerWorker::enablePartialReliability(bool enabled) {
-  transportSettings_.partialReliabilityEnabled = enabled;
-}
-
 void QuicServerWorker::setHealthCheckToken(
     const std::string& healthCheckToken) {
   healthCheckToken_ = folly::IOBuf::copyBuffer(healthCheckToken);

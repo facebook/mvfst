@@ -690,57 +690,6 @@ TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
   EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
 }
 
-std::unique_ptr<folly::IOBuf> createMinOrExpiredStreamDataFrame(
-    QuicInteger streamId,
-    folly::Optional<QuicInteger> maximumData = folly::none,
-    folly::Optional<QuicInteger> minimumStreamOffset = folly::none) {
-  std::unique_ptr<folly::IOBuf> bufQueue = folly::IOBuf::create(0);
-  BufAppender wcursor(bufQueue.get(), 10);
-  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
-  streamId.encode(appenderOp);
-
-  if (maximumData) {
-    maximumData->encode(appenderOp);
-  }
-
-  if (minimumStreamOffset) {
-    minimumStreamOffset->encode(appenderOp);
-  }
-  return bufQueue;
-}
-
-TEST_F(DecodeTest, DecodeMinStreamDataFrame) {
-  QuicInteger streamId(10);
-  QuicInteger maximumData(1000);
-  QuicInteger minimumStreamOffset(100);
-  auto noOffset = createMinOrExpiredStreamDataFrame(streamId, maximumData);
-  folly::io::Cursor cursor0(noOffset.get());
-  EXPECT_THROW(decodeMinStreamDataFrame(cursor0), QuicTransportException);
-
-  auto minStreamDataFrame = createMinOrExpiredStreamDataFrame(
-      streamId, maximumData, minimumStreamOffset);
-  folly::io::Cursor cursor(minStreamDataFrame.get());
-  auto result = decodeMinStreamDataFrame(cursor);
-  EXPECT_EQ(result.streamId, 10);
-  EXPECT_EQ(result.maximumData, 1000);
-  EXPECT_EQ(result.minimumStreamOffset, 100);
-}
-
-TEST_F(DecodeTest, DecodeExpiredStreamDataFrame) {
-  QuicInteger streamId(10);
-  QuicInteger offset(100);
-  auto noOffset = createMinOrExpiredStreamDataFrame(streamId);
-  folly::io::Cursor cursor0(noOffset.get());
-  EXPECT_THROW(decodeExpiredStreamDataFrame(cursor0), QuicTransportException);
-
-  auto expiredStreamDataFrame =
-      createMinOrExpiredStreamDataFrame(streamId, folly::none, offset);
-  folly::io::Cursor cursor(expiredStreamDataFrame.get());
-  auto result = decodeExpiredStreamDataFrame(cursor);
-  EXPECT_EQ(result.streamId, 10);
-  EXPECT_EQ(result.minimumStreamOffset, 100);
-}
-
 TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   ConnectionId odcid = getTestConnectionId();
   folly::IPAddress clientIp("109.115.3.49");

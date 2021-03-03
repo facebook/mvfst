@@ -227,12 +227,10 @@ const BufQueue* PacketRebuilder::cloneRetransmissionBuffer(
     const WriteStreamFrame& frame,
     const QuicStreamState* stream) {
   /**
-   * StreamBuffer is removed from retransmissionBuffer in 4 cases.
+   * StreamBuffer is removed from retransmissionBuffer in 3 cases.
    * 1: After send or receive RST.
    * 2: Packet containing the buffer gets acked.
    * 3: Packet containing the buffer is marked loss.
-   * 4: Skip (MIN_DATA or EXPIRED_DATA) frame is received with offset larger
-   *    than what's in the retransmission buffer.
    *
    * Checking retransmittable() should cover first case. The latter three cases
    * have to be covered by making sure we do not clone an already acked, lost or
@@ -242,12 +240,10 @@ const BufQueue* PacketRebuilder::cloneRetransmissionBuffer(
   DCHECK(retransmittable(*stream));
   auto iter = stream->retransmissionBuffer.find(frame.offset);
   if (iter != stream->retransmissionBuffer.end()) {
-    if (streamFrameMatchesRetransmitBuffer(*stream, frame, *iter->second)) {
-      DCHECK(!frame.len || !iter->second->data.empty())
-          << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
-          << " empty data. " << conn_;
-      return frame.len ? &(iter->second->data) : nullptr;
-    }
+    DCHECK(!frame.len || !iter->second->data.empty())
+        << "WriteStreamFrame cloning: frame is not empty but StreamBuffer has"
+        << " empty data. " << conn_;
+    return frame.len ? &(iter->second->data) : nullptr;
   }
   return nullptr;
 }

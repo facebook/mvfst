@@ -154,23 +154,6 @@ folly::dynamic StopSendingFrameLog::toDynamic() const {
   return d;
 }
 
-folly::dynamic MinStreamDataFrameLog::toDynamic() const {
-  folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toQlogString(FrameType::MIN_STREAM_DATA);
-  d["stream_id"] = streamId;
-  d["maximum_data"] = maximumData;
-  d["minimum_stream_offset"] = minimumStreamOffset;
-  return d;
-}
-
-folly::dynamic ExpiredStreamDataFrameLog::toDynamic() const {
-  folly::dynamic d = folly::dynamic::object();
-  d["frame_type"] = toQlogString(FrameType::EXPIRED_STREAM_DATA);
-  d["stream_id"] = streamId;
-  d["minimum_stream_offset"] = minimumStreamOffset;
-  return d;
-}
-
 folly::dynamic PathChallengeFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::PATH_CHALLENGE);

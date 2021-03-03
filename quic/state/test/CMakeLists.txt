@@ -62,11 +62,3 @@ quic_add_test(TARGET QuicPacingFunctionsTest
   DEPENDS
   mvfst_state_pacing_functions
 )
-
-quic_add_test(TARGET QPRFunctionsTest
-  SOURCES
-  QPRFunctionsTest.cpp
-  DEPENDS
-  mvfst_server
-  mvfst_state_qpr_functions
-)

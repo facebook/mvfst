@@ -23,7 +23,6 @@
 #include <quic/server/handshake/ServerHandshakeFactory.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
 #include <quic/state/AckHandlers.h>
-#include <quic/state/QPRFunctions.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>

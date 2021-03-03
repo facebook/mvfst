@@ -346,47 +346,6 @@ size_t writeSimpleFrame(
       // no space left in packet
       return size_t(0);
     }
-    case QuicSimpleFrame::Type::MinStreamDataFrame: {
-      const MinStreamDataFrame& minStreamDataFrame =
-          *frame.asMinStreamDataFrame();
-      QuicInteger streamId(minStreamDataFrame.streamId);
-      QuicInteger maximumData(minStreamDataFrame.maximumData);
-      QuicInteger minimumStreamOffset(minStreamDataFrame.minimumStreamOffset);
-      QuicInteger frameType(
-          static_cast<FrameTypeType>(FrameType::MIN_STREAM_DATA));
-      auto minStreamDataFrameSize = frameType.getSize() + streamId.getSize() +
-          maximumData.getSize() + minimumStreamOffset.getSize();
-      if (packetSpaceCheck(spaceLeft, minStreamDataFrameSize)) {
-        builder.write(frameType);
-        builder.write(streamId);
-        builder.write(maximumData);
-        builder.write(minimumStreamOffset);
-        builder.appendFrame(QuicSimpleFrame(std::move(minStreamDataFrame)));
-        return minStreamDataFrameSize;
-      }
-      // no space left in packet
-      return size_t(0);
-    }
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
-      const ExpiredStreamDataFrame& expiredStreamDataFrame =
-          *frame.asExpiredStreamDataFrame();
-      QuicInteger frameType(
-          static_cast<FrameTypeType>(FrameType::EXPIRED_STREAM_DATA));
-      QuicInteger streamId(expiredStreamDataFrame.streamId);
-      QuicInteger minimumStreamOffset(
-          expiredStreamDataFrame.minimumStreamOffset);
-      auto expiredStreamDataFrameSize = frameType.getSize() +
-          streamId.getSize() + minimumStreamOffset.getSize();
-      if (packetSpaceCheck(spaceLeft, expiredStreamDataFrameSize)) {
-        builder.write(frameType);
-        builder.write(streamId);
-        builder.write(minimumStreamOffset);
-        builder.appendFrame(QuicSimpleFrame(std::move(expiredStreamDataFrame)));
-        return expiredStreamDataFrameSize;
-      }
-      // no space left in packet
-      return size_t(0);
-    }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallengeFrame =
           *frame.asPathChallengeFrame();

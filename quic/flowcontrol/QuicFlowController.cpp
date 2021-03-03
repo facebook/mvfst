@@ -441,8 +441,4 @@ MaxStreamDataFrame generateMaxStreamDataFrame(const QuicStreamState& stream) {
   return MaxStreamDataFrame(stream.id, calculateMaximumData(stream));
 }
 
-MinStreamDataFrame generateMinStreamDataFrame(const QuicStreamState& stream) {
-  return MinStreamDataFrame(
-      stream.id, calculateMaximumData(stream), stream.currentReceiveOffset);
-}
 } // namespace quic

@@ -242,34 +242,6 @@ class StopSendingFrameLog : public QLogFrame {
   folly::dynamic toDynamic() const override;
 };
 
-class MinStreamDataFrameLog : public QLogFrame {
- public:
-  StreamId streamId;
-  uint64_t maximumData;
-  uint64_t minimumStreamOffset;
-
-  MinStreamDataFrameLog(
-      StreamId streamIdIn,
-      uint64_t maximumDataIn,
-      uint64_t minimumStreamOffsetIn)
-      : streamId{streamIdIn},
-        maximumData{maximumDataIn},
-        minimumStreamOffset{minimumStreamOffsetIn} {}
-  ~MinStreamDataFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
-};
-
-class ExpiredStreamDataFrameLog : public QLogFrame {
- public:
-  StreamId streamId;
-  uint64_t minimumStreamOffset;
-
-  ExpiredStreamDataFrameLog(StreamId streamIdIn, uint64_t minimumStreamOffsetIn)
-      : streamId{streamIdIn}, minimumStreamOffset{minimumStreamOffsetIn} {}
-  ~ExpiredStreamDataFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
-};
-
 class PathChallengeFrameLog : public QLogFrame {
  public:
   uint64_t pathData;

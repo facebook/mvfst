@@ -97,9 +97,6 @@ void processServerInitialParams(
       TransportParameterId::max_packet_size, serverParams.parameters);
   auto statelessResetToken =
       getStatelessResetTokenParameter(serverParams.parameters);
-  auto partialReliability = getIntegerParameter(
-      static_cast<TransportParameterId>(kPartialReliabilityParameterId),
-      serverParams.parameters);
   auto activeConnectionIdLimit = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       serverParams.parameters);
@@ -177,13 +174,6 @@ void processServerInitialParams(
   // to the server.
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
-
-  if (partialReliability && *partialReliability != 0 &&
-      conn.transportSettings.partialReliabilityEnabled) {
-    conn.partialReliabilityEnabled = true;
-  }
-  VLOG(10) << "conn.partialReliabilityEnabled="
-           << conn.partialReliabilityEnabled;
 
   conn.statelessResetToken = std::move(statelessResetToken);
   // Update the existing streams, because we allow streams to be created before

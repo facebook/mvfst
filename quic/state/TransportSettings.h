@@ -204,8 +204,6 @@ struct TransportSettings {
   // the callback registered through notifyPendingWriteOnConnection() will
   // not be called
   uint64_t totalBufferSpaceAvailable{kDefaultBufferSpaceAvailable};
-  // Whether or not to advertise partial reliability capability
-  bool partialReliabilityEnabled{false};
   // Whether the endpoint allows peer to migrate to new address
   bool disableMigration{true};
   // Whether or not the socket should gracefully drain on close

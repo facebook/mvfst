@@ -95,7 +95,6 @@ class MockQuicSocket : public QuicSocket {
           uint64_t,
           SharedBuf));
   MOCK_CONST_METHOD0(isKnobSupported, bool());
-  MOCK_CONST_METHOD0(isPartiallyReliableTransport, bool());
   MOCK_METHOD3(
       setStreamPriority,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, uint8_t, bool));
@@ -251,30 +250,6 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD2(
       consume,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, size_t));
-
-  MOCK_METHOD2(
-      setDataExpiredCallback,
-      folly::Expected<folly::Unit, LocalErrorCode>(
-          StreamId,
-          DataExpiredCallback*));
-
-  MOCK_METHOD2(
-      sendDataExpired,
-      folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>(
-          StreamId,
-          uint64_t offset));
-
-  MOCK_METHOD2(
-      setDataRejectedCallback,
-      folly::Expected<folly::Unit, LocalErrorCode>(
-          StreamId,
-          DataRejectedCallback*));
-
-  MOCK_METHOD2(
-      sendDataRejected,
-      folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>(
-          StreamId,
-          uint64_t offset));
 
   MOCK_METHOD1(setCongestionControl, void(CongestionControlType));
 

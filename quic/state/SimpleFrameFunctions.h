@@ -9,7 +9,6 @@
 #pragma once
 
 #include <quic/codec/Types.h>
-#include <quic/state/QPRFunctions.h>
 #include <quic/state/StateData.h>
 
 namespace quic {

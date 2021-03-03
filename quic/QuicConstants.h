@@ -158,8 +158,6 @@ enum class FrameType : uint64_t {
   // CONNECTION_CLOSE_APP_ERR frametype is use to indicate application errors
   CONNECTION_CLOSE_APP_ERR = 0x1D,
   HANDSHAKE_DONE = 0x1E,
-  MIN_STREAM_DATA = 0xFE, // subject to change
-  EXPIRED_STREAM_DATA = 0xFF, // subject to change
   KNOB = 0x1550,
   ACK_FREQUENCY = 0xAF,
 };
@@ -261,13 +259,9 @@ enum class QuicVersion : uint32_t {
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;
 
-using TransportPartialReliabilitySetting = bool;
-
 /**
  * Parameter ids for private transport parameter
  */
-
-constexpr uint16_t kPartialReliabilityParameterId = 0xFF00; // subject to change
 
 constexpr uint16_t kD6DBasePMTUParameterId = 0xFF77;
 
@@ -499,9 +493,6 @@ constexpr auto kRetryTokenSecretLength = 32;
 constexpr uint64_t kMaxRetryTokenValidMs = 1000 * 60 * 5;
 
 constexpr uint64_t kDefaultActiveConnectionIdLimit = 2;
-
-// default capability of QUIC partial reliability
-constexpr TransportPartialReliabilitySetting kDefaultPartialReliability = false;
 
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
 

@@ -821,9 +821,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Whether a connection can be paced based on its handshake and close states.
   // For example, we may not want to pace a connection that's still handshaking.
   bool canBePaced{false};
-
-  // Whether or not both ends agree to use partial reliability
-  bool partialReliabilityEnabled{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

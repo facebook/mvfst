@@ -305,21 +305,15 @@ TEST_F(QuicStreamManagerTest, TestClearActionable) {
   stream->readBuffer.emplace_back(folly::IOBuf::copyBuffer("blah blah"), 0);
   manager.queueFlowControlUpdated(id);
   manager.addDeliverable(id);
-  manager.addDataRejected(id);
-  manager.addDataExpired(id);
   manager.updateReadableStreams(*stream);
   manager.updatePeekableStreams(*stream);
   EXPECT_TRUE(manager.flowControlUpdatedContains(id));
   EXPECT_TRUE(manager.deliverableContains(id));
-  EXPECT_FALSE(manager.dataRejectedStreams().empty());
-  EXPECT_FALSE(manager.dataExpiredStreams().empty());
   EXPECT_FALSE(manager.readableStreams().empty());
   EXPECT_FALSE(manager.peekableStreams().empty());
   manager.clearActionable();
   EXPECT_FALSE(manager.flowControlUpdatedContains(id));
   EXPECT_FALSE(manager.deliverableContains(id));
-  EXPECT_TRUE(manager.dataRejectedStreams().empty());
-  EXPECT_TRUE(manager.dataExpiredStreams().empty());
   EXPECT_TRUE(manager.readableStreams().empty());
   EXPECT_TRUE(manager.peekableStreams().empty());
 }

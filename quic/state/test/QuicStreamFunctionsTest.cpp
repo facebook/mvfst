@@ -1544,8 +1544,6 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   conn.streamManager->addStopSending(
       streamId, GenericApplicationErrorCode::UNKNOWN);
   conn.streamManager->queueFlowControlUpdated(streamId);
-  conn.streamManager->addDataRejected(streamId);
-  conn.streamManager->addDataExpired(streamId);
   stream->sendState = StreamSendState::Closed;
   stream->recvState = StreamRecvState::Closed;
   conn.streamManager->removeClosedStream(streamId);
@@ -1559,8 +1557,6 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   EXPECT_FALSE(conn.streamManager->pendingWindowUpdate(streamId));
   EXPECT_TRUE(conn.streamManager->stopSendingStreams().empty());
   EXPECT_FALSE(conn.streamManager->flowControlUpdatedContains(streamId));
-  EXPECT_TRUE(conn.streamManager->dataRejectedStreams().empty());
-  EXPECT_TRUE(conn.streamManager->dataExpiredStreams().empty());
 }
 
 TEST_F(QuicServerStreamFunctionsTest, ServerGetClientQuicStream) {
@@ -2020,73 +2016,5 @@ TEST_F(QuicStreamFunctionsTest, AckCryptoStreamOffsetLengthMismatch) {
   EXPECT_EQ(cryptoStream.retransmissionBuffer.size(), 1);
 }
 
-TEST_F(
-    QuicStreamFunctionsTest,
-    StreamFrameMatchesRetransmitBufferFullyReliable) {
-  conn.partialReliabilityEnabled = false;
-  StreamId id = 4;
-  QuicStreamState stream(id, conn);
-
-  auto data = IOBuf::copyBuffer("Hello");
-  auto buf = StreamBuffer(data->clone(), 0, true);
-
-  WriteStreamFrame ackFrame(
-      id /* streamId */,
-      0 /* offset */,
-      data->length() /* length */,
-      true /* eof */);
-  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
-}
-
-TEST_F(
-    QuicStreamFunctionsTest,
-    StreamFrameMatchesRetransmitBufferPartiallyReliableNoSkip) {
-  conn.partialReliabilityEnabled = true;
-  StreamId id = 4;
-  QuicStreamState stream(id, conn);
-
-  auto data = IOBuf::copyBuffer("Hello");
-  auto buf = StreamBuffer(data->clone(), 0, true);
-
-  WriteStreamFrame ackFrame(
-      id /* streamId */,
-      0 /* offset */,
-      data->length() /* length */,
-      true /* eof */);
-  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
-}
-
-TEST_F(
-    QuicStreamFunctionsTest,
-    StreamFrameMatchesRetransmitBufferPartiallyReliableFullBufSkipped) {
-  conn.partialReliabilityEnabled = true;
-  StreamId id = 4;
-  QuicStreamState stream(id, conn);
-
-  auto data = IOBuf::copyBuffer("Hello");
-  auto buf = StreamBuffer(data->clone(), 42, true);
-
-  WriteStreamFrame ackFrame(
-      id /* streamId */,
-      0 /* offset */,
-      data->length() /* length */,
-      true /* eof */);
-  EXPECT_FALSE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
-}
-
-TEST_F(
-    QuicStreamFunctionsTest,
-    StreamFrameMatchesRetransmitBufferPartiallyReliableHalfBufSkipped) {
-  conn.partialReliabilityEnabled = true;
-  StreamId id = 4;
-  QuicStreamState stream(id, conn);
-
-  auto data = IOBuf::copyBuffer("llo");
-  auto buf = StreamBuffer(data->clone(), 2, true);
-
-  WriteStreamFrame ackFrame(
-      id /* streamId */, 0 /* offset */, 5 /* length */, true /* eof */);
-  EXPECT_TRUE(streamFrameMatchesRetransmitBuffer(stream, ackFrame, buf));
-}
 } // namespace test
 } // namespace quic

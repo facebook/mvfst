@@ -877,7 +877,6 @@ void QuicClientTransport::startCryptoHandshake() {
       *clientConn_->initialDestinationConnectionId, version);
 
   // Add partial reliability parameter to customTransportParameters_.
-  setPartialReliabilityTransportParameter();
   setD6DBasePMTUTransportParameter();
   setD6DRaiseTimeoutTransportParameter();
   setD6DProbeTimeoutTransportParameter();
@@ -1521,20 +1520,6 @@ bool QuicClientTransport::setCustomTransportParameter(
 
   customTransportParameters_.push_back(customParam->encode());
   return true;
-}
-
-void QuicClientTransport::setPartialReliabilityTransportParameter() {
-  uint64_t partialReliabilitySetting = 0;
-  if (conn_->transportSettings.partialReliabilityEnabled) {
-    partialReliabilitySetting = 1;
-  }
-  auto partialReliabilityCustomParam =
-      std::make_unique<CustomIntegralTransportParameter>(
-          kPartialReliabilityParameterId, partialReliabilitySetting);
-
-  if (!setCustomTransportParameter(std::move(partialReliabilityCustomParam))) {
-    LOG(ERROR) << "failed to set partial reliability transport parameter";
-  }
 }
 
 void QuicClientTransport::setD6DBasePMTUTransportParameter() {

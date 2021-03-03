@@ -27,7 +27,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       std::chrono::milliseconds idleTimeout,
       uint64_t ackDelayExponent,
       uint64_t maxRecvPacketSize,
-      TransportPartialReliabilitySetting partialReliability,
       const StatelessResetToken& token,
       ConnectionId initialSourceCid,
       ConnectionId originalDestinationCid)
@@ -41,7 +40,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         idleTimeout_(idleTimeout),
         ackDelayExponent_(ackDelayExponent),
         maxRecvPacketSize_(maxRecvPacketSize),
-        partialReliability_(partialReliability),
         token_(token),
         initialSourceCid_(initialSourceCid),
         originalDestinationCid_(originalDestinationCid) {}
@@ -95,14 +93,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     statelessReset.value = folly::IOBuf::copyBuffer(token_);
     params.parameters.push_back(std::move(statelessReset));
 
-    uint64_t partialReliabilitySetting = 0;
-    if (partialReliability_) {
-      partialReliabilitySetting = 1;
-    }
-    params.parameters.push_back(encodeIntegerParameter(
-        static_cast<TransportParameterId>(kPartialReliabilityParameterId),
-        partialReliabilitySetting));
-
     if (encodingVersion_ == QuicVersion::QUIC_DRAFT) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,
@@ -128,7 +118,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   std::chrono::milliseconds idleTimeout_;
   uint64_t ackDelayExponent_;
   uint64_t maxRecvPacketSize_;
-  TransportPartialReliabilitySetting partialReliability_;
   folly::Optional<ClientTransportParameters> clientTransportParameters_;
   StatelessResetToken token_;
   ConnectionId initialSourceCid_;

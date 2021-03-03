@@ -205,7 +205,6 @@ class QuicClientTransport
   HappyEyeballsConnAttemptDelayTimeout happyEyeballsConnAttemptDelayTimeout_;
 
  private:
-  void setPartialReliabilityTransportParameter();
   void setD6DBasePMTUTransportParameter();
   void setD6DRaiseTimeoutTransportParameter();
   void setD6DProbeTimeoutTransportParameter();

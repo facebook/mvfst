@@ -415,10 +415,6 @@ std::string toString(FrameType frame) {
       return "CONNECTION_CLOSE";
     case FrameType::CONNECTION_CLOSE_APP_ERR:
       return "APPLICATION_CLOSE";
-    case FrameType::MIN_STREAM_DATA:
-      return "MIN_STREAM_DATA";
-    case FrameType::EXPIRED_STREAM_DATA:
-      return "EXPIRED_STREAM_DATA";
     case FrameType::HANDSHAKE_DONE:
       return "HANDSHAKE_DONE";
     case FrameType::KNOB:

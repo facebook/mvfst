@@ -13,20 +13,6 @@ void addQuicSimpleFrameToEvent(
           frame.streamId, frame.errorCode));
       break;
     }
-    case quic::QuicSimpleFrame::Type::MinStreamDataFrame: {
-      const quic::MinStreamDataFrame& frame =
-          *simpleFrame.asMinStreamDataFrame();
-      event->frames.push_back(std::make_unique<quic::MinStreamDataFrameLog>(
-          frame.streamId, frame.maximumData, frame.minimumStreamOffset));
-      break;
-    }
-    case quic::QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
-      const quic::ExpiredStreamDataFrame& frame =
-          *simpleFrame.asExpiredStreamDataFrame();
-      event->frames.push_back(std::make_unique<quic::ExpiredStreamDataFrameLog>(
-          frame.streamId, frame.minimumStreamOffset));
-      break;
-    }
     case quic::QuicSimpleFrame::Type::PathChallengeFrame: {
       const quic::PathChallengeFrame& frame =
           *simpleFrame.asPathChallengeFrame();

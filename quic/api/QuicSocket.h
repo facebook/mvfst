@@ -448,11 +448,6 @@ class QuicSocket {
   FOLLY_NODISCARD virtual bool isKnobSupported() const = 0;
 
   /**
-   * Is partial reliability supported.
-   */
-  virtual bool isPartiallyReliableTransport() const = 0;
-
-  /**
    * Set stream priority.
    * level: can only be in [0, 7].
    */
@@ -666,68 +661,6 @@ class QuicSocket {
   virtual folly::Expected<folly::Unit, LocalErrorCode> consume(
       StreamId id,
       size_t amount) = 0;
-
-  /**
-   * ===== Expire/reject API =====
-   *
-   * Sender can "expire" stream data by advancing receiver's minimum
-   * retransmittable offset, effectively discarding some of the previously
-   * sent (or planned to be sent) data.
-   * Discarded data may or may not have already arrived on the receiver end.
-   *
-   * Received can "reject" stream data by advancing sender's minimum
-   * retransmittable offset, effectively discarding some of the previously
-   * sent (or planned to be sent) data.
-   * Rejected data may or may not have already arrived on the receiver end.
-   */
-
-  class DataExpiredCallback {
-   public:
-    virtual ~DataExpiredCallback() = default;
-
-    /**
-     * Called from the transport layer when sender informes us that data is
-     * expired on a given stream.
-     */
-    virtual void onDataExpired(StreamId id, uint64_t newOffset) noexcept = 0;
-  };
-
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setDataExpiredCallback(
-      StreamId id,
-      DataExpiredCallback* cb) = 0;
-
-  /**
-   * Expire data.
-   *
-   * The return value is Expected.  If the value hasError(), then an error
-   * occured and it can be obtained with error().
-   */
-  virtual folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>
-  sendDataExpired(StreamId id, uint64_t offset) = 0;
-
-  class DataRejectedCallback {
-   public:
-    virtual ~DataRejectedCallback() = default;
-
-    /**
-     * Called from the transport layer when receiver informes us that data is
-     * not needed anymore on a given stream.
-     */
-    virtual void onDataRejected(StreamId id, uint64_t newOffset) noexcept = 0;
-  };
-
-  virtual folly::Expected<folly::Unit, LocalErrorCode> setDataRejectedCallback(
-      StreamId id,
-      DataRejectedCallback* cb) = 0;
-
-  /**
-   * Reject data.
-   *
-   * The return value is Expected.  If the value hasError(), then an error
-   * occured and it can be obtained with error().
-   */
-  virtual folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>
-  sendDataRejected(StreamId id, uint64_t offset) = 0;
 
   /**
    * ===== Write API =====

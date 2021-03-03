@@ -427,42 +427,6 @@ struct MaxStreamDataFrame {
   }
 };
 
-// The MinStreamDataFrame is used by a receiver to inform
-// a sender of the maximum amount of data that can be sent on a stream
-// (like MAX_STREAM_DATA frame) and to request an update to the minimum
-// retransmittable offset for this stream.
-struct MinStreamDataFrame {
-  StreamId streamId;
-  uint64_t maximumData;
-  uint64_t minimumStreamOffset;
-  MinStreamDataFrame(
-      StreamId streamIdIn,
-      uint64_t maximumDataIn,
-      uint64_t minimumStreamOffsetIn)
-      : streamId(streamIdIn),
-        maximumData(maximumDataIn),
-        minimumStreamOffset(minimumStreamOffsetIn) {}
-
-  bool operator==(const MinStreamDataFrame& rhs) const {
-    return streamId == rhs.streamId && maximumData == rhs.maximumData &&
-        minimumStreamOffset == rhs.minimumStreamOffset;
-  }
-};
-
-// The ExpiredStreamDataFrame is used by a sender to
-// inform a receiver of the minimum retransmittable offset for a stream.
-struct ExpiredStreamDataFrame {
-  StreamId streamId;
-  uint64_t minimumStreamOffset;
-  ExpiredStreamDataFrame(StreamId streamIdIn, uint64_t minimumStreamOffsetIn)
-      : streamId(streamIdIn), minimumStreamOffset(minimumStreamOffsetIn) {}
-
-  bool operator==(const ExpiredStreamDataFrame& rhs) const {
-    return streamId == rhs.streamId &&
-        minimumStreamOffset == rhs.minimumStreamOffset;
-  }
-};
-
 struct MaxStreamsFrame {
   // A count of the cumulative number of streams
   uint64_t maxStreams;
@@ -654,8 +618,6 @@ struct RetryToken {
 
 #define QUIC_SIMPLE_FRAME(F, ...)         \
   F(StopSendingFrame, __VA_ARGS__)        \
-  F(MinStreamDataFrame, __VA_ARGS__)      \
-  F(ExpiredStreamDataFrame, __VA_ARGS__)  \
   F(PathChallengeFrame, __VA_ARGS__)      \
   F(PathResponseFrame, __VA_ARGS__)       \
   F(NewConnectionIdFrame, __VA_ARGS__)    \

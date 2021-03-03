@@ -84,10 +84,6 @@ MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor);
 
 MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor);
 
-ExpiredStreamDataFrame decodeExpiredStreamDataFrame(folly::io::Cursor& cursor);
-
-MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor);
-
 MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor);
 
 MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor);

@@ -1001,170 +1001,6 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
   }
 }
 
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setDataExpiredCallback(
-    StreamId id,
-    DataExpiredCallback* cb) {
-  if (!conn_->partialReliabilityEnabled) {
-    return folly::makeUnexpected(LocalErrorCode::APP_ERROR);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-
-  VLOG(4) << "Setting DataExpiredCallback for stream=" << id << " cb=" << cb
-          << " " << *this;
-
-  auto dataExpiredCbIt = dataExpiredCallbacks_.find(id);
-  if (dataExpiredCbIt == dataExpiredCallbacks_.end()) {
-    if (!cb) {
-      return folly::unit;
-    }
-    dataExpiredCbIt =
-        dataExpiredCallbacks_.emplace(id, DataExpiredCallbackData(cb)).first;
-  }
-
-  if (!cb) {
-    dataExpiredCallbacks_.erase(dataExpiredCbIt);
-  } else {
-    dataExpiredCbIt->second.dataExpiredCb = cb;
-  }
-
-  runOnEvbAsync([](auto self) { self->invokeDataExpiredCallbacks(); });
-
-  return folly::unit;
-}
-
-void QuicTransportBase::invokeDataExpiredCallbacks() {
-  if (!conn_->partialReliabilityEnabled || closeState_ != CloseState::OPEN) {
-    return;
-  }
-
-  auto self = sharedGuard();
-  for (auto streamId : self->conn_->streamManager->dataExpiredStreams()) {
-    auto callbackData = self->dataExpiredCallbacks_.find(streamId);
-    // Data expired is edge-triggered (nag only once on arrival), unlike read
-    // which is level-triggered (nag until application calls read() and
-    // clears the buffer).
-    if (callbackData == self->dataExpiredCallbacks_.end()) {
-      continue;
-    }
-
-    auto dataExpiredCb = callbackData->second.dataExpiredCb;
-    auto stream = conn_->streamManager->getStream(streamId);
-
-    if (dataExpiredCb && !stream->streamReadError) {
-      // If new offset is before current read offset, skip.
-      if (stream->currentReceiveOffset < stream->currentReadOffset) {
-        continue;
-      }
-      VLOG(10) << "invoking data expired callback on stream=" << streamId << " "
-               << *this;
-      dataExpiredCb->onDataExpired(streamId, stream->currentReceiveOffset);
-    }
-  }
-  self->conn_->streamManager->clearDataExpired();
-}
-
-folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>
-QuicTransportBase::sendDataExpired(StreamId id, uint64_t offset) {
-  if (!conn_->partialReliabilityEnabled) {
-    return folly::makeUnexpected(LocalErrorCode::APP_ERROR);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-  auto stream = conn_->streamManager->getStream(id);
-  auto newOffset = advanceMinimumRetransmittableOffset(stream, offset);
-
-  // Cancel byte event callbacks that are set for any offset below newOffset.
-  if (newOffset) {
-    cancelByteEventCallbacksForStream(id, *newOffset);
-  }
-
-  updateWriteLooper(true);
-  return folly::makeExpected<LocalErrorCode>(newOffset);
-}
-
-folly::Expected<folly::Unit, LocalErrorCode>
-QuicTransportBase::setDataRejectedCallback(
-    StreamId id,
-    DataRejectedCallback* cb) {
-  if (!conn_->partialReliabilityEnabled) {
-    return folly::makeUnexpected(LocalErrorCode::APP_ERROR);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-
-  VLOG(4) << "Setting DataRejectedCallback for stream=" << id << " cb=" << cb
-          << " " << *this;
-
-  auto dataRejectedCbIt = dataRejectedCallbacks_.find(id);
-  if (dataRejectedCbIt == dataRejectedCallbacks_.end()) {
-    if (!cb) {
-      return folly::unit;
-    }
-    dataRejectedCbIt =
-        dataRejectedCallbacks_.emplace(id, DataRejectedCallbackData(cb)).first;
-  }
-
-  if (!cb) {
-    dataRejectedCallbacks_.erase(dataRejectedCbIt);
-  } else {
-    dataRejectedCbIt->second.dataRejectedCb = cb;
-  }
-
-  runOnEvbAsync([](auto self) { self->invokeDataRejectedCallbacks(); });
-
-  return folly::unit;
-}
-
-void QuicTransportBase::invokeDataRejectedCallbacks() {
-  if (!conn_->partialReliabilityEnabled || closeState_ != CloseState::OPEN) {
-    return;
-  }
-
-  auto self = sharedGuard();
-  for (auto streamId : self->conn_->streamManager->dataRejectedStreams()) {
-    auto callbackData = self->dataRejectedCallbacks_.find(streamId);
-    // Data rejected is edge-triggered (nag only once on arrival), unlike read
-    // which is level-triggered (nag until application calls read() and
-    // clears the buffer).
-
-    if (callbackData == self->dataRejectedCallbacks_.end()) {
-      continue;
-    }
-
-    auto dataRejectedCb = callbackData->second.dataRejectedCb;
-    auto stream = conn_->streamManager->getStream(streamId);
-
-    // Invoke any delivery callbacks that are set for any offset below newly set
-    // minimumRetransmittableOffset.
-    if (!stream->streamReadError) {
-      cancelByteEventCallbacksForStream(
-          streamId, stream->minimumRetransmittableOffset);
-    }
-
-    if (dataRejectedCb && !stream->streamReadError) {
-      VLOG(10) << "invoking data rejected callback on stream=" << streamId
-               << " " << *this;
-      dataRejectedCb->onDataRejected(
-          streamId, stream->minimumRetransmittableOffset);
-    }
-  }
-  self->conn_->streamManager->clearDataRejected();
-}
-
 void QuicTransportBase::invokeStreamsAvailableCallbacks() {
   if (conn_->streamManager->consumeMaxLocalBidirectionalStreamIdIncreased()) {
     // check in case new streams were created in preceding callbacks
@@ -1182,23 +1018,6 @@ void QuicTransportBase::invokeStreamsAvailableCallbacks() {
       connCallback_->onUnidirectionalStreamsAvailable(numStreams);
     }
   }
-}
-
-folly::Expected<folly::Optional<uint64_t>, LocalErrorCode>
-QuicTransportBase::sendDataRejected(StreamId id, uint64_t offset) {
-  if (!conn_->partialReliabilityEnabled) {
-    return folly::makeUnexpected(LocalErrorCode::APP_ERROR);
-  }
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  if (!conn_->streamManager->streamExists(id)) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
-  }
-  auto stream = conn_->streamManager->getStream(id);
-  auto newOffset = advanceCurrentReceiveOffset(stream, offset);
-  updateWriteLooper(true);
-  return folly::makeExpected<LocalErrorCode>(newOffset);
 }
 
 void QuicTransportBase::updatePeekLooper() {
@@ -1740,15 +1559,6 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       deliveryCallbacks_.erase(deliveryCallbacksForAckedStream);
     }
     deliverableStreamId = conn_->streamManager->popDeliverable();
-  }
-
-  invokeDataExpiredCallbacks();
-  if (closeState_ != CloseState::OPEN) {
-    return;
-  }
-  invokeDataRejectedCallbacks();
-  if (closeState_ != CloseState::OPEN) {
-    return;
   }
 
   // Iterate over streams that changed their flow control window and give
@@ -2666,8 +2476,6 @@ void QuicTransportBase::cancelAllAppCallbacks(
   }
   VLOG(4) << "Clearing " << peekCallbacks_.size() << " peek callbacks";
   peekCallbacks_.clear();
-  dataExpiredCallbacks_.clear();
-  dataRejectedCallbacks_.clear();
 
   if (connWriteCallback_) {
     auto connWriteCallback = connWriteCallback_;
@@ -2699,9 +2507,6 @@ void QuicTransportBase::resetNonControlStreams(
       if (writeCallbackIt != pendingWriteCallbacks_.end()) {
         writeCallbackIt->second->onStreamWriteError(id, {error, errorMsg});
       }
-      if (conn_->partialReliabilityEnabled) {
-        dataRejectedCallbacks_.erase(id);
-      }
       resetStream(id, error);
     }
     if (isReceivingStream(conn_->nodeType, id) || isBidirectionalStream(id)) {
@@ -2709,9 +2514,6 @@ void QuicTransportBase::resetNonControlStreams(
       if (readCallbackIt != readCallbacks_.end() &&
           readCallbackIt->second.readCb) {
         readCallbackIt->second.readCb->readError(id, {error, errorMsg});
-      }
-      if (conn_->partialReliabilityEnabled) {
-        dataExpiredCallbacks_.erase(id);
       }
       peekCallbacks_.erase(id);
       stopSending(id, error);
@@ -2968,10 +2770,6 @@ bool QuicTransportBase::isKnobSupported() const {
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {
   return conn_->transportSettings;
-}
-
-bool QuicTransportBase::isPartiallyReliableTransport() const {
-  return conn_->partialReliabilityEnabled;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>

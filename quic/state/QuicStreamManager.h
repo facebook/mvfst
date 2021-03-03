@@ -523,49 +523,6 @@ class QuicStreamManager {
     return txStreams_.count(streamId) > 0;
   }
 
-  /*
-   * Returns a const reference to the underlying data rejected streams
-   * container.
-   */
-  const auto& dataRejectedStreams() const {
-    return dataRejectedStreams_;
-  }
-
-  /*
-   * Add a data rejected stream.
-   */
-  void addDataRejected(StreamId streamId) {
-    dataRejectedStreams_.insert(streamId);
-  }
-
-  /*
-   * Returns a const reference to the underlying data expired streams container.
-   */
-  const auto& dataExpiredStreams() const {
-    return dataExpiredStreams_;
-  }
-
-  /*
-   * Clear the data rejected streams.
-   */
-  void clearDataRejected() {
-    dataRejectedStreams_.clear();
-  }
-
-  /*
-   * Add a data expired stream.
-   */
-  void addDataExpired(StreamId streamId) {
-    dataExpiredStreams_.insert(streamId);
-  }
-
-  /*
-   * Clear the data expired streams.
-   */
-  void clearDataExpired() {
-    dataExpiredStreams_.clear();
-  }
-
   // TODO figure out a better interface here.
   /*
    * Returns a mutable reference to the underlying readable streams container.
@@ -763,8 +720,6 @@ class QuicStreamManager {
     readableStreams_.clear();
     peekableStreams_.clear();
     flowControlUpdated_.clear();
-    dataExpiredStreams_.clear();
-    dataRejectedStreams_.clear();
   }
 
   bool isAppIdle() const;
@@ -868,12 +823,6 @@ class QuicStreamManager {
 
   // Map of streams where the peer was asked to stop sending
   folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
-
-  // Set of streams that have expired data
-  folly::F14FastSet<StreamId> dataExpiredStreams_;
-
-  // Set of streams that have rejected data
-  folly::F14FastSet<StreamId> dataRejectedStreams_;
 
   // Streams that had their stream window change and potentially need a window
   // update sent

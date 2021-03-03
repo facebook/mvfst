@@ -667,53 +667,6 @@ ConnectionCloseFrame decodeApplicationClose(folly::io::Cursor& cursor) {
       QuicErrorCode(errorCode), std::move(reasonPhrase));
 }
 
-MinStreamDataFrame decodeMinStreamDataFrame(folly::io::Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
-  if (!streamId) {
-    throw QuicTransportException(
-        "Invalid streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::MIN_STREAM_DATA);
-  }
-  auto maximumData = decodeQuicInteger(cursor);
-  if (!maximumData) {
-    throw QuicTransportException(
-        "Invalid maximumData",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::MIN_STREAM_DATA);
-  }
-  auto minimumStreamOffset = decodeQuicInteger(cursor);
-  if (!minimumStreamOffset) {
-    throw QuicTransportException(
-        "Invalid minimumStreamOffset",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::MIN_STREAM_DATA);
-  }
-  return MinStreamDataFrame(
-      folly::to<StreamId>(streamId->first),
-      maximumData->first,
-      minimumStreamOffset->first);
-}
-
-ExpiredStreamDataFrame decodeExpiredStreamDataFrame(folly::io::Cursor& cursor) {
-  auto streamId = decodeQuicInteger(cursor);
-  if (!streamId) {
-    throw QuicTransportException(
-        "Invalid streamId",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::EXPIRED_STREAM_DATA);
-  }
-  auto minimumStreamOffset = decodeQuicInteger(cursor);
-  if (!minimumStreamOffset) {
-    throw QuicTransportException(
-        "Invalid minimumStreamOffset",
-        quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::EXPIRED_STREAM_DATA);
-  }
-  return ExpiredStreamDataFrame(
-      folly::to<StreamId>(streamId->first), minimumStreamOffset->first);
-}
-
 HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& /*cursor*/) {
   return HandshakeDoneFrame();
 }
@@ -843,10 +796,6 @@ QuicFrame parseFrame(
         return QuicFrame(decodeConnectionCloseFrame(cursor));
       case FrameType::CONNECTION_CLOSE_APP_ERR:
         return QuicFrame(decodeApplicationClose(cursor));
-      case FrameType::MIN_STREAM_DATA:
-        return QuicFrame(decodeMinStreamDataFrame(cursor));
-      case FrameType::EXPIRED_STREAM_DATA:
-        return QuicFrame(decodeExpiredStreamDataFrame(cursor));
       case FrameType::HANDSHAKE_DONE:
         return QuicFrame(decodeHandshakeDoneFrame(cursor));
       case FrameType::KNOB:

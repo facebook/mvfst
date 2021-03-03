@@ -121,9 +121,6 @@ void processClientInitialParams(
       TransportParameterId::ack_delay_exponent, clientParams.parameters);
   auto packetSize = getIntegerParameter(
       TransportParameterId::max_packet_size, clientParams.parameters);
-  auto partialReliability = getIntegerParameter(
-      static_cast<TransportParameterId>(kPartialReliabilityParameterId),
-      clientParams.parameters);
   auto activeConnectionIdLimit = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       clientParams.parameters);
@@ -214,13 +211,6 @@ void processClientInitialParams(
 
   conn.peerActiveConnectionIdLimit =
       activeConnectionIdLimit.value_or(kDefaultActiveConnectionIdLimit);
-
-  if (partialReliability && *partialReliability != 0 &&
-      conn.transportSettings.partialReliabilityEnabled) {
-    conn.partialReliabilityEnabled = true;
-  }
-  VLOG(10) << "conn.partialReliabilityEnabled="
-           << conn.partialReliabilityEnabled;
 
   if (conn.transportSettings.d6dConfig.enabled) {
     // Sanity check
@@ -674,7 +664,6 @@ void onServerReadDataFromOpen(
             conn.transportSettings.idleTimeout,
             conn.transportSettings.ackDelayExponent,
             conn.transportSettings.maxRecvPacketSize,
-            conn.transportSettings.partialReliabilityEnabled,
             *newServerConnIdData->token,
             conn.serverConnectionId.value(),
             initialDestinationConnectionId));

@@ -164,18 +164,6 @@ class MockByteEventCallback : public QuicSocket::ByteEventCallback {
   }
 };
 
-class MockDataExpiredCallback : public QuicSocket::DataExpiredCallback {
- public:
-  ~MockDataExpiredCallback() override = default;
-  GMOCK_METHOD2_(, noexcept, , onDataExpired, void(StreamId, uint64_t));
-};
-
-class MockDataRejectedCallback : public QuicSocket::DataRejectedCallback {
- public:
-  ~MockDataRejectedCallback() override = default;
-  GMOCK_METHOD2_(, noexcept, , onDataRejected, void(StreamId, uint64_t));
-};
-
 class MockQuicTransport : public QuicServerTransport {
  public:
   using Ptr = std::shared_ptr<MockQuicTransport>;

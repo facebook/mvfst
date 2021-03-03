@@ -100,24 +100,15 @@ void sendAckSMHandler(
       // Clean up the acked buffers from the retransmissionBuffer.
       auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
       if (ackedBuffer != stream.retransmissionBuffer.end()) {
-        if (streamFrameMatchesRetransmitBuffer(
-                stream, ackedFrame, *ackedBuffer->second)) {
-          VLOG(10) << "Open: acked stream data stream=" << stream.id
-                   << " offset=" << ackedBuffer->second->offset
-                   << " len=" << ackedBuffer->second->data.chainLength()
-                   << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-          stream.ackedIntervals.insert(
-              ackedBuffer->second->offset,
-              ackedBuffer->second->offset +
-                  ackedBuffer->second->data.chainLength());
-          stream.retransmissionBuffer.erase(ackedBuffer);
-        } else {
-          VLOG(10)
-              << "Open: received an ack for already discarded buffer; stream="
-              << stream.id << " offset=" << ackedBuffer->second->offset
-              << " len=" << ackedBuffer->second->data.chainLength()
-              << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-        }
+        VLOG(10) << "Open: acked stream data stream=" << stream.id
+                 << " offset=" << ackedBuffer->second->offset
+                 << " len=" << ackedBuffer->second->data.chainLength()
+                 << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
+        stream.ackedIntervals.insert(
+            ackedBuffer->second->offset,
+            ackedBuffer->second->offset +
+                ackedBuffer->second->data.chainLength());
+        stream.retransmissionBuffer.erase(ackedBuffer);
       }
 
       // This stream may be able to invoke some deliveryCallbacks:

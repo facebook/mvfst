@@ -140,10 +140,4 @@ MaxDataFrame generateMaxDataFrame(const QuicConnectionStateBase& conn);
  */
 MaxStreamDataFrame generateMaxStreamDataFrame(const QuicStreamState& stream);
 
-/**
- * Generate a new MinStreamDataFrame with the latest flow control state and
- * window size of stream.
- */
-MinStreamDataFrame generateMinStreamDataFrame(const QuicStreamState& stream);
-
 } // namespace quic

@@ -18,7 +18,6 @@
 DEFINE_string(host, "::1", "Echo server hostname/IP");
 DEFINE_int32(port, 6666, "Echo server port");
 DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
-DEFINE_bool(pr, false, "Enable partially realible mode");
 
 using namespace quic::samples;
 
@@ -33,14 +32,14 @@ int main(int argc, char* argv[]) {
   fizz::CryptoUtils::init();
 
   if (FLAGS_mode == "server") {
-    EchoServer server(FLAGS_host, FLAGS_port, FLAGS_pr);
+    EchoServer server(FLAGS_host, FLAGS_port);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {
       LOG(ERROR) << "EchoClient expected --host and --port";
       return -2;
     }
-    EchoClient client(FLAGS_host, FLAGS_port, FLAGS_pr);
+    EchoClient client(FLAGS_host, FLAGS_port);
     client.start();
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;

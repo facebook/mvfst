@@ -28,18 +28,6 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
         return folly::none;
       }
       return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::MinStreamDataFrame:
-      if (!conn.streamManager->streamExists(
-              frame.asMinStreamDataFrame()->streamId)) {
-        return folly::none;
-      }
-      return QuicSimpleFrame(frame);
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame:
-      if (!conn.streamManager->streamExists(
-              frame.asExpiredStreamDataFrame()->streamId)) {
-        return folly::none;
-      }
-      return QuicSimpleFrame(frame);
     case QuicSimpleFrame::Type::PathChallengeFrame:
       // Path validation timer expired, path validation failed;
       // or a different path validation was scheduled
@@ -95,24 +83,6 @@ void updateSimpleFrameOnPacketLoss(
       }
       break;
     }
-    case QuicSimpleFrame::Type::MinStreamDataFrame: {
-      const MinStreamDataFrame& minStreamData = *frame.asMinStreamDataFrame();
-      auto stream = conn.streamManager->getStream(minStreamData.streamId);
-      if (stream && stream->conn.partialReliabilityEnabled) {
-        advanceCurrentReceiveOffset(stream, minStreamData.minimumStreamOffset);
-      }
-      break;
-    }
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
-      const ExpiredStreamDataFrame& expiredFrame =
-          *frame.asExpiredStreamDataFrame();
-      auto stream = conn.streamManager->getStream(expiredFrame.streamId);
-      if (stream && stream->conn.partialReliabilityEnabled) {
-        advanceMinimumRetransmittableOffset(
-            stream, expiredFrame.minimumStreamOffset);
-      }
-      break;
-    }
     case QuicSimpleFrame::Type::PathChallengeFrame: {
       const PathChallengeFrame& pathChallenge = *frame.asPathChallengeFrame();
       if (conn.outstandingPathValidation &&
@@ -143,7 +113,7 @@ void updateSimpleFrameOnPacketLoss(
 bool updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame,
-    PacketNum packetNum,
+    PacketNum /*packetNum*/,
     bool fromChangedPeerAddress) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
@@ -151,23 +121,6 @@ bool updateSimpleFrameOnPacketReceived(
       auto stream = conn.streamManager->getStream(stopSending.streamId);
       if (stream) {
         sendStopSendingSMHandler(*stream, stopSending);
-      }
-      return true;
-    }
-    case QuicSimpleFrame::Type::MinStreamDataFrame: {
-      const MinStreamDataFrame& minStreamData = *frame.asMinStreamDataFrame();
-      auto stream = conn.streamManager->getStream(minStreamData.streamId);
-      if (stream && stream->conn.partialReliabilityEnabled) {
-        onRecvMinStreamDataFrame(stream, minStreamData, packetNum);
-      }
-      return true;
-    }
-    case QuicSimpleFrame::Type::ExpiredStreamDataFrame: {
-      const ExpiredStreamDataFrame& expiredStreamData =
-          *frame.asExpiredStreamDataFrame();
-      auto stream = conn.streamManager->getStream(expiredStreamData.streamId);
-      if (stream && stream->conn.partialReliabilityEnabled) {
-        onRecvExpiredStreamDataFrame(stream, expiredStreamData);
       }
       return true;
     }

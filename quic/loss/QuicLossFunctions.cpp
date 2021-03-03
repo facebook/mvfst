@@ -111,12 +111,6 @@ void markPacketLoss(
           // not have the offset.
           break;
         }
-        // The original rxmt offset might have been bumped up after it was
-        // shrunk due to egress partially reliable skip.
-        if (!streamFrameMatchesRetransmitBuffer(
-                *stream, frame, *bufferItr->second)) {
-          break;
-        }
         stream->insertIntoLossBuffer(std::move(bufferItr->second));
         stream->retransmissionBuffer.erase(bufferItr);
         conn.streamManager->updateLossStreams(*stream);

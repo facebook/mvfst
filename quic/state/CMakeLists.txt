@@ -207,7 +207,6 @@ target_compile_options(
 
 add_dependencies(
   mvfst_state_simple_frame_functions
-  mvfst_state_qpr_functions
   mvfst_state_functions
   mvfst_state_machine
   mvfst_codec_types
@@ -216,50 +215,10 @@ add_dependencies(
 target_link_libraries(
   mvfst_state_simple_frame_functions PUBLIC
   Folly::folly
-  mvfst_state_qpr_functions
   mvfst_state_functions
   mvfst_state_machine
   mvfst_codec_types
 )
-
-
-# qpr function
-add_library(
-  mvfst_state_qpr_functions
-  QPRFunctions.cpp
-)
-
-target_include_directories(
-  mvfst_state_qpr_functions PUBLIC
-  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
-  $<INSTALL_INTERFACE:include/>
-)
-
-target_compile_options(
-  mvfst_state_qpr_functions
-  PRIVATE
-  ${_QUIC_COMMON_COMPILE_OPTIONS}
-)
-
-add_dependencies(
-  mvfst_state_qpr_functions
-  mvfst_bufutil
-  mvfst_state_machine
-  mvfst_state_stream_functions
-  mvfst_codec_types
-  mvfst_flowcontrol
-)
-
-target_link_libraries(
-  mvfst_state_qpr_functions PUBLIC
-  Folly::folly
-  mvfst_bufutil
-  mvfst_state_machine
-  mvfst_state_stream_functions
-  mvfst_codec_types
-  mvfst_flowcontrol
-)
-
 
 add_library(
   mvfst_state_stream STATIC
@@ -342,12 +301,6 @@ install(
 
 install(
   TARGETS mvfst_state_simple_frame_functions
-  EXPORT mvfst-exports
-  DESTINATION lib
-)
-
-install(
-  TARGETS mvfst_state_qpr_functions
   EXPORT mvfst-exports
   DESTINATION lib
 )
