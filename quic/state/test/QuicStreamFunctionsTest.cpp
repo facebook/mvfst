@@ -1536,6 +1536,7 @@ TEST_F(QuicStreamFunctionsTest, RemovedClosedState) {
   auto streamId = stream->id;
   conn.streamManager->readableStreams().emplace(streamId);
   conn.streamManager->peekableStreams().emplace(streamId);
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("write data"), true);
   conn.streamManager->addWritable(*stream);
   conn.streamManager->queueBlocked(streamId, 0);
   conn.streamManager->addDeliverable(streamId);

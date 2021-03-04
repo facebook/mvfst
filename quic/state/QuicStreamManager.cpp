@@ -240,6 +240,7 @@ bool QuicStreamManager::setStreamPriority(
     // priority there.
     writableStreams_.updateIfExist(id, stream->priority);
     lossStreams_.updateIfExist(id, stream->priority);
+    writableDSRStreams_.updateIfExist(id, stream->priority);
     return true;
   }
   return false;
@@ -439,6 +440,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   readableStreams_.erase(streamId);
   peekableStreams_.erase(streamId);
   writableStreams_.erase(streamId);
+  writableDSRStreams_.erase(streamId);
   writableControlStreams_.erase(streamId);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
@@ -516,7 +518,8 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
-  if (stream.hasWritableData() && !stream.streamWriteError.has_value()) {
+  if (stream.hasWritableDataOrBufMeta() &&
+      !stream.streamWriteError.has_value()) {
     stream.conn.streamManager->addWritable(stream);
   } else {
     stream.conn.streamManager->removeWritable(stream);

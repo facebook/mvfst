@@ -227,6 +227,10 @@ class QuicStreamManager {
     return writableStreams_;
   }
 
+  auto& writableDSRStreams() {
+    return writableDSRStreams_;
+  }
+
   // TODO figure out a better interface here.
   /*
    * Returns a mutable reference to the container holding the writable stream
@@ -240,7 +244,8 @@ class QuicStreamManager {
    * Returns if there are any writable streams.
    */
   bool hasWritable() const {
-    return !writableStreams_.empty() || !writableControlStreams_.empty();
+    return !writableStreams_.empty() || !writableDSRStreams_.empty() ||
+        !writableControlStreams_.empty();
   }
 
   /*
@@ -250,7 +255,15 @@ class QuicStreamManager {
     if (stream.isControl) {
       writableControlStreams_.insert(stream.id);
     } else {
-      writableStreams_.insertOrUpdate(stream.id, stream.priority);
+      bool hasPendingBufMeta = stream.hasWritableBufMeta();
+      bool hasPendingWriteBuf = stream.hasWritableData();
+      CHECK(hasPendingBufMeta || hasPendingWriteBuf);
+      if (hasPendingBufMeta) {
+        writableDSRStreams_.insertOrUpdate(stream.id, stream.priority);
+      }
+      if (hasPendingWriteBuf) {
+        writableStreams_.insertOrUpdate(stream.id, stream.priority);
+      }
     }
   }
 
@@ -262,6 +275,7 @@ class QuicStreamManager {
       writableControlStreams_.erase(stream.id);
     } else {
       writableStreams_.erase(stream.id);
+      writableDSRStreams_.erase(stream.id);
     }
   }
 
@@ -270,6 +284,7 @@ class QuicStreamManager {
    */
   void clearWritable() {
     writableStreams_.clear();
+    writableDSRStreams_.clear();
     writableControlStreams_.clear();
   }
 
@@ -842,6 +857,7 @@ class QuicStreamManager {
 
   // Set of !control streams that have writable data
   PriorityQueue writableStreams_;
+  PriorityQueue writableDSRStreams_;
 
   // Set of control streams that have writable data
   std::set<StreamId> writableControlStreams_;

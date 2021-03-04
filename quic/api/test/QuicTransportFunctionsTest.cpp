@@ -2048,6 +2048,7 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   conn->flowControlState.peerAdvertisedMaxOffset = 1000;
   conn->flowControlState.sumCurWriteOffset = 800;
   QuicStreamState stream(0, *conn);
+  writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("I'm a devil"), true);
   conn->streamManager->addWritable(stream);
   EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
 

@@ -58,10 +58,16 @@ void writeBufMetaToQuicStream(
   if (data.length > 0) {
     maybeWriteBlockAfterAPIWrite(stream);
   }
+  auto realDataLength =
+      stream.currentWriteOffset + stream.writeBuffer.chainLength();
+  CHECK_GT(realDataLength, 0)
+      << "Real data has to be written to a stream before any buffer meta is"
+      << "written to it.";
   if (stream.writeBufMeta.offset == 0) {
-    CHECK(!stream.finalWriteOffset.has_value());
-    stream.writeBufMeta.offset =
-        stream.currentWriteOffset + stream.writeBuffer.chainLength();
+    CHECK(!stream.finalWriteOffset.has_value())
+        << "Buffer meta cannot be appended to a stream after we have seen EOM "
+        << "in real data";
+    stream.writeBufMeta.offset = realDataLength;
   }
   stream.writeBufMeta.length += data.length;
   if (eof) {

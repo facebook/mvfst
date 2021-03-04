@@ -318,5 +318,25 @@ TEST_F(QuicStreamManagerTest, TestClearActionable) {
   EXPECT_TRUE(manager.peekableStreams().empty());
 }
 
+TEST_F(QuicStreamManagerTest, WriteBufferMeta) {
+  auto& manager = *conn.streamManager;
+  auto stream = manager.createNextUnidirectionalStream().value();
+  // Add some real data into write buffer
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("prefix"), false);
+  // Artificially remove the stream from writable queue, so that any further
+  // writable query is about the DSR state.
+  manager.removeWritable(*stream);
+
+  BufferMeta bufferMeta(200);
+  writeBufMetaToQuicStream(*stream, bufferMeta, true);
+  EXPECT_TRUE(stream->hasWritableBufMeta());
+  EXPECT_TRUE(manager.hasWritable());
+
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  manager.removeClosedStream(stream->id);
+  EXPECT_TRUE(manager.writableDSRStreams().empty());
+}
+
 } // namespace test
 } // namespace quic

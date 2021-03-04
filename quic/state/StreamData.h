@@ -314,6 +314,23 @@ struct QuicStreamState : public QuicStreamLike {
     return false;
   }
 
+  FOLLY_NODISCARD bool hasWritableBufMeta() const {
+    if (writeBufMeta.offset == 0) {
+      return false;
+    }
+    if (writeBufMeta.length > 0) {
+      return flowControlState.peerAdvertisedMaxOffset - writeBufMeta.offset > 0;
+    }
+    if (finalWriteOffset) {
+      return writeBufMeta.offset <= *finalWriteOffset;
+    }
+    return false;
+  }
+
+  FOLLY_NODISCARD bool hasWritableDataOrBufMeta() const {
+    return hasWritableData() || hasWritableBufMeta();
+  }
+
   bool hasReadableData() const {
     return (readBuffer.size() > 0 &&
             currentReadOffset == readBuffer.front().offset) ||
