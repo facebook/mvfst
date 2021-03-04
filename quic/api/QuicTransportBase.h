@@ -178,6 +178,12 @@ class QuicTransportBase : public QuicSocket {
       bool eof,
       DeliveryCallback* cb = nullptr) override;
 
+  WriteResult writeBufMeta(
+      StreamId id,
+      const BufferMeta& data,
+      bool eof,
+      DeliveryCallback* cb = nullptr) override;
+
   folly::Expected<folly::Unit, LocalErrorCode> registerDeliveryCallback(
       StreamId id,
       uint64_t offset,

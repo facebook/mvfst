@@ -3279,5 +3279,31 @@ TEST_F(QuicTransportTest, PrioritySetAndGet) {
   EXPECT_EQ(LocalErrorCode::CONNECTION_CLOSED, closedConnStreamPri.error());
 }
 
+TEST_F(QuicTransportTest, WriteBufMetaIntoStream) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  size_t bufferLength = 2000;
+  BufferMeta meta(bufferLength);
+  auto buf = buildRandomInputData(20);
+  // Some amount of real data needs to be written first:
+  transport_->writeChain(streamId, std::move(buf), false);
+  transport_->writeBufMeta(streamId, meta, true);
+  auto& stream =
+      *transport_->getConnectionState().streamManager->findStream(streamId);
+  EXPECT_GE(stream.writeBufMeta.offset, 20);
+  EXPECT_EQ(stream.writeBufMeta.length, bufferLength);
+  EXPECT_TRUE(stream.writeBufMeta.eof);
+  EXPECT_EQ(
+      *stream.finalWriteOffset,
+      stream.writeBufMeta.offset + stream.writeBufMeta.length);
+}
+
+TEST_F(QuicTransportTest, WriteBufMetaWithoutRealData) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  size_t bufferLength = 2000;
+  BufferMeta meta(bufferLength);
+  auto result = transport_->writeBufMeta(streamId, meta, true);
+  EXPECT_TRUE(result.hasError());
+}
+
 } // namespace test
 } // namespace quic

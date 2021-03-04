@@ -29,6 +29,9 @@ void prependToBuf(quic::Buf& buf, quic::Buf toAppend) {
 namespace quic {
 
 void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
+  // Once data is written to writeBufMeta, no more data can be written to
+  // writeBuffer.
+  CHECK_EQ(0, stream.writeBufMeta.offset);
   uint64_t len = 0;
   if (data) {
     len = data->computeChainDataLength();
@@ -45,6 +48,28 @@ void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
     stream.finalWriteOffset = stream.currentWriteOffset + bufferSize;
   }
   updateFlowControlOnWriteToStream(stream, len);
+  stream.conn.streamManager->updateWritableStreams(stream);
+}
+
+void writeBufMetaToQuicStream(
+    QuicStreamState& stream,
+    const BufferMeta& data,
+    bool eof) {
+  if (data.length > 0) {
+    maybeWriteBlockAfterAPIWrite(stream);
+  }
+  if (stream.writeBufMeta.offset == 0) {
+    CHECK(!stream.finalWriteOffset.has_value());
+    stream.writeBufMeta.offset =
+        stream.currentWriteOffset + stream.writeBuffer.chainLength();
+  }
+  stream.writeBufMeta.length += data.length;
+  if (eof) {
+    stream.finalWriteOffset =
+        stream.writeBufMeta.offset + stream.writeBufMeta.length;
+    stream.writeBufMeta.eof = true;
+  }
+  updateFlowControlOnWriteToStream(stream, data.length);
   stream.conn.streamManager->updateWritableStreams(stream);
 }
 

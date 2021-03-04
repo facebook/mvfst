@@ -198,6 +198,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD4(
       writeChain,
       WriteResult(StreamId, SharedBuf, bool, DeliveryCallback*));
+  MOCK_METHOD4(
+      writeBufMeta,
+      WriteResult(StreamId, const BufferMeta&, bool, DeliveryCallback*));
   MOCK_METHOD3(
       registerDeliveryCallback,
       folly::Expected<folly::Unit, LocalErrorCode>(

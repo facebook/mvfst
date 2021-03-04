@@ -16,6 +16,71 @@
 
 namespace quic {
 
+/**
+ * A buffer representation without the actual data. This is part of the public
+ * facing interface.
+ *
+ * This is experimental.
+ */
+struct BufferMeta {
+  size_t length;
+
+  explicit BufferMeta(size_t lengthIn) : length(lengthIn) {}
+};
+
+/**
+ * A write buffer representation without the actual data. This is used for
+ * write buffer management in a stream.
+ *
+ * This is experimental.
+ */
+struct WriteBufferMeta {
+  size_t length{0};
+  size_t offset{0};
+  bool eof{false};
+
+  WriteBufferMeta() = default;
+
+  struct Builder {
+    Builder& setLength(size_t lengthIn) {
+      length_ = lengthIn;
+      return *this;
+    }
+
+    Builder& setOffset(size_t offsetIn) {
+      offset_ = offsetIn;
+      return *this;
+    }
+
+    Builder& setEOF(bool val) {
+      eof_ = val;
+      return *this;
+    }
+
+    WriteBufferMeta build() {
+      return WriteBufferMeta(length_, offset_, eof_);
+    }
+
+   private:
+    size_t length_{0};
+    size_t offset_{0};
+    bool eof_{false};
+  };
+
+  WriteBufferMeta split(size_t splitLen) {
+    CHECK_GE(length, splitLen);
+    auto splitEof = splitLen == length && eof;
+    WriteBufferMeta splitOf(splitLen, offset, splitEof);
+    offset += splitLen;
+    length -= splitLen;
+    return splitOf;
+  }
+
+ private:
+  explicit WriteBufferMeta(size_t lengthIn, size_t offsetIn, bool eofIn)
+      : length(lengthIn), offset(offsetIn), eof(eofIn) {}
+};
+
 struct StreamBuffer {
   BufQueue data;
   uint64_t offset;
@@ -96,6 +161,17 @@ struct QuicStreamLike {
   // Current cumulative number of packets sent for this stream. It only counts
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};
+
+  // BufferMeta that has been writen to the QUIC layer.
+  // When offset is 0, nothing has been written to it. On first write, its
+  // starting offset will be currentWriteOffset + writeBuffer.chainLength().
+  WriteBufferMeta writeBufMeta;
+
+  // A map to store sent WriteBufferMetas for potential retransmission.
+  folly::F14FastMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
+
+  // WriteBufferMetas that's already marked lost. They will be retransmitted.
+  std::deque<WriteBufferMeta> lossBufMetas;
 
   /*
    * Either insert a new entry into the loss buffer, or merge the buffer with

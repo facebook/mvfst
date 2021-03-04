@@ -956,6 +956,15 @@ class QuicSocket {
       DeliveryCallback* cb = nullptr) = 0;
 
   /**
+   * Write a data representation in the form of BufferMeta to the given stream.
+   */
+  virtual WriteResult writeBufMeta(
+      StreamId id,
+      const BufferMeta& data,
+      bool eof,
+      DeliveryCallback* cb = nullptr) = 0;
+
+  /**
    * Register a callback to be invoked when the peer has acknowledged the
    * given offset on the given stream.
    */

@@ -22,6 +22,17 @@ namespace quic {
 void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof);
 
 /**
+ * Adds data represented in the form of BufferMeta to the end of the Buffer
+ * Meta queue of the stream.
+ *
+ * TODO: move to dsr directory.
+ */
+void writeBufMetaToQuicStream(
+    QuicStreamState& stream,
+    const BufferMeta& data,
+    bool eof);
+
+/**
  * Adds data to the end of the write buffer of the QUIC crypto stream. This
  * data will be written onto the socket.
  */
