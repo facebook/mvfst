@@ -82,6 +82,7 @@ constexpr auto kHeaders = "headers";
 constexpr auto kOnHeaders = "on headers";
 constexpr auto kOnError = "on error";
 constexpr auto kPushPromise = "push promise";
+constexpr auto kBody = "body";
 
 constexpr folly::StringPiece kQLogServerVantagePoint = "server";
 constexpr folly::StringPiece kQLogClientVantagePoint = "client";
