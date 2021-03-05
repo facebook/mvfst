@@ -111,14 +111,6 @@ struct SendInstruction {
 };
 
 WriteStreamFrame sendInstructionToWriteStreamFrame(
-    const SendInstruction& sendInstruction) {
-  WriteStreamFrame frame(
-      sendInstruction.streamId,
-      sendInstruction.offset,
-      sendInstruction.len,
-      sendInstruction.fin);
-  frame.fromBufMeta = true;
-  return frame;
-}
+    const SendInstruction& sendInstruction);
 
 } // namespace quic
