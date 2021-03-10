@@ -564,7 +564,8 @@ OutstandingPacket makeTestingWritePacket(
     size_t desiredSize,
     uint64_t totalBytesSent,
     TimePoint sentTime /* = Clock::now() */,
-    uint64_t inflightBytes /* = 0 */) {
+    uint64_t inflightBytes /* = 0 */,
+    uint64_t writeCount /* = 0 */) {
   LongHeader longHeader(
       LongHeader::Types::ZeroRtt,
       getTestConnectionId(1),
@@ -580,7 +581,8 @@ OutstandingPacket makeTestingWritePacket(
       totalBytesSent,
       inflightBytes,
       0,
-      LossState());
+      LossState(),
+      writeCount);
 }
 
 CongestionController::AckEvent makeAck(

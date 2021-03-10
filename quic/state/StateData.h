@@ -821,6 +821,19 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Whether a connection can be paced based on its handshake and close states.
   // For example, we may not want to pace a connection that's still handshaking.
   bool canBePaced{false};
+
+  // Flag indicating whether the socket is currently waiting for the app to
+  // write data. All new sockets start off in this state where they wait for the
+  // application to pump data to the socket.
+  // TODO: Merge this flag with the existing appLimited flag that exists on each
+  // Congestion Controller.
+  bool waitingForAppData{true};
+
+  // Monotonically increasing counter that is incremented each time there is a
+  // write on this socket (writeSocketData() is called), This is used to
+  // identify specific outstanding packets (based on writeCount and packetNum)
+  // in the Observers, to construct Write Blocks
+  uint64_t writeCount{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

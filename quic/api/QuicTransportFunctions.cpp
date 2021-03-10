@@ -666,6 +666,7 @@ void updateConnection(
     return;
   }
   conn.lossState.totalAckElicitingPacketsSent++;
+
   auto packetIt =
       std::find_if(
           conn.outstandings.packets.rbegin(),
@@ -688,7 +689,8 @@ void updateConnection(
       conn.lossState.totalBytesSent,
       conn.lossState.inflightBytes + encodedSize,
       conn.outstandings.numOutstanding() + 1,
-      conn.lossState);
+      conn.lossState,
+      conn.writeCount);
 
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;

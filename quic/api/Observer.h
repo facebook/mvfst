@@ -37,6 +37,7 @@ class Observer {
     // following flags enable support for various callbacks.
     // observer and socket lifecycle callbacks are always enabled.
     bool evbEvents{false};
+    bool appDataSentEvents{false};
     bool appLimitedEvents{false};
     bool lossEvents{false};
     bool spuriousLossEvents{false};
@@ -50,6 +51,7 @@ class Observer {
     static Config getConfigAllEventsEnabled() {
       Config config = {};
       config.evbEvents = true;
+      config.appDataSentEvents = true;
       config.appLimitedEvents = true;
       config.rttSamples = true;
       config.lossEvents = true;
@@ -81,6 +83,24 @@ class Observer {
   const Config& getConfig() {
     return observerConfig_;
   }
+
+  struct AppLimitedEvent {
+    AppLimitedEvent(
+        const std::deque<OutstandingPacket>& outstandingPackets,
+        const uint64_t writeCount)
+        : outstandingPackets(outstandingPackets), writeCount(writeCount) {}
+
+    // Cannot support copy ctors safely
+    AppLimitedEvent(const AppLimitedEvent&) = delete;
+    AppLimitedEvent(AppLimitedEvent&&) = delete;
+
+    // Reference to the current list of outstanding packets
+    const std::deque<OutstandingPacket>& outstandingPackets;
+    // The current write number for the write() call that
+    // caused this appLimitedEvent. Used by Observers to identify specific
+    // packets from the outstandingPacket list (above).
+    const uint64_t writeCount;
+  };
 
   struct LostPacket {
     explicit LostPacket(
@@ -274,11 +294,51 @@ class Observer {
       folly::EventBase* /* evb */) noexcept {}
 
   /**
+   * startWritingFromAppLimited() is invoked when the socket is currenty
+   * app rate limited and is being asked to write a new set of Bytes.
+   . This callback is invoked BEFORE we write the
+   * new bytes to the socket, this is done so that Observers can collect
+   * metadata about the connection BEFORE the start of a potential Write Block.
+   *
+   * @param socket   Socket that has potentially sent application data.
+                             reference to the number of outstanding packets
+                             BEFORE the call to write() socket data.
+
+   */
+  virtual void startWritingFromAppLimited(
+      QuicSocket* /* socket */,
+      const AppLimitedEvent& /* appLimitedEvent */) {}
+
+  /**
+   * packetsWritten() is invoked when the socket writes retransmittable packets
+   * to the wire, those packets will be present in the outstanding packets list.
+   * Observers can use this callback (which will always be invoked AFTER
+   * startWritingFromAppLimited) to *update* the transport's metadata within the
+   * currently tracked WriteBlock.
+   *
+   * If an Observer receives startWritingFromAppLimited but doesn't receive
+   * packetsWritten (and instead directly receives appRateLimited), it means the
+   * socket witnessed non-app data writes - this scenario is irrelevant and
+   * should not be used to construct Write Blocks.
+   *
+   * @param socket   Socket that has sent application data.
+   * @param appLimitedEvent  The AppLimitedEvent details which contains a const
+                             reference to the number of outstanding packets
+   */
+  virtual void packetsWritten(
+      QuicSocket* /* socket */,
+      const AppLimitedEvent& /* appLimitedEvent */) {}
+
+  /**
    * appRateLimited() is invoked when the socket is app rate limited.
    *
    * @param socket      Socket that has become application rate limited.
+   * @param appLimitedEvent  The AppLimitedEvent details which contains a const
+                             reference to the number of outstanding packets
    */
-  virtual void appRateLimited(QuicSocket* /* socket */) {}
+  virtual void appRateLimited(
+      QuicSocket* /* socket */,
+      const AppLimitedEvent& /* appLimitedEvent */) {}
 
   /**
    * packetLossDetected() is invoked when a packet loss is detected.

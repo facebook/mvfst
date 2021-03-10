@@ -145,6 +145,7 @@ class QuicSocket {
     uint64_t bytesSent{0};
     uint64_t bytesAcked{0};
     uint64_t bytesRecvd{0};
+    uint64_t bytesInFlight{0};
     uint64_t totalBytesRetransmitted{0};
     uint32_t ptoCount{0};
     uint32_t totalPTOCount{0};

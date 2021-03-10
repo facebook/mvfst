@@ -222,7 +222,8 @@ OutstandingPacket makeTestingWritePacket(
     size_t desiredSize,
     uint64_t totalBytesSent,
     TimePoint sentTime = Clock::now(),
-    uint64_t inflightBytes = 0);
+    uint64_t inflightBytes = 0,
+    uint64_t writeCount = 0);
 
 // TODO: The way we setup packet sent, ack, loss in test cases can use some
 // major refactor.

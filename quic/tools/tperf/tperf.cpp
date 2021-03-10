@@ -134,7 +134,9 @@ ProbeSizeRaiserType parseRaiserType(uint32_t type) {
 class TPerfObserver : public Observer {
  public:
   TPerfObserver(const Observer::Config& config) : Observer(config) {}
-  void appRateLimited(QuicSocket* /* socket */) override {
+  void appRateLimited(
+      QuicSocket* /* socket */,
+      const quic::Observer::AppLimitedEvent& /* appLimitedEvent */) override {
     if (FLAGS_log_app_rate_limited) {
       LOG(INFO) << "appRateLimited detected";
     }

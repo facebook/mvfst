@@ -35,6 +35,9 @@ struct OutstandingPacketMetadata {
   uint32_t totalPacketsSent{0};
   // Total number of ack-eliciting packets sent on this connection.
   uint32_t totalAckElicitingPacketsSent{0};
+  // Write Count is the value of the monotonically increasing counter which
+  // tracks the number of writes on this socket.
+  uint64_t writeCount{0};
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
@@ -44,7 +47,8 @@ struct OutstandingPacketMetadata {
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
-      const LossState& lossStateIn)
+      const LossState& lossStateIn,
+      uint64_t writeCount)
       : time(timeIn),
         encodedSize(encodedSizeIn),
         isHandshake(isHandshakeIn),
@@ -53,8 +57,8 @@ struct OutstandingPacketMetadata {
         inflightBytes(inflightBytesIn),
         packetsInflight(packetsInflightIn),
         totalPacketsSent(lossStateIn.totalPacketsSent),
-        totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent) {
-  }
+        totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
+        writeCount(writeCount) {}
 };
 
 // Data structure to represent outstanding retransmittable packets
@@ -119,7 +123,8 @@ struct OutstandingPacket {
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
-      const LossState& lossStateIn)
+      const LossState& lossStateIn,
+      uint64_t writeCount = 0)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -129,7 +134,8 @@ struct OutstandingPacket {
             totalBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
-            lossStateIn)) {}
+            lossStateIn,
+            writeCount)) {}
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -140,7 +146,8 @@ struct OutstandingPacket {
       uint64_t totalBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
-      const LossState& lossStateIn)
+      const LossState& lossStateIn,
+      uint64_t writeCount = 0)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -150,6 +157,7 @@ struct OutstandingPacket {
             totalBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
-            lossStateIn)) {}
+            lossStateIn,
+            writeCount)) {}
 };
 } // namespace quic

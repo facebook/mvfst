@@ -602,6 +602,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.bytesSent = conn_->lossState.totalBytesSent;
   transportInfo.bytesAcked = conn_->lossState.totalBytesAcked;
   transportInfo.bytesRecvd = conn_->lossState.totalBytesRecvd;
+  transportInfo.bytesInFlight = conn_->lossState.inflightBytes;
   transportInfo.ptoCount = conn_->lossState.ptoCount;
   transportInfo.totalPTOCount = conn_->lossState.totalPTOCount;
   transportInfo.largestPacketAckedByPeer =
@@ -2660,7 +2661,20 @@ QuicConnectionStats QuicTransportBase::getConnectionsStats() const {
 
 void QuicTransportBase::writeSocketData() {
   if (socket_) {
+    // record this invocation of a new write to the socket
+    ++(conn_->writeCount);
     auto packetsBefore = conn_->outstandings.numOutstanding();
+    // Signal Observers the POTENTIAL start of a Write Block.
+    if (conn_->waitingForAppData && conn_->congestionController) {
+      Observer::AppLimitedEvent startWritingFromAppLimitedEvent(
+          conn_->outstandings.packets, conn_->writeCount);
+      for (const auto& cb : *observers_) {
+        if (cb->getConfig().appDataSentEvents) {
+          cb->startWritingFromAppLimited(this, startWritingFromAppLimitedEvent);
+        }
+      }
+      conn_->waitingForAppData = false;
+    }
     writeData();
     if (closeState_ != CloseState::CLOSED) {
       if (conn_->pendingEvents.closeTransport == true) {
@@ -2671,6 +2685,18 @@ void QuicTransportBase::writeSocketData() {
       setLossDetectionAlarm(*conn_, *this);
       auto packetsAfter = conn_->outstandings.numOutstanding();
       bool packetWritten = (packetsAfter > packetsBefore);
+      // Signal the Observers that *some* packets were written
+      // These may/may not be app data packets, it it up to the Observers
+      // to deal with these packets.
+      if (packetWritten && conn_->congestionController) {
+        Observer::AppLimitedEvent packetsWrittenEvent(
+            conn_->outstandings.packets, conn_->writeCount);
+        for (const auto& cb : *observers_) {
+          if (cb->getConfig().appDataSentEvents) {
+            cb->packetsWritten(this, packetsWrittenEvent);
+          }
+        }
+      }
       if (conn_->loopDetectorCallback && packetWritten) {
         conn_->writeDebugState.currentEmptyLoopCount = 0;
       } else if (
@@ -2706,11 +2732,14 @@ void QuicTransportBase::writeSocketData() {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any observer callbacks
         connCallback_->onAppRateLimited();
+        Observer::AppLimitedEvent appLimitedEvent(
+            conn_->outstandings.packets, conn_->writeCount);
         for (const auto& cb : *observers_) {
           if (cb->getConfig().appLimitedEvents) {
-            cb->appRateLimited(this);
+            cb->appRateLimited(this, appLimitedEvent);
           }
         }
+        conn_->waitingForAppData = true;
       }
     }
   }

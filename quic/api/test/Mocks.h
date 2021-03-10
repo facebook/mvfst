@@ -323,7 +323,24 @@ class MockObserver : public Observer {
       void(
           QuicSocket*,
           const folly::Optional<std::pair<QuicErrorCode, std::string>>&));
-  GMOCK_METHOD1_(, noexcept, , appRateLimited, void(QuicSocket*));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      startWritingFromAppLimited,
+      void(QuicSocket*, const AppLimitedEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      packetsWritten,
+      void(QuicSocket*, const AppLimitedEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      appRateLimited,
+      void(QuicSocket*, const AppLimitedEvent&));
   GMOCK_METHOD2_(
       ,
       noexcept,

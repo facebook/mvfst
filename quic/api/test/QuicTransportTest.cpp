@@ -359,6 +359,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
 
   Observer::Config config = {};
   config.appLimitedEvents = true;
+  config.appDataSentEvents = true;
   auto cb = std::make_unique<StrictMock<MockObserver>>(config);
 
   EXPECT_CALL(*cb, observerAttach(transport_.get()));
@@ -367,7 +368,9 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
   auto stream = transport_->createBidirectionalStream().value();
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
-  EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
+  EXPECT_CALL(*cb, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
   EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
@@ -389,6 +392,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
 
   Observer::Config config = {};
   config.appLimitedEvents = true;
+  config.appDataSentEvents = true;
   auto cb = std::make_unique<StrictMock<MockObserver>>(config);
 
   EXPECT_CALL(*cb, observerAttach(transport_.get()));
@@ -397,7 +401,9 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100 * 2000);
   transport_->writeChain(stream, buf->clone(), false, nullptr);
-  EXPECT_CALL(*cb, appRateLimited(transport_.get())).Times(0);
+  EXPECT_CALL(*cb, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
   EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
@@ -410,6 +416,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
 TEST_F(QuicTransportTest, AppLimitedWithObservers) {
   Observer::Config config = {};
   config.appLimitedEvents = true;
+  config.appDataSentEvents = true;
   auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
   auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
@@ -430,8 +437,12 @@ TEST_F(QuicTransportTest, AppLimitedWithObservers) {
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(1);
-  EXPECT_CALL(*cb1, appRateLimited(transport_.get()));
-  EXPECT_CALL(*cb2, appRateLimited(transport_.get()));
+  EXPECT_CALL(*cb1, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb1, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb1, appRateLimited(transport_.get(), _));
+  EXPECT_CALL(*cb2, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb2, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb2, appRateLimited(transport_.get(), _));
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
