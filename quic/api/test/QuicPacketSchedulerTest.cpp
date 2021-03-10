@@ -1508,6 +1508,47 @@ TEST_F(
   EXPECT_EQ(buf->length(), 0);
 }
 
+TEST_F(QuicPacketSchedulerTest, HighPriNewDataBeforeLowPriLossData) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 100000;
+  auto lowPriStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto highPriStreamId =
+      (*conn.streamManager->createNextBidirectionalStream())->id;
+  auto lowPriStream = conn.streamManager->findStream(lowPriStreamId);
+  auto highPriStream = conn.streamManager->findStream(highPriStreamId);
+
+  lowPriStream->lossBuffer.push_back(
+      StreamBuffer(folly::IOBuf::copyBuffer("Onegin"), 0, false));
+  conn.streamManager->updateWritableStreams(*lowPriStream);
+  conn.streamManager->setStreamPriority(lowPriStream->id, 5, false);
+
+  auto inBuf = buildRandomInputData(conn.udpSendPacketLen * 10);
+  writeDataToQuicStream(*highPriStream, inBuf->clone(), false);
+  conn.streamManager->updateWritableStreams(*highPriStream);
+  conn.streamManager->setStreamPriority(highPriStream->id, 0, false);
+
+  StreamFrameScheduler scheduler(conn);
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder.encodePacketHeader();
+  scheduler.writeStreams(builder);
+  auto packet = std::move(builder).buildPacket().packet;
+  EXPECT_EQ(1, packet.frames.size());
+  auto& writeStreamFrame = *packet.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(highPriStream->id, writeStreamFrame.streamId);
+  EXPECT_FALSE(lowPriStream->lossBuffer.empty());
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicPacketSchedulerTests,
     QuicPacketSchedulerTest,

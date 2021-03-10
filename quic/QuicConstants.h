@@ -537,7 +537,6 @@ enum class WriteDataReason {
   ACK,
   CRYPTO_STREAM,
   STREAM,
-  LOSS,
   BLOCKED,
   STREAM_WINDOW_UPDATE,
   CONN_WINDOW_UPDATE,

@@ -113,7 +113,8 @@ void markPacketLoss(
         }
         stream->insertIntoLossBuffer(std::move(bufferItr->second));
         stream->retransmissionBuffer.erase(bufferItr);
-        conn.streamManager->updateLossStreams(*stream);
+        conn.streamManager->updateWritableStreams(*stream);
+        conn.streamManager->addLoss(stream->id);
         break;
       }
       case QuicWriteFrame::Type::WriteCryptoFrame: {

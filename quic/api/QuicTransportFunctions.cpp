@@ -121,7 +121,6 @@ uint64_t writeQuicDataToSocketImpl(
             .simpleFrames()
             .resetFrames()
             .streamFrames()
-            .streamRetransmissions()
             .pingFrames();
     if (!exceptCryptoStream) {
       probeSchedulerBuilder.cryptoFrames();
@@ -152,7 +151,6 @@ uint64_t writeQuicDataToSocketImpl(
           exceptCryptoStream ? "FrameSchedulerWithoutCrypto" : "FrameScheduler")
           .streamFrames()
           .ackFrames()
-          .streamRetransmissions()
           .resetFrames()
           .windowUpdateFrames()
           .blockedFrames()
@@ -591,9 +589,9 @@ void updateConnection(
           updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
           maybeWriteBlockAfterSocketWrite(*stream);
           maybeWriteDataBlockedAfterSocketWrite(conn);
-          conn.streamManager->updateWritableStreams(*stream);
           conn.streamManager->addTx(writeStreamFrame.streamId);
         }
+        conn.streamManager->updateWritableStreams(*stream);
         conn.streamManager->updateLossStreams(*stream);
         break;
       }
@@ -1033,7 +1031,6 @@ uint64_t writeZeroRttDataToSocket(
                     LongHeader::typeToPacketNumberSpace(type),
                     "ZeroRttScheduler")
                     .streamFrames()
-                    .streamRetransmissions()
                     .resetFrames()
                     .windowUpdateFrames()
                     .blockedFrames()
@@ -1535,9 +1532,6 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   }
   if (conn.streamManager->hasBlocked()) {
     return WriteDataReason::BLOCKED;
-  }
-  if (conn.streamManager->hasLoss()) {
-    return WriteDataReason::LOSS;
   }
   if (getSendConnFlowControlBytesWire(conn) != 0 &&
       conn.streamManager->hasWritable()) {

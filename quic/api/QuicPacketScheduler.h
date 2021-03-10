@@ -59,20 +59,6 @@ class QuicPacketScheduler {
   virtual folly::StringPiece name() const = 0;
 };
 
-class RetransmissionScheduler {
- public:
-  explicit RetransmissionScheduler(const QuicConnectionStateBase& conn);
-
-  void writeRetransmissionStreams(PacketBuilderInterface& builder);
-
-  bool hasPendingData() const;
-
- private:
-  bool writeStreamLossBuffers(PacketBuilderInterface& builder, StreamId id);
-
-  const QuicConnectionStateBase& conn_;
-};
-
 class StreamFrameScheduler {
  public:
   explicit StreamFrameScheduler(QuicConnectionStateBase& conn);
@@ -86,6 +72,25 @@ class StreamFrameScheduler {
   bool hasPendingData() const;
 
  private:
+  // Return true if this stream wrote some data
+  bool writeStreamLossBuffers(
+      PacketBuilderInterface& builder,
+      QuicStreamState& stream);
+
+  /**
+   * Write a single stream's write buffer or loss buffer
+   *
+   * lossOnly: if only loss buffer should be written. This param may get mutated
+   *           inside the function.
+   *
+   * Return: true if write should continue after this stream, false otherwise.
+   */
+  bool writeSingleStream(
+      PacketBuilderInterface& builder,
+      QuicStreamState& stream,
+      bool& lossOnly,
+      uint64_t& connWritableBytes);
+
   StreamId writeStreamsHelper(
       PacketBuilderInterface& builder,
       const std::set<StreamId>& writableStreams,
@@ -103,13 +108,18 @@ class StreamFrameScheduler {
    * Helper function to write either stream data if stream is not flow
    * controlled or a blocked frame otherwise.
    *
-   * Return: boolean indicates if anything (either data, or Blocked frame) is
-   *   written into the packet.
-   *
+   * Return: A WriteStreamFrameResult enum indicates if write is
+   *         successful, and whether the error is due to packet space or flow
+   *         control.
    */
-  bool writeNextStreamFrame(
+  enum class WriteStreamFrameResult : uint8_t {
+    SUCCESSFUL,
+    PACKET_SPACE_ERR,
+    FLOW_CONTROL_ERR
+  };
+  WriteStreamFrameResult writeStreamFrame(
       PacketBuilderInterface& builder,
-      StreamId streamId,
+      QuicStreamState& stream,
       uint64_t& connWritableBytes);
 
   QuicConnectionStateBase& conn_;
@@ -237,7 +247,6 @@ class FrameScheduler : public QuicPacketScheduler {
         PacketNumberSpace packetNumberSpace,
         folly::StringPiece name);
 
-    Builder& streamRetransmissions();
     Builder& streamFrames();
     Builder& ackFrames();
     Builder& resetFrames();
@@ -256,7 +265,6 @@ class FrameScheduler : public QuicPacketScheduler {
     folly::StringPiece name_;
 
     // schedulers
-    bool retransmissionScheduler_{false};
     bool streamFrameScheduler_{false};
     bool ackScheduler_{false};
     bool rstScheduler_{false};
@@ -282,7 +290,6 @@ class FrameScheduler : public QuicPacketScheduler {
   FOLLY_NODISCARD folly::StringPiece name() const override;
 
  private:
-  folly::Optional<RetransmissionScheduler> retransmissionScheduler_;
   folly::Optional<StreamFrameScheduler> streamFrameScheduler_;
   folly::Optional<AckScheduler> ackScheduler_;
   folly::Optional<RstStreamScheduler> rstScheduler_;

@@ -147,9 +147,8 @@ void dropPackets(QuicServerConnectionState& conn) {
               }),
           std::move(*itr->second));
       stream->retransmissionBuffer.erase(itr);
-      if (conn.streamManager->lossStreams().count(streamFrame->streamId) == 0) {
-        conn.streamManager->addLoss(streamFrame->streamId);
-      }
+      conn.streamManager->updateWritableStreams(*stream);
+      conn.streamManager->updateLossStreams(*stream);
     }
   }
   conn.outstandings.packets.clear();

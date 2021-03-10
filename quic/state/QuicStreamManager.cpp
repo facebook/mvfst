@@ -239,7 +239,6 @@ bool QuicStreamManager::setStreamPriority(
     // If this stream is already in the writable or loss queus, update the
     // priority there.
     writableStreams_.updateIfExist(id, stream->priority);
-    lossStreams_.updateIfExist(id, stream->priority);
     writableDSRStreams_.updateIfExist(id, stream->priority);
     return true;
   }
@@ -442,11 +441,11 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   writableStreams_.erase(streamId);
   writableDSRStreams_.erase(streamId);
   writableControlStreams_.erase(streamId);
+  removeLoss(streamId);
   blockedStreams_.erase(streamId);
   deliverableStreams_.erase(streamId);
   txStreams_.erase(streamId);
   windowUpdates_.erase(streamId);
-  lossStreams_.erase(streamId);
   stopSendingStreams_.erase(streamId);
   flowControlUpdated_.erase(streamId);
   if (it->second.isControl) {
@@ -498,16 +497,6 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   updateAppIdleState();
 }
 
-void QuicStreamManager::updateLossStreams(QuicStreamState& stream) {
-  if (stream.lossBuffer.empty()) {
-    // No-op if not present
-    lossStreams_.erase(stream.id);
-  } else {
-    // No-op if already inserted
-    lossStreams_.insertOrUpdate(stream.id, stream.priority);
-  }
-}
-
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
   updateHolBlockedTime(stream);
   if (stream.hasReadableData() || stream.streamReadError.has_value()) {
@@ -518,11 +507,23 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
-  if (stream.hasWritableDataOrBufMeta() &&
-      !stream.streamWriteError.has_value()) {
-    stream.conn.streamManager->addWritable(stream);
+  if (stream.streamWriteError.has_value()) {
+    CHECK(stream.lossBuffer.empty());
+    removeWritable(stream);
+    return;
+  }
+  if (stream.hasWritableData() || !stream.lossBuffer.empty()) {
+    addWritable(stream);
   } else {
-    stream.conn.streamManager->removeWritable(stream);
+    removeWritable(stream);
+  }
+  if (stream.isControl) {
+    return;
+  }
+  if (stream.hasWritableBufMeta()) {
+    addDSRWritable(stream);
+  } else {
+    removeDSRWritable(stream);
   }
 }
 

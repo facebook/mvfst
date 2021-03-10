@@ -106,13 +106,6 @@ class QuicStreamManager {
   void updateWritableStreams(QuicStreamState& stream);
 
   /*
-   * Update the current loss streams for the given stream state. This will
-   * either add or remove it from the collection of streams with outstanding
-   * loss.
-   */
-  void updateLossStreams(QuicStreamState& stream);
-
-  /*
    * Find a open and active (we have created state for it) stream and return its
    * state.
    */
@@ -195,20 +188,24 @@ class QuicStreamManager {
     }
   }
 
-  auto& lossStreams() const {
-    return lossStreams_;
-  }
-
-  // This should be only used in testing code.
-  void addLoss(StreamId streamId) {
-    auto stream = findStream(streamId);
-    if (stream) {
-      lossStreams_.insertOrUpdate(streamId, stream->priority);
-    }
-  }
-
-  bool hasLoss() const {
+  FOLLY_NODISCARD bool hasLoss() const {
     return !lossStreams_.empty();
+  }
+
+  void removeLoss(StreamId id) {
+    lossStreams_.erase(id);
+  }
+
+  void addLoss(StreamId id) {
+    lossStreams_.insert(id);
+  }
+
+  void updateLossStreams(const QuicStreamState& stream) {
+    if (stream.lossBuffer.empty()) {
+      removeLoss(stream.id);
+    } else {
+      addLoss(stream.id);
+    }
   }
 
   /**
@@ -255,16 +252,15 @@ class QuicStreamManager {
     if (stream.isControl) {
       writableControlStreams_.insert(stream.id);
     } else {
-      bool hasPendingBufMeta = stream.hasWritableBufMeta();
-      bool hasPendingWriteBuf = stream.hasWritableData();
-      CHECK(hasPendingBufMeta || hasPendingWriteBuf);
-      if (hasPendingBufMeta) {
-        writableDSRStreams_.insertOrUpdate(stream.id, stream.priority);
-      }
-      if (hasPendingWriteBuf) {
-        writableStreams_.insertOrUpdate(stream.id, stream.priority);
-      }
+      CHECK(stream.hasWritableData() || !stream.lossBuffer.empty());
+      writableStreams_.insertOrUpdate(stream.id, stream.priority);
     }
+  }
+
+  void addDSRWritable(const QuicStreamState& stream) {
+    CHECK(!stream.isControl);
+    CHECK(stream.hasWritableBufMeta());
+    writableDSRStreams_.insertOrUpdate(stream.id, stream.priority);
   }
 
   /*
@@ -275,8 +271,12 @@ class QuicStreamManager {
       writableControlStreams_.erase(stream.id);
     } else {
       writableStreams_.erase(stream.id);
-      writableDSRStreams_.erase(stream.id);
     }
+  }
+
+  void removeDSRWritable(const QuicStreamState& stream) {
+    CHECK(!stream.isControl);
+    writableDSRStreams_.erase(stream.id);
   }
 
   /*
@@ -846,8 +846,8 @@ class QuicStreamManager {
   // Streams that had their flow control updated
   folly::F14FastSet<StreamId> flowControlUpdated_;
 
-  // Data structure to keep track of stream that have detected lost data
-  PriorityQueue lossStreams_;
+  // Streams that have bytes in loss buffer
+  folly::F14FastSet<StreamId> lossStreams_;
 
   // Set of streams that have pending reads
   folly::F14FastSet<StreamId> readableStreams_;

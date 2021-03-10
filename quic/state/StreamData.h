@@ -327,10 +327,6 @@ struct QuicStreamState : public QuicStreamLike {
     return false;
   }
 
-  FOLLY_NODISCARD bool hasWritableDataOrBufMeta() const {
-    return hasWritableData() || hasWritableBufMeta();
-  }
-
   bool hasReadableData() const {
     return (readBuffer.size() > 0 &&
             currentReadOffset == readBuffer.front().offset) ||

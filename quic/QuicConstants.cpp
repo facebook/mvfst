@@ -93,8 +93,6 @@ folly::StringPiece writeDataReasonString(WriteDataReason reason) {
       return "Crypto";
     case WriteDataReason::STREAM:
       return "Stream";
-    case WriteDataReason::LOSS:
-      return "Loss";
     case WriteDataReason::BLOCKED:
       return "Blocked";
     case WriteDataReason::STREAM_WINDOW_UPDATE:
