@@ -363,23 +363,17 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
 
 namespace quic {
 
-void handleNewStreamBufMetaWritten(
+void handleNewStreamDataWritten(
+    QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
-    uint64_t frameLen,
-    bool frameFin);
-
-void handleRetransmissionBufMetaWritten(
-    QuicStreamLike& stream,
-    uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    const decltype(stream.lossBufMetas)::iterator lossBufMetaIter);
-
-void handleNewStreamDataWritten(
-    QuicStreamLike& stream,
-    uint64_t frameLen,
-    bool frameFin) {
+    PacketNum packetNum,
+    PacketNumberSpace packetNumberSpace) {
   auto originalOffset = stream.currentWriteOffset;
+  VLOG(10) << nodeToString(conn.nodeType) << " sent"
+           << " packetNum=" << packetNum << " space=" << packetNumberSpace
+           << " " << conn;
   // Idealy we should also check this data doesn't exist in either retx buffer
   // or loss buffer, but that's an expensive search.
   stream.currentWriteOffset += frameLen;
@@ -395,33 +389,17 @@ void handleNewStreamDataWritten(
             .second);
 }
 
-void handleNewStreamBufMetaWritten(
-    QuicStreamLike& stream,
-    uint64_t frameLen,
-    bool frameFin) {
-  CHECK_GT(stream.writeBufMeta.offset, 0);
-  auto originalOffset = stream.writeBufMeta.offset;
-  auto bufMetaSplit = stream.writeBufMeta.split(frameLen);
-  CHECK_EQ(bufMetaSplit.offset, originalOffset);
-  if (frameFin) {
-    // If FIN is written, nothing should be left in the writeBufMeta.
-    CHECK_EQ(0, stream.writeBufMeta.length);
-    ++stream.writeBufMeta.offset;
-  }
-  CHECK(stream.retransmissionBufMetas
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(originalOffset),
-                std::forward_as_tuple(bufMetaSplit))
-            .second);
-}
-
 void handleRetransmissionWritten(
+    QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
+    PacketNum packetNum,
     std::deque<StreamBuffer>::iterator lossBufferIter) {
+  conn.lossState.totalBytesRetransmitted += frameLen;
+  VLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
+           << " packetNum=" << packetNum << " " << conn;
   auto bufferLen = lossBufferIter->data.chainLength();
   Buf bufWritten;
   if (frameLen == bufferLen && frameFin == lossBufferIter->eof) {
@@ -441,31 +419,6 @@ void handleRetransmissionWritten(
             .second);
 }
 
-void handleRetransmissionBufMetaWritten(
-    QuicStreamLike& stream,
-    uint64_t frameOffset,
-    uint64_t frameLen,
-    bool frameFin,
-    const decltype(stream.lossBufMetas)::iterator lossBufMetaIter) {
-  if (frameLen == lossBufMetaIter->length && frameFin == lossBufMetaIter->eof) {
-    stream.lossBufMetas.erase(lossBufMetaIter);
-  } else {
-    CHECK_GT(lossBufMetaIter->length, frameLen);
-    lossBufMetaIter->length -= frameLen;
-    lossBufMetaIter->offset += frameLen;
-  }
-  CHECK(stream.retransmissionBufMetas
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(frameOffset),
-                std::forward_as_tuple(WriteBufferMeta::Builder()
-                                          .setOffset(frameOffset)
-                                          .setLength(frameLen)
-                                          .setEOF(frameFin)
-                                          .build()))
-            .second);
-}
-
 /**
  * Update the connection and stream state after stream data is written and deal
  * with new data, as well as retranmissions. Returns true if the data sent is
@@ -478,66 +431,34 @@ bool handleStreamWritten(
     uint64_t frameLen,
     bool frameFin,
     PacketNum packetNum,
-    PacketNumberSpace packetNumberSpace,
-    bool fromBufMeta) {
-  auto writtenNewData = false;
+    PacketNumberSpace packetNumberSpace) {
   // Handle new data first
-  if (!fromBufMeta && frameOffset == stream.currentWriteOffset) {
-    handleNewStreamDataWritten(stream, frameLen, frameFin);
-    writtenNewData = true;
-  }
-
-  if (fromBufMeta && stream.writeBufMeta.offset > 0 &&
-      frameOffset == stream.writeBufMeta.offset) {
-    handleNewStreamBufMetaWritten(stream, frameLen, frameFin);
-    writtenNewData = true;
-  }
-
-  if (writtenNewData) {
+  if (frameOffset == stream.currentWriteOffset) {
     // Count packet. It's based on the assumption that schedluing scheme will
     // only writes one STREAM frame for a stream in a packet. If that doesn't
     // hold, we need to avoid double-counting.
-    ++stream.numPacketsTxWithNewData;
-    VLOG(10) << nodeToString(conn.nodeType) << " sent"
-             << " packetNum=" << packetNum << " space=" << packetNumberSpace
-             << " " << conn;
+    stream.numPacketsTxWithNewData++;
+    handleNewStreamDataWritten(
+        conn, stream, frameLen, frameFin, packetNum, packetNumberSpace);
     return true;
   }
 
-  bool writtenRetx = false;
-  if (!fromBufMeta) {
-    // If the data is in the loss buffer, it is a retransmission.
-    auto lossBufferIter = std::lower_bound(
-        stream.lossBuffer.begin(),
-        stream.lossBuffer.end(),
+  // If the data is in the loss buffer, it is a retransmission.
+  auto lossBufferIter = std::lower_bound(
+      stream.lossBuffer.begin(),
+      stream.lossBuffer.end(),
+      frameOffset,
+      [](const auto& buf, auto off) { return buf.offset < off; });
+  if (lossBufferIter != stream.lossBuffer.end() &&
+      lossBufferIter->offset == frameOffset) {
+    handleRetransmissionWritten(
+        conn,
+        stream,
         frameOffset,
-        [](const auto& buf, auto off) { return buf.offset < off; });
-    if (lossBufferIter != stream.lossBuffer.end() &&
-        lossBufferIter->offset == frameOffset) {
-      handleRetransmissionWritten(
-          stream, frameOffset, frameLen, frameFin, lossBufferIter);
-      writtenRetx = true;
-    }
-  } else {
-    auto lossBufMetaIter = std::lower_bound(
-        stream.lossBufMetas.begin(),
-        stream.lossBufMetas.end(),
-        frameOffset,
-        [](const auto& bufMeta, auto offset) {
-          return bufMeta.offset < offset;
-        });
-    if (lossBufMetaIter != stream.lossBufMetas.end() &&
-        lossBufMetaIter->offset == frameOffset) {
-      handleRetransmissionBufMetaWritten(
-          stream, frameOffset, frameLen, frameFin, lossBufMetaIter);
-      writtenRetx = true;
-    }
-  }
-
-  if (writtenRetx) {
-    conn.lossState.totalBytesRetransmitted += frameLen;
-    VLOG(10) << nodeToString(conn.nodeType) << " sent retransmission"
-             << " packetNum=" << packetNum << " " << conn;
+        frameLen,
+        frameFin,
+        packetNum,
+        lossBufferIter);
     QUIC_STATS(conn.statsCallback, onPacketRetransmission);
     return false;
   }
@@ -583,8 +504,7 @@ void updateConnection(
             writeStreamFrame.len,
             writeStreamFrame.fin,
             packetNum,
-            packetNumberSpace,
-            writeStreamFrame.fromBufMeta);
+            packetNumberSpace);
         if (newStreamDataWritten) {
           updateFlowControlOnWriteToSocket(*stream, writeStreamFrame.len);
           maybeWriteBlockAfterSocketWrite(*stream);
@@ -610,10 +530,9 @@ void updateConnection(
             *getCryptoStream(*conn.cryptoState, encryptionLevel),
             writeCryptoFrame.offset,
             writeCryptoFrame.len,
-            false /* fin */,
+            false,
             packetNum,
-            packetNumberSpace,
-            false /* fromBufMeta */);
+            packetNumberSpace);
         break;
       }
       case QuicWriteFrame::Type::WriteAckFrame: {
