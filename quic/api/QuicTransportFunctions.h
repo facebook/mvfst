@@ -146,23 +146,18 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
  * Invoked when the written stream data was new stream data.
  */
 void handleNewStreamDataWritten(
-    QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameLen,
-    bool frameFin,
-    PacketNum packetNum,
-    PacketNumberSpace packetNumberSpace);
+    bool frameFin);
 
 /**
  * Invoked when the stream data written was retransmitted data.
  */
 void handleRetransmissionWritten(
-    QuicConnectionStateBase& conn,
     QuicStreamLike& stream,
     uint64_t frameOffset,
     uint64_t frameLen,
     bool frameFin,
-    PacketNum packetNum,
     std::deque<StreamBuffer>::iterator lossBufferIter);
 
 /**
@@ -177,7 +172,8 @@ bool handleStreamWritten(
     uint64_t frameLen,
     bool frameFin,
     PacketNum packetNum,
-    PacketNumberSpace packetNumberSpace);
+    PacketNumberSpace packetNumberSpace,
+    bool fromBufMeta);
 
 /**
  * Update the connection state after sending a new packet.
