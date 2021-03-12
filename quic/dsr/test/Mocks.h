@@ -11,8 +11,7 @@
 #include <folly/portability/GMock.h>
 #include <quic/dsr/PacketBuilder.h>
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
 class MockDSRPacketBuilder : public DSRPacketBuilderBase {
  public:
@@ -21,7 +20,8 @@ class MockDSRPacketBuilder : public DSRPacketBuilderBase {
   size_t remainingSpace() const noexcept override {
     return const_cast<MockDSRPacketBuilder&>(*this).remainingSpaceNonConst();
   }
+
+  MOCK_METHOD2(addSendInstruction, void(SendInstruction, uint32_t));
 };
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test

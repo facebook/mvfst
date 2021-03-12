@@ -245,6 +245,10 @@ class QuicStreamManager {
         !writableControlStreams_.empty();
   }
 
+  FOLLY_NODISCARD bool hasDSRWritable() const {
+    return !writableDSRStreams_.empty();
+  }
+
   /*
    * Add a writable stream id.
    */
