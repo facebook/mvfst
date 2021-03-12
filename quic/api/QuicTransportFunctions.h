@@ -297,4 +297,9 @@ void implicitAckCryptoStream(
     EncryptionLevel encryptionLevel);
 void handshakeConfirmed(QuicConnectionStateBase& conn);
 
+bool writeLoopTimeLimit(
+    TimePoint loopBeginTime,
+    const QuicConnectionStateBase& connection,
+    const IOBufQuicBatch& ioBufBatch);
+
 } // namespace quic

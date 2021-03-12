@@ -375,6 +375,20 @@ void handleRetransmissionBufMetaWritten(
     bool frameFin,
     const decltype(stream.lossBufMetas)::iterator lossBufMetaIter);
 
+bool writeLoopTimeLimit(
+    TimePoint loopBeginTime,
+    const QuicConnectionStateBase& connection,
+    const IOBufQuicBatch& ioBufBatch) {
+  auto batchSize = connection.transportSettings.batchingMode ==
+          QuicBatchingMode::BATCHING_MODE_NONE
+      ? connection.transportSettings.writeConnectionDataPacketsLimit
+      : connection.transportSettings.maxBatchSize;
+  return ioBufBatch.getPktSent() < batchSize ||
+      connection.lossState.srtt == 0us ||
+      Clock::now() - loopBeginTime < connection.lossState.srtt /
+          connection.transportSettings.writeLimitRttFraction;
+}
+
 void handleNewStreamDataWritten(
     QuicStreamLike& stream,
     uint64_t frameLen,
@@ -1288,21 +1302,8 @@ uint64_t writeConnectionDataToSocket(
     }
   }
   auto writeLoopBeginTime = Clock::now();
-  // helper functor to check if we have been write in a loop for longer than the
-  // RTT fraction that we are allowed to write. Only kicks in if we have write
-  // one batch in batching write mode.
-  auto timeLimitHelper = [&]() -> bool {
-    auto batchSize = connection.transportSettings.batchingMode ==
-            quic::QuicBatchingMode::BATCHING_MODE_NONE
-        ? connection.transportSettings.writeConnectionDataPacketsLimit
-        : connection.transportSettings.maxBatchSize;
-    return ioBufBatch.getPktSent() < batchSize ||
-        connection.lossState.srtt == 0us ||
-        Clock::now() - writeLoopBeginTime < connection.lossState.srtt /
-            connection.transportSettings.writeLimitRttFraction;
-  };
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
-         timeLimitHelper()) {
+         writeLoopTimeLimit(writeLoopBeginTime, connection, ioBufBatch)) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(srcConnId, dstConnId, packetNum, version, token);
     uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
