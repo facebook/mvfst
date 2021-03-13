@@ -26,22 +26,22 @@ fn _start(args: String, ipc: String, out: Option<File>) -> u32 {
         ($alg:ident) => {
             if alg_name == <$alg::__ccp_alg_export as CongAlg<S<B>>>::name() {
                 let args = $alg::__ccp_alg_export::args();
-                let matches = args.get_matches_from(argv);
+                let matches = args.get_matches_from(argv.clone());
                 let alg =
                     $alg::__ccp_alg_export::with_arg_matches(&matches, Some(log.clone())).unwrap();
-                portus::start!(&ipc[..], Some(log), alg).expect("portus crashed")
+                portus::start!(&ipc[..], Some(log.clone()), alg).expect("portus crashed")
             }
         };
         ($pkg:ident, $base:ident, $alg:ident) => {
             if alg_name == <$pkg::$base<$alg> as CongAlg<S<B>>>::name() {
                 let args = <$pkg::$base<$alg> as CongAlgBuilder<'_, '_>>::args();
-                let matches = args.get_matches_from(argv);
+                let matches = args.get_matches_from(argv.clone());
                 let alg = <$pkg::$base<$alg> as CongAlgBuilder<'_, '_>>::with_arg_matches(
                     &matches,
                     Some(log.clone()),
                 )
                 .unwrap();
-                portus::start!(&ipc[..], Some(log), alg).expect("portus crashed")
+                portus::start!(&ipc[..], Some(log.clone()), alg).expect("portus crashed")
             }
         };
     }
