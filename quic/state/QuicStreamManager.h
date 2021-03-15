@@ -726,6 +726,13 @@ class QuicStreamManager {
   }
 
   /*
+   * Returns number of control streams.
+   */
+  auto numControlStreams() {
+    return numControlStreams_;
+  }
+
+  /*
    * Sets the given stream to be tracked as a control stream.
    */
   void setStreamAsControl(QuicStreamState& stream);

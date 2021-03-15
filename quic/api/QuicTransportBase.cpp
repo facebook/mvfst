@@ -2351,10 +2351,14 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
   // idle timeout is expired, just close the connection and drain or
   // send connection close immediately depending on 'drain'
   DCHECK_NE(closeState_, CloseState::CLOSED);
+  uint64_t numOpenStreans = conn_->streamManager->streamCount();
   closeImpl(
       std::make_pair(
           QuicErrorCode(LocalErrorCode::IDLE_TIMEOUT),
-          toString(LocalErrorCode::IDLE_TIMEOUT).str()),
+          folly::to<std::string>(
+              toString(LocalErrorCode::IDLE_TIMEOUT),
+              ", num non control streams: ",
+              numOpenStreans - conn_->streamManager->numControlStreams())),
       drain /* drainConnection */,
       !drain /* sendCloseImmediately */);
 }

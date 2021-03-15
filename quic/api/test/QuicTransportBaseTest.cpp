@@ -429,6 +429,32 @@ TEST_F(QuicTransportImplTest, IdleTimeoutExpiredDestroysTransport) {
   transport->invokeIdleTimeout();
 }
 
+TEST_F(QuicTransportImplTest, IdleTimeoutStreamMaessage) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  auto stream3 = transport->createUnidirectionalStream().value();
+  transport->setControlStream(stream3);
+
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
+
+  transport->setReadCallback(stream1, &readCb1);
+  transport->setReadCallback(stream2, &readCb2);
+
+  transport->addDataToStream(
+      stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
+  transport->addDataToStream(
+      stream2,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10));
+  EXPECT_CALL(readCb1, readError(stream1, _))
+      .Times(1)
+      .WillOnce(Invoke([](auto, auto error) {
+        EXPECT_EQ(
+            "Idle timeout, num non control streams: 2", error.second->str());
+      }));
+  transport->invokeIdleTimeout();
+}
+
 TEST_F(QuicTransportImplTest, WriteAckPacketUnsetsLooper) {
   // start looper in running state first
   transport->writeLooper()->run(true);
