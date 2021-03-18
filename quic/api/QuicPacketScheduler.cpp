@@ -348,20 +348,15 @@ StreamFrameScheduler::StreamFrameScheduler(QuicConnectionStateBase& conn)
 bool StreamFrameScheduler::writeSingleStream(
     PacketBuilderInterface& builder,
     QuicStreamState& stream,
-    bool& lossOnly,
     uint64_t& connWritableBytes) {
   if (!stream.lossBuffer.empty()) {
     if (!writeStreamLossBuffers(builder, stream)) {
       return false;
     }
   }
-  if (!lossOnly && stream.hasWritableData() && connWritableBytes > 0) {
-    auto streamWrite = writeStreamFrame(builder, stream, connWritableBytes);
-    if (streamWrite == WriteStreamFrameResult::PACKET_SPACE_ERR) {
+  if (stream.hasWritableData() && connWritableBytes > 0) {
+    if (!writeStreamFrame(builder, stream, connWritableBytes)) {
       return false;
-    } else if (streamWrite == WriteStreamFrameResult::FLOW_CONTROL_ERR) {
-      // In this case, we should continue with loss writes in other streams.
-      lossOnly = true;
     }
   }
   return true;
@@ -379,11 +374,10 @@ StreamId StreamFrameScheduler::writeStreamsHelper(
   // stream id. The iterator will wrap around the collection at the end, and we
   // keep track of the value at the next iteration. This allows us to start
   // writing at the next stream when building the next packet.
-  bool lossOnly = false;
   while (writableStreamItr != wrapper.cend()) {
     auto stream = conn_.streamManager->findStream(*writableStreamItr);
     CHECK(stream);
-    if (!writeSingleStream(builder, *stream, lossOnly, connWritableBytes)) {
+    if (!writeSingleStream(builder, *stream, connWritableBytes)) {
       break;
     }
     writableStreamItr++;
@@ -408,7 +402,6 @@ void StreamFrameScheduler::writeStreamsHelper(
       // No data here, keep going
       continue;
     }
-    bool lossOnly = false;
     if (level.incremental) {
       // Round robin the streams at this level
       MiddleStartingIterationWrapper wrapper(level.streams, level.next);
@@ -416,7 +409,7 @@ void StreamFrameScheduler::writeStreamsHelper(
       while (writableStreamItr != wrapper.cend()) {
         auto stream = conn_.streamManager->findStream(*writableStreamItr);
         CHECK(stream);
-        if (!writeSingleStream(builder, *stream, lossOnly, connWritableBytes)) {
+        if (!writeSingleStream(builder, *stream, connWritableBytes)) {
           break;
         }
         writableStreamItr++;
@@ -433,7 +426,7 @@ void StreamFrameScheduler::writeStreamsHelper(
            ++streamIt) {
         auto stream = conn_.streamManager->findStream(*streamIt);
         CHECK(stream);
-        if (!writeSingleStream(builder, *stream, lossOnly, connWritableBytes)) {
+        if (!writeSingleStream(builder, *stream, connWritableBytes)) {
           break;
         }
         if (streamPerPacket) {
@@ -447,9 +440,6 @@ void StreamFrameScheduler::writeStreamsHelper(
 void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
   DCHECK(conn_.streamManager->hasWritable());
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
-  if (connWritableBytes == 0) {
-    return;
-  }
   // Write the control streams first as a naive binary priority mechanism.
   const auto& writableControlStreams =
       conn_.streamManager->writableControlStreams();
@@ -460,9 +450,6 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
         conn_.schedulingState.nextScheduledControlStream,
         connWritableBytes,
         conn_.transportSettings.streamFramePerPacket);
-  }
-  if (connWritableBytes == 0) {
-    return;
   }
   auto& writableStreams = conn_.streamManager->writableStreams();
   if (!writableStreams.empty()) {
@@ -479,13 +466,12 @@ bool StreamFrameScheduler::hasPendingData() const {
       getSendConnFlowControlBytesWire(conn_) > 0;
 }
 
-StreamFrameScheduler::WriteStreamFrameResult
-StreamFrameScheduler::writeStreamFrame(
+bool StreamFrameScheduler::writeStreamFrame(
     PacketBuilderInterface& builder,
     QuicStreamState& stream,
     uint64_t& connWritableBytes) {
   if (builder.remainingSpaceInPkt() == 0) {
-    return WriteStreamFrameResult::PACKET_SPACE_ERR;
+    return false;
   }
 
   // hasWritableData is the condition which has to be satisfied for the
@@ -506,7 +492,7 @@ StreamFrameScheduler::writeStreamFrame(
       canWriteFin,
       folly::none /* skipLenHint */);
   if (!dataLen) {
-    return WriteStreamFrameResult::FLOW_CONTROL_ERR;
+    return false;
   }
   writeStreamFrameData(builder, stream.writeBuffer, *dataLen);
   VLOG(4) << "Wrote stream frame stream=" << stream.id
@@ -515,7 +501,7 @@ StreamFrameScheduler::writeStreamFrame(
           << " finWritten=" << (canWriteFin && *dataLen == bufferLen) << " "
           << conn_;
   connWritableBytes -= dataLen.value();
-  return WriteStreamFrameResult::SUCCESSFUL;
+  return true;
 }
 
 AckScheduler::AckScheduler(

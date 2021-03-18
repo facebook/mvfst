@@ -88,7 +88,6 @@ class StreamFrameScheduler {
   bool writeSingleStream(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
-      bool& lossOnly,
       uint64_t& connWritableBytes);
 
   StreamId writeStreamsHelper(
@@ -108,16 +107,9 @@ class StreamFrameScheduler {
    * Helper function to write either stream data if stream is not flow
    * controlled or a blocked frame otherwise.
    *
-   * Return: A WriteStreamFrameResult enum indicates if write is
-   *         successful, and whether the error is due to packet space or flow
-   *         control.
+   * Return: A boolean indicates if write is successful.
    */
-  enum class WriteStreamFrameResult : uint8_t {
-    SUCCESSFUL,
-    PACKET_SPACE_ERR,
-    FLOW_CONTROL_ERR
-  };
-  WriteStreamFrameResult writeStreamFrame(
+  bool writeStreamFrame(
       PacketBuilderInterface& builder,
       QuicStreamState& stream,
       uint64_t& connWritableBytes);
