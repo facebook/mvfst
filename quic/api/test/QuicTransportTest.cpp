@@ -2203,9 +2203,18 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByte) {
 
   auto buf = buildRandomInputData(1);
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, 0, &lastByteTxCb);
   transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // first and last byte TX callbacks should be triggered immediately
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
@@ -2213,19 +2222,29 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByte) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // try to set the first and last byte offsets again
   // callbacks should be triggered immediately
-  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
-  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, 0, &lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
   loopForWrites(); // have to loop since processed async
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
 
   // even if we register pastlastByte again, it shouldn't be triggered
+  EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
+      .Times(1);
   transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // pastlastByteTxCb::onByteEvent will never get called
   // cancel gets called instead
@@ -2245,10 +2264,21 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteWithFin) {
 
   auto buf = buildRandomInputData(1);
   transport_->writeChain(stream, buf->clone(), true /* eof */);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(finTxCb, onByteEventRegistered(getTxMatcher(stream, 1))).Times(1);
+  EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 2)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, 0, &lastByteTxCb);
   transport_->registerTxCallback(stream, 1, &finTxCb);
   transport_->registerTxCallback(stream, 2, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&finTxCb);
 
   // first, last byte, and fin TX callbacks should be triggered immediately
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
@@ -2257,6 +2287,7 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteWithFin) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
   Mock::VerifyAndClearExpectations(&finTxCb);
 
   // try to set all three offsets again
@@ -2264,6 +2295,11 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByteWithFin) {
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
   EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
   EXPECT_CALL(finTxCb, onByteEvent(getTxMatcher(stream, 1))).Times(1);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(finTxCb, onByteEventRegistered(getTxMatcher(stream, 1))).Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, 0, &lastByteTxCb);
   transport_->registerTxCallback(stream, 1, &finTxCb);
@@ -2292,9 +2328,21 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytes) {
   auto buf = buildRandomInputData(streamBytes);
   CHECK_EQ(streamBytes, buf->length());
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(
+      lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, lastByte)))
+      .Times(1);
+  EXPECT_CALL(
+      pastlastByteTxCb,
+      onByteEventRegistered(getTxMatcher(stream, lastByte + 1)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
   transport_->registerTxCallback(stream, lastByte + 1, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // first and last byte TX callbacks should be triggered immediately
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
@@ -2306,11 +2354,18 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytes) {
 
   // try to set the first and last byte offsets again
   // callbacks should be triggered immediately
-  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
-  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(
+      lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, lastByte)))
       .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
+  EXPECT_CALL(lastByteTxCb, onByteEvent(getTxMatcher(stream, lastByte)))
+      .Times(1);
   loopForWrites(); // have to loop since processed async
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
@@ -2340,11 +2395,29 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesWriteRateLimited) {
   auto buf = buildRandomInputData(streamBytes);
   CHECK_EQ(streamBytes, buf->length());
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(
+      secondPacketByteOffsetTxCb,
+      onByteEventRegistered(getTxMatcher(stream, kDefaultUDPSendPacketLen * 2)))
+      .Times(1);
+  EXPECT_CALL(
+      lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, lastByte)))
+      .Times(1);
+  EXPECT_CALL(
+      pastlastByteTxCb,
+      onByteEventRegistered(getTxMatcher(stream, lastByte + 1)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(
       stream, kDefaultUDPSendPacketLen * 2, &secondPacketByteOffsetTxCb);
   transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
   transport_->registerTxCallback(stream, lastByte + 1, &pastlastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&secondPacketByteOffsetTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // first byte gets TXed on first call to loopForWrites
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0))).Times(1);
@@ -2393,7 +2466,9 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesMultipleWrites) {
     auto buf = buildRandomInputData(10);
     transport_->writeChain(stream, buf->clone(), false /* eof */);
   }
+  EXPECT_CALL(txCb1, onByteEventRegistered(getTxMatcher(stream, 0))).Times(1);
   transport_->registerTxCallback(stream, 0, &txCb1);
+  Mock::VerifyAndClearExpectations(&txCb1);
   EXPECT_CALL(txCb1, onByteEvent(getTxMatcher(stream, 0))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb1);
@@ -2403,7 +2478,9 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesMultipleWrites) {
     auto buf = buildRandomInputData(10);
     transport_->writeChain(stream, buf->clone(), false /* eof */);
   }
+  EXPECT_CALL(txCb2, onByteEventRegistered(getTxMatcher(stream, 10))).Times(1);
   transport_->registerTxCallback(stream, 10, &txCb2);
+  Mock::VerifyAndClearExpectations(&txCb2);
   EXPECT_CALL(txCb2, onByteEvent(getTxMatcher(stream, 10))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb2);
@@ -2413,7 +2490,9 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksMultipleBytesMultipleWrites) {
     auto buf = buildRandomInputData(0);
     transport_->writeChain(stream, buf->clone(), true /* eof */);
   }
+  EXPECT_CALL(txCb3, onByteEventRegistered(getTxMatcher(stream, 20))).Times(1);
   transport_->registerTxCallback(stream, 20, &txCb3);
+  Mock::VerifyAndClearExpectations(&txCb3);
   EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb3);
@@ -2440,7 +2519,9 @@ TEST_F(
     auto buf = buildRandomInputData(10);
     transport_->writeChain(stream, buf->clone(), false /* eof */, &deliveryCb1);
   }
+  EXPECT_CALL(txCb1, onByteEventRegistered(getTxMatcher(stream, 0))).Times(1);
   transport_->registerTxCallback(stream, 0, &txCb1);
+  Mock::VerifyAndClearExpectations(&txCb1);
   EXPECT_CALL(txCb1, onByteEvent(getTxMatcher(stream, 0))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb1);
@@ -2450,7 +2531,9 @@ TEST_F(
     auto buf = buildRandomInputData(10);
     transport_->writeChain(stream, buf->clone(), false /* eof */, &deliveryCb2);
   }
+  EXPECT_CALL(txCb2, onByteEventRegistered(getTxMatcher(stream, 10))).Times(1);
   transport_->registerTxCallback(stream, 10, &txCb2);
+  Mock::VerifyAndClearExpectations(&txCb2);
   EXPECT_CALL(txCb2, onByteEvent(getTxMatcher(stream, 10))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb2);
@@ -2460,7 +2543,9 @@ TEST_F(
     auto buf = buildRandomInputData(0);
     transport_->writeChain(stream, buf->clone(), true /* eof */, &deliveryCb3);
   }
+  EXPECT_CALL(txCb3, onByteEventRegistered(getTxMatcher(stream, 20))).Times(1);
   transport_->registerTxCallback(stream, 20, &txCb3);
+  Mock::VerifyAndClearExpectations(&txCb3);
   EXPECT_CALL(txCb3, onByteEvent(getTxMatcher(stream, 20))).Times(1);
   loopForWrites();
   Mock::VerifyAndClearExpectations(&txCb3);
@@ -3145,7 +3230,10 @@ TEST_F(QuicTransportTest, GetStreamPackestTxedSingleByte) {
 
   auto buf = buildRandomInputData(1);
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
 
   // when first byte TX callback gets invoked, numPacketsTxWithNewData should be
   // one
@@ -3170,8 +3258,15 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultipleBytes) {
   auto buf = buildRandomInputData(streamBytes);
   CHECK_EQ(streamBytes, buf->length());
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(
+      lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, lastByte)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
 
   // when first and last byte TX callbacsk fired, numPacketsTxWithNewData should
   // be 1
@@ -3213,6 +3308,24 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
   auto buf = buildRandomInputData(streamBytes);
   CHECK_EQ(streamBytes, buf->length());
   transport_->writeChain(stream, buf->clone(), false /* eof */);
+
+  EXPECT_CALL(firstByteTxCb, onByteEventRegistered(getTxMatcher(stream, 0)))
+      .Times(1);
+  EXPECT_CALL(
+      firstPacketNearTailByteTxCb,
+      onByteEventRegistered(getTxMatcher(stream, firstPacketNearTailByte)))
+      .Times(1);
+  EXPECT_CALL(
+      secondPacketNearHeadByteTxCb,
+      onByteEventRegistered(getTxMatcher(stream, secondPacketNearHeadByte)))
+      .Times(1);
+  EXPECT_CALL(
+      secondPacketNearTailByteTxCb,
+      onByteEventRegistered(getTxMatcher(stream, secondPacketNearTailByte)))
+      .Times(1);
+  EXPECT_CALL(
+      lastByteTxCb, onByteEventRegistered(getTxMatcher(stream, lastByte)))
+      .Times(1);
   transport_->registerTxCallback(stream, 0, &firstByteTxCb);
   transport_->registerTxCallback(
       stream, firstPacketNearTailByte, &firstPacketNearTailByteTxCb);
@@ -3221,6 +3334,12 @@ TEST_F(QuicTransportTest, GetStreamPacketsTxedMultiplePackets) {
   transport_->registerTxCallback(
       stream, secondPacketNearTailByte, &secondPacketNearTailByteTxCb);
   transport_->registerTxCallback(stream, lastByte, &lastByteTxCb);
+
+  Mock::VerifyAndClearExpectations(&firstByteTxCb);
+  Mock::VerifyAndClearExpectations(&firstPacketNearTailByteTxCb);
+  Mock::VerifyAndClearExpectations(&secondPacketNearHeadByteTxCb);
+  Mock::VerifyAndClearExpectations(&secondPacketNearTailByteTxCb);
+  Mock::VerifyAndClearExpectations(&lastByteTxCb);
 
   // first byte and first packet last bytes get Txed on first loopForWrites
   EXPECT_CALL(firstByteTxCb, onByteEvent(getTxMatcher(stream, 0)))

@@ -2096,6 +2096,13 @@ QuicTransportBase::registerByteEventCallback(
   }
   auto stream = conn_->streamManager->getStream(id);
 
+  // Notify recipients that the registration was successful.
+  ByteEvent byteEvent = {};
+  byteEvent.id = id;
+  byteEvent.offset = offset;
+  byteEvent.type = type;
+  cb->onByteEventRegistered(byteEvent);
+
   // if the callback is already ready, we still insert, but schedule to process
   folly::Optional<uint64_t> maxOffsetReady;
   switch (type) {

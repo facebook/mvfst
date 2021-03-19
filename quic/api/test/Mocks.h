@@ -142,6 +142,7 @@ class MockDeliveryCallback : public QuicSocket::DeliveryCallback {
 class MockByteEventCallback : public QuicSocket::ByteEventCallback {
  public:
   ~MockByteEventCallback() override = default;
+  MOCK_METHOD1(onByteEventRegistered, void(QuicSocket::ByteEvent));
   MOCK_METHOD1(onByteEvent, void(QuicSocket::ByteEvent));
   MOCK_METHOD1(onByteEventCanceled, void(QuicSocket::ByteEvent));
 

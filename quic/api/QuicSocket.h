@@ -818,6 +818,13 @@ class QuicSocket {
     virtual ~ByteEventCallback() = default;
 
     /**
+     * Invoked when a byte event has been successfully registered.
+     * Since this is a convenience notification and not a mandatory callback,
+     * not marking this as pure virtual.
+     */
+    virtual void onByteEventRegistered(ByteEvent /* byteEvent */) {}
+
+    /**
      * Invoked when the byte event has occurred.
      */
     virtual void onByteEvent(ByteEvent byteEvent) = 0;
@@ -852,6 +859,9 @@ class QuicSocket {
 
    private:
     // Temporary shim during transition to ByteEvent
+    void onByteEventRegistered(ByteEvent /* byteEvent */) final {
+      // Not supported
+    }
     void onByteEvent(ByteEvent byteEvent) final {
       CHECK_EQ((int)ByteEvent::Type::ACK, (int)byteEvent.type); // sanity
       onDeliveryAck(byteEvent.id, byteEvent.offset, byteEvent.srtt);
@@ -871,6 +881,10 @@ class QuicSocket {
    * to the underlying UDP socket, indicating that it has passed through
    * congestion control and pacing. In the future, this callback may be
    * triggered by socket/NIC software or hardware timestamps.
+   *
+   * If the registration fails, the callback (ByteEventCallback* cb) will NEVER
+   * be invoked for anything. If the registration succeeds, the callback is
+   * guaranteed to receive an onByteEventRegistered() notification.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode> registerTxCallback(
       const StreamId id,
@@ -880,6 +894,10 @@ class QuicSocket {
   /**
    * Register a byte event to be triggered when specified event type occurs for
    * the specified stream and offset.
+   *
+   * If the registration fails, the callback (ByteEventCallback* cb) will NEVER
+   * be invoked for anything. If the registration succeeds, the callback is
+   * guaranteed to receive an onByteEventRegistered() notification.
    */
   virtual folly::Expected<folly::Unit, LocalErrorCode>
   registerByteEventCallback(
