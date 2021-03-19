@@ -13,6 +13,7 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/test/Mocks.h>
+#include <algorithm>
 
 using namespace testing;
 
@@ -62,6 +63,13 @@ class WriteFunctionsTest : public Test {
     BufferMeta bufMeta(bufMetaLength);
     writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */);
     return id;
+  }
+
+  bool verifyAllOutstandingsAreDSR() const {
+    return std::all_of(
+        conn_.outstandings.packets.begin(),
+        conn_.outstandings.packets.end(),
+        [](const OutstandingPacket& packet) { return packet.isDSRPacket; });
   }
 
  protected:
@@ -129,6 +137,8 @@ TEST_F(WriteFunctionsTest, WriteOne) {
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
   EXPECT_EQ(1, instructionCounter_);
+  EXPECT_EQ(1, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
 TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
@@ -143,6 +153,8 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
           conn_, scheduler_, cid, packetLimit, *aead_, sender_));
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, instructionCounter_);
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
 TEST_F(WriteFunctionsTest, PacketLimit) {
@@ -163,6 +175,8 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
           conn_, scheduler_, cid, packetLimit, *aead_, sender_));
   EXPECT_EQ(20, stream->retransmissionBufMetas.size());
   EXPECT_EQ(20, instructionCounter_);
+  EXPECT_EQ(20, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
 
 TEST_F(WriteFunctionsTest, WriteTwoStreams) {
@@ -183,4 +197,7 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   // 1:1 in the future. Then there will be two senders for this test case and
   // each of them will send out one instruction.
   EXPECT_EQ(2, instructionCounter_);
-}} // namespace quic::test
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  EXPECT_TRUE(verifyAllOutstandingsAreDSR());
+}
+} // namespace quic::test

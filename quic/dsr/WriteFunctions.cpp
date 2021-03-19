@@ -72,7 +72,8 @@ uint64_t writePacketizationRequest(
         folly::none /* Packet Event */,
         packet.packet,
         Clock::now(),
-        packet.encodedSize);
+        packet.encodedSize,
+        true /* isDSRPacket */);
 
     if (!instructionAdded) {
       // TODO: should I flush? This depends on the sender I think.

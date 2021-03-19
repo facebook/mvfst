@@ -99,6 +99,10 @@ struct OutstandingPacket {
   // folly::none if the packet isn't a clone and hasn't been cloned.
   folly::Optional<PacketEvent> associatedEvent;
 
+  // Whether this is a DSR packet. A DSR packet's stream data isn't written
+  // by transport directly.
+  bool isDSRPacket{false};
+
   /**
    * Whether the packet is sent when congestion controller is in app-limited
    * state.

@@ -183,7 +183,8 @@ void updateConnection(
     folly::Optional<PacketEvent> packetEvent,
     RegularQuicWritePacket packet,
     TimePoint time,
-    uint32_t encodedSize);
+    uint32_t encodedSize,
+    bool isDSRPacket);
 
 /**
  * Returns the minimum available bytes window out of path validation rate

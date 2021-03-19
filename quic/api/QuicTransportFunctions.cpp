@@ -560,7 +560,8 @@ void updateConnection(
     folly::Optional<PacketEvent> packetEvent,
     RegularQuicWritePacket packet,
     TimePoint sentTime,
-    uint32_t encodedSize) {
+    uint32_t encodedSize,
+    bool isDSRPacket) {
   auto packetNum = packet.header.getPacketSequenceNum();
   bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
   bool isHandshake = false;
@@ -802,6 +803,7 @@ void updateConnection(
     pkt.associatedEvent = std::move(packetEvent);
     conn.lossState.totalBytesCloned += encodedSize;
   }
+  pkt.isDSRPacket = isDSRPacket;
 
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(pkt);
@@ -1346,7 +1348,8 @@ uint64_t writeConnectionDataToSocket(
         std::move(result->packetEvent),
         std::move(result->packet->packet),
         Clock::now(),
-        folly::to<uint32_t>(ret.encodedSize));
+        folly::to<uint32_t>(ret.encodedSize),
+        false /* isDSRPacket */);
 
     // if ioBufBatch.write returns false
     // it is because a flush() call failed

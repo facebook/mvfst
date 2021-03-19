@@ -187,7 +187,13 @@ TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPList) {
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packet.packet.frames.push_back(PingFrame());
   EXPECT_EQ(0, conn->outstandings.packets.size());
-  updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      Clock::now(),
+      50,
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   // But it won't set loss detection alarm
   EXPECT_FALSE(conn->pendingEvents.setLossDetectionAlarm);
@@ -231,7 +237,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .Times(1)
       .WillOnce(Return(true));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint{}, getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint{},
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   EXPECT_EQ(
       conn->ackStates.initialAckState.nextPacketNum,
@@ -289,7 +300,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
       .Times(1)
       .WillOnce(Return(false));
   updateConnection(
-      *conn, folly::none, packet2.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(
       conn->ackStates.initialAckState.nextPacketNum,
       currentNextInitialPacketNum);
@@ -365,7 +381,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNotConsumeSendPing) {
   packet.packet.frames.push_back(PingFrame());
   auto packetNum = packet.packet.header.getPacketSequenceNum();
   conn->d6d.lastProbe = D6DProbePacket(packetNum, 50);
-  updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      Clock::now(),
+      50,
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(conn->outstandings.packets.front().metadata.isD6DProbe);
   EXPECT_EQ(1, conn->d6d.outstandingProbes);
@@ -380,7 +402,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionD6DNeedsAppDataPNSpace) {
   packet.packet.frames.push_back(PingFrame());
   auto packetNum = packet.packet.header.getPacketSequenceNum();
   conn->d6d.lastProbe = D6DProbePacket(packetNum, 50);
-  updateConnection(*conn, folly::none, packet.packet, Clock::now(), 50);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      Clock::now(),
+      50,
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_FALSE(conn->outstandings.packets.front().metadata.isD6DProbe);
   EXPECT_EQ(0, conn->d6d.outstandingProbes);
@@ -411,19 +439,22 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPacketSorting) {
       folly::none,
       handshakePacket.packet,
       TimePoint{},
-      getEncodedSize(handshakePacket));
+      getEncodedSize(handshakePacket),
+      false /* isDSRPacket */);
   updateConnection(
       *conn,
       folly::none,
       initialPacket.packet,
       TimePoint{},
-      getEncodedSize(initialPacket));
+      getEncodedSize(initialPacket),
+      false /* isDSRPacket */);
   updateConnection(
       *conn,
       folly::none,
       appDataPacket.packet,
       TimePoint{},
-      getEncodedSize(appDataPacket));
+      getEncodedSize(appDataPacket),
+      false /* isDSRPacket */);
   // verify qLogger added correct logs
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
@@ -469,7 +500,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionFinOnly) {
   writeDataToQuicStream(*stream1, nullptr, true);
   packet.packet.frames.push_back(WriteStreamFrame(stream1->id, 0, 0, true));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -514,7 +550,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionAllBytesExceptFin) {
   packet.packet.frames.push_back(
       WriteStreamFrame(stream1->id, 0, buf->computeChainDataLength(), false));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -558,7 +599,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionEmptyAckWriteResult) {
   auto currentPendingLargestAckScheduled =
       conn->ackStates.handshakeAckState.largestAckScheduled;
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -593,7 +639,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   ackFrame.ackBlocks.emplace_back(0, 100);
   packet.packet.frames.push_back(std::move(ackFrame));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   packetEncodedSize =
@@ -610,7 +661,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   packet2.packet.frames.push_back(std::move(rstFrame));
 
   updateConnection(
-      *conn, folly::none, packet2.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   //  verify QLogger contains correct packet and frame information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -640,7 +696,12 @@ TEST_F(QuicTransportFunctionsTest, TestPaddingPureAckPacketIsStillPureAck) {
   packet.packet.frames.push_back(std::move(ackFrame));
   packet.packet.frames.push_back(PaddingFrame());
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet and frames information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -671,7 +732,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
   initialStream->writeBuffer.append(data->clone());
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
   EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
   EXPECT_EQ(1, conn->outstandings.packets.size());
@@ -685,7 +751,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->writeBuffer.append(data->clone());
   initialStream->writeBuffer.append(data->clone());
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(2, conn->outstandings.initialPacketsCount);
   EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
   EXPECT_EQ(2, conn->outstandings.packets.size());
@@ -710,7 +781,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   packet.packet.frames.push_back(WriteCryptoFrame(0, data->length()));
   handshakeStream->writeBuffer.append(data->clone());
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
   EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
   EXPECT_EQ(2, conn->outstandings.packets.size());
@@ -721,7 +797,12 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       WriteCryptoFrame(data->length(), data->length()));
   handshakeStream->writeBuffer.append(data->clone());
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
   EXPECT_EQ(2, conn->outstandings.handshakePacketsCount);
   EXPECT_EQ(3, conn->outstandings.packets.size());
@@ -772,7 +853,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -790,7 +876,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       folly::none,
       nonHandshake.packet,
       TimePoint(),
-      getEncodedSize(packet));
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -840,7 +927,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
 
   packet.packet.frames.push_back(WriteCryptoFrame(0, 0));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
   EXPECT_EQ(1, conn->outstandings.packets.size());
@@ -860,7 +952,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
       folly::none,
       nonHandshake.packet,
       TimePoint(),
-      getEncodedSize(packet));
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -918,7 +1011,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithPureAck) {
   EXPECT_CALL(*rawController, onPacketSent(_)).Times(0);
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(0);
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->lossState.totalPacketsSent);
   EXPECT_EQ(0, conn->lossState.totalAckElicitingPacketsSent);
   EXPECT_EQ(0, conn->outstandings.packets.size());
@@ -961,7 +1059,13 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithBytesStats) {
   conn->lossState.totalBytesAckedAtLastAck = 5000;
   conn->lossState.totalPacketsSent = 20;
   conn->lossState.totalAckElicitingPacketsSent = 15;
-  updateConnection(*conn, folly::none, packet.packet, TimePoint(), 555);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      555,
+      false /* isDSRPacket */);
   EXPECT_EQ(21, conn->lossState.totalPacketsSent);
   EXPECT_EQ(16, conn->lossState.totalAckElicitingPacketsSent);
 
@@ -1048,7 +1152,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionWithCloneResult) {
   MockClock::mockNow = [=]() { return futureMoment; };
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
   updateConnection(
-      *conn, event, std::move(writePacket), MockClock::now(), 1500);
+      *conn,
+      event,
+      std::move(writePacket),
+      MockClock::now(),
+      1500,
+      false /* isDSRPacket */);
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
       std::dynamic_pointer_cast<quic::FileQLogger>(conn->qLogger);
@@ -1090,7 +1199,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionStreamWindowUpdate) {
   conn->streamManager->queueWindowUpdate(stream->id);
   packet.packet.frames.push_back(std::move(streamWindowUpdate));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -1120,7 +1234,12 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   MaxDataFrame connWindowUpdate(conn->flowControlState.advertisedMaxOffset);
   packet.packet.frames.push_back(std::move(connWindowUpdate));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
 
   // verify QLogger contains correct packet information
   std::shared_ptr<quic::FileQLogger> qLogger =
@@ -2066,7 +2185,13 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounter) {
   packet.packet.frames.emplace_back(connWindowUpdate);
   PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
   conn->outstandings.packetEvents.insert(packetEvent);
-  updateConnection(*conn, packetEvent, packet.packet, TimePoint(), 123);
+  updateConnection(
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      123,
+      false /* isDSRPacket */);
   EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
 }
 
@@ -2078,7 +2203,12 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
   packet.packet.frames.push_back(blockedFrame);
   conn->streamManager->queueBlocked(stream->id, 1000);
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_FALSE(conn->streamManager->hasBlocked());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(0, conn->outstandings.clonedPacketsCount);
@@ -2096,7 +2226,12 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
   conn->outstandings.packetEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(
-      *conn, packetEvent, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
 }
@@ -2115,7 +2250,8 @@ TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
           folly::none,
           packet.packet,
           TimePoint(),
-          getEncodedSize(packet)),
+          getEncodedSize(packet),
+          false /* isDSRPacket */),
       ".*Send more than one connection window update.*");
 }
 
@@ -2128,7 +2264,12 @@ TEST_F(QuicTransportFunctionsTest, WriteStreamFrameIsNotPureAck) {
   WriteStreamFrame writeStreamFrame(stream->id, 0, 5, false);
   packet.packet.frames.push_back(std::move(writeStreamFrame));
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_FALSE(conn->outstandings.packets.empty());
 }
 
@@ -2141,7 +2282,12 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
   packet.packet.frames.push_back(rstStreamFrame);
   conn->pendingEvents.resets.emplace(stream->id, rstStreamFrame);
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(0, conn->outstandings.clonedPacketsCount);
@@ -2160,7 +2306,12 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
   conn->outstandings.packetEvents.insert(packetEvent);
   // This shall not crash
   updateConnection(
-      *conn, packetEvent, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      false /* isDSRPacket */);
   EXPECT_FALSE(conn->outstandings.packets.empty());
   EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
 }
@@ -2169,7 +2320,13 @@ TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
   auto conn = createConn();
   conn->lossState.totalBytesSent = 1234;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  updateConnection(*conn, folly::none, packet.packet, TimePoint{}, 4321);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint{},
+      4321,
+      false /* isDSRPacket */);
   EXPECT_EQ(5555, conn->lossState.totalBytesSent);
 }
 
@@ -2178,7 +2335,13 @@ TEST_F(QuicTransportFunctionsTest, TotalPacketsSentUpdate) {
   auto conn = createConn();
   conn->lossState.totalPacketsSent = startTotalPacketsSent;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
-  updateConnection(*conn, folly::none, packet.packet, TimePoint{}, 4321);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint{},
+      4321,
+      false /* isDSRPacket */);
   EXPECT_EQ(startTotalPacketsSent + 1, conn->lossState.totalPacketsSent);
 }
 
@@ -2192,7 +2355,13 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
   packet.packet.frames.push_back(rstStreamFrame);
   PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
   conn->outstandings.packetEvents.insert(packetEvent);
-  updateConnection(*conn, packetEvent, packet.packet, TimePoint(), 500);
+  updateConnection(
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      500,
+      false /* isDSRPacket */);
   EXPECT_EQ(247, conn->lossState.timeoutBasedRtxCount);
 }
 
@@ -2634,7 +2803,12 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   packet.packet.frames.push_back(writeStreamFrame);
 
   updateConnection(
-      *conn, folly::none, packet.packet, TimePoint(), getEncodedSize(packet));
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      true /* dsr */);
   EXPECT_EQ(1000 + bufMetaStartingOffset, stream->writeBufMeta.offset);
   EXPECT_EQ(1000, stream->writeBufMeta.length);
   EXPECT_FALSE(stream->retransmissionBufMetas.empty());
@@ -2644,6 +2818,7 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   EXPECT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
   EXPECT_EQ(1000, retxBufMetaIter->second.length);
   EXPECT_FALSE(retxBufMetaIter->second.eof);
+  EXPECT_TRUE(conn->outstandings.packets.back().isDSRPacket);
 
   // Manually lose this packet:
   stream->lossBufMetas.push_back(retxBufMetaIter->second);
@@ -2660,13 +2835,15 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
       folly::none,
       retxPacket.packet,
       TimePoint(),
-      getEncodedSize(retxPacket));
+      getEncodedSize(retxPacket),
+      true /* dsr */);
   EXPECT_TRUE(stream->lossBufMetas.empty());
   retxBufMetaIter = stream->retransmissionBufMetas.find(bufMetaStartingOffset);
   EXPECT_NE(retxBufMetaIter, stream->retransmissionBufMetas.end());
   EXPECT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
   EXPECT_EQ(1000, retxBufMetaIter->second.length);
   EXPECT_FALSE(retxBufMetaIter->second.eof);
+  EXPECT_TRUE(conn->outstandings.packets.back().isDSRPacket);
 }
 
 } // namespace test

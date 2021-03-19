@@ -884,7 +884,12 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       result.packet->body->computeChainDataLength();
   EXPECT_EQ(conn.udpSendPacketLen, bufferLength);
   updateConnection(
-      conn, folly::none, result.packet->packet, Clock::now(), bufferLength);
+      conn,
+      folly::none,
+      result.packet->packet,
+      Clock::now(),
+      bufferLength,
+      false /* isDSRPacket */);
   buf = bufAccessor.obtain();
   ASSERT_EQ(conn.udpSendPacketLen, buf->length());
   buf->clear();
@@ -954,7 +959,8 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
       folly::none,
       packetResult.packet->packet,
       Clock::now(),
-      encodedSize);
+      encodedSize,
+      false /* isDSRPacket */);
 
   // make packetNum too larger to be encoded into the same size:
   packetNum += 0xFF;
@@ -1574,7 +1580,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(conn, folly::none, packet1, Clock::now(), 1000);
+  updateConnection(
+      conn, folly::none, packet1, Clock::now(), 1000, false /* isDSR */);
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
@@ -1600,7 +1607,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   builder2.encodePacketHeader();
   scheduler.writeStreams(builder2);
   auto packet2 = std::move(builder2).buildPacket().packet;
-  updateConnection(conn, folly::none, packet2, Clock::now(), 1000);
+  updateConnection(
+      conn, folly::none, packet2, Clock::now(), 1000, false /* isDSR */);
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame2.streamId);
@@ -1644,7 +1652,8 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   builder1.encodePacketHeader();
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
-  updateConnection(conn, folly::none, packet1, Clock::now(), 1200);
+  updateConnection(
+      conn, folly::none, packet1, Clock::now(), 1200, false /* isDSR */);
   EXPECT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId1, writeStreamFrame1.streamId);
