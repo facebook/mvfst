@@ -80,7 +80,6 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
         shortHeader->getPacketSequenceNum(), largestAckedPacketNum);
     auto connIdLen = shortHeader->getConnectionId().size();
     if (packetNumEncoding.length + connIdLen + 1 > packetSize_) {
-      // headerCanFit_ = false;
       packetSize_ = 0;
       return;
     }
@@ -92,7 +91,6 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
  private:
   size_t packetSize_;
   RegularQuicWritePacket packet_;
-  // bool headerCanFit_{true};
   std::optional<SendInstruction> sendInstruction_;
   uint32_t encodedSize_{0};
 };

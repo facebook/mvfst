@@ -299,7 +299,6 @@ void handshakeConfirmed(QuicConnectionStateBase& conn);
 
 bool writeLoopTimeLimit(
     TimePoint loopBeginTime,
-    const QuicConnectionStateBase& connection,
-    const IOBufQuicBatch& ioBufBatch);
+    const QuicConnectionStateBase& connection);
 
 } // namespace quic

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <folly/portability/GMock.h>
+#include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/dsr/PacketBuilder.h>
 
 namespace quic::test {
@@ -22,6 +23,13 @@ class MockDSRPacketBuilder : public DSRPacketBuilderBase {
   }
 
   MOCK_METHOD2(addSendInstruction, void(SendInstruction, uint32_t));
+};
+
+class MockDSRPacketizationRequestSender : public DSRPacketizationRequestSender {
+ public:
+  MOCK_METHOD1(addSendInstruction, bool(const SendInstruction&));
+  MOCK_METHOD0(flush, bool());
+  MOCK_METHOD0(release, void());
 };
 
 } // namespace quic::test

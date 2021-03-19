@@ -377,14 +377,8 @@ void handleRetransmissionBufMetaWritten(
 
 bool writeLoopTimeLimit(
     TimePoint loopBeginTime,
-    const QuicConnectionStateBase& connection,
-    const IOBufQuicBatch& ioBufBatch) {
-  auto batchSize = connection.transportSettings.batchingMode ==
-          QuicBatchingMode::BATCHING_MODE_NONE
-      ? connection.transportSettings.writeConnectionDataPacketsLimit
-      : connection.transportSettings.maxBatchSize;
-  return ioBufBatch.getPktSent() < batchSize ||
-      connection.lossState.srtt == 0us ||
+    const QuicConnectionStateBase& connection) {
+  return connection.lossState.srtt == 0us ||
       Clock::now() - loopBeginTime < connection.lossState.srtt /
           connection.transportSettings.writeLimitRttFraction;
 }
@@ -1302,8 +1296,13 @@ uint64_t writeConnectionDataToSocket(
     }
   }
   auto writeLoopBeginTime = Clock::now();
+  auto batchSize = connection.transportSettings.batchingMode ==
+          QuicBatchingMode::BATCHING_MODE_NONE
+      ? connection.transportSettings.writeConnectionDataPacketsLimit
+      : connection.transportSettings.maxBatchSize;
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
-         writeLoopTimeLimit(writeLoopBeginTime, connection, ioBufBatch)) {
+         ((ioBufBatch.getPktSent() < batchSize) ||
+          writeLoopTimeLimit(writeLoopBeginTime, connection))) {
     auto packetNum = getNextPacketNum(connection, pnSpace);
     auto header = builder(srcConnId, dstConnId, packetNum, version, token);
     uint32_t writableBytes = folly::to<uint32_t>(std::min<uint64_t>(
