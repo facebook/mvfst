@@ -40,6 +40,11 @@ struct BbrConfig {
   bool drainToTarget{false};
 };
 
+struct CcpConfig {
+  std::string alg_name = "";
+  std::string alg_args = "";
+};
+
 struct D6DConfig {
   /**
    * Currently, only server does probing, so this flags means different things
@@ -227,6 +232,8 @@ struct TransportSettings {
   bool shouldUseRecvmmsgForBatchRecv{false};
   // Config struct for BBR
   BbrConfig bbrConfig;
+  // Config struct for CCP
+  CcpConfig ccpConfig;
   // A packet is considered loss when a packet that's sent later by at least
   // timeReorderingThreshold * RTT is acked by peer.
   DurationRep timeReorderingThreshDividend{
