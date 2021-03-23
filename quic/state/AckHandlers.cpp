@@ -232,20 +232,26 @@ void processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  CHECK_GE(conn.outstandings.initialPacketsCount, initialPacketAcked);
-  conn.outstandings.initialPacketsCount -= initialPacketAcked;
-  CHECK_GE(conn.outstandings.handshakePacketsCount, handshakePacketAcked);
-  conn.outstandings.handshakePacketsCount -= handshakePacketAcked;
-  CHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
-  conn.outstandings.clonedPacketsCount -= clonedPacketsAcked;
+  CHECK_GE(
+      conn.outstandings.packetCount[PacketNumberSpace::Initial],
+      initialPacketAcked);
+  conn.outstandings.packetCount[PacketNumberSpace::Initial] -=
+      initialPacketAcked;
+  CHECK_GE(
+      conn.outstandings.packetCount[PacketNumberSpace::Handshake],
+      handshakePacketAcked);
+  conn.outstandings.packetCount[PacketNumberSpace::Handshake] -=
+      handshakePacketAcked;
+  CHECK_GE(conn.outstandings.numClonedPackets(), clonedPacketsAcked);
+  conn.outstandings.clonedPacketCount[pnSpace] -= clonedPacketsAcked;
   CHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
   CHECK_GE(
       updatedOustandingPacketsCount,
-      conn.outstandings.handshakePacketsCount +
-          conn.outstandings.initialPacketsCount);
-  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.clonedPacketsCount);
+      conn.outstandings.packetCount[PacketNumberSpace::Handshake] +
+          conn.outstandings.packetCount[PacketNumberSpace::Initial]);
+  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
       (ack.largestAckedPacket.has_value() || lossEvent)) {

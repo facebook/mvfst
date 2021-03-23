@@ -118,16 +118,11 @@ struct OutstandingsInfo {
   // TODO: Enforce only AppTraffic packets to be clonable
   folly::F14FastSet<PacketEvent, PacketEventHash> packetEvents;
 
-  // Number of outstanding packets in Initial space, not including cloned
-  // Initial packets.
-  uint64_t initialPacketsCount{0};
-
-  // Number of outstanding packets in Handshake space, not including cloned
-  // Handshake packets.
-  uint64_t handshakePacketsCount{0};
+  // Number of outstanding packets not including cloned
+  EnumArray<PacketNumberSpace, uint64_t> packetCount{};
 
   // Number of packets are clones or cloned.
-  uint64_t clonedPacketsCount{0};
+  EnumArray<PacketNumberSpace, uint64_t> clonedPacketCount{};
 
   // Number of packets currently declared lost.
   uint64_t declaredLostCount{0};
@@ -135,6 +130,13 @@ struct OutstandingsInfo {
   // Number of packets outstanding and not declared lost.
   uint64_t numOutstanding() {
     return packets.size() - declaredLostCount;
+  }
+
+  // Total number of cloned packets.
+  uint64_t numClonedPackets() {
+    return clonedPacketCount[PacketNumberSpace::Initial] +
+        clonedPacketCount[PacketNumberSpace::Handshake] +
+        clonedPacketCount[PacketNumberSpace::AppData];
   }
 };
 
@@ -566,7 +568,13 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     std::vector<KnobFrame> knobs;
 
     // Number of probing packets to send after PTO
-    uint8_t numProbePackets{0};
+    EnumArray<PacketNumberSpace, uint8_t> numProbePackets{};
+
+    bool anyProbePackets() const {
+      return numProbePackets[PacketNumberSpace::Initial] +
+          numProbePackets[PacketNumberSpace::Handshake] +
+          numProbePackets[PacketNumberSpace::AppData];
+    }
 
     // true: schedule timeout if not scheduled
     // false: cancel scheduled timeout

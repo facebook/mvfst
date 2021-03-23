@@ -139,10 +139,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   if (!hasDataToWrite && conn.outstandings.packetEvents.empty() &&
       (totalPacketsOutstanding - totalD6DProbesOutstanding) ==
-          conn.outstandings.clonedPacketsCount) {
+          conn.outstandings.numClonedPackets()) {
     VLOG(10) << __func__ << " unset alarm pure ack or processed packets only"
              << " outstanding=" << totalPacketsOutstanding
-             << " handshakePackets=" << conn.outstandings.handshakePacketsCount
+             << " handshakePackets="
+             << conn.outstandings.packetCount[PacketNumberSpace::Handshake]
              << " " << conn;
     conn.pendingEvents.setLossDetectionAlarm = false;
     timeout.cancelLossTimeout();
@@ -164,10 +165,11 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
   if (!conn.pendingEvents.setLossDetectionAlarm) {
     VLOG_IF(10, !timeout.isLossTimeoutScheduled())
         << __func__ << " alarm not scheduled"
-        << " outstanding=" << totalPacketsOutstanding
-        << " initialPackets=" << conn.outstandings.initialPacketsCount
-        << " handshakePackets=" << conn.outstandings.handshakePacketsCount
-        << " " << nodeToString(conn.nodeType) << " " << conn;
+        << " outstanding=" << totalPacketsOutstanding << " initialPackets="
+        << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+        << " handshakePackets="
+        << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
+        << nodeToString(conn.nodeType) << " " << conn;
     return;
   }
   timeout.cancelLossTimeout();
@@ -178,11 +180,13 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
            << " method=" << conn.lossState.currentAlarmMethod
            << " haDataToWrite=" << hasDataToWrite
            << " outstanding=" << totalPacketsOutstanding
-           << " outstanding clone=" << conn.outstandings.clonedPacketsCount
+           << " outstanding clone=" << conn.outstandings.numClonedPackets()
            << " packetEvents=" << conn.outstandings.packetEvents.size()
-           << " initialPackets=" << conn.outstandings.initialPacketsCount
-           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
-           << " " << nodeToString(conn.nodeType) << " " << conn;
+           << " initialPackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+           << " handshakePackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
+           << nodeToString(conn.nodeType) << " " << conn;
   timeout.scheduleLossTimeout(alarmDuration.first);
   conn.pendingEvents.setLossDetectionAlarm = false;
 }
@@ -259,8 +263,8 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     observerLossEvent.addLostPacket(lostByTimeout, lostByReorder, pkt);
 
     if (pkt.associatedEvent) {
-      DCHECK_GT(conn.outstandings.clonedPacketsCount, 0);
-      --conn.outstandings.clonedPacketsCount;
+      DCHECK_GT(conn.outstandings.numClonedPackets(), 0);
+      --conn.outstandings.clonedPacketCount[pnSpace];
     }
     // Invoke LossVisitor if the packet doesn't have a associated PacketEvent;
     // or if the PacketEvent is present in conn.outstandings.packetEvents.
@@ -273,12 +277,12 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     if (pkt.metadata.isHandshake && !processed) {
       if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
-        CHECK(conn.outstandings.initialPacketsCount);
-        --conn.outstandings.initialPacketsCount;
+        CHECK(conn.outstandings.packetCount[PacketNumberSpace::Initial]);
+        --conn.outstandings.packetCount[PacketNumberSpace::Initial];
       } else {
         CHECK_EQ(PacketNumberSpace::Handshake, currentPacketNumberSpace);
-        CHECK(conn.outstandings.handshakePacketsCount);
-        --conn.outstandings.handshakePacketsCount;
+        CHECK(conn.outstandings.packetCount[PacketNumberSpace::Handshake]);
+        --conn.outstandings.packetCount[PacketNumberSpace::Handshake];
       }
     }
     VLOG(10) << __func__ << " lost packetNum=" << currentPacketNum
@@ -392,9 +396,11 @@ void onLossDetectionAlarm(
   VLOG(10) << __func__ << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.numOutstanding()
-           << " initialPackets=" << conn.outstandings.initialPacketsCount
-           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
-           << " " << conn;
+           << " initialPackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+           << " handshakePackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
+           << conn;
 }
 
 /*
@@ -435,9 +441,11 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.numOutstanding()
-           << " initialPackets=" << conn.outstandings.initialPacketsCount
-           << " handshakePackets=" << conn.outstandings.handshakePacketsCount
-           << " " << conn;
+           << " initialPackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Initial]
+           << " handshakePackets="
+           << conn.outstandings.packetCount[PacketNumberSpace::Handshake] << " "
+           << conn;
   return lossEvent;
 }
 
@@ -464,8 +472,8 @@ void markZeroRttPacketsLost(
       // Remove the PacketEvent from the outstandings.packetEvents set
       if (pkt.associatedEvent) {
         conn.outstandings.packetEvents.erase(*pkt.associatedEvent);
-        DCHECK_GT(conn.outstandings.clonedPacketsCount, 0);
-        --conn.outstandings.clonedPacketsCount;
+        DCHECK_GT(conn.outstandings.numClonedPackets(), 0);
+        --conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
       }
       lossEvent.addLostPacket(pkt);
       iter = conn.outstandings.packets.erase(iter);

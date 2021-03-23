@@ -7,6 +7,7 @@
  */
 
 #include "quic/loss/QuicLossFunctions.h"
+#include "quic/QuicConstants.h"
 #include "quic/state/QuicStreamFunctions.h"
 
 namespace quic {
@@ -53,11 +54,21 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
     throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
   }
 
-  // If there is only one packet outstanding, no point to clone it twice in the
-  // same write loop.
-  conn.pendingEvents.numProbePackets =
-      std::min<decltype(conn.pendingEvents.numProbePackets)>(
-          conn.outstandings.numOutstanding(), kPacketToSendForPTO);
+  uint64_t numInitial =
+      conn.outstandings.packetCount[PacketNumberSpace::Initial] +
+      conn.outstandings.clonedPacketCount[PacketNumberSpace::Initial];
+  uint64_t numHandshake =
+      conn.outstandings.packetCount[PacketNumberSpace::Handshake] +
+      conn.outstandings.clonedPacketCount[PacketNumberSpace::Handshake];
+  uint64_t numAppData =
+      conn.outstandings.packetCount[PacketNumberSpace::AppData] +
+      conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData];
+  conn.pendingEvents.numProbePackets[PacketNumberSpace::Initial] =
+      std::min<uint8_t>(numInitial, kPacketToSendForPTO);
+  conn.pendingEvents.numProbePackets[PacketNumberSpace::Handshake] =
+      std::min<uint8_t>(numHandshake, kPacketToSendForPTO);
+  conn.pendingEvents.numProbePackets[PacketNumberSpace::AppData] =
+      std::min<uint8_t>(numAppData, kPacketToSendForPTO);
 }
 
 void markPacketLoss(

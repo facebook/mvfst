@@ -628,7 +628,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionPureAckCounter) {
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetEncodedSize =
@@ -738,8 +738,8 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       TimePoint(),
       getEncodedSize(packet),
       false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_EQ(1, initialStream->retransmissionBuffer.size());
 
@@ -757,8 +757,8 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       TimePoint(),
       getEncodedSize(packet),
       false /* isDSRPacket */);
-  EXPECT_EQ(2, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
   EXPECT_EQ(3, initialStream->retransmissionBuffer.size());
   EXPECT_TRUE(initialStream->writeBuffer.empty());
@@ -770,7 +770,7 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   initialStream->retransmissionBuffer.erase(0);
   initialStream->lossBuffer.emplace_back(std::move(firstBuf), 0, false);
   conn->outstandings.packets.pop_front();
-  conn->outstandings.initialPacketsCount--;
+  conn->outstandings.packetCount[PacketNumberSpace::Initial]--;
 
   auto handshakeStream =
       getCryptoStream(*conn->cryptoState, EncryptionLevel::Handshake);
@@ -787,8 +787,8 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       TimePoint(),
       getEncodedSize(packet),
       false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
   EXPECT_EQ(1, handshakeStream->retransmissionBuffer.size());
 
@@ -803,8 +803,8 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
       TimePoint(),
       getEncodedSize(packet),
       false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(2, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(3, conn->outstandings.packets.size());
   EXPECT_EQ(2, handshakeStream->retransmissionBuffer.size());
   EXPECT_TRUE(handshakeStream->writeBuffer.empty());
@@ -820,19 +820,19 @@ TEST_F(QuicTransportFunctionsTest, TestImplicitAck) {
   auto frame = op.packet.frames[0].asWriteCryptoFrame();
   EXPECT_EQ(frame->offset, 0);
   conn->outstandings.packets.pop_front();
-  conn->outstandings.handshakePacketsCount--;
+  conn->outstandings.packetCount[PacketNumberSpace::Handshake]--;
 
   implicitAckCryptoStream(*conn, EncryptionLevel::Initial);
-  EXPECT_EQ(0, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(initialStream->retransmissionBuffer.empty());
   EXPECT_TRUE(initialStream->writeBuffer.empty());
   EXPECT_TRUE(initialStream->lossBuffer.empty());
 
   implicitAckCryptoStream(*conn, EncryptionLevel::Handshake);
-  EXPECT_EQ(0, conn->outstandings.initialPacketsCount);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_TRUE(conn->outstandings.packets.empty());
   EXPECT_TRUE(handshakeStream->retransmissionBuffer.empty());
   EXPECT_TRUE(handshakeStream->writeBuffer.empty());
@@ -844,7 +844,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
   auto packetEncodedSize =
@@ -859,7 +859,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       TimePoint(),
       getEncodedSize(packet),
       false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   packetEncodedSize =
@@ -907,7 +907,8 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionHandshakeCounter) {
       EXPECT_EQ(gotFrame->offset, 0);
       EXPECT_EQ(gotFrame->len, 0);
       EXPECT_TRUE(gotFrame->fin);
-      EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
+      EXPECT_EQ(
+          1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
     }
   }
 }
@@ -917,7 +918,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
   conn->qLogger = std::make_shared<quic::FileQLogger>(VantagePoint::Client);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, nullptr, true);
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   // Packet with CryptoFrame in AppData pn space
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData, true);
@@ -934,7 +935,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
       getEncodedSize(packet),
       false /* isDSRPacket */);
 
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(1, conn->outstandings.packets.size());
 
   auto nonHandshake = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -986,7 +987,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionForOneRttCryptoData) {
     }
   }
 
-  EXPECT_EQ(0, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(0, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   EXPECT_EQ(2, conn->outstandings.packets.size());
 }
 
@@ -1370,7 +1371,9 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
           conn->transportSettings.writeConnectionDataPacketsLimit));
 
   // Normal limit
-  conn->pendingEvents.numProbePackets = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 0;
   conn->transportSettings.writeConnectionDataPacketsLimit =
       kDefaultWriteConnectionDataPacketLimit;
   EXPECT_CALL(*rawSocket, write(_, _))
@@ -1395,7 +1398,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
           conn->transportSettings.writeConnectionDataPacketsLimit));
 
   // Probing can be limited by packet limit too
-  conn->pendingEvents.numProbePackets =
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] =
       kDefaultWriteConnectionDataPacketLimit * 2;
   writeDataToQuicStream(*stream1, buf->clone(), true);
   writableBytes = 10000;
@@ -1870,7 +1873,9 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
   ASSERT_EQ(1, cryptoStream->retransmissionBuffer.size());
   ASSERT_TRUE(cryptoStream->writeBuffer.empty());
 
-  conn->pendingEvents.numProbePackets = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 0;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 0;
   EXPECT_EQ(
       0,
       writeCryptoAndAckDataToSocket(
@@ -2175,9 +2180,10 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   EXPECT_EQ(WriteDataReason::STREAM, hasNonAckDataToWrite(*conn));
 }
 
-TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounter) {
+TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
   auto conn = createConn();
-  ASSERT_EQ(0, conn->outstandings.clonedPacketsCount);
+  ASSERT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto connWindowUpdate =
       MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
@@ -2192,7 +2198,64 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounter) {
       TimePoint(),
       123,
       false /* isDSRPacket */);
-  EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Handshake]);
+  EXPECT_EQ(
+      1, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
+}
+
+TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterHandshake) {
+  auto conn = createConn();
+  ASSERT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Handshake]);
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Handshake);
+  auto connWindowUpdate =
+      MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
+  conn->pendingEvents.connWindowUpdate = true;
+  packet.packet.frames.emplace_back(connWindowUpdate);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
+  updateConnection(
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      123,
+      false /* isDSRPacket */);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(
+      1, conn->outstandings.clonedPacketCount[PacketNumberSpace::Handshake]);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
+}
+
+TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterInitial) {
+  auto conn = createConn();
+  ASSERT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::Initial);
+  auto connWindowUpdate =
+      MaxDataFrame(conn->flowControlState.advertisedMaxOffset);
+  conn->pendingEvents.connWindowUpdate = true;
+  packet.packet.frames.emplace_back(connWindowUpdate);
+  PacketEvent packetEvent(PacketNumberSpace::AppData, 100);
+  conn->outstandings.packetEvents.insert(packetEvent);
+  updateConnection(
+      *conn,
+      packetEvent,
+      packet.packet,
+      TimePoint(),
+      123,
+      false /* isDSRPacket */);
+  EXPECT_EQ(
+      1, conn->outstandings.clonedPacketCount[PacketNumberSpace::Initial]);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::Handshake]);
+  EXPECT_EQ(
+      0, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
 }
 
 TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
@@ -2211,7 +2274,7 @@ TEST_F(QuicTransportFunctionsTest, ClearBlockedFromPendingEvents) {
       false /* isDSRPacket */);
   EXPECT_FALSE(conn->streamManager->hasBlocked());
   EXPECT_FALSE(conn->outstandings.packets.empty());
-  EXPECT_EQ(0, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(0, conn->outstandings.numClonedPackets());
 }
 
 TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
@@ -2233,7 +2296,8 @@ TEST_F(QuicTransportFunctionsTest, ClonedBlocked) {
       getEncodedSize(packet),
       false /* isDSRPacket */);
   EXPECT_FALSE(conn->outstandings.packets.empty());
-  EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(
+      1, conn->outstandings.clonedPacketCount[PacketNumberSpace::AppData]);
 }
 
 TEST_F(QuicTransportFunctionsTest, TwoConnWindowUpdateWillCrash) {
@@ -2290,7 +2354,7 @@ TEST_F(QuicTransportFunctionsTest, ClearRstFromPendingEvents) {
       false /* isDSRPacket */);
   EXPECT_TRUE(conn->pendingEvents.resets.empty());
   EXPECT_FALSE(conn->outstandings.packets.empty());
-  EXPECT_EQ(0, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(0, conn->outstandings.numClonedPackets());
 }
 
 TEST_F(QuicTransportFunctionsTest, ClonedRst) {
@@ -2313,7 +2377,7 @@ TEST_F(QuicTransportFunctionsTest, ClonedRst) {
       getEncodedSize(packet),
       false /* isDSRPacket */);
   EXPECT_FALSE(conn->outstandings.packets.empty());
-  EXPECT_EQ(1, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(1, conn->outstandings.numClonedPackets());
 }
 
 TEST_F(QuicTransportFunctionsTest, TotalBytesSentUpdate) {
@@ -2518,7 +2582,7 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
       conn->transportSettings.writeConnectionDataPacketsLimit);
   ASSERT_EQ(1, stream->retransmissionBuffer.size());
 
-  conn->pendingEvents.numProbePackets = 1;
+  conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
   conn->flowControlState.windowSize *= 2;
   conn->flowControlState.timeOfLastFlowControlUpdate = Clock::now() - 20s;
   maybeSendConnWindowUpdate(*conn, Clock::now());

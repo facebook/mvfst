@@ -36,7 +36,8 @@ PacketEvent PacketRebuilder::cloneOutstandingPacket(OutstandingPacket& packet) {
     DCHECK(!conn_.outstandings.packetEvents.count(event));
     packet.associatedEvent = event;
     conn_.outstandings.packetEvents.insert(event);
-    ++conn_.outstandings.clonedPacketsCount;
+    ++conn_.outstandings
+          .clonedPacketCount[packet.packet.header.getPacketNumberSpace()];
   }
   return *packet.associatedEvent;
 }
