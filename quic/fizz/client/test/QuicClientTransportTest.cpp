@@ -257,12 +257,12 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     }));
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+    server->setTransportStatsCallbackFactory(std::move(statsFactory));
     server->setTransportSettings(transportSettings);
     server->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>());
     server->setQuicUDPSocketFactory(
         std::make_unique<QuicSharedUDPSocketFactory>());
-    server->setTransportStatsCallbackFactory(std::move(statsFactory));
     server->setFizzContext(serverCtx);
     server->setSupportedVersion({getVersion(), MVFST1});
     folly::SocketAddress addr("::1", 0);

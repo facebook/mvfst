@@ -153,12 +153,12 @@ class QuicServerWorkerTest : public Test {
     settings.statelessResetTokenSecret = getRandSecret();
     retryTokenSecret_ = getRandSecret();
     settings.retryTokenSecret = retryTokenSecret_;
+    worker_->setTransportStatsCallback(std::move(transportInfoCb));
     worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
     worker_->setWorkerId(42);
     worker_->setProcessId(ProcessId::ONE);
     worker_->setHostId(hostId_);
-    worker_->setTransportStatsCallback(std::move(transportInfoCb));
     worker_->setConnectionIdAlgo(std::make_unique<DefaultConnectionIdAlgo>());
     worker_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());

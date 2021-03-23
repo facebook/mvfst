@@ -639,6 +639,9 @@ void QuicServerWorker::dispatchPacketData(
           trans->setCcpDatapath(getCcpReader()->getDatapath());
 #endif
           trans->setCongestionControllerFactory(ccFactory_);
+          if (statsCallback_) {
+            trans->setTransportStatsCallback(statsCallback_.get());
+          }
           if (transportSettingsOverrideFn_) {
             folly::Optional<TransportSettings> overridenTransportSettings =
                 transportSettingsOverrideFn_(
@@ -674,9 +677,6 @@ void QuicServerWorker::dispatchPacketData(
               static_cast<uint8_t>(processId_),
               workerId_);
           trans->setServerConnectionIdParams(std::move(serverConnIdParams));
-          if (statsCallback_) {
-            trans->setTransportStatsCallback(statsCallback_.get());
-          }
           trans->accept();
           auto result = sourceAddressMap_.emplace(std::make_pair(
               std::make_pair(client, routingData.destinationConnId), trans));
