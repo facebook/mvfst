@@ -672,11 +672,9 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         0,
         LossState());
     if (GetParam() == PacketNumberSpace::Initial) {
-      conn.outstandings.packetCount[PacketNumberSpace::Initial] +=
-          packetNum % 2;
+      conn.outstandings.initialPacketsCount += packetNum % 2;
     } else if (GetParam() == PacketNumberSpace::Handshake) {
-      conn.outstandings.packetCount[PacketNumberSpace::Handshake] +=
-          packetNum % 2;
+      conn.outstandings.handshakePacketsCount += packetNum % 2;
     }
   }
 
@@ -701,13 +699,13 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
   EXPECT_EQ(numDeclaredLost, conn.outstandings.declaredLostCount);
   if (GetParam() == PacketNumberSpace::Initial) {
     EXPECT_EQ(numDeclaredLost, 1);
-    EXPECT_EQ(1, conn.outstandings.packetCount[PacketNumberSpace::Initial]);
+    EXPECT_EQ(1, conn.outstandings.initialPacketsCount);
     // AppData packets won't be acked by an ack in Initial space:
     // So 0, 2, 4, 6, 8 and 9 are left in OP list
     EXPECT_EQ(numDeclaredLost + 6, conn.outstandings.packets.size());
   } else if (GetParam() == PacketNumberSpace::Handshake) {
     EXPECT_EQ(numDeclaredLost, 1);
-    EXPECT_EQ(1, conn.outstandings.packetCount[PacketNumberSpace::Handshake]);
+    EXPECT_EQ(1, conn.outstandings.handshakePacketsCount);
     // AppData packets won't be acked by an ack in Handshake space:
     // So 0, 2, 4, 6, 8 and 9 are left in OP list
     EXPECT_EQ(numDeclaredLost + 6, conn.outstandings.packets.size());
@@ -802,7 +800,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   // outstandings.packetEvents
   outstandingPacket.associatedEvent.emplace(PacketNumberSpace::AppData, 0);
   conn.outstandings.packets.push_back(std::move(outstandingPacket));
-  conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]++;
+  conn.outstandings.clonedPacketsCount++;
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
@@ -850,7 +848,7 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
 
   conn.outstandings.packets.push_back(std::move(outstandingPacket1));
   conn.outstandings.packets.push_back(std::move(outstandingPacket2));
-  conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData] += 2;
+  conn.outstandings.clonedPacketsCount += 2;
   conn.outstandings.packetEvents.insert(
       PacketEvent(PacketNumberSpace::AppData, packetNum1));
 
@@ -913,7 +911,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
 
   conn.outstandings.packets.push_back(std::move(outstandingPacket1));
   conn.outstandings.packets.push_back(std::move(outstandingPacket2));
-  conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData] = 1;
+  conn.outstandings.clonedPacketsCount = 1;
   conn.outstandings.packetEvents.emplace(
       PacketNumberSpace::AppData, packetNum1);
 
@@ -936,7 +934,7 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
       ) { /* no-op */ },
       Clock::now());
   EXPECT_EQ(2, ackVisitorCounter);
-  EXPECT_EQ(0, conn.outstandings.numClonedPackets());
+  EXPECT_EQ(0, conn.outstandings.clonedPacketsCount);
 }
 
 TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
@@ -1009,7 +1007,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       0,
       LossState());
   conn.outstandings.packets.push_back(std::move(outstandingPacket));
-  conn.outstandings.clonedPacketCount[PacketNumberSpace::AppData]++;
+  conn.outstandings.clonedPacketsCount++;
 
   EXPECT_CALL(*mockQLogger, addPacketsLost(1, 1, 1));
 

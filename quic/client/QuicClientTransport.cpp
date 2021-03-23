@@ -770,11 +770,10 @@ void QuicClientTransport::writeData() {
     auto& initialCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
     CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-    auto& numProbePackets =
-        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
+
     if ((initialCryptoStream.retransmissionBuffer.size() &&
-         conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
-         numProbePackets) ||
+         conn_->outstandings.initialPacketsCount &&
+         conn_->pendingEvents.numProbePackets) ||
         initialScheduler.hasData() ||
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
@@ -791,7 +790,7 @@ void QuicClientTransport::writeData() {
           packetLimit,
           clientConn_->retryToken);
     }
-    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }
@@ -799,11 +798,9 @@ void QuicClientTransport::writeData() {
     auto& handshakeCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
     CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
-    auto& numProbePackets =
-        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
-    if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
+    if ((conn_->outstandings.handshakePacketsCount &&
          handshakeCryptoStream.retransmissionBuffer.size() &&
-         numProbePackets) ||
+         conn_->pendingEvents.numProbePackets) ||
         handshakeScheduler.hasData() ||
         (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
@@ -819,7 +816,7 @@ void QuicClientTransport::writeData() {
           version,
           packetLimit);
     }
-    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
+    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
       return;
     }
   }
@@ -835,7 +832,7 @@ void QuicClientTransport::writeData() {
         version,
         packetLimit);
   }
-  if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
+  if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
     return;
   }
   if (conn_->oneRttWriteCipher) {

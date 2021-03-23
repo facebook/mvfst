@@ -458,8 +458,9 @@ void QuicTransportBase::closeImpl(
 
   // Don't need outstanding packets.
   conn_->outstandings.packets.clear();
-  conn_->outstandings.packetCount = {};
-  conn_->outstandings.clonedPacketCount = {};
+  conn_->outstandings.initialPacketsCount = 0;
+  conn_->outstandings.handshakePacketsCount = 0;
+  conn_->outstandings.clonedPacketsCount = 0;
 
   // We don't need no congestion control.
   conn_->congestionController = nullptr;

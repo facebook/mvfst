@@ -461,7 +461,7 @@ TEST_F(QuicPacketRebuilderTest, CloneCounter) {
   PacketRebuilder rebuilder(regularBuilder2, conn);
   rebuilder.rebuildFromPacket(outstandingPacket);
   EXPECT_TRUE(outstandingPacket.associatedEvent.has_value());
-  EXPECT_EQ(1, conn.outstandings.numClonedPackets());
+  EXPECT_EQ(1, conn.outstandings.clonedPacketsCount);
 }
 
 TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
@@ -485,7 +485,7 @@ TEST_F(QuicPacketRebuilderTest, PurePingWontRebuild) {
   PacketRebuilder rebuilder(regularBuilder2, conn);
   EXPECT_EQ(folly::none, rebuilder.rebuildFromPacket(outstandingPacket));
   EXPECT_FALSE(outstandingPacket.associatedEvent.has_value());
-  EXPECT_EQ(0, conn.outstandings.numClonedPackets());
+  EXPECT_EQ(0, conn.outstandings.clonedPacketsCount);
 }
 
 TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {

@@ -1212,7 +1212,8 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
 
   // Remove any packets that might have been queued.
   server->getNonConstConn().outstandings.packets.clear();
-  server->getNonConstConn().outstandings.packetCount = {};
+  server->getNonConstConn().outstandings.initialPacketsCount = 0;
+  server->getNonConstConn().outstandings.handshakePacketsCount = 0;
   server->writeChain(streamId, data->clone(), false);
   loopForWrites();
   server->writeChain(streamId, data->clone(), false);
@@ -1806,7 +1807,8 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().streamManager->getStream(streamId);
   // knock every handshake outstanding packets out
-  server->getNonConstConn().outstandings.packetCount = {};
+  server->getNonConstConn().outstandings.initialPacketsCount = 0;
+  server->getNonConstConn().outstandings.handshakePacketsCount = 0;
   server->getNonConstConn().outstandings.packets.clear();
   for (auto& t : server->getNonConstConn().lossState.lossTimes) {
     t.reset();

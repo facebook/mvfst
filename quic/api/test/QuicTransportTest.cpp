@@ -229,7 +229,7 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
 
   auto streamId = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(kDefaultUDPSendPacketLen * 2);
-  conn.pendingEvents.numProbePackets[PacketNumberSpace::AppData] = 1;
+  conn.pendingEvents.numProbePackets = 1;
   // Probing won't ask about getWritableBytes. Then regular write may ask
   // multiple times:
   int getWritableBytesCounter = 0;
@@ -255,7 +255,7 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
   transport_->writeChain(streamId, buf->clone(), true);
   loopForWrites();
   // Pending numProbePackets is cleared:
-  EXPECT_EQ(0, conn.pendingEvents.numProbePackets[PacketNumberSpace::AppData]);
+  EXPECT_EQ(0, conn.pendingEvents.numProbePackets);
   transport_->close(folly::none);
 }
 
@@ -1114,7 +1114,7 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
 TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
+  conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
@@ -1148,7 +1148,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
+  conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
@@ -1290,7 +1290,7 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
 TEST_F(QuicTransportTest, ClonePathResponse) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
+  conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
@@ -1373,8 +1373,8 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Initial] = 0;
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
+  conn.outstandings.initialPacketsCount = 0;
+  conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
@@ -1513,8 +1513,8 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Initial] = 0;
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
+  conn.outstandings.initialPacketsCount = 0;
+  conn.outstandings.handshakePacketsCount = 0;
   conn.outstandings.packets.clear();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();

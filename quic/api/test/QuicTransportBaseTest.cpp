@@ -1309,13 +1309,9 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
 }
 
 TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {
-  transport->transportConn->outstandings
-      .packetCount[PacketNumberSpace::Handshake] = 200;
+  transport->transportConn->outstandings.handshakePacketsCount = 200;
   transport->closeNow(folly::none);
-  EXPECT_EQ(
-      0,
-      transport->transportConn->outstandings
-          .packetCount[PacketNumberSpace::Handshake]);
+  EXPECT_EQ(0, transport->transportConn->outstandings.handshakePacketsCount);
 }
 
 TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetAll) {
