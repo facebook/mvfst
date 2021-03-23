@@ -130,6 +130,11 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onCwndBlocked";
   }
 
+  void onNewCongestionController(CongestionControlType type) override {
+    VLOG(2) << prefix_ << "onNewCongestionController type="
+            << congestionControlTypeToString(type);
+  }
+
   // Probe timeout counter (aka loss timeout counter)
   void onPTO() override {
     VLOG(2) << prefix_ << "onPTO";

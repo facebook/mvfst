@@ -133,6 +133,8 @@ class QuicTransportStatsCallback {
 
   virtual void onCwndBlocked() = 0;
 
+  virtual void onNewCongestionController(CongestionControlType type) = 0;
+
   // retransmission timeout counter
   virtual void onPTO() = 0;
 

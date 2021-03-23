@@ -26,6 +26,8 @@ folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
       return kCongestionControlNoneStr;
     case CongestionControlType::CCP:
       return kCongestionControlCcpStr;
+    case CongestionControlType::MAX:
+      return "MAX";
     default:
       return "unknown";
   }

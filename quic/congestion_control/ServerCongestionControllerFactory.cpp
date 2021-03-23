@@ -57,7 +57,11 @@ ServerCongestionControllerFactory::makeCongestionController(
       break;
     case CongestionControlType::None:
       break;
+    case CongestionControlType::MAX:
+      throw QuicInternalException(
+          "MAX is not a valid cc algorithm.", LocalErrorCode::INTERNAL_ERROR);
   }
+  QUIC_STATS(conn.statsCallback, onNewCongestionController, type);
   return congestionController;
 }
 } // namespace quic

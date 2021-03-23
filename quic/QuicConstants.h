@@ -338,7 +338,9 @@ enum class CongestionControlType : uint8_t {
   Copa2,
   BBR,
   CCP,
-  None
+  None,
+  // NOTE: MAX should always be at the end
+  MAX
 };
 folly::StringPiece congestionControlTypeToString(CongestionControlType type);
 folly::Optional<CongestionControlType> congestionControlStrToType(
