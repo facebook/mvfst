@@ -101,5 +101,3 @@ jobs:
       with:
         name: mvfst
         path: _artifacts
-    - name: Test mvfst
-      run: python3 build/fbcode_builder/getdeps.py test --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
