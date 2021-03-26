@@ -82,7 +82,8 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
 
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "EchoClient error: " << toString(error.first);
+    LOG(ERROR) << "EchoClient error: " << toString(error.first)
+               << "; errStr=" << error.second;
     startDone_.post();
   }
 
