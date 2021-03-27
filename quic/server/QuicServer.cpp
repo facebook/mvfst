@@ -144,24 +144,11 @@ void QuicServer::initialize(
     connIdAlgo_ = connIdAlgoFactory_->make();
   }
   if (!ccFactory_) {
-    ccFactory_ = std::make_shared<DefaultCongestionControllerFactory>();
+    ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
   }
 
-  startCcpIfEnabled();
   initializeWorkers(evbs, useDefaultTransport);
   bindWorkersToSocket(address, evbs);
-}
-
-void QuicServer::startCcpIfEnabled() {
-#ifdef CCP_ENABLED
-  if (isUsingCCP()) {
-    ccpEvb_ = std::make_unique<folly::ScopedEventBaseThread>();
-    // run_forever (unsurpisingly) blocks until explicitly killed, so we start
-    // it in its own evb
-    ccpEvb_->getEventBase()->runInEventBaseThread(
-        [&] { ccp_run_forever(ccpConfig_.c_str(), 1); });
-  }
-#endif
 }
 
 void QuicServer::initializeWorkers(
@@ -276,9 +263,14 @@ void QuicServer::bindWorkersToSocket(
         }
       }
       if (usingCCP) {
+        auto serverId = self->boundAddress_.getIPAddress().hash() |
+            self->boundAddress_.getPort();
         try {
           worker->getCcpReader()->try_initialize(
-              worker->getEventBase(), worker->getWorkerId());
+              worker->getEventBase(),
+              self->ccpId_,
+              serverId,
+              worker->getWorkerId());
         } catch (const folly::AsyncSocketException& ex) {
           // probably means the unix socket failed to bind
           LOG(ERROR) << "error initializing ccp: " << ex.what()
@@ -297,9 +289,9 @@ void QuicServer::bindWorkersToSocket(
         self->startCv_.notify_all();
       }
     });
-    if (usingCCP && ccpInitFailed) {
-      shutdown();
-    }
+  }
+  if (usingCCP && ccpInitFailed) {
+    shutdown();
   }
 }
 
@@ -610,18 +602,19 @@ void QuicServer::setTransportSettings(TransportSettings transportSettings) {
   });
 }
 
-void QuicServer::setCcpConfig(std::string ccpConfig) {
-  ccpConfig_ = std::move(ccpConfig);
+void QuicServer::setCcpId(uint64_t ccpId) {
+  ccpId_ = ccpId;
 }
 
 bool QuicServer::isUsingCCP() {
-  auto foundConfig = !ccpConfig_.empty();
+  auto foundId = ccpId_ != 0;
 #ifdef CCP_ENABLED
-  return foundConfig;
+  LOG(ERROR) << "using ccp id=" << ccpId_;
+  return foundId;
 #else
-  if (foundConfig) {
+  if (foundId) {
     LOG(ERROR)
-        << "found ccp config, but server was not compiled with ccp support. recompile with -DCCP_ENABLED.";
+        << "found ccp id, but server was not compiled with ccp support. recompile with -DCCP_ENABLED.";
   }
   return false;
 #endif

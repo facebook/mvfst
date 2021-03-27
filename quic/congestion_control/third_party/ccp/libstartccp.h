@@ -1,5 +1,7 @@
 #include <cstdint>
 
 extern "C" {
-uint32_t ccp_run_forever(const char* args, uint32_t log_fd);
+bool *ccp_create_handle();
+void ccp_spawn(const char* args, uint32_t log_fd, uint64_t uid, bool *handle);
+void ccp_kill(bool *handle);
 }

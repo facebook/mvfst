@@ -11,6 +11,7 @@ add_library(
   QuicServerTransport.cpp
   QuicServerWorker.cpp
   CCPReader.cpp
+  QuicCcpThreadLauncher.cpp
   SlidingWindowRateLimiter.cpp
   handshake/ServerHandshake.cpp
   handshake/AppToken.cpp

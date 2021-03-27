@@ -479,7 +479,6 @@ class TPerfServer {
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
-    server_->setCcpConfig(FLAGS_ccp_config);
   }
 
   void start() {
