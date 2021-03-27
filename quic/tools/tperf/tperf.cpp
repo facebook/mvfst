@@ -20,6 +20,7 @@
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/server/AcceptObserver.h>
+#include <quic/server/QuicCcpThreadLauncher.h>
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
@@ -479,6 +480,16 @@ class TPerfServer {
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);
+
+    if (congestionControlType == quic::CongestionControlType::CCP) {
+#ifdef CCP_ENABLED
+      quicCcpThreadLauncher_.start(FLAGS_ccp_config);
+      server_->setCcpId(quicCcpThreadLauncher_.getCcpId());
+#else
+      LOG(ERROR)
+          << "To use CCP you must recompile tperf and all dependencies with -DCCP_ENABLED";
+#endif
+    }
   }
 
   void start() {
@@ -500,6 +511,7 @@ class TPerfServer {
   folly::EventBase eventBase_;
   std::unique_ptr<TPerfAcceptObserver> acceptObserver_;
   std::shared_ptr<quic::QuicServer> server_;
+  quic::QuicCcpThreadLauncher quicCcpThreadLauncher_;
 };
 
 class TPerfClient : public quic::QuicSocket::ConnectionCallback,
