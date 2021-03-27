@@ -48,6 +48,11 @@ CCP::CCP(QuicConnectionStateBase& conn)
       .dst_port = 0, // where is the destination addr?
   };
 
+  if (!datapath_) {
+    fallback();
+    return;
+  }
+
   // Inform CCP about this new connection. The returned ccp_conn_ object
   // contains per-connection state and must be passed to all other libccp
   // functions regarding this connection. We pass a reference to ourself
@@ -140,6 +145,9 @@ void CCP::onPacketAckOrLoss(
   // If we are in fallback mode, forward the call to the fallback algorithm.
   if (inFallback_) {
     fallbackCC_.onPacketAckOrLoss(ackEvent, lossEvent);
+  }
+  if (!ccp_conn_) {
+    return;
   }
 
   // If we never connected to ccp in the first place, nothing else to do

@@ -214,6 +214,9 @@ void QuicServer::bindWorkersToSocket(
   CHECK(!initialized_);
   boundAddress_ = address;
   auto usingCCP = isUsingCCP();
+  if (!usingCCP) {
+    LOG(INFO) << "NOT using CCP";
+  }
   auto ccpInitFailed = false;
   for (size_t i = 0; i < numWorkers; ++i) {
     auto workerEvb = evbs[i];
@@ -271,14 +274,15 @@ void QuicServer::bindWorkersToSocket(
               self->ccpId_,
               serverId,
               worker->getWorkerId());
+          worker->getCcpReader()->connect();
         } catch (const folly::AsyncSocketException& ex) {
           // probably means the unix socket failed to bind
-          LOG(ERROR) << "error initializing ccp: " << ex.what()
+          LOG(ERROR) << "exception while initializing ccp: " << ex.what()
                      << "\nshutting down...";
           // TODO also update counters
           ccpInitFailed = true;
         } catch (const std::exception& ex) {
-          LOG(ERROR) << "error initializing ccp: " << ex.what()
+          LOG(ERROR) << "exception initializing ccp: " << ex.what()
                      << "\nshutting down...";
           ccpInitFailed = true;
         }
@@ -609,7 +613,13 @@ void QuicServer::setCcpId(uint64_t ccpId) {
 bool QuicServer::isUsingCCP() {
   auto foundId = ccpId_ != 0;
 #ifdef CCP_ENABLED
-  LOG(ERROR) << "using ccp id=" << ccpId_;
+  auto default_is_ccp = transportSettings_.defaultCongestionController ==
+      CongestionControlType::CCP;
+  if (foundId && default_is_ccp) {
+    return true;
+  } else {
+    return false;
+  }
   return foundId;
 #else
   if (foundId) {

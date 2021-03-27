@@ -40,13 +40,6 @@
  */
 #define FALLBACK_TIMEOUT_US_LIBCCP 1000000
 
-/**
- * Defines the maximum number of times we will retry connecting to CCP, and
- * how long to wait in between each retry. See CCPReader::try_initialize().
- */
-#define MAX_CCP_CONNECT_RETRIES 5
-#define CCP_CONNECT_RETRY_WAIT_US 1000
-
 namespace quic {
 
 /**
@@ -76,6 +69,8 @@ class CCPReader : public folly::AsyncUDPSocket::ReadCallback {
       uint8_t workerId);
   // Start listening on the socket
   void start();
+  // Send a ready message to CCP
+  int connect();
   // Pause listening on the socket
   void pauseRead();
 
@@ -125,6 +120,7 @@ class CCPReader : public folly::AsyncUDPSocket::ReadCallback {
 #ifdef CCP_ENABLED
   struct ccp_datapath ccpDatapath_;
 #endif
+  bool initialized_{false};
 };
 
 } // namespace quic

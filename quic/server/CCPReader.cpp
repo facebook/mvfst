@@ -166,7 +166,9 @@ void CCPReader::try_initialize(
     LOG(ERROR) << "[ccp] ccp_init failed ret=" << ret;
     throw std::runtime_error("internal bug: unable to interface with libccp");
   }
+}
 
+int CCPReader::connect() {
   // This message registers us with CCP. CCP ignores messages from
   // datapaths that have not yet registered with it. It identifies a datapath
   // by the sending address (/ccp/mvfst{id}).
@@ -174,25 +176,21 @@ void CCPReader::try_initialize(
   int wrote = write_ready_msg(ready_buf, READY_MSG_SIZE, workerId_);
   std::unique_ptr<folly::IOBuf> ready_msg =
       folly::IOBuf::wrapBuffer(ready_buf, wrote);
-  ret = writeOwnedBuffer(std::move(ready_msg));
+  int ret = writeOwnedBuffer(std::move(ready_msg));
   // Since we start ccp within a separate thread from QuicServer, its possible
   // that it hasn't been scheduled yet when we send this message, in which case
   // we will get an unable to connet to socket error (111). If this happens,
-  // sleep a bit and then retry. If after a few tries we still can't connect,
-  // then something is probably wrong with CCP and we should exit.
-  int tries = 1;
-  while (ret == -1 && tries < MAX_CCP_CONNECT_RETRIES) {
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(CCP_CONNECT_RETRY_WAIT_US));
-    ready_msg = folly::IOBuf::wrapBuffer(ready_buf, wrote);
-    ret = writeOwnedBuffer(std::move(ready_msg));
-    tries += 1;
-  }
+  // we return a failure and expected the caller to wait and retry later.
+  // If we can't connect after a few tries then something is probably wrong
+  // with CCP and we should give up.
   if (ret < 0) {
-    LOG(ERROR) << "[ccp] write_ready_msg failed after " << tries
-               << " tries ret=" << ret << " errno=" << errno;
-    throw std::runtime_error("unable to connect to ccp");
+    LOG(ERROR) << "[ccp] write_ready_msg failed ret=" << ret
+               << " errno=" << errno;
+  } else {
+    LOG(INFO) << "[ccp] write_ready_msg success";
+    initialized_ = true;
   }
+  return ret;
 }
 
 folly::EventBase* CCPReader::getEventBase() const {
@@ -292,7 +290,7 @@ uint8_t CCPReader::getWorkerId() const noexcept {
 }
 
 struct ccp_datapath* CCPReader::getDatapath() noexcept {
-  return &ccpDatapath_;
+  return initialized_ ? &ccpDatapath_ : nullptr;
 }
 
 void CCPReader::shutdown() {
@@ -326,7 +324,9 @@ void CCPReader::try_initialize(
     uint8_t) {
   evb_ = evb;
 }
-
+int CCPReader::connect() {
+  return 0;
+}
 folly::EventBase* CCPReader::getEventBase() const {
   return evb_;
 }
