@@ -304,6 +304,10 @@ void CCPReader::shutdown() {
     }
     ccpSocket_ = nullptr;
   }
+  if (ccpDatapath_.ccp_active_connections) {
+    free(ccpDatapath_.ccp_active_connections);
+  }
+  ccp_free(&ccpDatapath_);
 }
 
 CCPReader::~CCPReader() {

@@ -37,7 +37,6 @@ CCP::CCP(QuicConnectionStateBase& conn)
       conn_.transportSettings.minCwndInMss);
 
   datapath_ = conn_.ccpDatapath;
-  datapath_ = nullptr;
 
   struct ccp_datapath_info info = {
       .init_cwnd = static_cast<u32>(conn.transportSettings.initCwndInMss),
@@ -70,30 +69,41 @@ CCP::~CCP() {
 }
 
 void CCP::onRemoveBytesFromInflight(uint64_t bytes) {
-  /**
-   * TODO we should also update packetsInFlight_ here, but the API only passes
-   * bytes. This would require changing the API to pass the full lossEvent
-   * object instead of just bytes. This is probably fine for now because CCP
-   * algorithms use bytes instead of packets anyway.
-   */
-  subtractAndCheckUnderflow(bytesInFlight_, bytes);
+  DCHECK_LE(bytes, conn_.lossState.inflightBytes);
+  conn_.lossState.inflightBytes -= bytes;
 }
 
 void CCP::onPacketSent(const OutstandingPacket& packet) {
-  addAndCheckOverflow(bytesInFlight_, packet.encodedSize);
-  addAndCheckOverflow(packetsInFlight_, 1);
+  if (std::numeric_limits<uint64_t>::max() - conn_.lossState.inflightBytes <
+      packet.metadata.encodedSize) {
+    throw QuicInternalException(
+        "CCP: inflightBytes overflow", LocalErrorCode::INFLIGHT_BYTES_OVERFLOW);
+  }
+
+  if (inFallback_) {
+    fallbackCC_.onPacketSent(packet);
+  } else {
+    // Fallback algorithm takes care of bytes acked since it shares the same
+    // conn_
+    addAndCheckOverflow(
+        conn_.lossState.inflightBytes, packet.metadata.encodedSize);
+  }
 
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
-        bytesInFlight_, getCongestionWindow(), kCongestionPacketSent);
+        conn_.lossState.inflightBytes,
+        getCongestionWindow(),
+        kCongestionPacketSent);
   }
 }
 
 void CCP::onAckEvent(const AckEvent& ack) {
   DCHECK(ack.largestAckedPacket.hasValue() && !ack.ackedPackets.empty());
 
-  subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
-  subtractAndCheckUnderflow(packetsInFlight_, ack.ackedPackets.size());
+  // Fallback algorithm takes care of bytes acked since it shares the same conn_
+  if (!inFallback_) {
+    onRemoveBytesFromInflight(ack.ackedBytes);
+  }
 
   // Add latest state to this batch of udpates. See comment regarding
   // ccp_primitives struct
@@ -132,6 +142,12 @@ void CCP::onPacketAckOrLoss(
     fallbackCC_.onPacketAckOrLoss(ackEvent, lossEvent);
   }
 
+  // If we never connected to ccp in the first place, nothing else to do
+  // regardless
+  if (!ccp_conn_) {
+    return;
+  }
+
   /**
    * Even if we are in fallback, we finish the rest of this function so that we
    * can keep the ccp primitives up to date in case connection with CCP is
@@ -158,13 +174,11 @@ void CCP::onPacketAckOrLoss(
   struct ccp_primitives* mmt = &ccp_conn_->prims;
   mmt->snd_cwnd = cwndBytes_;
   mmt->rtt_sample_us = conn_.lossState.srtt.count();
-  mmt->bytes_in_flight = bytesInFlight_;
-  mmt->packets_in_flight = packetsInFlight_;
+  mmt->bytes_in_flight = conn_.lossState.inflightBytes;
   mmt->rate_outgoing = sendRate_.normalize();
   mmt->rate_incoming = ackRate_.normalize();
   mmt->bytes_misordered = 0; // used for TCP SACK
   mmt->packets_misordered = 0; // used for TCP SACK
-
   /**
    * This is the heart of ccp on the datapath side. It takes the ccp_primitives
    * and runs them through the current datapath program. It handles sending
@@ -208,7 +222,7 @@ void CCP::fallback() {
   inFallback_ = true;
   // This just starts the fallback alg where we left off so it doesn't need to
   // restart all connections at init cwnd again.
-  fallbackCC_.handoff(cwndBytes_, bytesInFlight_);
+  fallbackCC_.handoff(cwndBytes_, conn_.lossState.inflightBytes);
 }
 
 void CCP::restoreAfterFallback() {
@@ -229,8 +243,11 @@ void CCP::onLossEvent(const LossEvent& loss) {
     endOfRecovery_ = Clock::now();
     ccp_conn_->prims.lost_pkts_sample += loss.lostPackets;
   }
-  subtractAndCheckUnderflow(bytesInFlight_, loss.lostBytes);
-  subtractAndCheckUnderflow(packetsInFlight_, loss.lostPackets);
+
+  // Fallback algorithm takes care of bytes acked since it shares the same conn_
+  if (!inFallback_) {
+    onRemoveBytesFromInflight(loss.lostBytes);
+  }
 }
 
 void CCP::setPacingRate(uint64_t rate) noexcept {
@@ -244,11 +261,9 @@ void CCP::setPacingRate(uint64_t rate) noexcept {
 
 uint64_t CCP::getWritableBytes() const noexcept {
   uint64_t cwndBytes = getCongestionWindow();
-  if (bytesInFlight_ > cwndBytes) {
-    return 0;
-  } else {
-    return cwndBytes - bytesInFlight_;
-  }
+  return cwndBytes > conn_.lossState.inflightBytes
+      ? cwndBytes - conn_.lossState.inflightBytes
+      : 0;
 }
 
 uint64_t CCP::getCongestionWindow() const noexcept {
@@ -264,7 +279,7 @@ void CCP::setCongestionWindow(uint64_t cwnd) noexcept {
 }
 
 uint64_t CCP::getBytesInFlight() const noexcept {
-  return bytesInFlight_;
+  return conn_.lossState.inflightBytes;
 }
 #else
 

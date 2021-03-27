@@ -92,8 +92,6 @@ class CCP : public CongestionController {
 
  private:
   QuicServerConnectionState& conn_;
-  uint64_t bytesInFlight_{0};
-  uint64_t packetsInFlight_{0};
   // The current cwnd for this connection when we are not in fallback mode.
   // When we are in fallback mode, we instead use
   // fallbackCC_->getCongestionWindow().
