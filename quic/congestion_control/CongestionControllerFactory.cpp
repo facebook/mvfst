@@ -28,6 +28,9 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::NewReno:
       congestionController = std::make_unique<NewReno>(conn);
       break;
+    case CongestionControlType::CCP:
+      LOG(ERROR)
+          << "Default CC Factory cannot make CCP. Falling back to cubic.";
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
       break;
@@ -45,10 +48,6 @@ DefaultCongestionControllerFactory::makeCongestionController(
       congestionController = std::move(bbr);
       break;
     }
-    case CongestionControlType::CCP:
-      throw QuicInternalException(
-          "CCP congestion control only available on server (via ServerCongestionControllerFactory)",
-          LocalErrorCode::INTERNAL_ERROR);
     case CongestionControlType::None:
       break;
     case CongestionControlType::MAX:

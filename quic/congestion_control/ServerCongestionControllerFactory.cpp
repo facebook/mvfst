@@ -29,6 +29,14 @@ ServerCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::NewReno:
       congestionController = std::make_unique<NewReno>(conn);
       break;
+    case CongestionControlType::CCP:
+#ifdef CCP_ENABLED
+      congestionController = std::make_unique<CCP>(conn);
+      break;
+#else
+      LOG(ERROR)
+          << "Server CC Factory cannot make CCP (unless recompiled with -DCCP_ENABLED). Falling back to cubic.";
+#endif
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
       break;
@@ -46,15 +54,6 @@ ServerCongestionControllerFactory::makeCongestionController(
       congestionController = std::move(bbr);
       break;
     }
-    case CongestionControlType::CCP:
-#ifdef CCP_ENABLED
-      congestionController = std::make_unique<CCP>(conn);
-#else
-      throw QuicInternalException(
-          "ccp not enabled. must be compiled with -DCCP_ENABLED",
-          LocalErrorCode::INTERNAL_ERROR);
-#endif
-      break;
     case CongestionControlType::None:
       break;
     case CongestionControlType::MAX:
