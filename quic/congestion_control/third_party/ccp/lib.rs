@@ -1,6 +1,8 @@
 // Step 1/2: Add new alg crates here.
 //
 // NOTE: Must be listed in TARGETS deps
+extern crate ccp_const;
+extern crate ccp_generic_cong_avoid;
 
 extern crate clap;
 extern crate portus;
@@ -12,6 +14,8 @@ use portus::{CongAlg, CongAlgBuilder};
 use std::ffi::CStr;
 use std::fs::File;
 use std::os::unix::io::FromRawFd;
+
+use ccp_generic_cong_avoid::{cubic::Cubic, reno::Reno};
 
 fn _start(args: String, ipc: String, out: Option<File>) -> u32 {
     // Parse config arguments
@@ -45,6 +49,10 @@ fn _start(args: String, ipc: String, out: Option<File>) -> u32 {
             }
         };
     }
+
+    register_alg!(ccp_const);
+    register_alg!(ccp_generic_cong_avoid, Alg, Reno);
+    register_alg!(ccp_generic_cong_avoid, Alg, Cubic);
 
     eprintln!("error: algorithm '{}' not found!", alg_name);
     1
