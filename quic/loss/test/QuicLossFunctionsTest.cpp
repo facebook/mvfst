@@ -236,19 +236,23 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     packet = std::move(sizeEnforcedBuilder).buildPacket();
   }
   uint32_t encodedSize = 0;
+  uint32_t encodedBodySize = 0;
   if (packet.header) {
     encodedSize += packet.header->computeChainDataLength();
   }
   if (packet.body) {
     encodedSize += packet.body->computeChainDataLength();
+    encodedBodySize += packet.body->computeChainDataLength();
   }
   auto outstandingPacket = OutstandingPacket(
       packet.packet,
       time,
       encodedSize,
+      encodedBodySize,
       isHandshake,
       isD6DProbe,
       encodedSize,
+      encodedBodySize,
       0,
       0,
       LossState());
@@ -1069,7 +1073,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
   conn->outstandings.packets.emplace_back(OutstandingPacket(
-      outstandingRegularPacket, now, 0, false, 0, 0, 0, LossState()));
+      outstandingRegularPacket, now, 0, 0, false, 0, 0, 0, 0, LossState()));
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool) {

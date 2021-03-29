@@ -55,8 +55,10 @@ auto emplacePackets(
         std::move(regularPacket),
         sentTime,
         1,
+        0,
         false /* handshake */,
         packetNum,
+        0,
         packetNum + 1,
         packetNum + 1,
         quic::LossState());
@@ -86,8 +88,10 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
         std::move(regularPacket),
         sentTime,
         1,
+        0,
         false,
         packetNum,
+        0,
         0,
         0,
         LossState()));
@@ -164,8 +168,10 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
         std::move(regularPacket),
         sentTime,
         1,
+        0,
         false,
         packetNum,
+        0,
         0,
         0,
         LossState()));
@@ -306,8 +312,10 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
         std::move(regularPacket),
         Clock::now(),
         1,
+        0,
         false,
         packetNum,
+        0,
         0,
         0,
         LossState()));
@@ -411,8 +419,10 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         std::move(regularPacket),
         Clock::now(),
         1,
+        0,
         false,
         packetNum,
+        0,
         0,
         0,
         LossState()));
@@ -427,8 +437,10 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         std::move(regularPacket),
         Clock::now(),
         1,
+        0,
         false,
         packetNum,
+        0,
         0,
         0,
         LossState()));
@@ -512,7 +524,16 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.ackStates.appDataAckState.acks.insert(500, 700);
   firstPacket.frames.emplace_back(std::move(firstAckFrame));
   conn.outstandings.packets.emplace_back(OutstandingPacket(
-      std::move(firstPacket), Clock::now(), 0, false, 0, 0, 0, LossState()));
+      std::move(firstPacket),
+      Clock::now(),
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState()));
 
   auto secondPacket = createNewPacket(101 /* packetNum */, GetParam());
   WriteAckFrame secondAckFrame;
@@ -522,7 +543,16 @@ TEST_P(AckHandlersTest, AckVisitorForAckTest) {
   conn.ackStates.appDataAckState.acks.insert(1002, 1090);
   secondPacket.frames.emplace_back(std::move(secondAckFrame));
   conn.outstandings.packets.emplace_back(OutstandingPacket(
-      std::move(secondPacket), Clock::now(), 0, false, 0, 0, 0, LossState()));
+      std::move(secondPacket),
+      Clock::now(),
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState()));
 
   ReadAckFrame firstReceivedAck;
   firstReceivedAck.largestAcked = 100;
@@ -583,7 +613,16 @@ TEST_P(AckHandlersTest, NoNewAckedPacket) {
   PacketNum packetAfterRtoNum = 10;
   auto packetAfterRto = createNewPacket(packetAfterRtoNum, GetParam());
   conn.outstandings.packets.emplace_back(OutstandingPacket(
-      std::move(packetAfterRto), Clock::now(), 0, false, 0, 0, 0, LossState()));
+      std::move(packetAfterRto),
+      Clock::now(),
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState()));
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 5;
@@ -629,12 +668,30 @@ TEST_P(AckHandlersTest, AckPacketNumDoesNotExist) {
   PacketNum packetNum1 = 9;
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
   conn.outstandings.packets.emplace_back(
-      std::move(regularPacket1), Clock::now(), 0, false, 0, 0, 0, LossState());
+      std::move(regularPacket1),
+      Clock::now(),
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState());
 
   PacketNum packetNum2 = 10;
   auto regularPacket2 = createNewPacket(packetNum2, GetParam());
   conn.outstandings.packets.emplace_back(
-      std::move(regularPacket2), Clock::now(), 0, false, 0, 0, 0, LossState());
+      std::move(regularPacket2),
+      Clock::now(),
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState());
 
   // Ack a packet one higher than the packet so that we don't trigger reordering
   // threshold.
@@ -666,8 +723,10 @@ TEST_P(AckHandlersTest, TestHandshakeCounterUpdate) {
         std::move(regularPacket),
         Clock::now(),
         0,
+        0,
         packetNum % 2 && GetParam() != PacketNumberSpace::AppData,
         packetNum / 2,
+        0,
         0,
         0,
         LossState());
@@ -753,7 +812,16 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
   conn.outstandings.packets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), Clock::now(), 1, false, 1, 0, 0, LossState()));
+      std::move(regularPacket),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState()));
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
   ackFrame.ackBlocks.emplace_back(0, 0);
@@ -795,7 +863,16 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   WriteStreamFrame frame(0, 0, 0, true);
   regularPacket.frames.emplace_back(std::move(frame));
   OutstandingPacket outstandingPacket(
-      std::move(regularPacket), Clock::now(), 1, false, 1, 0, 0, LossState());
+      std::move(regularPacket),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState());
   // Give this outstandingPacket an associatedEvent that's not in
   // outstandings.packetEvents
   outstandingPacket.associatedEvent.emplace(PacketNumberSpace::AppData, 0);
@@ -836,12 +913,30 @@ TEST_P(AckHandlersTest, NoDoubleProcess) {
   regularPacket2.frames.push_back(frame);
 
   OutstandingPacket outstandingPacket1(
-      std::move(regularPacket1), Clock::now(), 1, false, 1, 0, 0, LossState());
+      std::move(regularPacket1),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState());
   outstandingPacket1.associatedEvent.emplace(
       PacketNumberSpace::AppData, packetNum1);
 
   OutstandingPacket outstandingPacket2(
-      std::move(regularPacket2), Clock::now(), 1, false, 1, 0, 0, LossState());
+      std::move(regularPacket2),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState());
   // The seconds packet has the same PacketEvent
   outstandingPacket2.associatedEvent.emplace(
       PacketNumberSpace::AppData, packetNum1);
@@ -898,7 +993,16 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto regularPacket1 = createNewPacket(packetNum1, GetParam());
   regularPacket1.frames.push_back(frame);
   OutstandingPacket outstandingPacket1(
-      std::move(regularPacket1), Clock::now(), 1, false, 1, 0, 0, LossState());
+      std::move(regularPacket1),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState());
   outstandingPacket1.associatedEvent.emplace(
       PacketNumberSpace::AppData, packetNum1);
 
@@ -907,7 +1011,16 @@ TEST_P(AckHandlersTest, ClonedPacketsCounter) {
   auto regularPacket2 = createNewPacket(packetNum2, GetParam());
   regularPacket2.frames.push_back(frame);
   OutstandingPacket outstandingPacket2(
-      std::move(regularPacket2), Clock::now(), 1, false, 1, 0, 0, LossState());
+      std::move(regularPacket2),
+      Clock::now(),
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState());
 
   conn.outstandings.packets.push_back(std::move(outstandingPacket1));
   conn.outstandings.packets.push_back(std::move(outstandingPacket2));
@@ -946,7 +1059,16 @@ TEST_P(AckHandlersTest, UpdateMaxAckDelay) {
   auto regularPacket = createNewPacket(packetNum, GetParam());
   auto sentTime = Clock::now();
   conn.outstandings.packets.emplace_back(OutstandingPacket(
-      std::move(regularPacket), sentTime, 1, false, 1, 0, 0, LossState()));
+      std::move(regularPacket),
+      sentTime,
+      1,
+      0,
+      false,
+      1,
+      0,
+      0,
+      0,
+      LossState()));
 
   ReadAckFrame ackFrame;
   // ackDelay has no effect on mrtt
@@ -1001,8 +1123,10 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
       std::move(regularPacket),
       Clock::now() - delayUntilLost - 20ms,
       1,
+      0,
       false,
       1,
+      0,
       0,
       0,
       LossState());
@@ -1039,7 +1163,9 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       FizzServerQuicHandshakeContext::Builder().build());
   conn.congestionController = nullptr;
   conn.lossState.totalBytesSent = 2468;
+  conn.lossState.totalBodyBytesSent = 2000;
   conn.lossState.totalBytesAcked = 1357;
+  conn.lossState.totalBodyBytesAcked = 1000;
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
   auto sentTime = Clock::now() - 1500ms;
@@ -1047,12 +1173,15 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
       std::move(regularPacket),
       sentTime,
       111,
+      100,
       false,
       conn.lossState.totalBytesSent + 111,
+      conn.lossState.totalBodyBytesSent + 100,
       0,
       0,
       LossState()));
   conn.lossState.totalBytesSent += 111;
+  conn.lossState.totalBodyBytesSent += 100;
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 0;
@@ -1071,6 +1200,7 @@ TEST_P(AckHandlersTest, UpdatePendingAckStates) {
   EXPECT_EQ(sentTime, *conn.lossState.lastAckedPacketSentTime);
   EXPECT_EQ(receiveTime, *conn.lossState.lastAckedTime);
   EXPECT_EQ(111 + 1357, conn.lossState.totalBytesAcked);
+  EXPECT_EQ(100 + 1000, conn.lossState.totalBodyBytesAcked);
 }
 
 TEST_P(AckHandlersTest, AckEventCreation) {
@@ -1093,8 +1223,10 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         std::move(regularPacket),
         largestSentTime,
         1,
+        0,
         false /* handshake */,
         packetNum,
+        0,
         0,
         0,
         LossState());
@@ -1150,8 +1282,10 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         std::move(regularPacket),
         largestSentTime,
         1,
+        0,
         false /* handshake */,
         packetNum,
+        0,
         packetNum + 1,
         0,
         LossState());
@@ -1217,8 +1351,10 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
         std::move(regularPacket),
         sentTime,
         1,
+        0,
         false /* handshake */,
         packetNum,
+        0,
         packetNum + 1,
         0,
         LossState());

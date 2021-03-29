@@ -200,6 +200,8 @@ void processAckFrame(
         conn.lossState.totalBytesSentAtLastAck = conn.lossState.totalBytesSent;
         conn.lossState.totalBytesAckedAtLastAck =
             conn.lossState.totalBytesAcked;
+        conn.lossState.totalBodyBytesAcked +=
+            rPacketIt->metadata.encodedBodySize;
         if (!lastAckedPacketSentTime) {
           lastAckedPacketSentTime = rPacketIt->metadata.time;
         }

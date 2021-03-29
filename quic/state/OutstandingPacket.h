@@ -19,6 +19,8 @@ struct OutstandingPacketMetadata {
   TimePoint time;
   // Size of the packet sent on the wire.
   uint32_t encodedSize;
+  // Size of only the body within the packet sent on the wire.
+  uint32_t encodedBodySize;
   // Whether this packet has any data from stream 0
   bool isHandshake;
   // Whether the packet is a d6d probe
@@ -26,6 +28,9 @@ struct OutstandingPacketMetadata {
   // Total sent bytes on this connection including this packet itself when this
   // packet is sent.
   uint64_t totalBytesSent;
+  // Total sent body bytes on this connection including this packet itself when
+  // this packet is sent.
+  uint64_t totalBodyBytesSent;
   // Bytes in flight on this connection including this packet itself when this
   // packet is sent.
   uint64_t inflightBytes;
@@ -42,18 +47,22 @@ struct OutstandingPacketMetadata {
   OutstandingPacketMetadata(
       TimePoint timeIn,
       uint32_t encodedSizeIn,
+      uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       bool isD6DProbeIn,
       uint64_t totalBytesSentIn,
+      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount)
       : time(timeIn),
         encodedSize(encodedSizeIn),
+        encodedBodySize(encodedBodySizeIn),
         isHandshake(isHandshakeIn),
         isD6DProbe(isD6DProbeIn),
         totalBytesSent(totalBytesSentIn),
+        totalBodyBytesSent(totalBodyBytesSentIn),
         inflightBytes(inflightBytesIn),
         packetsInflight(packetsInflightIn),
         totalPacketsSent(lossStateIn.totalPacketsSent),
@@ -80,7 +89,6 @@ struct OutstandingPacket {
     // Total acked bytes on this connection when last acked packet is acked,
     // including the last acked packet.
     uint64_t totalBytesAcked;
-
     LastAckedPacketInfo(
         TimePoint sentTimeIn,
         TimePoint ackTimeIn,
@@ -123,8 +131,10 @@ struct OutstandingPacket {
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
       uint32_t encodedSizeIn,
+      uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       uint64_t totalBytesSentIn,
+      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
@@ -133,9 +143,11 @@ struct OutstandingPacket {
         metadata(OutstandingPacketMetadata(
             timeIn,
             encodedSizeIn,
+            encodedBodySizeIn,
             isHandshakeIn,
             false,
             totalBytesSentIn,
+            totalBodyBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,
@@ -145,9 +157,11 @@ struct OutstandingPacket {
       RegularQuicWritePacket packetIn,
       TimePoint timeIn,
       uint32_t encodedSizeIn,
+      uint32_t encodedBodySizeIn,
       bool isHandshakeIn,
       bool isD6DProbeIn,
       uint64_t totalBytesSentIn,
+      uint64_t totalBodyBytesSentIn,
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
@@ -156,9 +170,11 @@ struct OutstandingPacket {
         metadata(OutstandingPacketMetadata(
             timeIn,
             encodedSizeIn,
+            encodedBodySizeIn,
             isHandshakeIn,
             isD6DProbeIn,
             totalBytesSentIn,
+            totalBodyBytesSentIn,
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,

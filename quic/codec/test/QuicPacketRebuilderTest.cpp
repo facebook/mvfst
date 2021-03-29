@@ -32,8 +32,10 @@ OutstandingPacket makeDummyOutstandingPacket(
       writePacket,
       Clock::now(),
       1000,
+      0,
       false,
       totalBytesSentOnConnection,
+      0,
       0,
       0,
       LossState());

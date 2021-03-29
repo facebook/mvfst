@@ -41,7 +41,7 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet, Clock::now(), 0, true, 0, 0, 0, LossState(), 0);
+      packet, Clock::now(), 0, 0, true, 0, 0, 0, 0, LossState(), 0);
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -60,7 +60,7 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
       QuicVersion::QUIC_DRAFT);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet, Clock::now(), 0, true, 0, 0, 0, LossState(), 0);
+      packet, Clock::now(), 0, 0, true, 0, 0, 0, 0, LossState(), 0);
   conn.outstandings.handshakePacketsCount++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
@@ -74,7 +74,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet, Clock::now(), 0, false, 0, 0, 0, LossState(), 0);
+      packet, Clock::now(), 0, 0, false, 0, 0, 0, 0, LossState());
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }
@@ -889,6 +889,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
       result.packet->packet,
       Clock::now(),
       bufferLength,
+      0,
       false /* isDSRPacket */);
   buf = bufAccessor.obtain();
   ASSERT_EQ(conn.udpSendPacketLen, buf->length());
@@ -960,6 +961,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
       packetResult.packet->packet,
       Clock::now(),
       encodedSize,
+      0,
       false /* isDSRPacket */);
 
   // make packetNum too larger to be encoded into the same size:
@@ -1581,7 +1583,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
   updateConnection(
-      conn, folly::none, packet1, Clock::now(), 1000, false /* isDSR */);
+      conn, folly::none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
   EXPECT_EQ(1, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame1.streamId);
@@ -1608,7 +1610,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   scheduler.writeStreams(builder2);
   auto packet2 = std::move(builder2).buildPacket().packet;
   updateConnection(
-      conn, folly::none, packet2, Clock::now(), 1000, false /* isDSR */);
+      conn, folly::none, packet2, Clock::now(), 1000, 0, false /* isDSR */);
   EXPECT_EQ(1, packet2.frames.size());
   auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId, writeStreamFrame2.streamId);
@@ -1653,7 +1655,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   scheduler.writeStreams(builder1);
   auto packet1 = std::move(builder1).buildPacket().packet;
   updateConnection(
-      conn, folly::none, packet1, Clock::now(), 1200, false /* isDSR */);
+      conn, folly::none, packet1, Clock::now(), 1200, 0, false /* isDSR */);
   EXPECT_EQ(2, packet1.frames.size());
   auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
   EXPECT_EQ(streamId1, writeStreamFrame1.streamId);

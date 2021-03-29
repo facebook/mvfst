@@ -261,6 +261,7 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
       headerCipher);
   CHECK(!packetBuf->isChained());
   auto encodedSize = packetBuf->length();
+  auto encodedBodySize = encodedSize - headerLen;
   // Include previous packets back.
   packetBuf->prepend(prevSize);
   connection.bufAccessor->release(std::move(packetBuf));
@@ -280,7 +281,8 @@ DataPathResult continuousMemoryBuildScheduleEncrypt(
     QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
     QUIC_STATS(connection.statsCallback, onPacketSent);
   }
-  return DataPathResult::makeWriteResult(ret, std::move(result), encodedSize);
+  return DataPathResult::makeWriteResult(
+      ret, std::move(result), encodedSize, encodedBodySize);
 }
 
 DataPathResult iobufChainBasedBuildScheduleEncrypt(
@@ -344,10 +346,12 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
       packetBuf->length() - headerLen,
       headerCipher);
   auto encodedSize = packetBuf->computeChainDataLength();
+  auto encodedBodySize = encodedSize - headerLen;
 #if !FOLLY_MOBILE
   if (encodedSize > connection.udpSendPacketLen) {
     LOG_EVERY_N(ERROR, 5000)
-        << "Quic sending pkt larger than limit, encodedSize=" << encodedSize;
+        << "Quic sending pkt larger than limit, encodedSize=" << encodedSize
+        << " encodedBodySize=" << encodedBodySize;
   }
 #endif
   bool ret = ioBufBatch.write(std::move(packetBuf), encodedSize);
@@ -356,7 +360,8 @@ DataPathResult iobufChainBasedBuildScheduleEncrypt(
     QUIC_STATS(connection.statsCallback, onWrite, encodedSize);
     QUIC_STATS(connection.statsCallback, onPacketSent);
   }
-  return DataPathResult::makeWriteResult(ret, std::move(result), encodedSize);
+  return DataPathResult::makeWriteResult(
+      ret, std::move(result), encodedSize, encodedBodySize);
 }
 
 } // namespace
@@ -561,6 +566,7 @@ void updateConnection(
     RegularQuicWritePacket packet,
     TimePoint sentTime,
     uint32_t encodedSize,
+    uint32_t encodedBodySize,
     bool isDSRPacket) {
   auto packetNum = packet.header.getPacketSequenceNum();
   bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
@@ -574,7 +580,7 @@ void updateConnection(
       conn.d6d.lastProbe->packetNum == packetNum;
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize
-           << " " << conn;
+           << " bodySize: " << encodedBodySize << " " << conn;
   if (conn.qLogger) {
     conn.qLogger->addPacket(packet, encodedSize);
   }
@@ -749,6 +755,7 @@ void updateConnection(
     conn.pendingEvents.setLossDetectionAlarm = retransmittable;
   }
   conn.lossState.totalBytesSent += encodedSize;
+  conn.lossState.totalBodyBytesSent += encodedBodySize;
   conn.lossState.totalPacketsSent++;
 
   if (!retransmittable && !isPing) {
@@ -771,12 +778,14 @@ void updateConnection(
       std::move(packet),
       sentTime,
       encodedSize,
+      encodedBodySize,
       isHandshake,
       isD6DProbe,
       // these numbers should all _include_ the current packet
       // conn.lossState.inflightBytes isn't updated until below
       // conn.outstandings.numOutstanding() + 1 since we're emplacing here
       conn.lossState.totalBytesSent,
+      conn.lossState.totalBodyBytesSent,
       conn.lossState.inflightBytes + encodedSize,
       conn.outstandings.numOutstanding() + 1,
       conn.lossState,
@@ -1349,6 +1358,7 @@ uint64_t writeConnectionDataToSocket(
         std::move(result->packet->packet),
         Clock::now(),
         folly::to<uint32_t>(ret.encodedSize),
+        folly::to<uint32_t>(ret.encodedBodySize),
         false /* isDSRPacket */);
 
     // if ioBufBatch.write returns false

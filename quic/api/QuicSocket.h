@@ -142,11 +142,20 @@ class QuicSocket {
     uint32_t totalPacketsSpuriouslyMarkedLost{0};
     uint32_t timeoutBasedLoss{0};
     std::chrono::microseconds pto{0us};
+    // // Number of Bytes (packet header + body) that were sent
     uint64_t bytesSent{0};
+    // // Number of Bytes (packet header + body) that were acked
     uint64_t bytesAcked{0};
+    // // Number of Bytes (packet header + body) that were received
     uint64_t bytesRecvd{0};
+    // // Number of Bytes (packet header + body) that are in-flight
     uint64_t bytesInFlight{0};
+    // // Number of Bytes (packet header + body) that were retxed
     uint64_t totalBytesRetransmitted{0};
+    // Number of Bytes (only the encoded packet's body) that were sent
+    uint64_t bodyBytesSent{0};
+    // Number of Bytes (only the encoded packet's body) that were acked
+    uint64_t bodyBytesAcked{0};
     uint32_t ptoCount{0};
     uint32_t totalPTOCount{0};
     folly::Optional<PacketNum> largestPacketAckedByPeer;

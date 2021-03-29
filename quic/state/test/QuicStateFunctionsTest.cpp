@@ -594,7 +594,9 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
       135,
+      0,
       false,
+      0,
       0,
       0,
       0,
@@ -603,48 +605,86 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       makeTestLongPacket(LongHeader::Types::Handshake),
       Clock::now(),
       1217,
+      0,
       false,
+      0,
       0,
       0,
       0,
       LossState());
   conn.outstandings.packets.emplace_back(
-      makeTestShortPacket(), Clock::now(), 5556, false, 0, 0, 0, LossState());
+      makeTestShortPacket(),
+      Clock::now(),
+      5556,
+      5000,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState());
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
       56,
+      0,
       false,
+      0,
       0,
       0,
       0,
       LossState());
   conn.outstandings.packets.emplace_back(
-      makeTestShortPacket(), Clock::now(), 6665, false, 0, 0, 0, LossState());
+      makeTestShortPacket(),
+      Clock::now(),
+      6665,
+      6000,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState());
   EXPECT_EQ(
       135,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)
           ->metadata.encodedSize);
   EXPECT_EQ(
+      0,
+      getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)
+          ->metadata.encodedBodySize);
+  EXPECT_EQ(
       56,
       getLastOutstandingPacket(conn, PacketNumberSpace::Initial)
           ->metadata.encodedSize);
   EXPECT_EQ(
-      1217,
-      getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake)
-          ->metadata.encodedSize);
+      0,
+      getLastOutstandingPacket(conn, PacketNumberSpace::Initial)
+          ->metadata.encodedBodySize);
   EXPECT_EQ(
       1217,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake)
           ->metadata.encodedSize);
+  EXPECT_EQ(
+      0,
+      getFirstOutstandingPacket(conn, PacketNumberSpace::Handshake)
+          ->metadata.encodedBodySize);
   EXPECT_EQ(
       5556,
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)
           ->metadata.encodedSize);
   EXPECT_EQ(
+      5000,
+      getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)
+          ->metadata.encodedBodySize);
+  EXPECT_EQ(
       6665,
       getLastOutstandingPacket(conn, PacketNumberSpace::AppData)
           ->metadata.encodedSize);
+  EXPECT_EQ(
+      6000,
+      getLastOutstandingPacket(conn, PacketNumberSpace::AppData)
+          ->metadata.encodedBodySize);
 }
 
 TEST_F(QuicStateFunctionsTest, UpdateLargestReceivePacketsAtLatCloseSent) {

@@ -34,8 +34,10 @@ class CopaTest : public Test {
           std::move(packet),
           Clock::now(),
           10,
+          0,
           false,
           totalSentBytes,
+          0,
           0,
           0,
           LossState()));
@@ -57,8 +59,10 @@ class CopaTest : public Test {
         std::move(packet),
         Clock::now(),
         size,
+        0,
         false,
         totalSent,
+        0,
         inflight,
         0,
         LossState());

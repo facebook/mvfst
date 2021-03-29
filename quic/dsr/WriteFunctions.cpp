@@ -73,6 +73,10 @@ uint64_t writePacketizationRequest(
         packet.packet,
         Clock::now(),
         packet.encodedSize,
+        // TODO: (yangchi) Figure out how to calculate the
+        // packet.encodedBodySize for the DSR case. For now, it's not being
+        // used, so setting it to 0
+        0,
         true /* isDSRPacket */);
 
     if (!instructionAdded) {

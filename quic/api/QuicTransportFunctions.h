@@ -26,6 +26,7 @@ struct DataPathResult {
   bool writeSuccess{false};
   folly::Optional<SchedulingResult> result;
   uint64_t encodedSize{0};
+  uint64_t encodedBodySize{0};
 
   static DataPathResult makeBuildFailure() {
     return DataPathResult();
@@ -34,8 +35,10 @@ struct DataPathResult {
   static DataPathResult makeWriteResult(
       bool writeSuc,
       SchedulingResult&& res,
-      uint64_t encodedSizeIn) {
-    return DataPathResult(writeSuc, std::move(res), encodedSizeIn);
+      uint64_t encodedSizeIn,
+      uint64_t encodedBodySizeIn) {
+    return DataPathResult(
+        writeSuc, std::move(res), encodedSizeIn, encodedBodySizeIn);
   }
 
  private:
@@ -44,11 +47,13 @@ struct DataPathResult {
   explicit DataPathResult(
       bool writeSuc,
       SchedulingResult&& res,
-      uint64_t encodedSizeIn)
+      uint64_t encodedSizeIn,
+      uint64_t encodedBodySizeIn)
       : buildSuccess(true),
         writeSuccess(writeSuc),
         result(std::move(res)),
-        encodedSize(encodedSizeIn) {}
+        encodedSize(encodedSizeIn),
+        encodedBodySize(encodedBodySizeIn) {}
 };
 
 using DataPathFunc = std::function<DataPathResult(
@@ -184,6 +189,7 @@ void updateConnection(
     RegularQuicWritePacket packet,
     TimePoint time,
     uint32_t encodedSize,
+    uint32_t encodedBodySize,
     bool isDSRPacket);
 
 /**

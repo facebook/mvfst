@@ -58,6 +58,14 @@ struct LossState {
   // The total number of bytes acked on this connection when the last time a
   // packet is acked.
   uint64_t totalBytesAckedAtLastAck{0};
+
+  // Total number of body bytes sent on this connection. This is after encoding.
+  uint64_t totalBodyBytesSent{0};
+  // Total number of body bytes acked on this connection. If a packet is acked
+  // twice, it won't be count twice. Pure acks packets are NOT included (as they
+  // have no encoded body bytes).
+  uint64_t totalBodyBytesAcked{0};
+
   // Total number of packets sent on this connection, including retransmissions.
   uint32_t totalPacketsSent{0};
   // Total number of ack-eliciting packets sent on this connection.
