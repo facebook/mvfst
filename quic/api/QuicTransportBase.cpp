@@ -2095,6 +2095,15 @@ QuicTransportBase::registerByteEventCallback(
         byteEventMapIt->second.end(),
         offset,
         [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
+    if (pos != byteEventMapIt->second.begin()) {
+      auto prev = std::prev(pos);
+      if ((prev->offset == offset) && (prev->callback == cb)) {
+        // ByteEvent has been already registered for the same type, id,
+        // offset and for the same recipient, return an INVALID_OPERATION error
+        // to prevent duplicate registrations.
+        return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+      }
+    }
     byteEventMapIt->second.emplace(pos, offset, cb);
   }
   auto stream = conn_->streamManager->getStream(id);

@@ -806,7 +806,8 @@ class QuicSocket {
     Type type;
 
     // sRTT at time of event
-    // TODO(bschlinker): Deprecate, caller can fetch transport state if desired.
+    // TODO(bschlinker): Deprecate, caller can fetch transport state if
+    // desired.
     std::chrono::microseconds srtt{0us};
   };
 

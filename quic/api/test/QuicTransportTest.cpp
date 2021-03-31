@@ -2240,17 +2240,20 @@ TEST_F(QuicTransportTest, InvokeTxCallbacksSingleByte) {
   Mock::VerifyAndClearExpectations(&firstByteTxCb);
   Mock::VerifyAndClearExpectations(&lastByteTxCb);
 
-  // even if we register pastlastByte again, it shouldn't be triggered
+  // Even if we register pastlastByte again, it shouldn't trigger
+  // onByteEventRegistered because this is a duplicate registration.
   EXPECT_CALL(pastlastByteTxCb, onByteEventRegistered(getTxMatcher(stream, 1)))
-      .Times(1);
-  transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+      .Times(0);
+  auto ret = transport_->registerTxCallback(stream, 1, &pastlastByteTxCb);
+  EXPECT_EQ(LocalErrorCode::INVALID_OPERATION, ret.error());
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 
   // pastlastByteTxCb::onByteEvent will never get called
   // cancel gets called instead
-  // onByteEventCanceled called twice, since added twice
+  // Even though we attempted to register the ByteEvent twice,  it resulted in
+  // an error. So, onByteEventCanceled should be called only once.
   EXPECT_CALL(pastlastByteTxCb, onByteEventCanceled(getTxMatcher(stream, 1)))
-      .Times(2);
+      .Times(1);
   transport_->close(folly::none);
   Mock::VerifyAndClearExpectations(&pastlastByteTxCb);
 }
