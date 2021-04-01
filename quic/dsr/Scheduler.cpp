@@ -27,10 +27,6 @@ bool DSRStreamFrameScheduler::hasPendingData() const {
  * only write a single stream.
  */
 bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
-  uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
-  if (connWritableBytes == 0) {
-    return false;
-  }
   auto& writableDSRStreams = conn_.streamManager->writableDSRStreams();
   const auto& levelIter = std::find_if(
       writableDSRStreams.levels.cbegin(),
@@ -42,7 +38,36 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
   auto streamId = levelIter->streams.cbegin();
   auto stream = conn_.streamManager->findStream(*streamId);
   CHECK(stream);
-  CHECK_GT(stream->writeBufMeta.length, 0);
+  bool hasFreshBufMeta = stream->writeBufMeta.length > 0;
+  bool hasLossBufMeta = !stream->lossBufMetas.empty();
+  CHECK(hasFreshBufMeta || hasLossBufMeta);
+  bool written = false;
+  if (hasLossBufMeta) {
+    auto sendInstruction = writeDSRStreamFrame(
+        builder,
+        *streamId,
+        stream->lossBufMetas.front().offset,
+        stream->lossBufMetas.front().length,
+        stream->lossBufMetas.front()
+            .length, // flowControlLen shouldn't be used to limit loss write
+        stream->lossBufMetas.front().eof);
+    if (sendInstruction.has_value()) {
+      if (builder.remainingSpace() < sendInstruction->encodedSize) {
+        return false;
+      }
+      builder.addSendInstruction(
+          std::move(sendInstruction->sendInstruction),
+          sendInstruction->encodedSize);
+      written = true;
+    }
+  }
+  if (!hasFreshBufMeta || builder.remainingSpace() == 0) {
+    return written;
+  }
+  uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
+  if (connWritableBytes == 0) {
+    return written;
+  }
   auto flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(*stream), connWritableBytes);
   bool canWriteFin = stream->finalWriteOffset.has_value() &&
@@ -54,12 +79,15 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
       stream->writeBufMeta.length,
       flowControlLen,
       canWriteFin);
+  if (builder.remainingSpace() < sendInstruction->encodedSize) {
+    return written;
+  }
   if (sendInstruction.has_value()) {
     builder.addSendInstruction(
         std::move(sendInstruction->sendInstruction),
         sendInstruction->encodedSize);
     return true;
   }
-  return false;
+  return written;
 }
 } // namespace quic

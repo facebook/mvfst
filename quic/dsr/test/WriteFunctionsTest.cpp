@@ -200,4 +200,35 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
+
+TEST_F(WriteFunctionsTest, TwoInstructionsInOnePacket) {
+  prepareFlowControlAndStreamLimit();
+  auto streamId = prepareOneStream(1000);
+  auto stream = conn_.streamManager->findStream(streamId);
+  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
+  // Move part of the BufMetas to lossBufMetas
+  auto split = stream->writeBufMeta.split(500);
+  stream->lossBufMetas.push_back(split);
+  size_t packetLimit = 10;
+  EXPECT_CALL(sender_, addSendInstruction(_)).Times(2);
+  EXPECT_EQ(
+      1,
+      writePacketizationRequest(
+          conn_,
+          scheduler_,
+          getTestConnectionId(),
+          packetLimit,
+          *aead_,
+          sender_));
+  EXPECT_EQ(1, conn_.outstandings.packets.size());
+  auto& packet = conn_.outstandings.packets.back().packet;
+  EXPECT_EQ(2, packet.frames.size());
+  WriteStreamFrame expectedFirstFrame(
+      streamId, bufMetaStartingOffset, 500, false, true);
+  WriteStreamFrame expectedSecondFrame(
+      streamId, 500 + bufMetaStartingOffset, 500, true, true);
+  EXPECT_EQ(expectedFirstFrame, *packet.frames[0].asWriteStreamFrame());
+  EXPECT_EQ(expectedSecondFrame, *packet.frames[1].asWriteStreamFrame());
+}
+
 } // namespace quic::test
