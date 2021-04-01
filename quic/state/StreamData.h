@@ -194,6 +194,24 @@ struct QuicStreamLike {
       lossBuffer.insert(lossItr, std::move(*buf));
     }
   }
+
+  void insertIntoLossBufMeta(WriteBufferMeta bufMeta) {
+    auto lossItr = std::upper_bound(
+        lossBufMetas.begin(),
+        lossBufMetas.end(),
+        bufMeta.offset,
+        [](auto offset, const auto& bufMeta) {
+          return offset < bufMeta.offset;
+        });
+    if (!lossBufMetas.empty() && lossItr != lossBufMetas.begin() &&
+        std::prev(lossItr)->offset + std::prev(lossItr)->length ==
+            bufMeta.offset) {
+      std::prev(lossItr)->length += bufMeta.length;
+      std::prev(lossItr)->eof = bufMeta.eof;
+    } else {
+      lossBufMetas.insert(lossItr, bufMeta);
+    }
+  }
 };
 
 struct QuicConnectionStateBase;

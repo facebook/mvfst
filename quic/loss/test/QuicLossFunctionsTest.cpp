@@ -2307,6 +2307,154 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoAndReordering) {
   EXPECT_EQ(3, conn->lossState.totalPacketsMarkedLostByReorderingThreshold);
 }
 
+TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
+  auto conn = createConn();
+  auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("grape"), false);
+  writeBufMetaToQuicStream(*stream, BufferMeta(1000), true);
+  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
+  ASSERT_EQ(1000, stream->writeBufMeta.length);
+  ASSERT_TRUE(stream->writeBufMeta.eof);
+  ASSERT_EQ(bufMetaStartingOffset + 1000, *stream->finalWriteOffset);
+  // Send real data
+  handleStreamWritten(
+      *conn,
+      *stream,
+      0,
+      bufMetaStartingOffset,
+      false,
+      0 /* PacketNum */,
+      PacketNumberSpace::AppData,
+      false);
+  ASSERT_EQ(0, stream->writeBuffer.chainLength());
+  auto retxIter = stream->retransmissionBuffer.find(0);
+  ASSERT_NE(stream->retransmissionBuffer.end(), retxIter);
+  ASSERT_EQ(0, retxIter->second->offset);
+  ASSERT_FALSE(retxIter->second->eof);
+  ASSERT_TRUE(folly::IOBufEqualTo()(
+      *folly::IOBuf::copyBuffer("grape"), *retxIter->second->data.front()));
+  ASSERT_EQ(stream->currentWriteOffset, bufMetaStartingOffset);
+
+  // Send BufMeta in 3 chunks:
+  handleStreamWritten(
+      *conn,
+      *stream,
+      bufMetaStartingOffset,
+      200,
+      false,
+      1 /* PacketNum */,
+      PacketNumberSpace::AppData,
+      true);
+  ASSERT_EQ(800, stream->writeBufMeta.length);
+  ASSERT_TRUE(stream->writeBufMeta.eof);
+  ASSERT_EQ(bufMetaStartingOffset + 200, stream->writeBufMeta.offset);
+  auto retxBufMetaIter =
+      stream->retransmissionBufMetas.find(bufMetaStartingOffset);
+  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
+  ASSERT_EQ(bufMetaStartingOffset, retxBufMetaIter->second.offset);
+  ASSERT_EQ(200, retxBufMetaIter->second.length);
+  ASSERT_FALSE(retxBufMetaIter->second.eof);
+  conn->streamManager->updateWritableStreams(*stream);
+  conn->streamManager->updateLossStreams(*stream);
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+
+  handleStreamWritten(
+      *conn,
+      *stream,
+      bufMetaStartingOffset + 200,
+      400,
+      false,
+      2 /* PacketNum */,
+      PacketNumberSpace::AppData,
+      true);
+  ASSERT_EQ(400, stream->writeBufMeta.length);
+  ASSERT_TRUE(stream->writeBufMeta.eof);
+  ASSERT_EQ(bufMetaStartingOffset + 600, stream->writeBufMeta.offset);
+  retxBufMetaIter =
+      stream->retransmissionBufMetas.find(bufMetaStartingOffset + 200);
+  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
+  ASSERT_EQ(bufMetaStartingOffset + 200, retxBufMetaIter->second.offset);
+  ASSERT_EQ(400, retxBufMetaIter->second.length);
+  ASSERT_FALSE(retxBufMetaIter->second.eof);
+  conn->streamManager->updateWritableStreams(*stream);
+  conn->streamManager->updateLossStreams(*stream);
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+
+  handleStreamWritten(
+      *conn,
+      *stream,
+      bufMetaStartingOffset + 600,
+      400,
+      true,
+      3 /* PacketNum */,
+      PacketNumberSpace::AppData,
+      true);
+  ASSERT_EQ(0, stream->writeBufMeta.length);
+  ASSERT_TRUE(stream->writeBufMeta.eof);
+  ASSERT_EQ(bufMetaStartingOffset + 1000 + 1, stream->writeBufMeta.offset);
+  retxBufMetaIter =
+      stream->retransmissionBufMetas.find(bufMetaStartingOffset + 600);
+  ASSERT_NE(stream->retransmissionBufMetas.end(), retxBufMetaIter);
+  ASSERT_EQ(bufMetaStartingOffset + 600, retxBufMetaIter->second.offset);
+  ASSERT_EQ(400, retxBufMetaIter->second.length);
+  ASSERT_TRUE(retxBufMetaIter->second.eof);
+  conn->streamManager->updateWritableStreams(*stream);
+  conn->streamManager->updateLossStreams(*stream);
+  EXPECT_FALSE(conn->streamManager->hasLoss());
+  EXPECT_TRUE(conn->streamManager->writableDSRStreams().empty());
+
+  // Lose the 1st dsr packet:
+  RegularQuicWritePacket packet1(PacketHeader(ShortHeader(
+      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 1)));
+  WriteStreamFrame frame1(stream->id, bufMetaStartingOffset, 200, false);
+  frame1.fromBufMeta = true;
+  packet1.frames.push_back(frame1);
+  markPacketLoss(*conn, packet1, false /* processed */);
+  EXPECT_EQ(1, stream->lossBufMetas.size());
+  const auto& lostBufMeta1 = stream->lossBufMetas.front();
+  EXPECT_EQ(bufMetaStartingOffset, lostBufMeta1.offset);
+  EXPECT_EQ(200, lostBufMeta1.length);
+  EXPECT_FALSE(lostBufMeta1.eof);
+  EXPECT_EQ(2, stream->retransmissionBufMetas.size());
+  EXPECT_TRUE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+
+  // Lose the 3rd dsr packet:
+  RegularQuicWritePacket packet3(PacketHeader(ShortHeader(
+      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 3)));
+  WriteStreamFrame frame3(stream->id, bufMetaStartingOffset + 600, 400, true);
+  frame3.fromBufMeta = true;
+  packet3.frames.push_back(frame3);
+  markPacketLoss(*conn, packet3, false /* processed */);
+  EXPECT_EQ(2, stream->lossBufMetas.size());
+  const auto& lostBufMeta2 = stream->lossBufMetas.back();
+  EXPECT_EQ(bufMetaStartingOffset + 600, lostBufMeta2.offset);
+  EXPECT_EQ(400, lostBufMeta2.length);
+  EXPECT_TRUE(lostBufMeta2.eof);
+  EXPECT_EQ(1, stream->retransmissionBufMetas.size());
+  EXPECT_TRUE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+
+  // Lose the 3nd dsr packet, it should be merged together with the first
+  // element in the lossBufMetas:
+  RegularQuicWritePacket packet2(PacketHeader(ShortHeader(
+      ProtectionType::KeyPhaseZero, conn->serverConnectionId.value(), 2)));
+  WriteStreamFrame frame2(stream->id, bufMetaStartingOffset + 200, 400, false);
+  frame2.fromBufMeta = true;
+  packet2.frames.push_back(frame2);
+  markPacketLoss(*conn, packet2, false /* processed */);
+  EXPECT_EQ(2, stream->lossBufMetas.size());
+  const auto& lostBufMeta3 = stream->lossBufMetas.front();
+  EXPECT_EQ(bufMetaStartingOffset, lostBufMeta3.offset);
+  EXPECT_EQ(600, lostBufMeta3.length);
+  EXPECT_FALSE(lostBufMeta3.eof);
+  EXPECT_EQ(0, stream->retransmissionBufMetas.size());
+  EXPECT_TRUE(conn->streamManager->hasLoss());
+  EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicLossFunctionsTests,
     QuicLossFunctionsTest,

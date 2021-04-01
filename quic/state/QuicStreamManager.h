@@ -263,7 +263,7 @@ class QuicStreamManager {
 
   void addDSRWritable(const QuicStreamState& stream) {
     CHECK(!stream.isControl);
-    CHECK(stream.hasWritableBufMeta());
+    CHECK(stream.hasWritableBufMeta() || !stream.lossBufMetas.empty());
     writableDSRStreams_.insertOrUpdate(stream.id, stream.priority);
   }
 

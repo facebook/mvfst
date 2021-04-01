@@ -520,7 +520,7 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   if (stream.isControl) {
     return;
   }
-  if (stream.hasWritableBufMeta()) {
+  if (stream.hasWritableBufMeta() || !stream.lossBufMetas.empty()) {
     addDSRWritable(stream);
   } else {
     removeDSRWritable(stream);

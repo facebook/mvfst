@@ -6,8 +6,8 @@
  *
  */
 
-#include "quic/loss/QuicLossFunctions.h"
-#include "quic/state/QuicStreamFunctions.h"
+#include <quic/loss/QuicLossFunctions.h>
+#include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
 
@@ -104,15 +104,29 @@ void markPacketLoss(
         if (!stream) {
           break;
         }
-        auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
-        if (bufferItr == stream->retransmissionBuffer.end()) {
-          // It's possible that the stream was reset or data on the stream was
-          // skipped while we discovered that its packet was lost so we might
-          // not have the offset.
-          break;
+        if (!frame.fromBufMeta) {
+          auto bufferItr = stream->retransmissionBuffer.find(frame.offset);
+          if (bufferItr == stream->retransmissionBuffer.end()) {
+            // It's possible that the stream was reset or data on the stream was
+            // skipped while we discovered that its packet was lost so we might
+            // not have the offset.
+            break;
+          }
+          stream->insertIntoLossBuffer(std::move(bufferItr->second));
+          stream->retransmissionBuffer.erase(bufferItr);
+        } else {
+          auto retxBufMetaItr =
+              stream->retransmissionBufMetas.find(frame.offset);
+          if (retxBufMetaItr == stream->retransmissionBufMetas.end()) {
+            break;
+          }
+          auto& bufMeta = retxBufMetaItr->second;
+          CHECK_EQ(bufMeta.offset, frame.offset);
+          CHECK_EQ(bufMeta.length, frame.len);
+          CHECK_EQ(bufMeta.eof, frame.fin);
+          stream->insertIntoLossBufMeta(retxBufMetaItr->second);
+          stream->retransmissionBufMetas.erase(retxBufMetaItr);
         }
-        stream->insertIntoLossBuffer(std::move(bufferItr->second));
-        stream->retransmissionBuffer.erase(bufferItr);
         conn.streamManager->updateWritableStreams(*stream);
         conn.streamManager->addLoss(stream->id);
         break;
