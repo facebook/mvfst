@@ -73,7 +73,7 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
       std::move(sendInstruction), streamEncodedSize);
   auto packet = std::move(packetBuilder).buildPacket();
   const auto& writePacket = packet.packet;
-  const auto& si = packet.sendInstruction;
+  const auto& si = packet.sendInstructions.front();
   EXPECT_EQ(1, writePacket.frames.size());
   const auto& writeStreamFrame =
       *writePacket.frames.front().asWriteStreamFrame();
@@ -85,6 +85,36 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
 TEST_F(PacketBuilderTest, SizeTooSmall) {
   DSRPacketBuilder packetBuilder(5, header, 0);
   EXPECT_EQ(0, packetBuilder.remainingSpace());
+}
+
+TEST_F(PacketBuilderTest, WriteTwoInstructions) {
+  DSRPacketBuilder packetBuilder(kDefaultUDPSendPacketLen, header, 0);
+
+  StreamId id = 0;
+  packetBuilder.addSendInstruction(
+      SendInstruction::Builder(id)
+          .setOffset(0)
+          .setLength(100)
+          .setFin(false)
+          .build(),
+      110);
+  packetBuilder.addSendInstruction(
+      SendInstruction::Builder(id)
+          .setOffset(100)
+          .setLength(100)
+          .setFin(true)
+          .build(),
+      110);
+  auto packet = std::move(packetBuilder).buildPacket();
+  const auto& writePacket = packet.packet;
+  EXPECT_EQ(2, packet.sendInstructions.size());
+  EXPECT_EQ(2, writePacket.frames.size());
+  WriteStreamFrame expectedFirstFrame(id, 0, 100, false, true);
+  WriteStreamFrame expectedSecondFrame(id, 100, 100, true, true);
+  EXPECT_EQ(expectedFirstFrame, *writePacket.frames[0].asWriteStreamFrame());
+  EXPECT_EQ(expectedSecondFrame, *writePacket.frames[1].asWriteStreamFrame());
+  EXPECT_TRUE(expectedFirstFrame == packet.sendInstructions[0]);
+  EXPECT_TRUE(expectedSecondFrame == packet.sendInstructions[1]);
 }
 
 } // namespace test

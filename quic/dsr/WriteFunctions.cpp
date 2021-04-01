@@ -60,9 +60,16 @@ uint64_t writePacketizationRequest(
     // The contract is that if scheduler can schedule, builder has to be able to
     // build.
     CHECK_GT(packet.encodedSize, 0);
-    auto& instruction = packet.sendInstruction;
-    // TOOD: Augment instruction with other conn info and cipher info
-    bool instructionAdded = sender.addSendInstruction(instruction);
+    bool instructionAddError = false;
+    for (const auto& instruction : packet.sendInstructions) {
+      // TOOD: Augment instruction with other conn info and cipher info
+      // Yes, it is wasteful to add the same conn and cipher info to every
+      // instruction. On the other hand, they are very small.
+      if (!sender.addSendInstruction(instruction)) {
+        instructionAddError = true;
+        break;
+      }
+    }
 
     // Similar to the regular write case, if we build, we update connection
     // states. The connection states are changed already no matter the result
@@ -79,7 +86,7 @@ uint64_t writePacketizationRequest(
         0,
         true /* isDSRPacket */);
 
-    if (!instructionAdded) {
+    if (instructionAddError) {
       // TODO: should I flush? This depends on the sender I think.
       // TODO: Support empty write loop detection
       return packetCounter;

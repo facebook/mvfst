@@ -40,32 +40,34 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
   void addSendInstruction(
       SendInstruction sendInstruction,
       uint32_t streamEncodedSize) override {
-    CHECK(!sendInstruction_.has_value());
+    CHECK(
+        sendInstructions_.empty() ||
+        sendInstructions_.back().streamId == sendInstruction.streamId);
     WriteStreamFrame frame = sendInstructionToWriteStreamFrame(sendInstruction);
     packet_.frames.push_back(frame);
-    sendInstruction_ = std::move(sendInstruction);
+    sendInstructions_.push_back(std::move(sendInstruction));
     packetSize_ -= streamEncodedSize;
     encodedSize_ += streamEncodedSize;
   }
 
   struct Packet {
     RegularQuicWritePacket packet;
-    SendInstruction sendInstruction;
+    std::vector<SendInstruction> sendInstructions;
     uint32_t encodedSize;
 
     Packet(
         RegularQuicWritePacket pkt,
-        SendInstruction instruction,
+        std::vector<SendInstruction> instructions,
         uint32_t size)
         : packet(std::move(pkt)),
-          sendInstruction(std::move(instruction)),
+          sendInstructions(std::move(instructions)),
           encodedSize(size) {}
   };
 
   Packet buildPacket() && {
-    CHECK(sendInstruction_);
-    CHECK_EQ(1, packet_.frames.size());
-    return Packet(packet_, std::move(*sendInstruction_), encodedSize_);
+    CHECK(!sendInstructions_.empty());
+    CHECK_EQ(sendInstructions_.size(), packet_.frames.size());
+    return Packet(packet_, std::move(sendInstructions_), encodedSize_);
   }
 
   size_t remainingSpace() const noexcept override {
@@ -91,7 +93,7 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
  private:
   size_t packetSize_;
   RegularQuicWritePacket packet_;
-  std::optional<SendInstruction> sendInstruction_;
+  std::vector<SendInstruction> sendInstructions_;
   uint32_t encodedSize_{0};
 };
 

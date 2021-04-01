@@ -327,12 +327,17 @@ struct WriteStreamFrame {
       StreamId streamIdIn,
       uint64_t offsetIn,
       uint64_t lenIn,
-      bool finIn)
-      : streamId(streamIdIn), offset(offsetIn), len(lenIn), fin(finIn) {}
+      bool finIn,
+      bool fromBufMetaIn = false)
+      : streamId(streamIdIn),
+        offset(offsetIn),
+        len(lenIn),
+        fin(finIn),
+        fromBufMeta(fromBufMetaIn) {}
 
   bool operator==(const WriteStreamFrame& rhs) const {
     return streamId == rhs.streamId && offset == rhs.offset && len == rhs.len &&
-        fin == rhs.fin;
+        fin == rhs.fin && fromBufMeta == rhs.fromBufMeta;
   }
 };
 
