@@ -97,18 +97,36 @@ void sendAckSMHandler(
     const WriteStreamFrame& ackedFrame) {
   switch (stream.sendState) {
     case StreamSendState::Open: {
-      // Clean up the acked buffers from the retransmissionBuffer.
-      auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
-      if (ackedBuffer != stream.retransmissionBuffer.end()) {
-        VLOG(10) << "Open: acked stream data stream=" << stream.id
-                 << " offset=" << ackedBuffer->second->offset
-                 << " len=" << ackedBuffer->second->data.chainLength()
-                 << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-        stream.ackedIntervals.insert(
-            ackedBuffer->second->offset,
-            ackedBuffer->second->offset +
-                ackedBuffer->second->data.chainLength());
-        stream.retransmissionBuffer.erase(ackedBuffer);
+      if (!ackedFrame.fromBufMeta) {
+        // Clean up the acked buffers from the retransmissionBuffer.
+        auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
+        if (ackedBuffer != stream.retransmissionBuffer.end()) {
+          VLOG(10) << "Open: acked stream data stream=" << stream.id
+                   << " offset=" << ackedBuffer->second->offset
+                   << " len=" << ackedBuffer->second->data.chainLength()
+                   << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
+          stream.ackedIntervals.insert(
+              ackedBuffer->second->offset,
+              ackedBuffer->second->offset +
+                  ackedBuffer->second->data.chainLength());
+          stream.retransmissionBuffer.erase(ackedBuffer);
+        }
+      } else {
+        auto ackedBuffer =
+            stream.retransmissionBufMetas.find(ackedFrame.offset);
+        if (ackedBuffer != stream.retransmissionBufMetas.end()) {
+          CHECK_EQ(ackedFrame.offset, ackedBuffer->second.offset);
+          CHECK_EQ(ackedFrame.len, ackedBuffer->second.length);
+          CHECK_EQ(ackedFrame.fin, ackedBuffer->second.eof);
+          VLOG(10) << "Open: acked stream data bufmeta=" << stream.id
+                   << " offset=" << ackedBuffer->second.offset
+                   << " len=" << ackedBuffer->second.length
+                   << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
+          stream.ackedIntervals.insert(
+              ackedBuffer->second.offset,
+              ackedBuffer->second.offset + ackedBuffer->second.length);
+          stream.retransmissionBufMetas.erase(ackedBuffer);
+        }
       }
 
       // This stream may be able to invoke some deliveryCallbacks:
