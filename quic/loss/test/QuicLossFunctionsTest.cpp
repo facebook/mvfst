@@ -187,7 +187,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           *conn.serverConnectionId,
           conn.ackStates.initialAckState.nextPacketNum,
           *conn.version);
-      conn.outstandings.initialPacketsCount++;
       isHandshake = true;
       break;
     case PacketType::Handshake:
@@ -197,7 +196,6 @@ PacketNum QuicLossFunctionsTest::sendPacket(
           *conn.serverConnectionId,
           conn.ackStates.handshakeAckState.nextPacketNum,
           *conn.version);
-      conn.outstandings.handshakePacketsCount++;
       isHandshake = true;
       break;
     case PacketType::ZeroRtt:
@@ -262,7 +260,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     conn.congestionController->onPacketSent(outstandingPacket);
   }
   if (associatedEvent) {
-    conn.outstandings.clonedPacketsCount++;
+    conn.outstandings.clonedPacketCount[packetNumberSpace]++;
     // Simulates what the real writer does.
     auto it = std::find_if(
         conn.outstandings.packets.begin(),
@@ -276,10 +274,12 @@ PacketNum QuicLossFunctionsTest::sendPacket(
     if (it != conn.outstandings.packets.end()) {
       if (!it->associatedEvent) {
         conn.outstandings.packetEvents.emplace(*associatedEvent);
-        conn.outstandings.clonedPacketsCount++;
+        conn.outstandings.clonedPacketCount[packetNumberSpace]++;
         it->associatedEvent = *associatedEvent;
       }
     }
+  } else {
+    conn.outstandings.packetCount[packetNumberSpace]++;
   }
   conn.outstandings.packets.emplace_back(std::move(outstandingPacket));
   conn.lossState.largestSent = getNextPacketNum(conn, packetNumberSpace);
@@ -1014,7 +1014,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
   for (int i = 0; i < 6; ++i) {
     sendPacket(*conn, Clock::now(), folly::none, PacketType::Handshake);
   }
-  EXPECT_EQ(6, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(6, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   // Assume some packets are already acked
   for (auto iter =
            getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 2;
@@ -1022,7 +1022,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
        getFirstOutstandingPacket(*conn, PacketNumberSpace::Handshake) + 5;
        iter++) {
     if (iter->metadata.isHandshake) {
-      conn->outstandings.handshakePacketsCount--;
+      conn->outstandings.packetCount[PacketNumberSpace::Handshake]--;
     }
   }
   auto firstHandshakeOpIter =
@@ -1044,7 +1044,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderingThreshold) {
   EXPECT_EQ(lostPacket.back(), 2);
 
   // Packet 6 is the only thing remaining inflight, it is a handshake pkt
-  EXPECT_EQ(1, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 
   // Packet 6 should remain in packet as the delta is less than threshold
   auto numDeclaredLost = std::count_if(
@@ -1074,6 +1074,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   auto now = Clock::now();
   conn->outstandings.packets.emplace_back(OutstandingPacket(
       outstandingRegularPacket, now, 0, 0, false, 0, 0, 0, 0, LossState()));
+  conn->outstandings.packetCount[PacketNumberSpace::Handshake]++;
 
   bool testLossMarkFuncCalled = false;
   auto testLossMarkFunc = [&](auto& /* conn */, auto&, bool) {
@@ -1382,6 +1383,8 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
 
 TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
   auto conn = createConn();
+  conn->handshakeWriteCipher = createNoOpAead();
+  conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
   auto mockQLogger = std::make_shared<MockQLogger>(VantagePoint::Server);
   conn->qLogger = mockQLogger;
   auto mockCongestionController = std::make_unique<MockCongestionController>();
@@ -1404,13 +1407,21 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
         expectedLargestLostNum, i % 2 ? sentPacketNum : expectedLargestLostNum);
   }
   EXPECT_CALL(*transportInfoCb_, onPTO());
+  // Verify packet count doesn't change across PTO.
+  auto originalPacketCount = conn->outstandings.packetCount;
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), Clock>(
       *conn, testingLossMarkFunc(lostPackets));
+  EXPECT_EQ(originalPacketCount, conn->outstandings.packetCount);
 
   EXPECT_EQ(0, lostPackets.size());
   EXPECT_EQ(1, conn->lossState.ptoCount);
   EXPECT_EQ(0, conn->lossState.timeoutBasedRtxCount);
-  EXPECT_EQ(conn->pendingEvents.numProbePackets, kPacketToSendForPTO);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake],
+      kPacketToSendForPTO);
+  EXPECT_EQ(
+      conn->pendingEvents.numProbePackets[PacketNumberSpace::AppData],
+      kPacketToSendForPTO);
   EXPECT_EQ(0, conn->lossState.rtxCount);
 }
 
@@ -1542,16 +1553,20 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
         }
       };
   // Send 6 packets, so when we ack the last one, we mark the first two loss
+  EXPECT_EQ(1, conn->ackStates.appDataAckState.nextPacketNum);
   PacketNum lastSent;
-  PacketEvent event(PacketNumberSpace::AppData, 0);
+  lastSent = sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
+  PacketEvent event(PacketNumberSpace::AppData, lastSent);
   for (size_t i = 0; i < 6; i++) {
     lastSent = sendPacket(*conn, Clock::now(), event, PacketType::OneRtt);
   }
-  EXPECT_EQ(6, conn->outstandings.packets.size());
+  EXPECT_EQ(7, conn->outstandings.packets.size());
+  EXPECT_EQ(1, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
   // Add the PacketEvent to the outstandings.packetEvents set
   conn->outstandings.packetEvents.insert(event);
 
-  // Ack the last sent packet. Despite two losses, lossVisitor only visit one
+  // Ack the last sent packet. Despite three losses, lossVisitor only visit one
   // packet
   detectLossPackets(
       *conn,
@@ -1563,7 +1578,7 @@ TEST_F(QuicLossFunctionsTest, NoDoubleProcess) {
       conn->outstandings.packets.begin(),
       conn->outstandings.packets.end(),
       [](auto& op) { return op.declaredLost; });
-  EXPECT_EQ(2, numDeclaredLost);
+  EXPECT_EQ(3, numDeclaredLost);
   EXPECT_EQ(1, lossVisitorCount);
   EXPECT_EQ(4 + numDeclaredLost, conn->outstandings.packets.size());
 }
@@ -1586,7 +1601,7 @@ TEST_F(QuicLossFunctionsTest, DetectPacketLossClonedPacketsCounter) {
       noopLossMarker,
       Clock::now(),
       PacketNumberSpace::AppData);
-  EXPECT_EQ(0, conn->outstandings.clonedPacketsCount);
+  EXPECT_EQ(0, conn->outstandings.numClonedPackets());
 }
 
 TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
@@ -1762,8 +1777,9 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   }
 
   EXPECT_EQ(6, conn->outstandings.packets.size());
-  ASSERT_EQ(conn->outstandings.clonedPacketsCount, 6);
+  ASSERT_EQ(conn->outstandings.numClonedPackets(), 6);
   ASSERT_EQ(conn->outstandings.packetEvents.size(), 2);
+  ASSERT_EQ(2, conn->outstandings.packetCount[PacketNumberSpace::AppData]);
 
   std::vector<bool> lostPackets;
   // onRemoveBytesFromInflight should still happen
@@ -1774,7 +1790,7 @@ TEST_F(QuicLossFunctionsTest, TestZeroRttRejectedWithClones) {
   ASSERT_EQ(conn->outstandings.packetEvents.size(), 0);
   EXPECT_EQ(3, conn->outstandings.packets.size());
   EXPECT_EQ(lostPackets.size(), 3);
-  ASSERT_EQ(conn->outstandings.clonedPacketsCount, 3);
+  ASSERT_EQ(conn->outstandings.numClonedPackets(), 3);
   size_t numProcessed = 0;
   for (auto lostPacket : lostPackets) {
     numProcessed += lostPacket;
@@ -1832,7 +1848,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingInitialCounting) {
     largestSent =
         sendPacket(*conn, Clock::now(), folly::none, PacketType::Initial);
   }
-  EXPECT_EQ(10, conn->outstandings.initialPacketsCount);
+  EXPECT_EQ(10, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
   auto noopLossVisitor =
       [&](auto& /* conn */, auto& /* packet */, bool /* processed */
       ) {};
@@ -1843,7 +1859,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingInitialCounting) {
       TimePoint(100ms),
       PacketNumberSpace::Initial);
   // [1, 6] are removed, [7, 10] are still in OP list
-  EXPECT_EQ(4, conn->outstandings.initialPacketsCount);
+  EXPECT_EQ(4, conn->outstandings.packetCount[PacketNumberSpace::Initial]);
 }
 
 TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
@@ -1855,7 +1871,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
     largestSent =
         sendPacket(*conn, Clock::now(), folly::none, PacketType::Handshake);
   }
-  EXPECT_EQ(10, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(10, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
   auto noopLossVisitor =
       [&](auto& /* conn */, auto& /* packet */, bool /* processed */
       ) {};
@@ -1866,12 +1882,12 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
       TimePoint(100ms),
       PacketNumberSpace::Handshake);
   // [1, 6] are removed, [7, 10] are still in OP list
-  EXPECT_EQ(4, conn->outstandings.handshakePacketsCount);
+  EXPECT_EQ(4, conn->outstandings.packetCount[PacketNumberSpace::Handshake]);
 }
 
 TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
   auto conn = createConn();
-  conn->outstandings.handshakePacketsCount = 0;
+  conn->outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
   conn->outstandings.packets.clear();
   conn->lossState.ptoCount =
       std::numeric_limits<decltype(conn->lossState.ptoCount)>::max();

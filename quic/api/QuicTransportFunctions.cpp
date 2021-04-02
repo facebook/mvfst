@@ -6,8 +6,6 @@
  *
  */
 
-#include <quic/api/QuicTransportFunctions.h>
-
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicTransportFunctions.h>
@@ -94,7 +92,7 @@ bool toWriteAppDataAcks(const quic::QuicConnectionStateBase& conn) {
 
 using namespace quic;
 
-uint64_t writeQuicDataToSocketImpl(
+WriteQuicDataResult writeQuicDataToSocketImpl(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -108,8 +106,12 @@ uint64_t writeQuicDataToSocketImpl(
   // TODO: In FrameScheduler, Retx is prioritized over new data. We should
   // add a flag to the Scheduler to control the priority between them and see
   // which way is better.
-  uint64_t written = 0;
-  if (connection.pendingEvents.numProbePackets) {
+  WriteQuicDataResult result;
+  auto& packetsWritten = result.packetsWritten;
+  auto& probesWritten = result.probesWritten;
+  auto& numProbePackets =
+      connection.pendingEvents.numProbePackets[PacketNumberSpace::AppData];
+  if (numProbePackets) {
     auto probeSchedulerBuilder =
         FrameScheduler::Builder(
             connection,
@@ -126,7 +128,7 @@ uint64_t writeQuicDataToSocketImpl(
       probeSchedulerBuilder.cryptoFrames();
     }
     auto probeScheduler = std::move(probeSchedulerBuilder).build();
-    written = writeProbingDataToSocket(
+    probesWritten = writeProbingDataToSocket(
         sock,
         connection,
         srcConnId,
@@ -135,13 +137,14 @@ uint64_t writeQuicDataToSocketImpl(
         EncryptionLevel::AppData,
         PacketNumberSpace::AppData,
         probeScheduler,
-        std::min<uint64_t>(
-            packetLimit, connection.pendingEvents.numProbePackets),
+        numProbePackets, // This possibly bypasses the packetLimit.
         aead,
         headerCipher,
         version);
-    CHECK_GE(connection.pendingEvents.numProbePackets, written);
-    connection.pendingEvents.numProbePackets -= written;
+    // We only get one chance to write out the probes.
+    numProbePackets = 0;
+    packetLimit =
+        probesWritten > packetLimit ? 0 : (packetLimit - probesWritten);
   }
   auto schedulerBuilder =
       FrameScheduler::Builder(
@@ -160,7 +163,7 @@ uint64_t writeQuicDataToSocketImpl(
     schedulerBuilder.cryptoFrames();
   }
   FrameScheduler scheduler = std::move(schedulerBuilder).build();
-  written += writeConnectionDataToSocket(
+  packetsWritten = writeConnectionDataToSocket(
       sock,
       connection,
       srcConnId,
@@ -169,17 +172,16 @@ uint64_t writeQuicDataToSocketImpl(
       PacketNumberSpace::AppData,
       scheduler,
       congestionControlWritableBytes,
-      packetLimit - written,
+      packetLimit,
       aead,
       headerCipher,
       version);
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " written data "
-                           << (exceptCryptoStream ? "without crypto data " : "")
-                           << "to socket packets=" << written << " "
-                           << connection;
-  DCHECK_GE(packetLimit, written);
-  return written;
+  VLOG_IF(10, packetsWritten || probesWritten)
+      << nodeToString(connection.nodeType) << " written data "
+      << (exceptCryptoStream ? "without crypto data " : "")
+      << "to socket packets=" << packetsWritten << " probes=" << probesWritten
+      << " " << connection;
+  return result;
 }
 
 DataPathResult continuousMemoryBuildScheduleEncrypt(
@@ -835,26 +837,13 @@ void updateConnection(
       (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {
     conn.pathValidationLimiter->onPacketSent(pkt.metadata.encodedSize);
   }
-  if (pkt.metadata.isHandshake) {
-    if (!pkt.associatedEvent) {
-      if (packetNumberSpace == PacketNumberSpace::Initial) {
-        ++conn.outstandings.initialPacketsCount;
-      } else {
-        CHECK_EQ(packetNumberSpace, PacketNumberSpace::Handshake);
-        ++conn.outstandings.handshakePacketsCount;
-      }
-    }
-  }
   conn.lossState.lastRetransmittablePacketSentTime = pkt.metadata.time;
   if (pkt.associatedEvent) {
-    ++conn.outstandings.clonedPacketsCount;
+    ++conn.outstandings.clonedPacketCount[packetNumberSpace];
     ++conn.lossState.timeoutBasedRtxCount;
+  } else {
+    ++conn.outstandings.packetCount[packetNumberSpace];
   }
-
-  auto opCount = conn.outstandings.numOutstanding();
-  DCHECK_GE(opCount, conn.outstandings.initialPacketsCount);
-  DCHECK_GE(opCount, conn.outstandings.handshakePacketsCount);
-  DCHECK_GE(opCount, conn.outstandings.clonedPacketsCount);
 }
 
 uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {
@@ -919,7 +908,7 @@ HeaderBuilder ShortHeaderBuilder() {
   };
 }
 
-uint64_t writeCryptoAndAckDataToSocket(
+WriteQuicDataResult writeCryptoAndAckDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -942,12 +931,17 @@ uint64_t writeCryptoAndAckDataToSocket(
                     .cryptoFrames())
           .build();
   auto builder = LongHeaderBuilder(packetType);
-  uint64_t written = 0;
+  WriteQuicDataResult result;
+  auto& packetsWritten = result.packetsWritten;
+  auto& probesWritten = result.probesWritten;
   auto& cryptoStream =
       *getCryptoStream(*connection.cryptoState, encryptionLevel);
-  if (connection.pendingEvents.numProbePackets &&
+  auto& numProbePackets =
+      connection.pendingEvents
+          .numProbePackets[LongHeader::typeToPacketNumberSpace(packetType)];
+  if (numProbePackets &&
       (cryptoStream.retransmissionBuffer.size() || scheduler.hasData())) {
-    written = writeProbingDataToSocket(
+    probesWritten = writeProbingDataToSocket(
         sock,
         connection,
         srcConnId,
@@ -956,17 +950,17 @@ uint64_t writeCryptoAndAckDataToSocket(
         encryptionLevel,
         LongHeader::typeToPacketNumberSpace(packetType),
         scheduler,
-        std::min<uint64_t>(
-            packetLimit, connection.pendingEvents.numProbePackets),
+        numProbePackets, // This possibly bypasses the packetLimit.
         cleartextCipher,
         headerCipher,
         version,
         token);
-    CHECK_GE(connection.pendingEvents.numProbePackets, written);
-    connection.pendingEvents.numProbePackets -= written;
   }
+  packetLimit = probesWritten > packetLimit ? 0 : (packetLimit - probesWritten);
+  // Only get one chance to write probes.
+  numProbePackets = 0;
   // Crypto data is written without aead protection.
-  written += writeConnectionDataToSocket(
+  packetsWritten += writeConnectionDataToSocket(
       sock,
       connection,
       srcConnId,
@@ -975,20 +969,21 @@ uint64_t writeCryptoAndAckDataToSocket(
       LongHeader::typeToPacketNumberSpace(packetType),
       scheduler,
       congestionControlWritableBytes,
-      packetLimit - written,
+      packetLimit - packetsWritten,
       cleartextCipher,
       headerCipher,
       version,
       token);
-  VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
-                           << " written crypto and acks data type="
-                           << packetType << " packets=" << written << " "
-                           << connection;
-  CHECK_GE(packetLimit, written);
-  return written;
+  VLOG_IF(10, packetsWritten || probesWritten)
+      << nodeToString(connection.nodeType)
+      << " written crypto and acks data type=" << packetType
+      << " packetsWritten=" << packetsWritten
+      << " probesWritten=" << probesWritten << connection;
+  CHECK_GE(packetLimit, packetsWritten);
+  return result;
 }
 
-uint64_t writeQuicDataToSocket(
+WriteQuicDataResult writeQuicDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -1009,7 +1004,7 @@ uint64_t writeQuicDataToSocket(
       /*exceptCryptoStream=*/false);
 }
 
-uint64_t writeQuicDataExceptCryptoStreamToSocket(
+WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
     folly::AsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -1487,7 +1482,16 @@ uint64_t writeD6DProbeToSocket(
 }
 
 WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn) {
-  if (conn.pendingEvents.numProbePackets) {
+  auto& numProbePackets = conn.pendingEvents.numProbePackets;
+  bool shouldWriteInitialProbes =
+      numProbePackets[PacketNumberSpace::Initial] && conn.initialWriteCipher;
+  bool shouldWriteHandshakeProbes =
+      numProbePackets[PacketNumberSpace::Handshake] &&
+      conn.handshakeWriteCipher;
+  bool shouldWriteAppDataProbes =
+      numProbePackets[PacketNumberSpace::AppData] && conn.oneRttWriteCipher;
+  if (shouldWriteInitialProbes || shouldWriteHandshakeProbes ||
+      shouldWriteAppDataProbes) {
     VLOG(10) << nodeToString(conn.nodeType) << " needs write because of PTO"
              << conn;
     return WriteDataReason::PROBES;

@@ -29,8 +29,7 @@ enum PacketBuilderType { Regular, Inplace };
 namespace {
 
 PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
-  PacketNum nextPacketNum =
-      getNextPacketNum(conn, PacketNumberSpace::Handshake);
+  PacketNum nextPacketNum = getNextPacketNum(conn, PacketNumberSpace::Initial);
   std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
   ConnectionId srcConnId(zeroConnIdData);
   LongHeader header(
@@ -42,8 +41,8 @@ PacketNum addInitialOutstandingPacket(QuicConnectionStateBase& conn) {
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
       packet, Clock::now(), 0, 0, true, 0, 0, 0, 0, LossState(), 0);
-  conn.outstandings.handshakePacketsCount++;
-  increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
+  conn.outstandings.packetCount[PacketNumberSpace::Initial]++;
+  increaseNextPacketNum(conn, PacketNumberSpace::Initial);
   return nextPacketNum;
 }
 
@@ -61,7 +60,7 @@ PacketNum addHandshakeOutstandingPacket(QuicConnectionStateBase& conn) {
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
       packet, Clock::now(), 0, 0, true, 0, 0, 0, 0, LossState(), 0);
-  conn.outstandings.handshakePacketsCount++;
+  conn.outstandings.packetCount[PacketNumberSpace::Handshake]++;
   increaseNextPacketNum(conn, PacketNumberSpace::Handshake);
   return nextPacketNum;
 }

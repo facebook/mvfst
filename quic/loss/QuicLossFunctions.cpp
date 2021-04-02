@@ -53,11 +53,25 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
     throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
   }
 
-  // If there is only one packet outstanding, no point to clone it twice in the
-  // same write loop.
-  conn.pendingEvents.numProbePackets =
-      std::min<decltype(conn.pendingEvents.numProbePackets)>(
-          conn.outstandings.numOutstanding(), kPacketToSendForPTO);
+  // The number of probes we can probably send is the current packetCount,
+  // which is to say the number of "fresh" packets in the outstanding packet
+  // list + any active previous cloned packet.
+  auto& packetCount = conn.outstandings.packetCount;
+  auto& numProbePackets = conn.pendingEvents.numProbePackets;
+  // Zero it out so we don't try to send probes for spaces without a cipher.
+  numProbePackets = {};
+  if (conn.initialWriteCipher) {
+    numProbePackets[PacketNumberSpace::Initial] = std::min<uint8_t>(
+        packetCount[PacketNumberSpace::Initial], kPacketToSendForPTO);
+  }
+  if (conn.handshakeWriteCipher) {
+    numProbePackets[PacketNumberSpace::Handshake] = std::min<uint8_t>(
+        packetCount[PacketNumberSpace::Handshake], kPacketToSendForPTO);
+  }
+  if (conn.oneRttWriteCipher) {
+    numProbePackets[PacketNumberSpace::AppData] = std::min<uint8_t>(
+        packetCount[PacketNumberSpace::AppData], kPacketToSendForPTO);
+  }
 }
 
 void markPacketLoss(

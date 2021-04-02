@@ -6,10 +6,9 @@
  *
  */
 
-#include <quic/state/AckHandlers.h>
-
 #include <quic/logging/QuicLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
+#include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <iterator>
 
@@ -49,9 +48,6 @@ void processAckFrame(
   // acks which leads to different number of packets being acked usually.
   ack.ackedPackets.reserve(kDefaultRxPacketsBeforeAckAfterInit);
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
-  uint64_t initialPacketAcked = 0;
-  uint64_t handshakePacketAcked = 0;
-  uint64_t clonedPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
   folly::Optional<Observer::SpuriousLossEvent> spuriousLossEvent;
@@ -132,17 +128,14 @@ void processAckFrame(
       }
       bool needsProcess = !rPacketIt->associatedEvent ||
           conn.outstandings.packetEvents.count(*rPacketIt->associatedEvent);
-      if (rPacketIt->metadata.isHandshake && needsProcess) {
-        if (currentPacketNumberSpace == PacketNumberSpace::Initial) {
-          ++initialPacketAcked;
-        } else {
-          CHECK_EQ(PacketNumberSpace::Handshake, currentPacketNumberSpace);
-          ++handshakePacketAcked;
-        }
+      if (needsProcess) {
+        CHECK(conn.outstandings.packetCount[currentPacketNumberSpace]);
+        --conn.outstandings.packetCount[currentPacketNumberSpace];
       }
       ack.ackedBytes += rPacketIt->metadata.encodedSize;
       if (rPacketIt->associatedEvent) {
-        ++clonedPacketsAcked;
+        CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
+        --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
       }
       // Update RTT if current packet is the largestAcked in the frame:
       auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
@@ -234,20 +227,15 @@ void processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
-  CHECK_GE(conn.outstandings.initialPacketsCount, initialPacketAcked);
-  conn.outstandings.initialPacketsCount -= initialPacketAcked;
-  CHECK_GE(conn.outstandings.handshakePacketsCount, handshakePacketAcked);
-  conn.outstandings.handshakePacketsCount -= handshakePacketAcked;
-  CHECK_GE(conn.outstandings.clonedPacketsCount, clonedPacketsAcked);
-  conn.outstandings.clonedPacketsCount -= clonedPacketsAcked;
   CHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
   CHECK_GE(
       updatedOustandingPacketsCount,
-      conn.outstandings.handshakePacketsCount +
-          conn.outstandings.initialPacketsCount);
-  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.clonedPacketsCount);
+      conn.outstandings.packetCount[PacketNumberSpace::Handshake] +
+          conn.outstandings.packetCount[PacketNumberSpace::Initial] +
+          conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+  CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
       (ack.largestAckedPacket.has_value() || lossEvent)) {

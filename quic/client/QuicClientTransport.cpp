@@ -766,31 +766,38 @@ void QuicClientTransport::writeData() {
       (isConnectionPaced(*conn_)
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
+  // At the end of this function, clear out any probe packets credit we didn't
+  // use.
+  SCOPE_EXIT {
+    conn_->pendingEvents.numProbePackets = {};
+  };
   if (conn_->initialWriteCipher) {
     auto& initialCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
     CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-
+    auto& numProbePackets =
+        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
     if ((initialCryptoStream.retransmissionBuffer.size() &&
-         conn_->outstandings.initialPacketsCount &&
-         conn_->pendingEvents.numProbePackets) ||
+         conn_->outstandings.packetCount[PacketNumberSpace::Initial] &&
+         numProbePackets) ||
         initialScheduler.hasData() ||
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialHeaderCipher);
       packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          *destConnId /* dst */,
-          LongHeader::Types::Initial,
-          *conn_->initialWriteCipher,
-          *conn_->initialHeaderCipher,
-          version,
-          packetLimit,
-          clientConn_->retryToken);
+                         *socket_,
+                         *conn_,
+                         srcConnId /* src */,
+                         *destConnId /* dst */,
+                         LongHeader::Types::Initial,
+                         *conn_->initialWriteCipher,
+                         *conn_->initialHeaderCipher,
+                         version,
+                         packetLimit,
+                         clientConn_->retryToken)
+                         .packetsWritten;
     }
-    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
+    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
@@ -798,25 +805,28 @@ void QuicClientTransport::writeData() {
     auto& handshakeCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
     CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
-    if ((conn_->outstandings.handshakePacketsCount &&
+    auto& numProbePackets =
+        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
+    if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
          handshakeCryptoStream.retransmissionBuffer.size() &&
-         conn_->pendingEvents.numProbePackets) ||
+         numProbePackets) ||
         handshakeScheduler.hasData() ||
         (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
       CHECK(conn_->handshakeWriteHeaderCipher);
       packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          *destConnId /* dst */,
-          LongHeader::Types::Handshake,
-          *conn_->handshakeWriteCipher,
-          *conn_->handshakeWriteHeaderCipher,
-          version,
-          packetLimit);
+                         *socket_,
+                         *conn_,
+                         srcConnId /* src */,
+                         *destConnId /* dst */,
+                         LongHeader::Types::Handshake,
+                         *conn_->handshakeWriteCipher,
+                         *conn_->handshakeWriteHeaderCipher,
+                         version,
+                         packetLimit)
+                         .packetsWritten;
     }
-    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
+    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
@@ -832,7 +842,7 @@ void QuicClientTransport::writeData() {
         version,
         packetLimit);
   }
-  if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
+  if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
     return;
   }
   if (conn_->oneRttWriteCipher) {

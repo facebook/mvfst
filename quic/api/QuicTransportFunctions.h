@@ -78,11 +78,18 @@ using HeaderBuilder = std::function<PacketHeader(
 using WritableBytesFunc =
     std::function<uint64_t(const QuicConnectionStateBase& conn)>;
 
+// Encapsulating the return value for the write functions.
+// Useful because probes can go over the packet limit.
+struct WriteQuicDataResult {
+  uint64_t packetsWritten{};
+  uint64_t probesWritten{};
+};
+
 /**
  * Attempts to write data from all frames in the QUIC connection into the UDP
  * socket supplied with the aead and the headerCipher.
  */
-uint64_t writeQuicDataToSocket(
+WriteQuicDataResult writeQuicDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -97,7 +104,7 @@ uint64_t writeQuicDataToSocket(
  *
  * return the number of packets written to socket.
  */
-uint64_t writeCryptoAndAckDataToSocket(
+WriteQuicDataResult writeCryptoAndAckDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -114,7 +121,7 @@ uint64_t writeCryptoAndAckDataToSocket(
  * This is useful when the crypto stream still needs to be sent in separate
  * packets and cannot use the encryption of the data key.
  */
-uint64_t writeQuicDataExceptCryptoStreamToSocket(
+WriteQuicDataResult writeQuicDataExceptCryptoStreamToSocket(
     folly::AsyncUDPSocket& socket,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,

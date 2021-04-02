@@ -207,30 +207,37 @@ void QuicServerTransport::writeData() {
       (isConnectionPaced(*conn_)
            ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
            : conn_->transportSettings.writeConnectionDataPacketsLimit);
+  // At the end of this function, clear out any probe packets credit we didn't
+  // use.
+  SCOPE_EXIT {
+    conn_->pendingEvents.numProbePackets = {};
+  };
   if (conn_->initialWriteCipher) {
     auto& initialCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Initial);
     CryptoStreamScheduler initialScheduler(*conn_, initialCryptoStream);
-    if ((conn_->pendingEvents.numProbePackets &&
-         initialCryptoStream.retransmissionBuffer.size() &&
-         conn_->outstandings.initialPacketsCount) ||
+    auto& numProbePackets =
+        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Initial];
+    if ((numProbePackets && initialCryptoStream.retransmissionBuffer.size() &&
+         conn_->outstandings.packetCount[PacketNumberSpace::Initial]) ||
         initialScheduler.hasData() ||
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialWriteCipher);
       CHECK(conn_->initialHeaderCipher);
       packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          destConnId /* dst */,
-          LongHeader::Types::Initial,
-          *conn_->initialWriteCipher,
-          *conn_->initialHeaderCipher,
-          version,
-          packetLimit);
+                         *socket_,
+                         *conn_,
+                         srcConnId /* src */,
+                         destConnId /* dst */,
+                         LongHeader::Types::Initial,
+                         *conn_->initialWriteCipher,
+                         *conn_->initialHeaderCipher,
+                         version,
+                         packetLimit)
+                         .packetsWritten;
     }
-    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
+    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
@@ -238,40 +245,44 @@ void QuicServerTransport::writeData() {
     auto& handshakeCryptoStream =
         *getCryptoStream(*conn_->cryptoState, EncryptionLevel::Handshake);
     CryptoStreamScheduler handshakeScheduler(*conn_, handshakeCryptoStream);
-    if ((conn_->outstandings.handshakePacketsCount &&
+    auto& numProbePackets =
+        conn_->pendingEvents.numProbePackets[PacketNumberSpace::Handshake];
+    if ((conn_->outstandings.packetCount[PacketNumberSpace::Handshake] &&
          handshakeCryptoStream.retransmissionBuffer.size() &&
-         conn_->pendingEvents.numProbePackets) ||
+         numProbePackets) ||
         handshakeScheduler.hasData() ||
         (conn_->ackStates.handshakeAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
       CHECK(conn_->handshakeWriteCipher);
       CHECK(conn_->handshakeWriteHeaderCipher);
       packetLimit -= writeCryptoAndAckDataToSocket(
-          *socket_,
-          *conn_,
-          srcConnId /* src */,
-          destConnId /* dst */,
-          LongHeader::Types::Handshake,
-          *conn_->handshakeWriteCipher,
-          *conn_->handshakeWriteHeaderCipher,
-          version,
-          packetLimit);
+                         *socket_,
+                         *conn_,
+                         srcConnId /* src */,
+                         destConnId /* dst */,
+                         LongHeader::Types::Handshake,
+                         *conn_->handshakeWriteCipher,
+                         *conn_->handshakeWriteHeaderCipher,
+                         version,
+                         packetLimit)
+                         .packetsWritten;
     }
-    if (!packetLimit && !conn_->pendingEvents.numProbePackets) {
+    if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
     }
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
     packetLimit -= writeQuicDataToSocket(
-        *socket_,
-        *conn_,
-        srcConnId /* src */,
-        destConnId /* dst */,
-        *conn_->oneRttWriteCipher,
-        *conn_->oneRttWriteHeaderCipher,
-        version,
-        packetLimit);
+                       *socket_,
+                       *conn_,
+                       srcConnId /* src */,
+                       destConnId /* dst */,
+                       *conn_->oneRttWriteCipher,
+                       *conn_->oneRttWriteHeaderCipher,
+                       version,
+                       packetLimit)
+                       .packetsWritten;
 
     // D6D probes should be paced
     if (packetLimit && conn_->pendingEvents.d6d.sendProbePacket) {

@@ -2296,8 +2296,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2337,7 +2337,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
     EXPECT_CALL(*sock, write(_, _)).Times(0);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2372,8 +2372,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -2412,7 +2412,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
@@ -2449,8 +2449,8 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
 
-    EXPECT_CALL(*sock, write(firstAddress, _)).Times(2);
-    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(2);
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
   }
@@ -3884,8 +3884,8 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
   // Clear out all the outstanding packets to simulate quiescent state.
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
   client->getNonConstConn().outstandings.packets.clear();
-  client->getNonConstConn().outstandings.handshakePacketsCount = 0;
-  client->getNonConstConn().outstandings.clonedPacketsCount = 0;
+  client->getNonConstConn().outstandings.packetCount = {};
+  client->getNonConstConn().outstandings.clonedPacketCount = {};
   client->idleTimeout().cancelTimeout();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");
@@ -5567,7 +5567,7 @@ TEST_F(
           }));
   client->lossTimeout().cancelTimeout();
   client->lossTimeout().timeoutExpired();
-  EXPECT_EQ(socketWrites.size(), 4);
+  ASSERT_EQ(socketWrites.size(), 4);
   EXPECT_TRUE(
       verifyLongHeader(*socketWrites.at(0), LongHeader::Types::Initial));
   EXPECT_TRUE(
