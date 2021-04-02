@@ -123,7 +123,7 @@ void setLossDetectionAlarm(QuicConnectionStateBase& conn, Timeout& timeout) {
    */
   bool hasDataToWrite = hasAckDataToWrite(conn) ||
       (hasNonAckDataToWrite(conn) != WriteDataReason::NO_WRITE);
-  auto totalPacketsOutstanding = conn.outstandings.packets.size();
+  auto totalPacketsOutstanding = conn.outstandings.numOutstanding();
   auto totalD6DProbesOutstanding = conn.d6d.outstandingProbes;
   /*
    * We have this condition to disambiguate the case where we have.
