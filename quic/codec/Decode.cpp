@@ -449,7 +449,7 @@ MaxStreamDataFrame decodeMaxStreamDataFrame(folly::io::Cursor& cursor) {
 
 MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
-  if (!streamCount) {
+  if (!streamCount || streamCount->first > kMaxMaxStreams) {
     throw QuicTransportException(
         "Invalid Bi-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
@@ -460,7 +460,7 @@ MaxStreamsFrame decodeBiDiMaxStreamsFrame(folly::io::Cursor& cursor) {
 
 MaxStreamsFrame decodeUniMaxStreamsFrame(folly::io::Cursor& cursor) {
   auto streamCount = decodeQuicInteger(cursor);
-  if (!streamCount) {
+  if (!streamCount || streamCount->first > kMaxMaxStreams) {
     throw QuicTransportException(
         "Invalid Uni-directional streamId",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,

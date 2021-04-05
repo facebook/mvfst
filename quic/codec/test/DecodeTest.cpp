@@ -575,6 +575,50 @@ TEST_F(DecodeTest, StreamIncorrectDataLength) {
   EXPECT_THROW(decodeStreamFrame(queue, streamType), QuicTransportException);
 }
 
+std::unique_ptr<folly::IOBuf> CreateMaxStreamsIdFrame(
+    unsigned long long maxStreamsId) {
+  std::unique_ptr<folly::IOBuf> buf = folly::IOBuf::create(sizeof(QuicInteger));
+  BufAppender wcursor(buf.get(), sizeof(QuicInteger));
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+  QuicInteger maxStreamsIdVal(maxStreamsId);
+  maxStreamsIdVal.encode(appenderOp);
+  return buf;
+}
+
+// Uni and BiDi have same max limits so uses single 'frame' to check both.
+void MaxStreamsIdCheckSuccess(StreamId maxStreamsId) {
+  std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
+
+  folly::io::Cursor cursorBiDi(buf.get());
+  MaxStreamsFrame maxStreamsBiDiFrame = decodeBiDiMaxStreamsFrame(cursorBiDi);
+  EXPECT_EQ(maxStreamsBiDiFrame.maxStreams, maxStreamsId);
+
+  folly::io::Cursor cursorUni(buf.get());
+  MaxStreamsFrame maxStreamsUniFrame = decodeUniMaxStreamsFrame(cursorUni);
+  EXPECT_EQ(maxStreamsUniFrame.maxStreams, maxStreamsId);
+}
+
+// Uni and BiDi have same max limits so uses single 'frame' to check both.
+void MaxStreamsIdCheckInvalid(StreamId maxStreamsId) {
+  std::unique_ptr<folly::IOBuf> buf = CreateMaxStreamsIdFrame(maxStreamsId);
+
+  folly::io::Cursor cursorBiDi(buf.get());
+  EXPECT_THROW(decodeBiDiMaxStreamsFrame(cursorBiDi), QuicTransportException);
+
+  folly::io::Cursor cursorUni(buf.get());
+  EXPECT_THROW(decodeUniMaxStreamsFrame(cursorUni), QuicTransportException);
+}
+
+TEST_F(DecodeTest, MaxStreamsIdChecks) {
+  MaxStreamsIdCheckSuccess(0);
+  MaxStreamsIdCheckSuccess(123);
+  MaxStreamsIdCheckSuccess(kMaxMaxStreams);
+
+  MaxStreamsIdCheckInvalid(kMaxMaxStreams + 1);
+  MaxStreamsIdCheckInvalid(kMaxMaxStreams + 123);
+  MaxStreamsIdCheckInvalid(kMaxStreamId - 1);
+}
+
 TEST_F(DecodeTest, CryptoDecodeSuccess) {
   QuicInteger offset(10);
   QuicInteger length(1);
