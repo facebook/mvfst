@@ -51,6 +51,8 @@ void processAckFrame(
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
   folly::Optional<Observer::SpuriousLossEvent> spuriousLossEvent;
+  // Used for debug only.
+  const auto originalPacketCount = conn.outstandings.packetCount;
   if (conn.observers->size() > 0) {
     spuriousLossEvent.emplace(ackReceiveTime);
   }
@@ -230,11 +232,23 @@ void processAckFrame(
   CHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();
-  CHECK_GE(
-      updatedOustandingPacketsCount,
-      conn.outstandings.packetCount[PacketNumberSpace::Handshake] +
-          conn.outstandings.packetCount[PacketNumberSpace::Initial] +
-          conn.outstandings.packetCount[PacketNumberSpace::AppData]);
+  const auto& packetCount = conn.outstandings.packetCount;
+  LOG_IF(
+      DFATAL,
+      updatedOustandingPacketsCount <
+          packetCount[PacketNumberSpace::Handshake] +
+              packetCount[PacketNumberSpace::Initial] +
+              packetCount[PacketNumberSpace::AppData])
+      << "QUIC packetCount inconsistency: "
+         "numOutstanding: "
+      << updatedOustandingPacketsCount << " packetCount: {"
+      << packetCount[PacketNumberSpace::Initial] << ","
+      << packetCount[PacketNumberSpace::Handshake] << ","
+      << packetCount[PacketNumberSpace::AppData] << "}"
+      << " originalPacketCount: {"
+      << originalPacketCount[PacketNumberSpace::Initial] << ","
+      << originalPacketCount[PacketNumberSpace::Handshake] << ","
+      << originalPacketCount[PacketNumberSpace::AppData] << "}";
   CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
