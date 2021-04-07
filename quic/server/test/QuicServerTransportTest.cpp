@@ -2213,6 +2213,102 @@ TEST_F(QuicServerTransportTest, SwitchServerCidsMultipleCids) {
   EXPECT_EQ(secondCid.connId, *replacedCid);
 }
 
+TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFrames) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  server->getNonConstConn().qLogger = qLogger;
+  // Use large packet number to make sure packet is long enough to parse
+  PacketNum nextPacket = 0x11111111;
+  // Add some dummy data to make body parseable
+  auto dummyDataLen = 20;
+  server->getNonConstConn().serverConnectionId = getTestConnectionId();
+  auto aead = dynamic_cast<const MockAead*>(
+      server->getNonConstConn().readCodec->getOneRttReadCipher());
+  // Override the Aead mock to remove the 20 bytes of dummy data added below
+  ON_CALL(*aead, _tryDecrypt(_, _, _))
+      .WillByDefault(Invoke([&](auto& buf, auto, auto) {
+        buf->trimEnd(20);
+        return buf->clone();
+      }));
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      nextPacket);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  ASSERT_TRUE(builder.canBuildPacket());
+  auto packet = std::move(builder).buildPacket();
+  auto buf = packetToBuf(packet);
+  buf->coalesce();
+  buf->reserve(0, 200);
+  buf->append(dummyDataLen);
+  EXPECT_THROW(deliverData(std::move(buf)), std::runtime_error);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(
+      event->dropReason,
+      QuicTransportStatsCallback::toString(
+          PacketDropReason::PROTOCOL_VIOLATION));
+}
+
+TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  server->getNonConstConn().qLogger = qLogger;
+  // Use large packet number to make sure packet is long enough to parse
+  PacketNum nextPacket = 0x11111111;
+  // Add some dummy data to make body parseable
+  auto dummyDataLen = 20;
+  server->getNonConstConn().serverConnectionId = getTestConnectionId();
+  auto aead = dynamic_cast<const MockAead*>(
+      server->getNonConstConn().readCodec->getOneRttReadCipher());
+  // Override the Aead mock to remove the 20 bytes of dummy data added below
+  ON_CALL(*aead, _tryDecrypt(_, _, _))
+      .WillByDefault(Invoke([&](auto& buf, auto, auto) {
+        buf->trimEnd(20);
+        return buf->clone();
+      }));
+
+  // Close the connection
+  server->close(std::make_pair(
+      QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+      std::string("test close")));
+  server->idleTimeout().cancelTimeout();
+  ASSERT_FALSE(server->idleTimeout().isScheduled());
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      nextPacket);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  ASSERT_TRUE(builder.canBuildPacket());
+  auto packet = std::move(builder).buildPacket();
+  auto buf = packetToBuf(packet);
+  buf->coalesce();
+  buf->reserve(0, 200);
+  buf->append(dummyDataLen);
+  EXPECT_THROW(deliverData(std::move(buf)), std::runtime_error);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(
+      event->dropReason,
+      QuicTransportStatsCallback::toString(
+          PacketDropReason::PROTOCOL_VIOLATION));
+}
+
 class QuicServerTransportAllowMigrationTest
     : public QuicServerTransportTest,
       public WithParamInterface<MigrationParam> {

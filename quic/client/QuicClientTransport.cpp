@@ -206,6 +206,26 @@ void QuicClientTransport::processPacketData(
     QUIC_TRACE(packet_drop, *conn_, "parse");
     return;
   }
+
+  if (regularOptional->frames.empty()) {
+    // This is either a packet that has no data (long-header parsed but no data
+    // found) or a regular packet with a short header and no frames. Both are
+    // protocol violations.
+    QUIC_STATS(
+        conn_->statsCallback,
+        onPacketDropped,
+        PacketDropReason::PROTOCOL_VIOLATION);
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketDrop(
+          packetSize,
+          QuicTransportStatsCallback::toString(
+              PacketDropReason::PROTOCOL_VIOLATION));
+    }
+    QUIC_TRACE(packet_drop, *conn_, "no_data_packet");
+    throw QuicTransportException(
+        "Packet has no frames", TransportErrorCode::PROTOCOL_VIOLATION);
+  }
+
   if (happyEyeballsEnabled_) {
     CHECK(socket_);
     happyEyeballsOnDataReceived(

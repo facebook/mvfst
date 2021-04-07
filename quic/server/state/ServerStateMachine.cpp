@@ -745,6 +745,25 @@ void onServerReadDataFromOpen(
           conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;
     }
+    if (regularOptional->frames.empty()) {
+      // This packet had a pareseable header (most probably short header)
+      // but no data. This is a protocol violation so we throw an exception.
+      // This drop has not been recorded in the switch-case block above
+      // so we record it here.
+      if (conn.qLogger) {
+        conn.qLogger->addPacketDrop(
+            packetSize,
+            QuicTransportStatsCallback::toString(
+                PacketDropReason::PROTOCOL_VIOLATION));
+      }
+      QUIC_TRACE(packet_drop, conn, "no_data_packet");
+      QUIC_STATS(
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::PROTOCOL_VIOLATION);
+      throw QuicTransportException(
+          "Packet has no frames", TransportErrorCode::PROTOCOL_VIOLATION);
+    }
 
     auto protectionLevel = regularOptional->header.getProtectionType();
     auto encryptionLevel = protectionTypeToEncryptionLevel(protectionLevel);
@@ -1256,6 +1275,25 @@ void onServerReadDataFromClosed(
     QUIC_STATS(
         conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
     return;
+  }
+  if (regularOptional->frames.empty()) {
+    // This packet had a pareseable header (most probably short header)
+    // but no data. This is a protocol violation so we throw an exception.
+    // This drop has not been recorded in the switch-case block above
+    // so we record it here.
+    if (conn.qLogger) {
+      conn.qLogger->addPacketDrop(
+          packetSize,
+          QuicTransportStatsCallback::toString(
+              PacketDropReason::PROTOCOL_VIOLATION));
+    }
+    QUIC_TRACE(packet_drop, conn, "no_data_packet");
+    QUIC_STATS(
+        conn.statsCallback,
+        onPacketDropped,
+        PacketDropReason::PROTOCOL_VIOLATION);
+    throw QuicTransportException(
+        "Packet has no frames", TransportErrorCode::PROTOCOL_VIOLATION);
   }
 
   auto& regularPacket = *regularOptional;

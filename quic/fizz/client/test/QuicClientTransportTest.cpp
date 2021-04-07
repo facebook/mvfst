@@ -47,7 +47,8 @@ namespace test {
 namespace {
 std::vector<uint8_t> kInitialDstConnIdVecForRetryTest =
     {0x83, 0x94, 0xc8, 0xf0, 0x3e, 0x51, 0x57, 0x08};
-}
+using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
+} // namespace
 
 MATCHER_P(BufMatches, buf, "") {
   folly::IOBufEqualTo eq;
@@ -3059,6 +3060,48 @@ TEST_F(QuicClientTransportAfterStartTest, RecvNewConnectionIdValid) {
   EXPECT_EQ(conn.peerConnectionIds[1].connId, newConnId.connectionId);
   EXPECT_EQ(conn.peerConnectionIds[1].sequenceNumber, newConnId.sequenceNumber);
   EXPECT_EQ(conn.peerConnectionIds[1].token, newConnId.token);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ShortHeaderPacketWithNoFrames) {
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
+  client->getNonConstConn().qLogger = qLogger;
+  // Use large packet number to make sure packet is long enough to parse
+  PacketNum nextPacket = 0x11111111;
+  client->getNonConstConn().clientConnectionId = getTestConnectionId();
+  auto aead = dynamic_cast<const MockAead*>(
+      client->getNonConstConn().readCodec->getOneRttReadCipher());
+  // Override the Aead mock to remove the 20 bytes of dummy data added below
+  ON_CALL(*aead, _tryDecrypt(_, _, _))
+      .WillByDefault(Invoke([&](auto& buf, auto, auto) {
+        buf->trimEnd(20);
+        return buf->clone();
+      }));
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *client->getConn().clientConnectionId,
+      nextPacket);
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  ASSERT_TRUE(builder.canBuildPacket());
+  auto packet = std::move(builder).buildPacket();
+  auto buf = packetToBuf(packet);
+  buf->coalesce();
+  buf->reserve(0, 200);
+  buf->append(20);
+  EXPECT_THROW(deliverData(buf->coalesce()), std::runtime_error);
+  std::vector<int> indices =
+      getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
+  EXPECT_EQ(indices.size(), 1);
+
+  auto tmp = std::move(qLogger->logs[indices[0]]);
+  auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
+  EXPECT_EQ(
+      event->dropReason,
+      QuicTransportStatsCallback::toString(
+          PacketDropReason::PROTOCOL_VIOLATION));
 }
 
 TEST_F(
