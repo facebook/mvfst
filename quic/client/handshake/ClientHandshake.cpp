@@ -78,6 +78,8 @@ void ClientHandshake::doHandshake(
     case EncryptionLevel::AppData:
       appDataReadBuf_.append(std::move(data));
       break;
+    default:
+      LOG(FATAL) << "Unhandled EncryptionLevel";
   }
   // Get the current buffer type the transport is accepting.
   waitForData_ = false;
@@ -93,6 +95,8 @@ void ClientHandshake::doHandshake(
       case EncryptionLevel::AppData:
         processSocketData(appDataReadBuf_);
         break;
+      default:
+        LOG(FATAL) << "Unhandled EncryptionLevel";
     }
     throwOnError();
   }

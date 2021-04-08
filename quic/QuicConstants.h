@@ -583,6 +583,7 @@ enum class EncryptionLevel : uint8_t {
   Handshake,
   EarlyData,
   AppData,
+  MAX,
 };
 
 /**

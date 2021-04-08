@@ -21,6 +21,16 @@ namespace quic {
 
 struct CachedServerTransportParameters;
 
+struct PendingClientData {
+  NetworkDataSingle networkData;
+  folly::SocketAddress peer;
+
+  PendingClientData(
+      NetworkDataSingle networkDataIn,
+      folly::SocketAddress peerIn)
+      : networkData(std::move(networkDataIn)), peer(std::move(peerIn)) {}
+};
+
 struct QuicClientConnectionState : public QuicConnectionStateBase {
   ~QuicClientConnectionState() override = default;
 
@@ -56,10 +66,10 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   uint64_t peerAdvertisedInitialMaxStreamsBidi{0};
   uint64_t peerAdvertisedInitialMaxStreamsUni{0};
 
-  // Packet number in which client initial was sent. Receipt of data on the
-  // crypto stream from the server can implicitly ack the client initial packet.
-  // TODO: use this to get rid of the data in the crypto stream.
-  // folly::Optional<PacketNum> clientInitialPacketNum;
+  // Short header packets we received but couldn't yet decrypt.
+  std::vector<PendingClientData> pendingOneRttData;
+  // Handshake packets we received but couldn't yet decrypt.
+  std::vector<PendingClientData> pendingHandshakeData;
 
   explicit QuicClientConnectionState(
       std::shared_ptr<ClientHandshakeFactory> handshakeFactoryIn)

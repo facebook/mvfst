@@ -125,6 +125,34 @@ void QuicClientTransport::processUDPData(
       << "Leaving " << udpData.chainLength()
       << " bytes unprocessed after attempting to process "
       << kMaxNumCoalescedPackets << " packets.";
+
+  // Process any pending 1RTT and handshake packets if we have keys.
+  if (conn_->readCodec->getOneRttReadCipher() &&
+      !clientConn_->pendingOneRttData.empty()) {
+    BufQueue pendingPacket;
+    for (auto& pendingData : clientConn_->pendingOneRttData) {
+      pendingPacket.append(std::move(pendingData.networkData.data));
+      processPacketData(
+          pendingData.peer,
+          pendingData.networkData.receiveTimePoint,
+          pendingPacket);
+      pendingPacket.move();
+    }
+    clientConn_->pendingOneRttData.clear();
+  }
+  if (conn_->readCodec->getHandshakeReadCipher() &&
+      !clientConn_->pendingHandshakeData.empty()) {
+    BufQueue pendingPacket;
+    for (auto& pendingData : clientConn_->pendingHandshakeData) {
+      pendingPacket.append(std::move(pendingData.networkData.data));
+      processPacketData(
+          pendingData.peer,
+          pendingData.networkData.receiveTimePoint,
+          pendingPacket);
+      pendingPacket.move();
+    }
+    clientConn_->pendingHandshakeData.clear();
+  }
 }
 
 void QuicClientTransport::processPacketData(
@@ -194,6 +222,31 @@ void QuicClientTransport::processPacketData(
     // upon receiving a subsequent initial from the server.
 
     startCryptoHandshake();
+    return;
+  }
+
+  auto cipherUnavailable = parsedPacket.cipherUnavailable();
+  if (cipherUnavailable && cipherUnavailable->packet &&
+      !cipherUnavailable->packet->empty() &&
+      (cipherUnavailable->protectionType == ProtectionType::KeyPhaseZero ||
+       cipherUnavailable->protectionType == ProtectionType::Handshake) &&
+      clientConn_->pendingOneRttData.size() +
+              clientConn_->pendingHandshakeData.size() <
+          clientConn_->transportSettings.maxPacketsToBuffer) {
+    auto& pendingData =
+        cipherUnavailable->protectionType == ProtectionType::KeyPhaseZero
+        ? clientConn_->pendingOneRttData
+        : clientConn_->pendingHandshakeData;
+    pendingData.emplace_back(
+        NetworkDataSingle(
+            std::move(cipherUnavailable->packet), receiveTimePoint),
+        peer);
+    if (conn_->qLogger) {
+      conn_->qLogger->addPacketBuffered(
+          cipherUnavailable->packetNum,
+          cipherUnavailable->protectionType,
+          packetSize);
+    }
     return;
   }
 
@@ -1442,6 +1495,8 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
   }
   QUIC_TRACE(fst_trace, *conn_, "start");
   setConnectionCallback(cb);
+  clientConn_->pendingOneRttData.reserve(
+      conn_->transportSettings.maxPacketsToBuffer);
   try {
     happyEyeballsSetUpSocket(
         *socket_,

@@ -1078,7 +1078,8 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
     }
   }
 
-  void doHandshake(std::unique_ptr<folly::IOBuf>, EncryptionLevel) override {
+  void doHandshake(std::unique_ptr<folly::IOBuf> buf, EncryptionLevel level)
+      override {
     EXPECT_EQ(writeBuf.get(), nullptr);
     QuicClientConnectionState* conn = getClientConn();
     if (!conn->oneRttWriteCipher) {
@@ -1095,6 +1096,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
           IOBuf::copyBuffer("ClientFinished"));
       handshakeInitiated();
     }
+    readBuffers[level].append(std::move(buf));
   }
 
   bool connectInvoked() {
@@ -1121,6 +1123,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   uint64_t maxInitialStreamsBidi{std::numeric_limits<uint32_t>::max()};
   uint64_t maxInitialStreamsUni{std::numeric_limits<uint32_t>::max()};
   folly::Optional<ServerTransportParameters> params_;
+  EnumArray<EncryptionLevel, BufQueue> readBuffers{};
 
   std::unique_ptr<Aead> oneRttWriteCipher_;
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher_;
@@ -5681,6 +5684,213 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   auto event = dynamic_cast<QLogPacketDropEvent*>(tmp.get());
   EXPECT_EQ(event->packetSize, 10);
   EXPECT_EQ(event->dropReason, kParse);
+}
+
+TEST_F(QuicProcessDataTest, ProcessPendingData) {
+  auto params = mockClientHandshake->getServerTransportParams();
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::initial_source_connection_id, *serverChosenConnId));
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::original_destination_connection_id,
+      *client->getConn().initialDestinationConnectionId));
+  mockClientHandshake->setServerTransportParams(std::move(*params));
+  auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  PacketNum nextPacketNum = initialPacketNum++;
+  auto& aead = getInitialCipher();
+  auto packet = createCryptoPacket(
+      *serverChosenConnId,
+      *originalConnId,
+      nextPacketNum,
+      QuicVersion::QUIC_DRAFT,
+      ProtectionType::Initial,
+      *serverHello,
+      aead,
+      0 /* largestAcked */);
+  auto packetData = packetToBufCleartext(
+      packet, aead, getInitialHeaderCipher(), nextPacketNum);
+  deliverData(serverAddr, packetData->coalesce());
+  verifyTransportParameters(
+      kDefaultConnectionWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      mockClientHandshake->maxRecvPacketSize);
+
+  mockClientHandshake->setOneRttReadCipher(nullptr);
+  mockClientHandshake->setHandshakeReadCipher(nullptr);
+  ASSERT_TRUE(client->getConn().pendingOneRttData.empty());
+  auto streamId1 = client->createBidirectionalStream().value();
+
+  auto data = folly::IOBuf::copyBuffer("1RTT data!");
+  auto streamPacket1 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId1,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket1->coalesce());
+  EXPECT_EQ(client->getConn().pendingOneRttData.size(), 1);
+
+  auto cryptoData = folly::IOBuf::copyBuffer("Crypto data!");
+  auto cryptoPacket1 = packetToBuf(createCryptoPacket(
+      *serverChosenConnId,
+      *originalConnId,
+      handshakePacketNum++,
+      QuicVersion::QUIC_DRAFT,
+      ProtectionType::Handshake,
+      *cryptoData,
+      *createNoOpAead(),
+      0 /* largestAcked */));
+  deliverData(cryptoPacket1->coalesce());
+  EXPECT_EQ(client->getConn().pendingOneRttData.size(), 1);
+  EXPECT_EQ(client->getConn().pendingHandshakeData.size(), 1);
+
+  mockClientHandshake->setOneRttReadCipher(createNoOpAead());
+  auto streamId2 = client->createBidirectionalStream().value();
+  auto streamPacket2 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId2,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket2->coalesce());
+  EXPECT_TRUE(client->getConn().pendingOneRttData.empty());
+  EXPECT_EQ(client->getConn().pendingHandshakeData.size(), 1);
+
+  // Set the oneRtt one back to nullptr to make sure we trigger it on handshake
+  // only.
+  // mockClientHandshake->setOneRttReadCipher(nullptr);
+  mockClientHandshake->setHandshakeReadCipher(createNoOpAead());
+  auto cryptoPacket2 = packetToBuf(createCryptoPacket(
+      *serverChosenConnId,
+      *originalConnId,
+      handshakePacketNum++,
+      QuicVersion::QUIC_DRAFT,
+      ProtectionType::Handshake,
+      *cryptoData,
+      *createNoOpAead(),
+      0,
+      cryptoData->length()));
+  deliverData(cryptoPacket2->coalesce());
+  EXPECT_TRUE(client->getConn().pendingHandshakeData.empty());
+  EXPECT_TRUE(client->getConn().pendingOneRttData.empty());
+
+  // Both stream data and crypto data should be there.
+  auto d1 = client->read(streamId1, 1000);
+  ASSERT_FALSE(d1.hasError());
+  auto d2 = client->read(streamId2, 1000);
+  ASSERT_FALSE(d2.hasError());
+  EXPECT_TRUE(folly::IOBufEqualTo()(*d1.value().first, *data));
+  EXPECT_TRUE(folly::IOBufEqualTo()(*d2.value().first, *data));
+
+  ASSERT_FALSE(
+      mockClientHandshake->readBuffers[EncryptionLevel::Handshake].empty());
+  auto handshakeReadData =
+      mockClientHandshake->readBuffers[EncryptionLevel::Handshake].move();
+  cryptoData->prependChain(cryptoData->clone());
+  EXPECT_TRUE(folly::IOBufEqualTo()(*cryptoData, *handshakeReadData));
+}
+
+TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
+  auto params = mockClientHandshake->getServerTransportParams();
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::initial_source_connection_id, *serverChosenConnId));
+  params->parameters.push_back(encodeConnIdParameter(
+      TransportParameterId::original_destination_connection_id,
+      *client->getConn().initialDestinationConnectionId));
+  mockClientHandshake->setServerTransportParams(std::move(*params));
+  auto serverHello = IOBuf::copyBuffer("Fake SHLO");
+  PacketNum nextPacketNum = initialPacketNum++;
+  auto& aead = getInitialCipher();
+  auto packet = createCryptoPacket(
+      *serverChosenConnId,
+      *originalConnId,
+      nextPacketNum,
+      QuicVersion::QUIC_DRAFT,
+      ProtectionType::Initial,
+      *serverHello,
+      aead,
+      0 /* largestAcked */);
+  auto packetData = packetToBufCleartext(
+      packet, aead, getInitialHeaderCipher(), nextPacketNum);
+  deliverData(serverAddr, packetData->coalesce());
+  verifyTransportParameters(
+      kDefaultConnectionWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      mockClientHandshake->maxRecvPacketSize);
+
+  client->getNonConstConn().transportSettings.maxPacketsToBuffer = 2;
+  auto data = folly::IOBuf::copyBuffer("1RTT data!");
+  mockClientHandshake->setOneRttReadCipher(nullptr);
+  ASSERT_TRUE(client->getConn().pendingOneRttData.empty());
+  auto streamId1 = client->createBidirectionalStream().value();
+  auto streamPacket1 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId1,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket1->coalesce());
+  EXPECT_EQ(client->getConn().pendingOneRttData.size(), 1);
+
+  auto streamId2 = client->createBidirectionalStream().value();
+  auto streamPacket2 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId2,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket2->coalesce());
+  EXPECT_EQ(client->getConn().pendingOneRttData.size(), 2);
+
+  auto streamId3 = client->createBidirectionalStream().value();
+  auto streamPacket3 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId3,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket3->coalesce());
+  EXPECT_EQ(client->getConn().pendingOneRttData.size(), 2);
+
+  mockClientHandshake->setOneRttReadCipher(createNoOpAead());
+  auto streamId4 = client->createBidirectionalStream().value();
+  auto streamPacket4 = packetToBuf(createStreamPacket(
+      *serverChosenConnId /* src */,
+      *originalConnId /* dest */,
+      appDataPacketNum++,
+      streamId4,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(streamPacket4->coalesce());
+  EXPECT_TRUE(client->getConn().pendingOneRttData.empty());
+
+  // First, second, and fourht stream data should be there.
+  auto d1 = client->read(streamId1, 1000);
+  ASSERT_FALSE(d1.hasError());
+  auto d2 = client->read(streamId2, 1000);
+  ASSERT_FALSE(d2.hasError());
+  auto d3 = client->read(streamId3, 1000);
+  ASSERT_FALSE(d3.hasError());
+  EXPECT_EQ(d3.value().first, nullptr);
+  auto d4 = client->read(streamId4, 1000);
+  ASSERT_FALSE(d4.hasError());
+  EXPECT_TRUE(folly::IOBufEqualTo()(*d1.value().first, *data));
+  EXPECT_TRUE(folly::IOBufEqualTo()(*d2.value().first, *data));
+  EXPECT_TRUE(folly::IOBufEqualTo()(*d4.value().first, *data));
 }
 
 TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {

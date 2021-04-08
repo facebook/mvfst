@@ -53,6 +53,8 @@ void ServerHandshake::doHandshake(
     case EncryptionLevel::AppData:
       appDataReadBuf_.append(std::move(data));
       break;
+    default:
+      LOG(FATAL) << "Unhandled EncryptionLevel";
   }
   processPendingEvents();
   if (error_) {
@@ -240,6 +242,8 @@ void ServerHandshake::processPendingEvents() {
           // any more.
           processSocketData(appDataReadBuf_);
           break;
+        default:
+          LOG(FATAL) << "Unhandled EncryptionLevel";
       }
     } else if (!processPendingCryptoEvent()) {
       actionGuard_ = folly::DelayedDestruction::DestructorGuard(nullptr);

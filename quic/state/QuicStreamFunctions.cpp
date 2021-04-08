@@ -464,6 +464,8 @@ QuicCryptoStream* getCryptoStream(
       return &cryptoState.handshakeStream;
     case EncryptionLevel::AppData:
       return &cryptoState.oneRttStream;
+    default:
+      LOG(FATAL) << "Unhandled EncryptionLevel";
   }
   folly::assume_unreachable();
 }
