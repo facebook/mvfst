@@ -339,6 +339,8 @@ class TestQuicTransport
     stream->streamReadError = ex;
     conn_->streamManager->updateReadableStreams(*stream);
     conn_->streamManager->updatePeekableStreams(*stream);
+    // peekableStreams is updated to contain streams with streamReadError
+    updatePeekLooper();
     updateReadLooper();
   }
 
@@ -2691,6 +2693,24 @@ TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, PeekError) {
+  auto stream1 = transport->createBidirectionalStream().value();
+
+  NiceMock<MockPeekCallback> peekCb1;
+  transport->setPeekCallback(stream1, &peekCb1);
+
+  transport->addDataToStream(
+      stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
+  transport->addStreamReadError(stream1, LocalErrorCode::STREAM_CLOSED);
+
+  EXPECT_CALL(
+      peekCb1, peekError(stream1, IsError(LocalErrorCode::STREAM_CLOSED)));
+
+  transport->driveReadCallbacks();
+
+  transport.reset();
+}
+
 TEST_F(QuicTransportImplTest, PeekCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
@@ -3057,9 +3077,9 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListWithStreamErrorTest) {
 
   transport->addStreamReadError(streamId, LocalErrorCode::NO_ERROR);
 
-  // streamId is removed from the list after the call
-  // because there is an error on the stream.
-  EXPECT_EQ(0, conn->streamManager->peekableStreams().count(streamId));
+  // peekableStreams is updated to allow stream with streamReadError.
+  // So the streamId shall be in the list
+  EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
 }
 
 TEST_F(QuicTransportImplTest, SuccessfulPing) {

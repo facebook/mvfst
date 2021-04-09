@@ -614,7 +614,17 @@ class QuicSocket {
     virtual void onDataAvailable(
         StreamId id,
         const folly::Range<PeekIterator>& peekData) noexcept = 0;
+
+    /**
+     * Called from the transport layer during peek time when there is an error
+     * on the stream.
+     */
+    virtual void peekError(
+        StreamId id,
+        std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
+            error) noexcept = 0;
   };
+
   virtual folly::Expected<folly::Unit, LocalErrorCode> setPeekCallback(
       StreamId id,
       PeekCallback* cb) = 0;

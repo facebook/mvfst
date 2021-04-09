@@ -63,6 +63,14 @@ class MockPeekCallback : public QuicSocket::PeekCallback {
       ,
       onDataAvailable,
       void(StreamId, const folly::Range<PeekIterator>&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      peekError,
+      void(
+          StreamId,
+          std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
 };
 
 class MockWriteCallback : public QuicSocket::WriteCallback {

@@ -989,7 +989,13 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
     }
     auto peekCb = callback->second.peekCb;
     auto stream = conn_->streamManager->getStream(streamId);
-    if (peekCb && !stream->streamReadError && stream->hasPeekableData()) {
+    if (peekCb && stream->streamReadError) {
+      VLOG(10) << "invoking peek error callbacks on stream=" << streamId << " "
+               << *this;
+      peekCb->peekError(
+          streamId, std::make_pair(*stream->streamReadError, folly::none));
+    } else if (
+        peekCb && !stream->streamReadError && stream->hasPeekableData()) {
       VLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
                << *this;
 

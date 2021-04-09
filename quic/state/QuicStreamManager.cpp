@@ -528,7 +528,9 @@ void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
 }
 
 void QuicStreamManager::updatePeekableStreams(QuicStreamState& stream) {
-  if (stream.hasPeekableData() && !stream.streamReadError.has_value()) {
+  // In the PeekCallback, the API peekError() is added, so change the condition
+  // and allow streamReadError in the peekableStreams
+  if (stream.hasPeekableData() || stream.streamReadError.has_value()) {
     peekableStreams_.emplace(stream.id);
   } else {
     peekableStreams_.erase(stream.id);
