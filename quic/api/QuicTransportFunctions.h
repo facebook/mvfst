@@ -310,6 +310,7 @@ void implicitAckCryptoStream(
     QuicConnectionStateBase& conn,
     EncryptionLevel encryptionLevel);
 void handshakeConfirmed(QuicConnectionStateBase& conn);
+bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn);
 
 bool writeLoopTimeLimit(
     TimePoint loopBeginTime,

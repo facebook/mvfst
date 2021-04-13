@@ -1664,4 +1664,10 @@ void handshakeConfirmed(QuicConnectionStateBase& conn) {
   implicitAckCryptoStream(conn, EncryptionLevel::Handshake);
 }
 
+bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn) {
+  return conn.initialWriteCipher || conn.handshakeWriteCipher ||
+      conn.readCodec->getInitialCipher() ||
+      conn.readCodec->getHandshakeReadCipher();
+}
+
 } // namespace quic

@@ -377,9 +377,7 @@ void QuicClientTransport::processPacketData(
                 // finished message. We can mark the handshake as confirmed and
                 // drop the handshake cipher and outstanding packets after the
                 // processing loop.
-                if (conn_->handshakeWriteCipher) {
-                  conn_->handshakeLayer->handshakeConfirmed();
-                }
+                conn_->handshakeLayer->handshakeConfirmed();
                 // TODO reap
                 if (*conn_->version == QuicVersion::MVFST_D24) {
                   cancelHandshakeCryptoStreamRetransmissions(
@@ -583,7 +581,8 @@ void QuicClientTransport::processPacketData(
 
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (handshakeLayer->getPhase() == ClientHandshake::Phase::Established &&
-      *conn_->version != QuicVersion::MVFST_D24) {
+      *conn_->version != QuicVersion::MVFST_D24 &&
+      hasInitialOrHandshakeCiphers(*conn_)) {
     handshakeConfirmed(*conn_);
   }
 
