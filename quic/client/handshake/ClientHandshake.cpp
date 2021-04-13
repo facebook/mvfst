@@ -103,12 +103,6 @@ void ClientHandshake::doHandshake(
 }
 
 void ClientHandshake::handshakeConfirmed() {
-  if (phase_ != Phase::OneRttKeysDerived && phase_ != Phase::Established &&
-      *conn_->version != QuicVersion::MVFST_D24) {
-    LOG(WARNING)
-        << "Handshake was expected to be in the OneRttKeysDerived phase";
-  }
-
   phase_ = Phase::Established;
 }
 

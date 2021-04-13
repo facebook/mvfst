@@ -378,11 +378,6 @@ void QuicClientTransport::processPacketData(
                 // drop the handshake cipher and outstanding packets after the
                 // processing loop.
                 conn_->handshakeLayer->handshakeConfirmed();
-                // TODO reap
-                if (*conn_->version == QuicVersion::MVFST_D24) {
-                  cancelHandshakeCryptoStreamRetransmissions(
-                      *conn_->cryptoState);
-                }
               }
               switch (packetFrame.type()) {
                 case QuicWriteFrame::Type::WriteAckFrame: {
@@ -581,7 +576,6 @@ void QuicClientTransport::processPacketData(
 
   auto handshakeLayer = clientConn_->clientHandshakeLayer;
   if (handshakeLayer->getPhase() == ClientHandshake::Phase::Established &&
-      *conn_->version != QuicVersion::MVFST_D24 &&
       hasInitialOrHandshakeCiphers(*conn_)) {
     handshakeConfirmed(*conn_);
   }
@@ -597,8 +591,7 @@ void QuicClientTransport::processPacketData(
       oneRttKeyDerivationTriggered = true;
       updatePacingOnKeyEstablished(*conn_);
     }
-    if (conn_->oneRttWriteCipher && conn_->readCodec->getOneRttReadCipher() &&
-        conn_->version != QuicVersion::MVFST_D24) {
+    if (conn_->oneRttWriteCipher && conn_->readCodec->getOneRttReadCipher()) {
       conn_->zeroRttWriteCipher.reset();
       conn_->zeroRttWriteHeaderCipher.reset();
     }
@@ -709,14 +702,6 @@ void QuicClientTransport::processPacketData(
       markZeroRttPacketsLost(*conn_, markPacketLoss);
     }
   }
-  // TODO this is incorrect and needs to be removed post MVFST_D24
-  if (conn_->version == QuicVersion::MVFST_D24 &&
-      (protectionLevel == ProtectionType::KeyPhaseZero ||
-       protectionLevel == ProtectionType::KeyPhaseOne)) {
-    DCHECK(conn_->oneRttWriteCipher);
-    clientConn_->clientHandshakeLayer->handshakeConfirmed();
-    conn_->readCodec->onHandshakeDone(receiveTimePoint);
-  }
   updateAckSendStateOnRecvPacket(
       *conn_,
       ackState,
@@ -724,7 +709,7 @@ void QuicClientTransport::processPacketData(
       pktHasRetransmittableData,
       pktHasCryptoData);
   if (encryptionLevel == EncryptionLevel::Handshake &&
-      conn_->version != QuicVersion::MVFST_D24 && conn_->initialWriteCipher) {
+      conn_->initialWriteCipher) {
     conn_->initialWriteCipher.reset();
     conn_->initialHeaderCipher.reset();
     conn_->readCodec->setInitialReadCipher(nullptr);
@@ -804,8 +789,7 @@ void QuicClientTransport::writeData() {
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
     }
-    if (conn_->handshakeWriteCipher &&
-        *conn_->version != QuicVersion::MVFST_D24) {
+    if (conn_->handshakeWriteCipher) {
       CHECK(conn_->handshakeWriteHeaderCipher);
       writeLongClose(
           *socket_,
@@ -1710,7 +1694,12 @@ void QuicClientTransport::unbindConnection() {
 
 void QuicClientTransport::setSupportedVersions(
     const std::vector<QuicVersion>& versions) {
-  conn_->originalVersion = versions.at(0);
+  auto version = versions.at(0);
+  // Disallow setting D24.
+  if (version == QuicVersion::MVFST_D24) {
+    version = QuicVersion::MVFST;
+  }
+  conn_->originalVersion = version;
   auto params = conn_->readCodec->getCodecParameters();
   params.version = conn_->originalVersion.value();
   conn_->readCodec->setCodecParameters(params);

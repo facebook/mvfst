@@ -144,9 +144,6 @@ std::pair<Buf, bool> readDataInOrderFromReadBuffer(
     uint64_t amount,
     bool sinkData = false);
 
-// TODO reap
-void cancelHandshakeCryptoStreamRetransmissions(QuicCryptoState& cryptoStream);
-
 /**
  * Returns the appropriate crypto stream for the protection type of the packet.
  */

@@ -640,11 +640,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   expected->prependChain(data->clone());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
-  if (GetParam().version == QuicVersion::MVFST_D24) {
-    EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
-  } else {
-    EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
-  }
+  EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
@@ -946,7 +942,6 @@ INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTest,
     ::testing::Values(
         TestingParams(QuicVersion::MVFST),
-        TestingParams(QuicVersion::MVFST_D24),
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
@@ -3755,10 +3750,7 @@ class QuicClientTransportAfterStartTestTimeout
 INSTANTIATE_TEST_CASE_P(
     QuicClientTransportAfterStartTestTimeouts,
     QuicClientTransportAfterStartTestTimeout,
-    Values(
-        QuicVersion::MVFST,
-        QuicVersion::MVFST_D24,
-        QuicVersion::QUIC_DRAFT));
+    Values(QuicVersion::MVFST, QuicVersion::QUIC_DRAFT));
 
 TEST_P(
     QuicClientTransportAfterStartTestTimeout,
@@ -3780,13 +3772,7 @@ TEST_P(
       true));
   deliverData(packet->coalesce());
   EXPECT_NE(client->getConn().readCodec->getInitialCipher(), nullptr);
-  if (GetParam() == QuicVersion::MVFST_D24) {
-    EXPECT_TRUE(
-        client->getConn().readCodec->getHandshakeDoneTime().has_value());
-  } else {
-    EXPECT_FALSE(
-        client->getConn().readCodec->getHandshakeDoneTime().has_value());
-  }
+  EXPECT_FALSE(client->getConn().readCodec->getHandshakeDoneTime().has_value());
 }
 
 TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetOnRecvNewData) {
