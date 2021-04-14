@@ -8,6 +8,7 @@
 
 #include <quic/codec/QuicReadCodec.h>
 
+#include <fizz/crypto/Utils.h>
 #include <folly/io/Cursor.h>
 #include <quic/codec/Decode.h>
 #include <quic/codec/PacketNumber.h>
@@ -343,11 +344,10 @@ CodecResult QuicReadCodec::parsePacket(
       const uint8_t* tokenSource =
           data->data() + (dataLength - sizeof(StatelessResetToken));
       // Only allocate & copy the token if it matches the token we have
-      if (0 ==
-          memcmp(
-              tokenSource,
-              statelessResetToken_->data(),
-              sizeof(StatelessResetToken))) {
+      if (fizz::CryptoUtils::equal(
+              folly::ByteRange(tokenSource, sizeof(StatelessResetToken)),
+              folly::ByteRange(
+                  statelessResetToken_->data(), sizeof(StatelessResetToken)))) {
         token = StatelessResetToken();
         memcpy(token->data(), tokenSource, token->size());
       }
