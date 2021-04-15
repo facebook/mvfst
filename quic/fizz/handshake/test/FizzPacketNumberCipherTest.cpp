@@ -67,6 +67,7 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
   auto key = folly::unhexlify(GetParam().key);
   EXPECT_EQ(cipher->keyLength(), key.size());
   cipher->setKey(folly::range(key));
+  EXPECT_TRUE(!memcmp(cipher->getKey()->data(), key.c_str(), key.size()));
   CipherBytes cipherBytes(
       GetParam().sample,
       GetParam().decryptedInitialByte,

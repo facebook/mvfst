@@ -10,6 +10,7 @@
 
 #include <folly/Optional.h>
 #include <folly/io/Cursor.h>
+#include <quic/common/BufUtil.h>
 
 namespace quic {
 
@@ -70,6 +71,11 @@ class PacketNumberCipher {
    * Returns the length of key needed for the pn cipher.
    */
   virtual size_t keyLength() const = 0;
+
+  /**
+   * Get the packet protection key
+   */
+  virtual const Buf& getKey() const = 0;
 
  protected:
   virtual void cipherHeader(

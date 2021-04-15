@@ -22,6 +22,7 @@ class MockPacketNumberCipher : public PacketNumberCipher {
   MOCK_METHOD1(setKey, void(folly::ByteRange key));
   MOCK_CONST_METHOD1(mask, HeaderProtectionMask(folly::ByteRange));
   MOCK_CONST_METHOD0(keyLength, size_t());
+  MOCK_CONST_METHOD0(getKey, const Buf&());
 };
 
 class MockAead : public Aead {
