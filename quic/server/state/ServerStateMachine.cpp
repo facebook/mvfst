@@ -280,6 +280,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   auto oneRttReadHeaderCipher = handshakeLayer->getOneRttReadHeaderCipher();
 
   if (zeroRttReadCipher) {
+    conn.usedZeroRtt = true;
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher);
     }

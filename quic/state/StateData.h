@@ -842,6 +842,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // identify specific outstanding packets (based on writeCount and packetNum)
   // in the Observers, to construct Write Blocks
   uint64_t writeCount{0};
+
+  // Whether we successfully used 0-RTT keys in this connection.
+  bool usedZeroRtt{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);

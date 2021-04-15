@@ -393,6 +393,22 @@ class QLogConnectionCloseEvent : public QLogEvent {
   folly::dynamic toDynamic() const override;
 };
 
+struct TransportSummaryArgs {
+  uint64_t totalBytesSent{};
+  uint64_t totalBytesRecvd{};
+  uint64_t sumCurWriteOffset{};
+  uint64_t sumMaxObservedOffset{};
+  uint64_t sumCurStreamBufferLen{};
+  uint64_t totalBytesRetransmitted{};
+  uint64_t totalStreamBytesCloned{};
+  uint64_t totalBytesCloned{};
+  uint64_t totalCryptoDataWritten{};
+  uint64_t totalCryptoDataRecvd{};
+  uint64_t currentWritableBytes{};
+  uint64_t currentConnFlowControl{};
+  bool usedZeroRtt{};
+};
+
 class QLogTransportSummaryEvent : public QLogEvent {
  public:
   QLogTransportSummaryEvent(
@@ -406,6 +422,9 @@ class QLogTransportSummaryEvent : public QLogEvent {
       uint64_t totalBytesCloned,
       uint64_t totalCryptoDataWritten,
       uint64_t totalCryptoDataRecvd,
+      uint64_t currentWritableBytes,
+      uint64_t currentConnFlowControl,
+      bool usedZeroRtt,
       std::chrono::microseconds refTimeIn);
   ~QLogTransportSummaryEvent() override = default;
   uint64_t totalBytesSent;
@@ -418,6 +437,9 @@ class QLogTransportSummaryEvent : public QLogEvent {
   uint64_t totalBytesCloned;
   uint64_t totalCryptoDataWritten;
   uint64_t totalCryptoDataRecvd;
+  uint64_t currentWritableBytes;
+  uint64_t currentConnFlowControl;
+  bool usedZeroRtt;
 
   folly::dynamic toDynamic() const override;
 };
