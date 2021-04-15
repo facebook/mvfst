@@ -176,24 +176,31 @@ void FileQLogger::addConnectionClose(
       refTime));
 }
 
-void FileQLogger::addTransportSummary(const TransportSummaryArgs& args) {
+void FileQLogger::addTransportSummary(
+    uint64_t totalBytesSent,
+    uint64_t totalBytesRecvd,
+    uint64_t sumCurWriteOffset,
+    uint64_t sumMaxObservedOffset,
+    uint64_t sumCurStreamBufferLen,
+    uint64_t totalBytesRetransmitted,
+    uint64_t totalStreamBytesCloned,
+    uint64_t totalBytesCloned,
+    uint64_t totalCryptoDataWritten,
+    uint64_t totalCryptoDataRecvd) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogTransportSummaryEvent>(
-      args.totalBytesSent,
-      args.totalBytesRecvd,
-      args.sumCurWriteOffset,
-      args.sumMaxObservedOffset,
-      args.sumCurStreamBufferLen,
-      args.totalBytesRetransmitted,
-      args.totalStreamBytesCloned,
-      args.totalBytesCloned,
-      args.totalCryptoDataWritten,
-      args.totalCryptoDataRecvd,
-      args.currentWritableBytes,
-      args.currentConnFlowControl,
-      args.usedZeroRtt,
+      totalBytesSent,
+      totalBytesRecvd,
+      sumCurWriteOffset,
+      sumMaxObservedOffset,
+      sumCurStreamBufferLen,
+      totalBytesRetransmitted,
+      totalStreamBytesCloned,
+      totalBytesCloned,
+      totalCryptoDataWritten,
+      totalCryptoDataRecvd,
       refTime));
 }
 

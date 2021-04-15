@@ -53,22 +53,17 @@ class QLogger {
       std::string reason,
       bool drainConnection,
       bool sendCloseImmediately) = 0;
-  struct TransportSummaryArgs {
-    uint64_t totalBytesSent{};
-    uint64_t totalBytesRecvd{};
-    uint64_t sumCurWriteOffset{};
-    uint64_t sumMaxObservedOffset{};
-    uint64_t sumCurStreamBufferLen{};
-    uint64_t totalBytesRetransmitted{};
-    uint64_t totalStreamBytesCloned{};
-    uint64_t totalBytesCloned{};
-    uint64_t totalCryptoDataWritten{};
-    uint64_t totalCryptoDataRecvd{};
-    uint64_t currentWritableBytes{};
-    uint64_t currentConnFlowControl{};
-    bool usedZeroRtt{};
-  };
-  virtual void addTransportSummary(const TransportSummaryArgs& args) = 0;
+  virtual void addTransportSummary(
+      uint64_t totalBytesSent,
+      uint64_t totalBytesRecvd,
+      uint64_t sumCurWriteOffset,
+      uint64_t sumMaxObservedOffset,
+      uint64_t sumCurStreamBufferLen,
+      uint64_t totalBytesRetransmitted,
+      uint64_t totalStreamBytesCloned,
+      uint64_t totalBytesCloned,
+      uint64_t totalCryptoDataWritten,
+      uint64_t totalCryptoDataRecvd) = 0;
   virtual void addCongestionMetricUpdate(
       uint64_t bytesInFlight,
       uint64_t currentCwnd,

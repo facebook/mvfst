@@ -24,7 +24,19 @@ class MockQLogger : public QLogger {
   MOCK_METHOD3(addPacket, void(const RetryPacket&, uint64_t, bool));
   MOCK_METHOD2(addPacket, void(const RegularQuicWritePacket&, uint64_t));
   MOCK_METHOD4(addConnectionClose, void(std::string, std::string, bool, bool));
-  MOCK_METHOD1(addTransportSummary, void(const TransportSummaryArgs&));
+  MOCK_METHOD10(
+      addTransportSummary,
+      void(
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t,
+          uint64_t));
   MOCK_METHOD5(
       addCongestionMetricUpdate,
       void(uint64_t, uint64_t, std::string, std::string, std::string));

@@ -303,21 +303,16 @@ void QuicTransportBase::closeImpl(
 
   if (conn_->qLogger) {
     conn_->qLogger->addTransportSummary(
-        {conn_->lossState.totalBytesSent,
-         conn_->lossState.totalBytesRecvd,
-         conn_->flowControlState.sumCurWriteOffset,
-         conn_->flowControlState.sumMaxObservedOffset,
-         conn_->flowControlState.sumCurStreamBufferLen,
-         conn_->lossState.totalBytesRetransmitted,
-         conn_->lossState.totalStreamBytesCloned,
-         conn_->lossState.totalBytesCloned,
-         totalCryptoDataWritten,
-         totalCryptoDataRecvd,
-         conn_->congestionController
-             ? conn_->congestionController->getWritableBytes()
-             : std::numeric_limits<uint64_t>::max(),
-         getSendConnFlowControlBytesWire(*conn_),
-         conn_->usedZeroRtt});
+        conn_->lossState.totalBytesSent,
+        conn_->lossState.totalBytesRecvd,
+        conn_->flowControlState.sumCurWriteOffset,
+        conn_->flowControlState.sumMaxObservedOffset,
+        conn_->flowControlState.sumCurStreamBufferLen,
+        conn_->lossState.totalBytesRetransmitted,
+        conn_->lossState.totalStreamBytesCloned,
+        conn_->lossState.totalBytesCloned,
+        totalCryptoDataWritten,
+        totalCryptoDataRecvd);
   }
 
   // TODO: truncate the error code string to be 1MSS only.

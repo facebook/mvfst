@@ -607,7 +607,6 @@ void QuicClientTransport::processPacketData(
         conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
       }
       QUIC_TRACE(zero_rtt, *conn_, "accepted");
-      conn_->usedZeroRtt = true;
     }
     // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
     // was rejected, or we have derived 1-rtt keys and 0-rtt was never

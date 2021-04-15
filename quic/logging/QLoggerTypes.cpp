@@ -339,9 +339,6 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     uint64_t totalBytesClonedIn,
     uint64_t totalCryptoDataWrittenIn,
     uint64_t totalCryptoDataRecvdIn,
-    uint64_t currentWritableBytesIn,
-    uint64_t currentConnFlowControlIn,
-    bool usedZeroRttIn,
     std::chrono::microseconds refTimeIn)
     : totalBytesSent{totalBytesSentIn},
       totalBytesRecvd{totalBytesRecvdIn},
@@ -352,10 +349,7 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
       totalStreamBytesCloned{totalStreamBytesClonedIn},
       totalBytesCloned{totalBytesClonedIn},
       totalCryptoDataWritten{totalCryptoDataWrittenIn},
-      totalCryptoDataRecvd{totalCryptoDataRecvdIn},
-      currentWritableBytes{currentWritableBytesIn},
-      currentConnFlowControl{currentConnFlowControlIn},
-      usedZeroRtt{usedZeroRttIn} {
+      totalCryptoDataRecvd{totalCryptoDataRecvdIn} {
   eventType = QLogEventType::TransportSummary;
   refTime = refTimeIn;
 }
@@ -379,9 +373,6 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   data["total_bytes_cloned"] = totalBytesCloned;
   data["total_crypto_data_written"] = totalCryptoDataWritten;
   data["total_crypto_data_recvd"] = totalCryptoDataRecvd;
-  data["current_writable_bytes"] = currentWritableBytes;
-  data["current_conn_flow_control"] = currentConnFlowControl;
-  data["used_zero_rtt"] = usedZeroRtt;
 
   d.push_back(std::move(data));
   return d;

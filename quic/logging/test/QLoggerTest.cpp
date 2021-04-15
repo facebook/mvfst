@@ -98,7 +98,7 @@ TEST_F(QLoggerTest, ConnectionCloseEvent) {
 
 TEST_F(QLoggerTest, TransportSummaryEvent) {
   FileQLogger q(VantagePoint::Client);
-  q.addTransportSummary({8, 9, 5, 3, 2, 554, 100, 32, 134, 238, 22, 44, false});
+  q.addTransportSummary(8, 9, 5, 3, 2, 554, 100, 32, 134, 238);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogTransportSummaryEvent*>(p.get());
@@ -113,9 +113,6 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->totalBytesCloned, 32);
   EXPECT_EQ(gotEvent->totalCryptoDataWritten, 134);
   EXPECT_EQ(gotEvent->totalCryptoDataRecvd, 238);
-  EXPECT_EQ(gotEvent->currentWritableBytes, 22);
-  EXPECT_EQ(gotEvent->currentConnFlowControl, 44);
-  EXPECT_EQ(gotEvent->usedZeroRtt, false);
 }
 
 TEST_F(QLoggerTest, CongestionMetricUpdateEvent) {
@@ -740,16 +737,13 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        "total_stream_bytes_cloned": 7,
        "total_bytes_cloned": 8,
        "total_crypto_data_written": 9,
-       "total_crypto_data_recvd": 10,
-       "current_writable_bytes": 11,
-       "current_conn_flow_control": 12,
-       "used_zero_rtt": true
+       "total_crypto_data_recvd": 10
      }
    ]
  ])");
 
   FileQLogger q(VantagePoint::Client);
-  q.addTransportSummary({1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, true});
+  q.addTransportSummary(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

@@ -21,7 +21,6 @@ namespace quic {
 
 class FileQLogger : public BaseQLogger {
  public:
-  using QLogger::TransportSummaryArgs;
   std::vector<std::unique_ptr<QLogEvent>> logs;
   FileQLogger(
       VantagePoint vantagePointIn,
@@ -56,7 +55,17 @@ class FileQLogger : public BaseQLogger {
       std::string reason,
       bool drainConnection,
       bool sendCloseImmediately) override;
-  void addTransportSummary(const TransportSummaryArgs& args) override;
+  void addTransportSummary(
+      uint64_t totalBytesSent,
+      uint64_t totalBytesRecvd,
+      uint64_t sumCurWriteOffset,
+      uint64_t sumMaxObservedOffset,
+      uint64_t sumCurStreamBufferLen,
+      uint64_t totalBytesRetransmitted,
+      uint64_t totalStreamBytesCloned,
+      uint64_t totalBytesCloned,
+      uint64_t totalCryptoDataWritten,
+      uint64_t totalCryptoDataRecvd) override;
   void addCongestionMetricUpdate(
       uint64_t bytesInFlight,
       uint64_t currentCwnd,
