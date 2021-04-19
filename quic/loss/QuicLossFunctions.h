@@ -262,6 +262,10 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     lossEvent.addLostPacket(pkt);
     observerLossEvent.addLostPacket(lostByTimeout, lostByReorder, pkt);
 
+    if (pkt.isDSRPacket) {
+      CHECK_GT(conn.outstandings.dsrCount, 0);
+      --conn.outstandings.dsrCount;
+    }
     if (pkt.associatedEvent) {
       CHECK(conn.outstandings.clonedPacketCount[pnSpace]);
       --conn.outstandings.clonedPacketCount[pnSpace];

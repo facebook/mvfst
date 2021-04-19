@@ -815,6 +815,9 @@ void updateConnection(
     conn.lossState.totalBytesCloned += encodedSize;
   }
   pkt.isDSRPacket = isDSRPacket;
+  if (isDSRPacket) {
+    ++conn.outstandings.dsrCount;
+  }
 
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(pkt);

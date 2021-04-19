@@ -48,6 +48,7 @@ void processAckFrame(
   // acks which leads to different number of packets being acked usually.
   ack.ackedPackets.reserve(kDefaultRxPacketsBeforeAckAfterInit);
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
+  uint64_t dsrPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
   folly::Optional<Observer::SpuriousLossEvent> spuriousLossEvent;
@@ -139,6 +140,9 @@ void processAckFrame(
         CHECK(conn.outstandings.clonedPacketCount[currentPacketNumberSpace]);
         --conn.outstandings.clonedPacketCount[currentPacketNumberSpace];
       }
+      if (rPacketIt->isDSRPacket) {
+        ++dsrPacketsAcked;
+      }
       // Update RTT if current packet is the largestAcked in the frame:
       auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
           ? ackReceiveTime
@@ -229,6 +233,8 @@ void processAckFrame(
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;
   }
+  CHECK_GE(conn.outstandings.dsrCount, dsrPacketsAcked);
+  conn.outstandings.dsrCount -= dsrPacketsAcked;
   CHECK_GE(
       conn.outstandings.packets.size(), conn.outstandings.declaredLostCount);
   auto updatedOustandingPacketsCount = conn.outstandings.numOutstanding();

@@ -689,7 +689,8 @@ bool CloningScheduler::hasData() const {
   // TODO: I'm not completely convinced d6d.outstandingProbes has been updated
   // correctly.
   return frameScheduler_.hasData() ||
-      conn_.outstandings.numOutstanding() > conn_.d6d.outstandingProbes;
+      conn_.outstandings.numOutstanding() >
+      conn_.d6d.outstandingProbes + conn_.outstandings.dsrCount;
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(
@@ -712,7 +713,8 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   // Look for an outstanding packet that's no larger than the writableBytes
   for (auto& outstandingPacket : conn_.outstandings.packets) {
     if (outstandingPacket.declaredLost ||
-        outstandingPacket.metadata.isD6DProbe) {
+        outstandingPacket.metadata.isD6DProbe ||
+        outstandingPacket.isDSRPacket) {
       continue;
     }
     auto opPnSpace = outstandingPacket.packet.header.getPacketNumberSpace();

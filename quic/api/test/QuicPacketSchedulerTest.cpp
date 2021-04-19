@@ -478,6 +478,32 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
   EXPECT_EQ(builder.remainingSpaceInPkt(), originalSpace);
 }
 
+TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  FrameScheduler noopScheduler("frame");
+  ASSERT_FALSE(noopScheduler.hasData());
+  CloningScheduler cloningScheduler(noopScheduler, conn, "Juice WRLD", 0);
+  EXPECT_FALSE(cloningScheduler.hasData());
+  addOutstandingPacket(conn);
+  EXPECT_TRUE(cloningScheduler.hasData());
+  conn.outstandings.packets.back().isDSRPacket = true;
+  conn.outstandings.dsrCount++;
+  EXPECT_FALSE(cloningScheduler.hasData());
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_FALSE(result.packetEvent.hasValue());
+  EXPECT_FALSE(result.packet.hasValue());
+}
+
 TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());

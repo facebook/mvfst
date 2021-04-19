@@ -127,6 +127,10 @@ struct OutstandingsInfo {
   // Number of packets currently declared lost.
   uint64_t declaredLostCount{0};
 
+  // Number of outstanding inflight DSR packet. That is, when a DSR packet is
+  // declared lost, this counter will be decreased.
+  uint64_t dsrCount{0};
+
   // Number of packets outstanding and not declared lost.
   uint64_t numOutstanding() {
     return packets.size() - declaredLostCount;
