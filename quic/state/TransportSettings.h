@@ -154,8 +154,6 @@ struct TransportSettings {
   bool connectUDP{false};
   // Maximum number of consecutive PTOs before the connection is torn down.
   uint16_t maxNumPTOs{kDefaultMaxNumPTO};
-  // Whether to turn off PMTUD on the socket
-  bool turnoffPMTUD{false};
   // Whether to listen to socket error
   bool enableSocketErrMsgCallback{true};
   // Whether pacing is enabled.

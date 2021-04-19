@@ -160,11 +160,9 @@ void happyEyeballsSetUpSocket(
   }
 #endif
 
-  if (transportSettings.turnoffPMTUD) {
-    socket.setDFAndTurnOffPMTU();
-  } else {
-    socket.dontFragment(true);
-  }
+  // never fragment, always turn off PMTU
+  socket.setDFAndTurnOffPMTU();
+
   if (transportSettings.enableSocketErrMsgCallback) {
     socket.setErrMessageCallback(errMsgCallback);
   }

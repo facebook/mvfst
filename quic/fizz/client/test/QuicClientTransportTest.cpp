@@ -1267,7 +1267,7 @@ class QuicClientTransportTest : public Test {
   virtual void setUpSocketExpectations() {
     EXPECT_CALL(*sock, setReuseAddr(false));
     EXPECT_CALL(*sock, bind(_, _));
-    EXPECT_CALL(*sock, dontFragment(true));
+    EXPECT_CALL(*sock, setDFAndTurnOffPMTU());
     EXPECT_CALL(*sock, setErrMessageCallback(client.get()));
     EXPECT_CALL(*sock, resumeRead(client.get()));
     EXPECT_CALL(*sock, setErrMessageCallback(nullptr));
