@@ -686,7 +686,10 @@ CloningScheduler::CloningScheduler(
       cipherOverhead_(cipherOverhead) {}
 
 bool CloningScheduler::hasData() const {
-  return frameScheduler_.hasData() || conn_.outstandings.numOutstanding() > 0;
+  // TODO: I'm not completely convinced d6d.outstandingProbes has been updated
+  // correctly.
+  return frameScheduler_.hasData() ||
+      conn_.outstandings.numOutstanding() > conn_.d6d.outstandingProbes;
 }
 
 SchedulingResult CloningScheduler::scheduleFramesForPacket(

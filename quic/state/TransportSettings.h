@@ -53,6 +53,9 @@ struct D6DConfig {
    * whether it will send the base PMTU transport parameter during handshake.
    * As a result, d6d is activated for a connection only when *both* client and
    * server enables d6d.
+   *
+   * TODO: Please make sure QuicConnectionStateBase::D6DState::outstandingProbes
+   * are mutated correctly throughout Mvfst.
    */
   bool enabled{false};
 
