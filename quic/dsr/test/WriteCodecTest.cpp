@@ -31,12 +31,12 @@ class WriteCodecTest : public Test {
 
 TEST_F(WriteCodecTest, NoPacketSize) {
   packetSize_ = 0;
-  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
+  EXPECT_EQ(folly::none, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
 }
 
 TEST_F(WriteCodecTest, TooSmallPacketSize) {
   packetSize_ = 1;
-  EXPECT_EQ(std::nullopt, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
+  EXPECT_EQ(folly::none, writeDSRStreamFrame(builder_, 0, 0, 100, 100, true));
 }
 
 TEST_F(WriteCodecTest, RegularWrite) {

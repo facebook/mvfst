@@ -10,10 +10,10 @@
 
 #include <fizz/crypto/aead/Aead.h>
 #include <fizz/record/Types.h>
+#include <folly/Optional.h>
 #include <folly/SocketAddress.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
-#include <optional>
 
 namespace quic {
 
@@ -56,7 +56,7 @@ struct ConnKeyEq {
 struct SendInstruction {
   // Connection info:
   // TODO: All these are not correctly set right now
-  std::optional<ConnKey> connKey;
+  folly::Optional<ConnKey> connKey;
   folly::SocketAddress clientAddress;
   PacketNum packetNum{0};
   PacketNum largestAckedPacketNum{0};
@@ -100,8 +100,8 @@ struct SendInstruction {
 
    private:
     StreamId streamId;
-    std::optional<uint64_t> offset;
-    std::optional<uint64_t> len;
+    folly::Optional<uint64_t> offset;
+    folly::Optional<uint64_t> len;
     bool fin{false};
   };
 

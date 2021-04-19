@@ -8,9 +8,9 @@
 
 #pragma once
 
+#include <folly/Optional.h>
 #include <quic/dsr/PacketBuilder.h>
 #include <quic/dsr/Types.h>
-#include <optional>
 
 namespace quic {
 
@@ -22,7 +22,7 @@ struct DSRStreamFrameWriteResult {
       : sendInstruction(std::move(instruction)), encodedSize(size) {}
 };
 
-std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
+folly::Optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
     DSRPacketBuilderBase& packetBuilder,
     StreamId id,
     uint64_t offset,
@@ -30,7 +30,7 @@ std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
     uint64_t flowControlLen,
     bool fin) {
   if (packetBuilder.remainingSpace() == 0) {
-    return std::nullopt;
+    return folly::none;
   }
   if (writeBufferLen == 0 && !fin) {
     throw QuicInternalException(
@@ -44,7 +44,7 @@ std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
   if (packetBuilder.remainingSpace() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " limit=" << packetBuilder.remainingSpace();
-    return std::nullopt;
+    return folly::none;
   }
 
   QuicInteger offsetInt(offset);
@@ -59,12 +59,12 @@ std::optional<DSRStreamFrameWriteResult> writeDSRStreamFrame(
   dataLen = std::min(dataLen, packetBuilder.remainingSpace() - headerSize);
   bool shouldSetFin = fin && dataLen == writeBufferLen;
   if (dataLen == 0 && !shouldSetFin) {
-    return std::nullopt;
+    return folly::none;
   }
   if (packetBuilder.remainingSpace() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " limit=" << packetBuilder.remainingSpace();
-    return std::nullopt;
+    return folly::none;
   }
   DCHECK(dataLen + headerSize <= packetBuilder.remainingSpace());
   builder.setLength(dataLen);
