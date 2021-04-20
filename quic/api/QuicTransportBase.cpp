@@ -2107,8 +2107,13 @@ QuicTransportBase::registerByteEventCallback(
         offset,
         [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
     if (pos != byteEventMapIt->second.begin()) {
-      auto prev = std::prev(pos);
-      if ((prev->offset == offset) && (prev->callback == cb)) {
+      auto matchingEvent = std::find_if(
+          byteEventMapIt->second.begin(),
+          pos + 1,
+          [offset, cb](const ByteEventDetail& p) {
+            return ((p.offset == offset) && (p.callback == cb));
+          });
+      if (matchingEvent != pos + 1) {
         // ByteEvent has been already registered for the same type, id,
         // offset and for the same recipient, return an INVALID_OPERATION error
         // to prevent duplicate registrations.
@@ -2148,11 +2153,23 @@ QuicTransportBase::registerByteEventCallback(
       if (streamByteEventCbIt == byteEventMapL.end()) {
         return;
       }
-      auto pos = std::lower_bound(
+
+      // This is scheduled to run in the future (during the next iteration of
+      // the event loop). It is possible that the ByteEventDetail list gets
+      // mutated between the time it was scheduled to now when we are ready to
+      // run it. Look at the current outstanding ByteEvents for this stream ID
+      // and confirm that our ByteEvent's offset and recipient callback are
+      // still present.
+      auto pos = std::find_if(
           streamByteEventCbIt->second.begin(),
           streamByteEventCbIt->second.end(),
-          offset,
-          [&](const ByteEventDetail& p, uint64_t o) { return p.offset < o; });
+          [offset, cb](const ByteEventDetail& p) {
+            return ((p.offset == offset) && (p.callback == cb));
+          });
+      // if our byteEvent is not present, it must have been delivered already.
+      if (pos == streamByteEventCbIt->second.end()) {
+        return;
+      }
       streamByteEventCbIt->second.erase(pos);
 
       ByteEvent byteEvent = {};
