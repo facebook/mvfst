@@ -641,6 +641,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
@@ -705,6 +706,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
+  EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {

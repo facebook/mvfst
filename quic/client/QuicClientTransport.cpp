@@ -652,10 +652,6 @@ void QuicClientTransport::processPacketData(
             maxStreamsBidi.value_or(0),
             maxStreamsUni.value_or(0));
 
-        const auto& statelessResetToken = clientConn_->statelessResetToken;
-        if (statelessResetToken) {
-          conn_->readCodec->setStatelessResetToken(*statelessResetToken);
-        }
         if (zeroRttRejected.has_value() && *zeroRttRejected) {
           // verify that the new flow control parameters are >= the original
           // transport parameters that were use. This is the easy case. If the
@@ -692,6 +688,17 @@ void QuicClientTransport::processPacketData(
         updatedPacketSize =
             std::min<uint64_t>(*updatedPacketSize, kDefaultMaxUDPPayload);
         conn_->udpSendPacketLen = *updatedPacketSize;
+      }
+
+      // TODO this is another bandaid. Explicitly set the stateless reset token
+      // or else conns that use 0-RTT won't be able to parse stateless resets.
+      if (!clientConn_->statelessResetToken) {
+        clientConn_->statelessResetToken =
+            getStatelessResetTokenParameter(serverParams->parameters);
+      }
+      if (clientConn_->statelessResetToken) {
+        conn_->readCodec->setStatelessResetToken(
+            clientConn_->statelessResetToken.value());
       }
     }
 
