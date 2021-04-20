@@ -342,6 +342,7 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     uint64_t currentWritableBytesIn,
     uint64_t currentConnFlowControlIn,
     bool usedZeroRttIn,
+    QuicVersion quicVersionIn,
     std::chrono::microseconds refTimeIn)
     : totalBytesSent{totalBytesSentIn},
       totalBytesRecvd{totalBytesRecvdIn},
@@ -355,7 +356,8 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
       totalCryptoDataRecvd{totalCryptoDataRecvdIn},
       currentWritableBytes{currentWritableBytesIn},
       currentConnFlowControl{currentConnFlowControlIn},
-      usedZeroRtt{usedZeroRttIn} {
+      usedZeroRtt{usedZeroRttIn},
+      quicVersion{quicVersionIn} {
   eventType = QLogEventType::TransportSummary;
   refTime = refTimeIn;
 }
@@ -382,6 +384,9 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   data["current_writable_bytes"] = currentWritableBytes;
   data["current_conn_flow_control"] = currentConnFlowControl;
   data["used_zero_rtt"] = usedZeroRtt;
+  data["quic_version"] =
+      static_cast<std::underlying_type<decltype(quicVersion)>::type>(
+          quicVersion);
 
   d.push_back(std::move(data));
   return d;

@@ -317,7 +317,8 @@ void QuicTransportBase::closeImpl(
              ? conn_->congestionController->getWritableBytes()
              : std::numeric_limits<uint64_t>::max(),
          getSendConnFlowControlBytesWire(*conn_),
-         conn_->usedZeroRtt});
+         conn_->usedZeroRtt,
+         conn_->version.value_or(QuicVersion::MVFST_INVALID)});
   }
 
   // TODO: truncate the error code string to be 1MSS only.
