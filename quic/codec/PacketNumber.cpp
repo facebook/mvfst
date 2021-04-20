@@ -41,24 +41,23 @@ PacketNumEncodingResult encodePacketNumber(
   return PacketNumEncodingResult(packetNum & mask, lengthInBytes);
 }
 
-/**
- * This simply follows Draft-17 Appendix-A.
- */
 PacketNum decodePacketNumber(
     uint64_t encodedPacketNum,
     size_t packetNumBytes,
     PacketNum expectedNextPacketNum) {
+  CHECK(packetNumBytes <= 4);
   size_t packetNumBits = 8 * packetNumBytes;
   PacketNum packetNumWin = 1ULL << packetNumBits;
   PacketNum packetNumHalfWin = packetNumWin >> 1;
   PacketNum mask = packetNumWin - 1;
   PacketNum candidate = (expectedNextPacketNum & ~mask) | encodedPacketNum;
   if (expectedNextPacketNum > packetNumHalfWin &&
-      candidate <= expectedNextPacketNum - packetNumHalfWin) {
+      candidate <= expectedNextPacketNum - packetNumHalfWin &&
+      candidate < (1ULL << 62) - packetNumWin) {
     return candidate + packetNumWin;
   }
   if (candidate > expectedNextPacketNum + packetNumHalfWin &&
-      candidate > packetNumWin) {
+      candidate >= packetNumWin) {
     return candidate - packetNumWin;
   }
   return candidate;
