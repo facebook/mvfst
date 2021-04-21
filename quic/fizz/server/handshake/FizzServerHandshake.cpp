@@ -75,8 +75,7 @@ EncryptionLevel FizzServerHandshake::getReadRecordLayerEncryptionLevel() {
 }
 
 void FizzServerHandshake::processSocketData(folly::IOBufQueue& queue) {
-  startActions(
-      machine_.processSocketData(state_, queue, fizz::Aead::AeadOptions()));
+  startActions(machine_.processSocketData(state_, queue));
 }
 
 std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>

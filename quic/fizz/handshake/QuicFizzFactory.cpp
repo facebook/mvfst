@@ -14,9 +14,7 @@ class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
  public:
   ~QuicPlaintextReadRecordLayer() override = default;
 
-  folly::Optional<fizz::TLSMessage> read(
-      folly::IOBufQueue& buf,
-      fizz::Aead::AeadOptions) override {
+  folly::Optional<fizz::TLSMessage> read(folly::IOBufQueue& buf) override {
     if (buf.empty()) {
       return folly::none;
     }
@@ -34,9 +32,7 @@ class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
   explicit QuicEncryptedReadRecordLayer(fizz::EncryptionLevel encryptionLevel)
       : fizz::EncryptedReadRecordLayer(encryptionLevel) {}
 
-  folly::Optional<fizz::TLSMessage> read(
-      folly::IOBufQueue& buf,
-      fizz::Aead::AeadOptions) override {
+  folly::Optional<fizz::TLSMessage> read(folly::IOBufQueue& buf) override {
     if (buf.empty()) {
       return folly::none;
     }

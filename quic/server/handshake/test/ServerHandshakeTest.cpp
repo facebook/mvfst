@@ -115,11 +115,7 @@ class ServerHandshakeTest : public Test {
     fizzClient.reset(
         new fizz::client::
             FizzClient<ServerHandshakeTest, fizz::client::ClientStateMachine>(
-                clientState,
-                clientReadBuffer,
-                fizz::Aead::AeadOptions(),
-                *this,
-                dg.get()));
+                clientState, clientReadBuffer, *this, dg.get()));
     std::vector<QuicVersion> supportedVersions = {getVersion()};
     auto params = std::make_shared<ServerTransportParametersExtension>(
         getVersion(),

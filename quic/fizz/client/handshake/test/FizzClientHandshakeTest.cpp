@@ -115,11 +115,7 @@ class ClientHandshakeTest : public Test, public boost::static_visitor<> {
     fizzServer.reset(
         new fizz::server::
             FizzServer<ClientHandshakeTest, fizz::server::ServerStateMachine>(
-                serverState,
-                serverReadBuf,
-                fizz::Aead::AeadOptions(),
-                *this,
-                dg.get()));
+                serverState, serverReadBuf, *this, dg.get()));
     connect();
     processHandshake();
     fizzServer->accept(&evb, serverCtx, serverTransportParameters);
