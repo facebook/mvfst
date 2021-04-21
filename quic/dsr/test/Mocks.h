@@ -22,7 +22,13 @@ class MockDSRPacketBuilder : public DSRPacketBuilderBase {
     return const_cast<MockDSRPacketBuilder&>(*this).remainingSpaceNonConst();
   }
 
-  MOCK_METHOD2(addSendInstruction, void(SendInstruction, uint32_t));
+  MOCK_METHOD2(addSendInstructionPtr, void(const SendInstruction*, uint32_t));
+
+  void addSendInstruction(
+      SendInstruction instruction,
+      uint32_t streamEncodedSize) override {
+    addSendInstructionPtr(&instruction, streamEncodedSize);
+  }
 };
 
 class MockDSRPacketizationRequestSender : public DSRPacketizationRequestSender {

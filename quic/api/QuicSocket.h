@@ -29,6 +29,8 @@ class EventBase;
 
 namespace quic {
 
+class DSRPacketizationRequestSender;
+
 class QuicSocket {
  public:
   /**
@@ -1002,6 +1004,13 @@ class QuicSocket {
       const BufferMeta& data,
       bool eof,
       DeliveryCallback* cb = nullptr) = 0;
+
+  /**
+   * Set the DSRPacketizationRequestSender for a stream.
+   */
+  virtual WriteResult setDSRPacketizationRequestSender(
+      StreamId id,
+      std::unique_ptr<DSRPacketizationRequestSender> sender) = 0;
 
   /**
    * Register a callback to be invoked when the peer has acknowledged the

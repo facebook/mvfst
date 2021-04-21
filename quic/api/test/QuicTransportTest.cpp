@@ -19,6 +19,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/dsr/test/Mocks.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -3409,11 +3410,13 @@ TEST_F(QuicTransportTest, PrioritySetAndGet) {
   EXPECT_EQ(LocalErrorCode::CONNECTION_CLOSED, closedConnStreamPri.error());
 }
 
-TEST_F(QuicTransportTest, WriteBufMetaIntoStream) {
+TEST_F(QuicTransportTest, SetDSRSenderAndWriteBufMetaIntoStream) {
   auto streamId = transport_->createBidirectionalStream().value();
   size_t bufferLength = 2000;
   BufferMeta meta(bufferLength);
   auto buf = buildRandomInputData(20);
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  transport_->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
   // Some amount of real data needs to be written first:
   transport_->writeChain(streamId, std::move(buf), false);
   transport_->writeBufMeta(streamId, meta, true);

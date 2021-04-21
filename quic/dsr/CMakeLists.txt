@@ -1,0 +1,45 @@
+# Copyright (c) Facebook, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+add_library(
+  mvfst_dsr_types STATIC
+  Types.cpp
+)
+
+target_include_directories(
+  mvfst_dsr_types PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+add_dependencies(
+  mvfst_dsr_types
+  mvfst_codec_types
+)
+
+target_libk_libraries(
+  mvfst_dsr_types PUBLIC
+  Folly::folly
+  mvfst_codec_types
+)
+
+file(
+  GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
+  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+  *.h
+)
+list(FILTER QUIC_API_HEADERS_TOINSTALL EXCLUDE REGEX test/)
+foreach(header ${QUIC_API_HEADERS_TOINSTALL})
+  get_filename_component(header_dir ${header} DIRECTORY)
+  install(FILES ${header} DESTINATION include/quic/dsr/${header_dir})
+endforeach()
+
+install(
+  TARGETS mvfst_dsr_types
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+add_subdirectory(test)

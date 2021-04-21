@@ -12,6 +12,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
+#include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/state/QuicPriorityQueue.h>
 
 namespace quic {
@@ -354,5 +355,7 @@ struct QuicStreamState : public QuicStreamLike {
   bool hasPeekableData() const {
     return readBuffer.size() > 0;
   }
+
+  std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
 };
 } // namespace quic

@@ -53,12 +53,12 @@ TEST_F(SchedulerTest, ScheduleStream) {
       conn_.streamManager->hasDSRWritable());
   EXPECT_TRUE(scheduler.hasPendingData());
   EXPECT_CALL(builder_, remainingSpaceNonConst()).WillRepeatedly(Return(1000));
-  EXPECT_CALL(builder_, addSendInstruction(_, _))
-      .WillOnce(Invoke([&](SendInstruction instruction, uint32_t) {
-        EXPECT_EQ(stream->id, (size_t)instruction.streamId);
-        EXPECT_EQ(expectedBufMetaOffset, instruction.offset);
-        EXPECT_EQ(200, instruction.len);
-        EXPECT_TRUE(instruction.fin);
+  EXPECT_CALL(builder_, addSendInstructionPtr(_, _))
+      .WillOnce(Invoke([&](const SendInstruction* instruction, uint32_t) {
+        EXPECT_EQ(stream->id, (size_t)instruction->streamId);
+        EXPECT_EQ(expectedBufMetaOffset, instruction->offset);
+        EXPECT_EQ(200, instruction->len);
+        EXPECT_TRUE(instruction->fin);
       }));
   EXPECT_TRUE(scheduler.writeStream(builder_));
 

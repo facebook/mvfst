@@ -2005,6 +2005,9 @@ QuicSocket::WriteResult QuicTransportBase::writeBufMeta(
     if (!stream->writable()) {
       return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
     }
+    if (!stream->dsrSender) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
     if (stream->currentWriteOffset == 0 && stream->writeBuffer.empty()) {
       // If nothing has been written to writeBuffer ever, meta writing isn't
       // allowed.
@@ -3174,6 +3177,58 @@ void QuicTransportBase::onTransportKnobs(Buf knobBlob) {
           << std::string(
                  reinterpret_cast<const char*>(knobBlob->data()),
                  knobBlob->length());
+}
+
+QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
+    StreamId id,
+    std::unique_ptr<DSRPacketizationRequestSender> sender) {
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  try {
+    // Check whether stream exists before calling getStream to avoid
+    // creating a peer stream if it does not exist yet.
+    if (!conn_->streamManager->streamExists(id)) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+    }
+    auto stream = conn_->streamManager->getStream(id);
+    if (!stream->writable()) {
+      return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
+    }
+    if (stream->dsrSender != nullptr) {
+      return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+    }
+    stream->dsrSender = std::move(sender);
+    // Fow now, no appLimited or appIdle update here since we are not writing
+    // either BufferMetas yet. The first BufferMeta write will update it.
+  } catch (const QuicTransportException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(std::make_pair(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
+  } catch (const QuicInternalException& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(std::make_pair(
+        QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
+    return folly::makeUnexpected(ex.errorCode());
+  } catch (const std::exception& ex) {
+    VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
+            << *this;
+    exceptionCloseWhat_ = ex.what();
+    closeImpl(std::make_pair(
+        QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
+        std::string("writeChain() error")));
+    return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
+  }
+  return folly::unit;
 }
 
 } // namespace quic
