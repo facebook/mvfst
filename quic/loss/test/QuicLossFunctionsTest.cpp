@@ -2272,8 +2272,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
       bufMetaStartingOffset,
       false,
       0 /* PacketNum */,
-      PacketNumberSpace::AppData,
-      false);
+      PacketNumberSpace::AppData);
   ASSERT_EQ(0, stream->writeBuffer.chainLength());
   auto retxIter = stream->retransmissionBuffer.find(0);
   ASSERT_NE(stream->retransmissionBuffer.end(), retxIter);
@@ -2284,15 +2283,14 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   ASSERT_EQ(stream->currentWriteOffset, bufMetaStartingOffset);
 
   // Send BufMeta in 3 chunks:
-  handleStreamWritten(
+  handleStreamBufMetaWritten(
       *conn,
       *stream,
       bufMetaStartingOffset,
       200,
       false,
       1 /* PacketNum */,
-      PacketNumberSpace::AppData,
-      true);
+      PacketNumberSpace::AppData);
   ASSERT_EQ(800, stream->writeBufMeta.length);
   ASSERT_TRUE(stream->writeBufMeta.eof);
   ASSERT_EQ(bufMetaStartingOffset + 200, stream->writeBufMeta.offset);
@@ -2307,15 +2305,14 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
-  handleStreamWritten(
+  handleStreamBufMetaWritten(
       *conn,
       *stream,
       bufMetaStartingOffset + 200,
       400,
       false,
       2 /* PacketNum */,
-      PacketNumberSpace::AppData,
-      true);
+      PacketNumberSpace::AppData);
   ASSERT_EQ(400, stream->writeBufMeta.length);
   ASSERT_TRUE(stream->writeBufMeta.eof);
   ASSERT_EQ(bufMetaStartingOffset + 600, stream->writeBufMeta.offset);
@@ -2330,15 +2327,14 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->hasLoss());
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 
-  handleStreamWritten(
+  handleStreamBufMetaWritten(
       *conn,
       *stream,
       bufMetaStartingOffset + 600,
       400,
       true,
       3 /* PacketNum */,
-      PacketNumberSpace::AppData,
-      true);
+      PacketNumberSpace::AppData);
   ASSERT_EQ(0, stream->writeBufMeta.length);
   ASSERT_TRUE(stream->writeBufMeta.eof);
   ASSERT_EQ(bufMetaStartingOffset + 1000 + 1, stream->writeBufMeta.offset);

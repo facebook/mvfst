@@ -840,15 +840,14 @@ TEST_F(QuicOpenStateTest, DSRStreamAcked) {
       false);
   writeBufMetaToQuicStream(*stream, BufferMeta(1000), true);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
-  handleStreamWritten(
+  handleStreamBufMetaWritten(
       *conn,
       *stream,
       bufMetaStartingOffset,
       300,
       false,
       1,
-      PacketNumberSpace::AppData,
-      true);
+      PacketNumberSpace::AppData);
   ASSERT_NE(
       stream->retransmissionBufMetas.end(),
       stream->retransmissionBufMetas.find(bufMetaStartingOffset));

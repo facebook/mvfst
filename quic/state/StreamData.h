@@ -163,17 +163,6 @@ struct QuicStreamLike {
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};
 
-  // BufferMeta that has been writen to the QUIC layer.
-  // When offset is 0, nothing has been written to it. On first write, its
-  // starting offset will be currentWriteOffset + writeBuffer.chainLength().
-  WriteBufferMeta writeBufMeta;
-
-  // A map to store sent WriteBufferMetas for potential retransmission.
-  folly::F14FastMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
-
-  // WriteBufferMetas that's already marked lost. They will be retransmitted.
-  std::deque<WriteBufferMeta> lossBufMetas;
-
   /*
    * Either insert a new entry into the loss buffer, or merge the buffer with
    * an existing entry.
@@ -193,24 +182,6 @@ struct QuicStreamLike {
       std::prev(lossItr)->eof = buf->eof;
     } else {
       lossBuffer.insert(lossItr, std::move(*buf));
-    }
-  }
-
-  void insertIntoLossBufMeta(WriteBufferMeta bufMeta) {
-    auto lossItr = std::upper_bound(
-        lossBufMetas.begin(),
-        lossBufMetas.end(),
-        bufMeta.offset,
-        [](auto offset, const auto& bufMeta) {
-          return offset < bufMeta.offset;
-        });
-    if (!lossBufMetas.empty() && lossItr != lossBufMetas.begin() &&
-        std::prev(lossItr)->offset + std::prev(lossItr)->length ==
-            bufMeta.offset) {
-      std::prev(lossItr)->length += bufMeta.length;
-      std::prev(lossItr)->eof = bufMeta.eof;
-    } else {
-      lossBufMetas.insert(lossItr, bufMeta);
     }
   }
 };
@@ -357,5 +328,41 @@ struct QuicStreamState : public QuicStreamLike {
   }
 
   std::unique_ptr<DSRPacketizationRequestSender> dsrSender;
+
+  // BufferMeta that has been writen to the QUIC layer.
+  // When offset is 0, nothing has been written to it. On first write, its
+  // starting offset will be currentWriteOffset + writeBuffer.chainLength().
+  WriteBufferMeta writeBufMeta;
+
+  // A map to store sent WriteBufferMetas for potential retransmission.
+  folly::F14FastMap<uint64_t, WriteBufferMeta> retransmissionBufMetas;
+
+  // WriteBufferMetas that's already marked lost. They will be retransmitted.
+  std::deque<WriteBufferMeta> lossBufMetas;
+
+  /**
+   * Insert a new WriteBufferMeta into lossBufMetas. If the new WriteBufferMeta
+   * can be append to an existing WriteBufferMeta, it will be appended. Note
+   * it won't be prepended to an existing WriteBufferMeta. And it will also not
+   * merge 3 WriteBufferMetas together if the new one happens to fill up a hole
+   * between 2 existing WriteBufferMetas.
+   */
+  void insertIntoLossBufMeta(WriteBufferMeta bufMeta) {
+    auto lossItr = std::upper_bound(
+        lossBufMetas.begin(),
+        lossBufMetas.end(),
+        bufMeta.offset,
+        [](auto offset, const auto& bufMeta) {
+          return offset < bufMeta.offset;
+        });
+    if (!lossBufMetas.empty() && lossItr != lossBufMetas.begin() &&
+        std::prev(lossItr)->offset + std::prev(lossItr)->length ==
+            bufMeta.offset) {
+      std::prev(lossItr)->length += bufMeta.length;
+      std::prev(lossItr)->eof = bufMeta.eof;
+    } else {
+      lossBufMetas.insert(lossItr, bufMeta);
+    }
+  }
 };
 } // namespace quic

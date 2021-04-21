@@ -184,8 +184,16 @@ bool handleStreamWritten(
     uint64_t frameLen,
     bool frameFin,
     PacketNum packetNum,
-    PacketNumberSpace packetNumberSpace,
-    bool fromBufMeta);
+    PacketNumberSpace packetNumberSpace);
+
+bool handleStreamBufMetaWritten(
+    QuicConnectionStateBase& conn,
+    QuicStreamState& stream,
+    uint64_t frameOffset,
+    uint64_t frameLen,
+    bool frameFin,
+    PacketNum packetNum,
+    PacketNumberSpace packetNumberSpace);
 
 /**
  * Update the connection state after sending a new packet.
