@@ -4,7 +4,17 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
-  mvfst_dsr_types STATIC
+  mvfst_dsr_sender INTERFACE
+)
+
+target_include_directories(
+  mvfst_dsr_sender INTERFACE
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+add_library(
+  mvfst_dsr_types
   Types.cpp
 )
 
@@ -19,10 +29,16 @@ add_dependencies(
   mvfst_codec_types
 )
 
-target_libk_libraries(
+target_link_libraries(
   mvfst_dsr_types PUBLIC
   Folly::folly
   mvfst_codec_types
+)
+
+target_compile_options(
+  mvfst_dsr_types
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
 file(
@@ -37,9 +53,13 @@ foreach(header ${QUIC_API_HEADERS_TOINSTALL})
 endforeach()
 
 install(
+  TARGETS mvfst_dsr_sender
+  EXPORT mvfst-exports
+)
+
+install(
   TARGETS mvfst_dsr_types
   EXPORT mvfst-exports
   DESTINATION lib
 )
 
-add_subdirectory(test)
