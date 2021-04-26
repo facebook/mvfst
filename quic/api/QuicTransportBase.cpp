@@ -2110,8 +2110,13 @@ QuicTransportBase::registerByteEventCallback(
         offset,
         [&](uint64_t o, const ByteEventDetail& p) { return o < p.offset; });
     if (pos != byteEventMapIt->second.begin()) {
-      auto prev = std::prev(pos);
-      if ((prev->offset == offset) && (prev->callback == cb)) {
+      auto matchingEvent = std::find_if(
+          byteEventMapIt->second.begin(),
+          pos,
+          [offset, cb](const ByteEventDetail& p) {
+            return ((p.offset == offset) && (p.callback == cb));
+          });
+      if (matchingEvent != pos) {
         // ByteEvent has been already registered for the same type, id,
         // offset and for the same recipient, return an INVALID_OPERATION error
         // to prevent duplicate registrations.
