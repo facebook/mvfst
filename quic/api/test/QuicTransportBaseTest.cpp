@@ -2593,6 +2593,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   NiceMock<MockWriteCallback> wcb;
   NiceMock<MockWriteCallback> wcbConn;
   NiceMock<MockReadCallback> rcb;
+  NiceMock<MockPeekCallback> pcb;
   NiceMock<MockDeliveryCallback> deliveryCb;
   NiceMock<MockByteEventCallback> txCb;
   EXPECT_CALL(
@@ -2604,6 +2605,8 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
       onConnectionWriteError(IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(
       rcb, readError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
+  EXPECT_CALL(
+      pcb, peekError(stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
   EXPECT_CALL(deliveryCb, onCanceled(stream, _));
   EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 0)));
   EXPECT_CALL(txCb, onByteEventCanceled(getTxMatcher(stream, 4)));
@@ -2613,6 +2616,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   transport->notifyPendingWriteOnConnection(&wcbConn);
   transport->notifyPendingWriteOnStream(stream, &wcb);
   transport->setReadCallback(stream, &rcb);
+  transport->setPeekCallback(stream, &pcb);
   EXPECT_CALL(*socketPtr, write(_, _))
       .WillRepeatedly(SetErrnoAndReturn(EAGAIN, -1));
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, &deliveryCb);
@@ -2974,6 +2978,8 @@ TEST_F(QuicTransportImplTest, PeekError) {
       peekCb1, peekError(stream1, IsError(LocalErrorCode::STREAM_CLOSED)));
 
   transport->driveReadCallbacks();
+
+  EXPECT_CALL(peekCb1, peekError(stream1, _));
 
   transport.reset();
 }

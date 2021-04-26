@@ -2603,7 +2603,13 @@ void QuicTransportBase::cancelAllAppCallbacks(
     }
   }
   VLOG(4) << "Clearing " << peekCallbacks_.size() << " peek callbacks";
-  peekCallbacks_.clear();
+  auto peekCallbacksCopy = peekCallbacks_;
+  for (auto& cb : peekCallbacksCopy) {
+    peekCallbacks_.erase(cb.first);
+    if (cb.second.peekCb) {
+      cb.second.peekCb->peekError(cb.first, err);
+    }
+  }
 
   if (connWriteCallback_) {
     auto connWriteCallback = connWriteCallback_;
