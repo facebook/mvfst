@@ -325,7 +325,7 @@ bool writableContains(QuicStreamManager& streamManager, StreamId streamId);
 class FizzCryptoTestFactory : public FizzCryptoFactory {
  public:
   FizzCryptoTestFactory() = default;
-  explicit FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
+  explicit FizzCryptoTestFactory(std::shared_ptr<fizz::Factory> fizzFactory) {
     fizzFactory_ = std::move(fizzFactory);
   }
 

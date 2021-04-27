@@ -38,7 +38,7 @@ class FizzCryptoFactory : public CryptoFactory {
   }
 
  protected:
-  std::shared_ptr<QuicFizzFactory> fizzFactory_;
+  std::shared_ptr<fizz::Factory> fizzFactory_;
 };
 
 } // namespace quic
