@@ -47,13 +47,14 @@ struct AckState {
 };
 
 struct AckStates {
-  AckStates() {
-    PacketNum randomizedPacketNum =
-        folly::Random::secureRand32(kMaxInitialPacketNum);
-    initialAckState.nextPacketNum = randomizedPacketNum;
-    handshakeAckState.nextPacketNum = randomizedPacketNum;
-    appDataAckState.nextPacketNum = randomizedPacketNum;
+  explicit AckStates(PacketNum startingNum) {
+    initialAckState.nextPacketNum = startingNum;
+    handshakeAckState.nextPacketNum = startingNum;
+    appDataAckState.nextPacketNum = startingNum;
   }
+
+  AckStates() : AckStates(folly::Random::secureRand32(kMaxInitialPacketNum)) {}
+
   // AckState for acks to peer packets in Initial packet number space.
   AckState initialAckState;
   // AckState for acks to peer packets in Handshake packet number space.

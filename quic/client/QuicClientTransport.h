@@ -34,6 +34,14 @@ class QuicClientTransport
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize = 0);
 
+  // Testing only API:
+  QuicClientTransport(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
+      size_t connectionIdSize,
+      PacketNum startingPacketNum);
+
   ~QuicClientTransport() override;
 
   /**

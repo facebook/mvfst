@@ -63,6 +63,15 @@ class QuicServerTransport
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory = nullptr);
 
+  // Testing only API:
+  QuicServerTransport(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      ConnectionCallback& cb,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      std::unique_ptr<CryptoFactory> cryptoFactory,
+      PacketNum startingPacketNum);
+
   ~QuicServerTransport() override;
 
   virtual void setRoutingCallback(RoutingCallback* callback) noexcept;
