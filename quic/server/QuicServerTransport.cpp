@@ -24,11 +24,13 @@ QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> sock,
     ConnectionCallback& cb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx)
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+    std::unique_ptr<CryptoFactory> cryptoFactory)
     : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)
+          .setCryptoFactory(std::move(cryptoFactory))
           .build());
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();

@@ -82,7 +82,8 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
     connectionTime = Clock::now();
     originalVersion = QuicVersion::MVFST;
     DCHECK(handshakeFactory);
-    auto tmpClientHandshake = handshakeFactory->makeClientHandshake(this);
+    auto tmpClientHandshake =
+        std::move(*handshakeFactory).makeClientHandshake(this);
     clientHandshakeLayer = tmpClientHandshake.get();
     handshakeLayer = std::move(tmpClientHandshake);
     // We shouldn't normally need to set this until we're starting the

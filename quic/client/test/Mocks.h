@@ -21,8 +21,13 @@ namespace test {
 class MockClientHandshakeFactory : public ClientHandshakeFactory {
  public:
   MOCK_METHOD1(
-      makeClientHandshake,
+      _makeClientHandshake,
       std::unique_ptr<ClientHandshake>(QuicClientConnectionState*));
+
+  std::unique_ptr<ClientHandshake>
+      makeClientHandshake(QuicClientConnectionState* conn) && override {
+    return _makeClientHandshake(conn);
+  }
 };
 
 class MockClientHandshake : public ClientHandshake {

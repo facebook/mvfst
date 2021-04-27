@@ -36,7 +36,7 @@ class ClientStateMachineTest : public Test {
  public:
   void SetUp() override {
     mockFactory_ = std::make_shared<MockClientHandshakeFactory>();
-    EXPECT_CALL(*mockFactory_, makeClientHandshake(_))
+    EXPECT_CALL(*mockFactory_, _makeClientHandshake(_))
         .WillRepeatedly(Invoke(
             [&](QuicClientConnectionState* conn)
                 -> std::unique_ptr<quic::ClientHandshake> {

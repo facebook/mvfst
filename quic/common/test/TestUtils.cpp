@@ -266,29 +266,6 @@ void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx) {
   ctx.setCertManager(std::move(certManager));
 }
 
-template <class T>
-std::unique_ptr<T> createNoOpAeadImpl() {
-  // Fake that the handshake has already occured
-  auto aead = std::make_unique<NiceMock<T>>();
-  ON_CALL(*aead, _inplaceEncrypt(_, _, _))
-      .WillByDefault(Invoke([&](auto& buf, auto, auto) {
-        if (buf) {
-          return std::move(buf);
-        } else {
-          return folly::IOBuf::create(0);
-        }
-      }));
-  // Fake that the handshake has already occured and fix the keys.
-  ON_CALL(*aead, _decrypt(_, _, _))
-      .WillByDefault(
-          Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
-  ON_CALL(*aead, _tryDecrypt(_, _, _))
-      .WillByDefault(
-          Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
-  ON_CALL(*aead, getCipherOverhead()).WillByDefault(Return(0));
-  return aead;
-}
-
 std::unique_ptr<MockAead> createNoOpAead() {
   return createNoOpAeadImpl<MockAead>();
 }
@@ -793,5 +770,26 @@ bool writableContains(QuicStreamManager& streamManager, StreamId streamId) {
       streamManager.writableControlStreams().count(streamId) > 0;
 }
 
+std::unique_ptr<PacketNumberCipher>
+FizzCryptoTestFactory::makePacketNumberCipher(fizz::CipherSuite) const {
+  return std::move(packetNumberCipher_);
+}
+
+std::unique_ptr<PacketNumberCipher>
+FizzCryptoTestFactory::makePacketNumberCipher(folly::ByteRange secret) const {
+  return _makePacketNumberCipher(secret);
+}
+
+void FizzCryptoTestFactory::setMockPacketNumberCipher(
+    std::unique_ptr<PacketNumberCipher> packetNumberCipher) {
+  packetNumberCipher_ = std::move(packetNumberCipher);
+}
+
+void FizzCryptoTestFactory::setDefault() {
+  ON_CALL(*this, _makePacketNumberCipher(_))
+      .WillByDefault(Invoke([&](folly::ByteRange secret) {
+        return FizzCryptoFactory::makePacketNumberCipher(secret);
+      }));
+}
 } // namespace test
 } // namespace quic

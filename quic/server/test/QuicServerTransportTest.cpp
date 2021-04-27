@@ -48,7 +48,10 @@ class FakeServerHandshake : public FizzServerHandshake {
       bool chloSync = false,
       bool cfinSync = false,
       folly::Optional<uint64_t> clientActiveConnectionIdLimit = folly::none)
-      : FizzServerHandshake(&conn, std::move(fizzContext)),
+      : FizzServerHandshake(
+            &conn,
+            std::move(fizzContext),
+            std::make_unique<FizzCryptoFactory>()),
         conn_(conn),
         chloSync_(chloSync),
         cfinSync_(cfinSync),

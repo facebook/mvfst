@@ -954,7 +954,10 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   explicit FakeOneRttHandshakeLayer(
       QuicClientConnectionState* conn,
       std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
-      : FizzClientHandshake(conn, std::move(fizzContext)) {}
+      : FizzClientHandshake(
+            conn,
+            std::move(fizzContext),
+            std::make_unique<FizzCryptoFactory>()) {}
 
   folly::Optional<CachedServerTransportParameters> connectImpl(
       folly::Optional<std::string> hostname) override {

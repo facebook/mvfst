@@ -159,7 +159,8 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
          QuicVersion::QUIC_DRAFT_LEGACY}};
     originalVersion = QuicVersion::MVFST;
     DCHECK(handshakeFactory);
-    auto tmpServerHandshake = handshakeFactory->makeServerHandshake(this);
+    auto tmpServerHandshake =
+        std::move(*handshakeFactory).makeServerHandshake(this);
     serverHandshakeLayer = tmpServerHandshake.get();
     handshakeLayer = std::move(tmpServerHandshake);
     // We shouldn't normally need to set this until we're starting the

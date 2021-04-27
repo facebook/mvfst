@@ -38,15 +38,26 @@ namespace quic {
 
 FizzServerHandshake::FizzServerHandshake(
     QuicServerConnectionState* conn,
-    std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext)
-    : ServerHandshake(conn), fizzContext_(std::move(fizzContext)) {}
+    std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext,
+    std::unique_ptr<CryptoFactory> cryptoFactory)
+    : ServerHandshake(conn), fizzContext_(std::move(fizzContext)) {
+  CryptoFactory* cryptoFactoryPtr = cryptoFactory.release();
+  auto* fizzCryptoFactoryPtr =
+      dynamic_cast<FizzCryptoFactory*>(cryptoFactoryPtr);
+  if (!fizzCryptoFactoryPtr) {
+    cryptoFactory_ = std::make_unique<FizzCryptoFactory>();
+  } else {
+    cryptoFactory_.reset(fizzCryptoFactoryPtr);
+  }
+  CHECK(cryptoFactory_ && cryptoFactory_->getFizzFactory());
+}
 
 void FizzServerHandshake::initializeImpl(
     HandshakeCallback* callback,
     std::unique_ptr<fizz::server::AppTokenValidator> validator) {
   auto context = std::make_shared<fizz::server::FizzServerContext>(
       *fizzContext_->getContext());
-  context->setFactory(cryptoFactory_.getFizzFactory());
+  context->setFactory(cryptoFactory_->getFizzFactory());
   context->setSupportedCiphers({{fizz::CipherSuite::TLS_AES_128_GCM_SHA256}});
   context->setVersionFallbackEnabled(false);
   // Since Draft-17, client won't sent EOED
@@ -62,7 +73,7 @@ void FizzServerHandshake::initializeImpl(
 }
 
 const CryptoFactory& FizzServerHandshake::getCryptoFactory() const {
-  return cryptoFactory_;
+  return *cryptoFactory_;
 }
 
 const fizz::server::FizzServerContext* FizzServerHandshake::getContext() const {
@@ -87,7 +98,7 @@ FizzServerHandshake::buildCiphers(folly::ByteRange secret) {
       secret,
       kQuicKeyLabel,
       kQuicIVLabel));
-  auto headerCipher = cryptoFactory_.makePacketNumberCipher(secret);
+  auto headerCipher = cryptoFactory_->makePacketNumberCipher(secret);
 
   return {std::move(aead), std::move(headerCipher)};
 }

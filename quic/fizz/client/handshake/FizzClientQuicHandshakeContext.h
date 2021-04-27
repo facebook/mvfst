@@ -11,6 +11,7 @@
 #include <quic/client/handshake/ClientHandshakeFactory.h>
 
 #include <quic/fizz/client/handshake/QuicPskCache.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 
 #include <fizz/client/FizzClientContext.h>
 #include <fizz/protocol/DefaultCertificateVerifier.h>
@@ -23,8 +24,8 @@ class FizzClientQuicHandshakeContext
     : public ClientHandshakeFactory,
       public std::enable_shared_from_this<FizzClientQuicHandshakeContext> {
  public:
-  std::unique_ptr<ClientHandshake> makeClientHandshake(
-      QuicClientConnectionState* conn) override;
+  std::unique_ptr<ClientHandshake>
+      makeClientHandshake(QuicClientConnectionState* conn) && override;
 
   const std::shared_ptr<const fizz::client::FizzClientContext>& getContext()
       const {
@@ -57,36 +58,49 @@ class FizzClientQuicHandshakeContext
       std::shared_ptr<const fizz::CertificateVerifier> verifier,
       std::shared_ptr<QuicPskCache> pskCache);
 
+  FizzClientQuicHandshakeContext(
+      std::shared_ptr<const fizz::client::FizzClientContext> context,
+      std::shared_ptr<const fizz::CertificateVerifier> verifier,
+      std::shared_ptr<QuicPskCache> pskCache,
+      std::unique_ptr<FizzCryptoFactory> cryptoFactory);
+
   std::shared_ptr<const fizz::client::FizzClientContext> context_;
   std::shared_ptr<const fizz::CertificateVerifier> verifier_;
   std::shared_ptr<QuicPskCache> pskCache_;
+  std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 
  public:
   class Builder {
    public:
-    Builder& setFizzClientContext(
-        std::shared_ptr<const fizz::client::FizzClientContext> context) {
+    Builder&& setFizzClientContext(
+        std::shared_ptr<const fizz::client::FizzClientContext> context) && {
       context_ = std::move(context);
-      return *this;
+      return std::move(*this);
     }
 
-    Builder& setCertificateVerifier(
-        std::shared_ptr<const fizz::CertificateVerifier> verifier) {
+    Builder&& setCertificateVerifier(
+        std::shared_ptr<const fizz::CertificateVerifier> verifier) && {
       verifier_ = std::move(verifier);
-      return *this;
+      return std::move(*this);
     }
 
-    Builder& setPskCache(std::shared_ptr<QuicPskCache> pskCache) {
+    Builder&& setPskCache(std::shared_ptr<QuicPskCache> pskCache) && {
       pskCache_ = std::move(pskCache);
-      return *this;
+      return std::move(*this);
     }
 
-    std::shared_ptr<FizzClientQuicHandshakeContext> build();
+    Builder&& setCryptoFactory(std::unique_ptr<FizzCryptoFactory> factory) && {
+      cryptoFactory_ = std::move(factory);
+      return std::move(*this);
+    }
+
+    std::shared_ptr<FizzClientQuicHandshakeContext> build() &&;
 
    private:
     std::shared_ptr<const fizz::client::FizzClientContext> context_;
     std::shared_ptr<const fizz::CertificateVerifier> verifier_;
     std::shared_ptr<QuicPskCache> pskCache_;
+    std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
   };
 };
 

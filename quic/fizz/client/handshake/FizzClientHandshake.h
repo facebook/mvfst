@@ -23,7 +23,8 @@ class FizzClientHandshake : public ClientHandshake {
  public:
   FizzClientHandshake(
       QuicClientConnectionState* conn,
-      std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext);
+      std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext,
+      std::unique_ptr<FizzCryptoFactory> cryptoFactory);
 
   void removePsk(const folly::Optional<std::string>& hostname) override;
 
@@ -64,7 +65,7 @@ class FizzClientHandshake : public ClientHandshake {
   fizz::client::State state_;
   fizz::client::ClientStateMachine machine_;
 
-  FizzCryptoFactory cryptoFactory_;
+  std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 
   std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext_;
 };

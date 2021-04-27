@@ -60,7 +60,8 @@ class QuicServerTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionCallback& cb,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      std::unique_ptr<CryptoFactory> cryptoFactory = nullptr);
 
   ~QuicServerTransport() override;
 

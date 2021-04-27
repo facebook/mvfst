@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <quic/server/handshake/ServerHandshakeFactory.h>
-
 #include <fizz/server/FizzServerContext.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
+#include <quic/server/handshake/ServerHandshakeFactory.h>
 
 namespace quic {
 
@@ -20,8 +20,8 @@ class FizzServerQuicHandshakeContext
     : public ServerHandshakeFactory,
       public std::enable_shared_from_this<FizzServerQuicHandshakeContext> {
  public:
-  std::unique_ptr<ServerHandshake> makeServerHandshake(
-      QuicServerConnectionState* conn) override;
+  std::unique_ptr<ServerHandshake>
+      makeServerHandshake(QuicServerConnectionState* conn) && override;
 
   const std::shared_ptr<const fizz::server::FizzServerContext>& getContext()
       const {
@@ -40,21 +40,34 @@ class FizzServerQuicHandshakeContext
   FizzServerQuicHandshakeContext(
       std::shared_ptr<const fizz::server::FizzServerContext> context);
 
+  FizzServerQuicHandshakeContext(
+      std::shared_ptr<const fizz::server::FizzServerContext> context,
+      std::unique_ptr<CryptoFactory> cryptoFactory);
+
   std::shared_ptr<const fizz::server::FizzServerContext> context_;
+
+  std::unique_ptr<CryptoFactory> cryptoFactory_;
 
  public:
   class Builder {
    public:
-    Builder& setFizzServerContext(
-        std::shared_ptr<const fizz::server::FizzServerContext> context) {
+    Builder&& setFizzServerContext(
+        std::shared_ptr<const fizz::server::FizzServerContext> context) && {
       context_ = std::move(context);
-      return *this;
+      return std::move(*this);
     }
 
-    std::shared_ptr<FizzServerQuicHandshakeContext> build();
+    Builder&& setCryptoFactory(
+        std::unique_ptr<CryptoFactory> cryptoFactory) && {
+      cryptoFactory_ = std::move(cryptoFactory);
+      return std::move(*this);
+    }
+
+    std::shared_ptr<FizzServerQuicHandshakeContext> build() &&;
 
    private:
     std::shared_ptr<const fizz::server::FizzServerContext> context_;
+    std::unique_ptr<CryptoFactory> cryptoFactory_;
   };
 };
 

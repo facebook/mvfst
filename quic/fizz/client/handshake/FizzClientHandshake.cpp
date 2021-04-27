@@ -25,8 +25,13 @@ namespace quic {
 
 FizzClientHandshake::FizzClientHandshake(
     QuicClientConnectionState* conn,
-    std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext)
-    : ClientHandshake(conn), fizzContext_(std::move(fizzContext)) {}
+    std::shared_ptr<FizzClientQuicHandshakeContext> fizzContext,
+    std::unique_ptr<FizzCryptoFactory> cryptoFactory)
+    : ClientHandshake(conn),
+      cryptoFactory_(std::move(cryptoFactory)),
+      fizzContext_(std::move(fizzContext)) {
+  CHECK(cryptoFactory_->getFizzFactory());
+}
 
 folly::Optional<CachedServerTransportParameters>
 FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
@@ -43,7 +48,7 @@ FizzClientHandshake::connectImpl(folly::Optional<std::string> hostname) {
   // Setup context for this handshake.
   auto context = std::make_shared<fizz::client::FizzClientContext>(
       *fizzContext_->getContext());
-  context->setFactory(cryptoFactory_.getFizzFactory());
+  context->setFactory(cryptoFactory_->getFizzFactory());
   context->setSupportedCiphers({fizz::CipherSuite::TLS_AES_128_GCM_SHA256});
   context->setCompatibilityMode(false);
   // Since Draft-17, EOED should not be sent
@@ -89,7 +94,7 @@ void FizzClientHandshake::removePsk(
 }
 
 const CryptoFactory& FizzClientHandshake::getCryptoFactory() const {
-  return cryptoFactory_;
+  return *cryptoFactory_;
 }
 
 const folly::Optional<std::string>&
@@ -160,7 +165,7 @@ FizzClientHandshake::buildCiphers(CipherKind kind, folly::ByteRange secret) {
       kQuicKeyLabel,
       kQuicIVLabel));
 
-  auto packetNumberCipher = cryptoFactory_.makePacketNumberCipher(secret);
+  auto packetNumberCipher = cryptoFactory_->makePacketNumberCipher(secret);
 
   return {std::move(aead), std::move(packetNumberCipher)};
 }

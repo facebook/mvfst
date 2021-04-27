@@ -19,29 +19,6 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-class FizzCryptoTestFactory : public FizzCryptoFactory {
- public:
-  FizzCryptoTestFactory() {}
-  explicit FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
-    fizzFactory_ = std::move(fizzFactory);
-  }
-
-  ~FizzCryptoTestFactory() override = default;
-
-  using FizzCryptoFactory::makePacketNumberCipher;
-  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
-      fizz::CipherSuite) const override {
-    return std::move(packetNumberCipher_);
-  }
-
-  void setMockPacketNumberCipher(
-      std::unique_ptr<MockPacketNumberCipher> packetNumberCipher) {
-    packetNumberCipher_ = std::move(packetNumberCipher);
-  }
-
-  mutable std::unique_ptr<MockPacketNumberCipher> packetNumberCipher_;
-};
-
 class QuicFizzTestFactory : public QuicFizzFactory {
  public:
   ~QuicFizzTestFactory() override = default;
@@ -111,6 +88,7 @@ TEST_F(FizzCryptoFactoryTest, TestDraft29ClearTextCipher) {
 
 TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
   FizzCryptoTestFactory cryptoFactory;
+  cryptoFactory.setDefault();
   cryptoFactory.setMockPacketNumberCipher(createMockPacketNumberCipher());
   auto clientKey = std::vector<uint8_t>(
       {0x0c, 0x74, 0xbb, 0x95, 0xa1, 0x04, 0x8e, 0x52, 0xef, 0x3b, 0x72,

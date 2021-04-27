@@ -22,7 +22,8 @@ class FizzServerHandshake : public ServerHandshake {
  public:
   FizzServerHandshake(
       QuicServerConnectionState* conn,
-      std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext);
+      std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext,
+      std::unique_ptr<CryptoFactory> cryptoFactory);
 
   const CryptoFactory& getCryptoFactory() const override;
 
@@ -48,7 +49,7 @@ class FizzServerHandshake : public ServerHandshake {
   using PendingEvent = fizz::WriteNewSessionTicket;
   std::deque<PendingEvent> pendingEvents_;
 
-  FizzCryptoFactory cryptoFactory_;
+  std::unique_ptr<FizzCryptoFactory> cryptoFactory_;
 
   std::shared_ptr<FizzServerQuicHandshakeContext> fizzContext_;
 };

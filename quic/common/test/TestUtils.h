@@ -12,6 +12,7 @@
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
 #include <quic/fizz/client/handshake/QuicPskCache.h>
+#include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -138,6 +139,29 @@ void setupZeroRttOnServerCtx(
 QuicCachedPsk setupZeroRttOnClientCtx(
     fizz::client::FizzClientContext& clientCtx,
     std::string hostname);
+
+template <class T>
+std::unique_ptr<T> createNoOpAeadImpl() {
+  // Fake that the handshake has already occured
+  auto aead = std::make_unique<testing::NiceMock<T>>();
+  ON_CALL(*aead, _inplaceEncrypt(testing::_, testing::_, testing::_))
+      .WillByDefault(testing::Invoke([&](auto& buf, auto, auto) {
+        if (buf) {
+          return std::move(buf);
+        } else {
+          return folly::IOBuf::create(0);
+        }
+      }));
+  // Fake that the handshake has already occured and fix the keys.
+  ON_CALL(*aead, _decrypt(testing::_, testing::_, testing::_))
+      .WillByDefault(
+          testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
+  ON_CALL(*aead, _tryDecrypt(testing::_, testing::_, testing::_))
+      .WillByDefault(
+          testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
+  ON_CALL(*aead, getCipherOverhead()).WillByDefault(testing::Return(0));
+  return aead;
+}
 
 std::unique_ptr<MockAead> createNoOpAead();
 
@@ -297,6 +321,34 @@ void overridePacketWithToken(
  * Returns if the current writable streams contains the given id.
  */
 bool writableContains(QuicStreamManager& streamManager, StreamId streamId);
+
+class FizzCryptoTestFactory : public FizzCryptoFactory {
+ public:
+  FizzCryptoTestFactory() = default;
+  explicit FizzCryptoTestFactory(std::shared_ptr<QuicFizzFactory> fizzFactory) {
+    fizzFactory_ = std::move(fizzFactory);
+  }
+
+  ~FizzCryptoTestFactory() override = default;
+
+  using FizzCryptoFactory::makePacketNumberCipher;
+  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      fizz::CipherSuite) const override;
+
+  MOCK_CONST_METHOD1(
+      _makePacketNumberCipher,
+      std::unique_ptr<PacketNumberCipher>(folly::ByteRange));
+
+  std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
+      folly::ByteRange secret) const override;
+
+  void setMockPacketNumberCipher(
+      std::unique_ptr<PacketNumberCipher> packetNumberCipher);
+
+  void setDefault();
+
+  mutable std::unique_ptr<PacketNumberCipher> packetNumberCipher_;
+};
 
 } // namespace test
 } // namespace quic

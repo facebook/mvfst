@@ -23,7 +23,7 @@ class ServerHandshakeFactory {
    * Construct a new server handshake.
    */
   virtual std::unique_ptr<ServerHandshake> makeServerHandshake(
-      QuicServerConnectionState* conn) = 0;
+      QuicServerConnectionState* conn) && = 0;
 };
 
 } // namespace quic

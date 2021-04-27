@@ -20,10 +20,24 @@ FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
       verifier_(std::move(verifier)),
       pskCache_(std::move(pskCache)) {}
 
+FizzClientQuicHandshakeContext::FizzClientQuicHandshakeContext(
+    std::shared_ptr<const fizz::client::FizzClientContext> context,
+    std::shared_ptr<const fizz::CertificateVerifier> verifier,
+    std::shared_ptr<QuicPskCache> pskCache,
+    std::unique_ptr<FizzCryptoFactory> cryptoFactory)
+    : context_(std::move(context)),
+      verifier_(std::move(verifier)),
+      pskCache_(std::move(pskCache)),
+      cryptoFactory_(std::move(cryptoFactory)) {}
+
 std::unique_ptr<ClientHandshake>
 FizzClientQuicHandshakeContext::makeClientHandshake(
-    QuicClientConnectionState* conn) {
-  return std::make_unique<FizzClientHandshake>(conn, shared_from_this());
+    QuicClientConnectionState* conn) && {
+  if (!cryptoFactory_) {
+    cryptoFactory_ = std::make_unique<FizzCryptoFactory>();
+  }
+  return std::make_unique<FizzClientHandshake>(
+      conn, shared_from_this(), std::move(cryptoFactory_));
 }
 
 folly::Optional<QuicCachedPsk> FizzClientQuicHandshakeContext::getPsk(
@@ -51,7 +65,7 @@ void FizzClientQuicHandshakeContext::removePsk(
 }
 
 std::shared_ptr<FizzClientQuicHandshakeContext>
-FizzClientQuicHandshakeContext::Builder::build() {
+FizzClientQuicHandshakeContext::Builder::build() && {
   if (!context_) {
     context_ = std::make_shared<const fizz::client::FizzClientContext>();
   }
@@ -62,7 +76,10 @@ FizzClientQuicHandshakeContext::Builder::build() {
 
   return std::shared_ptr<FizzClientQuicHandshakeContext>(
       new FizzClientQuicHandshakeContext(
-          std::move(context_), std::move(verifier_), std::move(pskCache_)));
+          std::move(context_),
+          std::move(verifier_),
+          std::move(pskCache_),
+          std::move(cryptoFactory_)));
 }
 
 } // namespace quic
