@@ -23,7 +23,7 @@ class IOBufQuicBatch {
       BatchWriterPtr&& batchWriter,
       bool threadLocal,
       folly::AsyncUDPSocket& sock,
-      folly::SocketAddress& peerAddress,
+      const folly::SocketAddress& peerAddress,
       QuicTransportStatsCallback* statsCallback,
       QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState);
 
@@ -53,7 +53,7 @@ class IOBufQuicBatch {
   BatchWriterPtr batchWriter_;
   bool threadLocal_;
   folly::AsyncUDPSocket& sock_;
-  folly::SocketAddress& peerAddress_;
+  const folly::SocketAddress& peerAddress_;
   QuicTransportStatsCallback* statsCallback_{nullptr};
   QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState_;
   uint64_t pktSent_{0};

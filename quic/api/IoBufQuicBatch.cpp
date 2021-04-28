@@ -16,7 +16,7 @@ IOBufQuicBatch::IOBufQuicBatch(
     BatchWriterPtr&& batchWriter,
     bool threadLocal,
     folly::AsyncUDPSocket& sock,
-    folly::SocketAddress& peerAddress,
+    const folly::SocketAddress& peerAddress,
     QuicTransportStatsCallback* statsCallback,
     QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState)
     : batchWriter_(std::move(batchWriter)),
