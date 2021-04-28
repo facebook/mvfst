@@ -17,13 +17,13 @@ IOBufQuicBatch::IOBufQuicBatch(
     bool threadLocal,
     folly::AsyncUDPSocket& sock,
     folly::SocketAddress& peerAddress,
-    QuicConnectionStateBase& conn,
+    QuicTransportStatsCallback* statsCallback,
     QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState)
     : batchWriter_(std::move(batchWriter)),
       threadLocal_(threadLocal),
       sock_(sock),
       peerAddress_(peerAddress),
-      conn_(conn),
+      statsCallback_(statsCallback),
       happyEyeballsState_(happyEyeballsState) {}
 
 bool IOBufQuicBatch::write(
@@ -112,10 +112,10 @@ bool IOBufQuicBatch::flushInternal() {
   }
 
   int errnoCopy = 0;
-  if (!written) {
+  if (!written && statsCallback_) {
     errnoCopy = errno;
     QUIC_STATS(
-        conn_.statsCallback,
+        statsCallback_,
         onUDPSocketWriteError,
         QuicTransportStatsCallback::errnoToSocketErrorType(errnoCopy));
   }

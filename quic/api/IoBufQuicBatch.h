@@ -9,7 +9,7 @@
 #pragma once
 #include <quic/QuicException.h>
 #include <quic/api/QuicBatchWriter.h>
-#include <quic/state/StateData.h>
+#include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
 class IOBufQuicBatch {
@@ -24,7 +24,7 @@ class IOBufQuicBatch {
       bool threadLocal,
       folly::AsyncUDPSocket& sock,
       folly::SocketAddress& peerAddress,
-      QuicConnectionStateBase& conn,
+      QuicTransportStatsCallback* statsCallback,
       QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState);
 
   ~IOBufQuicBatch() = default;
@@ -54,7 +54,7 @@ class IOBufQuicBatch {
   bool threadLocal_;
   folly::AsyncUDPSocket& sock_;
   folly::SocketAddress& peerAddress_;
-  QuicConnectionStateBase& conn_;
+  QuicTransportStatsCallback* statsCallback_{nullptr};
   QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState_;
   uint64_t pktSent_{0};
 };

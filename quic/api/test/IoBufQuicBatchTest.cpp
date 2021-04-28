@@ -67,7 +67,7 @@ void RunTest(int numBatch) {
       false,
       sock,
       peerAddress,
-      conn,
+      conn.statsCallback,
       happyEyeballsState);
 
   std::string strTest("Test");

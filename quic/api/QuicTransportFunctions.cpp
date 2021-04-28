@@ -1326,7 +1326,7 @@ uint64_t writeConnectionDataToSocket(
       connection.transportSettings.useThreadLocalBatching,
       sock,
       connection.peerAddress,
-      connection,
+      connection.statsCallback,
       connection.happyEyeballsState);
 
   if (connection.loopDetectorCallback) {
