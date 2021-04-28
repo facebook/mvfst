@@ -3438,5 +3438,17 @@ TEST_F(QuicTransportTest, WriteBufMetaWithoutRealData) {
   EXPECT_TRUE(result.hasError());
 }
 
+TEST_F(QuicTransportTest, WriteBufferThenBufMetaThenEOM) {
+  auto streamId = transport_->createBidirectionalStream().value();
+  BufferMeta meta(500);
+  auto buf = buildRandomInputData(20);
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  transport_->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  EXPECT_TRUE(
+      transport_->writeChain(streamId, std::move(buf), false).hasValue());
+  EXPECT_TRUE(transport_->writeBufMeta(streamId, meta, false).hasValue());
+  EXPECT_TRUE(transport_->writeChain(streamId, nullptr, true).hasValue());
+}
+
 } // namespace test
 } // namespace quic

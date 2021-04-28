@@ -29,13 +29,14 @@ void prependToBuf(quic::Buf& buf, quic::Buf toAppend) {
 namespace quic {
 
 void writeDataToQuicStream(QuicStreamState& stream, Buf data, bool eof) {
-  // Once data is written to writeBufMeta, no more data can be written to
-  // writeBuffer.
-  CHECK_EQ(0, stream.writeBufMeta.offset);
+  auto neverWrittenBufMeta = (0 == stream.writeBufMeta.offset);
   uint64_t len = 0;
   if (data) {
     len = data->computeChainDataLength();
   }
+  // Once data is written to writeBufMeta, no more data can be written to
+  // writeBuffer. Write only an EOF is fine.
+  CHECK(neverWrittenBufMeta || len == 0);
   if (len > 0) {
     // We call this before updating the writeBuffer because we only want to
     // write a blocked frame first time the stream becomes blocked
