@@ -365,11 +365,11 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
       std::unique_ptr<folly::IOBuf>&& /*unused*/,
       size_t size,
       const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/);
+      folly::AsyncUDPSocket* /*unused*/) override;
 
   ssize_t write(
       folly::AsyncUDPSocket& /*unused*/,
-      const folly::SocketAddress& /*unused*/);
+      const folly::SocketAddress& /*unused*/) override;
 
  private:
   int maxBufs_{0};
