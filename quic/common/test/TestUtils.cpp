@@ -791,5 +791,26 @@ void FizzCryptoTestFactory::setDefault() {
         return FizzCryptoFactory::makePacketNumberCipher(secret);
       }));
 }
+
+void TestPacketBatchWriter::reset() {
+  bufNum_ = 0;
+  bufSize_ = 0;
+}
+
+bool TestPacketBatchWriter::append(
+    std::unique_ptr<folly::IOBuf>&& /*unused*/,
+    size_t size,
+    const folly::SocketAddress& /*unused*/,
+    folly::AsyncUDPSocket* /*unused*/) {
+  bufNum_++;
+  bufSize_ += size;
+  return ((maxBufs_ < 0) || (bufNum_ >= maxBufs_));
+}
+
+ssize_t TestPacketBatchWriter::write(
+    folly::AsyncUDPSocket& /*unused*/,
+    const folly::SocketAddress& /*unused*/) {
+  return bufSize_;
+}
 } // namespace test
 } // namespace quic

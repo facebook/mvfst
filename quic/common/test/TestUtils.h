@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <quic/api/QuicBatchWriter.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
@@ -348,6 +349,32 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
   void setDefault();
 
   mutable std::unique_ptr<PacketNumberCipher> packetNumberCipher_;
+};
+
+class TestPacketBatchWriter : public IOBufBatchWriter {
+ public:
+  explicit TestPacketBatchWriter(int maxBufs) : maxBufs_(maxBufs) {}
+  ~TestPacketBatchWriter() override {
+    CHECK_EQ(bufNum_, 0);
+    CHECK_EQ(bufSize_, 0);
+  }
+
+  void reset() override;
+
+  bool append(
+      std::unique_ptr<folly::IOBuf>&& /*unused*/,
+      size_t size,
+      const folly::SocketAddress& /*unused*/,
+      folly::AsyncUDPSocket* /*unused*/);
+
+  ssize_t write(
+      folly::AsyncUDPSocket& /*unused*/,
+      const folly::SocketAddress& /*unused*/);
+
+ private:
+  int maxBufs_{0};
+  int bufNum_{0};
+  size_t bufSize_{0};
 };
 
 } // namespace test

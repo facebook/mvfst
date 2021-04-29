@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/state/StateData.h>
 
@@ -18,45 +19,11 @@ constexpr const auto kMaxBufs = 10;
 
 namespace quic {
 namespace testing {
-class TestPacketBatchWriter : public IOBufBatchWriter {
- public:
-  explicit TestPacketBatchWriter(int maxBufs) : maxBufs_(maxBufs) {}
-  ~TestPacketBatchWriter() override {
-    CHECK_EQ(bufNum_, 0);
-    CHECK_EQ(bufSize_, 0);
-  }
-
-  void reset() override {
-    bufNum_ = 0;
-    bufSize_ = 0;
-  }
-
-  bool append(
-      std::unique_ptr<folly::IOBuf>&& /*unused*/,
-      size_t size,
-      const folly::SocketAddress& /*unused*/,
-      folly::AsyncUDPSocket* /*unused*/) override {
-    bufNum_++;
-    bufSize_ += size;
-    return ((maxBufs_ < 0) || (bufNum_ >= maxBufs_));
-  }
-  ssize_t write(
-      folly::AsyncUDPSocket& /*unused*/,
-      const folly::SocketAddress& /*unused*/) override {
-    return bufSize_;
-  }
-
- private:
-  int maxBufs_{0};
-  int bufNum_{0};
-  size_t bufSize_{0};
-};
-
 void RunTest(int numBatch) {
   folly::EventBase evb;
   folly::AsyncUDPSocket sock(&evb);
 
-  auto batchWriter = BatchWriterPtr(new TestPacketBatchWriter(numBatch));
+  auto batchWriter = BatchWriterPtr(new test::TestPacketBatchWriter(numBatch));
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
