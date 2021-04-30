@@ -371,6 +371,10 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
       folly::AsyncUDPSocket& /*unused*/,
       const folly::SocketAddress& /*unused*/) override;
 
+  size_t getBufSize() const {
+    return bufSize_;
+  }
+
  private:
   int maxBufs_{0};
   int bufNum_{0};
