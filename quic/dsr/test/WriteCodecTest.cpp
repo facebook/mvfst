@@ -10,6 +10,7 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/QuicConstants.h>
+#include <quic/dsr/test/MockDSRPacketBuilder.h>
 #include <quic/dsr/test/Mocks.h>
 
 using namespace testing;
