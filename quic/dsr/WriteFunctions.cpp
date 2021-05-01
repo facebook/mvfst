@@ -23,7 +23,8 @@ uint64_t writePacketizationRequest(
   // TODO: Do i maintain this ad-hoc packetCounter, or should
   // DSRPacketizationRequestSender maintains a counter?
   while (scheduler.hasPendingData() && packetCounter < packetLimit &&
-         writeLoopTimeLimit(writeLoopBeginTime, connection)) {
+         (packetCounter < connection.transportSettings.maxBatchSize ||
+          writeLoopTimeLimit(writeLoopBeginTime, connection))) {
     auto packetNum = getNextPacketNum(connection, PacketNumberSpace::AppData);
     ShortHeader header(ProtectionType::KeyPhaseZero, dstCid, packetNum);
     auto writableBytes = std::min(
