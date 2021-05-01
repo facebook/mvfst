@@ -54,6 +54,39 @@ struct ConnKeyEq {
  */
 
 struct SendInstruction {
+  explicit SendInstruction(const SendInstruction& other)
+      : connKey(other.connKey),
+        clientAddress(other.clientAddress),
+        packetNum(other.packetNum),
+        largestAckedPacketNum(other.largestAckedPacketNum),
+        streamId(other.streamId),
+        offset(other.offset),
+        len(other.len),
+        fin(other.fin),
+        bufMetaStartingOffset(other.bufMetaStartingOffset),
+        cipherSuite(other.cipherSuite) {
+    if (other.trafficKey.key && other.trafficKey.iv) {
+      trafficKey = other.trafficKey.clone();
+    }
+    if (other.packetProtectionKey) {
+      packetProtectionKey = other.packetProtectionKey->clone();
+    }
+  }
+
+  explicit SendInstruction(SendInstruction&& other)
+      : connKey(std::move(other.connKey)),
+        clientAddress(std::move(other.clientAddress)),
+        packetNum(other.packetNum),
+        largestAckedPacketNum(other.largestAckedPacketNum),
+        streamId(other.streamId),
+        offset(other.offset),
+        len(other.len),
+        fin(other.fin),
+        bufMetaStartingOffset(other.bufMetaStartingOffset),
+        trafficKey(std::move(other.trafficKey)),
+        cipherSuite(other.cipherSuite),
+        packetProtectionKey(std::move(other.packetProtectionKey)) {}
+
   // Connection info:
   // TODO: All these are not correctly set right now
   folly::Optional<ConnKey> connKey;

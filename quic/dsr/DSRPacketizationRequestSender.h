@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <quic/dsr/Types.h>
-
 namespace quic {
+
+struct SendInstruction;
 
 class DSRPacketizationRequestSender {
  public:

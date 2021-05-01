@@ -23,7 +23,8 @@ class DSRCommonTestFixture : public testing::Test {
         scheduler_(conn_),
         aead_(createNoOpAead()) {
     ON_CALL(sender_, addSendInstruction(testing::_))
-        .WillByDefault(testing::Invoke([&](const SendInstruction&) {
+        .WillByDefault(testing::Invoke([&](const SendInstruction& instruction) {
+          pendingInstructions_.push_back(instruction);
           instructionCounter_++;
           return true;
         }));
@@ -75,5 +76,6 @@ class DSRCommonTestFixture : public testing::Test {
   std::unique_ptr<Aead> aead_;
   MockDSRPacketizationRequestSender sender_;
   size_t instructionCounter_{0};
+  std::vector<SendInstruction> pendingInstructions_;
 };
 } // namespace quic::test

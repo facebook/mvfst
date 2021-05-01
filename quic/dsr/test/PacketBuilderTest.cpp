@@ -30,22 +30,6 @@ bool operator==(
   return instruction == frame;
 }
 
-// TODO: Remove this later
-SendInstruction clone(const SendInstruction& origin) {
-  SendInstruction::Builder builder(origin.streamId);
-  builder.setOffset(origin.offset).setLength(origin.len).setFin(origin.fin);
-  auto instruction = builder.build();
-  instruction.connKey = origin.connKey;
-  instruction.clientAddress = origin.clientAddress;
-  instruction.packetNum = origin.packetNum;
-  instruction.largestAckedPacketNum = origin.largestAckedPacketNum;
-  if (instruction.packetProtectionKey) {
-    instruction.packetProtectionKey = origin.packetProtectionKey->clone();
-  }
-  instruction.cipherSuite = origin.cipherSuite;
-  return instruction;
-}
-
 class PacketBuilderTest : public Test {
  public:
   PacketBuilderTest()
@@ -68,7 +52,7 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
   auto sendInstruction = siBuilder.build();
   DSRPacketBuilder packetBuilder(kDefaultUDPSendPacketLen, header, 0);
   uint32_t streamEncodedSize = 1003;
-  auto instructionCopy = clone(sendInstruction);
+  SendInstruction instructionCopy(sendInstruction);
   packetBuilder.addSendInstruction(
       std::move(sendInstruction), streamEncodedSize);
   auto packet = std::move(packetBuilder).buildPacket();

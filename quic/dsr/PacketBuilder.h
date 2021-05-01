@@ -18,7 +18,7 @@ namespace quic {
 struct DSRPacketBuilderBase {
   virtual ~DSRPacketBuilderBase() = default;
   virtual size_t remainingSpace() const noexcept = 0;
-  virtual void addSendInstruction(SendInstruction, uint32_t) = 0;
+  virtual void addSendInstruction(SendInstruction&&, uint32_t) = 0;
 };
 
 /**
@@ -38,7 +38,7 @@ class DSRPacketBuilder : public DSRPacketBuilderBase {
   }
 
   void addSendInstruction(
-      SendInstruction sendInstruction,
+      SendInstruction&& sendInstruction,
       uint32_t streamEncodedSize) override {
     CHECK(
         sendInstructions_.empty() ||
