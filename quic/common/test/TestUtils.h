@@ -533,6 +533,10 @@ class FakeServerHandshake : public FizzServerHandshake {
     sourceAddrs_ = std::move(srcAddrs);
   }
 
+  void setCipherSuite(fizz::CipherSuite cipher) {
+    state_.cipher() = cipher;
+  }
+
   QuicServerConnectionState& conn_;
   bool chloSync_{false};
   bool cfinSync_{false};
