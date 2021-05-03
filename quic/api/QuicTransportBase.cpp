@@ -2726,13 +2726,7 @@ void QuicTransportBase::writeSocketData() {
     auto packetsBefore = conn_->outstandings.numOutstanding();
     // Signal Observers the POTENTIAL start of a Write Block.
     if (conn_->waitingForAppData && conn_->congestionController) {
-      Observer::AppLimitedEvent startWritingFromAppLimitedEvent(
-          conn_->outstandings.packets, conn_->writeCount);
-      for (const auto& cb : *observers_) {
-        if (cb->getConfig().appDataSentEvents) {
-          cb->startWritingFromAppLimited(this, startWritingFromAppLimitedEvent);
-        }
-      }
+      notifyStartWritingFromAppRateLimited();
       conn_->waitingForAppData = false;
     }
     writeData();
@@ -2749,13 +2743,7 @@ void QuicTransportBase::writeSocketData() {
       // These may/may not be app data packets, it it up to the Observers
       // to deal with these packets.
       if (packetWritten && conn_->congestionController) {
-        Observer::AppLimitedEvent packetsWrittenEvent(
-            conn_->outstandings.packets, conn_->writeCount);
-        for (const auto& cb : *observers_) {
-          if (cb->getConfig().appDataSentEvents) {
-            cb->packetsWritten(this, packetsWrittenEvent);
-          }
-        }
+        notifyPacketsWritten();
       }
       if (conn_->loopDetectorCallback && packetWritten) {
         conn_->writeDebugState.currentEmptyLoopCount = 0;
@@ -2792,13 +2780,7 @@ void QuicTransportBase::writeSocketData() {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any observer callbacks
         connCallback_->onAppRateLimited();
-        Observer::AppLimitedEvent appLimitedEvent(
-            conn_->outstandings.packets, conn_->writeCount);
-        for (const auto& cb : *observers_) {
-          if (cb->getConfig().appLimitedEvents) {
-            cb->appRateLimited(this, appLimitedEvent);
-          }
-        }
+        notifyAppRateLimited();
         conn_->waitingForAppData = true;
       }
     }
@@ -3235,6 +3217,36 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
   }
   return folly::unit;
+}
+
+void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
+  Observer::AppLimitedEvent startWritingFromAppLimitedEvent(
+      conn_->outstandings.packets, conn_->writeCount);
+  for (const auto& cb : *observers_) {
+    if (cb->getConfig().appRateLimitedEvents) {
+      cb->startWritingFromAppLimited(this, startWritingFromAppLimitedEvent);
+    }
+  }
+}
+
+void QuicTransportBase::notifyPacketsWritten() {
+  Observer::AppLimitedEvent packetsWrittenEvent(
+      conn_->outstandings.packets, conn_->writeCount);
+  for (const auto& cb : *observers_) {
+    if (cb->getConfig().packetsWrittenEvents) {
+      cb->packetsWritten(this, packetsWrittenEvent);
+    }
+  }
+}
+
+void QuicTransportBase::notifyAppRateLimited() {
+  Observer::AppLimitedEvent appRateLimitedEvent(
+      conn_->outstandings.packets, conn_->writeCount);
+  for (const auto& cb : *observers_) {
+    if (cb->getConfig().appRateLimitedEvents) {
+      cb->appRateLimited(this, appRateLimitedEvent);
+    }
+  }
 }
 
 } // namespace quic

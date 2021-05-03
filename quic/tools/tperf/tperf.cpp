@@ -194,7 +194,7 @@ class TPerfAcceptObserver : public AcceptObserver {
     // Create an observer config, only enabling events we are interested in
     // receiving.
     Observer::Config config = {};
-    config.appLimitedEvents = true;
+    config.appRateLimitedEvents = true;
     config.pmtuEvents = true;
     config.rttSamples = true;
     config.lossEvents = true;

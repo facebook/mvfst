@@ -718,6 +718,12 @@ class QuicTransportBase : public QuicSocket {
 
   void validateCongestionAndPacing(CongestionControlType& type);
 
+  // Helpers to notify all registered observers about specific events during
+  // socket write (if enabled in the observer's config).
+  void notifyStartWritingFromAppRateLimited();
+  void notifyPacketsWritten();
+  void notifyAppRateLimited();
+
   /**
    * Callback when we receive a transport knob
    */

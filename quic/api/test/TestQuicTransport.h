@@ -132,6 +132,18 @@ class TestQuicTransport
     setIdleTimer();
   }
 
+  void invokeNotifyStartWritingFromAppRateLimited() {
+    notifyStartWritingFromAppRateLimited();
+  }
+
+  void invokeNotifyPacketsWritten() {
+    notifyPacketsWritten();
+  }
+
+  void invokeNotifyAppRateLimited() {
+    notifyAppRateLimited();
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};

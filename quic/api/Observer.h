@@ -34,30 +34,36 @@ class Observer {
    * Specifies events observer wants to receive.
    */
   struct Config {
+    virtual ~Config() = default;
+
     // following flags enable support for various callbacks.
     // observer and socket lifecycle callbacks are always enabled.
     bool evbEvents{false};
-    bool appDataSentEvents{false};
-    bool appLimitedEvents{false};
+    bool packetsWrittenEvents{false};
+    bool appRateLimitedEvents{false};
     bool lossEvents{false};
     bool spuriousLossEvents{false};
     bool pmtuEvents{false};
     bool rttSamples{false};
     bool knobFrameEvents{false};
 
+    virtual void enableAllEvents() {
+      evbEvents = true;
+      packetsWrittenEvents = true;
+      appRateLimitedEvents = true;
+      rttSamples = true;
+      lossEvents = true;
+      spuriousLossEvents = true;
+      pmtuEvents = true;
+      knobFrameEvents = true;
+    }
+
     /**
      * Returns a config where all events are enabled.
      */
     static Config getConfigAllEventsEnabled() {
       Config config = {};
-      config.evbEvents = true;
-      config.appDataSentEvents = true;
-      config.appLimitedEvents = true;
-      config.rttSamples = true;
-      config.lossEvents = true;
-      config.spuriousLossEvents = true;
-      config.pmtuEvents = true;
-      config.knobFrameEvents = true;
+      config.enableAllEvents();
       return config;
     }
   };
