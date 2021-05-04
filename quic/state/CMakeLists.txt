@@ -88,6 +88,38 @@ target_link_libraries(
   mvfst_state_machine
 )
 
+add_library(
+  mvfst_state_datagram_handler
+  DatagramHandlers.cpp
+)
+
+target_include_directories(
+  mvfst_state_datagram_handler PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_state_datagram_handler
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_state_datagram_handler
+  mvfst_codec_types
+  mvfst_state_machine
+)
+
+target_link_libraries(
+  mvfst_state_datagram_handler PUBLIC
+  Folly::folly
+  mvfst_constants
+  mvfst_codec_types
+  mvfst_loss
+  mvfst_state_functions
+  mvfst_state_machine
+)
 # stream functions
 add_library(
   mvfst_state_stream_functions
@@ -279,6 +311,12 @@ install(
 
 install(
   TARGETS mvfst_state_ack_handler
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_state_datagram_handler
   EXPORT mvfst-exports
   DESTINATION lib
 )

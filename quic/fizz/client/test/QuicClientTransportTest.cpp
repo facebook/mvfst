@@ -5133,6 +5133,55 @@ TEST_F(QuicClientTransportAfterStartTest, PingIsTreatedAsRetransmittable) {
   EXPECT_TRUE(client->getConn().pendingEvents.scheduleAckTimeout);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndDiscard) {
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+
+  RegularQuicPacketBuilder builder(
+      client->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  StringPiece datagramPayload = "do not rely on me. I am unreliable";
+  DatagramFrame datagramFrame(
+      datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+  writeFrame(datagramFrame, builder);
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  deliverData(packet->coalesce());
+  ASSERT_EQ(client->getConn().datagramState.readBuffer.size(), 0);
+}
+
+TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndStore) {
+  auto& conn = client->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+
+  for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+
+    RegularQuicPacketBuilder builder(
+        client->getConn().udpSendPacketLen,
+        std::move(header),
+        0 /* largestAcked */);
+    builder.encodePacketHeader();
+
+    StringPiece datagramPayload = "do not rely on me. I am unreliable";
+    DatagramFrame datagramFrame(
+        datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+    writeFrame(datagramFrame, builder);
+    auto packet = packetToBuf(std::move(builder).buildPacket());
+    deliverData(packet->coalesce());
+    if (i < conn.datagramState.maxReadBufferSize) {
+      ASSERT_EQ(client->getConn().datagramState.readBuffer.size(), i + 1);
+    }
+  }
+  ASSERT_EQ(
+      client->getConn().datagramState.readBuffer.size(),
+      conn.datagramState.maxReadBufferSize);
+}
+
 TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   auto streamId = client->createBidirectionalStream().value();
   auto& conn = client->getNonConstConn();

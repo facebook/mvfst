@@ -3188,6 +3188,55 @@ TEST_F(QuicServerTransportTest, PingIsTreatedAsRetransmittable) {
   EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
 }
 
+TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndDiscard) {
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  StringPiece datagramPayload = "do not rely on me. I am unreliable";
+  DatagramFrame datagramFrame(
+      datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+  writeFrame(datagramFrame, builder);
+  auto packet = std::move(builder).buildPacket();
+  deliverData(packetToBuf(packet));
+  ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 0);
+}
+
+TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndStore) {
+  auto& conn = server->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+
+  for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        server->getConn().udpSendPacketLen,
+        std::move(header),
+        0 /* largestAcked */);
+    builder.encodePacketHeader();
+    StringPiece datagramPayload = "do not rely on me. I am unreliable";
+    DatagramFrame datagramFrame(
+        datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+    writeFrame(datagramFrame, builder);
+    auto packet = std::move(builder).buildPacket();
+    deliverData(packetToBuf(packet));
+    if (i < conn.datagramState.maxReadBufferSize) {
+      ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), i + 1);
+    }
+  }
+  ASSERT_EQ(
+      server->getConn().datagramState.readBuffer.size(),
+      conn.datagramState.maxReadBufferSize);
+}
+
 TEST_F(QuicServerTransportTest, RecvNewConnectionIdValid) {
   auto& conn = server->getNonConstConn();
   conn.transportSettings.selfActiveConnectionIdLimit = 2;

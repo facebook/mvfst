@@ -22,6 +22,7 @@
 #include <quic/logging/QLoggerConstants.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
+#include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicPacingFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamReceiveHandlers.h>
@@ -572,6 +573,7 @@ void QuicClientTransport::processPacketData(
       }
       case QuicFrame::Type::PingFrame:
         // Ping isn't retransmittable. But we would like to ack them early.
+        // So, make Ping frames count towards ack policy
         pktHasRetransmittableData = true;
         break;
       case QuicFrame::Type::PaddingFrame:
@@ -583,8 +585,16 @@ void QuicClientTransport::processPacketData(
             *conn_, simpleFrame, packetNum, false);
         break;
       }
-      case QuicFrame::Type::DatagramFrame:
-        // TODO:
+      case QuicFrame::Type::DatagramFrame: {
+        DatagramFrame& frame = *quicFrame.asDatagramFrame();
+        VLOG(10) << "Client received datagram data: "
+                 << "len=" << frame.length << " " << *this;
+        // Datagram isn't retransmittable. But we would like to ack them early.
+        // So, make Datagram frames count towards ack policy
+        pktHasRetransmittableData = true;
+        handleDatagram(*conn_, frame);
+        break;
+      }
       default:
         break;
     }

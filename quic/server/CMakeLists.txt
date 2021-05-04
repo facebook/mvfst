@@ -81,6 +81,7 @@ add_dependencies(
   mvfst_qlogger
   mvfst_server_state
   mvfst_state_ack_handler
+  mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
 )
@@ -128,6 +129,7 @@ target_link_libraries(
   mvfst_qlogger
   mvfst_server_state
   mvfst_state_ack_handler
+  mvfst_state_datagram_handler
   mvfst_transport
   mvfst_transport_knobs
   ${LIBCCP_LIBRARY}

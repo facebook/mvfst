@@ -849,6 +849,19 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Whether we successfully used 0-RTT keys in this connection.
   bool usedZeroRtt{false};
+
+  struct DatagramState {
+    uint16_t maxReadFrameSize{kDefaultMaxDatagramFrameSize};
+    uint16_t maxWriteFrameSize{kDefaultMaxDatagramFrameSize};
+    uint32_t maxReadBufferSize{kDefaultMaxDatagramsBuffered};
+    uint32_t maxWriteBufferSize{kDefaultMaxDatagramsBuffered};
+    // Buffers Incoming Datagrams
+    std::deque<BufQueue> readBuffer;
+    // Buffers Outgoing Datagrams
+    std::deque<BufQueue> writeBuffer;
+  };
+
+  DatagramState datagramState;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);
