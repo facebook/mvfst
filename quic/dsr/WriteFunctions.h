@@ -13,12 +13,11 @@
 #include <quic/dsr/DSRPacketizationRequestSender.h>
 #include <quic/dsr/Scheduler.h>
 #include <quic/handshake/Aead.h>
-#include <quic/state/StateData.h>
+#include <quic/server/state/ServerStateMachine.h>
 
 namespace quic {
 uint64_t writePacketizationRequest(
-    QuicConnectionStateBase& connection,
-    DSRStreamFrameScheduler& scheduler,
+    QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,
     const Aead& aead);

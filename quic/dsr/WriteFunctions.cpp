@@ -11,11 +11,11 @@
 
 namespace quic {
 uint64_t writePacketizationRequest(
-    QuicConnectionStateBase& connection,
-    DSRStreamFrameScheduler& scheduler,
+    QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,
     const Aead& aead) {
+  DSRStreamFrameScheduler scheduler(connection);
   auto writeLoopBeginTime = Clock::now();
   uint64_t packetCounter = 0;
   std::set<DSRPacketizationRequestSender*> senders;

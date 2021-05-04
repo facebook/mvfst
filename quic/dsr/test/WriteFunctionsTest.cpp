@@ -19,12 +19,9 @@ class WriteFunctionsTest : public DSRCommonTestFixture {};
 
 TEST_F(WriteFunctionsTest, SchedulerNoData) {
   prepareFlowControlAndStreamLimit();
-  ASSERT_FALSE(scheduler_.hasPendingData());
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      0,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, CwndBlockd) {
@@ -37,9 +34,7 @@ TEST_F(WriteFunctionsTest, CwndBlockd) {
       .WillRepeatedly(Return(0));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      0,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, FlowControlBlockded) {
@@ -52,9 +47,7 @@ TEST_F(WriteFunctionsTest, FlowControlBlockded) {
       .WillRepeatedly(Return(0));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      0,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(0, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, WriteOne) {
@@ -64,9 +57,7 @@ TEST_F(WriteFunctionsTest, WriteOne) {
   auto stream = conn_.streamManager->findStream(streamId);
   auto currentBufMetaOffset = stream->writeBufMeta.offset;
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      1,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(1, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
   EXPECT_EQ(1, countInstructions(streamId));
@@ -80,9 +71,7 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   auto stream = conn_.streamManager->findStream(streamId);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      2,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
@@ -101,9 +90,7 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
       .WillRepeatedly(Return(1000));
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      20,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(20, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_EQ(20, stream->retransmissionBufMetas.size());
   EXPECT_EQ(20, countInstructions(streamId));
   EXPECT_EQ(20, conn_.outstandings.packets.size());
@@ -118,9 +105,7 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   auto stream2 = conn_.streamManager->findStream(streamId2);
   auto cid = getTestConnectionId();
   size_t packetLimit = 20;
-  EXPECT_EQ(
-      2,
-      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
+  EXPECT_EQ(2, writePacketizationRequest(conn_, cid, packetLimit, *aead_));
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
   // TODO: This needs to be fixed later: The stream and the sender needs to be
@@ -144,7 +129,7 @@ TEST_F(WriteFunctionsTest, TwoInstructionsInOnePacket) {
   EXPECT_EQ(
       1,
       writePacketizationRequest(
-          conn_, scheduler_, getTestConnectionId(), packetLimit, *aead_));
+          conn_, getTestConnectionId(), packetLimit, *aead_));
   EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(1, conn_.outstandings.packets.size());
   auto& packet = conn_.outstandings.packets.back().packet;
