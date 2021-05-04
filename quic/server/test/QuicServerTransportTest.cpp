@@ -18,6 +18,8 @@
 #include <quic/codec/Types.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
+#include <quic/dsr/Types.h>
+#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -4261,6 +4263,27 @@ TEST_F(
             TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
         1}});
   EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
+}
+
+TEST_F(QuicServerTransportTest, WriteDSR) {
+  // Make sure we are post-handshake
+  ASSERT_NE(nullptr, server->getConn().oneRttWriteCipher);
+  // Rinse anything pending
+  server->writeData();
+  loopForWrites();
+  server->getNonConstConn().outstandings.packets.clear();
+  getFakeHandshakeLayer()->setCipherSuite(
+      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto streamId = server->createBidirectionalStream().value();
+  server->writeChain(
+      streamId, folly::IOBuf::copyBuffer("Allegro Maestoso"), false);
+  auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  server->setDSRPacketizationRequestSender(streamId, std::move(mockDSRSender));
+  BufferMeta bufMeta(2000);
+  server->writeBufMeta(streamId, bufMeta, true);
+  server->writeData();
+  EXPECT_FALSE(server->getConn().outstandings.packets.empty());
+  EXPECT_TRUE(server->getConn().outstandings.packets.back().isDSRPacket);
 }
 
 } // namespace test

@@ -294,12 +294,24 @@ struct QuicStreamState : public QuicStreamLike {
     return recvState == StreamRecvState::Open;
   }
 
+  // If the stream has writable data that's not backed by DSR. That is, in a
+  // regular stream write, it will be able to write something. So it either
+  // needs to have writeBuffer, or it has EOF to send.
   bool hasWritableData() const {
     if (!writeBuffer.empty()) {
       return flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }
     if (finalWriteOffset) {
-      return currentWriteOffset <= *finalWriteOffset;
+      /**
+       * This is the case that EOF/FIN is the only thing we can write in a
+       * non-DSR write for a stream. It's actually OK to send out a FIN with
+       * correct offset before we send out DSRed bytes. Peer is supposed to be
+       * able to handle this. But it's also not hard to limit it. So here i'm
+       * gonna go with the safer path: do not write FIN only stream frame if we
+       * still have BufMetas to send.
+       */
+      return writeBufMeta.length == 0 &&
+          currentWriteOffset <= *finalWriteOffset;
     }
     return false;
   }

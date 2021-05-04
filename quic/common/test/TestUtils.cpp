@@ -270,7 +270,7 @@ std::unique_ptr<MockAead> createNoOpAead() {
   return createNoOpAeadImpl<MockAead>();
 }
 
-std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher() {
+std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipher() {
   auto headerCipher = std::make_unique<NiceMock<MockPacketNumberCipher>>();
   ON_CALL(*headerCipher, mask(_)).WillByDefault(Return(HeaderProtectionMask{}));
   ON_CALL(*headerCipher, keyLength()).WillByDefault(Return(16));
@@ -811,6 +811,26 @@ ssize_t TestPacketBatchWriter::write(
     folly::AsyncUDPSocket& /*unused*/,
     const folly::SocketAddress& /*unused*/) {
   return bufSize_;
+}
+
+TrafficKey getQuicTestKey() {
+  TrafficKey testKey;
+  testKey.key = folly::IOBuf::copyBuffer(
+      folly::unhexlify("000102030405060708090A0B0C0D0E0F"));
+  testKey.iv =
+      folly::IOBuf::copyBuffer(folly::unhexlify("000102030405060708090A0B"));
+  return testKey;
+}
+
+std::unique_ptr<folly::IOBuf> getProtectionKey() {
+  FizzCryptoFactory factory;
+  auto secret = folly::range(getRandSecret());
+  auto pnCipher =
+      factory.makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  auto deriver = factory.getFizzFactory()->makeKeyDeriver(
+      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
+  return deriver->expandLabel(
+      secret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
 }
 } // namespace test
 } // namespace quic

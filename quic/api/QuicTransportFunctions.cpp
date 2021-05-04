@@ -400,6 +400,8 @@ void handleNewStreamDataWritten(
   stream.currentWriteOffset += frameLen;
   auto bufWritten = stream.writeBuffer.splitAtMost(folly::to<size_t>(frameLen));
   DCHECK_EQ(bufWritten->computeChainDataLength(), frameLen);
+  // TODO: If we want to be able to write FIN out of order for DSR-ed streams,
+  // this needs to be fixed:
   stream.currentWriteOffset += frameFin ? 1 : 0;
   CHECK(stream.retransmissionBuffer
             .emplace(

@@ -41,6 +41,37 @@ target_compile_options(
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
 
+add_library(
+  mvfst_dsr_frontend
+  Scheduler.cpp
+  WriteCodec.cpp
+  WriteFunctions.cpp)
+
+target_include_directories(
+  mvfst_dsr_frontend PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+add_dependencies(
+  mvfst_dsr_frontend
+  mvfst_dsr_types
+  mvfst_flowcontrol
+)
+
+target_link_libraries(
+  mvfst_dsr_frontend PUBLIC
+  Folly::folly
+  mvfst_codec_types
+  mvfst_dsr_types
+)
+
+target_compile_options(
+  mvfst_dsr_frontend
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
 file(
   GLOB_RECURSE QUIC_API_HEADERS_TOINSTALL
   RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -63,3 +94,8 @@ install(
   DESTINATION lib
 )
 
+install(
+  TARGETS mvfst_dsr_frontend
+  EXPORT mvfst-exports
+  DESTINATION lib
+)

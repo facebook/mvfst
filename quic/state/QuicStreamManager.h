@@ -249,6 +249,10 @@ class QuicStreamManager {
     return !writableDSRStreams_.empty();
   }
 
+  bool hasNonDSRWritable() const {
+    return !writableStreams_.empty() || !writableControlStreams_.empty();
+  }
+
   /*
    * Add a writable stream id.
    */

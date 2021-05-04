@@ -11,6 +11,7 @@
 #include <quic/common/WindowedCounter.h>
 #include <quic/d6d/BinarySearchProbeSizeRaiser.h>
 #include <quic/d6d/ConstantStepProbeSizeRaiser.h>
+#include <quic/dsr/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
@@ -288,6 +289,9 @@ void QuicServerTransport::writeData() {
   }
   if (conn_->oneRttWriteCipher) {
     CHECK(conn_->oneRttWriteHeaderCipher);
+    // TODO(yangchi): I don't know which one to prioritize. I can see arguments
+    // both ways. I'm going with writing regular packets first since they
+    // contain ack and flow control update and other important info.
     packetLimit -= writeQuicDataToSocket(
                        *socket_,
                        *conn_,
@@ -298,6 +302,10 @@ void QuicServerTransport::writeData() {
                        version,
                        packetLimit)
                        .packetsWritten;
+    if (packetLimit) {
+      packetLimit -= writePacketizationRequest(
+          *serverConn_, destConnId, packetLimit, *conn_->oneRttWriteCipher);
+    }
 
     // D6D probes should be paced
     if (packetLimit && conn_->pendingEvents.d6d.sendProbePacket) {

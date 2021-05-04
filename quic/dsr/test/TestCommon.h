@@ -16,26 +16,6 @@
 
 namespace quic::test {
 
-std::unique_ptr<folly::IOBuf> getProtectionKey() {
-  FizzCryptoFactory factory;
-  auto secret = folly::range(test::getRandSecret());
-  auto pnCipher =
-      factory.makePacketNumberCipher(fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  auto deriver = factory.getFizzFactory()->makeKeyDeriver(
-      fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
-  return deriver->expandLabel(
-      secret, kQuicPNLabel, folly::IOBuf::create(0), pnCipher->keyLength());
-}
-
-TrafficKey getQuicTestKey() {
-  TrafficKey testKey;
-  testKey.key = folly::IOBuf::copyBuffer(
-      folly::unhexlify("000102030405060708090A0B0C0D0E0F"));
-  testKey.iv =
-      folly::IOBuf::copyBuffer(folly::unhexlify("000102030405060708090A0B"));
-  return testKey;
-}
-
 class DSRCommonTestFixture : public testing::Test {
  public:
   DSRCommonTestFixture()

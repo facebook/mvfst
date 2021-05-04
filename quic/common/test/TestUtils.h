@@ -167,7 +167,7 @@ std::unique_ptr<T> createNoOpAeadImpl() {
 
 std::unique_ptr<MockAead> createNoOpAead();
 
-std::unique_ptr<PacketNumberCipher> createNoOpHeaderCipher();
+std::unique_ptr<MockPacketNumberCipher> createNoOpHeaderCipher();
 
 uint64_t computeExpectedDelay(
     std::chrono::microseconds ackDelay,
@@ -382,6 +382,9 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
   size_t bufSize_{0};
 };
 
+TrafficKey getQuicTestKey();
+std::unique_ptr<folly::IOBuf> getProtectionKey();
+
 class FakeServerHandshake : public FizzServerHandshake {
  public:
   explicit FakeServerHandshake(
@@ -507,8 +510,13 @@ class FakeServerHandshake : public FizzServerHandshake {
     // Mimic ServerHandshake behavior.
     // oneRttWriteCipher would already be set during ReportEarlyHandshakeSuccess
     if (!allowZeroRttKeys_) {
-      oneRttWriteCipher_ = createNoOpAead();
-      oneRttWriteHeaderCipher_ = createNoOpHeaderCipher();
+      auto mockOneRttWriteCipher = createNoOpAead();
+      ON_CALL(*mockOneRttWriteCipher, getKey())
+          .WillByDefault(testing::Invoke([]() { return getQuicTestKey(); }));
+      oneRttWriteCipher_ = std::move(mockOneRttWriteCipher);
+      auto mockOneRttWriteHeaderCipher = createNoOpHeaderCipher();
+      mockOneRttWriteHeaderCipher->setDefaultKey();
+      oneRttWriteHeaderCipher_ = std::move(mockOneRttWriteHeaderCipher);
     }
     oneRttReadCipher_ = createNoOpAead();
     oneRttReadHeaderCipher_ = createNoOpHeaderCipher();

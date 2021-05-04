@@ -4,6 +4,40 @@
 # LICENSE file in the root directory of this source tree.
 
 add_library(
+  mvfst_server_state STATIC
+  handshake/AppToken.cpp
+  handshake/ServerHandshake.cpp
+  handshake/StatelessResetGenerator.cpp
+  state/ServerStateMachine.cpp)
+
+target_include_directories(
+  mvfst_server_state PUBLIC
+  $<BUILD_INTERFACE:${QUIC_FBCODE_ROOT}>
+  $<BUILD_INTERFACE:${LIBFIZZ_INCLUDE_DIR}>
+  $<INSTALL_INTERFACE:include/>
+)
+
+target_compile_options(
+  mvfst_server_state
+  PRIVATE
+  ${_QUIC_COMMON_COMPILE_OPTIONS}
+)
+
+add_dependencies(
+  mvfst_server_state
+  mvfst_buf_accessor
+  mvfst_cc_algo
+  mvfst_constants
+  mvfst_codec
+  mvfst_codec_types
+  mvfst_dsr_frontend
+  mvfst_fizz_handshake
+  mvfst_qlogger
+  mvfst_state_ack_handler
+)
+
+
+add_library(
   mvfst_server STATIC
   QuicServer.cpp
   QuicServerBackend.cpp
@@ -13,12 +47,8 @@ add_library(
   CCPReader.cpp
   QuicCcpThreadLauncher.cpp
   SlidingWindowRateLimiter.cpp
-  handshake/ServerHandshake.cpp
-  handshake/AppToken.cpp
   handshake/DefaultAppTokenValidator.cpp
   handshake/RetryTokenGenerator.cpp
-  handshake/StatelessResetGenerator.cpp
-  state/ServerStateMachine.cpp
 
   # Fizz specific parts, will be split in its own lib eventually.
   ../fizz/server/handshake/AppToken.cpp
@@ -46,8 +76,10 @@ add_dependencies(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
+  mvfst_server_state
   mvfst_state_ack_handler
   mvfst_transport
   mvfst_transport_knobs
@@ -62,7 +94,26 @@ if(DEFINED CCP_ENABLED)
 
   # This target is only defined when CCP_ENABLED, so we can ony add it here.
   add_dependencies(mvfst_server libstartccp)
+  add_dependencies(mvfst_server_state libstartccp)
 endif()
+
+target_link_libraries(
+  mvfst_server_state PUBLIC
+  Folly::folly
+  ${LIBFIZZ_LIBRARY}
+  mvfst_buf_accessor
+  mvfst_constants
+  mvfst_codec
+  mvfst_codec_types
+  mvfst_dsr_frontend
+  mvfst_fizz_handshake
+  mvfst_qlogger
+  mvfst_state_ack_handler
+  mvfst_transport
+  mvfst_transport_knobs
+  ${LIBCCP_LIBRARY}
+  ${LIBSTARTCCP_LIBRARY}
+)
 
 target_link_libraries(
   mvfst_server PUBLIC
@@ -72,8 +123,10 @@ target_link_libraries(
   mvfst_constants
   mvfst_codec
   mvfst_codec_types
+  mvfst_dsr_frontend
   mvfst_fizz_handshake
   mvfst_qlogger
+  mvfst_server_state
   mvfst_state_ack_handler
   mvfst_transport
   mvfst_transport_knobs
@@ -95,6 +148,12 @@ endforeach()
 
 install(
   TARGETS mvfst_server
+  EXPORT mvfst-exports
+  DESTINATION lib
+)
+
+install(
+  TARGETS mvfst_server_state
   EXPORT mvfst-exports
   DESTINATION lib
 )
