@@ -19,6 +19,7 @@
 #include <quic/common/BufUtil.h>
 #include <quic/common/Timers.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/logging/test/Mocks.h>

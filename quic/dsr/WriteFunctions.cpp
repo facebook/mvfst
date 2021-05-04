@@ -9,8 +9,6 @@
 #include <quic/dsr/WriteFunctions.h>
 
 namespace quic {
-// TODO: crypto info
-// TODO: Connection level infos (cid, client addr, etc)
 uint64_t writePacketizationRequest(
     QuicConnectionStateBase& connection,
     DSRStreamFrameScheduler& scheduler,
@@ -63,7 +61,6 @@ uint64_t writePacketizationRequest(
     CHECK_GT(packet.encodedSize, 0);
     bool instructionAddError = false;
     for (const auto& instruction : packet.sendInstructions) {
-      // TOOD: Augment instruction with other conn info and cipher info
       // Yes, it is wasteful to add the same conn and cipher info to every
       // instruction. On the other hand, they are very small.
       if (!sender.addSendInstruction(instruction)) {

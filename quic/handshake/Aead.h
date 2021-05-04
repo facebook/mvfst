@@ -25,6 +25,8 @@ class Aead {
  public:
   virtual ~Aead() = default;
 
+  virtual folly::Optional<TrafficKey> getKey() const = 0;
+
   /**
    * Encrypts plaintext inplace. Will throw on error.
    */

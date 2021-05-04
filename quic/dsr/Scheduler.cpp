@@ -9,10 +9,12 @@
 #include <quic/dsr/Scheduler.h>
 #include <quic/dsr/WriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/state/QuicStateFunctions.h>
 
 namespace quic {
 
-DSRStreamFrameScheduler::DSRStreamFrameScheduler(QuicConnectionStateBase& conn)
+DSRStreamFrameScheduler::DSRStreamFrameScheduler(
+    QuicServerConnectionState& conn)
     : conn_(conn) {}
 
 bool DSRStreamFrameScheduler::hasPendingData() const {
@@ -43,21 +45,23 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
   CHECK(hasFreshBufMeta || hasLossBufMeta);
   bool written = false;
   if (hasLossBufMeta) {
-    auto sendInstruction = writeDSRStreamFrame(
+    SendInstruction::Builder instructionBuilder(conn_, *streamId);
+    auto encodedSize = writeDSRStreamFrame(
         builder,
+        instructionBuilder,
         *streamId,
         stream->lossBufMetas.front().offset,
         stream->lossBufMetas.front().length,
         stream->lossBufMetas.front()
             .length, // flowControlLen shouldn't be used to limit loss write
-        stream->lossBufMetas.front().eof);
-    if (sendInstruction.has_value()) {
-      if (builder.remainingSpace() < sendInstruction->encodedSize) {
+        stream->lossBufMetas.front().eof,
+        stream->currentWriteOffset + stream->writeBuffer.chainLength());
+    if (encodedSize > 0) {
+      if (builder.remainingSpace() < encodedSize) {
         return false;
       }
-      builder.addSendInstruction(
-          std::move(sendInstruction->sendInstruction),
-          sendInstruction->encodedSize);
+      enrichInstruction(instructionBuilder);
+      builder.addSendInstruction(instructionBuilder.build(), encodedSize);
       written = true;
     }
   }
@@ -72,22 +76,32 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
       std::min(getSendStreamFlowControlBytesWire(*stream), connWritableBytes);
   bool canWriteFin = stream->finalWriteOffset.has_value() &&
       stream->writeBufMeta.length <= flowControlLen;
-  auto sendInstruction = writeDSRStreamFrame(
+  SendInstruction::Builder instructionBuilder(conn_, *streamId);
+  auto encodedSize = writeDSRStreamFrame(
       builder,
+      instructionBuilder,
       *streamId,
       stream->writeBufMeta.offset,
       stream->writeBufMeta.length,
       flowControlLen,
-      canWriteFin);
-  if (builder.remainingSpace() < sendInstruction->encodedSize) {
-    return written;
-  }
-  if (sendInstruction.has_value()) {
-    builder.addSendInstruction(
-        std::move(sendInstruction->sendInstruction),
-        sendInstruction->encodedSize);
+      canWriteFin,
+      stream->currentWriteOffset + stream->writeBuffer.chainLength());
+  if (encodedSize > 0) {
+    if (builder.remainingSpace() < encodedSize) {
+      return written;
+    }
+    enrichInstruction(instructionBuilder);
+    builder.addSendInstruction(instructionBuilder.build(), encodedSize);
     return true;
   }
   return written;
 }
+
+void DSRStreamFrameScheduler::enrichInstruction(
+    SendInstruction::Builder& builder) {
+  builder.setPacketNum(getNextPacketNum(conn_, PacketNumberSpace::AppData))
+      .setLargestAckedPacketNum(getAckState(conn_, PacketNumberSpace::AppData)
+                                    .largestAckedByPeer.value_or(0));
+}
+
 } // namespace quic

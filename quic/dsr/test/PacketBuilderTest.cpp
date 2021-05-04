@@ -10,6 +10,10 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/dsr/PacketBuilder.h>
 #include <quic/dsr/Types.h>
+#include <quic/dsr/test/TestCommon.h>
+#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/handshake/test/Mocks.h>
+#include <quic/server/state/ServerStateMachine.h>
 
 using namespace testing;
 
@@ -30,10 +34,11 @@ bool operator==(
   return instruction == frame;
 }
 
-class PacketBuilderTest : public Test {
+class PacketBuilderTest : public DSRCommonTestFixture {
  public:
   PacketBuilderTest()
-      : cid(getTestConnectionId()), header(ProtectionType::KeyPhaseZero, cid) {}
+      : cid(getTestConnectionId(0)),
+        header(ProtectionType::KeyPhaseZero, cid) {}
 
  protected:
   ConnectionId cid;
@@ -45,10 +50,12 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
   uint64_t offset = 1;
   uint64_t length = 1000;
   bool fin = true;
-  SendInstruction::Builder siBuilder(id);
+  uint64_t bufMetaStartingOffset = 333;
+  SendInstruction::Builder siBuilder(conn_, id);
   siBuilder.setOffset(offset);
   siBuilder.setLength(length);
   siBuilder.setFin(fin);
+  siBuilder.setBufMetaStartingOffset(bufMetaStartingOffset);
   auto sendInstruction = siBuilder.build();
   DSRPacketBuilder packetBuilder(kDefaultUDPSendPacketLen, header, 0);
   uint32_t streamEncodedSize = 1003;
@@ -76,17 +83,19 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
 
   StreamId id = 0;
   packetBuilder.addSendInstruction(
-      SendInstruction::Builder(id)
+      SendInstruction::Builder(conn_, id)
           .setOffset(0)
           .setLength(100)
           .setFin(false)
+          .setBufMetaStartingOffset(333)
           .build(),
       110);
   packetBuilder.addSendInstruction(
-      SendInstruction::Builder(id)
+      SendInstruction::Builder(conn_, id)
           .setOffset(100)
           .setLength(100)
           .setFin(true)
+          .setBufMetaStartingOffset(333)
           .build(),
       110);
   auto packet = std::move(packetBuilder).buildPacket();

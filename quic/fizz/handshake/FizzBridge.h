@@ -29,6 +29,8 @@ class FizzAead final : public Aead {
     return std::unique_ptr<FizzAead>(new FizzAead(std::move(fizzAeadIn)));
   }
 
+  folly::Optional<TrafficKey> getKey() const override;
+
   /**
    * Simply forward all calls to fizz::Aead.
    */

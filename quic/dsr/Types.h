@@ -14,6 +14,8 @@
 #include <folly/SocketAddress.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/Types.h>
+#include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/StateData.h>
 
 namespace quic {
 
@@ -55,7 +57,8 @@ struct ConnKeyEq {
 
 struct SendInstruction {
   explicit SendInstruction(const SendInstruction& other)
-      : connKey(other.connKey),
+      : dcid(other.dcid),
+        scid(other.scid),
         clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
@@ -64,18 +67,20 @@ struct SendInstruction {
         len(other.len),
         fin(other.fin),
         bufMetaStartingOffset(other.bufMetaStartingOffset),
-        cipherSuite(other.cipherSuite) {
-    if (other.trafficKey.key && other.trafficKey.iv) {
-      trafficKey = other.trafficKey.clone();
+        cipherSuite(other.cipherSuite),
+        packetProtectionKey(other.packetProtectionKey) {
+    if (other.trafficKey.key) {
+      trafficKey.key = other.trafficKey.key->clone();
     }
-    if (other.packetProtectionKey) {
-      packetProtectionKey = other.packetProtectionKey->clone();
+    if (other.trafficKey.iv) {
+      trafficKey.iv = other.trafficKey.iv->clone();
     }
   }
 
   explicit SendInstruction(SendInstruction&& other)
-      : connKey(std::move(other.connKey)),
-        clientAddress(std::move(other.clientAddress)),
+      : dcid(other.dcid),
+        scid(other.scid),
+        clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
         streamId(other.streamId),
@@ -85,12 +90,12 @@ struct SendInstruction {
         bufMetaStartingOffset(other.bufMetaStartingOffset),
         trafficKey(std::move(other.trafficKey)),
         cipherSuite(other.cipherSuite),
-        packetProtectionKey(std::move(other.packetProtectionKey)) {}
+        packetProtectionKey(other.packetProtectionKey) {}
 
   // Connection info:
-  // TODO: All these are not correctly set right now
-  folly::Optional<ConnKey> connKey;
-  folly::SocketAddress clientAddress;
+  const ConnectionId& dcid;
+  const ConnectionId& scid;
+  const folly::SocketAddress& clientAddress;
   PacketNum packetNum{0};
   PacketNum largestAckedPacketNum{0};
 
@@ -99,21 +104,48 @@ struct SendInstruction {
   uint64_t offset;
   uint64_t len;
   bool fin;
-  // The starting offset of the first BufferMeta byte in this stream.
-  // TODO: This isn't set correctly right now
-  uint64_t bufMetaStartingOffset{0};
+  uint64_t bufMetaStartingOffset;
 
   // Cipher info
-  // TODO: All these are not correctly set right now
-  fizz::TrafficKey trafficKey;
+  TrafficKey trafficKey;
   fizz::CipherSuite cipherSuite;
-  std::unique_ptr<folly::IOBuf> packetProtectionKey;
+  const Buf& packetProtectionKey;
 
   struct Builder {
-    explicit Builder(StreamId idIn) : streamId(idIn) {}
+    explicit Builder(const QuicServerConnectionState& conn, StreamId idIn)
+        : dcid(*conn.clientConnectionId),
+          scid(*conn.serverConnectionId),
+          clientAddr(conn.peerAddress),
+          streamId(idIn),
+          trafficKey(*conn.oneRttWriteCipher->getKey()),
+          cipherSuite(*conn.serverHandshakeLayer->getState().cipher()),
+          packetProtectionKey(conn.oneRttWriteHeaderCipher->getKey()) {}
 
     SendInstruction build() {
-      return SendInstruction(streamId, *offset, *len, fin);
+      return SendInstruction(
+          dcid,
+          scid,
+          clientAddr,
+          packetNum,
+          largestAckedPacketNum,
+          streamId,
+          *offset,
+          *len,
+          fin,
+          *bufMetaStartingOffset,
+          std::move(trafficKey),
+          cipherSuite,
+          packetProtectionKey);
+    }
+
+    Builder& setPacketNum(PacketNum val) {
+      packetNum = val;
+      return *this;
+    }
+
+    Builder& setLargestAckedPacketNum(PacketNum val) {
+      largestAckedPacketNum = val;
+      return *this;
     }
 
     Builder& setOffset(uint64_t val) {
@@ -131,16 +163,65 @@ struct SendInstruction {
       return *this;
     }
 
+    Builder& setBufMetaStartingOffset(uint64_t val) {
+      bufMetaStartingOffset = val;
+      return *this;
+    }
+
+    Builder& setTrafficKey(TrafficKey val) {
+      trafficKey = std::move(val);
+      return *this;
+    }
+
+    Builder& setCipherSuite(fizz::CipherSuite val) {
+      cipherSuite = val;
+      return *this;
+    }
+
    private:
+    const ConnectionId& dcid;
+    const ConnectionId& scid;
+    const folly::SocketAddress& clientAddr;
+    PacketNum packetNum{0};
+    PacketNum largestAckedPacketNum{0};
     StreamId streamId;
     folly::Optional<uint64_t> offset;
     folly::Optional<uint64_t> len;
     bool fin{false};
+    folly::Optional<uint64_t> bufMetaStartingOffset;
+    TrafficKey trafficKey;
+    fizz::CipherSuite cipherSuite;
+    const Buf& packetProtectionKey;
   };
 
  private:
-  SendInstruction(StreamId idIn, uint64_t offsetIn, uint64_t lenIn, bool finIn)
-      : streamId(idIn), offset(offsetIn), len(lenIn), fin(finIn) {}
+  SendInstruction(
+      const ConnectionId& dcidIn,
+      const ConnectionId& scidIn,
+      const folly::SocketAddress& clientAddrIn,
+      PacketNum packetNumIn,
+      PacketNum largestAcked,
+      StreamId idIn,
+      uint64_t offsetIn,
+      uint64_t lenIn,
+      bool finIn,
+      uint64_t bufMetaStartingOffsetIn,
+      TrafficKey trafficKeyIn,
+      fizz::CipherSuite cipherSuiteIn,
+      const Buf& packetProtectionKeyIn)
+      : dcid(dcidIn),
+        scid(scidIn),
+        clientAddress(clientAddrIn),
+        packetNum(packetNumIn),
+        largestAckedPacketNum(largestAcked),
+        streamId(idIn),
+        offset(offsetIn),
+        len(lenIn),
+        fin(finIn),
+        bufMetaStartingOffset(bufMetaStartingOffsetIn),
+        trafficKey(std::move(trafficKeyIn)),
+        cipherSuite(cipherSuiteIn),
+        packetProtectionKey(packetProtectionKeyIn) {}
 };
 
 WriteStreamFrame sendInstructionToWriteStreamFrame(

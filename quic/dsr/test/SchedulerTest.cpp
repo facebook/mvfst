@@ -9,7 +9,7 @@
 #include <folly/portability/GTest.h>
 #include <quic/dsr/Scheduler.h>
 #include <quic/dsr/test/MockDSRPacketBuilder.h>
-#include <quic/dsr/test/Mocks.h>
+#include <quic/dsr/test/TestCommon.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 
@@ -18,25 +18,13 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-class SchedulerTest : public Test {
+class SchedulerTest : public DSRCommonTestFixture {
  public:
-  SchedulerTest() : conn_(FizzServerQuicHandshakeContext::Builder().build()) {
-    conn_.streamManager->setMaxLocalBidirectionalStreams(
-        kDefaultMaxStreamsBidirectional);
-    conn_.streamManager->setMaxLocalUnidirectionalStreams(
-        kDefaultMaxStreamsUnidirectional);
-    conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
-    conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
-    conn_.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
-    conn_.flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+  SchedulerTest() {
+    prepareFlowControlAndStreamLimit();
   }
 
  protected:
-  QuicServerConnectionState conn_;
   MockDSRPacketBuilder builder_;
 };
 

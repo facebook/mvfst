@@ -29,6 +29,7 @@ class MockAead : public Aead {
  public:
   MOCK_CONST_METHOD0(getCipherOverhead, size_t());
 
+  MOCK_CONST_METHOD0(getKey, folly::Optional<TrafficKey>());
   MOCK_CONST_METHOD3(
       _inplaceEncrypt,
       std::unique_ptr<folly::IOBuf>(
