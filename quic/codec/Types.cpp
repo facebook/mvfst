@@ -417,6 +417,9 @@ std::string toString(FrameType frame) {
       return "APPLICATION_CLOSE";
     case FrameType::HANDSHAKE_DONE:
       return "HANDSHAKE_DONE";
+    case FrameType::DATAGRAM:
+    case FrameType::DATAGRAM_LEN:
+      return "DATAGRAM";
     case FrameType::KNOB:
       return "KNOB";
     case FrameType::ACK_FREQUENCY:

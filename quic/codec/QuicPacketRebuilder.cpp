@@ -179,6 +179,12 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
         writeSuccess = ret;
         break;
       }
+      case QuicWriteFrame::Type::DatagramFrame:
+        // Do not clone Datagram frames. If datagram frame is the only frame in
+        // the packet, notPureAck will be false, and the function will return
+        // folly::none correctly.
+        writeSuccess = true;
+        break;
       default: {
         bool ret = writeFrame(QuicWriteFrame(frame), builder_) != 0;
         notPureAck |= ret;

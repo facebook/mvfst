@@ -73,6 +73,9 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "connection_close";
     case FrameType::HANDSHAKE_DONE:
       return "handshake_done";
+    case FrameType::DATAGRAM:
+    case FrameType::DATAGRAM_LEN:
+      return "datagram";
     case FrameType::KNOB:
       return "knob";
     case FrameType::ACK_FREQUENCY:

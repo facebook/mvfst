@@ -717,6 +717,29 @@ folly::Expected<RetryToken, TransportErrorCode> parsePlaintextRetryToken(
   return RetryToken(connId, *ipAddress, clientPort, timestampInMs);
 }
 
+DatagramFrame decodeDatagramFrame(BufQueue& queue, bool hasLen) {
+  folly::io::Cursor cursor(queue.front());
+  size_t length = cursor.length();
+  if (hasLen) {
+    auto decodeLength = decodeQuicInteger(cursor);
+    if (!decodeLength) {
+      throw QuicTransportException(
+          "Invalid datagram len",
+          TransportErrorCode::FRAME_ENCODING_ERROR,
+          FrameType::DATAGRAM_LEN);
+    }
+    length = decodeLength->first;
+    if (cursor.length() < length) {
+      throw QuicTransportException(
+          "Invalid datagram frame",
+          TransportErrorCode::FRAME_ENCODING_ERROR,
+          FrameType::DATAGRAM_LEN);
+    }
+    queue.trimStart(decodeLength->second);
+  }
+  return DatagramFrame(length, queue.splitAtMost(length));
+}
+
 QuicFrame parseFrame(
     BufQueue& queue,
     const PacketHeader& header,
@@ -729,10 +752,10 @@ QuicFrame parseFrame(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);
   }
   queue.trimStart(cursor - queue.front());
-  bool isStream = false;
+  bool consumedQueue = false;
   bool error = false;
   SCOPE_EXIT {
-    if (isStream || error) {
+    if (consumedQueue || error) {
       return;
     }
     queue.trimStart(cursor - queue.front());
@@ -765,7 +788,7 @@ QuicFrame parseFrame(
       case FrameType::STREAM_OFF_FIN:
       case FrameType::STREAM_OFF_LEN:
       case FrameType::STREAM_OFF_LEN_FIN:
-        isStream = true;
+        consumedQueue = true;
         return QuicFrame(
             decodeStreamFrame(queue, StreamTypeField(frameTypeInt->first)));
       case FrameType::MAX_DATA:
@@ -798,6 +821,14 @@ QuicFrame parseFrame(
         return QuicFrame(decodeApplicationClose(cursor));
       case FrameType::HANDSHAKE_DONE:
         return QuicFrame(decodeHandshakeDoneFrame(cursor));
+      case FrameType::DATAGRAM: {
+        consumedQueue = true;
+        return QuicFrame(decodeDatagramFrame(queue, false /* hasLen */));
+      }
+      case FrameType::DATAGRAM_LEN: {
+        consumedQueue = true;
+        return QuicFrame(decodeDatagramFrame(queue, true /* hasLen */));
+      }
       case FrameType::KNOB:
         return QuicFrame(decodeKnobFrame(cursor));
       case FrameType::ACK_FREQUENCY:

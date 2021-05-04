@@ -1098,6 +1098,9 @@ void onServerReadDataFromOpen(
               conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
           break;
         }
+        case QuicFrame::Type::DatagramFrame:
+          isNonProbingPacket = true;
+          // TODO:
         default: {
           break;
         }

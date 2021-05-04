@@ -671,6 +671,23 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
     case QuicWriteFrame::Type::QuicSimpleFrame: {
       return writeSimpleFrame(std::move(*frame.asQuicSimpleFrame()), builder);
     }
+    case QuicWriteFrame::Type::DatagramFrame: {
+      const DatagramFrame& datagramFrame = *frame.asDatagramFrame();
+      QuicInteger frameTypeQuicInt(
+          static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
+      QuicInteger datagramLenInt(datagramFrame.length);
+      auto datagramFrameLength = frameTypeQuicInt.getSize() +
+          datagramFrame.length + datagramLenInt.getSize();
+      if (packetSpaceCheck(spaceLeft, datagramFrameLength)) {
+        builder.write(frameTypeQuicInt);
+        builder.write(datagramLenInt);
+        builder.insert(std::move(datagramFrame.data), datagramFrame.length);
+        builder.appendFrame(datagramFrame);
+        return datagramFrameLength;
+      }
+      // no space left in packet
+      return size_t(0);
+    }
     default: {
       // TODO add support for: RETIRE_CONNECTION_ID and NEW_TOKEN frames
       auto errorStr = folly::to<std::string>(

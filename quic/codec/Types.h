@@ -585,6 +585,35 @@ struct HandshakeDoneFrame {
   }
 };
 
+struct DatagramFrame {
+  size_t length;
+  BufQueue data;
+
+  explicit DatagramFrame(size_t len, Buf buf)
+      : length(len), data(std::move(buf)) {
+    CHECK_EQ(length, data.chainLength());
+  }
+
+  // Variant requirement:
+  DatagramFrame(const DatagramFrame& other)
+      : length(other.length),
+        data(other.data.front() ? other.data.front()->clone() : nullptr) {
+    CHECK_EQ(length, data.chainLength());
+  }
+
+  bool operator==(const DatagramFrame& other) const {
+    if (length != other.length) {
+      return false;
+    }
+    if (data.empty() && other.data.empty()) {
+      return true;
+    }
+    CHECK(data.front() && other.data.front());
+    folly::IOBufEqualTo eq;
+    return eq(*data.front(), *other.data.front());
+  }
+};
+
 // Frame to represent ones we skip
 struct NoopFrame {
   bool operator==(const NoopFrame&) const {
@@ -649,7 +678,8 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(ReadNewTokenFrame, __VA_ARGS__)      \
   F(QuicSimpleFrame, __VA_ARGS__)        \
   F(PingFrame, __VA_ARGS__)              \
-  F(NoopFrame, __VA_ARGS__)
+  F(NoopFrame, __VA_ARGS__)              \
+  F(DatagramFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
 
@@ -667,7 +697,8 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(WriteCryptoFrame, __VA_ARGS__)       \
   F(QuicSimpleFrame, __VA_ARGS__)        \
   F(PingFrame, __VA_ARGS__)              \
-  F(NoopFrame, __VA_ARGS__)
+  F(NoopFrame, __VA_ARGS__)              \
+  F(DatagramFrame, __VA_ARGS__)
 
 // Types of frames which are written.
 DECLARE_VARIANT_TYPE(QuicWriteFrame, QUIC_WRITE_FRAME)

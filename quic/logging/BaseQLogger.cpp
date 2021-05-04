@@ -164,15 +164,20 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         event->frames.push_back(std::make_unique<ReadNewTokenFrameLog>());
         break;
       }
-      case QuicFrame::Type::PingFrame:
+      case QuicFrame::Type::PingFrame: {
         event->frames.push_back(std::make_unique<quic::PingFrameLog>());
         break;
+      }
       case QuicFrame::Type::QuicSimpleFrame: {
         const auto& simpleFrame = *quicFrame.asQuicSimpleFrame();
         addQuicSimpleFrameToEvent(event.get(), simpleFrame);
         break;
       }
       case QuicFrame::Type::NoopFrame: {
+        break;
+      }
+      case QuicFrame::Type::DatagramFrame: {
+        // TODO
         break;
       }
     }
@@ -274,8 +279,16 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         addQuicSimpleFrameToEvent(event.get(), simpleFrame);
         break;
       }
-      default:
+      case QuicWriteFrame::Type::NoopFrame: {
         break;
+      }
+      case QuicWriteFrame::Type::DatagramFrame: {
+        // TODO
+        break;
+      }
+      default: {
+        break;
+      }
     }
   }
   if (numPaddingFrames > 0) {

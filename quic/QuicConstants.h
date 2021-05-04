@@ -158,6 +158,8 @@ enum class FrameType : uint64_t {
   // CONNECTION_CLOSE_APP_ERR frametype is use to indicate application errors
   CONNECTION_CLOSE_APP_ERR = 0x1D,
   HANDSHAKE_DONE = 0x1E,
+  DATAGRAM = 0x30,
+  DATAGRAM_LEN = 0x31,
   KNOB = 0x1550,
   ACK_FREQUENCY = 0xAF,
 };

@@ -136,6 +136,8 @@ HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& cursor);
 folly::Expected<RetryToken, TransportErrorCode> parsePlaintextRetryToken(
     folly::io::Cursor& cursor);
 
+DatagramFrame decodeDatagramFrame(BufQueue& queue, bool hasLen);
+
 /**
  * Parse the Invariant fields in Long Header.
  *
