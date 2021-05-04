@@ -32,6 +32,7 @@ TEST_F(SchedulerTest, ScheduleStream) {
   DSRStreamFrameScheduler scheduler(conn_);
   EXPECT_FALSE(scheduler.hasPendingData());
   auto stream = *conn_.streamManager->createNextBidirectionalStream();
+  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   writeDataToQuicStream(
       *stream, folly::IOBuf::copyBuffer("New York Bagles"), false);
   BufferMeta bufMeta(200);
@@ -49,7 +50,7 @@ TEST_F(SchedulerTest, ScheduleStream) {
         EXPECT_EQ(200, instruction.len);
         EXPECT_TRUE(instruction.fin);
       }));
-  EXPECT_TRUE(scheduler.writeStream(builder_));
+  EXPECT_TRUE(scheduler.writeStream(builder_).writeSuccess);
 
   auto writtenMeta = stream->writeBufMeta.split(200);
   EXPECT_EQ(0, stream->writeBufMeta.length);

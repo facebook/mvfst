@@ -28,22 +28,25 @@ bool DSRStreamFrameScheduler::hasPendingData() const {
  * same backend. Thus one SendInstruction can only have one stream. So this API
  * only write a single stream.
  */
-bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
+DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
+    DSRPacketBuilderBase& builder) {
+  SchedulingResult result;
   auto& writableDSRStreams = conn_.streamManager->writableDSRStreams();
   const auto& levelIter = std::find_if(
       writableDSRStreams.levels.cbegin(),
       writableDSRStreams.levels.cend(),
       [&](const auto& level) { return !level.streams.empty(); });
   if (levelIter == writableDSRStreams.levels.cend()) {
-    return false;
+    return result;
   }
   auto streamId = levelIter->streams.cbegin();
   auto stream = conn_.streamManager->findStream(*streamId);
   CHECK(stream);
+  CHECK(stream->dsrSender);
+  result.sender = stream->dsrSender.get();
   bool hasFreshBufMeta = stream->writeBufMeta.length > 0;
   bool hasLossBufMeta = !stream->lossBufMetas.empty();
   CHECK(hasFreshBufMeta || hasLossBufMeta);
-  bool written = false;
   if (hasLossBufMeta) {
     SendInstruction::Builder instructionBuilder(conn_, *streamId);
     auto encodedSize = writeDSRStreamFrame(
@@ -58,19 +61,19 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
         stream->currentWriteOffset + stream->writeBuffer.chainLength());
     if (encodedSize > 0) {
       if (builder.remainingSpace() < encodedSize) {
-        return false;
+        return result;
       }
       enrichInstruction(instructionBuilder);
       builder.addSendInstruction(instructionBuilder.build(), encodedSize);
-      written = true;
+      result.writeSuccess = true;
     }
   }
   if (!hasFreshBufMeta || builder.remainingSpace() == 0) {
-    return written;
+    return result;
   }
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
   if (connWritableBytes == 0) {
-    return written;
+    return result;
   }
   auto flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(*stream), connWritableBytes);
@@ -88,13 +91,14 @@ bool DSRStreamFrameScheduler::writeStream(DSRPacketBuilderBase& builder) {
       stream->currentWriteOffset + stream->writeBuffer.chainLength());
   if (encodedSize > 0) {
     if (builder.remainingSpace() < encodedSize) {
-      return written;
+      return result;
     }
     enrichInstruction(instructionBuilder);
     builder.addSendInstruction(instructionBuilder.build(), encodedSize);
-    return true;
+    result.writeSuccess = true;
+    return result;
   }
-  return written;
+  return result;
 }
 
 void DSRStreamFrameScheduler::enrichInstruction(

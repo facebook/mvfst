@@ -6,6 +6,7 @@
  *
  */
 
+#include <folly/ScopeGuard.h>
 #include <quic/dsr/WriteFunctions.h>
 
 namespace quic {
@@ -14,12 +15,14 @@ uint64_t writePacketizationRequest(
     DSRStreamFrameScheduler& scheduler,
     const ConnectionId& dstCid,
     size_t packetLimit,
-    const Aead& aead,
-    DSRPacketizationRequestSender& sender) {
+    const Aead& aead) {
   auto writeLoopBeginTime = Clock::now();
   uint64_t packetCounter = 0;
-  // TODO: Do i maintain this ad-hoc packetCounter, or should
-  // DSRPacketizationRequestSender maintains a counter?
+  std::set<DSRPacketizationRequestSender*> senders;
+  SCOPE_EXIT {
+    std::for_each(
+        senders.begin(), senders.end(), [](auto* sender) { sender->flush(); });
+  };
   while (scheduler.hasPendingData() && packetCounter < packetLimit &&
          (packetCounter < connection.transportSettings.maxBatchSize ||
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
@@ -40,8 +43,8 @@ uint64_t writePacketizationRequest(
         std::move(header),
         getAckState(connection, PacketNumberSpace::AppData)
             .largestAckedByPeer.value_or(0));
-    bool schedulerWritten = scheduler.writeStream(packetBuilder);
-    if (!schedulerWritten) {
+    auto schedulerResult = scheduler.writeStream(packetBuilder);
+    if (!schedulerResult.writeSuccess) {
       /**
        * Scheduling can fail when we:
        * (1) run out of flow control
@@ -52,18 +55,19 @@ uint64_t writePacketizationRequest(
        *
        * At least for (1) and (3), we should flush the sender.
        */
-      sender.flush();
+      if (schedulerResult.sender) {
+        senders.insert(schedulerResult.sender);
+      }
       return packetCounter;
     }
+    CHECK(schedulerResult.sender);
     auto packet = std::move(packetBuilder).buildPacket();
     // The contract is that if scheduler can schedule, builder has to be able to
     // build.
     CHECK_GT(packet.encodedSize, 0);
     bool instructionAddError = false;
     for (const auto& instruction : packet.sendInstructions) {
-      // Yes, it is wasteful to add the same conn and cipher info to every
-      // instruction. On the other hand, they are very small.
-      if (!sender.addSendInstruction(instruction)) {
+      if (!schedulerResult.sender->addSendInstruction(instruction)) {
         instructionAddError = true;
         break;
       }
@@ -85,13 +89,13 @@ uint64_t writePacketizationRequest(
         true /* isDSRPacket */);
 
     if (instructionAddError) {
-      // TODO: should I flush? This depends on the sender I think.
       // TODO: Support empty write loop detection
+      senders.insert(schedulerResult.sender);
       return packetCounter;
     }
     ++packetCounter;
+    senders.insert(schedulerResult.sender);
   }
-  sender.flush();
   return packetCounter;
 }
 } // namespace quic

@@ -24,8 +24,7 @@ TEST_F(WriteFunctionsTest, SchedulerNoData) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       0,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, CwndBlockd) {
@@ -40,8 +39,7 @@ TEST_F(WriteFunctionsTest, CwndBlockd) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       0,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, FlowControlBlockded) {
@@ -56,8 +54,7 @@ TEST_F(WriteFunctionsTest, FlowControlBlockded) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       0,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
 }
 
 TEST_F(WriteFunctionsTest, WriteOne) {
@@ -69,11 +66,10 @@ TEST_F(WriteFunctionsTest, WriteOne) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       1,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
   EXPECT_GT(stream->writeBufMeta.offset, currentBufMetaOffset);
   EXPECT_EQ(1, stream->retransmissionBufMetas.size());
-  EXPECT_EQ(1, instructionCounter_);
+  EXPECT_EQ(1, countInstructions(streamId));
   EXPECT_EQ(1, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
@@ -86,10 +82,9 @@ TEST_F(WriteFunctionsTest, WriteTwoInstructions) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       2,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
   EXPECT_EQ(2, stream->retransmissionBufMetas.size());
-  EXPECT_EQ(2, instructionCounter_);
+  EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
@@ -108,10 +103,9 @@ TEST_F(WriteFunctionsTest, PacketLimit) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       20,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
   EXPECT_EQ(20, stream->retransmissionBufMetas.size());
-  EXPECT_EQ(20, instructionCounter_);
+  EXPECT_EQ(20, countInstructions(streamId));
   EXPECT_EQ(20, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
@@ -126,14 +120,14 @@ TEST_F(WriteFunctionsTest, WriteTwoStreams) {
   size_t packetLimit = 20;
   EXPECT_EQ(
       2,
-      writePacketizationRequest(
-          conn_, scheduler_, cid, packetLimit, *aead_, sender_));
+      writePacketizationRequest(conn_, scheduler_, cid, packetLimit, *aead_));
   EXPECT_EQ(1, stream1->retransmissionBufMetas.size());
   EXPECT_EQ(1, stream2->retransmissionBufMetas.size());
   // TODO: This needs to be fixed later: The stream and the sender needs to be
   // 1:1 in the future. Then there will be two senders for this test case and
   // each of them will send out one instruction.
-  EXPECT_EQ(2, instructionCounter_);
+  EXPECT_EQ(1, countInstructions(streamId1));
+  EXPECT_EQ(1, countInstructions(streamId2));
   EXPECT_EQ(2, conn_.outstandings.packets.size());
   EXPECT_TRUE(verifyAllOutstandingsAreDSR());
 }
@@ -147,16 +141,11 @@ TEST_F(WriteFunctionsTest, TwoInstructionsInOnePacket) {
   auto split = stream->writeBufMeta.split(500);
   stream->lossBufMetas.push_back(split);
   size_t packetLimit = 10;
-  EXPECT_CALL(sender_, addSendInstruction(_)).Times(2);
   EXPECT_EQ(
       1,
       writePacketizationRequest(
-          conn_,
-          scheduler_,
-          getTestConnectionId(),
-          packetLimit,
-          *aead_,
-          sender_));
+          conn_, scheduler_, getTestConnectionId(), packetLimit, *aead_));
+  EXPECT_EQ(2, countInstructions(streamId));
   EXPECT_EQ(1, conn_.outstandings.packets.size());
   auto& packet = conn_.outstandings.packets.back().packet;
   EXPECT_EQ(2, packet.frames.size());

@@ -19,8 +19,20 @@ class DSRStreamFrameScheduler {
 
   FOLLY_NODISCARD bool hasPendingData() const;
 
+  struct SchedulingResult {
+    bool writeSuccess{false};
+    DSRPacketizationRequestSender* sender{nullptr};
+
+    explicit SchedulingResult(
+        bool written,
+        DSRPacketizationRequestSender* senderIn)
+        : writeSuccess(written), sender(senderIn) {}
+
+    SchedulingResult() : writeSuccess(false), sender(nullptr) {}
+  };
+
   // Write a single stream's data into builder.
-  bool writeStream(DSRPacketBuilderBase& builder);
+  SchedulingResult writeStream(DSRPacketBuilderBase& builder);
 
  private:
   void enrichInstruction(SendInstruction::Builder& builder);

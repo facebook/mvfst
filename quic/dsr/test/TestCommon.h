@@ -55,14 +55,6 @@ class DSRCommonTestFixture : public testing::Test {
     }));
     conn_.oneRttWriteCipher = std::move(mockCipher);
 
-    ON_CALL(sender_, addSendInstruction(testing::_))
-        .WillByDefault(testing::Invoke([&](const SendInstruction& instruction) {
-          pendingInstructions_.push_back(instruction);
-          instructionCounter_++;
-          return true;
-        }));
-    ON_CALL(sender_, flush()).WillByDefault(testing::Return(true));
-
     serverHandshake_ = std::make_unique<FakeServerHandshake>(
         conn_,
         FizzServerQuicHandshakeContext::Builder()
@@ -96,6 +88,21 @@ class DSRCommonTestFixture : public testing::Test {
         kDefaultMaxStreamsUnidirectional);
     auto id = conn_.streamManager->createNextBidirectionalStream().value()->id;
     auto stream = conn_.streamManager->findStream(id);
+
+    auto sender = std::make_unique<MockDSRPacketizationRequestSender>();
+    ON_CALL(*sender, addSendInstruction(testing::_))
+        .WillByDefault(testing::Invoke([&](const SendInstruction& instruction) {
+          pendingInstructions_.push_back(instruction);
+          auto streamId = instruction.streamId;
+          if (instructionCounter_.count(streamId) == 0) {
+            instructionCounter_[streamId] = 1;
+          } else {
+            instructionCounter_[streamId] += 1;
+          }
+          return true;
+        }));
+    ON_CALL(*sender, flush()).WillByDefault(testing::Return(true));
+    stream->dsrSender = std::move(sender);
     writeDataToQuicStream(
         *stream,
         folly::IOBuf::copyBuffer("MetroCard Customer Claims"),
@@ -103,6 +110,13 @@ class DSRCommonTestFixture : public testing::Test {
     BufferMeta bufMeta(bufMetaLength);
     writeBufMetaToQuicStream(*stream, bufMeta, true /* eof */);
     return id;
+  }
+
+  size_t countInstructions(StreamId streamId) {
+    if (instructionCounter_.count(streamId) == 0) {
+      return 0;
+    }
+    return instructionCounter_[streamId];
   }
 
   bool verifyAllOutstandingsAreDSR() const {
@@ -116,8 +130,7 @@ class DSRCommonTestFixture : public testing::Test {
   QuicServerConnectionState conn_;
   DSRStreamFrameScheduler scheduler_;
   std::unique_ptr<Aead> aead_;
-  MockDSRPacketizationRequestSender sender_;
-  size_t instructionCounter_{0};
+  std::unordered_map<StreamId, size_t> instructionCounter_;
   std::vector<SendInstruction> pendingInstructions_;
   Buf packetProtectionKey_;
   std::unique_ptr<FakeServerHandshake> serverHandshake_;

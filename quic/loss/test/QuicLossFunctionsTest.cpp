@@ -17,6 +17,8 @@
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/d6d/test/Mocks.h>
+#include <quic/dsr/Types.h>
+#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
@@ -2258,6 +2260,7 @@ TEST_F(QuicLossFunctionsTest, TotalPacketsMarkedLostByPtoAndReordering) {
 TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   auto conn = createConn();
   auto* stream = conn->streamManager->createNextBidirectionalStream().value();
+  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
   writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("grape"), false);
   writeBufMetaToQuicStream(*stream, BufferMeta(1000), true);
   auto bufMetaStartingOffset = stream->writeBufMeta.offset;
