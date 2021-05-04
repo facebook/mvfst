@@ -235,12 +235,6 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       bool isForwardedData = false) override;
 
   /**
-   * Set an EventBaseObserver for server and all its workers. This only works
-   * after server is already start()-ed, no-op otherwise.
-   */
-  void setEventBaseObserver(std::shared_ptr<folly::EventBaseObserver> observer);
-
-  /**
    * Set the transport factory for the worker associated with the given
    * eventbase.
    * This is relevant if the QuicServer is initialized with the vector of

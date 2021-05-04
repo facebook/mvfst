@@ -55,24 +55,6 @@ MATCHER_P(NetworkDataMatches, networkData, "") {
   return false;
 }
 
-class TestingEventBaseObserver : public folly::EventBaseObserver {
- public:
-  uint32_t getSampleRate() const override {
-    return 0; // Always sample
-  }
-
-  void loopSample(int64_t, int64_t) override {
-    observerCalled_ = true;
-  }
-
-  bool observerCalled() const noexcept {
-    return observerCalled_;
-  }
-
- private:
-  bool observerCalled_{false};
-};
-
 /**
  * QuicServerWorker test without a connection to drive any real behavior. Use
  * QuicServerWorkerTest for most cases.
@@ -2339,8 +2321,6 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
 
   folly::SocketAddress addr2("::1", 0);
@@ -2372,15 +2352,12 @@ TEST_F(QuicServerTest, NetworkTestVersionNegotiation) {
   ASSERT_TRUE(versionPacket.has_value());
 
   EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
-  EXPECT_TRUE(testingObserver->observerCalled());
 }
 
 TEST_F(QuicServerTest, NetworkTestVersionNegotiationMinLength) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
 
   folly::SocketAddress addr2("::1", 0);
@@ -2410,8 +2387,6 @@ TEST_F(QuicServerTest, NetworkTestNoVersionNegotiation) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
 
   folly::SocketAddress addr2("::1", 0);
@@ -2444,8 +2419,6 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   server_->start(addr, 2);
   server_->rejectNewConnections(true);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
 
   folly::SocketAddress addr2("::1", 0);
@@ -2479,7 +2452,6 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
 
   EXPECT_EQ(versionPacket->destinationConnectionId, clientConnId);
   EXPECT_EQ(versionPacket->sourceConnectionId, serverConnId);
-  EXPECT_TRUE(testingObserver->observerCalled());
   EXPECT_EQ(versionPacket->versions.size(), 1);
   EXPECT_EQ(versionPacket->versions.at(0), QuicVersion::MVFST_INVALID);
 }
@@ -2517,8 +2489,6 @@ void QuicServerTest::testReset(Buf packet) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
   auto serverAddr = server_->getAddress();
 
   folly::SocketAddress addr2("::1", 0);
@@ -2619,8 +2589,6 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 1);
   server_->waitUntilInitialized();
-  auto testingObserver = std::make_shared<TestingEventBaseObserver>();
-  server_->setEventBaseObserver(testingObserver);
 
   setUpTransportFactoryForWorkers(evbs);
   std::shared_ptr<MockQuicTransport> transport;

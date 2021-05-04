@@ -636,18 +636,6 @@ void QuicServer::rejectNewConnections(bool reject) {
       [reject](auto worker) mutable { worker->rejectNewConnections(reject); });
 }
 
-void QuicServer::setEventBaseObserver(
-    std::shared_ptr<folly::EventBaseObserver> observer) {
-  if (shutdown_ || workerEvbs_.empty()) {
-    return;
-  }
-  workerEvbs_.front()->getEventBase()->runInEventBaseThreadAndWait(
-      [&] { evbObserver_ = observer; });
-  runOnAllWorkers([observer](auto worker) {
-    worker->getEventBase()->setObserver(observer);
-  });
-}
-
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
   if (initialized_) {
     runOnAllWorkersSync([destAddr](auto worker) mutable {
