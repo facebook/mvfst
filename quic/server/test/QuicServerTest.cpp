@@ -1847,7 +1847,6 @@ class QuicServerTest : public Test {
     EXPECT_CALL(*transport, setTransportStatsCallback(nullptr));
     EXPECT_CALL(*transport, setRoutingCallback(nullptr));
     EXPECT_CALL(*transport, closeNow(_));
-    mockStats_.reset();
     server_->shutdown();
     closeUdpClient(std::move(client));
     // cleanup transport
@@ -1863,7 +1862,6 @@ class QuicServerTest : public Test {
   MockQuicServerTransportFactory* factory_;
   TransportSettings transportSettings_;
   MockQuicStatsFactory* transportStatsFactory_;
-  folly::ThreadLocalPtr<MockQuicStats> mockStats_;
   uint32_t clientHostId_{0}, serverHostId_{0xAABBCC};
 }; // namespace test
 
