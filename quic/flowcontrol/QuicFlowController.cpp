@@ -210,7 +210,8 @@ void updateFlowControlOnWriteToStream(
 void updateFlowControlOnResetStream(QuicStreamState& stream) {
   decrementWithOverFlowCheck(
       stream.conn.flowControlState.sumCurStreamBufferLen,
-      static_cast<uint64_t>(stream.writeBuffer.chainLength()));
+      static_cast<uint64_t>(
+          stream.writeBuffer.chainLength() + stream.writeBufMeta.length));
 }
 
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {

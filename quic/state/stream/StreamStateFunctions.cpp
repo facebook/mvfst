@@ -19,6 +19,13 @@ void resetQuicStream(QuicStreamState& stream, ApplicationErrorCode error) {
   stream.readBuffer.clear();
   stream.lossBuffer.clear();
   stream.streamWriteError = error;
+  stream.writeBufMeta.length = 0;
+  stream.retransmissionBufMetas.clear();
+  stream.lossBufMetas.clear();
+  if (stream.dsrSender) {
+    stream.dsrSender->release();
+    stream.dsrSender.reset();
+  }
   stream.conn.streamManager->updateReadableStreams(stream);
   stream.conn.streamManager->updateWritableStreams(stream);
   stream.conn.streamManager->removeLoss(stream.id);

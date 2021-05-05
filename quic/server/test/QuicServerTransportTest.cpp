@@ -4328,12 +4328,15 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   server->writeChain(
       streamId, folly::IOBuf::copyBuffer("Allegro Maestoso"), false);
   auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  auto rawDSRSender = mockDSRSender.get();
   server->setDSRPacketizationRequestSender(streamId, std::move(mockDSRSender));
   BufferMeta bufMeta(2000);
   server->writeBufMeta(streamId, bufMeta, true);
   server->writeData();
   EXPECT_FALSE(server->getConn().outstandings.packets.empty());
   EXPECT_TRUE(server->getConn().outstandings.packets.back().isDSRPacket);
+  EXPECT_CALL(*rawDSRSender, release()).Times(1);
+  server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
 }
 
 } // namespace test

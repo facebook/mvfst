@@ -509,7 +509,9 @@ void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
 void QuicStreamManager::updateWritableStreams(QuicStreamState& stream) {
   if (stream.streamWriteError.has_value()) {
     CHECK(stream.lossBuffer.empty());
+    CHECK(stream.lossBufMetas.empty());
     removeWritable(stream);
+    removeDSRWritable(stream);
     return;
   }
   if (stream.hasWritableData() || !stream.lossBuffer.empty()) {
