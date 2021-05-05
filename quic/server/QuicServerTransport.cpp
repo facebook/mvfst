@@ -302,7 +302,7 @@ void QuicServerTransport::writeData() {
                        version,
                        packetLimit)
                        .packetsWritten;
-    if (packetLimit) {
+    if (packetLimit && conn_->transportSettings.dsrEnabled) {
       packetLimit -= writePacketizationRequest(
           *serverConn_, destConnId, packetLimit, *conn_->oneRttWriteCipher);
     }
