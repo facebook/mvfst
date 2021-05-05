@@ -610,7 +610,9 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.bytesInFlight = conn_->lossState.inflightBytes;
   transportInfo.bodyBytesSent = conn_->lossState.totalBodyBytesSent;
   transportInfo.bodyBytesAcked = conn_->lossState.totalBodyBytesAcked;
-
+  transportInfo.totalStreamBytesSent = conn_->lossState.totalStreamBytesSent;
+  transportInfo.totalNewStreamBytesSent =
+      conn_->lossState.totalNewStreamBytesSent;
   transportInfo.ptoCount = conn_->lossState.ptoCount;
   transportInfo.totalPTOCount = conn_->lossState.totalPTOCount;
   transportInfo.largestPacketAckedByPeer =

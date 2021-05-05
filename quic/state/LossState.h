@@ -66,6 +66,16 @@ struct LossState {
   // have no encoded body bytes).
   uint64_t totalBodyBytesAcked{0};
 
+  // Total number of stream bytes sent on this connection.
+  // Includes retransmissions of stream bytes.
+  uint64_t totalStreamBytesSent{0};
+  // Total number of 'new' stream bytes sent on this connection.
+  // Does not include retransmissions of stream bytes.
+  //
+  // Equal to ConnectionFlowControlState::sumCurWriteOffset, stored here as well
+  // to colocate with other related vars to assist with interpreting LossState.
+  uint64_t totalNewStreamBytesSent{0};
+
   // Total number of packets sent on this connection, including retransmissions.
   uint32_t totalPacketsSent{0};
   // Total number of ack-eliciting packets sent on this connection.

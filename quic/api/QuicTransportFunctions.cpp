@@ -599,6 +599,8 @@ void updateConnection(
   bool isPing = false;
   uint32_t connWindowUpdateSent = 0;
   uint32_t ackFrameCounter = 0;
+  uint32_t streamBytesSent = 0;
+  uint32_t newStreamBytesSent = 0;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
   bool isD6DProbe = packetNumberSpace == PacketNumberSpace::AppData &&
       conn.d6d.lastProbe.hasValue() &&
@@ -643,9 +645,11 @@ void updateConnection(
           maybeWriteBlockAfterSocketWrite(*stream);
           maybeWriteDataBlockedAfterSocketWrite(conn);
           conn.streamManager->addTx(writeStreamFrame.streamId);
+          newStreamBytesSent += writeStreamFrame.len;
         }
         conn.streamManager->updateWritableStreams(*stream);
         conn.streamManager->updateLossStreams(*stream);
+        streamBytesSent += writeStreamFrame.len;
         break;
       }
       case QuicWriteFrame::Type::WriteCryptoFrame: {
@@ -794,6 +798,8 @@ void updateConnection(
   conn.lossState.totalBytesSent += encodedSize;
   conn.lossState.totalBodyBytesSent += encodedBodySize;
   conn.lossState.totalPacketsSent++;
+  conn.lossState.totalStreamBytesSent += streamBytesSent;
+  conn.lossState.totalNewStreamBytesSent += newStreamBytesSent;
 
   if (!retransmittable && !isPing) {
     DCHECK(!packetEvent);
