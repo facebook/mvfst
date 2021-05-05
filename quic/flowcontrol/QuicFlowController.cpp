@@ -217,7 +217,7 @@ void updateFlowControlOnResetStream(QuicStreamState& stream) {
 void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
   // Only write blocked when stream becomes blocked
   if (getSendStreamFlowControlBytesWire(stream) == 0 &&
-      stream.writeBuffer.empty()) {
+      stream.writeBuffer.empty() && stream.writeBufMeta.length == 0) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     if (stream.conn.qLogger) {
@@ -244,12 +244,14 @@ void maybeWriteDataBlockedAfterSocketWrite(QuicConnectionStateBase& conn) {
 void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
   // Only write blocked when the flow control bytes are used up and there are
   // still pending data
-  if (stream.finalWriteOffset &&
-      *stream.finalWriteOffset < stream.currentWriteOffset) {
+  if (stream.streamWriteError) {
+    return;
+  }
+  if (stream.finalWriteOffset && stream.hasSentFIN()) {
     return;
   }
   if (getSendStreamFlowControlBytesWire(stream) == 0 &&
-      !stream.writeBuffer.empty()) {
+      (!stream.writeBuffer.empty() || stream.writeBufMeta.length > 0)) {
     stream.conn.streamManager->queueBlocked(
         stream.id, stream.flowControlState.peerAdvertisedMaxOffset);
     if (stream.conn.qLogger) {
@@ -273,7 +275,8 @@ void handleStreamWindowUpdate(
   if (stream.flowControlState.peerAdvertisedMaxOffset <= maximumData) {
     stream.flowControlState.peerAdvertisedMaxOffset = maximumData;
     if (stream.flowControlState.peerAdvertisedMaxOffset >
-        stream.currentWriteOffset + stream.writeBuffer.chainLength()) {
+        stream.currentWriteOffset + stream.writeBuffer.chainLength() +
+            stream.writeBufMeta.length) {
       updateFlowControlList(stream);
     }
     stream.conn.streamManager->updateWritableStreams(stream);
@@ -323,14 +326,15 @@ void handleStreamBlocked(QuicStreamState& stream) {
 uint64_t getSendStreamFlowControlBytesWire(const QuicStreamState& stream) {
   DCHECK_GE(
       stream.flowControlState.peerAdvertisedMaxOffset,
-      stream.currentWriteOffset);
+      stream.nextOffsetToWrite());
   return stream.flowControlState.peerAdvertisedMaxOffset -
-      stream.currentWriteOffset;
+      stream.nextOffsetToWrite();
 }
 
 uint64_t getSendStreamFlowControlBytesAPI(const QuicStreamState& stream) {
   auto sendFlowControlBytes = getSendStreamFlowControlBytesWire(stream);
-  auto dataInBuffer = stream.writeBuffer.chainLength();
+  auto dataInBuffer =
+      stream.writeBuffer.chainLength() + stream.writeBufMeta.length;
   if (dataInBuffer > sendFlowControlBytes) {
     return 0;
   } else {

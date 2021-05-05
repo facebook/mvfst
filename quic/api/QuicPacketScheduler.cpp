@@ -481,8 +481,10 @@ bool StreamFrameScheduler::writeStreamFrame(
   uint64_t flowControlLen =
       std::min(getSendStreamFlowControlBytesWire(stream), connWritableBytes);
   uint64_t bufferLen = stream.writeBuffer.chainLength();
-  bool canWriteFin =
-      stream.finalWriteOffset.has_value() && bufferLen <= flowControlLen;
+  // We can't write FIN directly from here if writeBufMeta has pending bytes to
+  // send.
+  bool canWriteFin = stream.finalWriteOffset.has_value() &&
+      bufferLen <= flowControlLen && stream.writeBufMeta.length == 0;
   auto dataLen = writeStreamFrameHeader(
       builder,
       stream.id,

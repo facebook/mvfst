@@ -318,6 +318,15 @@ TEST_F(QuicFlowControlTest, MaybeWriteBlockedAfterSocketWrite) {
   EXPECT_CALL(*transportInfoCb_, onStreamFlowControlBlocked()).Times(1);
   maybeWriteBlockAfterSocketWrite(stream);
   EXPECT_TRUE(conn_.streamManager->hasBlocked());
+
+  // No block if everything till FIN has been sent
+  conn_.streamManager->removeBlocked(id);
+  EXPECT_FALSE(conn_.streamManager->hasBlocked());
+  stream.finalWriteOffset =
+      stream.currentWriteOffset + stream.writeBuffer.chainLength();
+  stream.currentWriteOffset = *stream.finalWriteOffset + 1;
+  maybeWriteBlockAfterSocketWrite(stream);
+  EXPECT_FALSE(conn_.streamManager->hasBlocked());
 }
 
 TEST_F(QuicFlowControlTest, MaybeSendStreamWindowUpdateChangeWindowLarger) {
@@ -824,6 +833,27 @@ TEST_F(QuicFlowControlTest, OnStreamWindowUpdateSentWithoutPendingEvent) {
   onStreamWindowUpdateSent(stream, 1000, Clock::now());
   EXPECT_EQ(1000, stream.flowControlState.advertisedMaxOffset);
   EXPECT_FALSE(conn_.streamManager->pendingWindowUpdate(id));
+}
+
+TEST_F(QuicFlowControlTest, StreamFlowControlWithBufMeta) {
+  StreamId id = 0;
+  QuicStreamState stream(id, conn_);
+  stream.flowControlState.peerAdvertisedMaxOffset = 1000;
+  stream.currentWriteOffset = 200;
+  stream.writeBuffer.append(buildRandomInputData(100));
+  EXPECT_EQ(800, getSendStreamFlowControlBytesWire(stream));
+  EXPECT_EQ(700, getSendStreamFlowControlBytesAPI(stream));
+
+  stream.writeBufMeta.offset =
+      stream.currentWriteOffset + stream.writeBuffer.chainLength();
+  stream.writeBufMeta.length = 300;
+  EXPECT_EQ(800, getSendStreamFlowControlBytesWire(stream));
+  EXPECT_EQ(400, getSendStreamFlowControlBytesAPI(stream));
+
+  stream.currentWriteOffset += stream.writeBuffer.chainLength();
+  stream.writeBuffer.move();
+  EXPECT_EQ(700, getSendStreamFlowControlBytesWire(stream));
+  EXPECT_EQ(400, getSendStreamFlowControlBytesAPI(stream));
 }
 
 } // namespace test

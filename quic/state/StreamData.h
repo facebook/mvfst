@@ -134,8 +134,11 @@ struct QuicStreamLike {
 
   // Current offset of the start bytes in the write buffer.
   // This changes when we pop stuff off the writeBuffer.
-  // When we are finished writing out all the bytes until FIN, this will
-  // be one greater than finalWriteOffset.
+  // In a non-DSR stream, when we are finished writing out all the bytes until
+  // FIN, this will be one greater than finalWriteOffset.
+  // When DSR is used, this still points to the starting bytes in the write
+  // buffer. Its value won't change with WriteBufferMetas are appended and sent
+  // for a stream.
   uint64_t currentWriteOffset{0};
 
   // the minimum offset requires retransmit
@@ -327,6 +330,28 @@ struct QuicStreamState : public QuicStreamLike {
       return writeBufMeta.offset <= *finalWriteOffset;
     }
     return false;
+  }
+
+  FOLLY_NODISCARD bool hasSentFIN() const {
+    if (!finalWriteOffset) {
+      return false;
+    }
+    return currentWriteOffset > *finalWriteOffset ||
+        writeBufMeta.offset > *finalWriteOffset;
+  }
+
+  FOLLY_NODISCARD uint64_t nextOffsetToWrite() const {
+    // The stream has never had WriteBufferMetas. Then currentWriteOffset
+    // always points to the next offset we send. This of course relies on the
+    // current contract of DSR: Real data always comes first. This code (and a
+    // lot other code) breaks when that contract is breached.
+    if (writeBufMeta.offset == 0) {
+      return currentWriteOffset;
+    }
+    if (!writeBuffer.empty()) {
+      return currentWriteOffset;
+    }
+    return writeBufMeta.offset;
   }
 
   bool hasReadableData() const {

@@ -16,6 +16,8 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/dsr/Types.h>
+#include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
@@ -1737,6 +1739,39 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   EXPECT_TRUE(stream2->lossBuffer.empty());
   EXPECT_EQ(1, stream2->retransmissionBuffer.size());
   EXPECT_EQ(200, stream2->retransmissionBuffer[0]->data.chainLength());
+}
+
+TEST_F(QuicPacketSchedulerTest, NoFinWhenThereIsPendingWriteBuf) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  auto* stream = *(conn.streamManager->createNextBidirectionalStream());
+  stream->flowControlState.peerAdvertisedMaxOffset = 100000;
+
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false);
+  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  BufferMeta bufferMeta(5000);
+  writeBufMetaToQuicStream(*stream, bufferMeta, true);
+  EXPECT_TRUE(stream->finalWriteOffset.hasValue());
+  PacketNum packetNum = 0;
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder.encodePacketHeader();
+  StreamFrameScheduler scheduler(conn);
+  scheduler.writeStreams(builder);
+  auto packet = std::move(builder).buildPacket().packet;
+  EXPECT_EQ(1, packet.frames.size());
+  auto streamFrame = *packet.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamFrame.len, 6);
+  EXPECT_EQ(streamFrame.offset, 0);
+  EXPECT_FALSE(streamFrame.fin);
 }
 
 INSTANTIATE_TEST_CASE_P(

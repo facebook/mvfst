@@ -71,12 +71,21 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
   if (!hasFreshBufMeta || builder.remainingSpace() == 0) {
     return result;
   }
+  // If we have fresh BufMeta to write, the offset cannot be 0. This is based on
+  // the current limit that some real data has to be written into the stream
+  // before BufMetas.
+  CHECK_NE(stream->writeBufMeta.offset, 0);
   uint64_t connWritableBytes = getSendConnFlowControlBytesWire(conn_);
   if (connWritableBytes == 0) {
     return result;
   }
-  auto flowControlLen =
-      std::min(getSendStreamFlowControlBytesWire(*stream), connWritableBytes);
+  // When stream still has writeBuffer, getSendStreamFlowControlBytesWire counts
+  // from currentWriteOffset which isn't right for BufMetas.
+  auto streamFlowControlLen = std::min(
+      getSendStreamFlowControlBytesWire(*stream),
+      stream->flowControlState.peerAdvertisedMaxOffset -
+          stream->writeBufMeta.offset);
+  auto flowControlLen = std::min(streamFlowControlLen, connWritableBytes);
   bool canWriteFin = stream->finalWriteOffset.has_value() &&
       stream->writeBufMeta.length <= flowControlLen;
   SendInstruction::Builder instructionBuilder(conn_, *streamId);
