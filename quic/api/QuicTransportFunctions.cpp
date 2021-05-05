@@ -605,7 +605,8 @@ void updateConnection(
       conn.d6d.lastProbe->packetNum == packetNum;
   VLOG(10) << nodeToString(conn.nodeType) << " sent packetNum=" << packetNum
            << " in space=" << packetNumberSpace << " size=" << encodedSize
-           << " bodySize: " << encodedBodySize << " " << conn;
+           << " bodySize: " << encodedBodySize << " isDSR=" << isDSRPacket
+           << " " << conn;
   if (conn.qLogger) {
     conn.qLogger->addPacket(packet, encodedSize);
   }
