@@ -10,7 +10,10 @@
 
 #include <folly/portability/GMock.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
-#include <quic/dsr/Types.h>
+
+namespace quic {
+struct SendInstruction;
+}
 
 namespace quic::test {
 
