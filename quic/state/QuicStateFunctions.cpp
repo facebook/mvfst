@@ -116,9 +116,7 @@ void updateAckSendStateOnRecvPacket(
                << static_cast<int>(ackState.numNonRxPacketsRecvd);
       conn.pendingEvents.scheduleAckTimeout = false;
       ackState.needsToSendAckImmediately = true;
-      ackState.numRxPacketsRecvd = 0;
-      ackState.numNonRxPacketsRecvd = 0;
-    } else {
+    } else if (!ackState.needsToSendAckImmediately) {
       VLOG(10) << conn << " scheduling ack timeout pktHasCryptoData="
                << pktHasCryptoData << " pktHasRetransmittableData="
                << static_cast<int>(pktHasRetransmittableData)
@@ -127,7 +125,6 @@ void updateAckSendStateOnRecvPacket(
                << " numNonRxPacketsRecvd="
                << static_cast<int>(ackState.numNonRxPacketsRecvd);
       conn.pendingEvents.scheduleAckTimeout = true;
-      ackState.needsToSendAckImmediately = false;
     }
   } else if (
       ++ackState.numNonRxPacketsRecvd + ackState.numRxPacketsRecvd >= thresh) {
@@ -140,6 +137,8 @@ void updateAckSendStateOnRecvPacket(
     // TODO: experiment with outOfOrder and ack timer for NonRxPacket too
     conn.pendingEvents.scheduleAckTimeout = false;
     ackState.needsToSendAckImmediately = true;
+  }
+  if (ackState.needsToSendAckImmediately) {
     ackState.numRxPacketsRecvd = 0;
     ackState.numNonRxPacketsRecvd = 0;
   }

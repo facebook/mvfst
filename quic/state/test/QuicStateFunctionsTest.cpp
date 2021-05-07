@@ -19,10 +19,9 @@
 
 using namespace testing;
 
-namespace quic {
-namespace test {
+namespace quic::test {
 
-bool verifyToAckImmediately(
+bool verifyToAckImmediatelyAndZeroPacketsReceived(
     const QuicConnectionStateBase& conn,
     const AckState& ackState) {
   return !conn.pendingEvents.scheduleAckTimeout &&
@@ -229,26 +228,30 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequencyFromTolerance) {
   ackState.tolerance = 2;
   for (nextPacketNum; nextPacketNum <= 10; nextPacketNum++) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
-    if (nextPacketNum % 2 == 0) {
-      EXPECT_TRUE(ackState.needsToSendAckImmediately);
-      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
-    } else {
+    if (nextPacketNum < 2) {
       EXPECT_FALSE(ackState.needsToSendAckImmediately);
       EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+      EXPECT_EQ(nextPacketNum, ackState.numRxPacketsRecvd);
+    } else {
+      EXPECT_TRUE(ackState.needsToSendAckImmediately);
+      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+      EXPECT_EQ(0, ackState.numRxPacketsRecvd);
     }
-    EXPECT_EQ(ackState.numRxPacketsRecvd, nextPacketNum % 2);
+    EXPECT_EQ(0, ackState.numNonRxPacketsRecvd);
   }
   ackState.tolerance = 10;
   for (nextPacketNum; nextPacketNum <= 40; nextPacketNum++) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
-    if (nextPacketNum % 10 == 0) {
-      EXPECT_TRUE(ackState.needsToSendAckImmediately);
-      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
-    } else {
+    if (nextPacketNum < 10) {
       EXPECT_FALSE(ackState.needsToSendAckImmediately);
       EXPECT_TRUE(conn.pendingEvents.scheduleAckTimeout);
+      EXPECT_EQ(nextPacketNum, ackState.numRxPacketsRecvd);
+    } else {
+      EXPECT_TRUE(ackState.needsToSendAckImmediately);
+      EXPECT_FALSE(conn.pendingEvents.scheduleAckTimeout);
+      EXPECT_EQ(0, ackState.numRxPacketsRecvd);
     }
-    EXPECT_EQ(ackState.numRxPacketsRecvd, nextPacketNum % 10);
+    EXPECT_EQ(0, ackState.numRxPacketsRecvd);
   }
 }
 
@@ -286,7 +289,7 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsCrypto) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, true);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -298,16 +301,17 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxLimit) {
        i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
        i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-    EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
     EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
   }
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
-  // Ack one more, we will start counting again
+
+  // Followed by a retx packet, we will still need to ack immediately
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
-  EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsNonRxLimit) {
@@ -316,15 +320,16 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsNonRxLimit) {
   auto& ackState = getAckState(conn, GetParam());
   for (size_t i = 0; i < kNonRtxRxPacketsPendingBeforeAck - 1; i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-    EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
     EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
   }
   updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
-  // Ack one more, we will start counting again
+
+  // Followed by a non-rx packet, we will still need to ack immediately
   updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -340,15 +345,60 @@ TEST_P(
        i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 2;
        i++) {
     updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-    EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
     EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
   }
   updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
-  // Ack one more, we will start counting again
+
+  // Followed by a non-rx packet, we will still need to ack immediately
   updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+}
+
+TEST_P(
+    UpdateAckStateTest,
+    UpdateAckSendStateOnRecvPacketsRxLimitFollowedByNonRx) {
+  // Retx packets reach thresh
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& ackState = getAckState(conn, GetParam());
+  for (size_t i = 0;
+       i < conn.transportSettings.rxPacketsBeforeAckBeforeInit - 1;
+       i++) {
+    updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+    EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
+  }
+  updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+
+  // Followed by a non-retx packet, we will still need to ack immediately
+  updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+}
+
+TEST_P(
+    UpdateAckStateTest,
+    UpdateAckSendStateOnRecvPacketsNonRxLimitFollowedByRx) {
+  // Non-rx packets reach thresh
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& ackState = getAckState(conn, GetParam());
+  for (size_t i = 0; i < kNonRtxRxPacketsPendingBeforeAck - 1; i++) {
+    updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+    EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+  }
+  updateAckSendStateOnRecvPacket(conn, ackState, false, false, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+
+  // Followed by a retx packet, we will still need to ack immediately
+  updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -363,16 +413,17 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxAndNonRxMixed) {
     bool isRetransmittable = i % 2;
     updateAckSendStateOnRecvPacket(
         conn, ackState, false, isRetransmittable, false);
-    EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+    EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
     EXPECT_EQ(i >= 1, verifyToScheduleAckTimeout(conn));
   }
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
-  // Ack one more, we will start counting again
+
+  // Followed by a retx packet, we will still need to ack immediately
   updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
-  EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxOutOfOrder) {
@@ -380,7 +431,7 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxOutOfOrder) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
   updateAckSendStateOnRecvPacket(conn, ackState, true, true, false);
-  EXPECT_TRUE(verifyToAckImmediately(conn, ackState));
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -390,7 +441,7 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxOutOfOrderIgnore) {
   auto& ackState = getAckState(conn, GetParam());
   ackState.ignoreReorder = true;
   updateAckSendStateOnRecvPacket(conn, ackState, true, true, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+  EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_TRUE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -399,7 +450,39 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsNonRxOutOfOrder) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto& ackState = getAckState(conn, GetParam());
   updateAckSendStateOnRecvPacket(conn, ackState, true, false, false);
-  EXPECT_FALSE(verifyToAckImmediately(conn, ackState));
+  EXPECT_FALSE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+}
+
+TEST_P(
+    UpdateAckStateTest,
+    UpdateAckSendStateOnRecvPacketsRxOutOfOrderFollowedByInOrder) {
+  // Retransmittable & out of order: ack immediately
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& ackState = getAckState(conn, GetParam());
+  updateAckSendStateOnRecvPacket(conn, ackState, true, true, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+
+  // Followed by a retransmittable & in order: still ack immediately
+  updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+}
+
+TEST_P(
+    UpdateAckStateTest,
+    UpdateAckSendStateOnRecvPacketsCryptoFollowedByNonCrypto) {
+  // Retransmittable & Crypto: ack immediately
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto& ackState = getAckState(conn, GetParam());
+  updateAckSendStateOnRecvPacket(conn, ackState, false, true, true);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
+  EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
+
+  // Followed by a retransmittable & non Crypo: still ack immediately
+  updateAckSendStateOnRecvPacket(conn, ackState, false, true, false);
+  EXPECT_TRUE(verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState));
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
@@ -769,5 +852,4 @@ INSTANTIATE_TEST_CASE_P(
         PacketNumberSpace::Handshake,
         PacketNumberSpace::AppData));
 
-} // namespace test
-} // namespace quic
+} // namespace quic::test
