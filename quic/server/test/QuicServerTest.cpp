@@ -2557,6 +2557,7 @@ TEST_F(QuicServerTest, NetworkTestResetLargePacket) {
       *buf,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
+  ASSERT_LE(packet->computeChainDataLength(), kDefaultUDPSendPacketLen);
   testReset(std::move(packet));
 }
 

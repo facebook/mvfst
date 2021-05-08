@@ -312,7 +312,7 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
   }
   builder->encodePacketHeader();
   builder->accountForCipherOverhead(cipherOverhead);
-  writeStreamFrameHeader(
+  auto dataLen = *writeStreamFrameHeader(
       *builder,
       streamId,
       offset,
@@ -320,7 +320,10 @@ RegularQuicPacketBuilder::Packet createStreamPacket(
       data.computeChainDataLength(),
       eof,
       folly::none /* skipLenHint */);
-  writeStreamFrameData(*builder, data.clone(), data.computeChainDataLength());
+  writeStreamFrameData(
+      *builder,
+      data.clone(),
+      std::min(folly::to<size_t>(dataLen), data.computeChainDataLength()));
   return std::move(*builder).buildPacket();
 }
 
