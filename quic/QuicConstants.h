@@ -433,6 +433,8 @@ constexpr uint16_t kDefaultRxPacketsBeforeAckAfterInit = 10;
 constexpr double kAckTimerFactor = 0.25;
 // max ack timeout: 25ms
 constexpr std::chrono::microseconds kMaxAckTimeout = 25000us;
+// max_ack_delay cannot be equal or greater that 2^14
+constexpr uint64_t kMaxAckDelay = 1ULL << 14;
 
 constexpr uint64_t kAckPurgingThresh = 10;
 

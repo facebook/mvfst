@@ -99,8 +99,17 @@ void setExperimentalSettings(QuicServerConnectionState& conn) {
 void processClientInitialParams(
     QuicServerConnectionState& conn,
     const ClientTransportParameters& clientParams) {
-  // TODO validate that we didn't receive original connection ID, stateless
-  // reset token, or preferred address.
+  auto preferredAddress = getIntegerParameter(
+      TransportParameterId::preferred_address, clientParams.parameters);
+  auto origConnId = getIntegerParameter(
+      TransportParameterId::original_destination_connection_id,
+      clientParams.parameters);
+  auto statelessResetToken = getIntegerParameter(
+      TransportParameterId::stateless_reset_token, clientParams.parameters);
+  auto retrySourceConnId = getIntegerParameter(
+      TransportParameterId::retry_source_connection_id,
+      clientParams.parameters);
+
   auto maxData = getIntegerParameter(
       TransportParameterId::initial_max_data, clientParams.parameters);
   auto maxStreamDataBidiLocal = getIntegerParameter(
@@ -136,6 +145,9 @@ void processClientInitialParams(
       clientParams.parameters);
   auto minAckDelay = getIntegerParameter(
       TransportParameterId::min_ack_delay, clientParams.parameters);
+  auto maxAckDelay = getIntegerParameter(
+      TransportParameterId::max_ack_delay, clientParams.parameters);
+
   if (conn.version == QuicVersion::QUIC_DRAFT) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
@@ -147,6 +159,38 @@ void processClientInitialParams(
           "Initial CID does not match.",
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
     }
+  }
+
+  // validate that we didn't receive original connection ID, stateless
+  // reset token, or preferred address.
+  if (preferredAddress && *preferredAddress != 0) {
+    throw QuicTransportException(
+        "Preferred Address is received by server",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
+  if (origConnId && *origConnId != 0) {
+    throw QuicTransportException(
+        "OriginalDestinationConnectionId is received by server",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
+  if (statelessResetToken && statelessResetToken.value() != 0) {
+    throw QuicTransportException(
+        "Stateless Reset Token is received by server",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
+  if (retrySourceConnId && retrySourceConnId.value() != 0) {
+    throw QuicTransportException(
+        "Retry Source Connection ID is received by server",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+
+  if (maxAckDelay && *maxAckDelay >= kMaxAckDelay) {
+    throw QuicTransportException(
+        "Max Ack Delay is greater than 2^14 ",
+        TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
   }
 
   // TODO Validate active_connection_id_limit
