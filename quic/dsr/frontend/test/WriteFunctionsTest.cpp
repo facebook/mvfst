@@ -7,7 +7,7 @@
  */
 
 #include <folly/portability/GTest.h>
-#include <quic/dsr/WriteFunctions.h>
+#include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/dsr/test/TestCommon.h>
 #include <quic/state/test/Mocks.h>
 

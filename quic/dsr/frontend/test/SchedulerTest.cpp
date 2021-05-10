@@ -7,8 +7,9 @@
  */
 
 #include <folly/portability/GTest.h>
-#include <quic/dsr/Scheduler.h>
-#include <quic/dsr/test/MockDSRPacketBuilder.h>
+#include <quic/dsr/frontend/Scheduler.h>
+#include <quic/dsr/frontend/test/Mocks.h>
+#include <quic/dsr/test/Mocks.h>
 #include <quic/dsr/test/TestCommon.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>

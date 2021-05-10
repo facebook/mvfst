@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <quic/dsr/PacketBuilder.h>
 #include <quic/dsr/Types.h>
+#include <quic/dsr/frontend/PacketBuilder.h>
 
 namespace quic {
 uint32_t writeDSRStreamFrame(

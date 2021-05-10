@@ -7,7 +7,7 @@
  */
 
 #include <folly/Optional.h>
-#include <quic/dsr/WriteCodec.h>
+#include <quic/dsr/frontend/WriteCodec.h>
 
 namespace quic {
 uint32_t writeDSRStreamFrame(

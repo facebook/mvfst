@@ -6,8 +6,8 @@
  *
  */
 
-#include <quic/dsr/Scheduler.h>
-#include <quic/dsr/WriteCodec.h>
+#include <quic/dsr/frontend/Scheduler.h>
+#include <quic/dsr/frontend/WriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStateFunctions.h>
 

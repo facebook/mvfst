@@ -43,9 +43,9 @@ target_compile_options(
 
 add_library(
   mvfst_dsr_frontend
-  Scheduler.cpp
-  WriteCodec.cpp
-  WriteFunctions.cpp)
+  frontend/Scheduler.cpp
+  frontend/WriteCodec.cpp
+  frontend/WriteFunctions.cpp)
 
 target_include_directories(
   mvfst_dsr_frontend PUBLIC

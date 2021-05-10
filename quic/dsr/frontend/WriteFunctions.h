@@ -11,7 +11,7 @@
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/QuicConnectionId.h>
 #include <quic/dsr/DSRPacketizationRequestSender.h>
-#include <quic/dsr/Scheduler.h>
+#include <quic/dsr/frontend/Scheduler.h>
 #include <quic/handshake/Aead.h>
 #include <quic/server/state/ServerStateMachine.h>
 

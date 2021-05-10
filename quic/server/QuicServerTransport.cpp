@@ -11,7 +11,7 @@
 #include <quic/common/WindowedCounter.h>
 #include <quic/d6d/BinarySearchProbeSizeRaiser.h>
 #include <quic/d6d/ConstantStepProbeSizeRaiser.h>
-#include <quic/dsr/WriteFunctions.h>
+#include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>

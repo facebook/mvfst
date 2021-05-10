@@ -6,12 +6,12 @@
  *
  */
 
-#include <quic/dsr/WriteCodec.h>
+#include <quic/dsr/frontend/WriteCodec.h>
 
 #include <folly/portability/GTest.h>
 #include <quic/QuicConstants.h>
 #include <quic/common/test/TestUtils.h>
-#include <quic/dsr/test/MockDSRPacketBuilder.h>
+#include <quic/dsr/frontend/test/Mocks.h>
 #include <quic/dsr/test/TestCommon.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/handshake/test/Mocks.h>

@@ -7,7 +7,7 @@
  */
 
 #include <folly/ScopeGuard.h>
-#include <quic/dsr/WriteFunctions.h>
+#include <quic/dsr/frontend/WriteFunctions.h>
 
 namespace quic {
 uint64_t writePacketizationRequest(
