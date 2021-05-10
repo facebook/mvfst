@@ -15,7 +15,6 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/QuicLogger.h>
 
 using namespace std::chrono_literals;
 
@@ -39,9 +38,7 @@ BbrCongestionController::BbrCongestionController(QuicConnectionStateBase& conn)
       pacingWindow_(
           conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
       // TODO: experiment with longer window len for ack aggregation filter
-      maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {
-  QUIC_TRACE(initcwnd, conn_, initialCwnd_);
-}
+      maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {}
 
 CongestionControlType BbrCongestionController::type() const noexcept {
   return CongestionControlType::BBR;
@@ -103,13 +100,6 @@ void BbrCongestionController::onPacketLoss(
           bbrStateToString(state_),
           bbrRecoveryStateToString(recoveryState_));
     }
-    QUIC_TRACE(
-        bbr_persistent_congestion,
-        conn_,
-        bbrStateToString(state_),
-        bbrRecoveryStateToString(recoveryState_),
-        recoveryWindow_,
-        conn_.lossState.inflightBytes);
   }
 }
 
@@ -187,15 +177,6 @@ void BbrCongestionController::onPacketAcked(
           bbrStateToString(state_),
           bbrRecoveryStateToString(recoveryState_));
     }
-    QUIC_TRACE(
-        bbr_ack,
-        conn_,
-        bbrStateToString(state_),
-        bbrRecoveryStateToString(recoveryState_),
-        getCongestionWindow(),
-        cwnd_,
-        sendQuantum_,
-        conn_.lossState.inflightBytes);
   };
   if (ack.implicit) {
     // This is an implicit ACK during the handshake, we can't trust very
@@ -539,7 +520,6 @@ void BbrCongestionController::setAppIdle(
   if (conn_.qLogger) {
     conn_.qLogger->addAppIdleUpdate(kAppIdle, idle);
   }
-  QUIC_TRACE(bbr_appidle, conn_, idle);
   /*
    * No-op for bbr.
    * We are not necessarily app-limite when we are app-idle. For example, the

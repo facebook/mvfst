@@ -33,12 +33,6 @@ bool isPersistentCongestion(
 
 void onPTOAlarm(QuicConnectionStateBase& conn) {
   VLOG(10) << __func__ << " " << conn;
-  QUIC_TRACE(
-      pto_alarm,
-      conn,
-      conn.lossState.largestSent.value_or(0),
-      conn.lossState.ptoCount,
-      conn.outstandings.numOutstanding());
   QUIC_STATS(conn.statsCallback, onPTO);
   conn.lossState.ptoCount++;
   conn.lossState.totalPTOCount++;

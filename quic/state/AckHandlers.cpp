@@ -6,7 +6,6 @@
  *
  */
 
-#include <quic/logging/QuicLogger.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>

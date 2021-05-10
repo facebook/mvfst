@@ -9,7 +9,6 @@
 #include <quic/congestion_control/TokenlessPacer.h>
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
-#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -39,8 +38,6 @@ void TokenlessPacer::refreshPacingRate(
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
   }
-  QUIC_TRACE(
-      pacing_update, conn_, writeInterval_.count(), (uint64_t)batchSize_);
   lastWriteTime_.reset();
 }
 

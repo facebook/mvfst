@@ -14,7 +14,7 @@
 #include <quic/codec/Types.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
-#include <quic/logging/QuicLogger.h>
+
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
@@ -862,17 +862,6 @@ void updateConnection(
 
   if (conn.congestionController) {
     conn.congestionController->onPacketSent(pkt);
-    // An approximation of the app being blocked. The app
-    // technically might not have bytes to write.
-    auto writableBytes = conn.congestionController->getWritableBytes();
-    bool cwndBlocked = writableBytes < kBlockedSizeBytes;
-    if (cwndBlocked) {
-      QUIC_TRACE(
-          cwnd_may_block,
-          conn,
-          writableBytes,
-          conn.congestionController->getCongestionWindow());
-    }
   }
   if (conn.pacer) {
     conn.pacer->onPacketSent();
@@ -1198,14 +1187,6 @@ void writeCloseCommon(
   if (connection.qLogger) {
     connection.qLogger->addPacket(packet.packet, packetSize);
   }
-  QUIC_TRACE(
-      packet_sent,
-      connection,
-      toString(pnSpace),
-      packetNum,
-      (uint64_t)packetSize,
-      (int)false,
-      (int)false);
   VLOG(10) << nodeToString(connection.nodeType)
            << " sent close packetNum=" << packetNum << " in space=" << pnSpace
            << " " << connection;

@@ -32,7 +32,6 @@ Cubic::Cubic(
   steadyState_.tcpFriendly = tcpFriendly;
   steadyState_.estRenoCwnd = cwndBytes_;
   hystartState_.ackTrain = ackTrain;
-  QUIC_TRACE(initcwnd, conn_, cwndBytes_);
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -85,13 +84,6 @@ void Cubic::onPersistentCongestion() {
 
   state_ = CubicStates::Hystart;
 
-  QUIC_TRACE(
-      cubic_persistent_congestion,
-      conn_,
-      cubicStateToString(state_).data(),
-      cwndBytes_,
-      conn_.lossState.inflightBytes,
-      steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -132,13 +124,6 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
       conn_.pacer->refreshPacingRate(
           cwndBytes_ * pacingGain(), conn_.lossState.srtt);
     }
-    QUIC_TRACE(
-        cubic_loss,
-        conn_,
-        cubicStateToString(state_).str().data(),
-        cwndBytes_,
-        conn_.lossState.inflightBytes,
-        steadyState_.lastMaxCwndBytes.value_or(0));
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -148,7 +133,6 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
     }
 
   } else {
-    QUIC_TRACE(fst_trace, conn_, "cubic_skip_loss");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -166,13 +150,6 @@ void Cubic::onPacketLoss(const LossEvent& loss) {
 void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
   DCHECK_LE(bytes, conn_.lossState.inflightBytes);
   conn_.lossState.inflightBytes -= bytes;
-  QUIC_TRACE(
-      cubic_remove_inflight,
-      conn_,
-      cubicStateToString(state_).str().data(),
-      cwndBytes_,
-      conn_.lossState.inflightBytes,
-      steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -183,18 +160,6 @@ void Cubic::onRemoveBytesFromInflight(uint64_t bytes) {
 }
 
 void Cubic::setAppIdle(bool idle, TimePoint eventTime) noexcept {
-  QUIC_TRACE(
-      cubic_appidle,
-      conn_,
-      idle,
-      folly::chrono::ceil<std::chrono::milliseconds>(
-          eventTime.time_since_epoch())
-          .count(),
-      steadyState_.lastReductionTime
-          ? folly::chrono::ceil<std::chrono::milliseconds>(
-                steadyState_.lastReductionTime->time_since_epoch())
-                .count()
-          : -1);
   if (conn_.qLogger) {
     conn_.qLogger->addAppIdleUpdate(kAppIdle, idle);
   }
@@ -240,7 +205,6 @@ void Cubic::updateTimeToOrigin() noexcept {
   if (conn_.qLogger) {
     conn_.qLogger->addTransportStateUpdate(kRecalculateTimeToOrigin);
   }
-  QUIC_TRACE(fst_trace, conn_, "recalculate_timetoorigin");
   if (*steadyState_.lastMaxCwndBytes <= cwndBytes_) {
     steadyState_.timeToOrigin = 0.0;
     steadyState_.originPoint = steadyState_.lastMaxCwndBytes;
@@ -297,13 +261,6 @@ int64_t Cubic::calculateCubicCwndDelta(TimePoint ackTime) noexcept {
            << ", timeToOrigin=" << steadyState_.timeToOrigin
            << ", origin=" << *steadyState_.lastMaxCwndBytes
            << ", cwnd delta=" << delta;
-  QUIC_TRACE(
-      cubic_steady_cwnd,
-      conn_,
-      cwndBytes_,
-      delta,
-      static_cast<uint64_t>(steadyState_.timeToOrigin),
-      static_cast<uint64_t>(timeElapsedCount));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -383,7 +340,6 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
   conn_.lossState.inflightBytes -= ack.ackedBytes;
   if (recoveryState_.endOfRecovery.has_value() &&
       *recoveryState_.endOfRecovery >= ack.largestAckedPacketSentTime) {
-    QUIC_TRACE(fst_trace, conn_, "cubic_skip_ack");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -409,8 +365,6 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
         cwndBytes_ * pacingGain(), conn_.lossState.srtt);
   }
   if (cwndBytes_ == currentCwnd) {
-    QUIC_TRACE(
-        fst_trace, conn_, "cwnd_no_change", quiescenceStart_.has_value());
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -419,13 +373,6 @@ void Cubic::onPacketAcked(const AckEvent& ack) {
           cubicStateToString(state_).str());
     }
   }
-  QUIC_TRACE(
-      cubic_ack,
-      conn_,
-      cubicStateToString(state_).str().data(),
-      cwndBytes_,
-      conn_.lossState.inflightBytes,
-      steadyState_.lastMaxCwndBytes.value_or(0));
   if (conn_.qLogger) {
     conn_.qLogger->addCongestionMetricUpdate(
         conn_.lossState.inflightBytes,
@@ -606,7 +553,6 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
  */
 void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
   if (isAppLimited()) {
-    QUIC_TRACE(fst_trace, conn_, "ack_in_quiescence");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -627,7 +573,6 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
   if (!steadyState_.lastMaxCwndBytes) {
     // lastMaxCwndBytes won't be set when we transit from Hybrid to Steady. In
     // that case, we are at the "origin" already.
-    QUIC_TRACE(fst_trace, conn_, "reset_timetoorigin");
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(
           conn_.lossState.inflightBytes,
@@ -647,7 +592,6 @@ void Cubic::onPacketAckedInSteady(const AckEvent& ack) {
     updateTimeToOrigin();
   }
   if (!steadyState_.lastReductionTime) {
-    QUIC_TRACE(fst_trace, conn_, "reset_lastreductiontime");
     steadyState_.lastReductionTime = ack.ackTime;
     if (conn_.qLogger) {
       conn_.qLogger->addCongestionMetricUpdate(

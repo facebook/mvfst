@@ -10,7 +10,6 @@
 
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -23,7 +22,6 @@ Copa2::Copa2(QuicConnectionStateBase& conn)
   VLOG(10) << __func__ << " writable=" << Copa2::getWritableBytes()
            << " cwnd=" << cwndBytes_
            << " inflight=" << conn_.lossState.inflightBytes << " " << conn_;
-  QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
 
 void Copa2::onRemoveBytesFromInflight(uint64_t bytes) {
@@ -63,11 +61,9 @@ void Copa2::onPacketAckOrLoss(
     if (conn_.pacer) {
       conn_.pacer->onPacketsLoss();
     }
-    QUIC_TRACE(copa2_loss, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
   if (ack && ack->largestAckedPacket.has_value()) {
     onPacketAcked(*ack);
-    QUIC_TRACE(copa2_ack, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
 }
 

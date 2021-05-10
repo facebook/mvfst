@@ -10,7 +10,6 @@
 #include <quic/state/QuicStreamFunctions.h>
 
 #include <quic/common/TimeUtil.h>
-#include <quic/logging/QuicLogger.h>
 
 namespace {
 std::deque<quic::OutstandingPacket>::reverse_iterator
@@ -72,13 +71,6 @@ void updateRtt(
     conn.qLogger->addMetricUpdate(
         rttSample, conn.lossState.mrtt, conn.lossState.srtt, ackDelay);
   }
-  QUIC_TRACE(
-      update_rtt,
-      conn,
-      rttSample.count(),
-      ackDelay.count(),
-      conn.lossState.mrtt.count(),
-      conn.lossState.srtt.count());
 }
 
 void updateAckSendStateOnRecvPacket(

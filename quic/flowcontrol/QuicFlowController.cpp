@@ -11,7 +11,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/logging/QLogger.h>
-#include <quic/logging/QuicLogger.h>
+
 #include <quic/state/StreamData.h>
 #include <limits>
 
@@ -95,7 +95,6 @@ bool maybeSendConnWindowUpdate(
       conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(newAdvertisedOffset.value()));
     }
-    QUIC_TRACE(flow_control_event, conn, "tx_conn", newAdvertisedOffset.value())
     return true;
   }
   return false;
@@ -190,12 +189,6 @@ void updateFlowControlOnWriteToSocket(
       stream.conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
     }
-    QUIC_TRACE(
-        flow_control_event,
-        stream.conn,
-        "conn_blocked",
-        stream.id,
-        stream.conn.flowControlState.sumCurWriteOffset);
     QUIC_STATS(stream.conn.statsCallback, onConnFlowControlBlocked);
   }
 }
@@ -224,12 +217,6 @@ void maybeWriteBlockAfterAPIWrite(QuicStreamState& stream) {
       stream.conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(stream.conn.flowControlState.sumCurWriteOffset));
     }
-    QUIC_TRACE(
-        flow_control_event,
-        stream.conn,
-        "stream_blocked",
-        stream.id,
-        stream.flowControlState.peerAdvertisedMaxOffset);
     QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
@@ -258,12 +245,6 @@ void maybeWriteBlockAfterSocketWrite(QuicStreamState& stream) {
       stream.conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(stream.flowControlState.peerAdvertisedMaxOffset));
     }
-    QUIC_TRACE(
-        flow_control_event,
-        stream.conn,
-        "stream_blocked",
-        stream.id,
-        stream.flowControlState.peerAdvertisedMaxOffset);
     QUIC_STATS(stream.conn.statsCallback, onStreamFlowControlBlocked);
   }
 }
@@ -284,13 +265,6 @@ void handleStreamWindowUpdate(
       stream.conn.qLogger->addTransportStateUpdate(
           getRxStreamWU(stream.id, packetNum, maximumData));
     }
-    QUIC_TRACE(
-        flow_control_event,
-        stream.conn,
-        "rx_stream",
-        stream.id,
-        maximumData,
-        packetNum);
   }
   // Peer sending a smaller max offset than previously advertised is legal but
   // ignored.
@@ -306,8 +280,6 @@ void handleConnWindowUpdate(
       conn.qLogger->addTransportStateUpdate(
           getRxConnWU(packetNum, frame.maximumData));
     }
-    QUIC_TRACE(
-        flow_control_event, conn, "rx_conn", frame.maximumData, packetNum);
   }
   // Peer sending a smaller max offset than previously advertised is legal but
   // ignored.

@@ -271,7 +271,6 @@ void QuicClientTransport::processPacketData(
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(packetSize, kParse);
     }
-    QUIC_TRACE(packet_drop, *conn_, "parse");
     return;
   }
 
@@ -289,7 +288,6 @@ void QuicClientTransport::processPacketData(
           QuicTransportStatsCallback::toString(
               PacketDropReason::PROTOCOL_VIOLATION));
     }
-    QUIC_TRACE(packet_drop, *conn_, "no_data_packet");
     throw QuicTransportException(
         "Packet has no frames", TransportErrorCode::PROTOCOL_VIOLATION);
   }
@@ -564,7 +562,6 @@ void QuicClientTransport::processPacketData(
         if (conn_->qLogger) {
           conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
         }
-        QUIC_TRACE(recvd_close, *conn_, errMsg.c_str());
         conn_->peerConnectionError = std::make_pair(
             QuicErrorCode(connFrame.errorCode), std::move(errMsg));
         throw QuicTransportException(
@@ -626,13 +623,11 @@ void QuicClientTransport::processPacketData(
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
       }
-      QUIC_TRACE(zero_rtt, *conn_, "rejected");
       handshakeLayer->removePsk(hostname_);
     } else if (zeroRttRejected.has_value()) {
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
       }
-      QUIC_TRACE(zero_rtt, *conn_, "accepted");
       conn_->usedZeroRtt = true;
     }
     // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
@@ -764,7 +759,6 @@ void QuicClientTransport::onReadData(
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(0, kAlreadyClosed);
     }
-    QUIC_TRACE(packet_drop, *conn_, "already_closed");
     return;
   }
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
@@ -1087,7 +1081,6 @@ void QuicClientTransport::onDataAvailable(
       if (conn_->qLogger) {
         conn_->qLogger->addPacketDrop(len, kUdpTruncated);
       }
-      QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
       if (conn_->loopDetectorCallback) {
         conn_->readDebugState.noReadReason = NoReadReason::TRUNCATED;
         conn_->loopDetectorCallback->onSuspiciousReadLoops(
@@ -1114,7 +1107,6 @@ void QuicClientTransport::onDataAvailable(
       if (conn_->qLogger) {
         conn_->qLogger->addPacketDrop(delta, kUdpTruncated);
       }
-      QUIC_TRACE(packet_drop, *conn_, "udp_truncated");
     }
 
     data->append(len);
@@ -1429,7 +1421,6 @@ void QuicClientTransport::recvMmsg(
       networkData.packets.emplace_back(std::move(readBuffers[i]));
     }
 
-    QUIC_TRACE(udp_recvd, *conn_, bytesRead);
     trackDatagramReceived(bytesRead);
   }
   for (; i < numPackets; i++) {
@@ -1482,7 +1473,6 @@ void QuicClientTransport::onNotifyDataAvailable(
 
 void QuicClientTransport::
     happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
-  QUIC_TRACE(happy_eyeballs, *conn_, "delay timer expired");
   // Declare 0-RTT data as lost so that they will be retransmitted over the
   // second socket.
   markZeroRttPacketsLost(*conn_, markPacketLoss);
@@ -1510,7 +1500,6 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
   if (conn_->qLogger) {
     conn_->qLogger->addTransportStateUpdate(kStart);
   }
-  QUIC_TRACE(fst_trace, *conn_, "start");
   setConnectionCallback(cb);
   clientConn_->pendingOneRttData.reserve(
       conn_->transportSettings.maxPacketsToBuffer);

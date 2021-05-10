@@ -10,7 +10,6 @@
 
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -27,11 +26,6 @@ void BbrBandwidthSampler::onPacketAcked(
   if (appLimited_) {
     if (appLimitedExitTarget_ < ackEvent.largestAckedPacketSentTime) {
       appLimited_ = false;
-      QUIC_TRACE(
-          bbr_appunlimited,
-          conn_,
-          *ackEvent.largestAckedPacket,
-          appLimitedExitTarget_.time_since_epoch().count());
       if (conn_.qLogger) {
         conn_.qLogger->addAppUnlimitedUpdate();
       }
@@ -103,8 +97,6 @@ void BbrBandwidthSampler::onPacketAcked(
 void BbrBandwidthSampler::onAppLimited() {
   appLimited_ = true;
   appLimitedExitTarget_ = Clock::now();
-  QUIC_TRACE(
-      bbr_applimited, conn_, appLimitedExitTarget_.time_since_epoch().count());
   if (conn_.qLogger) {
     conn_.qLogger->addAppLimitedUpdate();
   }

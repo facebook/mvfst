@@ -9,7 +9,7 @@
 #include <quic/happyeyeballs/QuicHappyEyeballsFunctions.h>
 
 #include <quic/common/SocketUtil.h>
-#include <quic/logging/QuicLogger.h>
+
 #include <quic/state/StateData.h>
 
 #include <folly/SocketAddress.h>
@@ -42,8 +42,6 @@ void happyEyeballsAddPeerAddress(
 
   // TODO: Support multiple addresses
 
-  QUIC_TRACE(
-      happy_eyeballs, connection, "add addr", peerAddress.getAddressStr());
   if (peerAddress.getFamily() == AF_INET) {
     DCHECK(!connection.happyEyeballsState.v4PeerAddress.isInitialized());
     connection.happyEyeballsState.v4PeerAddress = peerAddress;
@@ -74,14 +72,12 @@ void startHappyEyeballs(
     DCHECK(connection.happyEyeballsState.secondSocket);
 
     if (cachedFamily == AF_INET) {
-      QUIC_TRACE(happy_eyeballs, connection, "start", "cache=v4");
       connection.originalPeerAddress =
           connection.happyEyeballsState.v4PeerAddress;
       connection.peerAddress = connection.happyEyeballsState.v4PeerAddress;
       connection.happyEyeballsState.secondPeerAddress =
           connection.happyEyeballsState.v6PeerAddress;
     } else {
-      QUIC_TRACE(happy_eyeballs, connection, "start", "cache=v6");
       connection.originalPeerAddress =
           connection.happyEyeballsState.v6PeerAddress;
       connection.peerAddress = connection.happyEyeballsState.v6PeerAddress;
@@ -184,7 +180,6 @@ void happyEyeballsOnDataReceived(
   if (connection.happyEyeballsState.finished) {
     return;
   }
-  QUIC_TRACE(happy_eyeballs, connection, "finish", peerAddress.getAddressStr());
   connAttemptDelayTimeout.cancelTimeout();
   connection.happyEyeballsState.finished = true;
   connection.happyEyeballsState.shouldWriteToFirstSocket = true;

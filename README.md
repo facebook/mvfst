@@ -20,7 +20,6 @@
 **Client features**:
 - Native happy eyeballs support between ipv4 and ipv6 so that applications do not need to implement it themselves
 - Pluggable congestion control and support for turning off congestion control to plug in application specific control algorithms
-- QUIC trace APIs to retrieve deep transport level stats.
 
 ## Source Layout
 - `quic/api`:         Defines API that applications can use to interact with the QUIC transport layer.

@@ -10,7 +10,7 @@
 
 #include <quic/QuicException.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
-#include <quic/logging/QuicLogger.h>
+
 #include <quic/state/StateData.h>
 
 namespace quic {

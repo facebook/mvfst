@@ -11,7 +11,6 @@
 #include <quic/common/TimeUtil.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/QuicLogger.h>
 
 namespace quic {
 
@@ -33,7 +32,6 @@ Copa::Copa(QuicConnectionStateBase& conn)
     deltaParam_ = conn_.transportSettings.copaDeltaParam.value();
   }
   useRttStanding_ = conn_.transportSettings.copaUseRttStanding;
-  QUIC_TRACE(initcwnd, conn_, cwndBytes_);
 }
 
 void Copa::onRemoveBytesFromInflight(uint64_t bytes) {
@@ -141,11 +139,9 @@ void Copa::onPacketAckOrLoss(
     if (conn_.pacer) {
       conn_.pacer->onPacketsLoss();
     }
-    QUIC_TRACE(copa_loss, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
   if (ack && ack->largestAckedPacket.has_value()) {
     onPacketAcked(*ack);
-    QUIC_TRACE(copa_ack, conn_, cwndBytes_, conn_.lossState.inflightBytes);
   }
 }
 

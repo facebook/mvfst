@@ -143,13 +143,6 @@ const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
 QuicTransportBase::~QuicTransportBase() {
   connCallback_ = nullptr;
 
-  QUIC_TRACE(
-      conn_close,
-      *conn_,
-      (uint64_t) false,
-      (uint64_t) true,
-      "destructor",
-      "no_error");
   closeImpl(
       std::make_pair(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
@@ -234,13 +227,6 @@ void QuicTransportBase::closeGracefully() {
   if (conn_->qLogger) {
     conn_->qLogger->addConnectionClose(kNoError, kGracefulExit, true, false);
   }
-  QUIC_TRACE(
-      conn_close,
-      *conn_,
-      (uint64_t) true,
-      (uint64_t) false,
-      "graceful",
-      "no_error");
 
   // Stop reads and cancel all the app callbacks.
   VLOG(10) << "Stopping read and peek loopers due to graceful close " << *this;
@@ -286,20 +272,6 @@ void QuicTransportBase::closeImpl(
         conn_->cryptoState->handshakeStream.maxOffsetObserved;
     totalCryptoDataRecvd += conn_->cryptoState->oneRttStream.maxOffsetObserved;
   }
-
-  QUIC_TRACE(
-      transport_data,
-      *conn_,
-      conn_->lossState.totalBytesSent,
-      conn_->lossState.totalBytesRecvd,
-      conn_->flowControlState.sumCurWriteOffset,
-      conn_->flowControlState.sumMaxObservedOffset,
-      conn_->flowControlState.sumCurStreamBufferLen,
-      conn_->lossState.totalBytesRetransmitted,
-      conn_->lossState.totalStreamBytesCloned,
-      conn_->lossState.totalBytesCloned,
-      totalCryptoDataWritten,
-      totalCryptoDataRecvd);
 
   if (conn_->qLogger) {
     conn_->qLogger->addTransportSummary(
@@ -361,13 +333,6 @@ void QuicTransportBase::closeImpl(
       conn_->qLogger->addConnectionClose(
           errorStr, errorCodeStr, drainConnection, sendCloseImmediately);
     }
-    QUIC_TRACE(
-        conn_close,
-        *conn_,
-        (uint64_t)drainConnection,
-        (uint64_t)sendCloseImmediately,
-        errorStr,
-        errorCode->second.c_str());
   } else {
     auto reason = folly::to<std::string>(
         "Server: ",
@@ -380,13 +345,6 @@ void QuicTransportBase::closeImpl(
       conn_->qLogger->addConnectionClose(
           kNoError, reason, drainConnection, sendCloseImmediately);
     }
-    QUIC_TRACE(
-        conn_close,
-        *conn_,
-        (uint64_t)drainConnection,
-        (uint64_t)sendCloseImmediately,
-        "no_error",
-        "no_error");
   }
   cancelLossTimeout();
   if (ackTimeout_.isScheduled()) {
@@ -2334,7 +2292,6 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
   try {
     onLossDetectionAlarm(*conn_, markPacketLoss);
     // TODO: remove this trace when Pacing is ready to land
-    QUIC_TRACE(fst_trace, *conn_, "LossTimeoutExpired");
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired);
     }

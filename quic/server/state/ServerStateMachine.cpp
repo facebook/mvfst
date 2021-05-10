@@ -329,7 +329,6 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(kDerivedZeroRttReadCipher);
     }
-    QUIC_TRACE(fst_trace, conn, "derived 0-rtt read cipher");
     conn.readCodec->setZeroRttReadCipher(std::move(zeroRttReadCipher));
   }
   if (zeroRttHeaderCipher) {
@@ -346,7 +345,6 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(kDerivedOneRttWriteCipher);
     }
-    QUIC_TRACE(fst_trace, conn, "derived 1-rtt write cipher");
     if (conn.oneRttWriteCipher) {
       throw QuicTransportException(
           "Duplicate 1-rtt write cipher", TransportErrorCode::CRYPTO_ERROR);
@@ -369,7 +367,6 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(kDerivedOneRttReadCipher);
     }
-    QUIC_TRACE(fst_trace, conn, "derived 1-rtt read cipher");
     // Clear limit because CFIN is received at this point
     conn.writableBytesLimit = folly::none;
     conn.readCodec->setOneRttReadCipher(std::move(oneRttReadCipher));
@@ -570,7 +567,6 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kNoData);
     }
-    QUIC_TRACE(packet_drop, conn, "no_data");
     return;
   }
   if (originalData->protectionType != ProtectionType::ZeroRtt &&
@@ -579,7 +575,6 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kUnexpectedProtectionLevel);
     }
-    QUIC_TRACE(packet_drop, conn, "unexpected_protection_level");
     return;
   }
 
@@ -591,7 +586,6 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
     }
-    QUIC_TRACE(packet_drop, conn, "max_buffered");
     return;
   }
 
@@ -599,12 +593,6 @@ void handleCipherUnavailable(
       ? conn.pendingZeroRttData
       : conn.pendingOneRttData;
   if (pendingData) {
-    QUIC_TRACE(
-        packet_buffered,
-        conn,
-        originalData->packetNum,
-        originalData->protectionType,
-        packetSize);
     if (conn.qLogger) {
       conn.qLogger->addPacketBuffered(
           originalData->packetNum, originalData->protectionType, packetSize);
@@ -623,7 +611,6 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
     }
-    QUIC_TRACE(packet_drop, conn, "buffer_unavailable");
   }
 }
 
@@ -758,7 +745,6 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kRetry);
         }
-        QUIC_TRACE(packet_drop, conn, "retry");
         break;
       }
       case CodecResult::Type::STATELESS_RESET: {
@@ -766,7 +752,6 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kReset);
         }
-        QUIC_TRACE(packet_drop, conn, "reset");
         break;
       }
       case CodecResult::Type::NOTHING: {
@@ -774,7 +759,6 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
         }
-        QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
         break;
       }
       case CodecResult::Type::REGULAR_PACKET:
@@ -802,7 +786,6 @@ void onServerReadDataFromOpen(
             QuicTransportStatsCallback::toString(
                 PacketDropReason::PROTOCOL_VIOLATION));
       }
-      QUIC_TRACE(packet_drop, conn, "no_data_packet");
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
@@ -1114,7 +1097,6 @@ void onServerReadDataFromOpen(
           VLOG(4) << errMsg << " " << conn;
           // we want to deliver app callbacks with the peer supplied error,
           // but send a NO_ERROR to the peer.
-          QUIC_TRACE(recvd_close, conn, errMsg.c_str());
           if (conn.qLogger) {
             conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
           }
@@ -1274,7 +1256,6 @@ void onServerReadDataFromClosed(
           QuicTransportStatsCallback::toString(
               PacketDropReason::SERVER_STATE_CLOSED));
     }
-    QUIC_TRACE(packet_drop, conn, "ignoring peer close");
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -1288,7 +1269,6 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
-      QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
       break;
     }
     case CodecResult::Type::RETRY: {
@@ -1297,7 +1277,6 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kRetry);
       }
-      QUIC_TRACE(packet_drop, conn, "retry");
       break;
     }
     case CodecResult::Type::STATELESS_RESET: {
@@ -1305,7 +1284,6 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kReset);
       }
-      QUIC_TRACE(packet_drop, conn, "reset");
       break;
     }
     case CodecResult::Type::NOTHING: {
@@ -1313,7 +1291,6 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
-      QUIC_TRACE(packet_drop, conn, "cipher_unavailable");
       break;
     }
     case CodecResult::Type::REGULAR_PACKET:
@@ -1343,7 +1320,6 @@ void onServerReadDataFromClosed(
           QuicTransportStatsCallback::toString(
               PacketDropReason::PROTOCOL_VIOLATION));
     }
-    QUIC_TRACE(packet_drop, conn, "no_data_packet");
     QUIC_STATS(
         conn.statsCallback,
         onPacketDropped,
@@ -1372,7 +1348,6 @@ void onServerReadDataFromClosed(
         }
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
-        QUIC_TRACE(recvd_close, conn, errMsg.c_str());
         conn.peerConnectionError = std::make_pair(
             QuicErrorCode(connFrame.errorCode), std::move(errMsg));
         break;

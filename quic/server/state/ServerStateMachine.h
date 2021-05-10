@@ -17,7 +17,7 @@
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/congestion_control/QuicCubic.h>
 #include <quic/flowcontrol/QuicFlowController.h>
-#include <quic/logging/QuicLogger.h>
+
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/server/handshake/ServerHandshakeFactory.h>

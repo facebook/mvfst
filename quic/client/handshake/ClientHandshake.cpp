@@ -32,7 +32,6 @@ void ClientHandshake::connect(
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kZeroRttAttempted);
     }
-    QUIC_TRACE(zero_rtt, *conn_, "attempted");
 
     // If zero rtt write cipher is derived, it means the cached psk was valid
     DCHECK(cachedServerTransportParams);

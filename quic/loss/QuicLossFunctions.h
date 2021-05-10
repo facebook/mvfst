@@ -15,7 +15,6 @@
 #include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>
-#include <quic/logging/QuicLogger.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
@@ -338,12 +337,6 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
           lossEvent.lostBytes,
           lossEvent.lostPackets);
     }
-    QUIC_TRACE(
-        packets_lost,
-        conn,
-        *lossEvent.largestLostPacketNum,
-        lossEvent.lostBytes,
-        lossEvent.lostPackets);
 
     conn.lossState.rtxCount += lossEvent.lostPackets;
     if (conn.congestionController) {
