@@ -7,7 +7,12 @@ if(NOT BUILD_TESTS)
   return()
 endif()
 
-add_executable(tperf tperf.cpp TperfQLogger.cpp)
+add_executable(
+  tperf
+  tperf.cpp
+  TperfDSRSender.cpp
+  TperfQLogger.cpp
+)
 
 target_compile_options(
   tperf
@@ -25,6 +30,7 @@ target_link_libraries(
   Folly::folly
   fizz::fizz
   mvfst_test_utils
+  mvfst_dsr_backend
   ${GFLAGS_LIBRARIES}
   ${LIBGMOCK_LIBRARIES}
 )
