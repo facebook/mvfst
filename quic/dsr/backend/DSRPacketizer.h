@@ -161,7 +161,9 @@ struct PacketizationRequest {
   uint64_t offset;
   uint64_t len;
   bool fin;
-  uint64_t bufMetaStartingOffset;
+  // This is the offset of the buffer payload. It is different from the offset
+  // above which is the stream bytes offset.
+  uint64_t payloadOffset;
 
   // Cipher info
   fizz::TrafficKey trafficKey;

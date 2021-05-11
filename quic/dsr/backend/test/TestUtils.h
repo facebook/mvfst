@@ -23,7 +23,8 @@ quic::PacketizationRequest sendInstructionToPacketizationRequest(
   request.offset = instruction.offset;
   request.len = instruction.len;
   request.fin = instruction.fin;
-  request.bufMetaStartingOffset = instruction.bufMetaStartingOffset;
+  request.payloadOffset =
+      instruction.offset - instruction.bufMetaStartingOffset;
   request.trafficKey.key = instruction.trafficKey.key->clone();
   request.trafficKey.iv = instruction.trafficKey.iv->clone();
   request.cipherSuite = instruction.cipherSuite;
