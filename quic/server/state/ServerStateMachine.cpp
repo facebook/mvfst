@@ -147,6 +147,8 @@ void processClientInitialParams(
       TransportParameterId::min_ack_delay, clientParams.parameters);
   auto maxAckDelay = getIntegerParameter(
       TransportParameterId::max_ack_delay, clientParams.parameters);
+  auto maxDatagramFrameSize = getIntegerParameter(
+      TransportParameterId::max_datagram_frame_size, clientParams.parameters);
 
   if (conn.version == QuicVersion::QUIC_DRAFT) {
     auto initialSourceConnId = getConnIdParameter(
@@ -232,6 +234,9 @@ void processClientInitialParams(
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
   if (minAckDelay.hasValue()) {
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
+  }
+  if (maxDatagramFrameSize.hasValue()) {
+    conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
 
   // Default to max because we can probe PMTU now, and this will be the upper
@@ -684,6 +689,8 @@ void onServerReadDataFromOpen(
     CHECK(newServerConnIdData.has_value());
     conn.serverConnectionId = newServerConnIdData->connId;
 
+    auto customTransportParams = setSupportedExtensionTransportParameters(conn);
+
     QUIC_STATS(conn.statsCallback, onStatelessReset);
     conn.serverHandshakeLayer->accept(
         std::make_shared<ServerTransportParametersExtension>(
@@ -699,7 +706,8 @@ void onServerReadDataFromOpen(
             conn.transportSettings.maxRecvPacketSize,
             *newServerConnIdData->token,
             conn.serverConnectionId.value(),
-            initialDestinationConnectionId));
+            initialDestinationConnectionId,
+            customTransportParams));
     conn.transportParametersEncoded = true;
     const CryptoFactory& cryptoFactory =
         conn.serverHandshakeLayer->getCryptoFactory();
@@ -1412,4 +1420,17 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
   return newConnIdData;
 }
 
+std::vector<TransportParameter> setSupportedExtensionTransportParameters(
+    QuicServerConnectionState& conn) {
+  std::vector<TransportParameter> customTransportParams;
+  if (conn.transportSettings.datagramConfig.enabled) {
+    auto maxDatagramFrameSize =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::max_datagram_frame_size),
+            conn.datagramState.maxReadFrameSize);
+    customTransportParams.push_back(maxDatagramFrameSize->encode());
+  }
+  return customTransportParams;
+}
 } // namespace quic

@@ -1689,6 +1689,14 @@ void QuicClientTransport::setSupportedExtensionTransportParameters() {
         conn_->transportSettings.minAckDelay.value().count());
     customTransportParameters_.push_back(minAckDelayParam->encode());
   }
+  if (conn_->transportSettings.datagramConfig.enabled) {
+    auto maxDatagramFrameSize =
+        std::make_unique<CustomIntegralTransportParameter>(
+            static_cast<uint64_t>(
+                TransportParameterId::max_datagram_frame_size),
+            conn_->datagramState.maxReadFrameSize);
+    customTransportParameters_.push_back(maxDatagramFrameSize->encode());
+  }
 }
 
 void QuicClientTransport::adjustGROBuffers() {

@@ -110,6 +110,10 @@ struct D6DConfig {
   ProbeSizeRaiserType raiserType{ProbeSizeRaiserType::ConstantStep};
 };
 
+struct DatagramConfig {
+  bool enabled{false};
+};
+
 // JSON-serialized transport knobs
 struct SerializedKnob {
   uint64_t space;
@@ -254,6 +258,8 @@ struct TransportSettings {
   std::vector<SerializedKnob> knobs;
   // DSR enabling
   bool dsrEnabled{false};
+  // Datagram config
+  DatagramConfig datagramConfig;
 };
 
 } // namespace quic

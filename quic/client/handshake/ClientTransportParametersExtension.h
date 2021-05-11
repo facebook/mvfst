@@ -40,7 +40,7 @@ struct ClientTransportParametersExtension {
         maxRecvPacketSize_(maxRecvPacketSize),
         activeConnectionLimit_(activeConnectionIdLimit),
         initialSourceCid_(initialSourceCid),
-        customTransportParameters_(customTransportParameters) {}
+        customTransportParameters_(std::move(customTransportParameters)) {}
 
   folly::Optional<ServerTransportParameters> getServerTransportParams() {
     return std::move(serverTransportParameters_);

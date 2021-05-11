@@ -102,6 +102,8 @@ void processServerInitialParams(
   auto activeConnectionIdLimit = getIntegerParameter(
       TransportParameterId::active_connection_id_limit,
       serverParams.parameters);
+  auto maxDatagramFrameSize = getIntegerParameter(
+      TransportParameterId::max_datagram_frame_size, serverParams.parameters);
   if (conn.version == QuicVersion::QUIC_DRAFT) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
@@ -189,6 +191,9 @@ void processServerInitialParams(
         : conn.transportSettings.advertisedInitialBidiRemoteStreamWindowSize;
     handleStreamWindowUpdate(s, windowSize, packetNum);
   });
+  if (maxDatagramFrameSize.hasValue()) {
+    conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
+  }
 }
 
 void cacheServerInitialParams(

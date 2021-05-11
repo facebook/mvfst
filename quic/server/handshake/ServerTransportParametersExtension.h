@@ -29,7 +29,9 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
       uint64_t maxRecvPacketSize,
       const StatelessResetToken& token,
       ConnectionId initialSourceCid,
-      ConnectionId originalDestinationCid)
+      ConnectionId originalDestinationCid,
+      std::vector<TransportParameter> customTransportParameters =
+          std::vector<TransportParameter>())
       : encodingVersion_(encodingVersion),
         initialMaxData_(initialMaxData),
         initialMaxStreamDataBidiLocal_(initialMaxStreamDataBidiLocal),
@@ -42,7 +44,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
         maxRecvPacketSize_(maxRecvPacketSize),
         token_(token),
         initialSourceCid_(initialSourceCid),
-        originalDestinationCid_(originalDestinationCid) {}
+        originalDestinationCid_(originalDestinationCid),
+        customTransportParameters_(std::move(customTransportParameters)) {}
 
   ~ServerTransportParametersExtension() override = default;
 
@@ -99,6 +102,10 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
           initialSourceCid_));
     }
 
+    for (const auto& customParameter : customTransportParameters_) {
+      params.parameters.push_back(customParameter);
+    }
+
     exts.push_back(encodeExtension(params, encodingVersion_));
     return exts;
   }
@@ -122,5 +129,6 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
   StatelessResetToken token_;
   ConnectionId initialSourceCid_;
   ConnectionId originalDestinationCid_;
+  std::vector<TransportParameter> customTransportParameters_;
 };
 } // namespace quic

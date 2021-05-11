@@ -509,6 +509,7 @@ constexpr uint32_t kMaxInitialPacketNum = 0xffffff;
 // length, and payload) the endpoint is willing to receive, in bytes.
 // Disabled by default
 constexpr uint16_t kDefaultMaxDatagramFrameSize = 0;
+constexpr uint16_t kMaxDatagramFrameSize = 65535;
 // The Maximum number of datagrams (in/out) to buffer
 constexpr uint32_t kDefaultMaxDatagramsBuffered = 75;
 

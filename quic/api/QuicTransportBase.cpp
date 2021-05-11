@@ -2899,6 +2899,9 @@ void QuicTransportBase::setTransportSettings(
     }
   }
   setCongestionControl(conn_->transportSettings.defaultCongestionController);
+  if (conn_->transportSettings.datagramConfig.enabled) {
+    conn_->datagramState.maxReadFrameSize = kMaxDatagramFrameSize;
+  }
 }
 
 void QuicTransportBase::updateCongestionControlSettings(
