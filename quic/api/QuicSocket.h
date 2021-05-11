@@ -1155,5 +1155,48 @@ class QuicSocket {
    * Returns varios stats of the connection.
    */
   FOLLY_NODISCARD virtual QuicConnectionStats getConnectionsStats() const = 0;
+
+  /**
+   * ===== Datagram API =====
+   *
+   * Datagram support is experimental. Currently there isn't delivery callback
+   * or loss notification support for Datagram.
+   */
+
+  class DatagramCallback {
+   public:
+    virtual ~DatagramCallback() = default;
+
+    /**
+     * Notifies the DatagramCallback that datagrams are available for read.
+     */
+    virtual void onDatagramsAvailable() noexcept = 0;
+  };
+
+  /**
+   * Set the read callback for Datagrams
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setDatagramCallback(
+      DatagramCallback* cb) = 0;
+
+  /**
+   * Returns the maximum allowed Datagram payload size.
+   * 0 means Datagram is not supported
+   */
+  FOLLY_NODISCARD virtual uint16_t getDatagramSizeLimit() const = 0;
+
+  /**
+   * Writes a Datagram frame. If buf is larger than the size limit returned by
+   * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
+   * dropped, and a LocalErrorCode will be returned to caller.
+   */
+  virtual WriteResult writeDatagram(Buf buf) = 0;
+
+  /**
+   * Returns the currently available received Datagrams.
+   * Returns all datagrams if atMost is 0.
+   */
+  virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagrams(
+      size_t atMost = 0) = 0;
 };
 } // namespace quic

@@ -380,6 +380,10 @@ void QuicTransportBase::closeImpl(
       onQuicStreamClosed);
   conn_->streamManager->clearOpenStreams();
 
+  // Clear out all the buffered datagrams
+  conn_->datagramState.readBuffer.clear();
+  conn_->datagramState.writeBuffer.clear();
+
   // Clear out all the pending events.
   conn_->pendingEvents = QuicConnectionStateBase::PendingEvents();
   conn_->streamManager->clearActionable();
@@ -824,6 +828,9 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
       readCb->readAvailable(streamId);
     }
   }
+  if (self->datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
+    self->datagramCallback_->onDatagramsAvailable();
+  }
 }
 
 void QuicTransportBase::updateReadLooper() {
@@ -844,7 +851,8 @@ void QuicTransportBase::updateReadLooper() {
         // still return an error
         return readCb->second.readCb && readCb->second.resumed;
       });
-  if (iter != conn_->streamManager->readableStreams().end()) {
+  if (iter != conn_->streamManager->readableStreams().end() ||
+      !conn_->datagramState.readBuffer.empty()) {
     VLOG(10) << "Scheduling read looper " << *this;
     readLooper_->run();
   } else {
@@ -2561,6 +2569,10 @@ void QuicTransportBase::cancelAllAppCallbacks(
       cb.second.readCb->readError(cb.first, err);
     }
   }
+
+  VLOG(4) << "Clearing datagram callback";
+  datagramCallback_ = nullptr;
+
   VLOG(4) << "Clearing " << peekCallbacks_.size() << " peek callbacks";
   auto peekCallbacksCopy = peekCallbacks_;
   for (auto& cb : peekCallbacksCopy) {
@@ -2676,6 +2688,63 @@ QuicConnectionStats QuicTransportBase::getConnectionsStats() const {
     connStats.version = static_cast<uint32_t>(*conn_->version);
   }
   return connStats;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setDatagramCallback(DatagramCallback* cb) {
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  VLOG(4) << "Setting datagram callback "
+          << " cb=" << cb << " " << *this;
+
+  datagramCallback_ = cb;
+  updateReadLooper();
+  return folly::unit;
+}
+
+uint16_t QuicTransportBase::getDatagramSizeLimit() const {
+  CHECK(conn_);
+  return conn_->datagramState.maxWriteFrameSize;
+}
+
+folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::writeDatagram(
+    Buf buf) {
+  if (conn_->datagramState.writeBuffer.size() >=
+          conn_->datagramState.maxWriteBufferSize ||
+      // TODO(lniccolini) update max datagram frame size
+      // https://github.com/quicwg/datagram/issues/3
+      // For now, max_datagram_size > 0 means the peer supports datagram frames
+      conn_->datagramState.maxWriteFrameSize == 0) {
+    // TODO(lniccolini) use different return codes to signal the application
+    // exactly why the datagram got dropped
+    return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_DATA);
+  }
+  conn_->datagramState.writeBuffer.emplace_back(std::move(buf));
+  return folly::unit;
+}
+
+folly::Expected<std::vector<Buf>, LocalErrorCode>
+QuicTransportBase::readDatagrams(size_t atMost) {
+  CHECK(conn_);
+  auto datagrams = &conn_->datagramState.readBuffer;
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (atMost == 0) {
+    atMost = datagrams->size();
+  } else {
+    atMost = std::min(atMost, datagrams->size());
+  }
+  std::vector<Buf> retDatagrams;
+  retDatagrams.reserve(atMost);
+  std::transform(
+      datagrams->begin(),
+      datagrams->begin() + atMost,
+      std::back_inserter(retDatagrams),
+      [](BufQueue& bq) { return bq.move(); });
+  datagrams->erase(datagrams->begin(), datagrams->begin() + atMost);
+  return retDatagrams;
 }
 
 void QuicTransportBase::writeSocketData() {

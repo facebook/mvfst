@@ -158,7 +158,8 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
           .windowUpdateFrames()
           .blockedFrames()
           .simpleFrames()
-          .pingFrames();
+          .pingFrames()
+          .datagramFrames();
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();
   }

@@ -626,6 +626,32 @@ class QuicTransportBase : public QuicSocket {
 
   FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
 
+  /**
+   * Set the read callback for Datagrams
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> setDatagramCallback(
+      DatagramCallback* cb) override;
+
+  /**
+   * Returns the maximum allowed Datagram payload size.
+   * 0 means Datagram is not supported
+   */
+  FOLLY_NODISCARD uint16_t getDatagramSizeLimit() const override;
+
+  /**
+   * Writes a Datagram frame. If buf is larger than the size limit returned by
+   * getDatagramSizeLimit(), or if the write buffer is full, buf will simply be
+   * dropped, and a LocalErrorCode will be returned to caller.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(Buf buf) override;
+
+  /**
+   * Returns the currently available received Datagrams.
+   * Returns all datagrams if atMost is 0.
+   */
+  folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagrams(
+      size_t atMost = 0) override;
+
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);
@@ -789,7 +815,8 @@ class QuicTransportBase : public QuicSocket {
   ByteEventMap deliveryCallbacks_;
   ByteEventMap txCallbacks_;
 
-  PingCallback* pingCallback_;
+  DatagramCallback* datagramCallback_{nullptr};
+  PingCallback* pingCallback_{nullptr};
 
   WriteCallback* connWriteCallback_{nullptr};
   std::map<StreamId, WriteCallback*> pendingWriteCallbacks_;

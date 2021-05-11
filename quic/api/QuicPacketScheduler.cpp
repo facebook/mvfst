@@ -185,6 +185,11 @@ FrameScheduler::Builder& FrameScheduler::Builder::pingFrames() {
   return *this;
 }
 
+FrameScheduler::Builder& FrameScheduler::Builder::datagramFrames() {
+  datagramFrameScheduler_ = true;
+  return *this;
+}
+
 FrameScheduler FrameScheduler::Builder::build() && {
   FrameScheduler scheduler(std::move(name_));
   if (streamFrameScheduler_) {
@@ -213,6 +218,9 @@ FrameScheduler FrameScheduler::Builder::build() && {
   if (pingFrameScheduler_) {
     scheduler.pingFrameScheduler_.emplace(PingFrameScheduler(conn_));
   }
+  if (datagramFrameScheduler_) {
+    scheduler.datagramFrameScheduler_.emplace(DatagramFrameScheduler(conn_));
+  }
   return scheduler;
 }
 
@@ -226,7 +234,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   writableBytes = writableBytes > builder.getHeaderBytes()
       ? writableBytes - builder.getHeaderBytes()
       : 0;
-  // We cannot return early if the writablyBytes dropps to 0 here, since pure
+  // We cannot return early if the writablyBytes drops to 0 here, since pure
   // acks can skip writableBytes entirely.
   PacketBuilderWrapper wrapper(builder, writableBytes);
   bool cryptoDataWritten = false;
@@ -274,6 +282,10 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   if (streamFrameScheduler_ && streamFrameScheduler_->hasPendingData()) {
     streamFrameScheduler_->writeStreams(wrapper);
   }
+  if (datagramFrameScheduler_ &&
+      datagramFrameScheduler_->hasPendingDatagramFrames()) {
+    datagramFrameScheduler_->writeDatagramFrames(wrapper);
+  }
 
   if (builder.hasFramesPending()) {
     const LongHeader* longHeader = builder.getPacketHeader().asLong();
@@ -304,7 +316,9 @@ bool FrameScheduler::hasImmediateData() const {
       (blockedScheduler_ && blockedScheduler_->hasPendingBlockedFrames()) ||
       (simpleFrameScheduler_ &&
        simpleFrameScheduler_->hasPendingSimpleFrames()) ||
-      (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame());
+      (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame()) ||
+      (datagramFrameScheduler_ &&
+       datagramFrameScheduler_->hasPendingDatagramFrames());
 }
 
 folly::StringPiece FrameScheduler::name() const {
@@ -570,6 +584,30 @@ bool PingFrameScheduler::hasPingFrame() const {
 
 bool PingFrameScheduler::writePing(PacketBuilderInterface& builder) {
   return 0 != writeFrame(PingFrame(), builder);
+}
+
+DatagramFrameScheduler::DatagramFrameScheduler(QuicConnectionStateBase& conn)
+    : conn_(conn) {}
+
+bool DatagramFrameScheduler::hasPendingDatagramFrames() const {
+  return !conn_.datagramState.writeBuffer.empty();
+}
+
+bool DatagramFrameScheduler::writeDatagramFrames(
+    PacketBuilderInterface& builder) {
+  bool sent = false;
+  for (size_t i = 0; i <= conn_.datagramState.writeBuffer.size(); ++i) {
+    auto& payload = conn_.datagramState.writeBuffer.front();
+    auto datagramFrame = DatagramFrame(payload.chainLength(), payload.move());
+    if (writeFrame(datagramFrame, builder) > 0) {
+      conn_.datagramState.writeBuffer.pop_front();
+      sent = true;
+    } else {
+      payload = datagramFrame.data.move();
+      break;
+    }
+  }
+  return sent;
 }
 
 WindowUpdateScheduler::WindowUpdateScheduler(

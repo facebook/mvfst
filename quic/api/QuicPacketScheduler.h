@@ -182,6 +182,18 @@ class PingFrameScheduler {
   const QuicConnectionStateBase& conn_;
 };
 
+class DatagramFrameScheduler {
+ public:
+  explicit DatagramFrameScheduler(QuicConnectionStateBase& conn);
+
+  FOLLY_NODISCARD bool hasPendingDatagramFrames() const;
+
+  bool writeDatagramFrames(PacketBuilderInterface& builder);
+
+ private:
+  QuicConnectionStateBase& conn_;
+};
+
 class WindowUpdateScheduler {
  public:
   explicit WindowUpdateScheduler(const QuicConnectionStateBase& conn);
@@ -247,6 +259,7 @@ class FrameScheduler : public QuicPacketScheduler {
     Builder& cryptoFrames();
     Builder& simpleFrames();
     Builder& pingFrames();
+    Builder& datagramFrames();
 
     FrameScheduler build() &&;
 
@@ -265,6 +278,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool cryptoStreamScheduler_{false};
     bool simpleFrameScheduler_{false};
     bool pingFrameScheduler_{false};
+    bool datagramFrameScheduler_{false};
   };
 
   explicit FrameScheduler(folly::StringPiece name);
@@ -290,6 +304,7 @@ class FrameScheduler : public QuicPacketScheduler {
   folly::Optional<CryptoStreamScheduler> cryptoStreamScheduler_;
   folly::Optional<SimpleFrameScheduler> simpleFrameScheduler_;
   folly::Optional<PingFrameScheduler> pingFrameScheduler_;
+  folly::Optional<DatagramFrameScheduler> datagramFrameScheduler_;
   folly::StringPiece name_;
 };
 

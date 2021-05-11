@@ -17,6 +17,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/DatagramHandlers.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/test/Mocks.h>
 
@@ -37,7 +38,8 @@ enum class TestFrameType : uint8_t {
   CRYPTO,
   EXPIRED_DATA,
   REJECTED_DATA,
-  MAX_STREAMS
+  MAX_STREAMS,
+  DATAGRAM
 };
 
 // A made up encoding decoding of a stream.
@@ -75,6 +77,25 @@ Buf encodeMaxStreamsFrame(const MaxStreamsFrame& frame) {
   appender.writeBE<uint8_t>(frame.isForBidirectionalStream() ? 1 : 0);
   appender.writeBE<uint64_t>(frame.maxStreams);
   return buf;
+}
+
+// Build a datagram frame
+Buf encodeDatagramFrame(BufQueue data) {
+  auto buf = IOBuf::create(10);
+  folly::io::Appender appender(buf.get(), 10);
+  appender.writeBE(static_cast<uint8_t>(TestFrameType::DATAGRAM));
+  auto dataBuf = data.move();
+  dataBuf->coalesce();
+  appender.writeBE<uint32_t>(dataBuf->length());
+  appender.push(dataBuf->coalesce());
+  return buf;
+}
+
+std::pair<Buf, uint32_t> decodeDatagramFrame(folly::io::Cursor& cursor) {
+  Buf outData;
+  auto len = cursor.readBE<uint32_t>();
+  cursor.clone(outData, len);
+  return std::make_pair(std::move(outData), len);
 }
 
 std::pair<Buf, uint64_t> decodeDataBuffer(folly::io::Cursor& cursor) {
@@ -226,6 +247,10 @@ class TestQuicTransport
           conn_->streamManager->setMaxLocalUnidirectionalStreams(
               maxStreamsFrame.maxStreams);
         }
+      } else if (type == TestFrameType::DATAGRAM) {
+        auto buffer = decodeDatagramFrame(cursor);
+        auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
+        handleDatagram(*conn_, frame);
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         QuicStreamState* stream = conn_->streamManager->getStream(buffer.first);
@@ -344,6 +369,12 @@ class TestQuicTransport
     updateReadLooper();
   }
 
+  void addDatagram(Buf data) {
+    auto buf = encodeDatagramFrame(std::move(data));
+    SocketAddress addr("127.0.0.1", 1000);
+    onNetworkData(addr, NetworkData(std::move(buf), Clock::now()));
+  }
+
   void closeStream(StreamId id) {
     QuicStreamState* stream = conn_->streamManager->getStream(id);
     stream->sendState = StreamSendState::Closed;
@@ -449,6 +480,11 @@ class TestQuicTransport
     }
     streamByteEventCbIt->second.erase(pos);
     return true;
+  }
+
+  void enableDatagram() {
+    conn_->datagramState.maxReadFrameSize = 65535;
+    conn_->datagramState.maxReadBufferSize = 10;
   }
 
   QuicServerConnectionState* transportConn;
@@ -3702,6 +3738,15 @@ TEST_F(QuicTransportImplTest, GetConnectionStatsSmoke) {
   auto stats = transport->getConnectionsStats();
   EXPECT_EQ(stats.congestionController, CongestionControlType::Cubic);
   EXPECT_EQ(stats.clientConnectionId, "0a090807");
+}
+
+TEST_F(QuicTransportImplTest, DatagramCallbackDatagramAvailable) {
+  NiceMock<MockDatagramCallback> datagramCb;
+  transport->enableDatagram();
+  transport->setDatagramCallback(&datagramCb);
+  transport->addDatagram(folly::IOBuf::copyBuffer("datagram payload"));
+  EXPECT_CALL(datagramCb, onDatagramsAvailable());
+  transport->driveReadCallbacks();
 }
 
 } // namespace test

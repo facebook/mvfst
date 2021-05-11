@@ -73,6 +73,12 @@ class MockPeekCallback : public QuicSocket::PeekCallback {
           std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
 };
 
+class MockDatagramCallback : public QuicSocket::DatagramCallback {
+ public:
+  ~MockDatagramCallback() override = default;
+  GMOCK_METHOD0_(, noexcept, , onDatagramsAvailable, void());
+};
+
 class MockWriteCallback : public QuicSocket::WriteCallback {
  public:
   ~MockWriteCallback() override = default;

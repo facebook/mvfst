@@ -279,5 +279,18 @@ class MockQuicSocket : public QuicSocket {
       resetNonControlStreams,
       void(ApplicationErrorCode, folly::StringPiece));
   MOCK_CONST_METHOD0(getConnectionsStats, QuicConnectionStats());
+  MOCK_METHOD1(
+      setDatagramCallback,
+      folly::Expected<folly::Unit, LocalErrorCode>(DatagramCallback*));
+  MOCK_CONST_METHOD0(getDatagramSizeLimit, uint16_t());
+  folly::Expected<folly::Unit, LocalErrorCode> writeDatagram(
+      Buf data) override {
+    SharedBuf sharedData(data.release());
+    return writeDatagram(sharedData);
+  }
+  MOCK_METHOD1(writeDatagram, WriteResult(SharedBuf));
+  MOCK_METHOD1(
+      readDatagrams,
+      folly::Expected<std::vector<Buf>, LocalErrorCode>(size_t));
 };
 } // namespace quic
