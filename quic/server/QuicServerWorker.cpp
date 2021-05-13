@@ -1289,21 +1289,22 @@ QuicServerWorker::AcceptObserverList::~AcceptObserverList() {
 }
 
 void QuicServerWorker::AcceptObserverList::add(AcceptObserver* observer) {
+  // adding the same observer multiple times is not allowed
+  CHECK(
+      std::find(observers_.begin(), observers_.end(), observer) ==
+      observers_.end());
+
   observers_.emplace_back(CHECK_NOTNULL(observer));
   observer->observerAttach(worker_);
 }
 
 bool QuicServerWorker::AcceptObserverList::remove(AcceptObserver* observer) {
-  const auto eraseIt =
-      std::remove(observers_.begin(), observers_.end(), observer);
-  if (eraseIt == observers_.end()) {
+  auto it = std::find(observers_.begin(), observers_.end(), observer);
+  if (it == observers_.end()) {
     return false;
   }
-
-  for (auto it = eraseIt; it != observers_.end(); it++) {
-    (*it)->observerDetach(worker_);
-  }
-  observers_.erase(eraseIt, observers_.end());
+  observer->observerDetach(worker_);
+  observers_.erase(it);
   return true;
 }
 

@@ -1186,18 +1186,35 @@ TEST_F(QuicServerWorkerTest, AcceptObserverMultipleRemove) {
   auto cb2 = std::make_unique<StrictMock<MockAcceptObserver>>();
   EXPECT_CALL(*cb2, observerAttach(worker_.get()));
   worker_->addAcceptObserver(cb2.get());
-  Mock::VerifyAndClearExpectations(cb1.get());
-  Mock::VerifyAndClearExpectations(cb2.get());
-
-  EXPECT_CALL(*cb2, observerDetach(worker_.get()));
-  EXPECT_TRUE(worker_->removeAcceptObserver(cb2.get()));
-  Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
 
   EXPECT_CALL(*cb1, observerDetach(worker_.get()));
   EXPECT_TRUE(worker_->removeAcceptObserver(cb1.get()));
   Mock::VerifyAndClearExpectations(cb1.get());
+
+  EXPECT_CALL(*cb2, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb2.get()));
   Mock::VerifyAndClearExpectations(cb2.get());
+}
+
+TEST_F(QuicServerWorkerTest, AcceptObserverMultipleRemoveReverse) {
+  auto cb1 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb1.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+
+  auto cb2 = std::make_unique<StrictMock<MockAcceptObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(worker_.get()));
+  worker_->addAcceptObserver(cb2.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb2, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb2.get()));
+  Mock::VerifyAndClearExpectations(cb2.get());
+
+  EXPECT_CALL(*cb1, observerDetach(worker_.get()));
+  EXPECT_TRUE(worker_->removeAcceptObserver(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
 }
 
 TEST_F(QuicServerWorkerTest, AcceptObserverMultipleAcceptorDestroyed) {
@@ -1209,7 +1226,6 @@ TEST_F(QuicServerWorkerTest, AcceptObserverMultipleAcceptorDestroyed) {
   auto cb2 = std::make_unique<StrictMock<MockAcceptObserver>>();
   EXPECT_CALL(*cb2, observerAttach(worker_.get()));
   worker_->addAcceptObserver(cb2.get());
-  Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
 
   // destroy the acceptor while the AcceptObserver is installed

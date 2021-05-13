@@ -2627,21 +2627,22 @@ void QuicTransportBase::resetNonControlStreams(
 }
 
 void QuicTransportBase::addObserver(Observer* observer) {
+  // adding the same observer multiple times is not allowed
+  CHECK(
+      std::find(observers_->begin(), observers_->end(), observer) ==
+      observers_->end());
+
   observers_->push_back(CHECK_NOTNULL(observer));
   observer->observerAttach(this);
 }
 
 bool QuicTransportBase::removeObserver(Observer* observer) {
-  const auto eraseIt =
-      std::remove(observers_->begin(), observers_->end(), observer);
-  if (eraseIt == observers_->end()) {
+  auto it = std::find(observers_->begin(), observers_->end(), observer);
+  if (it == observers_->end()) {
     return false;
   }
-
-  for (auto it = eraseIt; it != observers_->end(); it++) {
-    (*it)->observerDetach(this);
-  }
-  observers_->erase(eraseIt, observers_->end());
+  observer->observerDetach(this);
+  observers_->erase(it);
   return true;
 }
 

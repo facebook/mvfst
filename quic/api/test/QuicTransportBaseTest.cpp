@@ -3497,6 +3497,56 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemove) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
+TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultiple) {
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(transport.get()));
+  transport->addObserver(cb1.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(transport.get()));
+  transport->addObserver(cb2.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_THAT(
+      transport->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  EXPECT_CALL(*cb1, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeObserver(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb2.get()));
+
+  EXPECT_CALL(*cb2, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeObserver(cb2.get()));
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_THAT(transport->getObservers(), IsEmpty());
+}
+
+TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultipleReverse) {
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb1, observerAttach(transport.get()));
+  transport->addObserver(cb1.get());
+  Mock::VerifyAndClearExpectations(cb1.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
+
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  EXPECT_CALL(*cb2, observerAttach(transport.get()));
+  transport->addObserver(cb2.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_THAT(
+      transport->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  EXPECT_CALL(*cb2, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeObserver(cb2.get()));
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
+
+  EXPECT_CALL(*cb1, observerDetach(transport.get()));
+  EXPECT_TRUE(transport->removeObserver(cb1.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  EXPECT_THAT(transport->getObservers(), IsEmpty());
+}
+
 TEST_F(QuicTransportImplTest, ObserverRemoveMissing) {
   auto cb = std::make_unique<StrictMock<MockObserver>>();
   EXPECT_FALSE(transport->removeObserver(cb.get()));
