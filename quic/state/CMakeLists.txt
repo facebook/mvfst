@@ -120,6 +120,7 @@ target_link_libraries(
   mvfst_state_functions
   mvfst_state_machine
 )
+
 # stream functions
 add_library(
   mvfst_state_stream_functions
