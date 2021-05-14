@@ -38,7 +38,8 @@ OutstandingPacket makeDummyOutstandingPacket(
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   return packet;
 }
 

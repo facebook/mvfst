@@ -11,6 +11,7 @@
 #include <quic/codec/Types.h>
 #include <quic/state/LossState.h>
 #include <quic/state/PacketEvent.h>
+#include "folly/container/F14Map.h"
 
 namespace quic {
 
@@ -44,6 +45,50 @@ struct OutstandingPacketMetadata {
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
 
+  // Structure used to hold information about each stream with frames in packet
+  class DetailsPerStream {
+   public:
+    struct StreamDetails {
+      bool finObserved{false};
+      uint64_t streamBytesSent{0};
+      uint64_t newStreamBytesSent{0};
+      folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
+    };
+
+    void addFrame(const WriteStreamFrame& frame, const bool newData) {
+      auto ret = detailsPerStream.emplace(
+          std::piecewise_construct,
+          std::make_tuple(frame.streamId),
+          std::make_tuple());
+
+      auto& streamDetails = ret.first->second;
+      streamDetails.streamBytesSent += frame.len;
+      if (frame.fin) {
+        streamDetails.finObserved = true;
+      }
+      if (newData) {
+        streamDetails.newStreamBytesSent += frame.len;
+        if (streamDetails.maybeFirstNewStreamByteOffset) {
+          streamDetails.maybeFirstNewStreamByteOffset = std::min(
+              frame.offset, *streamDetails.maybeFirstNewStreamByteOffset);
+        } else {
+          streamDetails.maybeFirstNewStreamByteOffset = frame.offset;
+        }
+      }
+    }
+
+    FOLLY_NODISCARD const folly::F14FastMap<StreamId, StreamDetails>
+    getDetails() const {
+      return detailsPerStream;
+    }
+
+   private:
+    folly::F14FastMap<StreamId, StreamDetails> detailsPerStream;
+  };
+
+  // When enabled, details about each stream with frames in this packet
+  folly::Optional<DetailsPerStream> maybeDetailsPerStream;
+
   OutstandingPacketMetadata(
       TimePoint timeIn,
       uint32_t encodedSizeIn,
@@ -55,7 +100,8 @@ struct OutstandingPacketMetadata {
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
-      uint64_t writeCount)
+      uint64_t writeCount,
+      folly::Optional<DetailsPerStream> maybeDetailsPerStream)
       : time(timeIn),
         encodedSize(encodedSizeIn),
         encodedBodySize(encodedBodySizeIn),
@@ -67,11 +113,14 @@ struct OutstandingPacketMetadata {
         packetsInflight(packetsInflightIn),
         totalPacketsSent(lossStateIn.totalPacketsSent),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
-        writeCount(writeCount) {}
+        writeCount(writeCount),
+        maybeDetailsPerStream(std::move(maybeDetailsPerStream)) {}
 };
 
 // Data structure to represent outstanding retransmittable packets
 struct OutstandingPacket {
+  using Metadata = OutstandingPacketMetadata;
+
   // Structure representing the frames that are outstanding including the header
   // that was sent.
   RegularQuicWritePacket packet;
@@ -138,7 +187,9 @@ struct OutstandingPacket {
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
-      uint64_t writeCount = 0)
+      uint64_t writeCount,
+      folly::Optional<Metadata::DetailsPerStream> maybeDetailsPerStream =
+          folly::none)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -151,7 +202,8 @@ struct OutstandingPacket {
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,
-            writeCount)) {}
+            writeCount,
+            std::move(maybeDetailsPerStream))) {}
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -165,7 +217,9 @@ struct OutstandingPacket {
       uint64_t inflightBytesIn,
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
-      uint64_t writeCount = 0)
+      uint64_t writeCount,
+      folly::Optional<Metadata::DetailsPerStream> maybeDetailsPerStream =
+          folly::none)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -178,6 +232,7 @@ struct OutstandingPacket {
             inflightBytesIn,
             packetsInflightIn,
             lossStateIn,
-            writeCount)) {}
+            writeCount,
+            std::move(maybeDetailsPerStream))) {}
 };
 } // namespace quic

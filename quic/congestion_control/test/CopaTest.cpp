@@ -40,7 +40,8 @@ class CopaTest : public Test {
           0,
           0,
           0,
-          LossState()));
+          LossState(),
+          0));
       loss.lostBytes = packetData.second;
     }
     loss.lostPackets = lostPackets.size();
@@ -65,7 +66,8 @@ class CopaTest : public Test {
         0,
         inflight,
         0,
-        LossState());
+        LossState(),
+        0);
   }
 
   CongestionController::AckEvent createAckEvent(

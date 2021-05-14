@@ -683,7 +683,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Handshake),
       Clock::now(),
@@ -694,7 +695,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
@@ -705,7 +707,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
@@ -716,7 +719,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
@@ -727,7 +731,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       0,
-      LossState());
+      LossState(),
+      0);
   EXPECT_EQ(
       135,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)

@@ -114,7 +114,7 @@ PacketNum addOutstandingPacket(QuicConnectionStateBase& conn) {
       nextPacketNum);
   RegularQuicWritePacket packet(std::move(header));
   conn.outstandings.packets.emplace_back(
-      packet, Clock::now(), 0, 0, false, 0, 0, 0, 0, LossState());
+      packet, Clock::now(), 0, 0, false, 0, 0, 0, 0, LossState(), 0);
   increaseNextPacketNum(conn, PacketNumberSpace::AppData);
   return nextPacketNum;
 }

@@ -1647,6 +1647,276 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
 }
 
+TEST_F(QuicTransportFunctionsTest, TestStreamDetailsEmptyPacket) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+  // Since there is no ACK eliciting frame in this packet, it is not included as
+  // an outstanding packet
+  EXPECT_EQ(0, conn->outstandings.packets.size());
+}
+
+TEST_F(QuicTransportFunctionsTest, TestStreamDetailsControlPacket) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  StreamDataBlockedFrame blockedFrame(stream->id, 1000);
+  packet.packet.frames.push_back(blockedFrame);
+  packet.packet.frames.push_back(PingFrame());
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+  // If we have only control frames sent, there should be no stream data in the
+  // outstanding packet.
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+  auto detailsPerStream =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.maybeDetailsPerStream;
+  EXPECT_EQ(true, detailsPerStream.has_value());
+  EXPECT_EQ(0, detailsPerStream->getDetails().size());
+}
+
+TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  WriteStreamFrame writeStreamFrame(
+      stream->id, 0 /* offset */, 10 /* length */, false /* fin */);
+  packet.packet.frames.push_back(writeStreamFrame);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+  auto detailsPerStream =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  auto streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(false, streamDetail.finObserved);
+  EXPECT_EQ(10, streamDetail.streamBytesSent);
+  EXPECT_EQ(10, streamDetail.newStreamBytesSent);
+  EXPECT_EQ(0, streamDetail.maybeFirstNewStreamByteOffset.value());
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    TestStreamDetailsAppDataPacketSingleStreamMultipleFrames) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("abcdefghijklmno"), true);
+  WriteStreamFrame writeStreamFrame1(
+      stream->id, 0 /* offset */, 10 /* length */, false /* fin */);
+  WriteStreamFrame writeStreamFrame2(
+      stream->id, 10 /* offset */, 5 /* length */, true /* fin */);
+  packet.packet.frames.push_back(writeStreamFrame1);
+  packet.packet.frames.push_back(writeStreamFrame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+  auto detailsPerStream =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  auto streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(true, streamDetail.finObserved);
+  EXPECT_EQ(15, streamDetail.streamBytesSent);
+  EXPECT_EQ(15, streamDetail.newStreamBytesSent);
+  EXPECT_EQ(0, streamDetail.maybeFirstNewStreamByteOffset.value());
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    TestStreamDetailsAppDataPacketSingleStreamRetransmit) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  uint64_t frame1Offset = 0;
+  uint64_t frame1Len = 10;
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame1(stream->id, frame1Offset, frame1Len, false /* fin */);
+  packet.packet.frames.push_back(frame1);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+
+  // The first outstanding packet is the one with new data
+  auto detailsPerStream =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  auto streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(false, streamDetail.finObserved);
+  EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
+  EXPECT_EQ(frame1Len, streamDetail.newStreamBytesSent);
+  EXPECT_EQ(frame1Offset, streamDetail.maybeFirstNewStreamByteOffset.value());
+
+  // retransmit the same frame1 again.
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.push_back(frame1);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(2, conn->outstandings.packets.size());
+
+  // The second outstanding packet is the one with retransmit data
+  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                         ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(false, streamDetail.finObserved);
+  EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
+  EXPECT_EQ(0, streamDetail.newStreamBytesSent);
+  EXPECT_FALSE(streamDetail.maybeFirstNewStreamByteOffset.has_value());
+
+  // Retransmit frame1 and send new data in frame2.
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("klmnopqrstuvwxy"), true);
+  uint64_t frame2Offset = 10;
+  uint64_t frame2Len = 15;
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame2(stream->id, frame2Offset, frame2Len, false /* fin */);
+  packet.packet.frames.push_back(frame1);
+  packet.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(3, conn->outstandings.packets.size());
+
+  // The third outstanding packet will have both new and retransmitted data.
+  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                         ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(false, streamDetail.finObserved);
+  EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
+  EXPECT_EQ(frame2Len, streamDetail.newStreamBytesSent);
+  EXPECT_EQ(frame2Offset, streamDetail.maybeFirstNewStreamByteOffset.value());
+
+  // Retransmit frame1 aand frame2.
+  packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet.packet.frames.push_back(frame1);
+  packet.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(4, conn->outstandings.packets.size());
+
+  // The forth outstanding packet will have only retransmit data.
+  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
+                         ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(1, detailsPerStream.size());
+  streamDetail = detailsPerStream[stream->id];
+  EXPECT_EQ(false, streamDetail.finObserved);
+  EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
+  EXPECT_EQ(0, streamDetail.newStreamBytesSent);
+  EXPECT_FALSE(streamDetail.maybeFirstNewStreamByteOffset.has_value());
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    TestStreamDetailsAppDataPacketMultipleStreams) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream1Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream2Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream1 = conn->streamManager->findStream(stream1Id);
+  auto stream2 = conn->streamManager->findStream(stream2Id);
+  EXPECT_NE(nullptr, stream1);
+  EXPECT_NE(nullptr, stream2);
+
+  auto buf = IOBuf::copyBuffer("hey whats up");
+  writeDataToQuicStream(*stream1, buf->clone(), true);
+  writeDataToQuicStream(*stream2, buf->clone(), true);
+
+  WriteStreamFrame writeStreamFrame1(stream1->id, 0, 5, false),
+      writeStreamFrame2(stream2->id, 0, 12, true);
+  packet.packet.frames.push_back(writeStreamFrame1);
+  packet.packet.frames.push_back(writeStreamFrame2);
+
+  updateConnection(
+      *conn,
+      folly::none,
+      packet.packet,
+      TimePoint(),
+      getEncodedSize(packet),
+      getEncodedBodySize(packet),
+      false /* isDSRPacket */);
+
+  ASSERT_EQ(1, conn->outstandings.packets.size());
+  auto detailsPerStream =
+      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
+          ->metadata.maybeDetailsPerStream->getDetails();
+  EXPECT_EQ(2, detailsPerStream.size());
+  auto stream1Detail = detailsPerStream[stream1Id];
+  auto stream2Detail = detailsPerStream[stream2Id];
+
+  EXPECT_EQ(false, stream1Detail.finObserved);
+  EXPECT_EQ(5, stream1Detail.streamBytesSent);
+  EXPECT_EQ(5, stream1Detail.newStreamBytesSent);
+  EXPECT_EQ(0, stream1Detail.maybeFirstNewStreamByteOffset.value());
+
+  EXPECT_EQ(true, stream2Detail.finObserved);
+  EXPECT_EQ(12, stream2Detail.streamBytesSent);
+  EXPECT_EQ(12, stream2Detail.newStreamBytesSent);
+  EXPECT_EQ(0, stream2Detail.maybeFirstNewStreamByteOffset.value());
+}
+
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
   auto conn = createConn();
   conn->udpSendPacketLen = 30;
@@ -2101,8 +2371,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingOldData) {
       1,
       writeProbingDataToSocketForTest(
           *rawSocket, *conn, 1, *aead, *headerCipher, getVersion(*conn)));
-  // Now we have no new data, let's probe again, and verify the same old data is
-  // sent.
+  // Now we have no new data, let's probe again, and verify the same old data
+  // is sent.
   folly::IOBuf secondBodyCaptured;
   EXPECT_CALL(*capturingAead, _inplaceEncrypt(_, _, _))
       .WillRepeatedly(Invoke([&](auto& buf, auto, auto) {
@@ -2458,7 +2728,8 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
   auto buf = IOBuf::copyBuffer("0123456789");
   writeDataToQuicStream(*stream1, buf->clone(), false);
 
-  // Only case that we allow the write; both CC / PathLimiter have writablebytes
+  // Only case that we allow the write; both CC / PathLimiter have
+  // writablebytes
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
   EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
 

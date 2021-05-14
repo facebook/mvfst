@@ -602,6 +602,7 @@ void updateConnection(
   uint32_t ackFrameCounter = 0;
   uint32_t streamBytesSent = 0;
   uint32_t newStreamBytesSent = 0;
+  OutstandingPacket::Metadata::DetailsPerStream detailsPerStream;
   auto packetNumberSpace = packet.header.getPacketNumberSpace();
   bool isD6DProbe = packetNumberSpace == PacketNumberSpace::AppData &&
       conn.d6d.lastProbe.hasValue() &&
@@ -651,6 +652,7 @@ void updateConnection(
         conn.streamManager->updateWritableStreams(*stream);
         conn.streamManager->updateLossStreams(*stream);
         streamBytesSent += writeStreamFrame.len;
+        detailsPerStream.addFrame(writeStreamFrame, newStreamDataWritten);
         break;
       }
       case QuicWriteFrame::Type::WriteCryptoFrame: {
@@ -833,7 +835,8 @@ void updateConnection(
       conn.lossState.inflightBytes + encodedSize,
       conn.outstandings.numOutstanding() + 1,
       conn.lossState,
-      conn.writeCount);
+      conn.writeCount,
+      std::move(detailsPerStream));
 
   if (isD6DProbe) {
     ++conn.d6d.outstandingProbes;
