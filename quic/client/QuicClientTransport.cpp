@@ -1024,11 +1024,6 @@ void QuicClientTransport::errMessage(
       (cmsg.cmsg_level == SOL_IPV6 && cmsg.cmsg_type == IPV6_RECVERR)) {
     const struct sock_extended_err* serr =
         reinterpret_cast<const struct sock_extended_err*>(CMSG_DATA(&cmsg));
-    auto connectionError = (serr->ee_errno == ECONNREFUSED) ||
-        (serr->ee_errno == ENETUNREACH) || (serr->ee_errno == ENETDOWN);
-    if (!connectionError) {
-      return;
-    }
     auto errStr = folly::errnoStr(serr->ee_errno);
     runOnEvbAsync([errString = std::move(errStr)](auto self) {
       auto quicError = std::make_pair(
