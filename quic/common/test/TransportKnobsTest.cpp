@@ -6,8 +6,10 @@
  *
  */
 
+#include <quic/QuicConstants.h>
 #include <quic/common/TransportKnobs.h>
 
+#include <folly/Format.h>
 #include <folly/portability/GTest.h>
 
 using namespace ::testing;
@@ -83,8 +85,102 @@ TEST(QuicKnobsParsingTest, NegativeNumbers) {
   run(fixture);
 }
 
-TEST(QuicKnobsParsingTest, StringValue) {
-  QuicKnobsParsingTestFixture fixture = {"{ \"1\" : \"1\" }", true, {}};
+TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+  uint64_t val =
+      static_cast<uint64_t>(congestionControlStrToType("cubic").value());
+  std::string args = folly::format(R"({{"{}" : "cubic"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidCCAlgorithm) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
+  std::string args = folly::format(R"({{"{}" : "foo"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidStringParam) {
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
+  std::string args = folly::format(R"({{"{}" : "foo"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamFormat) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamFormatDefault) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamFormat2) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1,2"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamZeroDenom) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1/0"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamZeroNum) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "0/2"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamLargeDenom) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1/1234567"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidFractionParamLargeNum) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "1234567/1"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, ValidFractionParam) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "4/5"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = (4 * 100 + 5)}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
+  std::string args = folly::format(R"({{"{}" : "4/5"}})", key).str();
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = (4 * 100 + 5)}}};
   run(fixture);
 }
 

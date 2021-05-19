@@ -659,6 +659,55 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               << "Knob param received, udpSendPacketLen is forcibly set to max UDP payload size advertised by peer";
         }
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        auto cctype = static_cast<CongestionControlType>(val);
+        LOG(INFO) << "Knob param received, set congestion control type to "
+                  << congestionControlTypeToString(cctype);
+        if (cctype == server_conn->congestionController->type()) {
+          return;
+        }
+        if (cctype == CongestionControlType::CCP) {
+          bool ccpAvailable = false;
+#ifdef CCP_ENABLED
+          ccpAvailable = server_conn->ccpDatapath != nullptr;
+#endif
+          if (!ccpAvailable) {
+            LOG(ERROR) << "ccp not enabled on this server";
+            return;
+          }
+        }
+        server_conn->congestionController =
+            server_conn->congestionControllerFactory->makeCongestionController(
+                *server_conn, cctype);
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        uint8_t numerator = (val / 100);
+        uint8_t denominator = (val - (numerator * 100));
+        LOG(INFO) << "Knob param received, set STARTUP rtt factor to ("
+                  << unsigned(numerator) << "," << unsigned(denominator) << ")";
+        server_conn->transportSettings.startupRttFactor =
+            std::make_pair(numerator, denominator);
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        auto numerator = (uint8_t)(val / 100);
+        auto denominator = (uint8_t)(val - (numerator * 100));
+        LOG(INFO) << "Knob param received, set DEFAULT rtt factor to ("
+                  << unsigned(numerator) << "," << unsigned(denominator) << ")";
+        server_conn->transportSettings.defaultRttFactor =
+            std::make_pair(numerator, denominator);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

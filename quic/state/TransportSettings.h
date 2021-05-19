@@ -169,6 +169,10 @@ struct TransportSettings {
       kDefaultPacingTimerTickInterval};
   ZeroRttSourceTokenMatchingPolicy zeroRttSourceTokenMatchingPolicy{
       ZeroRttSourceTokenMatchingPolicy::REJECT_IF_NO_EXACT_MATCH};
+  // Scale pacing rate for CC, non-empty indicates override via transport knobs
+  std::pair<uint8_t, uint8_t> startupRttFactor{1, 2};
+  std::pair<uint8_t, uint8_t> defaultRttFactor{4, 5};
+  //
   bool attemptEarlyData{false};
   // Maximum number of packets the connection will write in
   // writeConnectionDataToSocket.

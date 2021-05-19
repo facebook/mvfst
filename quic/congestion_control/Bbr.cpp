@@ -271,11 +271,13 @@ void BbrCongestionController::updatePacing() noexcept {
   }
   // TODO: slower pacing if we are in STARTUP and loss has happened
   if (state_ == BbrState::Startup) {
-    // This essentially paces at a 200% rate.
-    conn_.pacer->setRttFactor(1, 2);
+    conn_.pacer->setRttFactor(
+        conn_.transportSettings.startupRttFactor.first,
+        conn_.transportSettings.startupRttFactor.second);
   } else {
-    // Otherwise pace at a 120% rate.
-    conn_.pacer->setRttFactor(4, 5);
+    conn_.pacer->setRttFactor(
+        conn_.transportSettings.defaultRttFactor.first,
+        conn_.transportSettings.defaultRttFactor.second);
   }
   conn_.pacer->refreshPacingRate(pacingWindow_, mrtt);
   if (state_ == BbrState::Drain) {
