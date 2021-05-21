@@ -2068,8 +2068,9 @@ QuicTransportBase::registerByteEventCallback(
   if (byteEventMapIt == byteEventMap.end()) {
     byteEventMap.emplace(
         id,
-        std::initializer_list<std::remove_reference<decltype(
-            byteEventMap)>::type::mapped_type::value_type>({{offset, cb}}));
+        std::initializer_list<std::remove_reference<
+            decltype(byteEventMap)>::type::mapped_type::value_type>(
+            {{offset, cb}}));
   } else {
     // Keep ByteEvents for the same stream sorted by offsets:
     auto pos = std::upper_bound(
