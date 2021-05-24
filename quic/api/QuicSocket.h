@@ -1000,7 +1000,7 @@ class QuicSocket {
       StreamId id,
       Buf data,
       bool eof,
-      DeliveryCallback* cb = nullptr) = 0;
+      ByteEventCallback* cb = nullptr) = 0;
 
   /**
    * Write a data representation in the form of BufferMeta to the given stream.
@@ -1009,7 +1009,7 @@ class QuicSocket {
       StreamId id,
       const BufferMeta& data,
       bool eof,
-      DeliveryCallback* cb = nullptr) = 0;
+      ByteEventCallback* cb = nullptr) = 0;
 
   /**
    * Set the DSRPacketizationRequestSender for a stream.

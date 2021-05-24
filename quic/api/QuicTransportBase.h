@@ -176,7 +176,7 @@ class QuicTransportBase : public QuicSocket {
       StreamId id,
       Buf data,
       bool eof,
-      DeliveryCallback* cb = nullptr) override;
+      ByteEventCallback* cb = nullptr) override;
 
   // TODO: Maybe I should virtualize DSR related APIs and only implement in
   // QuicServerTransport
@@ -184,7 +184,7 @@ class QuicTransportBase : public QuicSocket {
       StreamId id,
       const BufferMeta& data,
       bool eof,
-      DeliveryCallback* cb = nullptr) override;
+      ByteEventCallback* cb = nullptr) override;
 
   WriteResult setDSRPacketizationRequestSender(
       StreamId id,

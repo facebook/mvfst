@@ -191,16 +191,16 @@ class MockQuicSocket : public QuicSocket {
       getNumByteEventCallbacksForStream,
       size_t(const ByteEvent::Type, const StreamId));
   folly::Expected<folly::Unit, LocalErrorCode>
-  writeChain(StreamId id, Buf data, bool eof, DeliveryCallback* cb) override {
+  writeChain(StreamId id, Buf data, bool eof, ByteEventCallback* cb) override {
     SharedBuf sharedData(data.release());
     return writeChain(id, sharedData, eof, cb);
   }
   MOCK_METHOD4(
       writeChain,
-      WriteResult(StreamId, SharedBuf, bool, DeliveryCallback*));
+      WriteResult(StreamId, SharedBuf, bool, ByteEventCallback*));
   MOCK_METHOD4(
       writeBufMeta,
-      WriteResult(StreamId, const BufferMeta&, bool, DeliveryCallback*));
+      WriteResult(StreamId, const BufferMeta&, bool, ByteEventCallback*));
   MOCK_METHOD2(
       setDSRPacketizationRequestSenderRef,
       WriteResult(

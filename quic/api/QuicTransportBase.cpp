@@ -1886,7 +1886,7 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
     StreamId id,
     Buf data,
     bool eof,
-    DeliveryCallback* cb) {
+    ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
@@ -1955,7 +1955,7 @@ QuicSocket::WriteResult QuicTransportBase::writeBufMeta(
     StreamId id,
     const BufferMeta& data,
     bool eof,
-    DeliveryCallback* cb) {
+    ByteEventCallback* cb) {
   if (isReceivingStream(conn_->nodeType, id)) {
     return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
   }
