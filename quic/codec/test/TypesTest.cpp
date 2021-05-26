@@ -196,10 +196,16 @@ TEST_F(TypesTest, ShortHeaderPacketNumberSpace) {
   ShortHeader shortHeaderZero(
       ProtectionType::KeyPhaseZero, ConnectionId({1, 3, 5, 7, 8}), 100);
   EXPECT_EQ(PacketNumberSpace::AppData, shortHeaderZero.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::AppData,
+      protectionTypeToPacketNumberSpace(shortHeaderZero.getProtectionType()));
 
   ShortHeader shortHeaderOne(
       ProtectionType::KeyPhaseOne, ConnectionId({1, 3, 5, 7, 9}), 101);
   EXPECT_EQ(PacketNumberSpace::AppData, shortHeaderOne.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::AppData,
+      protectionTypeToPacketNumberSpace(shortHeaderOne.getProtectionType()));
 }
 
 TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
@@ -211,6 +217,9 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       QuicVersion::QUIC_DRAFT);
   EXPECT_EQ(
       PacketNumberSpace::Initial, initialLongHeader.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::Initial,
+      protectionTypeToPacketNumberSpace(initialLongHeader.getProtectionType()));
 
   LongHeader retryLongHeader(
       LongHeader::Types::Retry,
@@ -219,6 +228,9 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       201,
       QuicVersion::QUIC_DRAFT);
   EXPECT_EQ(PacketNumberSpace::Initial, retryLongHeader.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::Initial,
+      protectionTypeToPacketNumberSpace(retryLongHeader.getProtectionType()));
 
   LongHeader handshakeLongHeader(
       LongHeader::Types::Handshake,
@@ -228,6 +240,10 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       QuicVersion::QUIC_DRAFT);
   EXPECT_EQ(
       PacketNumberSpace::Handshake, handshakeLongHeader.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::Handshake,
+      protectionTypeToPacketNumberSpace(
+          handshakeLongHeader.getProtectionType()));
 
   LongHeader zeroRttLongHeader(
       LongHeader::Types::ZeroRtt,
@@ -237,6 +253,9 @@ TEST_F(TypesTest, LongHeaderPacketNumberSpace) {
       QuicVersion::QUIC_DRAFT);
   EXPECT_EQ(
       PacketNumberSpace::AppData, zeroRttLongHeader.getPacketNumberSpace());
+  EXPECT_EQ(
+      PacketNumberSpace::AppData,
+      protectionTypeToPacketNumberSpace(zeroRttLongHeader.getProtectionType()));
 }
 
 class PacketHeaderTest : public Test {};

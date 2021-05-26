@@ -910,6 +910,7 @@ struct PacketHeader {
 };
 
 ProtectionType longHeaderTypeToProtectionType(LongHeader::Types type);
+PacketNumberSpace protectionTypeToPacketNumberSpace(ProtectionType type);
 
 struct StreamTypeField {
  public:

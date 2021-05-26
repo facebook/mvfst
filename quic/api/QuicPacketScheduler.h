@@ -12,10 +12,14 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/codec/QuicPacketBuilder.h>
+#include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+
+#include <folly/lang/Assume.h>
 
 namespace quic {
 
@@ -121,7 +125,6 @@ class AckScheduler {
  public:
   AckScheduler(const QuicConnectionStateBase& conn, const AckState& ackState);
 
-  template <typename ClockType = Clock>
   folly::Optional<PacketNum> writeNextAcks(PacketBuilderInterface& builder);
 
   bool hasPendingAcks() const;
@@ -376,4 +379,3 @@ class D6DProbeScheduler : public QuicPacketScheduler {
   bool probeSent_{false};
 };
 } // namespace quic
-#include <quic/api/QuicPacketScheduler-inl.h>

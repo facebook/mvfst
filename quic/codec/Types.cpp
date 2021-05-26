@@ -228,6 +228,21 @@ ProtectionType longHeaderTypeToProtectionType(
   folly::assume_unreachable();
 }
 
+PacketNumberSpace protectionTypeToPacketNumberSpace(
+    ProtectionType protectionType) {
+  switch (protectionType) {
+    case ProtectionType::Initial:
+      return PacketNumberSpace::Initial;
+    case ProtectionType::Handshake:
+      return PacketNumberSpace::Handshake;
+    case ProtectionType::ZeroRtt:
+    case ProtectionType::KeyPhaseZero:
+    case ProtectionType::KeyPhaseOne:
+      return PacketNumberSpace::AppData;
+  }
+  folly::assume_unreachable();
+}
+
 ShortHeaderInvariant::ShortHeaderInvariant(ConnectionId dcid)
     : destinationConnId(std::move(dcid)) {}
 

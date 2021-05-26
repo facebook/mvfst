@@ -172,10 +172,12 @@ void processAckFrame(
           }
         }
       }
-      // Only invoke AckVisitor if the packet doesn't have an associated
-      // PacketEvent; or the PacketEvent is in conn.outstandings.packetEvents
-      if (needsProcess) {
-        for (auto& packetFrame : rPacketIt->packet.frames) {
+      // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
+      // frame types only if the packet doesn't have an associated PacketEvent;
+      // or the PacketEvent is in conn.outstandings.packetEvents
+      for (auto& packetFrame : rPacketIt->packet.frames) {
+        if (needsProcess ||
+            packetFrame.type() == QuicWriteFrame::Type::WriteAckFrame) {
           ackVisitor(*rPacketIt, packetFrame, frame);
         }
       }

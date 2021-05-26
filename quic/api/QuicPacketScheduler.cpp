@@ -525,6 +525,34 @@ AckScheduler::AckScheduler(
     const AckState& ackState)
     : conn_(conn), ackState_(ackState) {}
 
+folly::Optional<PacketNum> AckScheduler::writeNextAcks(
+    PacketBuilderInterface& builder) {
+  // Use default ack delay for long headers. Usually long headers are sent
+  // before crypto negotiation, so the peer might not know about the ack delay
+  // exponent yet, so we use the default.
+  uint8_t ackDelayExponentToUse =
+      builder.getPacketHeader().getHeaderForm() == HeaderForm::Long
+      ? kDefaultAckDelayExponent
+      : conn_.transportSettings.ackDelayExponent;
+  auto largestAckedPacketNum = *largestAckToSend(ackState_);
+  auto ackingTime = Clock::now();
+  DCHECK(ackState_.largestRecvdPacketTime.hasValue())
+      << "Missing received time for the largest acked packet";
+  // assuming that we're going to ack the largest received with hightest pri
+  auto receivedTime = *ackState_.largestRecvdPacketTime;
+  std::chrono::microseconds ackDelay =
+      (ackingTime > receivedTime
+           ? std::chrono::duration_cast<std::chrono::microseconds>(
+                 ackingTime - receivedTime)
+           : 0us);
+  AckFrameMetaData meta(ackState_.acks, ackDelay, ackDelayExponentToUse);
+  auto ackWriteResult = writeAckFrame(meta, builder);
+  if (!ackWriteResult) {
+    return folly::none;
+  }
+  return largestAckedPacketNum;
+}
+
 bool AckScheduler::hasPendingAcks() const {
   return hasAcksToSchedule(ackState_);
 }

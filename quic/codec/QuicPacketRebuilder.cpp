@@ -9,6 +9,7 @@
 #include <quic/codec/QuicPacketRebuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>
+#include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 
@@ -51,6 +52,7 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   bool windowUpdateWritten = false;
   bool shouldWriteWindowUpdate = false;
   bool notPureAck = false;
+  bool shouldRebuildWriteAckFrame = false;
   auto encryptionLevel =
       protectionTypeToEncryptionLevel(packet.packet.header.getProtectionType());
   for (auto iter = packet.packet.frames.cbegin();
@@ -60,19 +62,10 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     const QuicWriteFrame& frame = *iter;
     switch (frame.type()) {
       case QuicWriteFrame::Type::WriteAckFrame: {
-        const WriteAckFrame& ackFrame = *frame.asWriteAckFrame();
-        auto& packetHeader = builder_.getPacketHeader();
-        uint64_t ackDelayExponent =
-            (packetHeader.getHeaderForm() == HeaderForm::Long)
-            ? kDefaultAckDelayExponent
-            : conn_.transportSettings.ackDelayExponent;
-        AckBlocks ackBlocks;
-        for (auto& block : ackFrame.ackBlocks) {
-          ackBlocks.insert(block.start, block.end);
-        }
-        AckFrameMetaData meta(ackBlocks, ackFrame.ackDelay, ackDelayExponent);
-        auto ackWriteResult = writeAckFrame(meta, builder_);
-        writeSuccess = ackWriteResult.has_value();
+        // We need to rebuild this WriteAckFrame with fresh AckStats
+        // which may make the packet larger. We keep track of this
+        // for now and rebuild the frame after the loop.
+        shouldRebuildWriteAckFrame = true;
         break;
       }
       case QuicWriteFrame::Type::WriteStreamFrame: {
@@ -195,6 +188,32 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
     if (!writeSuccess) {
       return folly::none;
     }
+  }
+  // If this packet had a WriteAckFrame, build a new one it with
+  // fresh AckState on best-effort basis. If writing
+  // that ACK fails, just ignore it and use the rest of the
+  // cloned packet.
+  if (shouldRebuildWriteAckFrame) {
+    auto& packetHeader = builder_.getPacketHeader();
+    uint64_t ackDelayExponent =
+        (packetHeader.getHeaderForm() == HeaderForm::Long)
+        ? kDefaultAckDelayExponent
+        : conn_.transportSettings.ackDelayExponent;
+    const AckState& ackState_ = getAckState(
+        conn_,
+        protectionTypeToPacketNumberSpace(packetHeader.getProtectionType()));
+    auto ackingTime = Clock::now();
+    DCHECK(ackState_.largestRecvdPacketTime.hasValue())
+        << "Missing received time for the largest acked packet";
+    auto receivedTime = *ackState_.largestRecvdPacketTime;
+    std::chrono::microseconds ackDelay =
+        (ackingTime > receivedTime
+             ? std::chrono::duration_cast<std::chrono::microseconds>(
+                   ackingTime - receivedTime)
+             : 0us);
+    AckFrameMetaData meta(ackState_.acks, ackDelay, ackDelayExponent);
+    // Write the AckFrame ignoring the result. This is best-effort.
+    writeAckFrame(meta, builder_);
   }
   // We shouldn't clone if:
   // (1) we only end up cloning only acks, ping, or paddings.
