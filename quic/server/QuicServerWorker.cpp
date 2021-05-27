@@ -1224,6 +1224,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   }
   socket_.reset();
   takeoverCB_.reset();
+  pacingTimer_.reset();
 }
 
 QuicServerWorker::~QuicServerWorker() {

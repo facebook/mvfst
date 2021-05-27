@@ -2690,5 +2690,16 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   b1.wait();
 }
 
+TEST_F(QuicServerTest, OneEVB) {
+  folly::EventBase evb;
+
+  folly::SocketAddress addr("::1", 0);
+  server_->initialize(addr, {&evb}, true);
+  server_->start();
+  server_->waitUntilInitialized();
+  evb.runAfterDelay([this] { server_->shutdown(); }, 100);
+  evb.loop();
+}
+
 } // namespace test
 } // namespace quic
