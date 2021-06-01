@@ -3451,5 +3451,42 @@ TEST_F(QuicTransportTest, WriteBufferThenBufMetaThenEOM) {
   EXPECT_TRUE(transport_->writeChain(streamId, nullptr, true).hasValue());
 }
 
+TEST_F(QuicTransportTest, ResetDSRStream) {
+  auto& conn = transport_->getConnectionState();
+  auto streamId = transport_->createBidirectionalStream().value();
+  BufferMeta meta(conn.udpSendPacketLen * 5);
+  auto buf = buildRandomInputData(200);
+  auto dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  EXPECT_CALL(*dsrSender, release()).Times(1);
+  transport_->setDSRPacketizationRequestSender(streamId, std::move(dsrSender));
+  EXPECT_TRUE(
+      transport_->writeChain(streamId, std::move(buf), false).hasValue());
+  EXPECT_TRUE(transport_->writeBufMeta(streamId, meta, false).hasValue());
+  loopForWrites();
+  conn.streamManager->getStream(streamId)->writeBufMeta.split(
+      conn.udpSendPacketLen - 200);
+
+  transport_->resetStream(streamId, GenericApplicationErrorCode::UNKNOWN);
+  loopForWrites();
+  auto packet =
+      getLastOutstandingPacket(
+          transport_->getConnectionState(), PacketNumberSpace::AppData)
+          ->packet;
+  EXPECT_GE(packet.frames.size(), 1);
+
+  bool foundReset = false;
+  for (auto& frame : packet.frames) {
+    auto rstStream = frame.asRstStreamFrame();
+    if (!rstStream) {
+      continue;
+    }
+    EXPECT_EQ(streamId, rstStream->streamId);
+    EXPECT_GT(rstStream->offset, 200);
+    EXPECT_EQ(GenericApplicationErrorCode::UNKNOWN, rstStream->errorCode);
+    foundReset = true;
+  }
+  EXPECT_TRUE(foundReset);
+}
+
 } // namespace test
 } // namespace quic

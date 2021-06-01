@@ -397,6 +397,18 @@ void appendPendingStreamReset(
     QuicConnectionStateBase& conn,
     const QuicStreamState& stream,
     ApplicationErrorCode errorCode) {
+  /*
+   * When BufMetas are written to the transport, but before they are written to
+   * the network, writeBufMeta.offset would be assigned a value >
+   * currentWriteOffset. For this reason, we can't simply use
+   * min(max(currentWriteOffset, writeBufMeta.offset), finalWriteOffset) as the
+   * final offset. We have to check if any BufMetas have been written to the
+   * network. If we simply use min(max(currentWriteOffset, writeBufMeta.offset),
+   * we risk using a value > peer's flow control limit.
+   */
+  bool writeBufWritten = stream.writeBufMeta.offset &&
+      (stream.currentWriteOffset + stream.writeBuffer.chainLength() !=
+       stream.writeBufMeta.offset);
   conn.pendingEvents.resets.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(stream.id),
@@ -404,7 +416,8 @@ void appendPendingStreamReset(
           stream.id,
           errorCode,
           std::min(
-              stream.currentWriteOffset,
+              writeBufWritten ? stream.writeBufMeta.offset
+                              : stream.currentWriteOffset,
               stream.finalWriteOffset.value_or(
                   std::numeric_limits<uint64_t>::max()))));
 }
