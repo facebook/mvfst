@@ -1741,7 +1741,7 @@ TEST_F(QuicPacketSchedulerTest, RunOutFlowControlDuringStreamWrite) {
   EXPECT_EQ(200, stream2->retransmissionBuffer[0]->data.chainLength());
 }
 
-TEST_F(QuicPacketSchedulerTest, NoFinWhenThereIsPendingWriteBuf) {
+TEST_F(QuicPacketSchedulerTest, WritingFINWithAndWithoutBufMetas) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
@@ -1772,6 +1772,74 @@ TEST_F(QuicPacketSchedulerTest, NoFinWhenThereIsPendingWriteBuf) {
   EXPECT_EQ(streamFrame.len, 6);
   EXPECT_EQ(streamFrame.offset, 0);
   EXPECT_FALSE(streamFrame.fin);
+  handleNewStreamDataWritten(*stream, streamFrame.len, streamFrame.fin);
+
+  // Pretent all the bufMetas were sent, without FIN bit
+  stream->writeBufMeta.split(5000);
+  ASSERT_EQ(0, stream->writeBufMeta.length);
+  ASSERT_GT(stream->writeBufMeta.offset, 0);
+  conn.streamManager->updateWritableStreams(*stream);
+  // Do another non-DSR stream write, it will write FIN with correct offset
+  ShortHeader header2(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      1);
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(header2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder2.encodePacketHeader();
+  StreamFrameScheduler scheduler2(conn);
+  scheduler2.writeStreams(builder2);
+  auto packet2 = std::move(builder2).buildPacket().packet;
+  EXPECT_EQ(1, packet2.frames.size());
+  auto streamFrame2 = *packet2.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamFrame2.len, 0);
+  EXPECT_EQ(streamFrame2.offset, 6 + 5000);
+  EXPECT_TRUE(streamFrame2.fin);
+}
+
+TEST_F(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 100000;
+  auto* stream = *(conn.streamManager->createNextBidirectionalStream());
+  stream->flowControlState.peerAdvertisedMaxOffset = 100000;
+
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("Ascent"), false);
+  stream->dsrSender = std::make_unique<MockDSRPacketizationRequestSender>();
+  BufferMeta bufferMeta(5000);
+  writeBufMetaToQuicStream(*stream, bufferMeta, true);
+  EXPECT_TRUE(stream->finalWriteOffset.hasValue());
+  PacketNum packetNum = 0;
+  ShortHeader header(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      packetNum);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder.encodePacketHeader();
+  StreamFrameScheduler scheduler(conn);
+  scheduler.writeStreams(builder);
+  auto packet = std::move(builder).buildPacket().packet;
+  EXPECT_EQ(1, packet.frames.size());
+  auto streamFrame = *packet.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamFrame.len, 6);
+  EXPECT_EQ(streamFrame.offset, 0);
+  EXPECT_FALSE(streamFrame.fin);
+  handleNewStreamDataWritten(*stream, streamFrame.len, streamFrame.fin);
+
+  // Pretent all the bufMetas were sent, without FIN bit
+  stream->writeBufMeta.split(5000);
+  stream->writeBufMeta.offset++;
+  ASSERT_EQ(0, stream->writeBufMeta.length);
+  ASSERT_GT(stream->writeBufMeta.offset, 0);
+  conn.streamManager->updateWritableStreams(*stream);
+  StreamFrameScheduler scheduler2(conn);
+  EXPECT_FALSE(scheduler2.hasPendingData());
 }
 
 INSTANTIATE_TEST_CASE_P(

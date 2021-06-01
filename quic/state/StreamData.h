@@ -314,7 +314,8 @@ struct QuicStreamState : public QuicStreamLike {
        * still have BufMetas to send.
        */
       return writeBufMeta.length == 0 &&
-          currentWriteOffset <= *finalWriteOffset;
+          currentWriteOffset <= *finalWriteOffset &&
+          writeBufMeta.offset <= *finalWriteOffset;
     }
     return false;
   }

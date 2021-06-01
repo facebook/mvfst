@@ -425,6 +425,7 @@ void handleNewStreamBufMetaWritten(
     // If FIN is written, nothing should be left in the writeBufMeta.
     CHECK_EQ(0, stream.writeBufMeta.length);
     ++stream.writeBufMeta.offset;
+    CHECK_GT(stream.writeBufMeta.offset, *stream.finalWriteOffset);
   }
   CHECK(stream.retransmissionBufMetas
             .emplace(

@@ -499,10 +499,16 @@ bool StreamFrameScheduler::writeStreamFrame(
   // send.
   bool canWriteFin = stream.finalWriteOffset.has_value() &&
       bufferLen <= flowControlLen && stream.writeBufMeta.length == 0;
+  auto writeOffset = stream.currentWriteOffset;
+  if (canWriteFin && stream.writeBuffer.empty()) {
+    // If we are writing FIN only from here, do not use currentWriteOffset in
+    // case some bufMeta has been sent before.
+    writeOffset = stream.finalWriteOffset.value();
+  }
   auto dataLen = writeStreamFrameHeader(
       builder,
       stream.id,
-      stream.currentWriteOffset,
+      writeOffset,
       bufferLen,
       flowControlLen,
       canWriteFin,
