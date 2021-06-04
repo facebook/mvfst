@@ -708,6 +708,16 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         server_conn->transportSettings.defaultRttFactor =
             std::make_pair(numerator, denominator);
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        LOG(INFO)
+            << "Knob param received, set total buffer space available to ("
+            << unsigned(val) << ")";
+        server_conn->transportSettings.totalBufferSpaceAvailable = val;
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

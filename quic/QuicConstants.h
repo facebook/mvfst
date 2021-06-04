@@ -127,6 +127,8 @@ enum class TransportKnobParamId : uint64_t {
   STARTUP_RTT_FACTOR_KNOB = 0x1111,
   // Set pacing rtt factor used when not in startup
   DEFAULT_RTT_FACTOR_KNOB = 0x2222,
+  // Set total buffer size (in bytes) for not yet sent packets
+  NOTSENT_BUFFER_SIZE_KNOB = 0x3333,
 };
 
 enum class FrameType : uint64_t {

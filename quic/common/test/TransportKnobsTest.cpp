@@ -184,6 +184,25 @@ TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, ValidNotSentBufferSize) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
+  uint64_t val = 111;
+  std::string args = folly::format(R"({{"{}" : {}}})", key, val).str();
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidNotSentBufferSizeAsString) {
+  auto key =
+      static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
+  uint64_t val = 111;
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, val).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
 TEST(QuicKnobsParsingTest, NonStringKey) {
   QuicKnobsParsingTestFixture fixture = {"{ 1 : 1 }", true, {}};
   run(fixture);
