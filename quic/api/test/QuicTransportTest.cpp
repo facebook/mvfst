@@ -597,7 +597,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   loopForWrites();
   EXPECT_EQ(conn.outstandings.packets.size(), 1);
-  auto& packet =
+  const auto& packet =
       getFirstOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   bool blockedFound = false;
   bool dataBlockedFound = false;
@@ -654,9 +654,10 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
 
   // Verify that there is one Data Blocked frame emitted.
   EXPECT_EQ(conn.outstandings.packets.size(), num_outstandings + 2);
-  packet = getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
+  const auto& packet2 =
+      getLastOutstandingPacket(conn, PacketNumberSpace::AppData)->packet;
   dataBlockedFound = false;
-  for (auto& frame : packet.frames) {
+  for (auto& frame : packet2.frames) {
     auto dataBlocked = frame.asDataBlockedFrame();
     if (!dataBlocked) {
       continue;
