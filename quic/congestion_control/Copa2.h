@@ -78,6 +78,12 @@ class Copa2 : public CongestionController {
   bool probeRtt_{false};
   // Last time we entered probe RTT
   TimePoint lastProbeRtt_{Clock::now()};
+
+  // Are we currently app limited?
+  bool appLimited_{false};
+  // When a packet with a send time later than appLimitedExitTarget_ is acked,
+  // an app-limited connection is considered no longer app-limited.
+  TimePoint appLimitedExitTarget_;
 };
 
 } // namespace quic

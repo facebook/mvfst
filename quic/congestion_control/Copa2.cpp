@@ -63,6 +63,15 @@ void Copa2::onPacketAckOrLoss(
     }
   }
   if (ack && ack->largestAckedPacket.has_value()) {
+    if (appLimited_) {
+      if (appLimitedExitTarget_ < ack->largestAckedPacketSentTime) {
+	appLimited_ = false;
+	if (conn_.qLogger) {
+	  conn_.qLogger->addAppUnlimitedUpdate();
+	}
+      }
+    }
+
     onPacketAcked(*ack);
   }
 }
@@ -236,14 +245,23 @@ uint64_t Copa2::getBytesInFlight() const noexcept {
   return conn_.lossState.inflightBytes;
 }
 
-void Copa2::setAppIdle(bool, TimePoint) noexcept { /* unsupported */
+void Copa2::setAppIdle(bool, TimePoint) noexcept {
 }
 
-void Copa2::setAppLimited() { /* unsupported */
+void Copa2::setAppLimited() {
+  // BBR uses this logic, so we use it too :)
+  if (conn_.lossState.inflightBytes > getCongestionWindow()) {
+    return;
+  }
+  appLimited_ = true;
+  appLimitedExitTarget_ = Clock::now();
+  if (conn_.qLogger) {
+    conn_.qLogger->addAppLimitedUpdate();
+  }
 }
 
 bool Copa2::isAppLimited() const noexcept {
-  return false; // not supported
+  return appLimited_;
 }
 
 void Copa2::getStats(CongestionControllerStats& /* stats */) const {}
