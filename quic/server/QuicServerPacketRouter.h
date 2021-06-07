@@ -35,6 +35,7 @@ enum class TakeoverProtocolVersion : uint32_t {
 struct RoutingData {
   HeaderForm headerForm;
   bool isInitial;
+  bool is0Rtt;
   bool isUsingClientConnId;
 
   // The destination connection id is the connection id picked by the
@@ -48,11 +49,13 @@ struct RoutingData {
   RoutingData(
       HeaderForm headerFormIn,
       bool isInitialIn,
+      bool is0RttIn,
       bool isUsingClientConnIdIn,
       ConnectionId destinationConnIdIn,
       folly::Optional<ConnectionId> sourceConnIdIn)
       : headerForm(headerFormIn),
         isInitial(isInitialIn),
+        is0Rtt(is0RttIn),
         isUsingClientConnId(isUsingClientConnIdIn),
         destinationConnId(std::move(destinationConnIdIn)),
         sourceConnId(std::move(sourceConnIdIn)) {}

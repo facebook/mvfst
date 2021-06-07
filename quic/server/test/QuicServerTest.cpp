@@ -272,7 +272,7 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  RoutingData routingData(HeaderForm::Long, true, true, connId, connId);
+  RoutingData routingData(HeaderForm::Long, true, false, true, connId, connId);
 
   auto data = createData(kMinInitialPacketSize + 10);
   expectConnCreateRefused();
@@ -291,7 +291,7 @@ void QuicServerWorkerTest::createQuicConnection(
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  RoutingData routingData(HeaderForm::Long, true, true, connId, connId);
+  RoutingData routingData(HeaderForm::Long, true, false, true, connId, connId);
 
   auto data = createData(kMinInitialPacketSize + 10);
   MockQuicTransport::Ptr transport = transport_;
@@ -345,6 +345,7 @@ void QuicServerWorkerTest::testSendReset(
       HeaderForm::Short,
       false,
       false,
+      false,
       shortHeader.getConnectionId(),
       folly::none);
   worker_->dispatchPacketData(
@@ -368,7 +369,8 @@ std::string QuicServerWorkerTest::testSendRetry(
 
   // Send a client inital to the server - the server will respond with retry
   // packet
-  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   auto data = createData(kMinInitialPacketSize);
 
   std::string encryptedRetryToken;
@@ -434,7 +436,8 @@ void QuicServerWorkerTest::testSendInitialWithRetryToken(
     writeFrame(PaddingFrame(), initialBuilder);
   }
   auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
-  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   worker_->dispatchPacketData(
       clientAddr,
       std::move(routingData),
@@ -487,7 +490,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   auto connId1 = getTestConnectionId(hostId_);
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
-  RoutingData routingData(HeaderForm::Long, true, true, connId1, connId1);
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, connId1, connId1);
 
   auto data = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -517,7 +521,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   ConnectionId connId2({2, 4, 5, 6});
   num = 1;
   version = QuicVersion::MVFST;
-  RoutingData routingData2(HeaderForm::Long, true, true, connId2, connId2);
+  RoutingData routingData2(
+      HeaderForm::Long, true, false, true, connId2, connId2);
 
   auto data2 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(
@@ -537,7 +542,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   ConnectionId connId3({8, 4, 5, 6});
   num = 1;
   version = QuicVersion::MVFST;
-  RoutingData routingData3(HeaderForm::Long, true, true, connId3, connId3);
+  RoutingData routingData3(
+      HeaderForm::Long, true, false, true, connId3, connId3);
   auto data3 = createData(kMinInitialPacketSize + 10);
   EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
   worker_->dispatchPacketData(
@@ -655,7 +661,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData2(
-      HeaderForm::Short, false, false, connId, folly::none);
+      HeaderForm::Short, false, false, false, connId, folly::none);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
@@ -672,7 +678,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       *transport_, onNetworkData(kClientAddr, NetworkDataMatches(*data)))
       .Times(1);
   RoutingData routingData3(
-      HeaderForm::Short, false, false, connId2, folly::none);
+      HeaderForm::Short, false, false, false, connId2, folly::none);
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData3),
@@ -712,6 +718,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       HeaderForm::Short,
       false,
       false,
+      false,
       shortHeaderConnId.getConnectionId(),
       folly::none);
   worker_->dispatchPacketData(
@@ -744,6 +751,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       HeaderForm::Short,
       false,
       false,
+      false,
       shortHeaderConnId.getConnectionId(),
       folly::none);
   worker_->dispatchPacketData(
@@ -774,6 +782,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
   RoutingData routingData3(
       HeaderForm::Short,
+      false,
       false,
       false,
       shortHeaderConnId2.getConnectionId(),
@@ -821,6 +830,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
   RoutingData routingData(
       HeaderForm::Long,
       true,
+      false,
       true,
       header.getDestinationConnId(),
       header.getSourceConnId());
@@ -947,6 +957,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   RoutingData routingData(
       HeaderForm::Long,
       false /* isInitial */,
+      false,
       true /* isUsingClientCid */,
       dstConnId,
       srcConnId);
@@ -985,7 +996,8 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
     writeFrame(PaddingFrame(), builder);
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData));
@@ -1012,7 +1024,8 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
     writeFrame(PaddingFrame(), builder);
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
-  RoutingData routingData(HeaderForm::Long, true, true, dstConnId, srcConnId);
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData));
@@ -1474,16 +1487,8 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverForwarding) {
                clientConnId = getTestConnectionId(clientHostId_);
   takeoverWorker_->setProcessId(ProcessId::ONE);
   size_t len{0};
-  // Test the packet forwarding works for all packet type expect Initial
-  auto pkt = writeTestDataOnWorkersBuf(
-      clientConnId,
-      connId,
-      len,
-      takeoverWorker_.get(),
-      LongHeader::Types::Retry);
-  testPacketForwarding(std::move(pkt), len, connId);
 
-  pkt = writeTestDataOnWorkersBuf(
+  auto pkt = writeTestDataOnWorkersBuf(
       clientConnId,
       connId,
       len,
@@ -1497,7 +1502,8 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverForwarding) {
       len,
       takeoverWorker_.get(),
       LongHeader::Types::ZeroRtt);
-  testPacketForwarding(std::move(pkt), len, connId);
+  testNoPacketForwarding(std::move(pkt), len, connId);
+
   // verify that the Initial packet type is not forwarded even if the
   // server-bit is different
   pkt = writeTestDataOnWorkersBuf(
@@ -1920,6 +1926,7 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
     RoutingData routingData(
         HeaderForm::Long,
         true,
+        false,
         true,
         header.getDestinationConnId(),
         header.getSourceConnId());
@@ -1965,6 +1972,7 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
   RoutingData routingData(
       HeaderForm::Long,
       true,
+      false,
       true,
       header.getDestinationConnId(),
       header.getSourceConnId());
@@ -2688,6 +2696,103 @@ TEST_F(QuicServerTest, ZeroRttPacketRoute) {
   EXPECT_CALL(*transport, onNetworkData(_, _)).WillOnce(Invoke(verifyZeroRtt));
   reader->getSocket().write(serverAddr, data->clone());
   b1.wait();
+}
+
+TEST_F(QuicServerTest, ZeroRttBeforeInitial) {
+  folly::ScopedEventBaseThread evbThread;
+  auto evb = evbThread.getEventBase();
+  std::vector<folly::EventBase*> evbs{evb};
+
+  folly::SocketAddress addr("::1", 0);
+  server_->start(addr, 1);
+  server_->waitUntilInitialized();
+
+  setUpTransportFactoryForWorkers(evbs);
+  std::shared_ptr<MockQuicTransport> transport;
+  NiceMock<MockConnectionCallback> cb;
+  folly::Baton<> b;
+  // create payload
+  StreamId id = 1;
+  auto clientConnId = getTestConnectionId(clientHostId_);
+  auto serverConnId =
+      getTestConnectionId(serverHostId_, quic::ConnectionIdVersion::V2);
+  auto initialBuf = createData(kMinInitialPacketSize + 10);
+  auto initialPacket = createInitialStream(
+      clientConnId, serverConnId, id, *initialBuf, QuicVersion::MVFST);
+  auto initialData = std::move(initialPacket);
+
+  std::vector<Buf> receivedData;
+  auto makeTransport =
+      [&](folly::EventBase* eventBase,
+          std::unique_ptr<folly::AsyncUDPSocket>& socket,
+          const folly::SocketAddress&,
+          std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept {
+        transport = std::make_shared<MockQuicTransport>(
+            eventBase, std::move(socket), cb, ctx);
+        EXPECT_CALL(*transport, getEventBase())
+            .WillRepeatedly(Return(eventBase));
+        EXPECT_CALL(*transport, setSupportedVersions(_));
+        EXPECT_CALL(*transport, setOriginalPeerAddress(_));
+        EXPECT_CALL(*transport, setTransportSettings(_));
+        EXPECT_CALL(*transport, setServerConnectionIdParams(_));
+        EXPECT_CALL(*transport, accept());
+        // post baton upon receiving the data
+        EXPECT_CALL(*transport, onNetworkData(_, _))
+            .Times(2)
+            .WillRepeatedly(Invoke([&](auto, auto& networkData) {
+              for (auto& buf : networkData.packets) {
+                receivedData.emplace_back(buf->clone());
+              }
+              if (receivedData.size() == 2) {
+                b.post();
+              }
+            }));
+        return transport;
+      };
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Invoke(makeTransport));
+
+  auto serverAddr = server_->getAddress();
+
+  folly::SocketAddress addr2("::1", 0);
+
+  std::unique_ptr<UDPReader> reader = std::make_unique<UDPReader>();
+  reader->start(evbThread_.getEventBase(), addr2);
+
+  SCOPE_EXIT {
+    server_->shutdown();
+    evbThread_.getEventBase()->runInEventBaseThreadAndWait(
+        [&] { reader->getSocket().close(); });
+    transport->getEventBase()->runInEventBaseThreadAndWait(
+        [&] { transport.reset(); });
+  };
+
+  // send 0-rtt packet, it should be buffered
+  PacketNum packetNum = 20;
+  auto zeroRttBuf = folly::IOBuf::copyBuffer("blah blah blah blah");
+  auto zeroRttPacket = packetToBuf(createStreamPacket(
+      clientConnId,
+      serverConnId,
+      packetNum,
+      id,
+      *zeroRttBuf,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */,
+      std::make_pair(LongHeader::Types::ZeroRtt, QuicVersion::MVFST)));
+  auto zeroRttData = std::move(zeroRttPacket);
+  reader->getSocket().write(serverAddr, zeroRttData->clone());
+
+  // send an initial packet - that should create a new 'connection'
+  reader->getSocket().write(serverAddr, initialData->clone());
+  b.wait();
+  ASSERT_EQ(receivedData.size(), 2);
+  ASSERT_EQ(
+      initialData->computeChainDataLength(),
+      receivedData[0]->computeChainDataLength());
+  ASSERT_EQ(
+      zeroRttData->computeChainDataLength(),
+      receivedData[1]->computeChainDataLength());
+  EXPECT_TRUE(folly::IOBufEqualTo()(*initialData, *receivedData[0]));
+  EXPECT_TRUE(folly::IOBufEqualTo()(*zeroRttData, *receivedData[1]));
 }
 
 TEST_F(QuicServerTest, OneEVB) {

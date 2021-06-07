@@ -41,6 +41,8 @@ QuicServerWorker::QuicServerWorker(
       takeoverPktHandler_(this),
       observerList_(this) {
   ccpReader_ = std::make_unique<CCPReader>();
+  pending0RttData_.setPruneHook(
+      [&](auto, auto) { QUIC_STATS(statsCallback_, onZeroRttBufferedPruned); });
 }
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
@@ -361,8 +363,9 @@ void QuicServerWorker::handleNetworkData(
       }
       RoutingData routingData(
           headerForm,
-          false,
-          false,
+          false, /* isInitial */
+          false, /* is0Rtt */
+          false, /* isUsingClientConnId */
           std::move(parsedShortHeader->destinationConnId),
           folly::none);
       return forwardNetworkData(
@@ -386,8 +389,8 @@ void QuicServerWorker::handleNetworkData(
     // TODO: check version before looking at type
     LongHeader::Types longHeaderType = parseLongHeaderType(initialByte);
     bool isInitial = longHeaderType == LongHeader::Types::Initial;
-    bool isUsingClientConnId =
-        isInitial || longHeaderType == LongHeader::Types::ZeroRtt;
+    bool is0Rtt = longHeaderType == LongHeader::Types::ZeroRtt;
+    bool isUsingClientConnId = isInitial || is0Rtt;
 
     if (isInitial) {
       // This stats gets updated even if the client initial will be dropped.
@@ -417,6 +420,7 @@ void QuicServerWorker::handleNetworkData(
     RoutingData routingData(
         headerForm,
         isInitial,
+        is0Rtt,
         isUsingClientConnId,
         std::move(parsedLongHeader->invariant.dstConnId),
         std::move(parsedLongHeader->invariant.srcConnId));
@@ -556,10 +560,21 @@ void QuicServerWorker::dispatchPacketData(
     auto source = std::make_pair(client, routingData.destinationConnId);
     auto sit = sourceAddressMap_.find(source);
     if (sit == sourceAddressMap_.end()) {
-      // TODO for O-RTT types we need to create new connections to handle
-      // the case, where the new server gets packets sent to the old one due
-      // to network reordering
-      if (!routingData.isInitial) {
+      // If it's a 0RTT packet and we have no CID, we probably lost the initial
+      // and want to buffer it for a while.
+      if (routingData.is0Rtt) {
+        auto itr = pending0RttData_.find(routingData.destinationConnId);
+        if (itr == pending0RttData_.end()) {
+          itr =
+              pending0RttData_.insert(routingData.destinationConnId, {}).first;
+        }
+        auto& vec = itr->second;
+        if (vec.size() != vec.max_size()) {
+          vec.emplace_back(std::move(networkData));
+          QUIC_STATS(statsCallback_, onZeroRttBuffered);
+        }
+        return;
+      } else if (!routingData.isInitial) {
         VLOG(3) << folly::format(
             "Dropping packet from client={}, routingInfo={}",
             client.describe(),
@@ -703,6 +718,16 @@ void QuicServerWorker::dispatchPacketData(
   if (!dropPacket) {
     DCHECK(transport->getEventBase()->isInEventBaseThread());
     transport->onNetworkData(client, std::move(networkData));
+    // If we had pending 0RTT data for this DCID, process it.
+    if (routingData.isInitial && !pending0RttData_.empty()) {
+      auto itr = pending0RttData_.find(routingData.destinationConnId);
+      if (itr != pending0RttData_.end()) {
+        for (auto& data : itr->second) {
+          transport->onNetworkData(client, std::move(data));
+        }
+        pending0RttData_.erase(itr);
+      }
+    }
     return;
   }
   if (cannotMakeTransport) {

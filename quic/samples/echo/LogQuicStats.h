@@ -184,6 +184,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onServerUnfinishedHandshake";
   }
 
+  void onZeroRttBuffered() override {
+    VLOG(2) << prefix_ << "onZeroRttBuffered";
+  }
+
+  void onZeroRttBufferedPruned() override {
+    VLOG(2) << prefix_ << "onZeroRttBufferedPruned";
+  }
+
  private:
   std::string prefix_;
 };
