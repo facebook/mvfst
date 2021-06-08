@@ -51,7 +51,9 @@ class QuicPlaintextWriteRecordLayer : public fizz::PlaintextWriteRecordLayer {
  public:
   ~QuicPlaintextWriteRecordLayer() override = default;
 
-  fizz::TLSContent write(fizz::TLSMessage&& msg) const override {
+  fizz::TLSContent write(
+      fizz::TLSMessage&& msg,
+      fizz::Aead::AeadOptions /*options*/) const override {
     fizz::TLSContent content;
     content.data = std::move(msg.fragment);
     content.contentType = msg.type;
@@ -61,8 +63,10 @@ class QuicPlaintextWriteRecordLayer : public fizz::PlaintextWriteRecordLayer {
 
   fizz::TLSContent writeInitialClientHello(
       std::unique_ptr<folly::IOBuf> encodedClientHello) const override {
-    return write(fizz::TLSMessage{
-        fizz::ContentType::handshake, std::move(encodedClientHello)});
+    return write(
+        fizz::TLSMessage{
+            fizz::ContentType::handshake, std::move(encodedClientHello)},
+        fizz::Aead::AeadOptions());
   }
 };
 
@@ -73,7 +77,9 @@ class QuicEncryptedWriteRecordLayer : public fizz::EncryptedWriteRecordLayer {
   explicit QuicEncryptedWriteRecordLayer(fizz::EncryptionLevel encryptionLevel)
       : EncryptedWriteRecordLayer(encryptionLevel) {}
 
-  fizz::TLSContent write(fizz::TLSMessage&& msg) const override {
+  fizz::TLSContent write(
+      fizz::TLSMessage&& msg,
+      fizz::Aead::AeadOptions /*options*/) const override {
     fizz::TLSContent content;
     content.data = std::move(msg.fragment);
     content.contentType = msg.type;
