@@ -90,8 +90,8 @@ bool IOBufQuicBatch::flushInternal() {
   // If error occured on first socket, kick off second socket immediately
   if (!written && happyEyeballsState_.connAttemptDelayTimeout &&
       happyEyeballsState_.connAttemptDelayTimeout->isScheduled()) {
+    happyEyeballsState_.connAttemptDelayTimeout->timeoutExpired();
     happyEyeballsState_.connAttemptDelayTimeout->cancelTimeout();
-    happyEyeballsStartSecondSocket(happyEyeballsState_);
   }
 
   if (happyEyeballsState_.shouldWriteToSecondSocket) {

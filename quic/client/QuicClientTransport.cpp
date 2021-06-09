@@ -1470,8 +1470,10 @@ void QuicClientTransport::
     happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
   // Declare 0-RTT data as lost so that they will be retransmitted over the
   // second socket.
-  markZeroRttPacketsLost(*conn_, markPacketLoss);
   happyEyeballsStartSecondSocket(conn_->happyEyeballsState);
+  // If this gets called from the write path then we haven't added the packets
+  // to the outstanding packet list yet.
+  runOnEvbAsync([&](auto) { markZeroRttPacketsLost(*conn_, markPacketLoss); });
 }
 
 void QuicClientTransport::start(ConnectionCallback* cb) {

@@ -5631,6 +5631,7 @@ TEST_F(
   client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
   EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+  loopForWrites();
   // Declared lost
   EXPECT_FALSE(zeroRttPacketsOutstanding());
 
@@ -5662,6 +5663,77 @@ TEST_F(
       verifyLongHeader(*socketWrites.at(2), LongHeader::Types::ZeroRtt));
   EXPECT_TRUE(
       verifyLongHeader(*socketWrites.at(3), LongHeader::Types::ZeroRtt));
+}
+
+TEST_F(
+    QuicZeroRttHappyEyeballsClientTransportTest,
+    ZeroRttDataIsRetransmittedOverSecondSocketOnWriteFail) {
+  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
+      .WillOnce(InvokeWithoutArgs([]() {
+        QuicCachedPsk quicCachedPsk;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataUni =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxData =
+            kDefaultConnectionWindowSize;
+        quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
+        quicCachedPsk.transportParams.maxRecvPacketSize =
+            kDefaultUDPReadBufferSize;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
+        return quicCachedPsk;
+      }));
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) { return true; },
+      []() -> Buf { return nullptr; });
+
+  EXPECT_CALL(*sock, write(firstAddress, _))
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            socketWrites.push_back(buf->clone());
+            return buf->computeChainDataLength();
+          }));
+  startClient();
+  socketWrites.clear();
+  auto& conn = client->getConn();
+  EXPECT_EQ(conn.peerAddress, firstAddress);
+  EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+  ASSERT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+  EXPECT_CALL(*sock, write(firstAddress, _))
+      .WillOnce(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>&) {
+            errno = EBADF;
+            return -1;
+          }));
+  auto streamId = client->createBidirectionalStream().value();
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  loopForWrites();
+  EXPECT_FALSE(zeroRttPacketsOutstanding());
+  ASSERT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+  ASSERT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+  EXPECT_CALL(*secondSock, write(secondAddress, _))
+      .Times(2)
+      .WillRepeatedly(Invoke(
+          [&](const SocketAddress&, const std::unique_ptr<folly::IOBuf>& buf) {
+            socketWrites.push_back(buf->clone());
+            return buf->computeChainDataLength();
+          }));
+  client->lossTimeout().cancelTimeout();
+  client->lossTimeout().timeoutExpired();
+  ASSERT_EQ(socketWrites.size(), 2);
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(0), LongHeader::Types::Initial));
+  EXPECT_TRUE(
+      verifyLongHeader(*socketWrites.at(1), LongHeader::Types::ZeroRtt));
 }
 
 class QuicProcessDataTest : public QuicClientTransportAfterStartTestBase,
