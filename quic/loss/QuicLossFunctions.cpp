@@ -44,7 +44,8 @@ void onPTOAlarm(QuicConnectionStateBase& conn) {
         kPtoAlarm);
   }
   if (conn.lossState.ptoCount == conn.transportSettings.maxNumPTOs) {
-    throw QuicInternalException("Exceeded max PTO", LocalErrorCode::NO_ERROR);
+    throw QuicInternalException(
+        "Exceeded max PTO", LocalErrorCode::CONNECTION_ABANDONED);
   }
 
   // The number of probes we can probably send is the current packetCount,

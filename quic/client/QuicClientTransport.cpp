@@ -1022,15 +1022,41 @@ void QuicClientTransport::errMessage(
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
   if ((cmsg.cmsg_level == SOL_IP && cmsg.cmsg_type == IP_RECVERR) ||
       (cmsg.cmsg_level == SOL_IPV6 && cmsg.cmsg_type == IPV6_RECVERR)) {
+    // Time to make some assumptions. We assume the first socket == IPv6, if it
+    // exists, and the second socket is IPv4. Then we basically do the same
+    // thing we would have done if we'd gotten a write error on that socket.
+    // If both sockets are not functional we close the connection.
+    auto& happyEyeballsState = conn_->happyEyeballsState;
+    if (!happyEyeballsState.finished) {
+      if (cmsg.cmsg_level == SOL_IPV6 &&
+          happyEyeballsState.shouldWriteToFirstSocket) {
+        happyEyeballsState.shouldWriteToFirstSocket = false;
+        socket_->pauseRead();
+        if (happyEyeballsState.connAttemptDelayTimeout &&
+            happyEyeballsState.connAttemptDelayTimeout->isScheduled()) {
+          happyEyeballsState.connAttemptDelayTimeout->timeoutExpired();
+          happyEyeballsState.connAttemptDelayTimeout->cancelTimeout();
+        }
+      } else if (
+          cmsg.cmsg_level == SOL_IP &&
+          happyEyeballsState.shouldWriteToSecondSocket) {
+        happyEyeballsState.shouldWriteToSecondSocket = false;
+        happyEyeballsState.secondSocket->pauseRead();
+      }
+    }
+
     const struct sock_extended_err* serr =
         reinterpret_cast<const struct sock_extended_err*>(CMSG_DATA(&cmsg));
     auto errStr = folly::errnoStr(serr->ee_errno);
-    runOnEvbAsync([errString = std::move(errStr)](auto self) {
-      auto quicError = std::make_pair(
-          QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
-      auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(std::move(quicError), false, false);
-    });
+    if (!happyEyeballsState.shouldWriteToFirstSocket &&
+        !happyEyeballsState.shouldWriteToSecondSocket) {
+      runOnEvbAsync([errString = std::move(errStr)](auto self) {
+        auto quicError = std::make_pair(
+            QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
+        auto clientPtr = static_cast<QuicClientTransport*>(self.get());
+        clientPtr->closeImpl(std::move(quicError), false, false);
+      });
+    }
   }
 #endif
 }

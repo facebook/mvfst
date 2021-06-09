@@ -13,6 +13,8 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
+#include <sys/socket.h>
+
 #include <fizz/crypto/aead/test/Mocks.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
@@ -535,6 +537,9 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   client->getNonConstConn().qLogger = qLogger;
   // Point the client to a bad server.
   client->addNewPeerAddress(SocketAddress("127.0.0.1", 14114));
+  auto tp = client->getTransportSettings();
+  tp.maxNumPTOs = 4;
+  client->setTransportSettings(tp);
   EXPECT_CALL(clientConnCallback, onConnectionError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
@@ -2270,6 +2275,40 @@ class QuicClientTransportHappyEyeballsTest
     client->lossTimeout().timeoutExpired();
   }
 
+  void fatalReadErrorOnFirstBeforeSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    // Socket is paused read once during happy eyeballs
+    // Socket is paused read for the second time when QuicClientTransport dies
+    EXPECT_CALL(*sock, pauseRead()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(1);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    // Give up first socket
+    union {
+      struct cmsghdr hdr;
+      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+    } cmsgbuf;
+    cmsgbuf.hdr.cmsg_level = SOL_IPV6;
+    cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
+    struct sock_extended_err err {};
+    err.ee_errno = EBADF;
+    auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
+    *dest = err;
+    client->errMessage(cmsgbuf.hdr);
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _));
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
   void nonFatalWriteErrorOnFirstAfterSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
@@ -2336,6 +2375,49 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(_, _)).Times(0);
+    EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
+  void fatalReadErrorOnFirstAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    EXPECT_CALL(*sock, pauseRead()).Times(2);
+    EXPECT_CALL(*sock, close()).Times(1);
+
+    union {
+      struct cmsghdr hdr;
+      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+    } cmsgbuf;
+    cmsgbuf.hdr.cmsg_level = SOL_IPV6;
+    cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
+    struct sock_extended_err err {};
+    err.ee_errno = EBADF;
+    auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
+    *dest = err;
+    client->errMessage(cmsgbuf.hdr);
 
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
@@ -2422,6 +2504,54 @@ class QuicClientTransportHappyEyeballsTest
     client->lossTimeout().timeoutExpired();
   }
 
+  void fatalReadErrorOnSecondAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire loss timeout to trigger write to both first and second
+    // socket
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    union {
+      struct cmsghdr hdr;
+      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+    } cmsgbuf;
+    cmsgbuf.hdr.cmsg_level = SOL_IP;
+    cmsgbuf.hdr.cmsg_type = IP_RECVERR;
+    struct sock_extended_err err {};
+    err.ee_errno = EBADF;
+    auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
+    *dest = err;
+    client->errMessage(cmsgbuf.hdr);
+    // Socket is paused read once during happy eyeballs
+    EXPECT_CALL(*secondSock, pauseRead()).Times(1);
+    EXPECT_CALL(*secondSock, close()).Times(1);
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+
+    EXPECT_CALL(*sock, write(firstAddress, _)).Times(1);
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->lossTimeout().cancelTimeout();
+    client->lossTimeout().timeoutExpired();
+  }
+
   void nonFatalWriteErrorOnBothAfterSecondStarts(
       const SocketAddress& firstAddress,
       const SocketAddress& secondAddress) {
@@ -2492,6 +2622,44 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
   }
 
+  void fatalReadErrorOnBothAfterSecondStarts(
+      const SocketAddress& firstAddress,
+      const SocketAddress& secondAddress) {
+    auto& conn = client->getConn();
+
+    EXPECT_CALL(*sock, write(firstAddress, _));
+    EXPECT_CALL(*secondSock, write(_, _)).Times(0);
+    client->start(&clientConnCallback);
+    EXPECT_EQ(conn.peerAddress, firstAddress);
+    EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
+    EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    // Manually expire conn attempt timeout
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    client->happyEyeballsConnAttemptDelayTimeout().cancelTimeout();
+    client->happyEyeballsConnAttemptDelayTimeout().timeoutExpired();
+    EXPECT_TRUE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+    EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
+
+    union {
+      struct cmsghdr hdr;
+      unsigned char buf[CMSG_SPACE(sizeof(sock_extended_err))];
+    } cmsgbuf;
+    cmsgbuf.hdr.cmsg_level = SOL_IP;
+    cmsgbuf.hdr.cmsg_type = IP_RECVERR;
+    struct sock_extended_err err {};
+    err.ee_errno = EBADF;
+    auto dest = (struct sock_extended_err*)CMSG_DATA(&cmsgbuf.hdr);
+    *dest = err;
+    client->errMessage(cmsgbuf.hdr);
+    cmsgbuf.hdr.cmsg_level = SOL_IPV6;
+    cmsgbuf.hdr.cmsg_type = IPV6_RECVERR;
+    client->errMessage(cmsgbuf.hdr);
+
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
+    EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+  }
+
  protected:
   folly::test::MockAsyncUDPSocket* secondSock;
   SocketAddress serverAddrV4{"127.0.0.1", 443};
@@ -2535,6 +2703,12 @@ TEST_F(
 
 TEST_F(
     QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6FatalReadErrorBeforeV4Start) {
+  fatalReadErrorOnFirstBeforeSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
     V6FirstAndV6NonFatalErrorAfterV4Starts) {
   nonFatalWriteErrorOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
@@ -2543,6 +2717,12 @@ TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V6FirstAndV6FatalErrorAfterV4Start) {
   fatalWriteErrorOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV6FatalReadErrorAfterV4Start) {
+  fatalReadErrorOnFirstAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
 TEST_F(
@@ -2559,6 +2739,12 @@ TEST_F(
 
 TEST_F(
     QuicClientTransportHappyEyeballsTest,
+    V6FirstAndV4FatalReadErrorAfterV4Start) {
+  fatalReadErrorOnSecondAfterSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
     V6FirstAndBothNonFatalErrorAfterV4Start) {
   nonFatalWriteErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
@@ -2567,6 +2753,12 @@ TEST_F(
     QuicClientTransportHappyEyeballsTest,
     V6FirstAndBothFatalErrorAfterV4Start) {
   fatalWriteErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
+}
+
+TEST_F(
+    QuicClientTransportHappyEyeballsTest,
+    V6FirstAndBothFatalReadErrorAfterV4Start) {
+  fatalReadErrorOnBothAfterSecondStarts(serverAddrV6, serverAddrV4);
 }
 
 TEST_P(QuicClientTransportHappyEyeballsTest, V4FirstAndV4WinBeforeV6Start) {
