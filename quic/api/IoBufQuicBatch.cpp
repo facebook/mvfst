@@ -75,8 +75,10 @@ bool IOBufQuicBatch::flushInternal() {
   }
 
   bool written = false;
+  folly::Optional<int> firstSocketErrno;
   if (happyEyeballsState_.shouldWriteToFirstSocket) {
     auto consumed = batchWriter_->write(sock_, peerAddress_);
+    firstSocketErrno = errno;
     written = (consumed >= 0);
     happyEyeballsState_.shouldWriteToFirstSocket =
         (consumed >= 0 || isRetriableError(errno));
@@ -93,6 +95,7 @@ bool IOBufQuicBatch::flushInternal() {
     happyEyeballsState_.connAttemptDelayTimeout->cancelTimeout();
   }
 
+  folly::Optional<int> secondSocketErrno;
   if (happyEyeballsState_.shouldWriteToSecondSocket) {
     // TODO: if the errno is EMSGSIZE, and we move on with the second socket,
     // we actually miss the chance to fix our UDP packet size with the first
@@ -100,6 +103,7 @@ bool IOBufQuicBatch::flushInternal() {
     auto consumed = batchWriter_->write(
         *happyEyeballsState_.secondSocket,
         happyEyeballsState_.secondPeerAddress);
+    secondSocketErrno = errno;
 
     // written is marked true if either socket write succeeds
     written |= (consumed >= 0);
@@ -110,24 +114,35 @@ bool IOBufQuicBatch::flushInternal() {
     }
   }
 
-  int errnoCopy = 0;
   if (!written && statsCallback_) {
-    errnoCopy = errno;
-    QUIC_STATS(
-        statsCallback_,
-        onUDPSocketWriteError,
-        QuicTransportStatsCallback::errnoToSocketErrorType(errnoCopy));
+    if (firstSocketErrno.has_value()) {
+      QUIC_STATS(
+          statsCallback_,
+          onUDPSocketWriteError,
+          QuicTransportStatsCallback::errnoToSocketErrorType(
+              firstSocketErrno.value()));
+    }
+    if (secondSocketErrno.has_value()) {
+      QUIC_STATS(
+          statsCallback_,
+          onUDPSocketWriteError,
+          QuicTransportStatsCallback::errnoToSocketErrorType(
+              secondSocketErrno.value()));
+    }
   }
 
-  // TODO: handle ENOBUFS and backpressure the socket.
   if (!happyEyeballsState_.shouldWriteToFirstSocket &&
       !happyEyeballsState_.shouldWriteToSecondSocket) {
+    auto firstSocketErrorMsg = firstSocketErrno.has_value()
+        ? folly::to<std::string>(
+              folly::errnoStr(firstSocketErrno.value()), ", ")
+        : "";
+    auto secondSocketErrorMsg = secondSocketErrno.has_value()
+        ? folly::errnoStr(secondSocketErrno.value())
+        : "";
+    auto errorMsg =
+        folly::to<std::string>(firstSocketErrorMsg, secondSocketErrorMsg);
     // Both sockets becomes fatal, close connection
-    std::string errorMsg = folly::to<std::string>(
-        folly::errnoStr(errnoCopy),
-        (errnoCopy == EMSGSIZE)
-            ? folly::to<std::string>(", pktSize=", batchWriter_->size())
-            : "");
     VLOG(4) << "Error writing to the socket " << errorMsg << " "
             << peerAddress_;
 
