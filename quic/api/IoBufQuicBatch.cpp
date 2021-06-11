@@ -66,8 +66,7 @@ void IOBufQuicBatch::reset() {
 }
 
 bool IOBufQuicBatch::isRetriableError(int err) {
-  return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS ||
-      err == EMSGSIZE;
+  return err == EAGAIN || err == EWOULDBLOCK || err == ENOBUFS;
 }
 
 bool IOBufQuicBatch::flushInternal() {
