@@ -1842,6 +1842,54 @@ TEST_F(QuicPacketSchedulerTest, NoFINWriteWhenBufMetaWrittenFIN) {
   EXPECT_FALSE(scheduler2.hasPendingData());
 }
 
+TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = false;
+  DatagramFrameScheduler scheduler(conn);
+  // Add datagrams
+  conn.datagramState.writeBuffer.emplace_back(
+      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
+  conn.datagramState.writeBuffer.emplace_back(
+      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
+  NiceMock<MockQuicPacketBuilder> builder2;
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+  }));
+  // Call scheduler
+  auto& frames = builder2.frames_;
+  scheduler.writeDatagramFrames(builder2);
+  ASSERT_EQ(frames.size(), 2);
+}
+
+TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = true;
+  DatagramFrameScheduler scheduler(conn);
+  // Add datagrams
+  conn.datagramState.writeBuffer.emplace_back(
+      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
+  conn.datagramState.writeBuffer.emplace_back(
+      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
+  NiceMock<MockQuicPacketBuilder> builder2;
+  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder2.frames_.push_back(f);
+  }));
+  // Call scheduler
+  auto& frames = builder2.frames_;
+  scheduler.writeDatagramFrames(builder2);
+  ASSERT_EQ(frames.size(), 1);
+  scheduler.writeDatagramFrames(builder2);
+  ASSERT_EQ(frames.size(), 2);
+}
+
 INSTANTIATE_TEST_CASE_P(
     QuicPacketSchedulerTests,
     QuicPacketSchedulerTest,

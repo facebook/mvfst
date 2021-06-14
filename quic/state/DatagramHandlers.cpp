@@ -11,14 +11,21 @@
 namespace quic {
 
 void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame) {
-  if (conn.datagramState.readBuffer.size() >=
-          conn.datagramState.maxReadBufferSize ||
-      // TODO(lniccolini) update max datagram frame size
-      // https://github.com/quicwg/datagram/issues/3
-      // For now, max_datagram_size > 0 means the peer supports datagram frames
-      conn.datagramState.maxReadFrameSize == 0) {
+  // TODO(lniccolini) update max datagram frame size
+  // https://github.com/quicwg/datagram/issues/3
+  // For now, max_datagram_size > 0 means the peer supports datagram frames
+  if (conn.datagramState.maxReadFrameSize == 0) {
     frame.data.move();
     return;
+  }
+  if (conn.datagramState.readBuffer.size() >=
+      conn.datagramState.maxReadBufferSize) {
+    if (!conn.transportSettings.datagramConfig.recvDropOldDataFirst) {
+      frame.data.move();
+      return;
+    } else {
+      conn.datagramState.readBuffer.pop_front();
+    }
   }
   conn.datagramState.readBuffer.emplace_back(std::move(frame.data));
 }

@@ -5374,6 +5374,58 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndStore) {
       conn.datagramState.maxReadBufferSize);
 }
 
+TEST_F(
+    QuicClientTransportAfterStartTest,
+    ReceiveDatagramFrameAndDiscardOldDataFirst) {
+  auto& conn = client->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 1;
+  auto& transportSettings = client->getNonConstConn().transportSettings;
+  transportSettings.datagramConfig.recvDropOldDataFirst = true;
+
+  // Enqueue first datagram
+  ShortHeader header1(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder1(
+      client->getConn().udpSendPacketLen,
+      std::move(header1),
+      0 /* largestAcked */);
+  builder1.encodePacketHeader();
+  StringPiece datagramPayload1 = "first";
+  DatagramFrame datagramFrame1(
+      datagramPayload1.size(), IOBuf::copyBuffer(datagramPayload1));
+  writeFrame(datagramFrame1, builder1);
+  auto packet1 = packetToBuf(std::move(builder1).buildPacket());
+  deliverData(packet1->coalesce());
+  ASSERT_EQ(
+      client->getConn().datagramState.readBuffer.size(),
+      conn.datagramState.maxReadBufferSize);
+  // Enqueue second datagram
+  ShortHeader header2(
+      ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
+  RegularQuicPacketBuilder builder2(
+      client->getConn().udpSendPacketLen,
+      std::move(header2),
+      0 /* largestAcked */);
+  builder2.encodePacketHeader();
+  StringPiece datagramPayload2 = "second";
+  DatagramFrame datagramFrame2(
+      datagramPayload2.size(), IOBuf::copyBuffer(datagramPayload2));
+  writeFrame(datagramFrame2, builder2);
+  auto packet2 = packetToBuf(std::move(builder2).buildPacket());
+  deliverData(packet2->coalesce());
+  ASSERT_EQ(
+      client->getConn().datagramState.readBuffer.size(),
+      conn.datagramState.maxReadBufferSize);
+
+  auto payload = client->getConn()
+                     .datagramState.readBuffer[0]
+                     .front()
+                     ->clone()
+                     ->moveToFbString();
+  ASSERT_EQ(payload, "second");
+}
+
 TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   auto streamId = client->createBidirectionalStream().value();
   auto& conn = client->getNonConstConn();

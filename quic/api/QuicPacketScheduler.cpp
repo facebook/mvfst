@@ -640,6 +640,9 @@ bool DatagramFrameScheduler::writeDatagramFrames(
       payload = datagramFrame.data.move();
       break;
     }
+    if (conn_.transportSettings.datagramConfig.framePerPacket) {
+      break;
+    }
   }
   return sent;
 }

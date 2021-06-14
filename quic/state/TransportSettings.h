@@ -112,6 +112,9 @@ struct D6DConfig {
 
 struct DatagramConfig {
   bool enabled{false};
+  bool framePerPacket{true};
+  bool recvDropOldDataFirst{false};
+  bool sendDropOldDataFirst{false};
 };
 
 // JSON-serialized transport knobs
