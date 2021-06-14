@@ -2707,7 +2707,10 @@ QuicTransportBase::setDatagramCallback(DatagramCallback* cb) {
 
 uint16_t QuicTransportBase::getDatagramSizeLimit() const {
   CHECK(conn_);
-  return conn_->datagramState.maxWriteFrameSize;
+  auto maxDatagramPacketSize = std::min<uint64_t>(
+      conn_->datagramState.maxWriteFrameSize, conn_->udpSendPacketLen);
+  CHECK(maxDatagramPacketSize >= kMaxDatagramPacketOverhead);
+  return maxDatagramPacketSize - kMaxDatagramPacketOverhead;
 }
 
 folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::writeDatagram(

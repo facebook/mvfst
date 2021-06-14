@@ -518,6 +518,9 @@ constexpr uint32_t kMaxInitialPacketNum = 0xffffff;
 // Disabled by default
 constexpr uint16_t kDefaultMaxDatagramFrameSize = 0;
 constexpr uint16_t kMaxDatagramFrameSize = 65535;
+// Maximum overhead for a QUIC packet containing a single datagram frame
+// i.e. Max Short Header + Max Datagram Frame Header
+constexpr uint16_t kMaxDatagramPacketOverhead = 25 + 16;
 // The Maximum number of datagrams (in/out) to buffer
 constexpr uint32_t kDefaultMaxDatagramsBuffered = 75;
 

@@ -1,12 +1,12 @@
 // Copyright 2004-present Facebook. All Rights Reserved.
 
-#include <quic/client/state/ClientStateMachine.h>
-
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
+#include <quic/client/state/ClientStateMachine.h>
+#include <quic/client/test/Mocks.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/handshake/CryptoFactory.h>
 #include <quic/handshake/TransportParameters.h>
-#include "quic/client/test/Mocks.h"
 
 using namespace ::testing;
 namespace quic::test {
@@ -97,6 +97,39 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   auto newConn = undoAllClientStateForRetry(std::move(client_));
   EXPECT_TRUE(newConn->happyEyeballsState.finished);
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);
+}
+
+TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(encodeIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      kMaxDatagramPacketOverhead - 1));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  try {
+    processServerInitialParams(clientConn, serverTransportParams, 0);
+    FAIL()
+        << "Expect transport exception due to max datagram frame size too small";
+  } catch (QuicTransportException& e) {
+    EXPECT_EQ(e.errorCode(), TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+}
+
+TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(encodeIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      kMaxDatagramPacketOverhead + 1));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_EQ(
+      clientConn.datagramState.maxWriteFrameSize,
+      kMaxDatagramPacketOverhead + 1);
 }
 
 } // namespace quic::test

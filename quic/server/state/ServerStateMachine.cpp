@@ -236,6 +236,11 @@ void processClientInitialParams(
     conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
   }
   if (maxDatagramFrameSize.hasValue()) {
+    if (maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
+      throw QuicTransportException(
+          "max_datagram_frame_size too small",
+          TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+    }
     conn.datagramState.maxWriteFrameSize = maxDatagramFrameSize.value();
   }
 

@@ -179,6 +179,39 @@ TEST(ServerStateMachineTest, TestProcessMaxRecvPacketSizeParamBelowMin) {
   }
 }
 
+TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(encodeIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      kMaxDatagramPacketOverhead - 1));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  try {
+    processClientInitialParams(serverConn, clientTransportParams);
+    FAIL()
+        << "Expect transport exception due to max datagram frame size too small";
+  } catch (QuicTransportException& e) {
+    EXPECT_EQ(e.errorCode(), TransportErrorCode::TRANSPORT_PARAMETER_ERROR);
+  }
+}
+
+TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeOk) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(encodeIntegerParameter(
+      TransportParameterId::max_datagram_frame_size,
+      kMaxDatagramPacketOverhead + 1));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_EQ(
+      serverConn.datagramState.maxWriteFrameSize,
+      kMaxDatagramPacketOverhead + 1);
+}
+
 struct MaxPacketSizeTestUnit {
   uint64_t maxPacketSize;
   bool canIgnorePathMTU;
