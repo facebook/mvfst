@@ -1595,6 +1595,9 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (conn.pendingEvents.sendPing) {
     return WriteDataReason::PING;
   }
+  if (!conn.datagramState.writeBuffer.empty()) {
+    return WriteDataReason::DATAGRAM;
+  }
   return WriteDataReason::NO_WRITE;
 }
 

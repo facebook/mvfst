@@ -2893,6 +2893,15 @@ TEST_F(QuicTransportFunctionsTest, HasAppDataToWrite) {
   EXPECT_EQ(WriteDataReason::STREAM, hasNonAckDataToWrite(*conn));
 }
 
+TEST_F(QuicTransportFunctionsTest, HasDatagramsToWrite) {
+  auto conn = createConn();
+  conn->oneRttWriteCipher = test::createNoOpAead();
+  EXPECT_EQ(WriteDataReason::NO_WRITE, hasNonAckDataToWrite(*conn));
+  conn->datagramState.writeBuffer.emplace_back(
+      folly::IOBuf::copyBuffer("I'm an unreliable Datagram"));
+  EXPECT_EQ(WriteDataReason::DATAGRAM, hasNonAckDataToWrite(*conn));
+}
+
 TEST_F(QuicTransportFunctionsTest, UpdateConnectionCloneCounterAppData) {
   auto conn = createConn();
   ASSERT_EQ(

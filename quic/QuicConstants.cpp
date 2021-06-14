@@ -109,6 +109,8 @@ folly::StringPiece writeDataReasonString(WriteDataReason reason) {
       return "PathChallenge";
     case WriteDataReason::PING:
       return "Ping";
+    case WriteDataReason::DATAGRAM:
+      return "Datagram";
     case WriteDataReason::NO_WRITE:
       return "NoWrite";
   }
