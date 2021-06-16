@@ -267,6 +267,9 @@ struct TransportSettings {
   bool dsrEnabled{false};
   // Datagram config
   DatagramConfig datagramConfig;
+  // Whether or not to opportunistically retransmit 0RTT when the handshake
+  // completes.
+  bool earlyRetransmit0Rtt{false};
 };
 
 } // namespace quic

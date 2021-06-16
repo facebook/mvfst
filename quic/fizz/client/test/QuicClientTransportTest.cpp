@@ -5691,6 +5691,80 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   mockClientHandshake->triggerOnNewCachedPsk();
 }
 
+TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
+  EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
+      .WillOnce(InvokeWithoutArgs([]() {
+        QuicCachedPsk quicCachedPsk;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiLocal =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataBidiRemote =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxStreamDataUni =
+            kDefaultStreamWindowSize;
+        quicCachedPsk.transportParams.initialMaxData =
+            kDefaultConnectionWindowSize;
+        quicCachedPsk.transportParams.idleTimeout = kDefaultIdleTimeout.count();
+        quicCachedPsk.transportParams.maxRecvPacketSize =
+            kDefaultUDPReadBufferSize;
+        quicCachedPsk.transportParams.initialMaxStreamsBidi =
+            std::numeric_limits<uint32_t>::max();
+        quicCachedPsk.transportParams.initialMaxStreamsUni =
+            std::numeric_limits<uint32_t>::max();
+        return quicCachedPsk;
+      }));
+  auto tp = client->getTransportSettings();
+  tp.earlyRetransmit0Rtt = true;
+  client->setTransportSettings(tp);
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>&, const Buf&) {
+        performedValidation = true;
+        return true;
+      },
+      []() -> Buf { return nullptr; });
+  startClient();
+  EXPECT_TRUE(performedValidation);
+
+  socketWrites.clear();
+  auto streamId = client->createBidirectionalStream().value();
+  client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
+  loopForWrites();
+  EXPECT_TRUE(zeroRttPacketsOutstanding());
+  assertWritten(false, LongHeader::Types::ZeroRtt);
+  EXPECT_CALL(clientConnCallback, onReplaySafe());
+  mockClientHandshake->setZeroRttRejected(false);
+  recvServerHello();
+
+  EXPECT_EQ(client->getConn().zeroRttWriteCipher, nullptr);
+
+  // All the data is marked lost.
+  EXPECT_FALSE(zeroRttPacketsOutstanding());
+  // Transport parameters did not change since zero rtt was accepted.
+  // Except for max packet size.
+  verifyTransportParameters(
+      kDefaultConnectionWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      kDefaultMaxUDPPayload);
+
+  EXPECT_CALL(*mockQuicPskCache_, putPsk(hostname_, _))
+      .WillOnce(Invoke([=](const std::string&, QuicCachedPsk psk) {
+        auto& params = psk.transportParams;
+        EXPECT_EQ(params.initialMaxData, kDefaultConnectionWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamDataBidiLocal, kDefaultStreamWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamDataBidiRemote, kDefaultStreamWindowSize);
+        EXPECT_EQ(params.initialMaxStreamDataUni, kDefaultStreamWindowSize);
+        EXPECT_EQ(
+            params.initialMaxStreamsBidi, std::numeric_limits<uint32_t>::max());
+        EXPECT_EQ(
+            params.initialMaxStreamsUni, std::numeric_limits<uint32_t>::max());
+      }));
+  mockClientHandshake->triggerOnNewCachedPsk();
+}
+
 TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   EXPECT_CALL(*mockQuicPskCache_, getPsk(hostname_))
       .WillOnce(InvokeWithoutArgs([]() {
