@@ -643,7 +643,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(server_conn);
         if (static_cast<bool>(val)) {
           server_conn->d6d.noBlackholeDetection = true;
-          LOG(INFO)
+          VLOG(3)
               << "Knob param received, pmtu blackhole detection is turned off";
         }
       });
@@ -655,7 +655,7 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(server_conn);
         if (static_cast<bool>(val)) {
           server_conn->udpSendPacketLen = server_conn->peerMaxUdpPayloadSize;
-          LOG(INFO)
+          VLOG(3)
               << "Knob param received, udpSendPacketLen is forcibly set to max UDP payload size advertised by peer";
         }
       });
@@ -665,8 +665,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerConnectionState* server_conn, uint64_t val) {
         CHECK(server_conn);
         auto cctype = static_cast<CongestionControlType>(val);
-        LOG(INFO) << "Knob param received, set congestion control type to "
-                  << congestionControlTypeToString(cctype);
+        VLOG(3) << "Knob param received, set congestion control type to "
+                << congestionControlTypeToString(cctype);
         if (cctype == server_conn->congestionController->type()) {
           return;
         }
@@ -691,8 +691,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(server_conn);
         uint8_t numerator = (val / 100);
         uint8_t denominator = (val - (numerator * 100));
-        LOG(INFO) << "Knob param received, set STARTUP rtt factor to ("
-                  << unsigned(numerator) << "," << unsigned(denominator) << ")";
+        VLOG(3) << "Knob param received, set STARTUP rtt factor to ("
+                << unsigned(numerator) << "," << unsigned(denominator) << ")";
         server_conn->transportSettings.startupRttFactor =
             std::make_pair(numerator, denominator);
       });
@@ -703,8 +703,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         CHECK(server_conn);
         auto numerator = (uint8_t)(val / 100);
         auto denominator = (uint8_t)(val - (numerator * 100));
-        LOG(INFO) << "Knob param received, set DEFAULT rtt factor to ("
-                  << unsigned(numerator) << "," << unsigned(denominator) << ")";
+        VLOG(3) << "Knob param received, set DEFAULT rtt factor to ("
+                << unsigned(numerator) << "," << unsigned(denominator) << ")";
         server_conn->transportSettings.defaultRttFactor =
             std::make_pair(numerator, denominator);
       });
@@ -713,9 +713,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB),
       [](QuicServerConnectionState* server_conn, uint64_t val) {
         CHECK(server_conn);
-        LOG(INFO)
-            << "Knob param received, set total buffer space available to ("
-            << unsigned(val) << ")";
+        VLOG(3) << "Knob param received, set total buffer space available to ("
+                << unsigned(val) << ")";
         server_conn->transportSettings.totalBufferSpaceAvailable = val;
       });
 }
