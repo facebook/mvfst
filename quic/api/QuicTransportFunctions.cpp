@@ -1176,6 +1176,8 @@ void writeCloseCommon(
   }
   auto packet = std::move(packetBuilder).buildPacket();
   packet.header->coalesce();
+  packet.body->reserve(0, aead.getCipherOverhead());
+  CHECK_GE(packet.body->tailroom(), aead.getCipherOverhead());
   auto body = aead.inplaceEncrypt(
       std::move(packet.body), packet.header.get(), packetNum);
   body->coalesce();
