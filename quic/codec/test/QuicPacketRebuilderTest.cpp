@@ -570,7 +570,7 @@ TEST_F(QuicPacketRebuilderTest, LastStreamFrameSkipLen) {
   EXPECT_TRUE(rebuilder.rebuildFromPacket(outstandingPacket).has_value());
 }
 
-TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlyNotSkipLen) {
+TEST_F(QuicPacketRebuilderTest, LastStreamFrameFinOnlySkipLen) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(100);

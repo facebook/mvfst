@@ -55,6 +55,20 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
   bool shouldRebuildWriteAckFrame = false;
   auto encryptionLevel =
       protectionTypeToEncryptionLevel(packet.packet.header.getProtectionType());
+  // First check if there's an ACK in this packet. We do this because we need
+  // to know before we rebuild a stream frame whether there is an ACK in this
+  // packet. If there is an ACK, we have to always encode the stream frame's
+  // length. This forces the associatedEvent code to reconsider the packet for
+  // ACK processing. We should always be able to write an ACK since the min
+  // ACK frame size is 4, while 1500 MTU stream frame lengths are going to be
+  // 2 bytes maximum.
+  bool hasAckFrame = false;
+  for (const auto& frame : packet.packet.frames) {
+    if (frame.asWriteAckFrame()) {
+      hasAckFrame = true;
+      break;
+    }
+  }
   for (auto iter = packet.packet.frames.cbegin();
        iter != packet.packet.frames.cend();
        iter++) {
@@ -81,7 +95,10 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
               bufferLen,
               bufferLen,
               streamFrame.fin,
-              lastFrame && bufferLen);
+              // It's safe to skip the length if it was the last frame in the
+              // original packet and there's no ACK frame. Since we put the ACK
+              // frame last we need to end the stream frame in that case.
+              lastFrame && bufferLen && !hasAckFrame);
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has
