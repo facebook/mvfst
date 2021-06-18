@@ -13,8 +13,6 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
-#include <sys/socket.h>
-
 #include <fizz/crypto/aead/test/Mocks.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <folly/futures/Future.h>
@@ -2276,8 +2274,9 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnFirstBeforeSecondStarts(
-      const SocketAddress& firstAddress,
-      const SocketAddress& secondAddress) {
+      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
+      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
     EXPECT_CALL(*sock, write(firstAddress, _));
     // Socket is paused read once during happy eyeballs
@@ -2307,6 +2306,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, write(secondAddress, _));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+#endif
   }
 
   void nonFatalWriteErrorOnFirstAfterSecondStarts(
@@ -2386,8 +2386,9 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnFirstAfterSecondStarts(
-      const SocketAddress& firstAddress,
-      const SocketAddress& secondAddress) {
+      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
+      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
     EXPECT_CALL(*sock, write(firstAddress, _));
@@ -2426,6 +2427,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, write(secondAddress, _)).Times(1);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+#endif
   }
 
   void nonFatalWriteErrorOnSecondAfterSecondStarts(
@@ -2505,8 +2507,9 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnSecondAfterSecondStarts(
-      const SocketAddress& firstAddress,
-      const SocketAddress& secondAddress) {
+      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
+      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
     EXPECT_CALL(*sock, write(firstAddress, _));
@@ -2550,6 +2553,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
+#endif
   }
 
   void nonFatalWriteErrorOnBothAfterSecondStarts(
@@ -2623,8 +2627,9 @@ class QuicClientTransportHappyEyeballsTest
   }
 
   void fatalReadErrorOnBothAfterSecondStarts(
-      const SocketAddress& firstAddress,
-      const SocketAddress& secondAddress) {
+      FOLLY_MAYBE_UNUSED const SocketAddress& firstAddress,
+      FOLLY_MAYBE_UNUSED const SocketAddress& secondAddress) {
+#ifdef FOLLY_HAVE_MSG_ERRQUEUE
     auto& conn = client->getConn();
 
     EXPECT_CALL(*sock, write(firstAddress, _));
@@ -2658,6 +2663,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToFirstSocket);
     EXPECT_FALSE(conn.happyEyeballsState.shouldWriteToSecondSocket);
+#endif
   }
 
  protected:
