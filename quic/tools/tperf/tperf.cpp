@@ -715,6 +715,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
         std::numeric_limits<uint32_t>::max();
     settings.connectUDP = true;
     settings.shouldRecvBatch = true;
+    settings.shouldUseRecvmmsgForBatchRecv = true;
+    settings.maxRecvBatchSize = 32;
     settings.defaultCongestionController = congestionControlType_;
     if (congestionControlType_ == quic::CongestionControlType::BBR) {
       settings.pacingEnabled = true;
