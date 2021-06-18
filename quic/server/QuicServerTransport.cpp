@@ -160,9 +160,7 @@ void QuicServerTransport::accept() {
 }
 
 void QuicServerTransport::writeData() {
-  if (!conn_->clientConnectionId && !conn_->serverConnectionId) {
-    // It is possible for the server to invoke writeData() after receiving a
-    // packet that could not per parsed successfully.
+  if (!conn_->clientConnectionId || !conn_->serverConnectionId) {
     return;
   }
   auto version = conn_->version.value_or(*(conn_->originalVersion));
