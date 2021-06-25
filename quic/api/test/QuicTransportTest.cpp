@@ -1589,10 +1589,6 @@ TEST_F(QuicTransportTest, NonWritableStreamAPI) {
       NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
 
   // Check that write-side APIs return an error
-  auto res = transport_->getStreamFlowControl(streamId);
-  EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res.error());
-  auto res1 = transport_->setStreamFlowControlWindow(streamId, 0);
-  EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res1.error());
   auto res2 = transport_->notifyPendingWriteOnStream(streamId, &writeCallback_);
   EXPECT_EQ(LocalErrorCode::STREAM_CLOSED, res2.error());
   auto res3 = transport_->setStreamPriority(streamId, 0, false);
@@ -3487,6 +3483,21 @@ TEST_F(QuicTransportTest, ResetDSRStream) {
     foundReset = true;
   }
   EXPECT_TRUE(foundReset);
+}
+
+TEST_F(QuicTransportTest, GetSetReceiveWindowOnIncomingUnidirectionalStream) {
+  auto& conn = transport_->getConnectionState();
+  // Stream ID is for a peer-initiated unidirectional stream
+  StreamId id = 0b110;
+  uint64_t windowSize = 1500;
+  auto stream = conn.streamManager->getStream(id);
+  EXPECT_FALSE(stream->writable());
+  EXPECT_TRUE(stream->shouldSendFlowControl());
+  auto res1 = transport_->setStreamFlowControlWindow(id, windowSize);
+  EXPECT_FALSE(res1.hasError());
+  EXPECT_EQ(windowSize, stream->flowControlState.windowSize);
+  auto res2 = transport_->getStreamFlowControl(id);
+  EXPECT_FALSE(res2.hasError());
 }
 
 } // namespace test

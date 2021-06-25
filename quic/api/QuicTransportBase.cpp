@@ -624,10 +624,6 @@ QuicTransportBase::getStreamFlowControl(StreamId id) const {
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
-  if (!stream->writable()) {
-    VLOG(10) << "Tried to write to non writable stream=" << id << " " << *this;
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-  }
   return QuicSocket::FlowControlState(
       getSendStreamFlowControlBytesAPI(*stream),
       stream->flowControlState.peerAdvertisedMaxOffset,
@@ -657,9 +653,6 @@ QuicTransportBase::setStreamFlowControlWindow(
     return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
   }
   auto stream = conn_->streamManager->getStream(id);
-  if (!stream->writable()) {
-    return folly::makeUnexpected(LocalErrorCode::STREAM_CLOSED);
-  }
   stream->flowControlState.windowSize = windowSize;
   maybeSendStreamWindowUpdate(*stream, Clock::now());
   updateWriteLooper(true);
