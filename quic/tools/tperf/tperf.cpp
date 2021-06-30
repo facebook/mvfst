@@ -241,7 +241,9 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
         numStreams_(numStreams),
         maxBytesPerStream_(maxBytesPerStream),
         udpSock_(sock),
-        dsrEnabled_(dsrEnabled) {}
+        dsrEnabled_(dsrEnabled) {
+    buf_ = folly::IOBuf::createCombined(blockSize_);
+  }
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock_ = socket;
@@ -324,7 +326,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
       override {
     bool eof = false;
-    uint64_t toSend = maxToSend;
+    uint64_t toSend = std::min<uint64_t>(maxToSend, blockSize_);
     if (maxBytesPerStream_ > 0) {
       toSend =
           std::min<uint64_t>(toSend, maxBytesPerStream_ - bytesPerStream_[id]);
@@ -384,13 +386,9 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   }
 
   void regularSend(quic::StreamId id, uint64_t toSend, bool eof) {
-    auto buf = folly::IOBuf::createChain(toSend, blockSize_);
-    auto curBuf = buf.get();
-    do {
-      curBuf->append(curBuf->capacity());
-      curBuf = curBuf->next();
-    } while (curBuf != buf.get());
-    auto res = sock_->writeChain(id, std::move(buf), eof, nullptr);
+    auto sendBuffer = buf_->clone();
+    sendBuffer->append(toSend);
+    auto res = sock_->writeChain(id, std::move(sendBuffer), eof, nullptr);
     if (res.hasError()) {
       LOG(FATAL) << "Got error on write: " << quic::toString(res.error());
     }
@@ -400,6 +398,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   std::shared_ptr<quic::QuicSocket> sock_;
   folly::EventBase* evb_;
   uint64_t blockSize_;
+  std::unique_ptr<folly::IOBuf> buf_;
   uint32_t numStreams_;
   uint64_t maxBytesPerStream_;
   std::unordered_map<quic::StreamId, uint64_t> bytesPerStream_;
