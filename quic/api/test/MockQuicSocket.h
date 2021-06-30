@@ -83,6 +83,9 @@ class MockQuicSocket : public QuicSocket {
       setStreamFlowControlWindow,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, uint64_t));
   MOCK_METHOD1(setTransportSettings, void(TransportSettings));
+  MOCK_METHOD1(
+      setMaxPacingRate,
+      folly::Expected<folly::Unit, LocalErrorCode>(uint64_t));
   folly::Expected<folly::Unit, LocalErrorCode>
   setKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override {
     SharedBuf sharedBlob(knobBlob.release());

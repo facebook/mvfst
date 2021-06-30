@@ -2909,6 +2909,19 @@ void QuicTransportBase::setTransportSettings(
   }
 }
 
+folly::Expected<folly::Unit, LocalErrorCode>
+QuicTransportBase::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
+  if (conn_->pacer) {
+    conn_->pacer->setMaxPacingRate(maxRateBytesPerSec);
+    return folly::unit;
+  } else {
+    LOG(WARNING)
+        << "Cannot set max pacing rate without a pacer. Pacing Enabled = "
+        << conn_->transportSettings.pacingEnabled;
+    return folly::makeUnexpected(LocalErrorCode::PACER_NOT_AVAILABLE);
+  }
+}
+
 void QuicTransportBase::updateCongestionControlSettings(
     const TransportSettings& transportSettings) {
   conn_->transportSettings.defaultCongestionController =

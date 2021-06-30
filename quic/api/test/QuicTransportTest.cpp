@@ -3500,5 +3500,19 @@ TEST_F(QuicTransportTest, GetSetReceiveWindowOnIncomingUnidirectionalStream) {
   EXPECT_FALSE(res2.hasError());
 }
 
+TEST_F(QuicTransportTest, SetMaxPacingRateWithAndWithoutPacing) {
+  auto settings = transport_->getTransportSettings();
+  EXPECT_FALSE(settings.pacingEnabled);
+  auto res1 = transport_->setMaxPacingRate(125000);
+  EXPECT_TRUE(res1.hasError());
+  EXPECT_EQ(LocalErrorCode::PACER_NOT_AVAILABLE, res1.error());
+  settings.pacingEnabled = true;
+  transport_->setPacingTimer(
+      TimerHighRes::newTimer(&evb_, settings.pacingTimerTickInterval));
+  transport_->setTransportSettings(settings);
+  auto res2 = transport_->setMaxPacingRate(125000);
+  EXPECT_FALSE(res2.hasError());
+}
+
 } // namespace test
 } // namespace quic

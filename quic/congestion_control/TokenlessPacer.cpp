@@ -24,7 +24,10 @@ void TokenlessPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt,
     TimePoint /*currentTime*/) {
-  if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
+  uint64_t targetRateBytesPerSec = cwndBytes * 1s / rtt;
+  if (targetRateBytesPerSec > maxPacingRateBytesPerSec_) {
+    return setPacingRate(maxPacingRateBytesPerSec_);
+  } else if (rtt < conn_.transportSettings.pacingTimerTickInterval) {
     writeInterval_ = 0us;
     batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
   } else {
@@ -42,14 +45,42 @@ void TokenlessPacer::refreshPacingRate(
 }
 
 // rate_bps is *bytes* per second
-void TokenlessPacer::setPacingRate(
-    QuicConnectionStateBase& conn,
-    uint64_t rate_bps) {
-  batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
-  uint64_t interval = (batchSize_ * conn.udpSendPacketLen * 1000000) / rate_bps;
-  writeInterval_ = std::max(
-      std::chrono::microseconds(interval),
-      conn.transportSettings.pacingTimerTickInterval);
+void TokenlessPacer::setPacingRate(uint64_t rateBps) {
+  if (rateBps > maxPacingRateBytesPerSec_) {
+    rateBps = maxPacingRateBytesPerSec_;
+  }
+
+  if (rateBps == 0) {
+    batchSize_ = 0;
+    writeInterval_ = conn_.transportSettings.pacingTimerTickInterval;
+  } else {
+    batchSize_ = conn_.transportSettings.writeConnectionDataPacketsLimit;
+    uint64_t interval =
+        (batchSize_ * conn_.udpSendPacketLen * 1000000) / rateBps;
+    writeInterval_ = std::max(
+        std::chrono::microseconds(interval),
+        conn_.transportSettings.pacingTimerTickInterval);
+  }
+
+  if (conn_.qLogger) {
+    conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
+  }
+  lastWriteTime_.reset();
+}
+
+void TokenlessPacer::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
+  maxPacingRateBytesPerSec_ = maxRateBytesPerSec;
+  // Current rate in bytes per sec =
+  //         batchSize * packetLen * (1 second / writeInterval)
+  // if writeInterval = 0, current rate is UINT64_MAX
+  uint64_t currentRateBytesPerSec = (writeInterval_ == 0us)
+      ? UINT64_MAX
+      : (batchSize_ * conn_.udpSendPacketLen * std::chrono::seconds(1)) /
+          writeInterval_;
+  if (currentRateBytesPerSec > maxPacingRateBytesPerSec_) {
+    // Current rate is faster than max. Enforce the maxPacingRate.
+    return setPacingRate(maxPacingRateBytesPerSec_);
+  }
 }
 
 void TokenlessPacer::reset() {

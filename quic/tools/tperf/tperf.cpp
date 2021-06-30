@@ -41,6 +41,10 @@ DEFINE_uint64(window, 64 * 1024, "Flow control window size");
 DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/ccp/none");
 DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
 DEFINE_bool(pacing, false, "Enable pacing");
+DEFINE_uint64(
+    max_pacing_rate,
+    UINT64_MAX,
+    "Max pacing rate to use in bytes per second");
 DEFINE_bool(gso, false, "Enable GSO writes to the socket");
 DEFINE_uint32(
     client_transport_timer_resolution_ms,
@@ -277,6 +281,9 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onTransportReady() noexcept override {
+    if (FLAGS_max_pacing_rate != UINT64_MAX) {
+      sock_->setMaxPacingRate(FLAGS_max_pacing_rate);
+    }
     LOG(INFO) << "Starting sends to client.";
     for (uint32_t i = 0; i < numStreams_; i++) {
       createNewStream();

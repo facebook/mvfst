@@ -241,6 +241,13 @@ class QuicTransportBase : public QuicSocket {
   void setTransportSettings(TransportSettings transportSettings) override;
 
   /**
+   * Sets the maximum pacing rate in Bytes per second to be used
+   * if pacing is enabled.
+   */
+  folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
+      uint64_t maxRateBytesPerSec) override;
+
+  /**
    * Set a "knob". This will emit a knob frame to the peer, which the peer
    * application can act on by e.g. changing transport settings during the
    * connection.

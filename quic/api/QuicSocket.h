@@ -453,6 +453,13 @@ class QuicSocket {
   virtual const TransportSettings& getTransportSettings() const = 0;
 
   /**
+   * Sets the maximum pacing rate in Bytes per second to be used
+   * if pacing is enabled
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setMaxPacingRate(
+      uint64_t rateBytesPerSec) = 0;
+
+  /**
    * Set a "knob". This will emit a knob frame to the peer, which the peer
    * application can act on by e.g. changing transport settings during the
    * connection.

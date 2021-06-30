@@ -261,7 +261,7 @@ void CCP::onLossEvent(const LossEvent& loss) {
 void CCP::setPacingRate(uint64_t rate) noexcept {
   pacingRate_ = rate;
   if (conn_.pacer) {
-    conn_.pacer->setPacingRate(conn_, rate);
+    conn_.pacer->setPacingRate(rate);
   } else {
     LOG(ERROR) << "setPacingRate called but pacer is undefined!";
   }

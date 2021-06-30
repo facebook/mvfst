@@ -120,6 +120,8 @@ folly::StringPiece toString(LocalErrorCode code) {
       return "Connection abandoned";
     case LocalErrorCode::KNOB_FRAME_UNSUPPORTED:
       return "Knob Frame Not Supported";
+    case LocalErrorCode::PACER_NOT_AVAILABLE:
+      return "Pacer not available";
   }
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";

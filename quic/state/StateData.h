@@ -157,9 +157,19 @@ struct Pacer {
       std::chrono::microseconds rtt,
       TimePoint currentTime = Clock::now()) = 0;
 
-  virtual void setPacingRate(
-      QuicConnectionStateBase& conn,
-      uint64_t rate_bps) = 0;
+  /**
+   * Set the pacers rate to the given value in Bytes per second
+   */
+  virtual void setPacingRate(uint64_t rateBps) = 0;
+
+  /**
+   * Set an upper limit on the rate this pacer can use.
+   * - If the pacer is currently using a faster pace, it will be brought down to
+   *   maxRateBytesPerSec.
+   * - If refreshPacingRate or setPacingRate are called with a value
+   * greated than maxRateBytesPerSec, maxRateBytesPerSec will be used instead.
+   */
+  virtual void setMaxPacingRate(uint64_t maxRateBytesPerSec) = 0;
 
   /**
    * Resets the pacer, which should have the effect of the next write

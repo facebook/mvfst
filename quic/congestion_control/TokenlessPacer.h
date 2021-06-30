@@ -27,7 +27,9 @@ class TokenlessPacer : public Pacer {
       std::chrono::microseconds rtt,
       TimePoint currentTime = Clock::now()) override;
 
-  void setPacingRate(QuicConnectionStateBase& conn, uint64_t rate_bps) override;
+  void setPacingRate(uint64_t rateBps) override;
+
+  void setMaxPacingRate(uint64_t maxRateBytesPerSec) override;
 
   void reset() override;
 
@@ -48,6 +50,7 @@ class TokenlessPacer : public Pacer {
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
   uint64_t batchSize_;
+  uint64_t maxPacingRateBytesPerSec_{UINT64_MAX};
   std::chrono::microseconds writeInterval_{0};
   PacingRateCalculator pacingRateCalculator_;
   folly::Optional<TimePoint> lastWriteTime_;
