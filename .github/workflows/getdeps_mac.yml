@@ -15,8 +15,6 @@ jobs:
     runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Install system deps
-      run: sudo python3 build/fbcode_builder/getdeps.py install-system-deps --recursive mvfst
     - name: Fetch boost
       run: python3 build/fbcode_builder/getdeps.py fetch --no-tests boost
     - name: Fetch openssl
@@ -101,3 +99,5 @@ jobs:
       with:
         name: mvfst
         path: _artifacts
+    - name: Test mvfst
+      run: python3 build/fbcode_builder/getdeps.py test --src-dir=. mvfst  --project-install-prefix mvfst:/usr/local
