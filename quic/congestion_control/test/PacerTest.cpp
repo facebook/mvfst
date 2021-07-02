@@ -200,5 +200,17 @@ TEST_F(TokenlessPacerTest, SetZeroPacingRate) {
   EXPECT_NEAR(1000, pacer.getTimeUntilNextWrite().count(), 100);
 }
 
+TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsZero) {
+  // rtt=0 should not result in a divide-by-zero
+  conn.transportSettings.pacingTimerTickInterval = 1000us;
+  pacer.refreshPacingRate(100, 0us);
+  // Verify burst is writeConnectionDataPacketsLimit and interval is
+  // 0us right after writing
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      pacer.updateAndGetWriteBatchSize(Clock::now()));
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+}
+
 } // namespace test
 } // namespace quic

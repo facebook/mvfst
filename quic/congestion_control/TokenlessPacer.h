@@ -50,7 +50,7 @@ class TokenlessPacer : public Pacer {
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
   uint64_t batchSize_;
-  uint64_t maxPacingRateBytesPerSec_{UINT64_MAX};
+  uint64_t maxPacingRateBytesPerSec_{std::numeric_limits<uint64_t>::max()};
   std::chrono::microseconds writeInterval_{0};
   PacingRateCalculator pacingRateCalculator_;
   folly::Optional<TimePoint> lastWriteTime_;

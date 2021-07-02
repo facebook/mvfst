@@ -43,7 +43,7 @@ DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
 DEFINE_bool(pacing, false, "Enable pacing");
 DEFINE_uint64(
     max_pacing_rate,
-    UINT64_MAX,
+    std::numeric_limits<uint64_t>::max(),
     "Max pacing rate to use in bytes per second");
 DEFINE_bool(gso, false, "Enable GSO writes to the socket");
 DEFINE_uint32(
@@ -281,7 +281,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onTransportReady() noexcept override {
-    if (FLAGS_max_pacing_rate != UINT64_MAX) {
+    if (FLAGS_max_pacing_rate != std::numeric_limits<uint64_t>::max()) {
       sock_->setMaxPacingRate(FLAGS_max_pacing_rate);
     }
     LOG(INFO) << "Starting sends to client.";
