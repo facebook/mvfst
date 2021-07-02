@@ -596,7 +596,8 @@ void updateConnection(
     uint32_t encodedBodySize,
     bool isDSRPacket) {
   auto packetNum = packet.header.getPacketSequenceNum();
-  bool retransmittable = false; // AckFrame and PaddingFrame are not retx-able.
+  // AckFrame, PaddingFrame and Datagrams are not retx-able.
+  bool retransmittable = false;
   bool isHandshake = false;
   bool isPing = false;
   uint32_t connWindowUpdateSent = 0;
@@ -783,6 +784,10 @@ void updateConnection(
         //    count towards congestion window, so the padding frames in those
         //    ack packets should not count towards the window either
         // 2. Of course we do not want to retransmit the ACK frames.
+        break;
+      }
+      case QuicWriteFrame::Type::DatagramFrame: {
+        // do not mark Datagram frames as retransmittable
         break;
       }
       default:
