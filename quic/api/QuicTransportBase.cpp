@@ -798,7 +798,7 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
   for (StreamId streamId : readableStreamsCopy) {
     auto callback = self->readCallbacks_.find(streamId);
     if (callback == self->readCallbacks_.end()) {
-      self->conn_->streamManager->readableStreams().erase(streamId);
+      // Stream doesn't have a read callback set, skip it.
       continue;
     }
     auto readCb = callback->second.readCb;

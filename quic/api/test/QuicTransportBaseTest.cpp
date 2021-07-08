@@ -652,6 +652,52 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailable) {
   transport.reset();
 }
 
+TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableNoReap) {
+  auto stream1 = transport->createBidirectionalStream().value();
+  auto stream2 = transport->createBidirectionalStream().value();
+  StreamId stream3 = 0x6;
+
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
+  NiceMock<MockReadCallback> readCb3;
+
+  transport->setReadCallback(stream1, &readCb1);
+  transport->setReadCallback(stream2, &readCb2);
+
+  transport->addDataToStream(
+      stream1, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
+
+  transport->addDataToStream(
+      stream2,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10));
+
+  transport->addDataToStream(
+      stream3, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
+
+  EXPECT_CALL(readCb1, readAvailable(stream1));
+  transport->driveReadCallbacks();
+
+  transport->setReadCallback(stream3, &readCb3);
+  transport->addDataToStream(
+      stream2, StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0));
+
+  EXPECT_CALL(readCb1, readAvailable(stream1));
+  EXPECT_CALL(readCb2, readAvailable(stream2));
+  EXPECT_CALL(readCb3, readAvailable(stream3));
+  transport->driveReadCallbacks();
+
+  EXPECT_CALL(readCb1, readAvailable(stream1));
+  EXPECT_CALL(readCb2, readAvailable(stream2));
+  EXPECT_CALL(readCb3, readAvailable(stream3));
+  transport->driveReadCallbacks();
+
+  EXPECT_CALL(readCb2, readAvailable(stream2));
+  EXPECT_CALL(readCb3, readAvailable(stream3));
+  transport->setReadCallback(stream1, nullptr);
+  transport->driveReadCallbacks();
+  transport.reset();
+}
+
 TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableOrdered) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.orderedReadCallbacks = true;
