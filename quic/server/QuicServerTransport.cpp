@@ -715,6 +715,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << unsigned(val) << ")";
         server_conn->transportSettings.totalBufferSpaceAvailable = val;
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+      [this](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        VLOG(3) << "Knob param received, set max pacing rate to ("
+                << unsigned(val) << " bytes per second)";
+        this->setMaxPacingRate(val);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

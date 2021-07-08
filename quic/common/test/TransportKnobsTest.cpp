@@ -203,6 +203,32 @@ TEST(QuicKnobsParsingTest, InvalidNotSentBufferSizeAsString) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
+  uint64_t val = 111;
+  std::string args = folly::format(R"({{"{}" : {}}})", key, val).str();
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsString) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
+  uint64_t val = 111;
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, val).str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
+  // Decimal is UINT64_MAX + 1
+  std::string args =
+      folly::format(R"({{"{}" : {}}})", key, "18446744073709551616").str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 1}}};
+  run(fixture);
+}
+
 TEST(QuicKnobsParsingTest, NonStringKey) {
   QuicKnobsParsingTestFixture fixture = {"{ 1 : 1 }", true, {}};
   run(fixture);
