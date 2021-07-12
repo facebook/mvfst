@@ -187,7 +187,8 @@ struct Pacer {
   /**
    * API for Trnasport to query the interval before next write
    */
-  virtual std::chrono::microseconds getTimeUntilNextWrite() const = 0;
+  [[nodiscard]] virtual std::chrono::microseconds getTimeUntilNextWrite(
+      TimePoint currentTime = Clock::now()) const = 0;
 
   /**
    * API for Transport to query a recalculated batch size based on currentTime

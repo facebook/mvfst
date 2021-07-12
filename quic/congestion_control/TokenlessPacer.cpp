@@ -99,8 +99,8 @@ void TokenlessPacer::onPacketSent() {}
 
 void TokenlessPacer::onPacketsLoss() {}
 
-std::chrono::microseconds TokenlessPacer::getTimeUntilNextWrite() const {
-  auto now = Clock::now();
+std::chrono::microseconds TokenlessPacer::getTimeUntilNextWrite(
+    TimePoint now) const {
   // If we don't have a lastWriteTime_, we want to write immediately.
   auto timeSinceLastWrite =
       std::chrono::duration_cast<std::chrono::microseconds>(

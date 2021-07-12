@@ -120,41 +120,42 @@ TEST_F(TokenlessPacerTest, ChangeMaxPacingRate) {
         .build();
   });
   auto rtt = 500 * 1000us;
+  auto timestamp = Clock::now();
   // Request pacing at 50 Mbps
   pacer.refreshPacingRate(3125000, rtt);
   EXPECT_EQ(1, calculatorCallCount);
   EXPECT_EQ(
       3125000 / kDefaultUDPSendPacketLen,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(rtt.count(), pacer.getTimeUntilNextWrite().count(), 100);
+      pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(rtt.count(), pacer.getTimeUntilNextWrite(timestamp).count());
 
   // Set max pacing rate to 40 Mbps
   pacer.setMaxPacingRate(5 * 1000 * 1000u); // Bytes per second
   // This should bring down the pacer rate to 40 Mbps
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  auto burst = pacer.updateAndGetWriteBatchSize(Clock::now());
-  auto interval = pacer.getTimeUntilNextWrite();
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
+  auto burst = pacer.updateAndGetWriteBatchSize(timestamp);
+  auto interval = pacer.getTimeUntilNextWrite(timestamp);
   uint64_t pacerRate =
       burst * kDefaultUDPSendPacketLen * std::chrono::seconds{1} / interval;
-  EXPECT_NEAR(5 * 1000 * 1000u, pacerRate, 5000); // 0.1% cushion for timing
+  EXPECT_EQ(5 * 1000 * 1000u, pacerRate);
   pacer.reset();
   // Requesting a rate of 50 Mbps should not change interval or burst
   pacer.refreshPacingRate(3125000, rtt);
   EXPECT_EQ(1, calculatorCallCount); // Calculator not called again.
-  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(interval.count(), pacer.getTimeUntilNextWrite().count(), 1000);
+  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(interval.count(), pacer.getTimeUntilNextWrite(timestamp).count());
   pacer.reset();
 
   // The setPacingRate API shouldn't make changes either
   pacer.setPacingRate(6250 * 1000u); // 50 Mbps
-  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(interval.count(), pacer.getTimeUntilNextWrite().count(), 1000);
+  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(interval.count(), pacer.getTimeUntilNextWrite(timestamp).count());
   pacer.reset();
 
   // Increasing max pacing rate to 75 Mbps shouldn't make changes
   pacer.setMaxPacingRate(9375 * 1000u);
-  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(interval.count(), pacer.getTimeUntilNextWrite().count(), 1000);
+  EXPECT_EQ(burst, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(interval.count(), pacer.getTimeUntilNextWrite(timestamp).count());
   pacer.reset();
 
   // Increase pacing to 50 Mbps and ensure it takes effect
@@ -162,45 +163,48 @@ TEST_F(TokenlessPacerTest, ChangeMaxPacingRate) {
   EXPECT_EQ(2, calculatorCallCount); // Calculator called
   EXPECT_EQ(
       3125000 / kDefaultUDPSendPacketLen,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(rtt.count(), pacer.getTimeUntilNextWrite().count(), 1000);
+      pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(rtt.count(), pacer.getTimeUntilNextWrite(timestamp).count());
   pacer.reset();
 
   // Increase pacing to 80 Mbps using alternative API and ensure rate is limited
   // to 75 Mbps
   pacer.setPacingRate(10 * 1000 * 1000u);
-  burst = pacer.updateAndGetWriteBatchSize(Clock::now());
-  interval = pacer.getTimeUntilNextWrite();
+  burst = pacer.updateAndGetWriteBatchSize(timestamp);
+  interval = pacer.getTimeUntilNextWrite(timestamp);
   pacerRate =
       burst * kDefaultUDPSendPacketLen * std::chrono::seconds{1} / interval;
-  EXPECT_NEAR(9375 * 1000u, pacerRate, 9375); // 0.1% cushion for timing
+  EXPECT_NEAR(9375 * 1000u, pacerRate, 1000); // To accommodate rounding
 }
 
 TEST_F(TokenlessPacerTest, SetMaxPacingRateOnUnlimitedPacer) {
+  auto timestamp = Clock::now();
   // Pacing is currently not pacing
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  EXPECT_NE(0, pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
+  EXPECT_NE(0, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
 
   // Set max pacing rate 40 Mbps and ensure it took effect
   pacer.setMaxPacingRate(5 * 1000 * 1000u); // Bytes per second
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
-  auto burst = pacer.updateAndGetWriteBatchSize(Clock::now());
-  auto interval = pacer.getTimeUntilNextWrite();
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
+  auto burst = pacer.updateAndGetWriteBatchSize(timestamp);
+  auto interval = pacer.getTimeUntilNextWrite(timestamp);
   uint64_t pacerRate =
       burst * kDefaultUDPSendPacketLen * std::chrono::seconds{1} / interval;
-  EXPECT_NEAR(5 * 1000 * 1000u, pacerRate, 5000); // 0.1% cushion for timing
+  EXPECT_NEAR(5 * 1000 * 1000u, pacerRate, 1000); // To accommodate rounding
 }
 
 TEST_F(TokenlessPacerTest, SetZeroPacingRate) {
+  auto timestamp = Clock::now();
   // A Zero pacing rate should not result in a divide-by-zero
   conn.transportSettings.pacingTimerTickInterval = 1000us;
   pacer.setPacingRate(0);
-  EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_NEAR(1000, pacer.getTimeUntilNextWrite().count(), 100);
+  EXPECT_EQ(0, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(1000, pacer.getTimeUntilNextWrite(timestamp).count());
 }
 
 TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsZero) {
+  auto timestamp = Clock::now();
   // rtt=0 should not result in a divide-by-zero
   conn.transportSettings.pacingTimerTickInterval = 1000us;
   pacer.refreshPacingRate(100, 0us);
@@ -208,8 +212,8 @@ TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsZero) {
   // 0us right after writing
   EXPECT_EQ(
       conn.transportSettings.writeConnectionDataPacketsLimit,
-      pacer.updateAndGetWriteBatchSize(Clock::now()));
-  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite());
+      pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
 }
 
 } // namespace test

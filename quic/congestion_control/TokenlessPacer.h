@@ -35,7 +35,8 @@ class TokenlessPacer : public Pacer {
 
   void setRttFactor(uint8_t numerator, uint8_t denominator) override;
 
-  std::chrono::microseconds getTimeUntilNextWrite() const override;
+  std::chrono::microseconds getTimeUntilNextWrite(
+      TimePoint currentTime = Clock::now()) const override;
 
   uint64_t updateAndGetWriteBatchSize(TimePoint currentTime) override;
 
