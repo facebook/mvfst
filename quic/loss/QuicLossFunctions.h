@@ -412,8 +412,6 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     PacketNumberSpace pnSpace) {
   auto& largestAcked = getAckState(conn, pnSpace).largestAckedByPeer;
   if (ack.largestAckedPacket.hasValue()) {
-    // TODO: Should we NOT reset these counters if the received Ack frame
-    // doesn't ack anything that's in OP list?
     conn.lossState.ptoCount = 0;
     largestAcked = std::max<PacketNum>(
         largestAcked.value_or(*ack.largestAckedPacket),
