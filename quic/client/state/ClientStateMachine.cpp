@@ -192,7 +192,8 @@ void processServerInitialParams(
     handleStreamWindowUpdate(s, windowSize, packetNum);
   });
   if (maxDatagramFrameSize.hasValue()) {
-    if (maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
+    if (maxDatagramFrameSize.value() > 0 &&
+        maxDatagramFrameSize.value() <= kMaxDatagramPacketOverhead) {
       throw QuicTransportException(
           "max_datagram_frame_size too small",
           TransportErrorCode::TRANSPORT_PARAMETER_ERROR);

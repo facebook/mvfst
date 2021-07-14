@@ -212,6 +212,18 @@ TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeOk) {
       kMaxDatagramPacketOverhead + 1);
 }
 
+TEST(ServerStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
+  QuicServerConnectionState serverConn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0));
+  ClientTransportParameters clientTransportParams = {
+      std::move(transportParams)};
+  processClientInitialParams(serverConn, clientTransportParams);
+  EXPECT_EQ(serverConn.datagramState.maxWriteFrameSize, 0);
+}
+
 struct MaxPacketSizeTestUnit {
   uint64_t maxPacketSize;
   bool canIgnorePathMTU;

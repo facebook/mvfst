@@ -117,6 +117,18 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {
   }
 }
 
+TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeZeroOk) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+  transportParams.push_back(
+      encodeIntegerParameter(TransportParameterId::max_datagram_frame_size, 0));
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+  EXPECT_EQ(clientConn.datagramState.maxWriteFrameSize, 0);
+}
+
 TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
   QuicClientConnectionState clientConn(
       FizzClientQuicHandshakeContext::Builder().build());
