@@ -12,8 +12,6 @@
 #include <folly/Format.h>
 #include <folly/portability/GTest.h>
 
-using namespace ::testing;
-
 namespace quic {
 namespace test {
 

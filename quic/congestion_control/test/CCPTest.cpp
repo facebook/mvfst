@@ -6,24 +6,12 @@
  *
  */
 
-#include <folly/io/async/ScopedEventBaseThread.h>
-#include <quic/congestion_control/QuicCCP.h>
-#include <quic/congestion_control/third_party/ccp/libstartccp.h>
-#include <quic/server/QuicCcpThreadLauncher.h>
-
-#include <quic/server/CCPReader.h>
-
 #include <folly/portability/GTest.h>
-#include <quic/common/test/TestUtils.h>
-#include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 #include <chrono>
 #include <thread>
 
 #define MSS 1232
-
-using namespace testing;
-using namespace std::chrono_literals;
 
 namespace quic::test {
 

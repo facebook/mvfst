@@ -107,9 +107,6 @@ class MiddleStartingIterationWrapper {
   const MiddleStartingIterator start_;
 };
 
-using WritableStreamItr =
-    MiddleStartingIterationWrapper::MiddleStartingIterator;
-
 } // namespace
 
 namespace quic {

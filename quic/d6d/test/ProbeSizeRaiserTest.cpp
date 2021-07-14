@@ -4,8 +4,6 @@
 #include <quic/d6d/BinarySearchProbeSizeRaiser.h>
 #include <vector>
 
-using namespace testing;
-
 namespace quic {
 namespace test {
 

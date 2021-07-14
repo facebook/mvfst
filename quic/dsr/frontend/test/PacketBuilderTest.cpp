@@ -15,8 +15,6 @@
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 
-using namespace testing;
-
 namespace quic {
 namespace test {
 

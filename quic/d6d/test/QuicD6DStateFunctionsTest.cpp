@@ -16,7 +16,6 @@
 #include <quic/state/StateData.h>
 
 using namespace testing;
-using namespace std::literals::chrono_literals;
 
 namespace quic {
 namespace test {
