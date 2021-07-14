@@ -8,8 +8,8 @@
 
 #pragma once
 
+#include <folly/container/F14Map.h>
 #include <glog/logging.h>
-#include <map>
 #include <set>
 
 #include <quic/codec/Types.h>
@@ -49,7 +49,6 @@ struct PriorityQueue {
     bool incremental{false};
   };
   std::vector<Level> levels;
-  std::map<StreamId, size_t> writableStreams;
 
   PriorityQueue() {
     levels.resize(kDefaultPriorityLevels * 2);
@@ -153,6 +152,7 @@ struct PriorityQueue {
   }
 
  private:
+  folly::F14FastMap<StreamId, size_t> writableStreams;
   using WSIterator = decltype(writableStreams)::iterator;
 
   WSIterator find(StreamId id) {
