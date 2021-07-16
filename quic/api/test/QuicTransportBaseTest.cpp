@@ -3845,5 +3845,16 @@ TEST_F(QuicTransportImplTest, DatagramCallbackDatagramAvailable) {
   transport->driveReadCallbacks();
 }
 
+TEST_F(QuicTransportImplTest, Cmsgs) {
+  transport->setServerConnectionId();
+  folly::SocketOptionMap cmsgs;
+  cmsgs[{IPPROTO_IP, IP_TOS}] = 123;
+  EXPECT_CALL(*socketPtr, setCmsgs(_)).Times(1);
+  transport->setCmsgs(cmsgs);
+
+  EXPECT_CALL(*socketPtr, appendCmsgs(_)).Times(1);
+  transport->appendCmsgs(cmsgs);
+}
+
 } // namespace test
 } // namespace quic

@@ -659,6 +659,15 @@ class QuicTransportBase : public QuicSocket {
   folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagrams(
       size_t atMost = 0) override;
 
+  /**
+   * Set control messages to be sent for socket_ write, note that it's for this
+   * specific transport and does not change the other sockets sharing the same
+   * fd.
+   */
+  void setCmsgs(const folly::SocketOptionMap& options);
+
+  void appendCmsgs(const folly::SocketOptionMap& options);
+
  protected:
   void updateCongestionControlSettings(
       const TransportSettings& transportSettings);

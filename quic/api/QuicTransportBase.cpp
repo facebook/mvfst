@@ -3298,4 +3298,12 @@ void QuicTransportBase::notifyAppRateLimited() {
   }
 }
 
+void QuicTransportBase::setCmsgs(const folly::SocketOptionMap& options) {
+  socket_->setCmsgs(options);
+}
+
+void QuicTransportBase::appendCmsgs(const folly::SocketOptionMap& options) {
+  socket_->appendCmsgs(options);
+}
+
 } // namespace quic
