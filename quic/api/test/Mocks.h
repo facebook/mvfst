@@ -393,8 +393,14 @@ class MockObserver : public Observer {
       ,
       knobFrameReceived,
       void(QuicSocket*, const KnobFrameEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      packetsRemoved,
+      void(QuicSocket*, const std::shared_ptr<std::vector<OutstandingPacket>>));
 
-  static auto getLossPacketNum(PacketNum packetNum) {
+  static auto getPacketNum(PacketNum packetNum) {
     return testing::Field(
         &OutstandingPacket::packet,
         testing::Field(
@@ -412,8 +418,7 @@ class MockObserver : public Observer {
             testing::Eq(reorderLoss)),
         testing::Field(
             &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)),
-        testing::Field(
-            &Observer::LostPacket::packet, getLossPacketNum(packetNum)));
+        testing::Field(&Observer::LostPacket::packet, getPacketNum(packetNum)));
   }
 };
 

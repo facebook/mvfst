@@ -423,6 +423,13 @@ void QuicTransportBase::closeImpl(
   connCallback_ = nullptr;
 
   // Don't need outstanding packets.
+  removeOutstandingPackets(
+      *conn_,
+      conn_->outstandings.packets.begin(),
+      conn_->outstandings.packets.end());
+  for (const auto& cb : conn_->pendingCallbacks) {
+    cb(this);
+  }
   conn_->outstandings.packets.clear();
   conn_->outstandings.packetCount = {};
   conn_->outstandings.clonedPacketCount = {};

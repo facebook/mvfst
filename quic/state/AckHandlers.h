@@ -49,4 +49,15 @@ void clearOldOutstandingPackets(
 void commonAckVisitorForAckFrame(
     AckState& ackState,
     const WriteAckFrame& frame);
+
+/**
+ * Helper function to remove packets from the outstanding queue. If there
+ * is at least one observer with the callback for removed packets we move these
+ * packets to another container and remove the invalid positions from the
+ * outsdanding queue.
+ */
+std::deque<quic::OutstandingPacket>::iterator removeOutstandingPackets(
+    QuicConnectionStateBase& conn,
+    std::deque<quic::OutstandingPacket>::iterator begin,
+    std::deque<quic::OutstandingPacket>::iterator end);
 } // namespace quic

@@ -1669,6 +1669,145 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
   }
 }
 
+TEST_P(AckHandlersTest, TestPacketsDeletedObserver) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // Register 1 observer
+  Observer::Config config = {};
+  config.packetsRemovedEvents = true;
+  auto ib = MockObserver(config);
+
+  auto observers = std::make_shared<ObserverVec>();
+  observers->emplace_back(&ib);
+  conn.observers = observers;
+
+  TimePoint startTime = Clock::now();
+  emplacePackets(conn, 6, startTime, GetParam());
+  EXPECT_EQ(6, size(conn.outstandings.packets));
+
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 2;
+    ackFrame.ackBlocks.emplace_back(0, 2);
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        startTime);
+  }
+
+  EXPECT_EQ(1, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      packetsRemoved(
+          nullptr,
+          Pointee(ElementsAre(
+              MockObserver::getPacketNum(0),
+              MockObserver::getPacketNum(1),
+              MockObserver::getPacketNum(2)))));
+
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 5;
+    ackFrame.ackBlocks.emplace_back(3, 5);
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        startTime);
+  }
+
+  EXPECT_EQ(2, size(conn.pendingCallbacks));
+
+  EXPECT_CALL(
+      ib,
+      packetsRemoved(
+          nullptr,
+          Pointee(ElementsAre(
+              MockObserver::getPacketNum(3),
+              MockObserver::getPacketNum(4),
+              MockObserver::getPacketNum(5)))));
+
+  for (auto& callback : conn.pendingCallbacks) {
+    callback(nullptr);
+  }
+  conn.pendingCallbacks.clear();
+
+  EXPECT_EQ(0, size(conn.outstandings.packets));
+}
+
+TEST_P(AckHandlersTest, TestRemoveOutstandingPacketsNoObserver) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  TimePoint startTime = Clock::now();
+  emplacePackets(conn, 6, startTime, GetParam());
+  EXPECT_EQ(6, size(conn.outstandings.packets));
+  // 0 1 2 3 4 5
+  // 0 1 x x 2 3
+  auto startIt = conn.outstandings.packets.begin() + 2;
+  auto endIt = conn.outstandings.packets.begin() + 4;
+  // removeOutstandingPackets should return the iterator to endIt / iterator
+  // following the last removed element
+  auto itReturn = removeOutstandingPackets(conn, startIt, endIt);
+  auto expectedIt = conn.outstandings.packets.begin() + 2;
+  EXPECT_EQ(
+      expectedIt->packet.header.getPacketSequenceNum(),
+      itReturn->packet.header.getPacketSequenceNum());
+  EXPECT_EQ(
+      endIt->packet.header.getPacketSequenceNum(),
+      itReturn->packet.header.getPacketSequenceNum());
+  EXPECT_EQ(4, size(conn.outstandings.packets));
+  EXPECT_EQ(0, size(conn.pendingCallbacks));
+}
+
+TEST_P(AckHandlersTest, TestRemoveOutstandingPacketsWithObserver) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  Observer::Config config = {};
+  config.packetsRemovedEvents = true;
+  auto ib = MockObserver(config);
+
+  auto observers = std::make_shared<ObserverVec>();
+  observers->emplace_back(&ib);
+  conn.observers = observers;
+
+  TimePoint startTime = Clock::now();
+  emplacePackets(conn, 6, startTime, GetParam());
+  EXPECT_EQ(6, size(conn.outstandings.packets));
+  // 0 1 2 3 4 5
+  // 0 1 x x 2 3
+  auto startIt = conn.outstandings.packets.begin() + 2;
+  auto endIt = conn.outstandings.packets.begin() + 4;
+  // removeOutstandingPackets should return the iterator to endIt / iterator
+  // following the last removed element
+  auto itReturn = removeOutstandingPackets(conn, startIt, endIt);
+  auto expectedIt = conn.outstandings.packets.begin() + 2;
+  EXPECT_EQ(
+      expectedIt->packet.header.getPacketSequenceNum(),
+      itReturn->packet.header.getPacketSequenceNum());
+  EXPECT_EQ(
+      endIt->packet.header.getPacketSequenceNum(),
+      itReturn->packet.header.getPacketSequenceNum());
+  EXPECT_EQ(4, size(conn.outstandings.packets));
+  EXPECT_EQ(1, size(conn.pendingCallbacks));
+  conn.pendingCallbacks.clear();
+}
+
 INSTANTIATE_TEST_CASE_P(
     AckHandlersTests,
     AckHandlersTest,

@@ -46,6 +46,7 @@ class Observer {
     bool pmtuEvents{false};
     bool rttSamples{false};
     bool knobFrameEvents{false};
+    bool packetsRemovedEvents{false};
 
     virtual void enableAllEvents() {
       evbEvents = true;
@@ -56,6 +57,7 @@ class Observer {
       spuriousLossEvents = true;
       pmtuEvents = true;
       knobFrameEvents = true;
+      packetsRemovedEvents = true;
     }
 
     /**
@@ -412,6 +414,19 @@ class Observer {
   virtual void knobFrameReceived(
       QuicSocket*, /* socket */
       const KnobFrameEvent& /* event */) {}
+
+  /**
+   * packetsRemoved() is invoked when packets are removed from the
+   * OutstandingPacket queue. Using shared pointer avoids copying the vector for
+   * every observer called.
+   *
+   * @param socket         Socket when the callback is processed.
+   * @param removedPackets Vector with the removed packets.
+   */
+  virtual void packetsRemoved(
+      QuicSocket*, /* socket */
+      const std::shared_ptr<
+          std::vector<OutstandingPacket>> /* removedPackets */) {}
 
  protected:
   // observer configuration; cannot be changed post instantiation

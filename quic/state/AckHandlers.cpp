@@ -93,8 +93,8 @@ void processAckFrame(
         // this ack block. So the code erases the current iterator range and
         // move the iterator to be the next search point.
         if (rPacketIt != eraseEnd) {
-          auto nextElem = conn.outstandings.packets.erase(
-              rPacketIt.base(), eraseEnd.base());
+          auto nextElem =
+              removeOutstandingPackets(conn, rPacketIt.base(), eraseEnd.base());
           rPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem) + 1;
           eraseEnd = rPacketIt;
         } else {
@@ -150,12 +150,12 @@ void processAckFrame(
         Observer::PacketRTT packetRTT(
             ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
         for (const auto& observer : *(conn.observers)) {
-          conn.pendingCallbacks.emplace_back(
-              [observer, packetRTT](QuicSocket* qSocket) {
-                if (observer->getConfig().rttSamples) {
+          if (observer->getConfig().rttSamples) {
+            conn.pendingCallbacks.emplace_back(
+                [observer, packetRTT](QuicSocket* qSocket) {
                   observer->rttSampleGenerated(qSocket, packetRTT);
-                }
-              });
+                });
+          }
         }
         updateRtt(conn, rttSample, frame.ackDelay);
       }
@@ -222,7 +222,7 @@ void processAckFrame(
     // the next search point.
     if (rPacketIt != eraseEnd) {
       auto nextElem =
-          conn.outstandings.packets.erase(rPacketIt.base(), eraseEnd.base());
+          removeOutstandingPackets(conn, rPacketIt.base(), eraseEnd.base());
       currentPacketIt = std::reverse_iterator<decltype(nextElem)>(nextElem);
     } else {
       currentPacketIt = rPacketIt;
@@ -287,12 +287,12 @@ void processAckFrame(
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
   if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {
     for (const auto& observer : *(conn.observers)) {
-      conn.pendingCallbacks.emplace_back(
-          [observer, spuriousLossEvent](QuicSocket* qSocket) {
-            if (observer->getConfig().spuriousLossEvents) {
+      if (observer->getConfig().spuriousLossEvents) {
+        conn.pendingCallbacks.emplace_back(
+            [observer, spuriousLossEvent](QuicSocket* qSocket) {
               observer->spuriousLossDetected(qSocket, *spuriousLossEvent);
-            }
-          });
+            });
+      }
     }
   }
 }
@@ -315,7 +315,7 @@ void clearOldOutstandingPackets(
       if (opItr->packet.header.getPacketNumberSpace() != pnSpace) {
         if (eraseBegin != opItr) {
           // We want to keep [eraseBegin, opItr) within a single PN space.
-          opItr = conn.outstandings.packets.erase(eraseBegin, opItr);
+          opItr = removeOutstandingPackets(conn, eraseBegin, opItr);
         }
         opItr++;
         eraseBegin = opItr;
@@ -330,7 +330,7 @@ void clearOldOutstandingPackets(
       }
     }
     if (eraseBegin != opItr) {
-      conn.outstandings.packets.erase(eraseBegin, opItr);
+      removeOutstandingPackets(conn, eraseBegin, opItr);
     }
   }
 }
@@ -355,5 +355,32 @@ void commonAckVisitorForAckFrame(
       ackState.acks.withdraw({0, largestAcked - kAckPurgingThresh});
     }
   }
+}
+
+std::deque<quic::OutstandingPacket>::iterator removeOutstandingPackets(
+    QuicConnectionStateBase& conn,
+    std::deque<quic::OutstandingPacket>::iterator begin,
+    std::deque<quic::OutstandingPacket>::iterator end) {
+  bool needToMove{false};
+  // Check if there is at least one observer with the callback to justify moving
+  // packets
+  for (const auto& observer : *(conn.observers)) {
+    needToMove |= observer->getConfig().packetsRemovedEvents;
+  }
+  if (needToMove) {
+    std::shared_ptr<std::vector<quic::OutstandingPacket>> removedPackets;
+    removedPackets = std::make_shared<std::vector<quic::OutstandingPacket>>(
+        std::make_move_iterator(begin), std::make_move_iterator(end));
+
+    for (const auto& observer : *(conn.observers)) {
+      if (observer->getConfig().packetsRemovedEvents) {
+        conn.pendingCallbacks.emplace_back(
+            [observer, removedPackets](QuicSocket* qSocket) {
+              observer->packetsRemoved(qSocket, removedPackets);
+            });
+      }
+    }
+  }
+  return conn.outstandings.packets.erase(begin, end);
 }
 } // namespace quic
