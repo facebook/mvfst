@@ -975,7 +975,6 @@ void QuicClientTransport::startCryptoHandshake() {
   conn_->initialHeaderCipher = cryptoFactory.makeClientInitialHeaderCipher(
       *clientConn_->initialDestinationConnectionId, version);
 
-  // Add partial reliability parameter to customTransportParameters_.
   setD6DBasePMTUTransportParameter();
   setD6DRaiseTimeoutTransportParameter();
   setD6DProbeTimeoutTransportParameter();
