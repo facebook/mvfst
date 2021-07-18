@@ -279,11 +279,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void rejectNewConnections(bool rejectNewConnections);
 
   /**
-   * Enable/disable partial reliability on connection settings.
-   */
-  void enablePartialReliability(bool enabled);
-
-  /**
    * Set a health-check token that can be used to ping if the server is alive
    */
   void setHealthCheckToken(const std::string& healthCheckToken);
