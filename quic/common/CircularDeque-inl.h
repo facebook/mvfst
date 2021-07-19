@@ -445,12 +445,8 @@ void CircularDeque<T>::clear() noexcept {
 template <typename T>
 void CircularDeque<T>::swap(CircularDeque<T>& other) noexcept {
   storage_.swap(other.storage_);
-  auto tempBegin = other.begin_;
-  auto tempEnd = other.end_;
-  other.begin_ = begin_;
-  other.end_ = end_;
-  begin_ = tempBegin;
-  end_ = tempEnd;
+  std::swap(begin_, other.begin_);
+  std::swap(end_, other.end_);
 }
 
 } // namespace quic
