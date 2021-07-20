@@ -438,8 +438,6 @@ constexpr uint16_t kDefaultRxPacketsBeforeAckBeforeInit = 10;
 constexpr uint16_t kDefaultRxPacketsBeforeAckAfterInit = 10;
 
 /* Ack timer */
-// TODO: These numbers are shamlessly taken from Chromium code. We have no idea
-// how good/bad this is.
 // Ack timeout = SRTT * kAckTimerFactor
 constexpr double kAckTimerFactor = 0.25;
 // max ack timeout: 25ms

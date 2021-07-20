@@ -226,8 +226,6 @@ struct ReadCryptoFrame {
       : offset(offsetIn), data(folly::IOBuf::create(0)) {}
 
   // Stuff stored in a variant type needs to be copyable.
-  // TODO: can we make this copyable only by the variant, but not
-  // by anyone else.
   ReadCryptoFrame(const ReadCryptoFrame& other) {
     offset = other.offset;
     if (other.data) {
@@ -278,8 +276,6 @@ struct ReadNewTokenFrame {
   ReadNewTokenFrame(Buf tokenIn) : token(std::move(tokenIn)) {}
 
   // Stuff stored in a variant type needs to be copyable.
-  // TODO: can we make this copyable only by the variant, but not
-  // by anyone else.
   ReadNewTokenFrame(const ReadNewTokenFrame& other) {
     if (other.token) {
       token = other.token->clone();
@@ -367,8 +363,6 @@ struct ReadStreamFrame {
         fin(finIn) {}
 
   // Stuff stored in a variant type needs to be copyable.
-  // TODO: can we make this copyable only by the variant, but not
-  // by anyone else.
   ReadStreamFrame(const ReadStreamFrame& other) {
     streamId = other.streamId;
     offset = other.offset;
@@ -724,7 +718,6 @@ struct LongHeaderInvariant {
   LongHeaderInvariant(QuicVersion ver, ConnectionId scid, ConnectionId dcid);
 };
 
-// TODO: split this into read and write types.
 struct LongHeader {
  public:
   virtual ~LongHeader() = default;

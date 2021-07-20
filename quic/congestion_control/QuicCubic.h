@@ -55,7 +55,6 @@ class Cubic : public CongestionController {
    * spreadacrossRtt:   if the pacing bursts should be spread across RTT or all
    *                    close to the beginning of an RTT round
    */
-  // TODO: We haven't experimented with setting ackTrain and tcpFriendly
   explicit Cubic(
       QuicConnectionStateBase& conn,
       uint64_t initCwndBytes = 0,

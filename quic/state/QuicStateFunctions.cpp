@@ -126,7 +126,6 @@ void updateAckSendStateOnRecvPacket(
         << static_cast<int>(ackState.numNonRxPacketsRecvd)
         << " numRxPacketsRecvd="
         << static_cast<int>(ackState.numRxPacketsRecvd);
-    // TODO: experiment with outOfOrder and ack timer for NonRxPacket too
     conn.pendingEvents.scheduleAckTimeout = false;
     ackState.needsToSendAckImmediately = true;
   }

@@ -150,7 +150,6 @@ void processServerInitialParams(
       maxStreamDataBidiRemote.value_or(0);
   conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
       maxStreamDataUni.value_or(0);
-  // TODO Make idleTimeout disableable via transport parameter.
   conn.streamManager->setMaxLocalBidirectionalStreams(
       maxStreamsBidi.value_or(0));
   conn.peerAdvertisedInitialMaxStreamsBidi = maxStreamsBidi.value_or(0);
@@ -166,7 +165,6 @@ void processServerInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
-  // TODO: udpSendPacketLen should also be limited by PMTU
   if (conn.transportSettings.canIgnorePathMTU) {
     if (*packetSize > kDefaultMaxUDPPayload) {
       *packetSize = kDefaultUDPSendPacketLen;

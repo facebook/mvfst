@@ -148,7 +148,6 @@ uint64_t writeZeroRttDataToSocket(
 /**
  * Whether we should and can write data.
  *
- * TODO: We should probably split "should" and "can" into two APIs.
  */
 WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);

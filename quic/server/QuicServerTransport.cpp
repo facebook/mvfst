@@ -54,9 +54,6 @@ QuicServerTransport::QuicServerTransport(
   conn_.reset(tempConn.release());
   conn_->observers = observers_;
 
-  // TODO: generate this when we can encode the packet sequence number
-  // correctly.
-  // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();
   setConnectionCallback(&cb);
   registerAllTransportKnobParamHandlers();
 }
@@ -73,8 +70,6 @@ QuicServerTransport::~QuicServerTransport() {
       false);
 }
 
-// TODO: refactor this API so that the factory does not have to create an
-// owning reference.
 QuicServerTransport::Ptr QuicServerTransport::make(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> sock,

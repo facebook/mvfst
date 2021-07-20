@@ -181,7 +181,6 @@ void markPacketLoss(
           break;
         }
         auto stream = conn.streamManager->getStream(frame.streamId);
-        // TODO: check for retransmittable
         if (!stream) {
           break;
         }

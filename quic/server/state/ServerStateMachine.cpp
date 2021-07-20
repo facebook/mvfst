@@ -813,7 +813,6 @@ void onServerReadDataFromOpen(
     auto packetNum = regularOptional->header.getPacketSequenceNum();
     auto packetNumberSpace = regularOptional->header.getPacketNumberSpace();
 
-    // TODO: enforce constraints on other protection levels.
     auto& regularPacket = *regularOptional;
 
     bool isProtectedPacket = protectionLevel == ProtectionType::ZeroRtt ||
@@ -909,8 +908,6 @@ void onServerReadDataFromOpen(
     bool isNonProbingPacket = false;
     bool handshakeConfirmedThisLoop = false;
 
-    // TODO: possibly drop the packet here, but rolling back state of
-    // what we've already processed is difficult.
     for (auto& quicFrame : regularPacket.frames) {
       switch (quicFrame.type()) {
         case QuicFrame::Type::ReadAckFrame: {
@@ -1404,7 +1401,6 @@ QuicServerConnectionState::createAndAddNewSelfConnId() {
       transportSettings.statelessResetTokenSecret.value(),
       serverAddr.getFullyQualified());
 
-  // TODO Possibly change this mechanism later
   // The default connectionId algo has 36 bits of randomness.
   auto encodedCid = connIdAlgo->encodeConnectionId(*serverConnIdParams);
   size_t encodedTimes = 0;

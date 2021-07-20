@@ -103,9 +103,6 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
     uint64_t packetLimit,
     bool exceptCryptoStream) {
   auto builder = ShortHeaderBuilder();
-  // TODO: In FrameScheduler, Retx is prioritized over new data. We should
-  // add a flag to the Scheduler to control the priority between them and see
-  // which way is better.
   WriteQuicDataResult result;
   auto& packetsWritten = result.packetsWritten;
   auto& probesWritten = result.probesWritten;
@@ -1203,7 +1200,6 @@ void writeCloseCommon(
            << " sent close packetNum=" << packetNum << " in space=" << pnSpace
            << " " << connection;
   // Increment the sequence number.
-  // TODO: Do not increase pn if write fails
   increaseNextPacketNum(connection, pnSpace);
   // best effort writing to the socket, ignore any errors.
   auto ret = sock.write(connection.peerAddress, packetBuf);
@@ -1357,7 +1353,6 @@ uint64_t writeConnectionDataToSocket(
       writableBytes -= cipherOverhead;
     }
 
-    // TODO: Select a different DataPathFunc based on TransportSettings
     const auto& dataPlainFunc =
         connection.transportSettings.dataPathType == DataPathType::ChainedMemory
         ? iobufChainBasedBuildScheduleEncrypt

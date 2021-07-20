@@ -168,7 +168,6 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
         CipherUnavailable(std::move(currentPacketData), 0, protectionType));
   }
 
-  // TODO: decrypt the long header.
   PacketNum expectedNextPacketNum = 0;
   folly::Optional<PacketNum> largestReceivedPacketNum;
   switch (longHeaderTypeToProtectionType(type)) {

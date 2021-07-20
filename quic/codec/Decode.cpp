@@ -569,7 +569,6 @@ NewConnectionIdFrame decodeNewConnectionIdFrame(folly::io::Cursor& cursor) {
 
 RetireConnectionIdFrame decodeRetireConnectionIdFrame(
     folly::io::Cursor& cursor) {
-  // TODO we parse this frame, but return NoopFrame. Add proper support for it!
   auto sequenceNum = decodeQuicInteger(cursor);
   if (!sequenceNum) {
     throw QuicTransportException(
@@ -746,7 +745,6 @@ QuicFrame parseFrame(
     const CodecParameters& params) {
   folly::io::Cursor cursor(queue.front());
   auto frameTypeInt = decodeQuicInteger(cursor);
-  // TODO add an new api to determine whether the frametype is encoded minimally
   if (!frameTypeInt) {
     throw QuicTransportException(
         "Invalid frame-type field", TransportErrorCode::FRAME_ENCODING_ERROR);

@@ -206,7 +206,6 @@ void QuicTransportBase::closeNow(
   // the drain timeout may have been scheduled by a previous close, in which
   // case, our close would not take effect. This cancels the drain timeout in
   // this case and expires the timeout.
-  // TODO: fix this in a better way.
   if (drainTimeout_.isScheduled()) {
     drainTimeout_.cancelTimeout();
     drainTimeoutExpired();
@@ -365,7 +364,6 @@ void QuicTransportBase::closeImpl(
   peekLooper_->stop();
   writeLooper_->stop();
 
-  // TODO: invoke connection close callbacks.
   cancelAllAppCallbacks(cancelCode);
 
   // Clear out all the pending events, we don't need them any more.
@@ -1487,8 +1485,6 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
 
   handleKnobCallbacks();
 
-  // TODO: we're currently assuming that canceling write callbacks will not
-  // cause reset of random streams. Maybe get rid of that assumption later.
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
        pendingResetIt != conn_->pendingEvents.resets.end();
        pendingResetIt++) {
@@ -1589,8 +1585,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     }
 
     // If the connection flow control is unblocked, we might be unblocked
-    // on the streams now. TODO: maybe do this only when we know connection
-    // flow control changed.
+    // on the streams now.
     auto writeCallbackIt = pendingWriteCallbacks_.begin();
 
     while (writeCallbackIt != pendingWriteCallbacks_.end()) {
@@ -2293,7 +2288,6 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   try {
     onLossDetectionAlarm(*conn_, markPacketLoss);
-    // TODO: remove this trace when Pacing is ready to land
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kLossTimeoutExpired);
     }

@@ -148,8 +148,6 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     // Create the crypto stream.
     cryptoState = std::make_unique<QuicCryptoState>();
     congestionController = std::make_unique<Cubic>(*this);
-    // TODO: this is wrong, it should be the handshake finish time. But i need
-    // a relatively sane time now to make the timestamps all sane.
     connectionTime = Clock::now();
     supportedVersions = std::vector<QuicVersion>{
         {QuicVersion::MVFST,

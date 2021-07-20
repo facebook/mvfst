@@ -1202,7 +1202,6 @@ void QuicServerWorker::onConnectionUnbound(
     }
   }
 
-  // TODO: verify we are removing the right transport
   sourceAddressMap_.erase(source);
 }
 

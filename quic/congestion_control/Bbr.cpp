@@ -37,7 +37,6 @@ BbrCongestionController::BbrCongestionController(QuicConnectionStateBase& conn)
           conn.udpSendPacketLen * conn.transportSettings.maxCwndInMss),
       pacingWindow_(
           conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
-      // TODO: experiment with longer window len for ack aggregation filter
       maxAckHeightFilter_(kBandwidthWindowLength, 0, 0) {}
 
 CongestionControlType BbrCongestionController::type() const noexcept {
@@ -81,8 +80,6 @@ void BbrCongestionController::onPacketLoss(
     // We need to make sure CONSERVATIVE can last for a round trip, so update
     // endOfRoundTrip_ to the latest sent packet.
     endOfRoundTrip_ = Clock::now();
-
-    // TODO: maybe set appLimited in recovery based on config
   }
 
   recoveryWindow_ = recoveryWindow_ >
@@ -193,7 +190,6 @@ void BbrCongestionController::onPacketAcked(
   }
 
   bool newRoundTrip = updateRoundTripCounter(ack.largestAckedPacketSentTime);
-  // TODO: I actually don't know why the last one is so special
   bool lastAckedPacketAppLimited =
       ack.ackedPackets.empty() ? false : ack.largestAckedPacketAppLimited;
   if (bandwidthSampler_) {
@@ -269,7 +265,6 @@ void BbrCongestionController::updatePacing() noexcept {
   } else {
     pacingWindow_ = std::max(pacingWindow_, targetPacingWindow);
   }
-  // TODO: slower pacing if we are in STARTUP and loss has happened
   if (state_ == BbrState::Startup) {
     conn_.pacer->setRttFactor(
         conn_.transportSettings.startupRttFactor.first,

@@ -115,7 +115,6 @@ struct OutstandingsInfo {
   // All PacketEvents of this connection. If a OutstandingPacket doesn't have an
   // associatedEvent or if it's not in this set, there is no need to process its
   // frames upon ack or loss.
-  // TODO: Enforce only AppTraffic packets to be clonable
   folly::F14FastSet<PacketEvent, PacketEventHash> packetEvents;
 
   // Number of outstanding packets not including cloned
@@ -341,11 +340,6 @@ struct CongestionController {
 
   /**
    * Take bytes out of flight without mutating other states of the controller
-   * TODO(yangchi): I'm not sure how long I'd like to keep this API. This is a
-   * temporary workaround the fact that there are packets we will need to take
-   * out of outstandings.packets but not considered loss for congestion
-   * control perspective. In long term, we shouldn't take them out of
-   * outstandings.packets, then we don't have to do this.
    */
   virtual void onRemoveBytesFromInflight(uint64_t) = 0;
   virtual void onPacketSent(const OutstandingPacket& packet) = 0;
@@ -848,8 +842,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Flag indicating whether the socket is currently waiting for the app to
   // write data. All new sockets start off in this state where they wait for the
   // application to pump data to the socket.
-  // TODO: Merge this flag with the existing appLimited flag that exists on each
-  // Congestion Controller.
   bool waitingForAppData{true};
 
   // Monotonically increasing counter that is incremented each time there is a

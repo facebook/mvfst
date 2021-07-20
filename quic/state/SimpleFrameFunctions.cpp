@@ -243,7 +243,6 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::KnobFrame: {
-      // TODO it's const so we have to copy it
       const KnobFrame& knobFrame = *frame.asKnobFrame();
       conn.pendingEvents.knobs.emplace_back(
           knobFrame.knobSpace, knobFrame.id, knobFrame.blob->clone());

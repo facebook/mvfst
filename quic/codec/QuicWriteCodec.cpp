@@ -262,8 +262,6 @@ folly::Optional<AckFrameWriteResult> writeAckFrame(
   WriteAckFrame ackFrame;
   uint64_t spaceLeft = builder.remainingSpaceInPkt();
   uint64_t beginningSpace = spaceLeft;
-  // Reserve enough space a full packet of ACKs with 2 byte varints.
-  // TODO is this a good heuristic?
   ackFrame.ackBlocks.reserve(spaceLeft / 4);
 
   // We could technically split the range if the size of the representation of

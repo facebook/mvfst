@@ -242,7 +242,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   if (rstScheduler_ && rstScheduler_->hasPendingRsts()) {
     rstWritten = rstScheduler_->writeRsts(wrapper);
   }
-  // TODO: Long time ago we decided RST has higher priority than Acks. Why tho?
+  // Long time ago we decided RST has higher priority than Acks.
   if (ackScheduler_ && ackScheduler_->hasPendingAcks()) {
     if (cryptoDataWritten || rstWritten) {
       // If packet has non ack data, it is subject to congestion control. We
@@ -570,7 +570,6 @@ bool RstStreamScheduler::hasPendingRsts() const {
 bool RstStreamScheduler::writeRsts(PacketBuilderInterface& builder) {
   bool rstWritten = false;
   for (const auto& resetStream : conn_.pendingEvents.resets) {
-    // TODO: here, maybe coordinate scheduling of RST_STREAMS and streams.
     auto bytesWritten = writeFrame(resetStream.second, builder);
     if (!bytesWritten) {
       break;

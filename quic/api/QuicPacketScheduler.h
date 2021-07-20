@@ -323,9 +323,6 @@ class CloningScheduler : public QuicPacketScheduler {
  public:
   // Normally a scheduler takes in a const conn, and update conn later. But for
   // this one I want to update conn right inside this class itself.
-  // TODO: Passing cipherOverhead into the CloningScheduler to recalculate the
-  // correct writableBytes isn't ideal. But unblock me or others from quickly
-  // testing it on load test. :(
   CloningScheduler(
       FrameScheduler& scheduler,
       QuicConnectionStateBase& conn,

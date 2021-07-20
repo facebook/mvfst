@@ -83,9 +83,6 @@ QuicClientTransport::QuicClientTransport(
 
   conn_->readCodec->setCodecParameters(CodecParameters(
       conn_->peerAckDelayExponent, conn_->originalVersion.value()));
-  // TODO: generate this once we can generate the packet sequence number
-  // correctly.
-  // conn_->nextSequenceNum = folly::Random::secureRandom<PacketNum>();
 
   VLOG(10) << "client created " << *conn_;
 }
@@ -331,9 +328,6 @@ void QuicClientTransport::processPacketData(
 
   // We got a packet that was not the version negotiation packet, that means
   // that the version is now bound to the new packet.
-  // TODO: move this into the state machine.
-  // TODO: get this from the crypto layer instead. This would be a security vuln
-  // if we don't.
   if (!conn_->version) {
     conn_->version = conn_->originalVersion;
   }
@@ -752,8 +746,6 @@ void QuicClientTransport::onReadData(
     NetworkDataSingle&& networkData) {
   if (closeState_ == CloseState::CLOSED) {
     // If we are closed, then we shoudn't process new network data.
-    // TODO: we might want to process network data if we decide that we should
-    // exit draining state early
     QUIC_STATS(
         statsCallback_, onPacketDropped, PacketDropReason::CLIENT_STATE_CLOSED);
     if (conn_->qLogger) {
@@ -791,9 +783,6 @@ void QuicClientTransport::onReadData(
 }
 
 void QuicClientTransport::writeData() {
-  // TODO: replace with write in state machine.
-  // TODO: change to draining when we move the client to have a draining state
-  // as well.
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
   const ConnectionId* destConnId =
@@ -950,11 +939,7 @@ void QuicClientTransport::writeData() {
 
 void QuicClientTransport::startCryptoHandshake() {
   auto self = this->shared_from_this();
-  // Set idle timer whenever crypto starts so that we can restart the idle timer
-  // after a version negotiation as well.
   setIdleTimer();
-  // TODO: no need to close the transport if there is an error in the
-  // handshake.
   // We need to update the flow control settings every time we start a crypto
   // handshake. This is so that we can reset the flow control settings when
   // we go through version negotiation as well.

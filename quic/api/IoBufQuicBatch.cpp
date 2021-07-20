@@ -97,9 +97,6 @@ bool IOBufQuicBatch::flushInternal() {
 
   folly::Optional<int> secondSocketErrno;
   if (happyEyeballsState_.shouldWriteToSecondSocket) {
-    // TODO: if the errno is EMSGSIZE, and we move on with the second socket,
-    // we actually miss the chance to fix our UDP packet size with the first
-    // socket.
     auto consumed = batchWriter_->write(
         *happyEyeballsState_.secondSocket,
         happyEyeballsState_.secondPeerAddress);
@@ -160,9 +157,8 @@ bool IOBufQuicBatch::flushInternal() {
   }
 
   if (!written) {
-    // This can happen normally, so ignore for now. Now we treat EAGAIN same
+    // This can happen normally, so ignore. Now we treat most errors same
     // as a loss to avoid looping.
-    // TODO: Remove once we use write event from libevent.
     return false; // done
   }
 

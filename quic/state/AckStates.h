@@ -39,8 +39,6 @@ struct AckState {
   // Flag indicating that if we need to send ack immediately. This will be set
   // to true if we got packets with retransmittable data and haven't sent the
   // ack for the first time.
-  // TODO: upgrade this to be bundled like non-retransmittable packets once we
-  // figured out how to do timeout.
   bool needsToSendAckImmediately{false};
   // Count of oustanding packets received with retransmittable data.
   uint8_t numRxPacketsRecvd{0};

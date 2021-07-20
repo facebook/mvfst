@@ -81,8 +81,6 @@ void processAckFrame(
       break;
     }
 
-    // TODO: only process ACKs from packets which are sent from a greater than
-    // or equal to crypto protection level.
     auto eraseEnd = rPacketIt;
     while (rPacketIt != conn.outstandings.packets.rend()) {
       auto currentPacketNum = rPacketIt->packet.header.getPacketSequenceNum();
