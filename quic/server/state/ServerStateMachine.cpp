@@ -392,7 +392,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
   }
   if (handshakeLayer->isHandshakeDone()) {
     CHECK(conn.oneRttWriteCipher);
-    if (conn.version != QuicVersion::MVFST_D24 && !conn.sentHandshakeDone) {
+    if (!conn.sentHandshakeDone) {
       sendSimpleFrame(conn, HandshakeDoneFrame());
       conn.sentHandshakeDone = true;
     }
@@ -974,8 +974,7 @@ void onServerReadDataFromOpen(
                     const QuicSimpleFrame& frame =
                         *packetFrame.asQuicSimpleFrame();
                     // ACK of HandshakeDone is a server-specific behavior.
-                    if (frame.asHandshakeDoneFrame() &&
-                        conn.version != QuicVersion::MVFST_D24) {
+                    if (frame.asHandshakeDoneFrame()) {
                       // Call handshakeConfirmed outside of the packet
                       // processing loop to avoid a re-entrancy.
                       handshakeConfirmedThisLoop = true;
@@ -1220,7 +1219,7 @@ void onServerReadDataFromOpen(
         pktHasRetransmittableData,
         pktHasCryptoData);
     if (encryptionLevel == EncryptionLevel::Handshake &&
-        conn.version != QuicVersion::MVFST_D24 && conn.initialWriteCipher) {
+        conn.initialWriteCipher) {
       conn.initialWriteCipher.reset();
       conn.initialHeaderCipher.reset();
       conn.readCodec->setInitialReadCipher(nullptr);

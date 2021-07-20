@@ -259,7 +259,6 @@ enum class QuicNodeType : bool {
 
 enum class QuicVersion : uint32_t {
   VERSION_NEGOTIATION = 0x00000000,
-  MVFST_D24 = 0xfaceb001,
   // Before updating the MVFST version, please check
   // QuicTransportBase::isKnobSupported() and make sure that knob support is not
   // broken.

@@ -1738,10 +1738,6 @@ void QuicClientTransport::unbindConnection() {
 void QuicClientTransport::setSupportedVersions(
     const std::vector<QuicVersion>& versions) {
   auto version = versions.at(0);
-  // Disallow setting D24.
-  if (version == QuicVersion::MVFST_D24) {
-    version = QuicVersion::MVFST;
-  }
   conn_->originalVersion = version;
   auto params = conn_->readCodec->getCodecParameters();
   params.version = conn_->originalVersion.value();

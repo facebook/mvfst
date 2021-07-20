@@ -51,48 +51,39 @@ inline void decodeVarintParams(
 inline fizz::Extension encodeExtension(
     const quic::ClientTransportParameters& params,
     QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion == QuicVersion::MVFST_D24) {
-    folly::io::Appender appender(ext.extension_data.get(), 40);
-    fizz::detail::writeVector<uint16_t>(params.parameters, appender);
-  } else {
-    BufAppender appender(ext.extension_data.get(), 40);
-    encodeVarintParams(params.parameters, appender);
-  }
+  BufAppender appender(ext.extension_data.get(), 40);
+  encodeVarintParams(params.parameters, appender);
   return ext;
 }
 
 inline fizz::Extension encodeExtension(
     const quic::ServerTransportParameters& params,
     QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion == QuicVersion::MVFST_D24) {
-    folly::io::Appender appender(ext.extension_data.get(), 40);
-    fizz::detail::writeVector<uint16_t>(params.parameters, appender);
-  } else {
-    BufAppender appender(ext.extension_data.get(), 40);
-    encodeVarintParams(params.parameters, appender);
-  }
+  BufAppender appender(ext.extension_data.get(), 40);
+  encodeVarintParams(params.parameters, appender);
   return ext;
 }
 
 inline fizz::Extension encodeExtension(
     const quic::TicketTransportParameters& params,
     QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   fizz::Extension ext;
   ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
   ext.extension_data = folly::IOBuf::create(0);
-  if (encodingVersion == QuicVersion::MVFST_D24) {
-    folly::io::Appender appender(ext.extension_data.get(), 40);
-    fizz::detail::writeVector<uint16_t>(params.parameters, appender);
-  } else {
-    BufAppender appender(ext.extension_data.get(), 40);
-    encodeVarintParams(params.parameters, appender);
-  }
+  BufAppender appender(ext.extension_data.get(), 40);
+  encodeVarintParams(params.parameters, appender);
   return ext;
 }
 
@@ -103,51 +94,45 @@ namespace fizz {
 inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
   if (it == extensions.end()) {
     return folly::none;
   }
   quic::ClientTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
-    detail::readVector<uint16_t>(parameters.parameters, cursor);
-  } else {
-    decodeVarintParams(parameters.parameters, cursor);
-  }
+  decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
 
 inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
   if (it == extensions.end()) {
     return folly::none;
   }
   quic::ServerTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
-    detail::readVector<uint16_t>(parameters.parameters, cursor);
-  } else {
-    decodeVarintParams(parameters.parameters, cursor);
-  }
+  decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
 
 inline folly::Optional<quic::TicketTransportParameters> getTicketExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
+  // Silence the unused variable warning . It will be used for Quic V1.
+  (void)encodingVersion;
   auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
   if (it == extensions.end()) {
     return folly::none;
   }
   quic::TicketTransportParameters parameters;
   folly::io::Cursor cursor(it->extension_data.get());
-  if (encodingVersion == quic::QuicVersion::MVFST_D24) {
-    detail::readVector<uint16_t>(parameters.parameters, cursor);
-  } else {
-    decodeVarintParams(parameters.parameters, cursor);
-  }
+  decodeVarintParams(parameters.parameters, cursor);
   return parameters;
 }
 

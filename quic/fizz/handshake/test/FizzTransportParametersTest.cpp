@@ -57,19 +57,6 @@ StringPiece serverParamsD27{"ffa5001004049d7f3e7d00081212547612561469"};
 StringPiece ticketParamsD24{"ffa5000a0008000400049d7f3e7d"};
 StringPiece ticketParamsD27{"ffa5000604049d7f3e7d"};
 
-TEST_F(QuicExtensionsTest, TestClientParamsD24) {
-  auto exts = getExtensions(clientParamsD24);
-  auto ext = getClientExtension(exts, QuicVersion::MVFST_D24);
-  EXPECT_EQ(ext->parameters.size(), 1);
-  EXPECT_EQ(
-      ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
-  checkEncode(std::move(*ext), clientParamsD24, QuicVersion::MVFST_D24);
-}
-
 TEST_F(QuicExtensionsTest, TestClientParamsD27) {
   auto exts = getExtensions(clientParamsD27);
   auto ext = getClientExtension(exts, QuicVersion::QUIC_DRAFT);
@@ -81,19 +68,6 @@ TEST_F(QuicExtensionsTest, TestClientParamsD27) {
           TransportParameterId::initial_max_data, ext->parameters),
       494878333ULL);
   checkEncode(std::move(*ext), clientParamsD27, QuicVersion::QUIC_DRAFT);
-}
-
-TEST_F(QuicExtensionsTest, TestServerParamsD24) {
-  auto exts = getExtensions(serverParamsD24);
-  auto ext = getServerExtension(exts, QuicVersion::MVFST_D24);
-
-  EXPECT_EQ(
-      ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
-  checkEncode(std::move(*ext), serverParamsD24, QuicVersion::MVFST_D24);
 }
 
 TEST_F(QuicExtensionsTest, TestServerParamsD27) {
@@ -117,20 +91,6 @@ TEST_F(QuicExtensionsTest, TestServerParamsD27) {
           ext->parameters),
       connId);
   checkEncode(std::move(*ext), serverParamsD27, QuicVersion::QUIC_DRAFT);
-}
-
-TEST_F(QuicExtensionsTest, TestTicketParamsD24) {
-  auto exts = getExtensions(ticketParamsD24);
-  auto ext = getTicketExtension(exts, QuicVersion::MVFST_D24);
-
-  EXPECT_EQ(ext->parameters.size(), 1);
-  EXPECT_EQ(
-      ext->parameters[0].parameter, TransportParameterId::initial_max_data);
-  EXPECT_EQ(
-      *getIntegerParameter(
-          TransportParameterId::initial_max_data, ext->parameters),
-      494878333ULL);
-  checkEncode(std::move(*ext), ticketParamsD24, QuicVersion::MVFST_D24);
 }
 
 TEST_F(QuicExtensionsTest, TestTicketParamsD27) {

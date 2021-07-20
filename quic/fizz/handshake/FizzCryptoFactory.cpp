@@ -23,11 +23,6 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
   auto connIdRange = folly::range(clientDestinationConnId);
   folly::StringPiece salt;
   switch (version) {
-    // Our transport version is equivalent to d-24 mostly, but we never
-    // updated the salt to avoid a version transition.
-    case QuicVersion::MVFST_D24:
-      salt = kQuicDraft22Salt;
-      break;
     case QuicVersion::QUIC_DRAFT:
       salt = kQuicDraft29Salt;
       break;

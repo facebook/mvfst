@@ -183,8 +183,7 @@ void QuicServerTransport::writeData() {
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
     }
-    if (conn_->handshakeWriteCipher &&
-        *conn_->version != QuicVersion::MVFST_D24) {
+    if (conn_->handshakeWriteCipher) {
       CHECK(conn_->handshakeWriteHeaderCipher);
       writeLongClose(
           *socket_,
