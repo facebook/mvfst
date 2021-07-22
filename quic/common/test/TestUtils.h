@@ -173,8 +173,6 @@ uint64_t computeExpectedDelay(
     std::chrono::microseconds ackDelay,
     uint8_t ackDelayExponent);
 
-std::unique_ptr<fizz::CertificateVerifier> createTestCertificateVerifier();
-
 // match error functions
 bool matchError(
     std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,

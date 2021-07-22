@@ -16,6 +16,7 @@
 
 #include <quic/QuicConstants.h>
 #include <quic/client/QuicClientTransport.h>
+#include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>

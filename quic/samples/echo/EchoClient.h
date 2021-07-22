@@ -20,6 +20,7 @@
 #include <quic/api/QuicSocket.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/samples/echo/LogQuicStats.h>

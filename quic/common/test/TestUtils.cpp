@@ -472,25 +472,6 @@ ConnectionId getTestConnectionId(uint32_t hostId, ConnectionIdVersion version) {
   return connId;
 }
 
-class TestCertificateVerifier : public fizz::CertificateVerifier {
- public:
-  ~TestCertificateVerifier() override = default;
-
-  void verify(const std::vector<std::shared_ptr<const fizz::PeerCert>>&)
-      const override {
-    return;
-  }
-
-  std::vector<fizz::Extension> getCertificateRequestExtensions()
-      const override {
-    return std::vector<fizz::Extension>();
-  }
-};
-
-std::unique_ptr<fizz::CertificateVerifier> createTestCertificateVerifier() {
-  return std::make_unique<TestCertificateVerifier>();
-}
-
 ProtectionType encryptionLevelToProtectionType(
     fizz::EncryptionLevel encryptionLevel) {
   switch (encryptionLevel) {

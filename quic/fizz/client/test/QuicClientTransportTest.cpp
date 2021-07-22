@@ -21,6 +21,7 @@
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientHandshake.h>
