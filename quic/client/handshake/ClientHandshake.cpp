@@ -140,8 +140,8 @@ void ClientHandshake::computeCiphers(CipherKind kind, folly::ByteRange secret) {
       conn_->readCodec->setOneRttHeaderCipher(std::move(packetNumberCipher));
       break;
     case CipherKind::ZeroRttWrite:
-      conn_->zeroRttWriteCipher = std::move(aead);
-      conn_->zeroRttWriteHeaderCipher = std::move(packetNumberCipher);
+      getClientConn()->zeroRttWriteCipher = std::move(aead);
+      getClientConn()->zeroRttWriteHeaderCipher = std::move(packetNumberCipher);
       break;
     default:
       // Report error?

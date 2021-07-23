@@ -469,9 +469,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Handshake header cipher.
   std::unique_ptr<PacketNumberCipher> handshakeWriteHeaderCipher;
 
-  // Zero rtt write header cipher.
-  std::unique_ptr<PacketNumberCipher> zeroRttWriteHeaderCipher;
-
   // One rtt write header cipher.
   std::unique_ptr<PacketNumberCipher> oneRttWriteHeaderCipher;
 
@@ -483,10 +480,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Write cipher for packets with handshake keys.
   std::unique_ptr<Aead> handshakeWriteCipher;
-
-  // Write cipher for 0-RTT data
-  // TODO: move this back into the client state
-  std::unique_ptr<Aead> zeroRttWriteCipher;
 
   // Time at which the connection started.
   TimePoint connectionTime;

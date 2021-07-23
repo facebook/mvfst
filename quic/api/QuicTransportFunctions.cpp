@@ -9,6 +9,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
 #include <quic/api/QuicTransportFunctions.h>
+#include <quic/client/state/ClientStateMachine.h>
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/QuicWriteCodec.h>
 #include <quic/codec/Types.h>
@@ -1567,7 +1568,10 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
              << " " << conn;
     return WriteDataReason::CRYPTO_STREAM;
   }
-  if (!conn.oneRttWriteCipher && !conn.zeroRttWriteCipher) {
+  if (!conn.oneRttWriteCipher &&
+      !(conn.nodeType == QuicNodeType::Client &&
+        static_cast<const QuicClientConnectionState&>(conn)
+            .zeroRttWriteCipher)) {
     // All the rest of the types of data need either a 1-rtt or 0-rtt cipher to
     // be written.
     return WriteDataReason::NO_WRITE;

@@ -609,8 +609,8 @@ void QuicClientTransport::processPacketData(
       updatePacingOnKeyEstablished(*conn_);
     }
     if (conn_->oneRttWriteCipher && conn_->readCodec->getOneRttReadCipher()) {
-      conn_->zeroRttWriteCipher.reset();
-      conn_->zeroRttWriteHeaderCipher.reset();
+      clientConn_->zeroRttWriteCipher.reset();
+      clientConn_->zeroRttWriteHeaderCipher.reset();
     }
     auto zeroRttRejected = handshakeLayer->getZeroRttRejected();
     if (zeroRttRejected.has_value() && *zeroRttRejected) {

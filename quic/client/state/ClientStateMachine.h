@@ -34,6 +34,11 @@ struct PendingClientData {
 struct QuicClientConnectionState : public QuicConnectionStateBase {
   ~QuicClientConnectionState() override = default;
 
+  // Zero rtt write header cipher.
+  std::unique_ptr<PacketNumberCipher> zeroRttWriteHeaderCipher;
+  // Write cipher for 0-RTT data
+  std::unique_ptr<Aead> zeroRttWriteCipher;
+
   // The stateless reset token sent by the server.
   folly::Optional<StatelessResetToken> statelessResetToken;
 
