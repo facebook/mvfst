@@ -28,7 +28,7 @@ namespace fsp = folly::portability::sockets;
 namespace quic {
 
 void happyEyeballsAddPeerAddress(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     const folly::SocketAddress& peerAddress) {
   // TODO: Do not wait for both IPv4 and IPv6 addresses to return before
   // attempting connection establishment. -- RFC8305
@@ -52,13 +52,13 @@ void happyEyeballsAddPeerAddress(
 }
 
 void happyEyeballsAddSocket(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     std::unique_ptr<folly::AsyncUDPSocket> socket) {
   connection.happyEyeballsState.secondSocket = std::move(socket);
 }
 
 void startHappyEyeballs(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     folly::EventBase* evb,
     sa_family_t cachedFamily,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
@@ -166,14 +166,14 @@ void happyEyeballsSetUpSocket(
 }
 
 void happyEyeballsStartSecondSocket(
-    QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState) {
+    QuicClientConnectionState::HappyEyeballsState& happyEyeballsState) {
   CHECK(!happyEyeballsState.finished);
 
   happyEyeballsState.shouldWriteToSecondSocket = true;
 }
 
 void happyEyeballsOnDataReceived(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::unique_ptr<folly::AsyncUDPSocket>& socket,
     const folly::SocketAddress& peerAddress) {

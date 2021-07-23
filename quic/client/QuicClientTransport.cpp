@@ -99,8 +99,8 @@ QuicClientTransport::~QuicClientTransport() {
           std::string("Closing from client destructor")),
       false);
 
-  if (conn_->happyEyeballsState.secondSocket) {
-    auto sock = std::move(conn_->happyEyeballsState.secondSocket);
+  if (clientConn_->happyEyeballsState.secondSocket) {
+    auto sock = std::move(clientConn_->happyEyeballsState.secondSocket);
     sock->pauseRead();
     sock->close();
   }
@@ -213,7 +213,7 @@ void QuicClientTransport::processPacketData(
 
     if (happyEyeballsEnabled_) {
       happyEyeballsOnDataReceived(
-          *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
+          *clientConn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
     }
     // Set the destination connection ID to be the value from the source
     // connection id of the retry packet
@@ -292,7 +292,7 @@ void QuicClientTransport::processPacketData(
   if (happyEyeballsEnabled_) {
     CHECK(socket_);
     happyEyeballsOnDataReceived(
-        *conn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
+        *clientConn_, happyEyeballsConnAttemptDelayTimeout_, socket_, peer);
   }
 
   LongHeader* longHeader = regularOptional->header.asLong();
@@ -1015,7 +1015,7 @@ void QuicClientTransport::errMessage(
     // exists, and the second socket is IPv4. Then we basically do the same
     // thing we would have done if we'd gotten a write error on that socket.
     // If both sockets are not functional we close the connection.
-    auto& happyEyeballsState = conn_->happyEyeballsState;
+    auto& happyEyeballsState = clientConn_->happyEyeballsState;
     if (!happyEyeballsState.finished) {
       if (cmsg.cmsg_level == SOL_IPV6 &&
           happyEyeballsState.shouldWriteToFirstSocket) {
@@ -1485,7 +1485,7 @@ void QuicClientTransport::
     happyEyeballsConnAttemptDelayTimeoutExpired() noexcept {
   // Declare 0-RTT data as lost so that they will be retransmitted over the
   // second socket.
-  happyEyeballsStartSecondSocket(conn_->happyEyeballsState);
+  happyEyeballsStartSecondSocket(clientConn_->happyEyeballsState);
   // If this gets called from the write path then we haven't added the packets
   // to the outstanding packet list yet.
   runOnEvbAsync([&](auto) { markZeroRttPacketsLost(*conn_, markPacketLoss); });
@@ -1495,7 +1495,7 @@ void QuicClientTransport::start(ConnectionCallback* cb) {
   if (happyEyeballsEnabled_) {
     // TODO Supply v4 delay amount from somewhere when we want to tune this
     startHappyEyeballs(
-        *conn_,
+        *clientConn_,
         evb_,
         happyEyeballsCachedFamily_,
         happyEyeballsConnAttemptDelayTimeout_,
@@ -1558,7 +1558,7 @@ void QuicClientTransport::addNewPeerAddress(folly::SocketAddress peerAddress) {
         conn_->udpSendPacketLen,
         (peerAddress.getFamily() == AF_INET6 ? kDefaultV6UDPSendPacketLen
                                              : kDefaultV4UDPSendPacketLen));
-    happyEyeballsAddPeerAddress(*conn_, peerAddress);
+    happyEyeballsAddPeerAddress(*clientConn_, peerAddress);
     return;
   }
 
@@ -1585,7 +1585,7 @@ void QuicClientTransport::setHappyEyeballsCachedFamily(
 
 void QuicClientTransport::addNewSocket(
     std::unique_ptr<folly::AsyncUDPSocket> socket) {
-  happyEyeballsAddSocket(*conn_, std::move(socket));
+  happyEyeballsAddSocket(*clientConn_, std::move(socket));
 }
 
 void QuicClientTransport::setHostname(const std::string& hostname) {

@@ -18,7 +18,7 @@ IOBufQuicBatch::IOBufQuicBatch(
     folly::AsyncUDPSocket& sock,
     const folly::SocketAddress& peerAddress,
     QuicTransportStatsCallback* statsCallback,
-    QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState)
+    QuicClientConnectionState::HappyEyeballsState* happyEyeballsState)
     : batchWriter_(std::move(batchWriter)),
       threadLocal_(threadLocal),
       sock_(sock),
@@ -76,38 +76,45 @@ bool IOBufQuicBatch::flushInternal() {
 
   bool written = false;
   folly::Optional<int> firstSocketErrno;
-  if (happyEyeballsState_.shouldWriteToFirstSocket) {
+  if (!happyEyeballsState_ || happyEyeballsState_->shouldWriteToFirstSocket) {
     auto consumed = batchWriter_->write(sock_, peerAddress_);
-    firstSocketErrno = errno;
+    if (consumed < 0) {
+      firstSocketErrno = errno;
+    }
     written = (consumed >= 0);
-    happyEyeballsState_.shouldWriteToFirstSocket =
-        (consumed >= 0 || isRetriableError(errno));
+    if (happyEyeballsState_) {
+      happyEyeballsState_->shouldWriteToFirstSocket =
+          (consumed >= 0 || isRetriableError(errno));
 
-    if (!happyEyeballsState_.shouldWriteToFirstSocket) {
-      sock_.pauseRead();
+      if (!happyEyeballsState_->shouldWriteToFirstSocket) {
+        sock_.pauseRead();
+      }
     }
   }
 
   // If error occured on first socket, kick off second socket immediately
-  if (!written && happyEyeballsState_.connAttemptDelayTimeout &&
-      happyEyeballsState_.connAttemptDelayTimeout->isScheduled()) {
-    happyEyeballsState_.connAttemptDelayTimeout->timeoutExpired();
-    happyEyeballsState_.connAttemptDelayTimeout->cancelTimeout();
+  if (!written && happyEyeballsState_ &&
+      happyEyeballsState_->connAttemptDelayTimeout &&
+      happyEyeballsState_->connAttemptDelayTimeout->isScheduled()) {
+    happyEyeballsState_->connAttemptDelayTimeout->timeoutExpired();
+    happyEyeballsState_->connAttemptDelayTimeout->cancelTimeout();
   }
 
   folly::Optional<int> secondSocketErrno;
-  if (happyEyeballsState_.shouldWriteToSecondSocket) {
+  if (happyEyeballsState_ && happyEyeballsState_->shouldWriteToSecondSocket) {
     auto consumed = batchWriter_->write(
-        *happyEyeballsState_.secondSocket,
-        happyEyeballsState_.secondPeerAddress);
-    secondSocketErrno = errno;
+        *happyEyeballsState_->secondSocket,
+        happyEyeballsState_->secondPeerAddress);
+    if (consumed < 0) {
+      secondSocketErrno = errno;
+    }
 
     // written is marked true if either socket write succeeds
     written |= (consumed >= 0);
-    happyEyeballsState_.shouldWriteToSecondSocket =
+    happyEyeballsState_->shouldWriteToSecondSocket =
         (consumed >= 0 || isRetriableError(errno));
-    if (!happyEyeballsState_.shouldWriteToSecondSocket) {
-      happyEyeballsState_.secondSocket->pauseRead();
+    if (!happyEyeballsState_->shouldWriteToSecondSocket) {
+      happyEyeballsState_->secondSocket->pauseRead();
     }
   }
 
@@ -128,8 +135,12 @@ bool IOBufQuicBatch::flushInternal() {
     }
   }
 
-  if (!happyEyeballsState_.shouldWriteToFirstSocket &&
-      !happyEyeballsState_.shouldWriteToSecondSocket) {
+  // If we have no happy eyeballs state, we only care if the first socket had
+  // an error. Otherwise we check both.
+  if ((!happyEyeballsState_ && firstSocketErrno.has_value() &&
+       !isRetriableError(firstSocketErrno.value())) ||
+      (happyEyeballsState_ && !happyEyeballsState_->shouldWriteToFirstSocket &&
+       !happyEyeballsState_->shouldWriteToSecondSocket)) {
     auto firstSocketErrorMsg = firstSocketErrno.has_value()
         ? folly::to<std::string>(
               folly::errnoStr(firstSocketErrno.value()), ", ")

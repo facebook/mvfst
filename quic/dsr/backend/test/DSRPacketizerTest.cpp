@@ -42,7 +42,6 @@ class DSRPacketizerSingleWriteTest : public Test {
   }
 
   folly::EventBase evb;
-  QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
@@ -59,7 +58,7 @@ TEST_F(DSRPacketizerSingleWriteTest, SingleWrite) {
       *socket,
       peerAddress,
       nullptr /* statsCallback */,
-      happyEyeballsState);
+      nullptr /* happyEyeballsState */);
   PacketNum packetNum = 20;
   PacketNum largestAckedByPeer = 0;
   StreamId streamId = 0;
@@ -102,7 +101,7 @@ TEST_F(DSRPacketizerSingleWriteTest, NotEnoughData) {
       *socket,
       peerAddress,
       nullptr /* statsCallback */,
-      happyEyeballsState);
+      nullptr /* happyEyeballsState */);
   PacketNum packetNum = 20;
   PacketNum largestAckedByPeer = 0;
   StreamId streamId = 0;

@@ -27,7 +27,7 @@ void RunTest(int numBatch) {
   folly::SocketAddress peerAddress{"127.0.0.1", 1234};
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
+  QuicClientConnectionState::HappyEyeballsState happyEyeballsState;
 
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
@@ -35,7 +35,7 @@ void RunTest(int numBatch) {
       sock,
       peerAddress,
       conn.statsCallback,
-      happyEyeballsState);
+      nullptr /* happyEyeballsState */);
 
   std::string strTest("Test");
 

@@ -685,36 +685,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Track stats for various server events
   QuicTransportStatsCallback* statsCallback{nullptr};
 
-  struct HappyEyeballsState {
-    // Delay timer
-    folly::HHWheelTimer::Callback* connAttemptDelayTimeout{nullptr};
-
-    // IPv6 peer address
-    folly::SocketAddress v6PeerAddress;
-
-    // IPv4 peer address
-    folly::SocketAddress v4PeerAddress;
-
-    // The address that this socket will try to connect to after connection
-    // attempt delay timeout fires
-    folly::SocketAddress secondPeerAddress;
-
-    // The UDP socket that will be used for the second connection attempt
-    std::unique_ptr<folly::AsyncUDPSocket> secondSocket;
-
-    // Whether should write to the first UDP socket
-    bool shouldWriteToFirstSocket{true};
-
-    // Whether should write to the second UDP socket
-    bool shouldWriteToSecondSocket{false};
-
-    // Whether HappyEyeballs has finished
-    // The signal of finishing is first successful decryption of a packet
-    bool finished{false};
-  };
-
-  HappyEyeballsState happyEyeballsState;
-
   // Meta state of d6d, mostly useful for analytics. D6D can operate without it.
   struct D6DMetaState {
     // Cumulative count of acked packets

@@ -104,14 +104,13 @@ size_t writePacketsGroup(
   auto batchWriter =
       BatchWriterPtr(new GSOPacketBatchWriter(kDefaultQuicMaxBatchSize));
   // This doesn't matter:
-  QuicConnectionStateBase::HappyEyeballsState happyEyeballsState;
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       false /* thread local batching */,
       sock,
       reqGroup[0].clientAddress,
       nullptr /* statsCallback */,
-      happyEyeballsState);
+      nullptr /* happyEyeballsState */);
   // TODO: Instead of building ciphers every time, we should cache them into a
   // CipherMap and look them up.
   CipherBuilder cipherBuilder;

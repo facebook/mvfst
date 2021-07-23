@@ -1320,13 +1320,16 @@ uint64_t writeConnectionDataToSocket(
       connection.transportSettings.dataPathType,
       connection);
 
+  auto happyEyeballsState = connection.nodeType == QuicNodeType::Server
+      ? nullptr
+      : &static_cast<QuicClientConnectionState&>(connection).happyEyeballsState;
   IOBufQuicBatch ioBufBatch(
       std::move(batchWriter),
       connection.transportSettings.useThreadLocalBatching,
       sock,
       connection.peerAddress,
       connection.statsCallback,
-      connection.happyEyeballsState);
+      happyEyeballsState);
 
   if (connection.loopDetectorCallback) {
     connection.writeDebugState.schedulerName = scheduler.name().str();

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <quic/state/StateData.h>
+#include <quic/client/state/ClientStateMachine.h>
 
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
@@ -26,15 +26,15 @@ namespace quic {
 struct TransportSettings;
 
 void happyEyeballsAddPeerAddress(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     const folly::SocketAddress& peerAddress);
 
 void happyEyeballsAddSocket(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     std::unique_ptr<folly::AsyncUDPSocket> socket);
 
 void startHappyEyeballs(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     folly::EventBase* evb,
     sa_family_t cachedFamily,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
@@ -43,7 +43,7 @@ void startHappyEyeballs(
     folly::AsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
-void resetHappyEyeballs(QuicConnectionStateBase& connection);
+void resetHappyEyeballs(QuicClientConnectionState& connection);
 
 void happyEyeballsSetUpSocket(
     folly::AsyncUDPSocket& socket,
@@ -55,10 +55,10 @@ void happyEyeballsSetUpSocket(
     const folly::SocketOptionMap& options);
 
 void happyEyeballsStartSecondSocket(
-    QuicConnectionStateBase::HappyEyeballsState& happyEyeballsState);
+    QuicClientConnectionState::HappyEyeballsState& happyEyeballsState);
 
 void happyEyeballsOnDataReceived(
-    QuicConnectionStateBase& connection,
+    QuicClientConnectionState& connection,
     folly::HHWheelTimer::Callback& connAttemptDelayTimeout,
     std::unique_ptr<folly::AsyncUDPSocket>& socket,
     const folly::SocketAddress& peerAddress);
