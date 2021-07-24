@@ -527,9 +527,7 @@ constexpr uint32_t kDefaultMaxDatagramsBuffered = 75;
 enum class ZeroRttSourceTokenMatchingPolicy : uint8_t {
   REJECT_IF_NO_EXACT_MATCH = 0,
   LIMIT_IF_NO_EXACT_MATCH = 1,
-  // T33014230 Subnet matching
-  // REJECT_IF_NO_SUBNECT_MATCH,
-  // LIMIT_IF_NO_EXACT_MATCH
+  ALWAYS_REJECT = 2,
 };
 
 inline folly::StringPiece nodeToString(QuicNodeType node) {

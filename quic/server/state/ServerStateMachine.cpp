@@ -415,7 +415,11 @@ bool validateAndUpdateSourceToken(
     }
   }
   conn.sourceTokenMatching = foundMatch;
-  bool acceptZeroRtt = foundMatch;
+  bool acceptZeroRtt =
+      (conn.transportSettings.zeroRttSourceTokenMatchingPolicy !=
+       ZeroRttSourceTokenMatchingPolicy::ALWAYS_REJECT) &&
+      foundMatch;
+
   if (!foundMatch) {
     // Add peer address to token for next resumption
     if (sourceAddresses.size() >= kMaxNumTokenSourceAddresses) {
@@ -424,6 +428,7 @@ bool validateAndUpdateSourceToken(
     sourceAddresses.push_back(conn.peerAddress.getIPAddress());
 
     switch (conn.transportSettings.zeroRttSourceTokenMatchingPolicy) {
+      case ZeroRttSourceTokenMatchingPolicy::ALWAYS_REJECT:
       case ZeroRttSourceTokenMatchingPolicy::REJECT_IF_NO_EXACT_MATCH:
         acceptZeroRtt = false;
         break;

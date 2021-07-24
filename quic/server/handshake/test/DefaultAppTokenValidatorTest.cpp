@@ -488,5 +488,77 @@ TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
           conn_.peerAddress.getIPAddress()));
 }
 
+class AlwaysRejectPolicyTest : public SourceAddressTokenTest {
+ public:
+  void SetUp() override {
+    SourceAddressTokenTest::SetUp();
+    conn_.transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::ALWAYS_REJECT;
+  }
+};
+
+TEST_F(AlwaysRejectPolicyTest, EmptySourceToken) {
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(AlwaysRejectPolicyTest, OneSourceTokenNoAddrMatch) {
+  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.5")};
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(
+          folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(AlwaysRejectPolicyTest, OneSourceTokenAddrMatch) {
+  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.4")};
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenNoAddrMatch) {
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.6"),
+      folly::IPAddress("1.2.3.7")};
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(
+          folly::IPAddress("1.2.3.6"),
+          folly::IPAddress("1.2.3.7"),
+          conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenAddrMatch) {
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.4"),
+      folly::IPAddress("1.2.3.7")};
+
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(
+          folly::IPAddress("1.2.3.5"),
+          folly::IPAddress("1.2.3.7"),
+          conn_.peerAddress.getIPAddress()));
+}
+
 } // namespace test
 } // namespace quic
