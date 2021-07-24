@@ -578,6 +578,7 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.largestPacketAckedByPeer =
       conn_->ackStates.appDataAckState.largestAckedByPeer;
   transportInfo.largestPacketSent = conn_->lossState.largestSent;
+  transportInfo.usedZeroRtt = conn_->usedZeroRtt;
   return transportInfo;
 }
 
