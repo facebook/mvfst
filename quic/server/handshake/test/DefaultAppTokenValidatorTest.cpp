@@ -310,8 +310,6 @@ class SourceAddressTokenTest : public Test {
   void SetUp() override {
     conn_.peerAddress = folly::SocketAddress("1.2.3.4", 443);
     conn_.version = QuicVersion::MVFST;
-    conn_.transportSettings.zeroRttSourceTokenMatchingPolicy =
-        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
 
     appToken_.transportParams = createTicketTransportParameters(
         conn_.transportSettings.idleTimeout.count(),
@@ -341,7 +339,16 @@ class SourceAddressTokenTest : public Test {
   AppToken appToken_;
 };
 
-TEST_F(SourceAddressTokenTest, EmptySourceToken) {
+class LimitIfNoMatchPolicyTest : public SourceAddressTokenTest {
+ public:
+  void SetUp() override {
+    SourceAddressTokenTest::SetUp();
+    conn_.transportSettings.zeroRttSourceTokenMatchingPolicy =
+        ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+  }
+};
+
+TEST_F(LimitIfNoMatchPolicyTest, EmptySourceToken) {
   encodeAndValidate();
 
   EXPECT_EQ(
@@ -352,7 +359,7 @@ TEST_F(SourceAddressTokenTest, EmptySourceToken) {
       ElementsAre(conn_.peerAddress.getIPAddress()));
 }
 
-TEST_F(SourceAddressTokenTest, OneSourceTokensNoMatch) {
+TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenNoAddrMatch) {
   appToken_.sourceAddresses = {folly::IPAddress("1.2.3.5")};
   encodeAndValidate();
 
@@ -365,7 +372,17 @@ TEST_F(SourceAddressTokenTest, OneSourceTokensNoMatch) {
           folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
 }
 
-TEST_F(SourceAddressTokenTest, MaxNumSourceTokensNoMatch) {
+TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
+  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.4")};
+  encodeAndValidate();
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
   appToken_.sourceAddresses = {
       folly::IPAddress("1.2.3.5"),
       folly::IPAddress("1.2.3.6"),
@@ -383,17 +400,7 @@ TEST_F(SourceAddressTokenTest, MaxNumSourceTokensNoMatch) {
           conn_.peerAddress.getIPAddress()));
 }
 
-TEST_F(SourceAddressTokenTest, OneSourceTokensMatch) {
-  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.4")};
-  encodeAndValidate();
-
-  EXPECT_FALSE(conn_.writableBytesLimit);
-  ASSERT_THAT(
-      conn_.tokenSourceAddresses,
-      ElementsAre(conn_.peerAddress.getIPAddress()));
-}
-
-TEST_F(SourceAddressTokenTest, ThreeSourceTokensMatch) {
+TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
   appToken_.sourceAddresses = {
       folly::IPAddress("1.2.3.5"),
       folly::IPAddress("1.2.3.4"),
@@ -409,8 +416,7 @@ TEST_F(SourceAddressTokenTest, ThreeSourceTokensMatch) {
           conn_.peerAddress.getIPAddress()));
 }
 
-class SourceAddressTokenRejectNoMatchPolicyTest
-    : public SourceAddressTokenTest {
+class RejectIfNoMatchPolicyTest : public SourceAddressTokenTest {
  public:
   void SetUp() override {
     SourceAddressTokenTest::SetUp();
@@ -419,21 +425,68 @@ class SourceAddressTokenRejectNoMatchPolicyTest
   }
 };
 
-TEST_F(SourceAddressTokenRejectNoMatchPolicyTest, EmptySourceToken) {
+TEST_F(RejectIfNoMatchPolicyTest, EmptySourceToken) {
   encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
 }
 
-TEST_F(SourceAddressTokenRejectNoMatchPolicyTest, OneSourceTokensNoMatch) {
+TEST_F(RejectIfNoMatchPolicyTest, OneSourceTokenNoAddrMatch) {
   appToken_.sourceAddresses = {folly::IPAddress("1.2.3.5")};
   encodeAndValidate(false);
 
+  EXPECT_FALSE(conn_.writableBytesLimit);
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(
           folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
 }
+
+TEST_F(RejectIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
+  appToken_.sourceAddresses = {folly::IPAddress("1.2.3.4")};
+  encodeAndValidate();
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.6"),
+      folly::IPAddress("1.2.3.7")};
+  encodeAndValidate(false);
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(
+          folly::IPAddress("1.2.3.6"),
+          folly::IPAddress("1.2.3.7"),
+          conn_.peerAddress.getIPAddress()));
+}
+
+TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
+  appToken_.sourceAddresses = {
+      folly::IPAddress("1.2.3.5"),
+      folly::IPAddress("1.2.3.4"),
+      folly::IPAddress("1.2.3.7")};
+
+  encodeAndValidate();
+
+  EXPECT_FALSE(conn_.writableBytesLimit);
+  ASSERT_THAT(
+      conn_.tokenSourceAddresses,
+      ElementsAre(
+          folly::IPAddress("1.2.3.5"),
+          folly::IPAddress("1.2.3.7"),
+          conn_.peerAddress.getIPAddress()));
+}
+
 } // namespace test
 } // namespace quic
