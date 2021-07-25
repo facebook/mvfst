@@ -417,16 +417,14 @@ class Observer {
 
   /**
    * packetsRemoved() is invoked when packets are removed from the
-   * OutstandingPacket queue. Using shared pointer avoids copying the vector for
-   * every observer called.
+   * Outstanding Packet queue.
    *
    * @param socket         Socket when the callback is processed.
-   * @param removedPackets Vector with the removed packets.
+   * @param removedPackets const reference to the removed packets.
    */
   virtual void packetsRemoved(
       QuicSocket*, /* socket */
-      const std::shared_ptr<
-          std::vector<OutstandingPacket>> /* removedPackets */) {}
+      const std::vector<OutstandingPacket>& /* removedPackets */) {}
 
  protected:
   // observer configuration; cannot be changed post instantiation

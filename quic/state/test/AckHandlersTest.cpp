@@ -1708,10 +1708,10 @@ TEST_P(AckHandlersTest, TestPacketsDeletedObserver) {
       ib,
       packetsRemoved(
           nullptr,
-          Pointee(ElementsAre(
+          ElementsAre(
               MockObserver::getPacketNum(0),
               MockObserver::getPacketNum(1),
-              MockObserver::getPacketNum(2)))));
+              MockObserver::getPacketNum(2))));
 
   {
     ReadAckFrame ackFrame;
@@ -1733,10 +1733,10 @@ TEST_P(AckHandlersTest, TestPacketsDeletedObserver) {
       ib,
       packetsRemoved(
           nullptr,
-          Pointee(ElementsAre(
+          ElementsAre(
               MockObserver::getPacketNum(3),
               MockObserver::getPacketNum(4),
-              MockObserver::getPacketNum(5)))));
+              MockObserver::getPacketNum(5))));
 
   for (auto& callback : conn.pendingCallbacks) {
     callback(nullptr);

@@ -398,7 +398,7 @@ class MockObserver : public Observer {
       noexcept,
       ,
       packetsRemoved,
-      void(QuicSocket*, const std::shared_ptr<std::vector<OutstandingPacket>>));
+      void(QuicSocket*, const std::vector<OutstandingPacket>&));
 
   static auto getPacketNum(PacketNum packetNum) {
     return testing::Field(

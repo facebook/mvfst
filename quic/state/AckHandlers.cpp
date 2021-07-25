@@ -368,18 +368,18 @@ std::deque<quic::OutstandingPacket>::iterator removeOutstandingPackets(
     needToMove |= observer->getConfig().packetsRemovedEvents;
   }
   if (needToMove) {
-    std::shared_ptr<std::vector<quic::OutstandingPacket>> removedPackets;
-    removedPackets = std::make_shared<std::vector<quic::OutstandingPacket>>(
+    std::vector<quic::OutstandingPacket> removedPackets(
         std::make_move_iterator(begin), std::make_move_iterator(end));
 
-    for (const auto& observer : *(conn.observers)) {
-      if (observer->getConfig().packetsRemovedEvents) {
-        conn.pendingCallbacks.emplace_back(
-            [observer, removedPackets](QuicSocket* qSocket) {
-              observer->packetsRemoved(qSocket, removedPackets);
-            });
-      }
-    }
+    conn.pendingCallbacks.emplace_back(
+        [observers = conn.observers,
+         packets = std::move(removedPackets)](QuicSocket* qSocket) {
+          for (const auto& observer : *(observers)) {
+            if (observer->getConfig().packetsRemovedEvents) {
+              observer->packetsRemoved(qSocket, packets);
+            }
+          }
+        });
   }
   return conn.outstandings.packets.erase(begin, end);
 }
