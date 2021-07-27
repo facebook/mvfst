@@ -681,6 +681,13 @@ class QuicTransportBase : public QuicSocket {
   void updateWriteLooper(bool thisIteration);
   void handlePingCallback();
   void handleKnobCallbacks();
+  void handleCancelByteEventCallbacks();
+  void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
+  void handleDeliveryCallbacks();
+  void handleStreamFlowControlUpdatedCallbacks(
+      std::vector<StreamId>& streamStorage);
+  void handleStreamStopSendingCallbacks();
+  void handleConnWritable();
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);

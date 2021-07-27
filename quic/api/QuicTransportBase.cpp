@@ -1451,41 +1451,7 @@ void QuicTransportBase::handleKnobCallbacks() {
   conn_->pendingEvents.knobs.clear();
 }
 
-void QuicTransportBase::processCallbacksAfterNetworkData() {
-  if (closeState_ != CloseState::OPEN) {
-    return;
-  }
-  // We reuse this storage for storing streams which need callbacks.
-  std::vector<StreamId> tempStorage;
-  // TODO move all of this callback processing to individual functions.
-  tempStorage =
-      conn_->streamManager->consumeNewPeerStreams(std::move(tempStorage));
-  const auto& newPeerStreamsCopy = tempStorage;
-  for (const auto& stream : newPeerStreamsCopy) {
-    CHECK_NOTNULL(connCallback_);
-    if (isBidirectionalStream(stream)) {
-      connCallback_->onNewBidirectionalStream(stream);
-    } else {
-      connCallback_->onNewUnidirectionalStream(stream);
-    }
-    if (closeState_ != CloseState::OPEN) {
-      return;
-    }
-  }
-
-  // to call any callbacks added for observers
-  for (const auto& callback : conn_->pendingCallbacks) {
-    callback(this);
-  }
-  conn_->pendingCallbacks.clear();
-
-  handlePingCallback();
-  if (closeState_ != CloseState::OPEN) {
-    return;
-  }
-
-  handleKnobCallbacks();
-
+void QuicTransportBase::handleCancelByteEventCallbacks() {
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
        pendingResetIt != conn_->pendingEvents.resets.end();
        pendingResetIt++) {
@@ -1494,6 +1460,31 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       return;
     }
   }
+}
+
+void QuicTransportBase::handleNewStreamCallbacks(
+    std::vector<StreamId>& streamStorage) {
+  streamStorage =
+      conn_->streamManager->consumeNewPeerStreams(std::move(streamStorage));
+
+  const auto& newPeerStreams = streamStorage;
+  for (const auto& stream : newPeerStreams) {
+    CHECK_NOTNULL(connCallback_);
+    if (isBidirectionalStream(stream)) {
+      connCallback_->onNewBidirectionalStream(stream);
+    } else {
+      connCallback_->onNewUnidirectionalStream(stream);
+    }
+
+    if (closeState_ != CloseState::OPEN) {
+      return;
+    }
+  }
+
+  streamStorage.clear();
+}
+
+void QuicTransportBase::handleDeliveryCallbacks() {
   auto deliverableStreamId = conn_->streamManager->popDeliverable();
   while (deliverableStreamId.has_value()) {
     auto streamId = *deliverableStreamId;
@@ -1533,14 +1524,17 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     }
     deliverableStreamId = conn_->streamManager->popDeliverable();
   }
+}
 
+void QuicTransportBase::handleStreamFlowControlUpdatedCallbacks(
+    std::vector<StreamId>& streamStorage) {
   // Iterate over streams that changed their flow control window and give
   // their registered listeners their updates.
   // We don't really need flow control notifications when we are closed.
-  tempStorage =
-      conn_->streamManager->consumeFlowControlUpdated(std::move(tempStorage));
-  const auto& flowControlUpdatedCopy = tempStorage;
-  for (auto streamId : flowControlUpdatedCopy) {
+  streamStorage =
+      conn_->streamManager->consumeFlowControlUpdated(std::move(streamStorage));
+  const auto& flowControlUpdated = streamStorage;
+  for (auto streamId : flowControlUpdated) {
     auto stream = conn_->streamManager->getStream(streamId);
     if (!stream->writable()) {
       pendingWriteCallbacks_.erase(streamId);
@@ -1566,6 +1560,10 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
     }
   }
 
+  streamStorage.clear();
+}
+
+void QuicTransportBase::handleStreamStopSendingCallbacks() {
   const auto stopSendingStreamsCopy =
       conn_->streamManager->consumeStopSending();
   for (const auto& itr : stopSendingStreamsCopy) {
@@ -1574,7 +1572,9 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
       return;
     }
   }
+}
 
+void QuicTransportBase::handleConnWritable() {
   auto maxConnWrite = maxWritableOnConn();
   if (maxConnWrite != 0) {
     // If the connection now has flow control, we may either have been blocked
@@ -1607,6 +1607,57 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
         }
       }
     }
+  }
+}
+
+void QuicTransportBase::processCallbacksAfterNetworkData() {
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+  // We reuse this storage for storing streams which need callbacks.
+  std::vector<StreamId> tempStorage;
+
+  handleNewStreamCallbacks(tempStorage);
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  // to call any callbacks added for observers
+  for (const auto& callback : conn_->pendingCallbacks) {
+    callback(this);
+  }
+  conn_->pendingCallbacks.clear();
+
+  handlePingCallback();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleKnobCallbacks();
+
+  handleCancelByteEventCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleDeliveryCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleStreamFlowControlUpdatedCallbacks(tempStorage);
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleStreamStopSendingCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleConnWritable();
+  if (closeState_ != CloseState::OPEN) {
+    return;
   }
 
   invokeStreamsAvailableCallbacks();
