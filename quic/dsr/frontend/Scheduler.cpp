@@ -66,6 +66,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       enrichInstruction(instructionBuilder);
       builder.addSendInstruction(instructionBuilder.build(), encodedSize);
       result.writeSuccess = true;
+      return result;
     }
   }
   if (!hasFreshBufMeta || builder.remainingSpace() == 0) {

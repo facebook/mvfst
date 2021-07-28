@@ -131,7 +131,7 @@ class DSRMultiWriteTest : public DSRCommonTestFixture {
   folly::EventBase evb;
 };
 
-TEST_F(DSRMultiWriteTest, TwoRequests) {
+TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   prepareFlowControlAndStreamLimit();
   auto streamId = prepareOneStream(1000);
   auto stream = conn_.streamManager->findStream(streamId);
@@ -141,19 +141,20 @@ TEST_F(DSRMultiWriteTest, TwoRequests) {
   stream->lossBufMetas.push_back(split);
   size_t packetLimit = 10;
   EXPECT_EQ(
-      1,
+      2,
       writePacketizationRequest(
           conn_, getTestConnectionId(), packetLimit, *aead_));
   EXPECT_EQ(2, countInstructions(streamId));
-  EXPECT_EQ(1, conn_.outstandings.packets.size());
-  auto& packet = conn_.outstandings.packets.back().packet;
-  EXPECT_EQ(2, packet.frames.size());
+  EXPECT_EQ(2, conn_.outstandings.packets.size());
+  auto& packet1 = conn_.outstandings.packets.front().packet;
+  auto& packet2 = conn_.outstandings.packets.back().packet;
+  EXPECT_EQ(1, packet1.frames.size());
   WriteStreamFrame expectedFirstFrame(
       streamId, bufMetaStartingOffset, 500, false, true);
   WriteStreamFrame expectedSecondFrame(
       streamId, 500 + bufMetaStartingOffset, 500, true, true);
-  EXPECT_EQ(expectedFirstFrame, *packet.frames[0].asWriteStreamFrame());
-  EXPECT_EQ(expectedSecondFrame, *packet.frames[1].asWriteStreamFrame());
+  EXPECT_EQ(expectedFirstFrame, *packet1.frames[0].asWriteStreamFrame());
+  EXPECT_EQ(expectedSecondFrame, *packet2.frames[0].asWriteStreamFrame());
 
   std::vector<Buf> sentData;
   auto sock = std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb);
