@@ -192,6 +192,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onZeroRttBufferedPruned";
   }
 
+  void onZeroRttAccepted() override {
+    VLOG(2) << prefix_ << "onZeroRttAccepted";
+  }
+
+  void onZeroRttRejected() override {
+    VLOG(2) << prefix_ << "onZeroRttRejected";
+  }
+
  private:
   std::string prefix_;
 };

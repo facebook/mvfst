@@ -36,16 +36,25 @@ bool DefaultAppTokenValidator::validate(
     const fizz::server::ResumptionState& resumptionState) const {
   conn_->transportParamsMatching = false;
   conn_->sourceTokenMatching = false;
+  bool validated = true;
+
+  SCOPE_EXIT {
+    if (validated) {
+      QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
+    } else {
+      QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
+    }
+  };
 
   if (!resumptionState.appToken) {
     VLOG(10) << "App token does not exist";
-    return false;
+    return validated = false;
   }
 
   auto appToken = decodeAppToken(*resumptionState.appToken);
   if (!appToken) {
     VLOG(10) << "Failed to decode app token";
-    return false;
+    return validated = false;
   }
 
   auto& params = appToken->transportParams.parameters;
@@ -58,7 +67,7 @@ bool DefaultAppTokenValidator::validate(
   // kExpectedNumOfParamsInTheTicket.
   if (params.size() != kExpectedNumOfParamsInTheTicket) {
     VLOG(10) << "Unexpected number of parameters in the ticket";
-    return false;
+    return validated = false;
   }
 
   auto ticketIdleTimeout =
@@ -67,7 +76,7 @@ bool DefaultAppTokenValidator::validate(
       conn_->transportSettings.idleTimeout !=
           std::chrono::milliseconds(*ticketIdleTimeout)) {
     VLOG(10) << "Changed idle timeout";
-    return false;
+    return validated = false;
   }
 
   auto ticketPacketSize =
@@ -75,7 +84,7 @@ bool DefaultAppTokenValidator::validate(
   if (!ticketPacketSize ||
       conn_->transportSettings.maxRecvPacketSize < *ticketPacketSize) {
     VLOG(10) << "Decreased max receive packet size";
-    return false;
+    return validated = false;
   }
 
   // if the current max data is less than the one advertised previously we
@@ -86,7 +95,7 @@ bool DefaultAppTokenValidator::validate(
       conn_->transportSettings.advertisedInitialConnectionWindowSize <
           *ticketMaxData) {
     VLOG(10) << "Decreased max data";
-    return false;
+    return validated = false;
   }
 
   auto ticketMaxStreamDataBidiLocal = getIntegerParameter(
@@ -105,7 +114,7 @@ bool DefaultAppTokenValidator::validate(
       conn_->transportSettings.advertisedInitialUniStreamWindowSize <
           *ticketMaxStreamDataUni) {
     VLOG(10) << "Decreased max stream data";
-    return false;
+    return validated = false;
   }
 
   auto ticketMaxStreamsBidi = getIntegerParameter(
@@ -119,7 +128,7 @@ bool DefaultAppTokenValidator::validate(
       conn_->transportSettings.advertisedInitialMaxStreamsUni <
           *ticketMaxStreamsUni) {
     VLOG(10) << "Decreased max streams";
-    return false;
+    return validated = false;
   }
 
   // TODO max ack delay, is this really necessary?
@@ -130,7 +139,7 @@ bool DefaultAppTokenValidator::validate(
   if (!validateAndUpdateSourceToken(
           *conn_, std::move(appToken->sourceAddresses))) {
     VLOG(10) << "No exact match from source address token";
-    return false;
+    return validated = false;
   }
 
   // If application has set validator and the token is invalid, reject 0-RTT.
@@ -139,7 +148,7 @@ bool DefaultAppTokenValidator::validate(
       !conn_->earlyDataAppParamsValidator(
           resumptionState.alpn, appToken->appParams)) {
     VLOG(10) << "Invalid app params";
-    return false;
+    return validated = false;
   }
 
   updateTransportParamsFromTicket(
@@ -153,7 +162,7 @@ bool DefaultAppTokenValidator::validate(
       *ticketMaxStreamsBidi,
       *ticketMaxStreamsUni);
 
-  return true;
+  return validated;
 }
 
 } // namespace quic

@@ -163,6 +163,10 @@ class QuicTransportStatsCallback {
 
   virtual void onZeroRttBufferedPruned() = 0;
 
+  virtual void onZeroRttAccepted() = 0;
+
+  virtual void onZeroRttRejected() = 0;
+
   static const char* toString(ConnectionCloseReason reason) {
     switch (reason) {
       case ConnectionCloseReason::NONE:

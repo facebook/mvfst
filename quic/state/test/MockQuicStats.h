@@ -57,6 +57,8 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onServerUnfinishedHandshake, void());
   MOCK_METHOD0(onZeroRttBuffered, void());
   MOCK_METHOD0(onZeroRttBufferedPruned, void());
+  MOCK_METHOD0(onZeroRttAccepted, void());
+  MOCK_METHOD0(onZeroRttRejected, void());
 };
 
 class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {
