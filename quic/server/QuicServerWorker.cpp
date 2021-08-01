@@ -1182,7 +1182,7 @@ void QuicServerWorker::onConnectionUnbound(
     // still hold a pointer to the incorrect transport.
     QuicServerTransport* incorrectTransportPtr = nullptr;
     if (it == connectionIdMap_.end()) {
-      LOG(ERROR) << "connectionIdMap_ didn't include CID= " << connId.connId;
+      LOG(ERROR) << "CID not found in connectionIdMap_ CID= " << connId.connId;
     } else {
       QuicServerTransport* existingPtr = it->second.get();
       if (existingPtr != transport) {
