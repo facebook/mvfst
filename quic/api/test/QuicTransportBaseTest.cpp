@@ -3845,6 +3845,20 @@ TEST_F(QuicTransportImplTest, DatagramCallbackDatagramAvailable) {
   transport->driveReadCallbacks();
 }
 
+TEST_F(QuicTransportImplTest, ZeroLengthDatagram) {
+  NiceMock<MockDatagramCallback> datagramCb;
+  transport->enableDatagram();
+  transport->setDatagramCallback(&datagramCb);
+  transport->addDatagram(folly::IOBuf::copyBuffer(""));
+  EXPECT_CALL(datagramCb, onDatagramsAvailable());
+  transport->driveReadCallbacks();
+  auto datagrams = transport->readDatagrams();
+  EXPECT_FALSE(datagrams.hasError());
+  EXPECT_EQ(datagrams->size(), 1);
+  EXPECT_TRUE(datagrams->front() != nullptr);
+  EXPECT_EQ(datagrams->front()->computeChainDataLength(), 0);
+}
+
 TEST_F(QuicTransportImplTest, Cmsgs) {
   transport->setServerConnectionId();
   folly::SocketOptionMap cmsgs;
