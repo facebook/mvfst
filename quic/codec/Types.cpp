@@ -456,6 +456,8 @@ std::string toString(QuicVersion version) {
       return "QUIC_DRAFT_LEGACY";
     case QuicVersion::MVFST_EXPERIMENTAL:
       return "MVFST_EXPERIMENTAL";
+    case QuicVersion::MVFST_ALIAS:
+      return "MVFST_ALIAS";
     case QuicVersion::MVFST_INVALID:
       return "MVFST_INVALID";
   }

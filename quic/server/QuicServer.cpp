@@ -388,6 +388,7 @@ void QuicServer::routeDataToWorker(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
+    folly::Optional<QuicVersion> quicVersion,
     bool isForwardedData) {
   // figure out worker idx
   if (!initialized_) {
@@ -424,6 +425,7 @@ void QuicServer::routeDataToWorker(
         client,
         std::move(routingData),
         std::move(networkData),
+        quicVersion,
         isForwardedData);
     return;
   }
@@ -440,22 +442,25 @@ void QuicServer::routeDataToWorker(
         client,
         std::move(routingData),
         std::move(networkData),
+        quicVersion,
         isForwardedData);
     return;
   }
-  worker->getEventBase()->runInEventBaseThread(
-      [server = this->shared_from_this(),
-       cl = client,
-       routingData = std::move(routingData),
-       w = worker.get(),
-       buf = std::move(networkData),
-       isForwarded = isForwardedData]() mutable {
-        if (server->shutdown_) {
-          return;
-        }
-        w->dispatchPacketData(
-            cl, std::move(routingData), std::move(buf), isForwarded);
-      });
+  worker->getEventBase()->runInEventBaseThread([server =
+                                                    this->shared_from_this(),
+                                                cl = client,
+                                                routingData =
+                                                    std::move(routingData),
+                                                w = worker.get(),
+                                                buf = std::move(networkData),
+                                                isForwarded = isForwardedData,
+                                                quicVersion]() mutable {
+    if (server->shutdown_) {
+      return;
+    }
+    w->dispatchPacketData(
+        cl, std::move(routingData), std::move(buf), quicVersion, isForwarded);
+  });
 }
 
 void QuicServer::handleWorkerError(LocalErrorCode error) {

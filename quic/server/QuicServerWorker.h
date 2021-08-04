@@ -125,6 +125,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
         const folly::SocketAddress& client,
         RoutingData&& routingData,
         NetworkData&& networkData,
+        folly::Optional<QuicVersion> quicVersion,
         bool isForwardedData) = 0;
   };
 
@@ -370,6 +371,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       const folly::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
+      folly::Optional<QuicVersion> quicVersion,
       bool isForwardedData = false) noexcept;
 
   using ConnIdToTransportMap = folly::
@@ -411,15 +413,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   bool tryHandlingAsHealthCheck(
       const folly::SocketAddress& client,
       const folly::IOBuf& data);
-
-  /**
-   * Forward data to the right worker or to the takeover socket
-   */
-  void forwardNetworkData(
-      const folly::SocketAddress& client,
-      RoutingData&& routingData,
-      NetworkData&& networkData,
-      bool isForwardedData = false);
 
   /**
    * Return Infocallback ptr for various transport stats (such as packet
@@ -523,6 +516,16 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   bool hasTimestamping() {
     return (socket_ && (socket_->getTimestamping() > 0));
   }
+
+  /**
+   * Forward data to the right worker or to the takeover socket
+   */
+  void forwardNetworkData(
+      const folly::SocketAddress& client,
+      RoutingData&& routingData,
+      NetworkData&& networkData,
+      folly::Optional<QuicVersion> quicVersion,
+      bool isForwardedData = false);
 
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   folly::SocketOptionMap* socketOptions_{nullptr};

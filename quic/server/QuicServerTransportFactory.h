@@ -22,6 +22,7 @@ class QuicServerTransportFactory {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       const folly::SocketAddress& addr,
+      QuicVersion quicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept = 0;
 };
 } // namespace quic

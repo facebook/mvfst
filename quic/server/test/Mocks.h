@@ -41,6 +41,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       const folly::SocketAddress& addr,
+      QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
     return _make(evb, socket, addr, ctx);
@@ -63,33 +64,38 @@ class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
   ~MockWorkerCallback() = default;
   MOCK_METHOD1(handleWorkerError, void(LocalErrorCode));
 
-  MOCK_METHOD4(
+  MOCK_METHOD5(
       routeDataToWorkerLong,
       void(
           const folly::SocketAddress&,
           std::unique_ptr<RoutingData>&,
           std::unique_ptr<NetworkData>&,
+          folly::Optional<QuicVersion>,
           bool isForwardedData));
 
-  MOCK_METHOD4(
+  MOCK_METHOD5(
       routeDataToWorkerShort,
       void(
           const folly::SocketAddress&,
           std::unique_ptr<RoutingData>&,
           std::unique_ptr<NetworkData>&,
+          folly::Optional<QuicVersion>,
           bool isForwardedData));
 
   void routeDataToWorker(
       const folly::SocketAddress& client,
       RoutingData&& routingDataIn,
       NetworkData&& networkDataIn,
+      folly::Optional<QuicVersion> quicVersion,
       bool isForwardedData = false) {
     auto routingData = std::make_unique<RoutingData>(std::move(routingDataIn));
     auto networkData = std::make_unique<NetworkData>(std::move(networkDataIn));
     if (routingData->headerForm == HeaderForm::Long) {
-      routeDataToWorkerLong(client, routingData, networkData, isForwardedData);
+      routeDataToWorkerLong(
+          client, routingData, networkData, quicVersion, isForwardedData);
     } else {
-      routeDataToWorkerShort(client, routingData, networkData, isForwardedData);
+      routeDataToWorkerShort(
+          client, routingData, networkData, quicVersion, isForwardedData);
     }
   }
 };

@@ -225,6 +225,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       const folly::SocketAddress& client,
       RoutingData&& routingData,
       NetworkData&& networkData,
+      folly::Optional<QuicVersion> quicVersion,
       bool isForwardedData = false) override;
 
   /**
@@ -385,6 +386,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   std::vector<QuicVersion> supportedVersions_{
       {QuicVersion::MVFST,
        QuicVersion::MVFST_EXPERIMENTAL,
+       QuicVersion::MVFST_ALIAS,
        QuicVersion::QUIC_DRAFT,
        QuicVersion::QUIC_DRAFT_LEGACY}};
 

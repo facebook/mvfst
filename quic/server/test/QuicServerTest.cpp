@@ -149,15 +149,17 @@ class QuicServerWorkerTest : public Test {
     auto cb = [&](const folly::SocketAddress& addr,
                   std::unique_ptr<RoutingData>& routingData,
                   std::unique_ptr<NetworkData>& networkData,
+                  folly::Optional<QuicVersion> quicVersion,
                   bool isForwardedData) {
       worker_->dispatchPacketData(
           addr,
           std::move(*routingData.get()),
           std::move(*networkData.get()),
+          std::move(quicVersion),
           isForwardedData);
     };
 
-    EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _))
+    EXPECT_CALL(*workerCb_, routeDataToWorkerLong(_, _, _, _, _))
         .WillRepeatedly(Invoke(cb));
 
     socketFactory_ = std::make_unique<MockQuicUDPSocketFactory>();
@@ -277,7 +279,10 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
   auto data = createData(kMinInitialPacketSize + 10);
   expectConnCreateRefused();
   worker_->dispatchPacketData(
-      addr, std::move(routingData), NetworkData(data->clone(), Clock::now()));
+      addr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()),
+      version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(0, addrMap.count(std::make_pair(addr, connId)));
@@ -301,7 +306,10 @@ void QuicServerWorkerTest::createQuicConnection(
   expectConnectionCreation(addr, connId, transport);
   EXPECT_CALL(*transport, onNetworkData(addr, NetworkDataMatches(*data)));
   worker_->dispatchPacketData(
-      addr, std::move(routingData), NetworkData(data->clone(), Clock::now()));
+      addr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()),
+      version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(addr, connId)), 1);
@@ -351,7 +359,8 @@ void QuicServerWorkerTest::testSendReset(
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(packet->clone(), Clock::now()));
+      NetworkData(packet->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 }
 
@@ -406,7 +415,8 @@ std::string QuicServerWorkerTest::testSendRetry(
   worker_->dispatchPacketData(
       clientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      QuicVersion::MVFST);
   eventbase_.loop();
 
   return encryptedRetryToken;
@@ -441,7 +451,8 @@ void QuicServerWorkerTest::testSendInitialWithRetryToken(
   worker_->dispatchPacketData(
       clientAddr,
       std::move(routingData),
-      NetworkData(initialPacket->clone(), Clock::now()));
+      NetworkData(initialPacket->clone(), Clock::now()),
+      version);
 }
 
 TEST_F(QuicServerWorkerTest, HostIdMismatchTestReset) {
@@ -501,7 +512,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      version);
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
@@ -531,7 +543,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       caddr2,
       std::move(routingData2),
-      NetworkData(data2->clone(), Clock::now()));
+      NetworkData(data2->clone(), Clock::now()),
+      version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
   eventbase_.loop();
@@ -549,7 +562,8 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->dispatchPacketData(
       caddr3,
       std::move(routingData3),
-      NetworkData(data2->clone(), Clock::now()));
+      NetworkData(data2->clone(), Clock::now()),
+      version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
   EXPECT_EQ(addrMap.size(), 2);
@@ -665,7 +679,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 
   auto connId2 = connId;
@@ -682,7 +697,8 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData3),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(1);
@@ -724,7 +740,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onNewConnection());
@@ -757,7 +774,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData2),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 
   // routing by address after transport_'s connid available, but before
@@ -790,7 +808,8 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   worker_->dispatchPacketData(
       clientAddr2,
       std::move(routingData3),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      folly::none);
   eventbase_.loop();
 
   EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(2);
@@ -837,7 +856,8 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
   worker_->dispatchPacketData(
       kClientAddr,
       std::move(routingData),
-      NetworkData(data->clone(), Clock::now()));
+      NetworkData(data->clone(), Clock::now()),
+      version);
   eventbase_.loop();
 }
 
@@ -972,7 +992,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
   EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
   worker_->dispatchPacketData(
-      kClientAddr, std::move(routingData), std::move(networkData));
+      kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loop();
 }
 
@@ -1000,7 +1020,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
       HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
-      kClientAddr, std::move(routingData), std::move(networkData));
+      kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loop();
 }
 
@@ -1028,7 +1048,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
       HeaderForm::Long, true, false, true, dstConnId, srcConnId);
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
-      kClientAddr, std::move(routingData), std::move(networkData));
+      kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loop();
 }
 
@@ -1467,12 +1487,13 @@ void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
   auto cb = [&](const folly::SocketAddress& addr,
                 std::unique_ptr<RoutingData>& /* routingData */,
                 std::unique_ptr<NetworkData>& /* networkData */,
+                folly::Optional<QuicVersion> /* quicVersion */,
                 bool isForwardedData) {
     EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
     EXPECT_EQ(addr.getPort(), clientAddr.getPort());
     EXPECT_FALSE(isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(cb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));
@@ -1569,14 +1590,16 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
   auto cb = [&](const folly::SocketAddress& client,
                 std::unique_ptr<RoutingData>& routingData,
                 std::unique_ptr<NetworkData>& networkData,
+                folly::Optional<QuicVersion> quicVersion,
                 bool isForwardedData) {
     takeoverWorker_->dispatchPacketData(
         client,
         std::move(*routingData.get()),
         std::move(*networkData.get()),
+        std::move(quicVersion),
         isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(cb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));
@@ -1633,6 +1656,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
         auto cb = [&](const folly::SocketAddress& addr,
                       std::unique_ptr<RoutingData>& /* routingData */,
                       std::unique_ptr<NetworkData>& networkData,
+                      folly::Optional<QuicVersion> /* quicVersion */,
                       bool isForwardedData) {
           // verify that it is the original client address
           EXPECT_EQ(addr.getIPAddress(), clientAddr.getIPAddress());
@@ -1643,7 +1667,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
           EXPECT_TRUE(eq(*data, *(networkData->packets[0])));
           EXPECT_TRUE(isForwardedData);
         };
-        EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
+        EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
             .WillOnce(Invoke(cb));
 
         takeoverCb->onDataAvailable(
@@ -1653,14 +1677,16 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
   auto workerCb = [&](const folly::SocketAddress& client,
                       std::unique_ptr<RoutingData>& routingData,
                       std::unique_ptr<NetworkData>& networkData,
+                      folly::Optional<QuicVersion> quicVersion,
                       bool isForwardedData) {
     takeoverWorker_->dispatchPacketData(
         client,
         std::move(*routingData.get()),
         std::move(*networkData.get()),
+        std::move(quicVersion),
         isForwardedData);
   };
-  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _))
+  EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(workerCb));
   EXPECT_CALL(*transportInfoCb_, onPacketReceived());
   EXPECT_CALL(*transportInfoCb_, onRead(len));
@@ -1931,7 +1957,7 @@ TEST_F(QuicServerTest, DontRouteDataAfterShutdown) {
         header.getDestinationConnId(),
         header.getSourceConnId());
     server_->routeDataToWorker(
-        kClientAddr, std::move(routingData), std::move(networkData));
+        kClientAddr, std::move(routingData), std::move(networkData), version);
   }));
   std::thread t([&] { server_->shutdown(); });
   t.join();
@@ -1985,7 +2011,10 @@ TEST_F(QuicServerTest, RouteDataFromDifferentThread) {
       }));
 
   server_->routeDataToWorker(
-      client->address(), std::move(routingData), std::move(networkData));
+      client->address(),
+      std::move(routingData),
+      std::move(networkData),
+      version);
 
   // cleanup transport
   transport->getEventBase()->runInEventBaseThreadAndWait(

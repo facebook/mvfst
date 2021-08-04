@@ -433,6 +433,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       const folly::SocketAddress&,
+      QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
     CHECK_EQ(evb, sock->getEventBase());

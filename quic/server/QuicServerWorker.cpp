@@ -372,6 +372,7 @@ void QuicServerWorker::handleNetworkData(
           client,
           std::move(routingData),
           NetworkData(std::move(data), packetReceiveTime),
+          folly::none, /* quicVersion */
           isForwardedData);
     }
 
@@ -428,6 +429,7 @@ void QuicServerWorker::handleNetworkData(
         client,
         std::move(routingData),
         NetworkData(std::move(data), packetReceiveTime),
+        parsedLongHeader->invariant.version,
         isForwardedData);
   } catch (const std::exception& ex) {
     // Drop the packet.
@@ -491,6 +493,7 @@ void QuicServerWorker::forwardNetworkData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
+    folly::Optional<QuicVersion> quicVersion,
     bool isForwardedData) {
   // if it's not Client initial or ZeroRtt, AND if the connectionId version
   // mismatches: foward if pktForwarding is enabled else dropPacket
@@ -518,7 +521,11 @@ void QuicServerWorker::forwardNetworkData(
     return;
   }
   callback_->routeDataToWorker(
-      client, std::move(routingData), std::move(networkData), isForwardedData);
+      client,
+      std::move(routingData),
+      std::move(networkData),
+      std::move(quicVersion),
+      isForwardedData);
 }
 
 void QuicServerWorker::setPacingTimer(
@@ -530,6 +537,7 @@ void QuicServerWorker::dispatchPacketData(
     const folly::SocketAddress& client,
     RoutingData&& routingData,
     NetworkData&& networkData,
+    folly::Optional<QuicVersion> quicVersion,
     bool isForwardedData) noexcept {
   DCHECK(socket_);
   QuicServerTransport::Ptr transport;
@@ -632,10 +640,15 @@ void QuicServerWorker::dispatchPacketData(
           }
         }
 
+        // Check that we have a proper quic version before creating transport.
+        CHECK(quicVersion.has_value())
+            << "no QUIC version supplied for transport creation";
+
         // create 'accepting' transport
         auto sock = makeSocket(getEventBase());
+
         auto trans = transportFactory_->make(
-            getEventBase(), std::move(sock), client, ctx_);
+            getEventBase(), std::move(sock), client, quicVersion.value(), ctx_);
         if (!trans) {
           dropPacket = true;
           cannotMakeTransport = true;
