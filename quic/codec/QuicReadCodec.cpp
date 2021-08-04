@@ -163,9 +163,8 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
       CHECK(false) << "one rtt protection type in long header";
   }
   if (!headerCipher || !cipher) {
-    // TODO: remove packet number here.
     return CodecResult(
-        CipherUnavailable(std::move(currentPacketData), 0, protectionType));
+        CipherUnavailable(std::move(currentPacketData), protectionType));
   }
 
   PacketNum expectedNextPacketNum = 0;
@@ -331,7 +330,7 @@ CodecResult QuicReadCodec::parsePacket(
              << folly::hexlify(queue.front()->clone()->moveToFbString()) << " "
              << connIdToHex();
     return CodecResult(
-        CipherUnavailable(queue.move(), 0, ProtectionType::KeyPhaseZero));
+        CipherUnavailable(queue.move(), ProtectionType::KeyPhaseZero));
   }
 
   auto data = queue.move();

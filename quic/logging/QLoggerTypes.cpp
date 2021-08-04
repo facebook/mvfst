@@ -674,13 +674,10 @@ folly::dynamic QLogTransportStateUpdateEvent::toDynamic() const {
 }
 
 QLogPacketBufferedEvent::QLogPacketBufferedEvent(
-    PacketNum packetNumIn,
     ProtectionType protectionTypeIn,
     uint64_t packetSizeIn,
     std::chrono::microseconds refTimeIn)
-    : packetNum{packetNumIn},
-      protectionType{protectionTypeIn},
-      packetSize{packetSizeIn} {
+    : protectionType{protectionTypeIn}, packetSize{packetSizeIn} {
   eventType = QLogEventType::PacketBuffered;
   refTime = refTimeIn;
 }
@@ -694,7 +691,6 @@ folly::dynamic QLogPacketBufferedEvent::toDynamic() const {
       toString(eventType));
   folly::dynamic data = folly::dynamic::object();
 
-  data["packet_num"] = packetNum;
   data["protection_type"] = toString(protectionType);
   data["packet_size"] = packetSize;
 

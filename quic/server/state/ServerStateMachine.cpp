@@ -609,8 +609,7 @@ void handleCipherUnavailable(
       : conn.pendingOneRttData;
   if (pendingData) {
     if (conn.qLogger) {
-      conn.qLogger->addPacketBuffered(
-          originalData->packetNum, originalData->protectionType, packetSize);
+      conn.qLogger->addPacketBuffered(originalData->protectionType, packetSize);
     }
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;

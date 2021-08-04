@@ -40,7 +40,7 @@ class MockQLogger : public QLogger {
   MOCK_METHOD4(addLossAlarm, void(PacketNum, uint64_t, uint64_t, std::string));
   MOCK_METHOD3(addPacketsLost, void(PacketNum, uint64_t, uint64_t));
   MOCK_METHOD1(addTransportStateUpdate, void(std::string));
-  MOCK_METHOD3(addPacketBuffered, void(PacketNum, ProtectionType, uint64_t));
+  MOCK_METHOD2(addPacketBuffered, void(ProtectionType, uint64_t));
   MOCK_METHOD4(
       addMetricUpdate,
       void(

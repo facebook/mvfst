@@ -315,14 +315,13 @@ void FileQLogger::addTransportStateUpdate(std::string update) {
 }
 
 void FileQLogger::addPacketBuffered(
-    PacketNum packetNum,
     ProtectionType protectionType,
     uint64_t packetSize) {
   auto refTime = std::chrono::duration_cast<std::chrono::microseconds>(
       std::chrono::steady_clock::now().time_since_epoch());
 
   handleEvent(std::make_unique<quic::QLogPacketBufferedEvent>(
-      packetNum, protectionType, packetSize, refTime));
+      protectionType, packetSize, refTime));
 }
 
 void FileQLogger::addMetricUpdate(

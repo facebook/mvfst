@@ -26,16 +26,10 @@ namespace quic {
  */
 struct CipherUnavailable {
   Buf packet;
-  PacketNum packetNum;
   ProtectionType protectionType;
 
-  CipherUnavailable(
-      Buf packetIn,
-      PacketNum packetNumIn,
-      ProtectionType protectionTypeIn)
-      : packet(std::move(packetIn)),
-        packetNum(packetNumIn),
-        protectionType(protectionTypeIn) {}
+  CipherUnavailable(Buf packetIn, ProtectionType protectionTypeIn)
+      : packet(std::move(packetIn)), protectionType(protectionTypeIn) {}
 };
 
 /**

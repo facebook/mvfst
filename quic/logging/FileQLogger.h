@@ -87,10 +87,8 @@ class FileQLogger : public BaseQLogger {
       uint64_t lostBytes,
       uint64_t lostPackets) override;
   void addTransportStateUpdate(std::string update) override;
-  void addPacketBuffered(
-      PacketNum packetNum,
-      ProtectionType protectionType,
-      uint64_t packetSize) override;
+  void addPacketBuffered(ProtectionType protectionType, uint64_t packetSize)
+      override;
   void addMetricUpdate(
       std::chrono::microseconds latestRtt,
       std::chrono::microseconds mrtt,

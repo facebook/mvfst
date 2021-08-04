@@ -3819,7 +3819,6 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   EXPECT_EQ(indices.size(), 1);
   auto tmp = std::move(qLogger->logs[indices[0]]);
   auto event = dynamic_cast<QLogPacketBufferedEvent*>(tmp.get());
-  EXPECT_EQ(event->packetNum, nextPacket);
   EXPECT_EQ(event->protectionType, ProtectionType::KeyPhaseZero);
   EXPECT_EQ(event->packetSize, 10);
 }

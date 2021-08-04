@@ -236,12 +236,11 @@ TEST_F(QLoggerTest, TransportStateUpdateEvent) {
 
 TEST_F(QLoggerTest, PacketBufferedEvent) {
   FileQLogger q(VantagePoint::Client);
-  q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
+  q.addPacketBuffered(ProtectionType::Handshake, 100);
 
   std::unique_ptr<QLogEvent> p = std::move(q.logs[0]);
   auto gotEvent = dynamic_cast<QLogPacketBufferedEvent*>(p.get());
 
-  EXPECT_EQ(gotEvent->packetNum, PacketNum{10});
   EXPECT_EQ(gotEvent->protectionType, ProtectionType::Handshake);
   EXPECT_EQ(gotEvent->packetSize, 100);
 }
@@ -964,7 +963,6 @@ TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
      "transport",
      "packet_buffered",
      {
-       "packet_num": 10,
        "protection_type": "Handshake",
        "packet_size": 100
      }
@@ -972,7 +970,7 @@ TEST_F(QLoggerTest, PacketBufferedFollyDynamic) {
 ])");
 
   FileQLogger q(VantagePoint::Client);
-  q.addPacketBuffered(PacketNum{10}, ProtectionType::Handshake, 100);
+  q.addPacketBuffered(ProtectionType::Handshake, 100);
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

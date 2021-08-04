@@ -255,9 +255,7 @@ void QuicClientTransport::processPacketData(
         peer);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketBuffered(
-          cipherUnavailable->packetNum,
-          cipherUnavailable->protectionType,
-          packetSize);
+          cipherUnavailable->protectionType, packetSize);
     }
     return;
   }

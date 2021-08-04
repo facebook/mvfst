@@ -599,12 +599,10 @@ class QLogTransportStateUpdateEvent : public QLogEvent {
 class QLogPacketBufferedEvent : public QLogEvent {
  public:
   QLogPacketBufferedEvent(
-      PacketNum packetNum,
       ProtectionType protectionType,
       uint64_t packetSize,
       std::chrono::microseconds refTime);
   ~QLogPacketBufferedEvent() override = default;
-  PacketNum packetNum;
   ProtectionType protectionType;
   uint64_t packetSize;
   folly::dynamic toDynamic() const override;

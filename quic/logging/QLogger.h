@@ -102,7 +102,6 @@ class QLogger {
       uint64_t lostPackets) = 0;
   virtual void addTransportStateUpdate(std::string update) = 0;
   virtual void addPacketBuffered(
-      PacketNum packetNum,
       ProtectionType protectionType,
       uint64_t packetSize) = 0;
   virtual void addMetricUpdate(
