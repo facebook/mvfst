@@ -277,7 +277,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   /**
    * If true, start to reject any new connection during handshake
    */
-  void rejectNewConnections(bool rejectNewConnections);
+  void rejectNewConnections(std::function<bool()> rejectNewConnections);
 
   /**
    * Set a health-check token that can be used to ping if the server is alive
@@ -564,7 +564,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   // supports GRO. otherwise 1
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   folly::Optional<Buf> healthCheckToken_;
-  bool rejectNewConnections_{false};
+  std::function<bool()> rejectNewConnections_{[]() { return false; }};
   uint8_t workerId_{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   uint32_t hostId_{0};

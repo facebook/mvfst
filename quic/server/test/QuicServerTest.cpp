@@ -2468,7 +2468,7 @@ TEST_F(QuicServerTest, TestRejectNewConnections) {
   // new connections
   folly::SocketAddress addr("::1", 0);
   server_->start(addr, 2);
-  server_->rejectNewConnections(true);
+  server_->rejectNewConnections([]() { return true; });
   server_->waitUntilInitialized();
   auto serverAddr = server_->getAddress();
 

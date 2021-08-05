@@ -185,9 +185,11 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void setCcpId(uint64_t ccpId);
 
   /**
-   * Tells the server to start rejecting any new connection
+   * Tells the server to start rejecting any new connection. The parameter
+   * function is stored and evaluated on each new connection before being
+   * accepted.
    */
-  void rejectNewConnections(bool reject);
+  void rejectNewConnections(std::function<bool()> rejectFn);
 
   /**
    * Returns listening address of this server
@@ -426,7 +428,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   ProcessId processId_{ProcessId::ZERO};
   uint32_t hostId_{0};
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
-  bool rejectNewConnections_{false};
+  std::function<bool()> rejectNewConnections_{[]() { return false; }};
   // factory to create per worker QuicTransportStatsCallback
   std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory_;
   // factory to create per worker ConnectionIdAlgo

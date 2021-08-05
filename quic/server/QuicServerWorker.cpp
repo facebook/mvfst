@@ -196,7 +196,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   }
   isInitial =
       isInitial && invariant.version != QuicVersion::VERSION_NEGOTIATION;
-  if (rejectNewConnections_ && isInitial) {
+  if (rejectNewConnections_() && isInitial) {
     VersionNegotiationPacketBuilder builder(
         invariant.dstConnId,
         invariant.srcConnId,
@@ -1103,8 +1103,9 @@ void QuicServerWorker::setTransportSettings(
   }
 }
 
-void QuicServerWorker::rejectNewConnections(bool rejectNewConnections) {
-  rejectNewConnections_ = rejectNewConnections;
+void QuicServerWorker::rejectNewConnections(
+    std::function<bool()> rejectNewConnections) {
+  rejectNewConnections_ = std::move(rejectNewConnections);
 }
 
 void QuicServerWorker::setHealthCheckToken(

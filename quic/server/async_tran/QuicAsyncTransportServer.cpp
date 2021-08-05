@@ -66,7 +66,7 @@ void QuicAsyncTransportServer::createAcceptors() {
 }
 
 void QuicAsyncTransportServer::shutdown() {
-  quicServer_->rejectNewConnections(true);
+  quicServer_->rejectNewConnections([]() { return true; });
   for (size_t i = 0; i < workerEvbs_.size(); i++) {
     workerEvbs_[i]->getEventBase()->runInEventBaseThreadAndWait(
         [&] { acceptors_[i]->dropAllConnections(); });

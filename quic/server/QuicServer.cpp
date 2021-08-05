@@ -631,10 +631,11 @@ bool QuicServer::isUsingCCP() {
 #endif
 }
 
-void QuicServer::rejectNewConnections(bool reject) {
-  rejectNewConnections_ = reject;
-  runOnAllWorkers(
-      [reject](auto worker) mutable { worker->rejectNewConnections(reject); });
+void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
+  rejectNewConnections_ = rejectFn;
+  runOnAllWorkers([rejectFn](auto worker) mutable {
+    worker->rejectNewConnections(rejectFn);
+  });
 }
 
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
