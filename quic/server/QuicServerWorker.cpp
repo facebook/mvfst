@@ -31,6 +31,14 @@
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/QuicConnectionStats.h>
 
+namespace {
+bool isBlockListedSourcePort(uint16_t srcPort) {
+  // Generically privileged ports.
+  // TODO make configurable, allow individual ports.
+  return srcPort < 1024;
+}
+} // namespace
+
 namespace quic {
 
 QuicServerWorker::QuicServerWorker(
@@ -329,6 +337,14 @@ void QuicServerWorker::handleNetworkData(
       VLOG(4) << "Packet received after shutdown, dropping";
       QUIC_STATS(
           statsCallback_, onPacketDropped, PacketDropReason::SERVER_SHUTDOWN);
+      return;
+    }
+
+    if (isBlockListedSourcePort(client.getPort())) {
+      VLOG(4) << "Dropping packet with blocklisted src port: "
+              << client.getPort();
+      QUIC_STATS(
+          statsCallback_, onPacketDropped, PacketDropReason::INVALID_SRC_PORT);
       return;
     }
 

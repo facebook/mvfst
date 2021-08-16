@@ -45,6 +45,7 @@ class QuicTransportStatsCallback {
     UDP_TRUNCATED,
     CLIENT_STATE_CLOSED,
     CLIENT_SHUTDOWN,
+    INVALID_SRC_PORT,
     // NOTE: MAX should always be at the end
     MAX
   };
@@ -218,6 +219,8 @@ class QuicTransportStatsCallback {
         return "CLIENT_STATE_CLOSED";
       case PacketDropReason::CLIENT_SHUTDOWN:
         return "CLIENT_SHUTDOWN";
+      case PacketDropReason::INVALID_SRC_PORT:
+        return "INVALID_SRC_PORT";
       case PacketDropReason::MAX:
         return "MAX";
       default:

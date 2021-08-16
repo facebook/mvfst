@@ -869,6 +869,27 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
   createQuicConnectionDuringShedding(kClientAddr, connId);
 }
 
+TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
+  folly::SocketAddress blockedSrcPort("1.2.3.4", 443);
+  auto data = createData(kDefaultUDPSendPacketLen);
+  auto connId = ConnectionId(std::vector<uint8_t>());
+  PacketNum num = 1;
+  QuicVersion version = QuicVersion::MVFST;
+  LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
+  EXPECT_CALL(
+      *transportInfoCb_, onPacketDropped(PacketDropReason::INVALID_SRC_PORT));
+
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
+  while (builder.remainingSpaceInPkt() > 0) {
+    writeFrame(PaddingFrame(), builder);
+  }
+  auto packet = packetToBuf(std::move(builder).buildPacket());
+  worker_->handleNetworkData(blockedSrcPort, std::move(packet), Clock::now());
+  eventbase_.loop();
+}
+
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   auto data = createData(kDefaultUDPSendPacketLen);
   auto connId = ConnectionId(std::vector<uint8_t>());
@@ -1405,7 +1426,7 @@ class QuicServerWorkerTakeoverTest : public Test {
   folly::test::MockAsyncUDPSocket* takeoverSocket_;
   folly::EventBase evb_;
   folly::IOBufEqualTo eq;
-  folly::SocketAddress clientAddr{"1.2.3.4", 49};
+  folly::SocketAddress clientAddr{kClientAddr};
   std::unique_ptr<MockQuicUDPSocketFactory> takeoverSocketFactory_;
   std::unique_ptr<MockQuicServerTransportFactory> factory_;
   MockQuicStats* transportInfoCb_{nullptr};
@@ -1437,7 +1458,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverNoForwarding) {
   auto data = writeTestDataOnWorkersBuf(
       clientConnId, connId, len, takeoverWorker_.get());
   // enable packet forwarding
-  takeoverWorker_->startPacketForwarding(folly::SocketAddress("0", 0));
+  takeoverWorker_->startPacketForwarding(kClientAddr);
 
   // this packet belongs to this server, so it should write unaltered packet
   // to the actual client. Also test different variations in header type Also
@@ -1585,7 +1606,7 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
         }
         return data->computeChainDataLength();
       }));
-  takeoverWorker_->startPacketForwarding(folly::SocketAddress("0", 0));
+  takeoverWorker_->startPacketForwarding(kClientAddr);
 
   auto cb = [&](const folly::SocketAddress& client,
                 std::unique_ptr<RoutingData>& routingData,
@@ -1624,7 +1645,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
       len,
       takeoverWorker_.get(),
       LongHeader::Types::Handshake);
-  takeoverWorker_->startPacketForwarding(folly::SocketAddress("0", 0));
+  takeoverWorker_->startPacketForwarding(kClientAddr);
 
   // the packet will be forwarded
   auto writeSock =
