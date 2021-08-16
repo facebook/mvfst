@@ -91,7 +91,7 @@ void recoverOrResetCongestionAndRttState(
 }
 
 void setExperimentalSettings(QuicServerConnectionState& conn) {
-  conn.transportSettings.maxNumPTOs = 5;
+  conn.transportSettings.experimentalPersistentCongestion = true;
 }
 } // namespace
 

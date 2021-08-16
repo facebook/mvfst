@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <folly/Chrono.h>
+#include <folly/Optional.h>
+#include <folly/io/async/AsyncTimeout.h>
 #include <quic/QuicConstants.h>
 #include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
@@ -18,9 +21,6 @@
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/StateData.h>
-
-#include <folly/Chrono.h>
-#include <folly/io/async/AsyncTimeout.h>
 
 namespace quic {
 
@@ -42,6 +42,12 @@ bool isPersistentCongestion(
     const QuicConnectionStateBase& conn,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd) noexcept;
+
+bool isPersistentCongestionExperimental(
+    folly::Optional<std::chrono::microseconds> pto,
+    TimePoint lostPeriodStart,
+    TimePoint lostPeriodEnd,
+    const CongestionController::AckEvent& ack);
 
 inline std::ostream& operator<<(
     std::ostream& os,
@@ -372,10 +378,12 @@ void onLossDetectionAlarm(
         lossTimeAndSpace.second);
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
-      lossEvent->persistentCongestion = isPersistentCongestion(
-          conn,
-          *lossEvent->smallestLostSentTime,
-          *lossEvent->largestLostSentTime);
+      if (!conn.transportSettings.experimentalPersistentCongestion) {
+        lossEvent->persistentCongestion = isPersistentCongestion(
+            conn,
+            *lossEvent->smallestLostSentTime,
+            *lossEvent->largestLostSentTime);
+      }
       conn.congestionController->onPacketAckOrLoss(
           folly::none, std::move(lossEvent));
     }

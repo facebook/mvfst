@@ -1854,6 +1854,94 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
   EXPECT_FALSE(isPersistentCongestion(*conn, currentTime - 100us, currentTime));
 }
 
+TEST_F(QuicLossFunctionsTest, ExperimentalPersistentCongestion) {
+  // Test cases copied over from PersistentCongestion above.
+  auto conn = createConn();
+  auto currentTime = Clock::now();
+  conn->lossState.srtt = 1s;
+
+  CongestionController::AckEvent ack;
+
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 10s, currentTime, ack));
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 3s, currentTime, ack));
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn),
+      currentTime - (1s * kPersistentCongestionThreshold),
+      currentTime,
+      ack));
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn),
+      currentTime - (1s * kPersistentCongestionThreshold) + 1us,
+      currentTime,
+      ack));
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 2s, currentTime, ack));
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 100ms, currentTime, ack));
+
+  conn->lossState.rttvar = 2s;
+  conn->lossState.maxAckDelay = 5s;
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 42s, currentTime, ack));
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 43s, currentTime, ack));
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 42s + 1ms, currentTime, ack));
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime - 100us, currentTime, ack));
+}
+
+TEST_F(
+    QuicLossFunctionsTest,
+    ExperimentalPersistentCongestionAckOutsideWindow) {
+  auto conn = createConn();
+  auto currentTime = Clock::now();
+  conn->lossState.srtt = 1s;
+
+  CongestionController::AckEvent ack;
+
+  ack.ackedPackets.push_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setSentTime(currentTime + 12s)
+          .build());
+
+  EXPECT_TRUE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime + 1s, currentTime + 8s, ack));
+}
+
+TEST_F(QuicLossFunctionsTest, ExperimentalPersistentCongestionAckInsideWindow) {
+  auto conn = createConn();
+  auto currentTime = Clock::now();
+  conn->lossState.srtt = 1s;
+
+  CongestionController::AckEvent ack;
+
+  ack.ackedPackets.push_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setSentTime(currentTime + 4s)
+          .build());
+
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      calculatePTO(*conn), currentTime + 1s, currentTime + 8s, ack));
+}
+
+TEST_F(QuicLossFunctionsTest, ExperimentalPersistentCongestionNoPTO) {
+  auto conn = createConn();
+  auto currentTime = Clock::now();
+
+  CongestionController::AckEvent ack;
+
+  ack.ackedPackets.push_back(
+      CongestionController::AckEvent::AckPacket::Builder()
+          .setSentTime(currentTime + 12s)
+          .build());
+
+  EXPECT_FALSE(isPersistentCongestionExperimental(
+      folly::none, currentTime + 1s, currentTime + 8s, ack));
+}
+
 TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
   Observer::Config config = {};

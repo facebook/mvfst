@@ -270,6 +270,8 @@ struct TransportSettings {
   // Whether or not to opportunistically retransmit 0RTT when the handshake
   // completes.
   bool earlyRetransmit0Rtt{false};
+  // Experimental persistent congestion flag
+  bool experimentalPersistentCongestion{false};
 };
 
 } // namespace quic

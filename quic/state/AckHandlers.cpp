@@ -265,10 +265,18 @@ void processAckFrame(
       // contiguous lost block and determine if that block is larger than the
       // congestion period. Alternatively we could consider every lost block
       // and check if any of them constitute persistent congestion.
-      lossEvent->persistentCongestion = isPersistentCongestion(
-          conn,
-          *lossEvent->smallestLostSentTime,
-          *lossEvent->largestLostSentTime);
+      lossEvent->persistentCongestion =
+          conn.transportSettings.experimentalPersistentCongestion
+          ? isPersistentCongestionExperimental(
+                conn.lossState.srtt == 0s ? folly::none
+                                          : folly::Optional(calculatePTO(conn)),
+                *lossEvent->smallestLostSentTime,
+                *lossEvent->largestLostSentTime,
+                ack)
+          : isPersistentCongestion(
+                conn,
+                *lossEvent->smallestLostSentTime,
+                *lossEvent->largestLostSentTime);
       if (lossEvent->persistentCongestion) {
         QUIC_STATS(conn.statsCallback, onPersistentCongestion);
       }
