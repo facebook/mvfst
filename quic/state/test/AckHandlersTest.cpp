@@ -1295,7 +1295,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestAckedPacketAppLimited);
         EXPECT_EQ(
-            std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),
             ack->mrttSample.value());
       }));
@@ -1469,7 +1469,7 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   EXPECT_EQ(6, size(conn.pendingCallbacks));
 
   for (const auto ackData : ackVec) {
-    auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
+    auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
         ackData.ackTime - packetRcvTime[ackData.endSeq]);
     EXPECT_CALL(
         ib,
@@ -1667,6 +1667,47 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
   for (auto& callback : conn.pendingCallbacks) {
     callback(nullptr);
   }
+}
+
+TEST_P(AckHandlersTest, SubMicrosecondRTT) {
+  // Verify that an ackReceive timestamp that is less than 1 us
+  // after the packet send timestamp results in an rtt sample rounded up to 1 us
+  // rather than rounded down to 0. <1 us differences could occur because we
+  // mix socket-provided timestamps for incoming packets (which can move
+  // backwards) with steady_clock timestamps for outgoing packets. Clock
+  // adjustments are more likely to result in < 1us differences when the clients
+  // are close.
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+
+  auto packetSendTime = Clock::now();
+  auto packet = createNewPacket(5, GetParam());
+  conn.outstandings.packetCount[packet.header.getPacketNumberSpace()]++;
+  conn.outstandings.packets.emplace_back(OutstandingPacket(
+      std::move(packet),
+      packetSendTime,
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState(),
+      0));
+
+  ReadAckFrame ackFrame;
+  auto ackReceiveTime = packetSendTime + 400ns;
+  ackFrame.largestAcked = 5;
+  ackFrame.ackBlocks.emplace_back(5, 5);
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      ackReceiveTime);
+  EXPECT_EQ(conn.lossState.lrtt, 1us);
 }
 
 INSTANTIATE_TEST_CASE_P(

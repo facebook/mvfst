@@ -144,7 +144,7 @@ void processAckFrame(
       auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
           ? ackReceiveTime
           : Clock::now();
-      auto rttSample = std::chrono::duration_cast<std::chrono::microseconds>(
+      auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
           ackReceiveTimeOrNow - rPacketIt->metadata.time);
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
         Observer::PacketRTT packetRTT(
