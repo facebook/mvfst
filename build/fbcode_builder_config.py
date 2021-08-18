@@ -10,41 +10,42 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-'fbcode_builder steps to build & test mvfst'
+"fbcode_builder steps to build & test mvfst"
 
-import specs.gmock as gmock
+import specs.fizz as fizz
 import specs.fmt as fmt
 import specs.folly as folly
-import specs.fizz as fizz
-
+import specs.gmock as gmock
 from shell_quoting import ShellQuoted
 
 
 def fbcode_builder_spec(builder):
     builder.add_option(
-        'mvfst/_build:cmake_defines',
+        "mvfst/_build:cmake_defines",
         {
-            'BUILD_SHARED_LIBS': 'OFF',
-            'BUILD_TESTS': 'ON',
-        }
+            "BUILD_SHARED_LIBS": "OFF",
+            "BUILD_TESTS": "ON",
+        },
     )
     return {
-        'depends_on': [gmock, fmt, folly, fizz],
-        'steps': [
-            builder.fb_github_cmake_install('mvfst/_build', '..', 'facebookincubator'),
+        "depends_on": [gmock, fmt, folly, fizz],
+        "steps": [
+            builder.fb_github_cmake_install("mvfst/_build", "..", "facebookincubator"),
             builder.step(
-                'Run mvfst tests', [
+                "Run mvfst tests",
+                [
                     builder.run(
-                        ShellQuoted('ctest --output-on-failure -j {n}')
-                        .format(n=builder.option('make_parallelism'), )
+                        ShellQuoted("ctest --output-on-failure -j {n}").format(
+                            n=builder.option("make_parallelism"),
+                        )
                     )
-                ]
+                ],
             ),
-        ]
+        ],
     }
 
 
 config = {
-    'github_project': 'facebookincubator/mvfst',
-    'fbcode_builder_spec': fbcode_builder_spec,
+    "github_project": "facebookincubator/mvfst",
+    "fbcode_builder_spec": fbcode_builder_spec,
 }
