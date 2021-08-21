@@ -272,6 +272,8 @@ struct TransportSettings {
   bool earlyRetransmit0Rtt{false};
   // Experimental persistent congestion flag
   bool experimentalPersistentCongestion{false};
+  // Whether to use JumpStarter as the CongestionControllerFactory
+  bool useJumpStart{false};
 };
 
 } // namespace quic
