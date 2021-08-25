@@ -809,6 +809,10 @@ class QuicTransportBase : public QuicSocket {
     }
   }
 
+  void resetConnectionCallbacks() {
+    connCallback_ = nullptr;
+  }
+
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionCallback* connCallback_{nullptr};

@@ -62,7 +62,7 @@ QuicServerTransport::~QuicServerTransport() {
   VLOG(10) << "Destroyed connection to client=" << *this;
   // The caller probably doesn't need the conn callback after destroying the
   // transport.
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
   closeImpl(
       std::make_pair(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),

@@ -141,7 +141,7 @@ const folly::SocketAddress& QuicTransportBase::getLocalAddress() const {
 }
 
 QuicTransportBase::~QuicTransportBase() {
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
 
   closeImpl(
       std::make_pair(
@@ -179,7 +179,7 @@ void QuicTransportBase::close(
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   // The caller probably doesn't need a conn callback any more because they
   // explicitly called close.
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
 
   // If we were called with no error code, ensure that we are going to write
   // an application close, so the peer knows it didn't come from the transport.
@@ -220,7 +220,7 @@ void QuicTransportBase::closeGracefully() {
     return;
   }
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
   closeState_ = CloseState::GRACEFUL_CLOSING;
   updatePacingOnClose(*conn_);
   if (conn_->qLogger) {
@@ -420,7 +420,7 @@ void QuicTransportBase::closeImpl(
   }
 
   // can't invoke connection callbacks any more.
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
 
   // Don't need outstanding packets.
   conn_->outstandings.packets.clear();

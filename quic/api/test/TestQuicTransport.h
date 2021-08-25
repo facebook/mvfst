@@ -36,7 +36,7 @@ class TestQuicTransport
 
   ~TestQuicTransport() override {
     // we need to call close in the derived class.
-    connCallback_ = nullptr;
+    resetConnectionCallbacks();
     closeImpl(
         std::make_pair(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),

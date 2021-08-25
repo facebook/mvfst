@@ -91,7 +91,7 @@ QuicClientTransport::~QuicClientTransport() {
   VLOG(10) << "Destroyed connection to server=" << conn_->peerAddress;
   // The caller probably doesn't need the conn callback after destroying the
   // transport.
-  connCallback_ = nullptr;
+  resetConnectionCallbacks();
   // Close without draining.
   closeImpl(
       std::make_pair(

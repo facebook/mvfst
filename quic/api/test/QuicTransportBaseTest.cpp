@@ -210,7 +210,7 @@ class TestQuicTransport
   }
 
   ~TestQuicTransport() override {
-    connCallback_ = nullptr;
+    resetConnectionCallbacks();
     // we need to call close in the derived class.
     closeImpl(
         std::make_pair(
