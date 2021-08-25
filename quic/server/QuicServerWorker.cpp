@@ -978,7 +978,7 @@ void QuicServerWorker::sendRetryPacket(
   Buf pseudoRetryPacketBuf = std::move(pseudoBuilder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
-      pseudoRetryPacketBuf.get());
+      QuicVersion::MVFST_INVALID, pseudoRetryPacketBuf.get());
 
   // Create the actual retry packet
   RetryPacketBuilder builder(

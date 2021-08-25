@@ -51,6 +51,7 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
 
   std::vector<fizz::Extension> getExtensions(
       const fizz::ClientHello& chlo) override {
+    fizz::validateTransportExtensions(chlo.extensions, encodingVersion_);
     auto clientParams =
         fizz::getClientExtension(chlo.extensions, encodingVersion_);
 
@@ -64,7 +65,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     std::vector<fizz::Extension> exts;
 
     ServerTransportParameters params;
-    if (encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+    if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
+        encodingVersion_ == QuicVersion::QUIC_V1) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::original_destination_connection_id,
           originalDestinationCid_));
@@ -96,7 +98,8 @@ class ServerTransportParametersExtension : public fizz::ServerExtensions {
     statelessReset.value = folly::IOBuf::copyBuffer(token_);
     params.parameters.push_back(std::move(statelessReset));
 
-    if (encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+    if (encodingVersion_ == QuicVersion::QUIC_DRAFT ||
+        encodingVersion_ == QuicVersion::QUIC_V1) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,
           initialSourceCid_));

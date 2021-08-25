@@ -86,6 +86,29 @@ TEST_F(FizzCryptoFactoryTest, TestDraft29ClearTextCipher) {
   EXPECT_EQ(trafficIvHex, expectedIv);
 }
 
+TEST_F(FizzCryptoFactoryTest, TestV1ClearTextCipher) {
+  // test vector taken from
+  // https://datatracker.ietf.org/doc/html/rfc9001#appendix-A
+  auto connid = folly::unhexlify("8394c8f03e515708");
+  std::vector<uint8_t> destinationConnidVector;
+  for (size_t i = 0; i < connid.size(); ++i) {
+    destinationConnidVector.push_back(connid.data()[i]);
+  }
+  ConnectionId destinationConnid(destinationConnidVector);
+  auto fizzFactory = std::make_shared<QuicFizzTestFactory>();
+  fizzFactory->setMockAead(createMockAead());
+  auto aead =
+      FizzCryptoTestFactory(fizzFactory)
+          .getClientInitialCipher(destinationConnid, QuicVersion::QUIC_V1);
+
+  std::string expectedKey = "1f369613dd76d5467730efcbe3b1a22d";
+  std::string expectedIv = "fa044b2f42a3fd3b46fb255c";
+  auto trafficKeyHex = folly::hexlify(trafficKey_->key->coalesce());
+  auto trafficIvHex = folly::hexlify(trafficKey_->iv->coalesce());
+  EXPECT_EQ(trafficKeyHex, expectedKey);
+  EXPECT_EQ(trafficIvHex, expectedIv);
+}
+
 TEST_F(FizzCryptoFactoryTest, TestPacketEncryptionKey) {
   FizzCryptoTestFactory cryptoFactory;
   cryptoFactory.setDefault();

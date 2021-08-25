@@ -56,7 +56,8 @@ class FizzClientExtensions : public fizz::ClientExtensions {
     params.parameters.push_back(encodeIntegerParameter(
         TransportParameterId::active_connection_id_limit,
         clientParameters_->activeConnectionLimit_));
-    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_DRAFT) {
+    if (clientParameters_->encodingVersion_ == QuicVersion::QUIC_DRAFT ||
+        clientParameters_->encodingVersion_ == QuicVersion::QUIC_V1) {
       params.parameters.push_back(encodeConnIdParameter(
           TransportParameterId::initial_source_connection_id,
           clientParameters_->initialSourceCid_));
@@ -74,6 +75,8 @@ class FizzClientExtensions : public fizz::ClientExtensions {
 
   void onEncryptedExtensions(
       const std::vector<fizz::Extension>& exts) override {
+    fizz::validateTransportExtensions(
+        exts, clientParameters_->encodingVersion_);
     auto serverParams =
         fizz::getServerExtension(exts, clientParameters_->encodingVersion_);
     if (!serverParams) {

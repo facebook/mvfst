@@ -15,6 +15,15 @@
 
 namespace quic {
 
+inline fizz::ExtensionType getQuicTransportParametersExtention(
+    QuicVersion version) {
+  if (version == QuicVersion::QUIC_V1) {
+    return fizz::ExtensionType::quic_transport_parameters;
+  } else {
+    return fizz::ExtensionType::quic_transport_parameters_draft;
+  }
+}
+
 inline void encodeVarintParams(
     const std::vector<TransportParameter>& parameters,
     BufAppender& appender) {
@@ -51,10 +60,8 @@ inline void decodeVarintParams(
 inline fizz::Extension encodeExtension(
     const quic::ClientTransportParameters& params,
     QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
   fizz::Extension ext;
-  ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
+  ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
   ext.extension_data = folly::IOBuf::create(0);
   BufAppender appender(ext.extension_data.get(), 40);
   encodeVarintParams(params.parameters, appender);
@@ -64,10 +71,8 @@ inline fizz::Extension encodeExtension(
 inline fizz::Extension encodeExtension(
     const quic::ServerTransportParameters& params,
     QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
   fizz::Extension ext;
-  ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
+  ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
   ext.extension_data = folly::IOBuf::create(0);
   BufAppender appender(ext.extension_data.get(), 40);
   encodeVarintParams(params.parameters, appender);
@@ -77,10 +82,8 @@ inline fizz::Extension encodeExtension(
 inline fizz::Extension encodeExtension(
     const quic::TicketTransportParameters& params,
     QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
   fizz::Extension ext;
-  ext.extension_type = fizz::ExtensionType::quic_transport_parameters;
+  ext.extension_type = getQuicTransportParametersExtention(encodingVersion);
   ext.extension_data = folly::IOBuf::create(0);
   BufAppender appender(ext.extension_data.get(), 40);
   encodeVarintParams(params.parameters, appender);
@@ -94,9 +97,8 @@ namespace fizz {
 inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
-  auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
+  auto extensionType = getQuicTransportParametersExtention(encodingVersion);
+  auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
     return folly::none;
   }
@@ -109,9 +111,8 @@ inline folly::Optional<quic::ClientTransportParameters> getClientExtension(
 inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
-  auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
+  auto extensionType = getQuicTransportParametersExtention(encodingVersion);
+  auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
     return folly::none;
   }
@@ -124,9 +125,8 @@ inline folly::Optional<quic::ServerTransportParameters> getServerExtension(
 inline folly::Optional<quic::TicketTransportParameters> getTicketExtension(
     const std::vector<Extension>& extensions,
     quic::QuicVersion encodingVersion) {
-  // Silence the unused variable warning . It will be used for Quic V1.
-  (void)encodingVersion;
-  auto it = findExtension(extensions, ExtensionType::quic_transport_parameters);
+  auto extensionType = getQuicTransportParametersExtention(encodingVersion);
+  auto it = findExtension(extensions, extensionType);
   if (it == extensions.end()) {
     return folly::none;
   }
@@ -134,6 +134,57 @@ inline folly::Optional<quic::TicketTransportParameters> getTicketExtension(
   folly::io::Cursor cursor(it->extension_data.get());
   decodeVarintParams(parameters.parameters, cursor);
   return parameters;
+}
+
+// Performs any required validation checks on the given extensions
+//
+// Currently verifies that the QUIC transport params extension
+// uses the correct extension number for the Quic version,
+// and that the extension list does not have more than
+// one QUIC transport params extension.
+//
+// Throws an error on an invalid list of extensions.
+inline void validateTransportExtensions(
+    const std::vector<Extension>& extensions,
+    const quic::QuicVersion encodingVersion) {
+  auto found = false;
+  for (const auto& extension : extensions) {
+    if (extension.extension_type ==
+            fizz::ExtensionType::quic_transport_parameters ||
+        extension.extension_type ==
+            fizz::ExtensionType::quic_transport_parameters_draft) {
+      if (found) {
+        // This is a duplicate.
+        throw fizz::FizzException(
+            "duplicate quic transport parameters extension",
+            fizz::AlertDescription::illegal_parameter);
+      } else if (
+          encodingVersion == quic::QuicVersion::QUIC_V1 &&
+          extension.extension_type !=
+              fizz::ExtensionType::quic_transport_parameters) {
+        // This is QUIC v1 using an incorrect transport parameters extension
+        // type
+        throw fizz::FizzException(
+            fmt::format(
+                "unexpected extension type ({:#x}) for quic v1",
+                extension.extension_type),
+            fizz::AlertDescription::illegal_parameter);
+      } else if (
+          (encodingVersion == quic::QuicVersion::QUIC_DRAFT ||
+           encodingVersion == quic::QuicVersion::QUIC_DRAFT_LEGACY) &&
+          extension.extension_type !=
+              fizz::ExtensionType::quic_transport_parameters_draft) {
+        // This is a QUIC draft version using an incorrect transport parameters
+        // extension type
+        throw fizz::FizzException(
+            fmt::format(
+                "unexpected extension type ({:#x}) for quic draft version",
+                extension.extension_type),
+            fizz::AlertDescription::illegal_parameter);
+      }
+      found = true;
+    }
+  }
 }
 
 namespace detail {

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <folly/io/IOBuf.h>
+#include <quic/QuicConstants.h>
 
 namespace quic {
 
@@ -11,6 +12,7 @@ class RetryIntegrityTagGenerator {
   virtual ~RetryIntegrityTagGenerator() = default;
 
   virtual std::unique_ptr<folly::IOBuf> getRetryIntegrityTag(
+      QuicVersion version,
       const folly::IOBuf* pseudoRetryPacket) = 0;
 };
 

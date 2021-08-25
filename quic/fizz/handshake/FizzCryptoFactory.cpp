@@ -23,6 +23,9 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
   auto connIdRange = folly::range(clientDestinationConnId);
   folly::StringPiece salt;
   switch (version) {
+    case QuicVersion::QUIC_V1:
+      salt = kQuicV1Salt;
+      break;
     case QuicVersion::QUIC_DRAFT:
       salt = kQuicDraft29Salt;
       break;

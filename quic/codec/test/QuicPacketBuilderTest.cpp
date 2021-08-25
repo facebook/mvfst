@@ -612,7 +612,7 @@ TEST_F(QuicPacketBuilderTest, PseudoRetryPacket) {
   Buf pseudoRetryPacketBuf = std::move(builder).buildPacket();
   FizzRetryIntegrityTagGenerator fizzRetryIntegrityTagGenerator;
   auto integrityTag = fizzRetryIntegrityTagGenerator.getRetryIntegrityTag(
-      pseudoRetryPacketBuf.get());
+      quicVersion, pseudoRetryPacketBuf.get());
   Buf expectedIntegrityTag = folly::IOBuf::copyBuffer(
       "\xd1\x69\x26\xd8\x1f\x6f\x9c\xa2\x95\x3a\x8a\xa4\x57\x5e\x1e\x49");
 

@@ -948,6 +948,8 @@ INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTest,
     ::testing::Values(
         TestingParams(QuicVersion::MVFST),
+        TestingParams(QuicVersion::QUIC_V1),
+        TestingParams(QuicVersion::QUIC_V1, 0),
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
@@ -1202,7 +1204,10 @@ class QuicClientTransportTest : public Test {
     destructionCallback = std::make_shared<DestructionCallback>();
     client->setDestructionCallback(destructionCallback);
     client->setSupportedVersions(
-        {QuicVersion::MVFST, MVFST1, QuicVersion::QUIC_DRAFT});
+        {QuicVersion::MVFST,
+         MVFST1,
+         QuicVersion::QUIC_V1,
+         QuicVersion::QUIC_DRAFT});
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ON_CALL(*sock, resumeRead(_))
         .WillByDefault(SaveArg<0>(&networkReadCallback));
@@ -1624,7 +1629,7 @@ class QuicClientTransportTest : public Test {
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   folly::Optional<ConnectionId> originalConnId;
   folly::Optional<ConnectionId> serverChosenConnId;
-  QuicVersion version{QuicVersion::QUIC_DRAFT};
+  QuicVersion version{QuicVersion::QUIC_V1};
 };
 
 TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
@@ -3954,7 +3959,7 @@ class QuicClientTransportAfterStartTestTimeout
 INSTANTIATE_TEST_CASE_P(
     QuicClientTransportAfterStartTestTimeouts,
     QuicClientTransportAfterStartTestTimeout,
-    Values(QuicVersion::MVFST, QuicVersion::QUIC_DRAFT));
+    Values(QuicVersion::MVFST, QuicVersion::QUIC_V1, QuicVersion::QUIC_DRAFT));
 
 TEST_P(
     QuicClientTransportAfterStartTestTimeout,
@@ -6068,8 +6073,8 @@ class QuicProcessDataTest : public QuicClientTransportAfterStartTestBase,
 
   void start() override {
     // force the server to declare that the version negotiated was invalid.;
-    mockClientHandshake->negotiatedVersion = QuicVersion::QUIC_DRAFT;
-    client->setSupportedVersions({QuicVersion::QUIC_DRAFT});
+    mockClientHandshake->negotiatedVersion = QuicVersion::QUIC_V1;
+    client->setSupportedVersions({QuicVersion::QUIC_V1});
     client->start(&clientConnCallback);
     setConnectionIds();
   }
@@ -6099,7 +6104,7 @@ TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
       *serverChosenConnId,
       *originalConnId,
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Initial,
       *serverHello,
       aead,
@@ -6138,7 +6143,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       *serverChosenConnId,
       *originalConnId,
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Initial,
       *serverHello,
       aead,
@@ -6175,7 +6180,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       *serverChosenConnId,
       *originalConnId,
       handshakePacketNum++,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Handshake,
       *cryptoData,
       *createNoOpAead(),
@@ -6206,7 +6211,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingData) {
       *serverChosenConnId,
       *originalConnId,
       handshakePacketNum++,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Handshake,
       *cryptoData,
       *createNoOpAead(),
@@ -6247,7 +6252,7 @@ TEST_F(QuicProcessDataTest, ProcessPendingDataBufferLimit) {
       *serverChosenConnId,
       *originalConnId,
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Initial,
       *serverHello,
       aead,
@@ -6348,7 +6353,7 @@ TEST_P(QuicProcessDataTest, ProcessDataHeaderOnly) {
       *serverChosenConnId,
       *originalConnId,
       nextPacketNum,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::QUIC_V1,
       ProtectionType::Initial,
       *serverHello,
       aead,

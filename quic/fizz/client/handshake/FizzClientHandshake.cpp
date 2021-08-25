@@ -121,8 +121,8 @@ bool FizzClientHandshake::verifyRetryIntegrityTag(
   Buf pseudoRetryPacket = std::move(pseudoRetryPacketBuilder).buildPacket();
 
   FizzRetryIntegrityTagGenerator retryIntegrityTagGenerator;
-  auto expectedIntegrityTag =
-      retryIntegrityTagGenerator.getRetryIntegrityTag(pseudoRetryPacket.get());
+  auto expectedIntegrityTag = retryIntegrityTagGenerator.getRetryIntegrityTag(
+      retryPacket.header.getVersion(), pseudoRetryPacket.get());
 
   return folly::IOBufEqualTo()(
       *expectedIntegrityTag, *retryPacket.integrityTag);
