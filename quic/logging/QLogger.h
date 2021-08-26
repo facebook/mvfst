@@ -68,6 +68,7 @@ class QLogger {
     uint64_t currentConnFlowControl{};
     bool usedZeroRtt{};
     QuicVersion quicVersion{QuicVersion::MVFST_INVALID};
+    uint64_t dsrPacketCount{};
   };
   virtual void addTransportSummary(const TransportSummaryArgs& args) = 0;
   virtual void addCongestionMetricUpdate(

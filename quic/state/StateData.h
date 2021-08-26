@@ -813,6 +813,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // in the Observers, to construct Write Blocks
   uint64_t writeCount{0};
 
+  // Number of DSR packets sent by this connection.
+  uint64_t dsrPacketCount{0};
+
   // Whether we successfully used 0-RTT keys in this connection.
   bool usedZeroRtt{false};
 

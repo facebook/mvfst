@@ -195,6 +195,7 @@ void FileQLogger::addTransportSummary(const TransportSummaryArgs& args) {
       args.currentConnFlowControl,
       args.usedZeroRtt,
       args.quicVersion,
+      args.dsrPacketCount,
       refTime));
 }
 

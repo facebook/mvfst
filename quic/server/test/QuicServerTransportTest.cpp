@@ -4315,6 +4315,7 @@ TEST_F(
 
 TEST_F(QuicServerTransportTest, WriteDSR) {
   server->getNonConstConn().transportSettings.dsrEnabled = true;
+  EXPECT_EQ(server->getConn().dsrPacketCount, 0);
   // Make sure we are post-handshake
   ASSERT_NE(nullptr, server->getConn().oneRttWriteCipher);
   // Rinse anything pending
@@ -4336,6 +4337,7 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   EXPECT_TRUE(server->getConn().outstandings.packets.back().isDSRPacket);
   EXPECT_CALL(*rawDSRSender, release()).Times(1);
   server->resetStream(streamId, GenericApplicationErrorCode::NO_ERROR);
+  EXPECT_EQ(server->getConn().dsrPacketCount, 1);
 }
 
 } // namespace test

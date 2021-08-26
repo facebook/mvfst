@@ -87,6 +87,7 @@ uint64_t writePacketizationRequest(
         // used, so setting it to 0
         0,
         true /* isDSRPacket */);
+    connection.dsrPacketCount++;
 
     if (instructionAddError) {
       // TODO: Support empty write loop detection
