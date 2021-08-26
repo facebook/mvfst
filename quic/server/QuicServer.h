@@ -192,6 +192,13 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void rejectNewConnections(std::function<bool()> rejectFn);
 
   /**
+   * Tells the server to begin rejecting any new connections with block listed
+   * source ports. Like rejectNewConnections above, the parameter function is
+   * stored and evaluated on each new connection before being accepted.
+   */
+  void blockListedSrcPort(std::function<bool(uint16_t)> isBlockListedSrcPort);
+
+  /**
    * Returns listening address of this server
    */
   const folly::SocketAddress& getAddress() const;
@@ -430,6 +437,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   uint32_t hostId_{0};
   ConnectionIdVersion cidVersion_{ConnectionIdVersion::V1};
   std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool(uint16_t)> isBlockListedSrcPort_{
+      [](uint16_t) { return false; }};
   // factory to create per worker QuicTransportStatsCallback
   std::unique_ptr<QuicTransportStatsCallbackFactory> transportStatsFactory_;
   // factory to create per worker ConnectionIdAlgo

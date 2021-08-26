@@ -871,6 +871,7 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
 
 TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   folly::SocketAddress blockedSrcPort("1.2.3.4", 443);
+  worker_->setIsBlockListedSrcPort([](uint16_t port) { return port == 443; });
   auto data = createData(kDefaultUDPSendPacketLen);
   auto connId = ConnectionId(std::vector<uint8_t>());
   PacketNum num = 1;

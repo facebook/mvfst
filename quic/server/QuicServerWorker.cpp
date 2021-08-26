@@ -21,6 +21,7 @@
 #define SOF_TIMESTAMPING_SOFTWARE 0
 #endif
 
+#include <folly/Conv.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/fizz/handshake/FizzRetryIntegrityTagGenerator.h>
@@ -30,14 +31,6 @@
 #include <quic/server/handshake/RetryTokenGenerator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/QuicConnectionStats.h>
-
-namespace {
-bool isBlockListedSourcePort(uint16_t srcPort) {
-  // Generically privileged ports.
-  // TODO make configurable, allow individual ports.
-  return srcPort < 1024;
-}
-} // namespace
 
 namespace quic {
 
@@ -340,7 +333,7 @@ void QuicServerWorker::handleNetworkData(
       return;
     }
 
-    if (isBlockListedSourcePort(client.getPort())) {
+    if (isBlockListedSrcPort_(client.getPort())) {
       VLOG(4) << "Dropping packet with blocklisted src port: "
               << client.getPort();
       QUIC_STATS(
@@ -1122,6 +1115,11 @@ void QuicServerWorker::setTransportSettings(
 void QuicServerWorker::rejectNewConnections(
     std::function<bool()> rejectNewConnections) {
   rejectNewConnections_ = std::move(rejectNewConnections);
+}
+
+void QuicServerWorker::setIsBlockListedSrcPort(
+    std::function<bool(uint16_t)> isBlockListedSrcPort) {
+  isBlockListedSrcPort_ = std::move(isBlockListedSrcPort);
 }
 
 void QuicServerWorker::setHealthCheckToken(

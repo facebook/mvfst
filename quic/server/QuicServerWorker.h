@@ -280,6 +280,12 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   void rejectNewConnections(std::function<bool()> rejectNewConnections);
 
   /**
+   * If true, begin rejecting connections with block listed source ports
+   */
+  void setIsBlockListedSrcPort(
+      std::function<bool(uint16_t)> isBlockListedSrcPort_);
+
+  /**
    * Set a health-check token that can be used to ping if the server is alive
    */
   void setHealthCheckToken(const std::string& healthCheckToken);
@@ -565,6 +571,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   uint32_t numGROBuffers_{kDefaultNumGROBuffers};
   folly::Optional<Buf> healthCheckToken_;
   std::function<bool()> rejectNewConnections_{[]() { return false; }};
+  std::function<bool(uint16_t)> isBlockListedSrcPort_{
+      [](uint16_t) { return false; }};
   uint8_t workerId_{0};
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   uint32_t hostId_{0};

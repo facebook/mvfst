@@ -638,6 +638,14 @@ void QuicServer::rejectNewConnections(std::function<bool()> rejectFn) {
   });
 }
 
+void QuicServer::blockListedSrcPort(
+    std::function<bool(uint16_t)> isBlockListedSrcPort) {
+  isBlockListedSrcPort_ = isBlockListedSrcPort;
+  runOnAllWorkers([isBlockListedSrcPort](auto worker) mutable {
+    worker->setIsBlockListedSrcPort(isBlockListedSrcPort);
+  });
+}
+
 void QuicServer::startPacketForwarding(const folly::SocketAddress& destAddr) {
   if (initialized_) {
     runOnAllWorkersSync([destAddr](auto worker) mutable {
