@@ -39,7 +39,8 @@ class QuicTransportBase : public QuicSocket {
  public:
   QuicTransportBase(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket);
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      bool useSplitConnectionCallbacks = false);
 
   ~QuicTransportBase() override;
 
@@ -875,6 +876,11 @@ class QuicTransportBase : public QuicSocket {
   std::shared_ptr<ObserverVec> observers_{std::make_shared<ObserverVec>()};
 
   uint64_t qlogRefcnt_{0};
+
+  // Temp flag controlling which connection callbacks to use - old single
+  // callback object or two new split callback objects. Will be removed out once
+  // mvfst is switched to the new split callbacks eventually.
+  bool useSplitConnectionCallbacks_{false};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

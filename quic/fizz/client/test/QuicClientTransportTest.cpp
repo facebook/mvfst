@@ -85,12 +85,14 @@ class TestingQuicClientTransport : public QuicClientTransport {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-      size_t connIdSize = kDefaultConnectionIdSize)
+      size_t connIdSize = kDefaultConnectionIdSize,
+      bool useSplitConnectionCallbacks = false)
       : QuicClientTransport(
             evb,
             std::move(socket),
             std::move(handshakeFactory),
-            connIdSize) {}
+            connIdSize,
+            useSplitConnectionCallbacks) {}
 
   ~TestingQuicClientTransport() override {
     if (destructionCallback_) {

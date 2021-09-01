@@ -29,7 +29,8 @@ namespace quic {
 
 QuicTransportBase::QuicTransportBase(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket)
+    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    bool useSplitConnectionCallbacks)
     : evb_(evb),
       socket_(std::move(socket)),
       lossTimeout_(this),
@@ -52,7 +53,8 @@ QuicTransportBase::QuicTransportBase(
       writeLooper_(new FunctionLooper(
           evb,
           [this](bool fromTimer) { pacedWriteDataToSocket(fromTimer); },
-          LooperType::WriteLooper)) {
+          LooperType::WriteLooper)),
+      useSplitConnectionCallbacks_(useSplitConnectionCallbacks) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
       return conn_->pacer->getTimeUntilNextWrite();

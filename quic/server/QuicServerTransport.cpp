@@ -43,7 +43,11 @@ QuicServerTransport::QuicServerTransport(
     ConnectionCallback& cb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory)
-    : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
+    : QuicTransportBase(
+          evb,
+          std::move(sock),
+          false /* useSplitConnectionCallbacks */),
+      ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)
