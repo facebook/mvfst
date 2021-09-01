@@ -761,7 +761,7 @@ void QuicClientTransport::onReadData(
   }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
-    CHECK_NOTNULL(connCallback_)->onTransportReady();
+    connCallback_->onTransportReady();
   }
 
   // Checking connCallback_ because application will start to write data

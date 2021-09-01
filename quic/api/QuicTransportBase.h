@@ -811,6 +811,10 @@ class QuicTransportBase : public QuicSocket {
   }
 
   void resetConnectionCallbacks() {
+    if (!connCallback_) {
+      return;
+    }
+    connCallback_->resetConnectionCallbacks();
     connCallback_ = nullptr;
   }
 
@@ -819,9 +823,69 @@ class QuicTransportBase : public QuicSocket {
   void processConnectionEndError(
       const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
 
+  class CallbackDispatcher : public ConnectionCallback {
+   public:
+    explicit CallbackDispatcher(ConnectionCallback* connCallback)
+        : connCallback_(connCallback) {}
+
+    void onFlowControlUpdate(StreamId id) noexcept override {
+      CHECK_NOTNULL(connCallback_)->onFlowControlUpdate(id);
+    }
+    void onNewBidirectionalStream(StreamId id) noexcept override {
+      CHECK_NOTNULL(connCallback_)->onNewBidirectionalStream(id);
+    }
+    void onNewUnidirectionalStream(StreamId id) noexcept override {
+      CHECK_NOTNULL(connCallback_)->onNewUnidirectionalStream(id);
+    }
+    void onStopSending(StreamId id, ApplicationErrorCode error) noexcept
+        override {
+      CHECK_NOTNULL(connCallback_)->onStopSending(id, error);
+    }
+    void onConnectionEnd() noexcept override {
+      CHECK_NOTNULL(connCallback_)->onConnectionEnd();
+    }
+    void onConnectionError(
+        std::pair<QuicErrorCode, std::string> code) noexcept override {
+      CHECK_NOTNULL(connCallback_)->onConnectionError(std::move(code));
+    }
+    void onReplaySafe() noexcept override {
+      CHECK_NOTNULL(connCallback_)->onReplaySafe();
+    }
+    void onTransportReady() noexcept override {
+      CHECK_NOTNULL(connCallback_)->onTransportReady();
+    }
+    void onFirstPeerPacketProcessed() noexcept override {
+      CHECK_NOTNULL(connCallback_)->onFirstPeerPacketProcessed();
+    }
+    void onBidirectionalStreamsAvailable(
+        uint64_t numStreamsAvailable) noexcept override {
+      CHECK_NOTNULL(connCallback_)
+          ->onBidirectionalStreamsAvailable(numStreamsAvailable);
+    }
+    void onUnidirectionalStreamsAvailable(
+        uint64_t numStreamsAvailable) noexcept override {
+      CHECK_NOTNULL(connCallback_)
+          ->onUnidirectionalStreamsAvailable(numStreamsAvailable);
+    }
+    void onAppRateLimited() noexcept override {
+      CHECK_NOTNULL(connCallback_)->onAppRateLimited();
+    }
+    void onKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override {
+      CHECK_NOTNULL(connCallback_)
+          ->onKnob(knobSpace, knobId, std::move(knobBlob));
+    }
+
+    void resetConnectionCallbacks() {
+      connCallback_ = nullptr;
+    }
+
+   private:
+    ConnectionCallback* connCallback_{nullptr};
+  };
+
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
-  ConnectionCallback* connCallback_{nullptr};
+  std::unique_ptr<CallbackDispatcher> connCallback_;
 
   std::
       unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>

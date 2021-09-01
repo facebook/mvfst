@@ -1483,7 +1483,7 @@ void QuicTransportBase::handleNewStreamCallbacks(
 
   const auto& newPeerStreams = streamStorage;
   for (const auto& stream : newPeerStreams) {
-    CHECK_NOTNULL(connCallback_);
+    CHECK_NOTNULL(connCallback_.get());
     if (isBidirectionalStream(stream)) {
       connCallback_->onNewBidirectionalStream(stream);
     } else {
@@ -1554,7 +1554,7 @@ void QuicTransportBase::handleStreamFlowControlUpdatedCallbacks(
       pendingWriteCallbacks_.erase(streamId);
       continue;
     }
-    CHECK_NOTNULL(connCallback_)->onFlowControlUpdate(streamId);
+    connCallback_->onFlowControlUpdate(streamId);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
@@ -1581,7 +1581,7 @@ void QuicTransportBase::handleStreamStopSendingCallbacks() {
   const auto stopSendingStreamsCopy =
       conn_->streamManager->consumeStopSending();
   for (const auto& itr : stopSendingStreamsCopy) {
-    CHECK_NOTNULL(connCallback_)->onStopSending(itr.first, itr.second);
+    connCallback_->onStopSending(itr.first, itr.second);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
@@ -2588,7 +2588,7 @@ void QuicTransportBase::setSupportedVersions(
 }
 
 void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
-  connCallback_ = CHECK_NOTNULL(callback);
+  connCallback_ = std::make_unique<CallbackDispatcher>(CHECK_NOTNULL(callback));
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(
