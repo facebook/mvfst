@@ -814,6 +814,11 @@ class QuicTransportBase : public QuicSocket {
     connCallback_ = nullptr;
   }
 
+  bool processCancelCode(
+      const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
+  void processConnectionEndError(
+      const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
+
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionCallback* connCallback_{nullptr};

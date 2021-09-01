@@ -393,34 +393,7 @@ void QuicTransportBase::closeImpl(
   conn_->ackStates.handshakeAckState.acks.clear();
   conn_->ackStates.appDataAckState.acks.clear();
 
-  // connCallback_ could be null if start() was never invoked and the
-  // transport was destroyed or if the app initiated close.
-  if (connCallback_) {
-    bool noError = false;
-    switch (cancelCode.first.type()) {
-      case QuicErrorCode::Type::LocalErrorCode: {
-        LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
-        noError = localErrorCode == LocalErrorCode::NO_ERROR ||
-            localErrorCode == LocalErrorCode::IDLE_TIMEOUT;
-        break;
-      }
-      case QuicErrorCode::Type::TransportErrorCode: {
-        TransportErrorCode transportErrorCode =
-            *cancelCode.first.asTransportErrorCode();
-        noError = transportErrorCode == TransportErrorCode::NO_ERROR;
-        break;
-      }
-      case QuicErrorCode::Type::ApplicationErrorCode:
-        auto appErrorCode = *cancelCode.first.asApplicationErrorCode();
-        noError = appErrorCode == GenericApplicationErrorCode::NO_ERROR;
-    }
-    if (noError) {
-      connCallback_->onConnectionEnd();
-    } else {
-      connCallback_->onConnectionError(
-          std::make_pair(cancelCode.first, cancelCode.second.str()));
-    }
-  }
+  processConnectionEndError(cancelCode);
 
   // can't invoke connection callbacks any more.
   resetConnectionCallbacks();
@@ -455,6 +428,44 @@ void QuicTransportBase::closeImpl(
             kDrainFactor * calculatePTO(*conn_)));
   } else {
     drainTimeoutExpired();
+  }
+}
+
+bool QuicTransportBase::processCancelCode(
+    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+  bool noError = false;
+  switch (cancelCode.first.type()) {
+    case QuicErrorCode::Type::LocalErrorCode: {
+      LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
+      noError = localErrorCode == LocalErrorCode::NO_ERROR ||
+          localErrorCode == LocalErrorCode::IDLE_TIMEOUT;
+      break;
+    }
+    case QuicErrorCode::Type::TransportErrorCode: {
+      TransportErrorCode transportErrorCode =
+          *cancelCode.first.asTransportErrorCode();
+      noError = transportErrorCode == TransportErrorCode::NO_ERROR;
+      break;
+    }
+    case QuicErrorCode::Type::ApplicationErrorCode:
+      auto appErrorCode = *cancelCode.first.asApplicationErrorCode();
+      noError = appErrorCode == GenericApplicationErrorCode::NO_ERROR;
+  }
+  return noError;
+}
+
+void QuicTransportBase::processConnectionEndError(
+    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+  // connCallback_ could be null if start() was never invoked and the
+  // transport was destroyed or if the app initiated close.
+  if (connCallback_) {
+    bool noError = processCancelCode(cancelCode);
+    if (noError) {
+      connCallback_->onConnectionEnd();
+    } else {
+      connCallback_->onConnectionError(
+          std::make_pair(cancelCode.first, cancelCode.second.str()));
+    }
   }
 }
 
