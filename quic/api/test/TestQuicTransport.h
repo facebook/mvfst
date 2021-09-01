@@ -144,6 +144,10 @@ class TestQuicTransport
     notifyAppRateLimited();
   }
 
+  void setTransportReadyNotified(bool transportReadyNotified) {
+    transportReadyNotified_ = transportReadyNotified;
+  }
+
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   bool closed{false};

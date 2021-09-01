@@ -2872,7 +2872,9 @@ void QuicTransportBase::writeSocketData() {
           conn_->congestionController->getWritableBytes()) {
         conn_->congestionController->setAppLimited();
         // notify via connection call and any observer callbacks
-        connCallback_->onAppRateLimited();
+        if (transportReadyNotified_) {
+          connCallback_->onAppRateLimited();
+        }
         notifyAppRateLimited();
         conn_->waitingForAppData = true;
       }

@@ -333,6 +333,7 @@ TEST_F(QuicTransportTest, AppLimited) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(5000));
 
+  transport_->setTransportReadyNotified(true);
   auto stream = transport_->createBidirectionalStream().value();
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
