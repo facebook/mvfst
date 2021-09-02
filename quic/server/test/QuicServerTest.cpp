@@ -371,7 +371,8 @@ std::string QuicServerWorkerTest::testSendRetry(
     ConnectionId& dstConnId,
     const folly::SocketAddress& clientAddr) {
   // Retry packet will only be sent if rate-limiting is configured
-  worker_->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(0, 60s));
+  worker_->setRateLimiter(
+      std::make_unique<SlidingWindowRateLimiter>([]() { return 0; }, 60s));
   EXPECT_CALL(*transportInfoCb_, onConnectionRateLimited()).Times(1);
   EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
   EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
@@ -485,7 +486,8 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
 }
 
 TEST_F(QuicServerWorkerTest, RateLimit) {
-  worker_->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(2, 60s));
+  worker_->setRateLimiter(
+      std::make_unique<SlidingWindowRateLimiter>([]() { return 2; }, 60s));
   EXPECT_CALL(*transportInfoCb_, onConnectionRateLimited()).Times(1);
 
   NiceMock<MockConnectionCallback> connCb1;

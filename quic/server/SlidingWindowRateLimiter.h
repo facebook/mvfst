@@ -20,13 +20,15 @@ namespace quic {
  */
 class SlidingWindowRateLimiter : public RateLimiter {
  public:
-  SlidingWindowRateLimiter(uint64_t count, std::chrono::seconds window)
-      : count_(count), window_(window) {}
+  SlidingWindowRateLimiter(
+      std::function<uint64_t()> count,
+      std::chrono::seconds window)
+      : count_(std::move(count)), window_(window) {}
 
   bool check(TimePoint time) override;
 
  private:
-  const uint64_t count_;
+  const std::function<uint64_t()> count_;
   const std::chrono::microseconds window_;
   folly::Optional<TimePoint> currentWindowStartPoint_{folly::none};
   uint64_t countInPrevWindow_{0};

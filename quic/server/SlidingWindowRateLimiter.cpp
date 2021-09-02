@@ -34,7 +34,7 @@ bool SlidingWindowRateLimiter::check(TimePoint time) {
           (static_cast<double>((window_ - timeElapsedSinceCurWindow).count()) /
            window_.count()) +
       countInCurWindow_ + 1;
-  bool limited = std::trunc(weightedCount) > count_;
+  bool limited = std::trunc(weightedCount) > count_();
   countInCurWindow_ = limited ? countInCurWindow_ : countInCurWindow_ + 1;
   return limited;
 }

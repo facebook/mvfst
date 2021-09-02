@@ -7,7 +7,7 @@
 using namespace quic;
 
 TEST(SlidingWindowRateLimiterTest, BasicExceedsCount) {
-  SlidingWindowRateLimiter limiter(10, 60s);
+  SlidingWindowRateLimiter limiter([]() { return 10; }, 60s);
   auto now = Clock::now();
   for (int i = 0; i < 10; i++) {
     EXPECT_FALSE(limiter.check(now));
@@ -17,7 +17,7 @@ TEST(SlidingWindowRateLimiterTest, BasicExceedsCount) {
 }
 
 TEST(SlidingWindowRateLimiterTest, SlidingNoExceedsCount) {
-  SlidingWindowRateLimiter limiter(10, 60s);
+  SlidingWindowRateLimiter limiter([]() { return 10; }, 60s);
   auto now = Clock::now();
   auto prevStart = now;
 
@@ -29,7 +29,7 @@ TEST(SlidingWindowRateLimiterTest, SlidingNoExceedsCount) {
 }
 
 TEST(SlidingWindowRateLimiterTest, SlidingExceedsCount) {
-  SlidingWindowRateLimiter limiter(10, 60s);
+  SlidingWindowRateLimiter limiter([]() { return 10; }, 60s);
   auto now = Clock::now();
   auto prevStart = now;
 
@@ -48,7 +48,7 @@ TEST(SlidingWindowRateLimiterTest, SlidingExceedsCount) {
 }
 
 TEST(SlidingWindowRateLimiterTest, QuiescentWindowNoExceeds) {
-  SlidingWindowRateLimiter limiter(10, 60s);
+  SlidingWindowRateLimiter limiter([]() { return 10; }, 60s);
   auto now = Clock::now();
   auto prevStart = now;
 

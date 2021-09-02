@@ -70,8 +70,10 @@ void QuicServer::setCongestionControllerFactory(
   ccFactory_ = std::move(ccFactory);
 }
 
-void QuicServer::setRateLimit(uint64_t count, std::chrono::seconds window) {
-  rateLimit_ = folly::make_optional<RateLimit>(count, window);
+void QuicServer::setRateLimit(
+    std::function<uint64_t()> count,
+    std::chrono::seconds window) {
+  rateLimit_ = folly::make_optional<RateLimit>(std::move(count), window);
 }
 
 void QuicServer::setSupportedVersion(const std::vector<QuicVersion>& versions) {

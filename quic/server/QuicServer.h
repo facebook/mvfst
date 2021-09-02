@@ -100,7 +100,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   void setCongestionControllerFactory(
       std::shared_ptr<CongestionControllerFactory> ccFactory);
 
-  void setRateLimit(uint64_t count, std::chrono::seconds window);
+  void setRateLimit(
+      std::function<uint64_t()> count,
+      std::chrono::seconds window);
 
   /**
    * Set list of supported QUICVersion for this server. These versions will be
@@ -452,8 +454,9 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   folly::SocketOptionMap socketOptions_;
   // Rate limits
   struct RateLimit {
-    RateLimit(uint64_t c, std::chrono::seconds w) : count(c), window(w) {}
-    uint64_t count;
+    RateLimit(std::function<uint64_t()> c, std::chrono::seconds w)
+        : count(std::move(c)), window(w) {}
+    std::function<uint64_t()> count;
     std::chrono::seconds window;
   };
   folly::Optional<RateLimit> rateLimit_;
