@@ -263,8 +263,6 @@ struct TransportSettings {
   D6DConfig d6dConfig;
   // Quic knobs
   std::vector<SerializedKnob> knobs;
-  // DSR enabling
-  bool dsrEnabled{false};
   // Datagram config
   DatagramConfig datagramConfig;
   // Whether or not to opportunistically retransmit 0RTT when the handshake

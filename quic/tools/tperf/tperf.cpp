@@ -531,7 +531,6 @@ class TPerfServer {
         std::chrono::seconds(FLAGS_d6d_blackhole_detection_window_secs);
     settings.d6dConfig.blackholeDetectionThreshold =
         FLAGS_d6d_blackhole_detection_threshold;
-    settings.dsrEnabled = dsrEnabled;
     server_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
     server_->setTransportSettings(settings);

@@ -4314,7 +4314,6 @@ TEST_F(
 }
 
 TEST_F(QuicServerTransportTest, WriteDSR) {
-  server->getNonConstConn().transportSettings.dsrEnabled = true;
   EXPECT_EQ(server->getConn().dsrPacketCount, 0);
   // Make sure we are post-handshake
   ASSERT_NE(nullptr, server->getConn().oneRttWriteCipher);

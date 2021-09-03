@@ -298,7 +298,7 @@ void QuicServerTransport::writeData() {
                        version,
                        packetLimit)
                        .packetsWritten;
-    if (packetLimit && conn_->transportSettings.dsrEnabled) {
+    if (packetLimit) {
       packetLimit -= writePacketizationRequest(
           *serverConn_, destConnId, packetLimit, *conn_->oneRttWriteCipher);
     }
