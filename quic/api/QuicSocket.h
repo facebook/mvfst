@@ -34,12 +34,45 @@ class DSRPacketizationRequestSender;
 class QuicSocket {
  public:
   /**
-   * Callback for connection level events.  This callback must be set at all
-   * times.
+   * Callback for connection set up events.
    */
-  class ConnectionCallback {
+  class ConnectionSetupCallback {
    public:
-    virtual ~ConnectionCallback() = default;
+    virtual ~ConnectionSetupCallback() = default;
+
+    /**
+     * Called after the transport successfully processes the received packet.
+     */
+    virtual void onFirstPeerPacketProcessed() noexcept {}
+
+    /**
+     * Invoked when the connection setup fails.
+     */
+    virtual void onConnectionSetupError(
+        std::pair<QuicErrorCode, std::string> code) noexcept = 0;
+
+    /**
+     * Called when the transport is ready to send/receive data.
+     * This can be potentially triggerred immidiately when using 0-RTT.
+     */
+    virtual void onTransportReady() noexcept {}
+
+    /**
+     * Client only.
+     * Called when the transport becomes replay safe - both crypto keys derived.
+     * Called after onTransportReady() and in case of 0-RTT, unlike
+     * onTransportReady(), signifies full crypto handshake finished.
+     */
+    virtual void onReplaySafe() noexcept {}
+  };
+
+  /**
+   * Callback for connection level events once connection is set up.
+   * The name is temporary until we phase out the old monolithic callback.
+   */
+  class ConnectionCallbackNew {
+   public:
+    virtual ~ConnectionCallbackNew() = default;
 
     /**
      * Invoked when stream id's flow control state changes.  This is an edge
@@ -61,7 +94,8 @@ class QuicSocket {
     virtual void onNewUnidirectionalStream(StreamId id) noexcept = 0;
 
     /**
-     * Invokved when a stream receives a StopSending frame from a peer.
+     * Invoked when a stream receives a StopSending frame from a peer.
+     * The application should reset the stream as part of this callback.
      */
     virtual void onStopSending(
         StreamId id,
@@ -78,22 +112,6 @@ class QuicSocket {
      */
     virtual void onConnectionError(
         std::pair<QuicErrorCode, std::string> code) noexcept = 0;
-
-    /**
-     * Client only.
-     * Called when the transport becomes replay safe.
-     */
-    virtual void onReplaySafe() noexcept {}
-
-    /**
-     * Called when the transport is ready to send/receive data.
-     */
-    virtual void onTransportReady() noexcept {}
-
-    /**
-     * Called after the transport successfully processes the received packet.
-     */
-    virtual void onFirstPeerPacketProcessed() noexcept {}
 
     /**
      * Called when more bidirectional streams become available for creation
@@ -119,6 +137,18 @@ class QuicSocket {
      */
     virtual void
     onKnob(uint64_t /*knobSpace*/, uint64_t /*knobId*/, Buf /*knobBlob*/) {}
+  };
+
+  /**
+   * Callback for connection level events.  This callback must be set at all
+   * times.
+   * This callback will be phased out with the two separate callbacks above to
+   * replace it.
+   */
+  class ConnectionCallback : public ConnectionSetupCallback,
+                             public ConnectionCallbackNew {
+    void onConnectionSetupError(
+        std::pair<QuicErrorCode, std::string>) noexcept override {}
   };
 
   /**
@@ -193,6 +223,19 @@ class QuicSocket {
    * Sets connection callback, must be set BEFORE using the socket.
    */
   virtual void setConnectionCallback(ConnectionCallback* callback) = 0;
+
+  /**
+   * Sets connection setup callback. This callback must be set before using the
+   * socket.
+   */
+  virtual void setConnectionSetupCallback(
+      ConnectionSetupCallback* callback) = 0;
+
+  /**
+   * Sets connection streams callback. This callback must be set after
+   * connection set up is finished and is ready for streams processing.
+   */
+  virtual void setConnectionCallbackNew(ConnectionCallbackNew* callback) = 0;
 
   /**
    * Sets the functions that mvfst will invoke to validate early data params

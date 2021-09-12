@@ -56,10 +56,25 @@ class QuicServerTransport
       ConnectionCallback& cb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx);
 
+  static QuicServerTransport::Ptr make(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connStreamsCb,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
+
   QuicServerTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionCallback& cb,
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      std::unique_ptr<CryptoFactory> cryptoFactory = nullptr);
+
+  QuicServerTransport(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> sock,
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory = nullptr);
 

@@ -393,7 +393,15 @@ void QuicTransportBase::closeImpl(
   conn_->ackStates.handshakeAckState.acks.clear();
   conn_->ackStates.appDataAckState.acks.clear();
 
-  processConnectionEndError(cancelCode);
+  // connCallback_ could be null if start() was never invoked and the
+  // transport was destroyed or if the app initiated close.
+  if (connCallback_) {
+    if (!useSplitConnectionCallbacks_) {
+      processConnectionEndError(cancelCode);
+    } else {
+      processConnectionEndErrorSplitCallbacks(cancelCode);
+    }
+  }
 
   // can't invoke connection callbacks any more.
   resetConnectionCallbacks();
@@ -456,14 +464,31 @@ bool QuicTransportBase::processCancelCode(
 
 void QuicTransportBase::processConnectionEndError(
     const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
-  // connCallback_ could be null if start() was never invoked and the
-  // transport was destroyed or if the app initiated close.
-  if (connCallback_) {
-    bool noError = processCancelCode(cancelCode);
-    if (noError) {
+  bool noError = processCancelCode(cancelCode);
+  if (noError) {
+    connCallback_->onConnectionEnd();
+  } else {
+    connCallback_->onConnectionError(
+        std::make_pair(cancelCode.first, cancelCode.second.str()));
+  }
+}
+
+void QuicTransportBase::processConnectionEndErrorSplitCallbacks(
+    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+  bool noError = processCancelCode(cancelCode);
+  if (noError) {
+    if (transportReadyNotified_) {
       connCallback_->onConnectionEnd();
     } else {
+      connCallback_->onConnectionSetupError(
+          std::make_pair(cancelCode.first, cancelCode.second.str()));
+    }
+  } else {
+    if (transportReadyNotified_) {
       connCallback_->onConnectionError(
+          std::make_pair(cancelCode.first, cancelCode.second.str()));
+    } else {
+      connCallback_->onConnectionSetupError(
           std::make_pair(cancelCode.first, cancelCode.second.str()));
     }
   }
@@ -2588,7 +2613,26 @@ void QuicTransportBase::setSupportedVersions(
 }
 
 void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
-  connCallback_ = std::make_unique<CallbackDispatcher>(CHECK_NOTNULL(callback));
+  if (!connCallback_) {
+    connCallback_ = CallbackDispatcher::make();
+  }
+  connCallback_->setConnectionCallback(CHECK_NOTNULL(callback));
+}
+
+void QuicTransportBase::setConnectionSetupCallback(
+    ConnectionSetupCallback* callback) {
+  if (!connCallback_) {
+    connCallback_ = CallbackDispatcher::make();
+  }
+  connCallback_->setConnectionSetupCallback(CHECK_NOTNULL(callback));
+}
+
+void QuicTransportBase::setConnectionCallbackNew(
+    ConnectionCallbackNew* callback) {
+  if (!connCallback_) {
+    connCallback_ = CallbackDispatcher::make();
+  }
+  connCallback_->setConnectionCallbackNew(callback);
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(

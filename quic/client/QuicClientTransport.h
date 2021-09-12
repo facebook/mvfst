@@ -99,6 +99,13 @@ class QuicClientTransport
   virtual void start(ConnectionCallback* cb);
 
   /**
+   * Starts the connection with split callbacks.
+   */
+  virtual void start(
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connStreamsCb);
+
+  /**
    * Returns whether or not TLS is resumed.
    */
   bool isTLSResumed() const;
@@ -232,6 +239,11 @@ class QuicClientTransport
    * calls setKnobs() internally.
    */
   void maybeSendTransportKnobs();
+
+  void startBase(
+      ConnectionCallback* cb,
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connStreamsCb);
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned

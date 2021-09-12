@@ -111,6 +111,8 @@ class MockQuicSocket : public QuicSocket {
           ReadCallback*,
           folly::Optional<ApplicationErrorCode> err));
   MOCK_METHOD1(setConnectionCallback, void(ConnectionCallback*));
+  MOCK_METHOD1(setConnectionSetupCallback, void(ConnectionSetupCallback*));
+  MOCK_METHOD1(setConnectionCallbackNew, void(ConnectionCallbackNew*));
   void setEarlyDataAppParamsFunctions(
       folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
                           const> validator,

@@ -62,6 +62,33 @@ QuicServerTransport::QuicServerTransport(
   registerAllTransportKnobParamHandlers();
 }
 
+QuicServerTransport::QuicServerTransport(
+    folly::EventBase* evb,
+    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    ConnectionSetupCallback* connSetupCb,
+    ConnectionCallbackNew* connStreamsCb,
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+    std::unique_ptr<CryptoFactory> cryptoFactory)
+    : QuicTransportBase(
+          evb,
+          std::move(sock),
+          true /* useSplitConnectionCallbacks */),
+      ctx_(std::move(ctx)) {
+  auto tempConn = std::make_unique<QuicServerConnectionState>(
+      FizzServerQuicHandshakeContext::Builder()
+          .setFizzServerContext(ctx_)
+          .setCryptoFactory(std::move(cryptoFactory))
+          .build());
+  tempConn->serverAddr = socket_->address();
+  serverConn_ = tempConn.get();
+  conn_.reset(tempConn.release());
+  conn_->observers = observers_;
+
+  setConnectionSetupCallback(connSetupCb);
+  setConnectionCallbackNew(connStreamsCb);
+  registerAllTransportKnobParamHandlers();
+}
+
 QuicServerTransport::~QuicServerTransport() {
   VLOG(10) << "Destroyed connection to client=" << *this;
   // The caller probably doesn't need the conn callback after destroying the
@@ -80,6 +107,21 @@ QuicServerTransport::Ptr QuicServerTransport::make(
     ConnectionCallback& cb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
   return std::make_shared<QuicServerTransport>(evb, std::move(sock), cb, ctx);
+}
+
+QuicServerTransport::Ptr QuicServerTransport::make(
+    folly::EventBase* evb,
+    std::unique_ptr<folly::AsyncUDPSocket> sock,
+    ConnectionSetupCallback* connSetupCb,
+    ConnectionCallbackNew* connStreamsCb,
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
+  return std::make_shared<QuicServerTransport>(
+      evb,
+      std::move(sock),
+      connSetupCb,
+      connStreamsCb,
+      ctx,
+      nullptr /* cryptoFactory */);
 }
 
 void QuicServerTransport::setRoutingCallback(
