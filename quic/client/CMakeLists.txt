@@ -9,6 +9,7 @@ add_library(
   QuicClientAsyncTransport.cpp
   handshake/ClientHandshake.cpp
   state/ClientStateMachine.cpp
+  connector/QuicConnector.cpp
 )
 
 target_include_directories(

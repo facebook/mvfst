@@ -49,4 +49,24 @@ folly::remove_cvref_t<T1> timeMax(T1&& arg1, Args&&... args) {
   }
   return max;
 }
+
+template <typename T>
+bool timePointInitialized(const T& time) {
+  static T epoch;
+  return time > epoch;
+}
+
+template <typename ClockType = std::chrono::steady_clock>
+inline std::chrono::milliseconds millisecondsBetween(
+    std::chrono::time_point<ClockType> finish,
+    std::chrono::time_point<ClockType> start) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(finish - start);
+}
+
+template <typename ClockType = std::chrono::steady_clock>
+inline std::chrono::milliseconds millisecondsSince(
+    std::chrono::time_point<ClockType> t) {
+  return millisecondsBetween(ClockType::now(), t);
+}
+
 } // namespace quic

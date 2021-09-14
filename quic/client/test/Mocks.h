@@ -9,6 +9,8 @@
 #pragma once
 
 #include <folly/portability/GMock.h>
+#include <quic/client/QuicClientTransport.h>
+#include <quic/client/connector/QuicConnector.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/handshake/ClientHandshakeFactory.h>
@@ -71,6 +73,52 @@ class MockClientHandshake : public ClientHandshake {
   MOCK_CONST_METHOD0(
       getApplicationProtocol,
       const folly::Optional<std::string>&());
+};
+
+class MockQuicConnectorCallback : public quic::QuicConnector::Callback {
+ public:
+  MOCK_METHOD1(
+      onConnectError,
+      void(std::pair<quic::QuicErrorCode, std::string>));
+  MOCK_METHOD0(onConnectSuccess, void());
+};
+
+class MockQuicClientTransport : public quic::QuicClientTransport {
+ public:
+  enum class TestType : uint8_t { Success = 0, Failure, Timeout };
+
+  explicit MockQuicClientTransport(
+      TestType testType,
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      std::shared_ptr<ClientHandshakeFactory> handshakeFactory)
+      : QuicClientTransport(
+            evb,
+            std::move(socket),
+            std::move(handshakeFactory)),
+        testType_(testType) {}
+
+  void start(ConnectionSetupCallback* connSetupCb, ConnectionCallbackNew*)
+      override {
+    auto cancelCode = std::make_pair(
+        QuicErrorCode(LocalErrorCode::NO_ERROR),
+        toString(LocalErrorCode::NO_ERROR).str());
+
+    switch (testType_) {
+      case TestType::Success:
+        connSetupCb->onReplaySafe();
+        break;
+      case TestType::Failure:
+        connSetupCb->onConnectionSetupError(std::move(cancelCode));
+        break;
+      case TestType::Timeout:
+        // Do nothing and let it timeout.
+        break;
+    }
+  }
+
+ private:
+  TestType testType_;
 };
 
 } // namespace test
