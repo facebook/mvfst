@@ -77,6 +77,7 @@ std::vector<QuicVersion> filterSupportedVersions(
       std::back_inserter(filteredVersions),
       [](auto version) {
         return version == QuicVersion::MVFST ||
+            version == QuicVersion::QUIC_V1 ||
             version == QuicVersion::QUIC_DRAFT ||
             version == QuicVersion::MVFST_INVALID ||
             version == QuicVersion::MVFST_EXPERIMENTAL ||

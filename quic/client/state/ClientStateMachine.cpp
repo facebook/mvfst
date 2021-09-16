@@ -104,7 +104,8 @@ void processServerInitialParams(
       serverParams.parameters);
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, serverParams.parameters);
-  if (conn.version == QuicVersion::QUIC_DRAFT) {
+  if (conn.version == QuicVersion::QUIC_DRAFT ||
+      conn.version == QuicVersion::QUIC_V1) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
         serverParams.parameters);
