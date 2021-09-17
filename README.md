@@ -1,9 +1,9 @@
 
 ![alt text](logo.png "MVFST")
 
-[![Linux Build Status](https://github.com/facebookincubator/mvfst/workflows/linux/badge.svg?branch=master)](https://github.com/facebookincubator/mvfst/actions?workflow=linux)
-[![macOS Build Status](https://github.com/facebookincubator/mvfst/workflows/mac/badge.svg?branch=master)](https://github.com/facebookincubator/mvfst/actions?workflow=mac)
-[![Windows Build Status](https://github.com/facebookincubator/mvfst/workflows/windows/badge.svg?branch=master)](https://github.com/facebookincubator/mvfst/actions?workflow=windows)
+[![Linux Build Status](https://github.com/facebookincubator/mvfst/workflows/linux/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=linux)
+[![macOS Build Status](https://github.com/facebookincubator/mvfst/workflows/mac/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=mac)
+[![Windows Build Status](https://github.com/facebookincubator/mvfst/workflows/windows/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=windows)
 
 ## Introduction
 `mvfst` (Pronounced *move fast*) is a client and server implementation of [IETF QUIC](https://quicwg.org/) protocol in C++ by Facebook. QUIC is a UDP based reliable, multiplexed transport protocol that will become an internet standard. The goal of `mvfst` is to build a performant implementation of the QUIC transport protocol that applications could adapt for use cases on both the internet and the data-center. `mvfst` has been tested at scale on android, iOS apps, as well as servers and has several features to support large scale deployments.
