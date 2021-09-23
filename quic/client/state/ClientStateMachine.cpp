@@ -7,6 +7,8 @@
  */
 
 #include <quic/client/state/ClientStateMachine.h>
+#include <quic/codec/Types.h>
+#include <quic/loss/QuicLossFunctions.h>
 
 #include <folly/io/async/AsyncSocketException.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
@@ -57,6 +59,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
       std::move(conn->earlyDataAppParamsValidator);
   newConn->earlyDataAppParamsGetter = std::move(conn->earlyDataAppParamsGetter);
   newConn->happyEyeballsState = std::move(conn->happyEyeballsState);
+  newConn->flowControlState = std::move(conn->flowControlState);
   newConn->pendingOneRttData.reserve(
       newConn->transportSettings.maxPacketsToBuffer);
   if (conn->congestionControllerFactory) {
@@ -69,6 +72,27 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
               *newConn, conn->congestionController->type());
     }
   }
+
+  // only copy over zero-rtt data
+  for (auto& outstandingPacket : conn->outstandings.packets) {
+    auto& packetHeader = outstandingPacket.packet.header;
+    if (packetHeader.getPacketNumberSpace() == PacketNumberSpace::AppData &&
+        packetHeader.getProtectionType() == ProtectionType::ZeroRtt) {
+      newConn->outstandings.packets.push_back(std::move(outstandingPacket));
+      newConn->outstandings.packetCount[PacketNumberSpace::AppData]++;
+    }
+  }
+
+  newConn->lossState = conn->lossState;
+  newConn->nodeType = conn->nodeType;
+  newConn->streamManager = std::make_unique<QuicStreamManager>(
+      *newConn,
+      newConn->nodeType,
+      newConn->transportSettings,
+      std::move(*conn->streamManager));
+
+  markZeroRttPacketsLost(*newConn, markPacketLoss);
+
   return newConn;
 }
 

@@ -228,6 +228,30 @@ struct QuicStreamState : public QuicStreamLike {
 
   QuicStreamState(QuicStreamState&&) = default;
 
+  /**
+   * Constructor to migrate QuicStreamState to another
+   * QuicConnectionStateBase.
+   */
+  QuicStreamState(QuicConnectionStateBase& connIn, QuicStreamState&& other)
+      : QuicStreamLike(std::move(other)), conn(connIn), id(other.id) {
+    // QuicStreamState fields
+    finalWriteOffset = other.finalWriteOffset;
+    flowControlState = other.flowControlState;
+    streamReadError = other.streamReadError;
+    streamWriteError = other.streamWriteError;
+    sendState = other.sendState;
+    recvState = other.recvState;
+    isControl = other.isControl;
+    lastHolbTime = other.lastHolbTime;
+    totalHolbTime = other.totalHolbTime;
+    holbCount = other.holbCount;
+    priority = other.priority;
+    dsrSender = std::move(other.dsrSender);
+    writeBufMeta = other.writeBufMeta;
+    retransmissionBufMetas = std::move(other.retransmissionBufMetas);
+    lossBufMetas = std::move(other.lossBufMetas);
+  }
+
   // Connection that this stream is associated with.
   QuicConnectionStateBase& conn;
 

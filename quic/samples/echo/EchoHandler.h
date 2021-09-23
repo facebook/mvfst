@@ -49,7 +49,8 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
 
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "Socket error=" << toString(error.first);
+    LOG(ERROR) << "Socket error=" << toString(error.first) << " "
+               << error.second;
   }
 
   void readAvailable(quic::StreamId id) noexcept override {

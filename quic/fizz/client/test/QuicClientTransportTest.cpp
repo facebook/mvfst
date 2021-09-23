@@ -5,10 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  *
  */
+#include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientTransport.h>
 #include <quic/server/QuicServer.h>
-
-#include <quic/api/test/Mocks.h>
 
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
@@ -20,6 +19,7 @@
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/QuicConstants.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/common/test/TestClientUtils.h>
 #include <quic/common/test/TestUtils.h>
@@ -36,7 +36,6 @@
 #include <quic/samples/echo/EchoHandler.h>
 #include <quic/samples/echo/EchoServer.h>
 #include <quic/state/test/MockQuicStats.h>
-#include "quic/QuicConstants.h"
 
 using namespace testing;
 using namespace folly;
@@ -250,7 +249,9 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     return client;
   }
 
-  std::shared_ptr<QuicServer> createServer(ProcessId processId) {
+  std::shared_ptr<QuicServer> createServer(
+      ProcessId processId,
+      bool withRetryPacket = false) {
     auto server = QuicServer::createQuicServer();
     auto transportSettings = server->getTransportSettings();
     auto statsFactory = std::make_unique<NiceMock<MockQuicStatsFactory>>();
@@ -261,6 +262,12 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     }));
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+    if (withRetryPacket) {
+      std::array<uint8_t, kRetryTokenSecretLength> secret;
+      folly::Random::secureRandom(secret.data(), secret.size());
+      transportSettings.retryTokenSecret = secret;
+      server->setRateLimit([]() { return 0u; }, 1s);
+    }
     server->setTransportStatsCallbackFactory(std::move(statsFactory));
     server->setTransportSettings(transportSettings);
     server->setQuicServerTransportFactory(
@@ -646,6 +653,93 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   expected->prependChain(data->clone());
   EXPECT_CALL(clientConnCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+  EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
+}
+
+TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
+  /**
+   * logic extrapolated from TestZeroRttSuccess and RetryPacket tests
+   */
+  auto retryServer = createServer(ProcessId::ONE, true);
+  client->getNonConstConn().peerAddress = retryServer->getAddress();
+
+  SCOPE_EXIT {
+    retryServer->shutdown();
+    retryServer = nullptr;
+  };
+
+  auto cachedPsk = setupZeroRttOnClientCtx(*clientCtx, hostname);
+  pskCache_->putPsk(hostname, cachedPsk);
+  setupZeroRttOnServerCtx(*serverCtx, cachedPsk);
+  // Change the ctx
+  retryServer->setFizzContext(serverCtx);
+
+  std::vector<uint8_t> clientConnIdVec = {};
+  ConnectionId clientConnId(clientConnIdVec);
+
+  ConnectionId initialDstConnId(kInitialDstConnIdVecForRetryTest);
+
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
+  client->getNonConstConn().qLogger = qLogger;
+  client->getNonConstConn().readCodec->setClientConnectionId(clientConnId);
+  client->getNonConstConn().initialDestinationConnectionId = initialDstConnId;
+  client->getNonConstConn().originalDestinationConnectionId = initialDstConnId;
+  client->setCongestionControllerFactory(
+      std::make_shared<DefaultCongestionControllerFactory>());
+  client->setCongestionControl(CongestionControlType::NewReno);
+
+  folly::Optional<std::string> alpn = std::string("h1q-fb");
+  bool performedValidation = false;
+  client->setEarlyDataAppParamsFunctions(
+      [&](const folly::Optional<std::string>& alpnToValidate, const Buf&) {
+        performedValidation = true;
+        EXPECT_EQ(alpnToValidate, alpn);
+        return true;
+      },
+      []() -> Buf { return nullptr; });
+  client->start(&clientConnCallback);
+  EXPECT_TRUE(performedValidation);
+  CHECK(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->serverInitialParamsSet());
+  EXPECT_EQ(
+      client->peerAdvertisedInitialMaxData(), kDefaultConnectionWindowSize);
+  EXPECT_EQ(
+      client->peerAdvertisedInitialMaxStreamDataBidiLocal(),
+      kDefaultStreamWindowSize);
+  EXPECT_EQ(
+      client->peerAdvertisedInitialMaxStreamDataBidiRemote(),
+      kDefaultStreamWindowSize);
+  EXPECT_EQ(
+      client->peerAdvertisedInitialMaxStreamDataUni(),
+      kDefaultStreamWindowSize);
+  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+    ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
+    CHECK(client->getConn().zeroRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  EXPECT_TRUE(client->getConn().zeroRttWriteCipher);
+  EXPECT_TRUE(client->good());
+  EXPECT_FALSE(client->replaySafe());
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+
+  EXPECT_CALL(clientConnCallback, onReplaySafe()).WillOnce(Invoke([&] {
+    EXPECT_TRUE(!client->getConn().retryToken.empty());
+  }));
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  // Check CC is kept after retry recreates QuicClientConnectionState
+  EXPECT_TRUE(client->getConn().congestionControllerFactory);
+  EXPECT_EQ(
+      client->getConn().congestionController->type(),
+      CongestionControlType::NewReno);
+
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
 }

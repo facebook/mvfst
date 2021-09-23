@@ -57,6 +57,89 @@ class QuicStreamManager {
     }
     refreshTransportSettings(transportSettings);
   }
+
+  /**
+   * Constructor to facilitate migration of a QuicStreamManager to another
+   * QuicConnectionStateBase
+   */
+  explicit QuicStreamManager(
+      QuicConnectionStateBase& conn,
+      QuicNodeType nodeType,
+      const TransportSettings& transportSettings,
+      QuicStreamManager&& other)
+      : conn_(conn),
+        nodeType_(nodeType),
+        transportSettings_(&transportSettings) {
+    nextAcceptablePeerBidirectionalStreamId_ =
+        other.nextAcceptablePeerBidirectionalStreamId_;
+    nextAcceptablePeerUnidirectionalStreamId_ =
+        other.nextAcceptablePeerUnidirectionalStreamId_;
+    nextAcceptableLocalBidirectionalStreamId_ =
+        other.nextAcceptableLocalBidirectionalStreamId_;
+    nextAcceptableLocalUnidirectionalStreamId_ =
+        other.nextAcceptableLocalUnidirectionalStreamId_;
+    nextBidirectionalStreamId_ = other.nextBidirectionalStreamId_;
+    nextUnidirectionalStreamId_ = other.nextUnidirectionalStreamId_;
+    maxLocalBidirectionalStreamId_ = other.maxLocalBidirectionalStreamId_;
+    maxLocalUnidirectionalStreamId_ = other.maxLocalUnidirectionalStreamId_;
+    maxRemoteBidirectionalStreamId_ = other.maxRemoteBidirectionalStreamId_;
+    maxRemoteUnidirectionalStreamId_ = other.maxRemoteUnidirectionalStreamId_;
+    initialLocalBidirectionalStreamId_ =
+        other.initialLocalBidirectionalStreamId_;
+    initialLocalUnidirectionalStreamId_ =
+        other.initialLocalUnidirectionalStreamId_;
+    initialRemoteBidirectionalStreamId_ =
+        other.initialRemoteBidirectionalStreamId_;
+    initialRemoteUnidirectionalStreamId_ =
+        other.initialRemoteUnidirectionalStreamId_;
+
+    streamLimitWindowingFraction_ = other.streamLimitWindowingFraction_;
+    remoteBidirectionalStreamLimitUpdate_ =
+        other.remoteBidirectionalStreamLimitUpdate_;
+    remoteUnidirectionalStreamLimitUpdate_ =
+        other.remoteUnidirectionalStreamLimitUpdate_;
+    numControlStreams_ = other.numControlStreams_;
+    openBidirectionalPeerStreams_ =
+        std::move(other.openBidirectionalPeerStreams_);
+    openUnidirectionalPeerStreams_ =
+        std::move(other.openUnidirectionalPeerStreams_);
+    openBidirectionalLocalStreams_ =
+        std::move(other.openBidirectionalLocalStreams_);
+    openUnidirectionalLocalStreams_ =
+        std::move(other.openUnidirectionalLocalStreams_);
+    newPeerStreams_ = std::move(other.newPeerStreams_);
+    blockedStreams_ = std::move(other.blockedStreams_);
+    stopSendingStreams_ = std::move(other.stopSendingStreams_);
+    windowUpdates_ = std::move(other.windowUpdates_);
+    flowControlUpdated_ = std::move(other.flowControlUpdated_);
+    lossStreams_ = std::move(other.lossStreams_);
+    readableStreams_ = std::move(other.readableStreams_);
+    peekableStreams_ = std::move(other.peekableStreams_);
+    writableStreams_ = std::move(other.writableStreams_);
+    writableDSRStreams_ = std::move(other.writableDSRStreams_);
+    writableControlStreams_ = std::move(other.writableControlStreams_);
+    txStreams_ = std::move(other.txStreams_);
+    deliverableStreams_ = std::move(other.deliverableStreams_);
+    closedStreams_ = std::move(other.closedStreams_);
+    isAppIdle_ = other.isAppIdle_;
+    maxLocalBidirectionalStreamIdIncreased_ =
+        other.maxLocalBidirectionalStreamIdIncreased_;
+    maxLocalUnidirectionalStreamIdIncreased_ =
+        other.maxLocalUnidirectionalStreamIdIncreased_;
+
+    /**
+     * We can't simply std::move the streams as the underlying
+     * QuicStreamState(s) hold a reference to the other.conn_.
+     */
+    for (auto& pair : other.streams_) {
+      streams_.emplace(
+          std::piecewise_construct,
+          std::forward_as_tuple(pair.first),
+          std::forward_as_tuple(
+              /* migrate state to new conn ref */ conn_,
+              std::move(pair.second)));
+    }
+  }
   /*
    * Create the state for a stream if it does not exist and return it. Note this
    * function is only used internally or for testing.
