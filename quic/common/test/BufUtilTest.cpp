@@ -359,7 +359,7 @@ TEST(BufWriterTest, InsertSingle) {
   auto len = inputBuffer->computeChainDataLength();
   writer.insert(inputBuffer.get());
   folly::io::Cursor reader(testBuffer.get());
-  EXPECT_EQ(inputBuffer->coalesce().str(), reader.readFixedString(len));
+  EXPECT_EQ(inputBuffer->to<string>(), reader.readFixedString(len));
 }
 
 TEST(BufWriterTest, InsertChain) {
