@@ -39,15 +39,10 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn);
  *
  */
 bool isPersistentCongestion(
-    const QuicConnectionStateBase& conn,
-    TimePoint lostPeriodStart,
-    TimePoint lostPeriodEnd) noexcept;
-
-bool isPersistentCongestionExperimental(
     folly::Optional<std::chrono::microseconds> pto,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd,
-    const CongestionController::AckEvent& ack);
+    const CongestionController::AckEvent& ack) noexcept;
 
 inline std::ostream& operator<<(
     std::ostream& os,
@@ -378,12 +373,6 @@ void onLossDetectionAlarm(
         lossTimeAndSpace.second);
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
-      if (!conn.transportSettings.experimentalPersistentCongestion) {
-        lossEvent->persistentCongestion = isPersistentCongestion(
-            conn,
-            *lossEvent->smallestLostSentTime,
-            *lossEvent->largestLostSentTime);
-      }
       conn.congestionController->onPacketAckOrLoss(
           folly::none, std::move(lossEvent));
     }

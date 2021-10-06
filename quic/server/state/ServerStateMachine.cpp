@@ -90,9 +90,7 @@ void recoverOrResetCongestionAndRttState(
   }
 }
 
-void setExperimentalSettings(QuicServerConnectionState& conn) {
-  conn.transportSettings.experimentalPersistentCongestion = true;
-}
+void setExperimentalSettings(QuicServerConnectionState& /*conn*/) {}
 } // namespace
 
 void processClientInitialParams(

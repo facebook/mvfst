@@ -19,11 +19,11 @@ std::chrono::microseconds calculatePTO(const QuicConnectionStateBase& conn) {
       conn.lossState.maxAckDelay;
 }
 
-bool isPersistentCongestionExperimental(
+bool isPersistentCongestion(
     folly::Optional<std::chrono::microseconds> pto,
     TimePoint lostPeriodStart,
     TimePoint lostPeriodEnd,
-    const CongestionController::AckEvent& ack) {
+    const CongestionController::AckEvent& ack) noexcept {
   if (!pto.has_value()) {
     return false;
   }
@@ -42,18 +42,6 @@ bool isPersistentCongestionExperimental(
       });
 
   return it == ack.ackedPackets.cend();
-}
-
-bool isPersistentCongestion(
-    const QuicConnectionStateBase& conn,
-    TimePoint lostPeriodStart,
-    TimePoint lostPeriodEnd) noexcept {
-  if (conn.lossState.srtt == 0us) {
-    return false;
-  }
-  auto pto = calculatePTO(conn);
-  return (lostPeriodEnd - lostPeriodStart) >=
-      pto * kPersistentCongestionThreshold;
 }
 
 void onPTOAlarm(QuicConnectionStateBase& conn) {
