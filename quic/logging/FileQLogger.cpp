@@ -34,10 +34,15 @@ void FileQLogger::setupStream() {
     return;
   }
   endLine_ = prettyJson_ ? "\n" : "";
+  auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
-      folly::to<std::string>(path_, "/", (dcid.value()).hex(), ".qlog");
+      folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
   std::ofstream file(outputPath);
   writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
+  if (compress_) {
+    compressionCodec_ = folly::io::getStreamCodec(folly::io::CodecType::GZIP);
+    compressionBuffer_ = folly::IOBuf::createCombined(kCompressionBufferSize);
+  }
 
   // Create the base json
   auto qLog = prettyJson_ ? folly::toPrettyJson(toDynamicBase())
@@ -50,7 +55,7 @@ void FileQLogger::setupStream() {
   while (getline(baseJson_, eventLine_)) {
     pos_ = eventLine_.find(token_);
     if (pos_ == std::string::npos) {
-      writer_->writeMessage(eventLine_ + endLine_);
+      writeToStream(eventLine_ + endLine_);
     } else {
       // Found the token
       for (char c : eventLine_) {
@@ -62,9 +67,31 @@ void FileQLogger::setupStream() {
         }
       }
       // write up to and including the token
-      writer_->writeMessage(std::string(&eventLine_[0], pos_ + token_.size()));
+      writeToStream(std::string(&eventLine_[0], pos_ + token_.size()));
       break;
     }
+  }
+}
+
+void FileQLogger::writeToStream(folly::StringPiece message) {
+  if (compress_) {
+    bool inputConsumed = false;
+    while (!inputConsumed) {
+      compressionBuffer_->clear();
+      folly::ByteRange inputRange(message);
+      auto outputRange = folly::MutableByteRange(
+          compressionBuffer_->writableData(), compressionBuffer_->capacity());
+      compressionCodec_->compressStream(inputRange, outputRange);
+      // Output range has advanced to last compressed byte written
+      auto outputLen = compressionBuffer_->capacity() - outputRange.size();
+      // Input range has advanced to last uncompressed byte read
+      inputConsumed = inputRange.empty();
+      // Write compressed data to file
+      writer_->writeMessage(folly::StringPiece(
+          (const char*)compressionBuffer_->data(), outputLen));
+    }
+  } else {
+    writer_->writeMessage(message);
   }
 }
 
@@ -74,18 +101,18 @@ void FileQLogger::finishStream() {
       &eventLine_[pos_ + token_.size()],
       eventLine_.size() - pos_ - token_.size() - (prettyJson_ ? 0 : 1));
   if (!prettyJson_) {
-    writer_->writeMessage(unfinishedLine);
+    writeToStream(unfinishedLine);
   } else {
     // copy all the remaining lines but the last one
     std::string previousLine = eventsPadding_ + unfinishedLine;
     while (getline(baseJson_, eventLine_)) {
-      writer_->writeMessage(endLine_);
-      writer_->writeMessage(previousLine);
+      writeToStream(endLine_);
+      writeToStream(previousLine);
       previousLine = eventLine_;
     }
   }
-  writer_->writeMessage(folly::StringPiece(","));
-  writer_->writeMessage(endLine_);
+  writeToStream(folly::StringPiece(","));
+  writeToStream(endLine_);
 
   // generate and add the summary
   auto summary = generateSummary(numEvents_, startTime_, endTime_);
@@ -93,17 +120,32 @@ void FileQLogger::finishStream() {
       prettyJson_ ? folly::toPrettyJson(summary) : folly::toJson(summary);
   std::stringstream summaryBuffer;
   std::string line;
-  writer_->writeMessage(
+  writeToStream(
       prettyJson_ ? (basePadding_ + "\"summary\" : ") : "\"summary\":");
   summaryBuffer << summaryJson;
   std::string summaryPadding = "";
   // add padding to every line in the summary except the first
   while (getline(summaryBuffer, line)) {
-    writer_->writeMessage(
-        folly::to<std::string>(summaryPadding, line, endLine_));
+    writeToStream(folly::to<std::string>(summaryPadding, line, endLine_));
     summaryPadding = basePadding_;
   }
-  writer_->writeMessage(folly::StringPiece("}"));
+  writeToStream(folly::StringPiece("}"));
+
+  // Finalize compression frame
+  if (compress_) {
+    bool ended = false;
+    while (!ended) {
+      compressionBuffer_->clear();
+      folly::ByteRange inputRange(folly::StringPiece(""));
+      auto outputRange = folly::MutableByteRange(
+          compressionBuffer_->writableData(), compressionBuffer_->capacity());
+      ended = compressionCodec_->compressStream(
+          inputRange, outputRange, folly::io::StreamCodec::FlushOp::END);
+      auto outputLen = compressionBuffer_->capacity() - outputRange.size();
+      writer_->writeMessage(folly::StringPiece(
+          (const char*)compressionBuffer_->data(), outputLen));
+    }
+  }
 }
 
 void FileQLogger::handleEvent(std::unique_ptr<QLogEvent> event) {
@@ -120,14 +162,13 @@ void FileQLogger::handleEvent(std::unique_ptr<QLogEvent> event) {
     eventBuffer << eventJson;
 
     if (numEvents_ > 1) {
-      writer_->writeMessage(folly::StringPiece(","));
+      writeToStream(folly::StringPiece(","));
     }
 
     // add padding to every line in the event
     while (getline(eventBuffer, line)) {
-      writer_->writeMessage(endLine_);
-      writer_->writeMessage(
-          folly::to<std::string>(basePadding_, eventsPadding_, line));
+      writeToStream(endLine_);
+      writeToStream(folly::to<std::string>(basePadding_, eventsPadding_, line));
     }
 
   } else {
@@ -453,14 +494,25 @@ void FileQLogger::outputLogsToFile(const std::string& path, bool prettyJson) {
     LOG(ERROR) << "Error: No dcid found";
     return;
   }
+  auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
-      folly::to<std::string>(path, "/", (dcid.value()).hex(), ".qlog");
+      folly::to<std::string>(path, "/", (dcid.value()).hex(), extension);
 
   std::ofstream fileObj(outputPath);
   if (fileObj) {
     auto qLog = prettyJson ? folly::toPrettyJson(toDynamic())
                            : folly::toJson(toDynamic());
-    fileObj << qLog;
+    if (compress_) {
+      try {
+        auto gzipCodec = folly::io::getCodec(folly::io::CodecType::GZIP);
+        auto compressed = gzipCodec->compress(qLog);
+        fileObj << compressed;
+      } catch (std::invalid_argument& ex) {
+        LOG(ERROR) << "Failed to compress QLog. " << ex.what();
+      }
+    } else {
+      fileObj << qLog;
+    }
   } else {
     LOG(ERROR) << "Error: Can't write to provided path: " << path;
   }

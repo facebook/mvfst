@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 
+#include <folly/compression/Compression.h>
 #include <folly/dynamic.h>
 #include <folly/logging/AsyncFileWriter.h>
 #include <quic/codec/Types.h>
@@ -20,7 +21,12 @@
 namespace quic {
 
 class FileQLogger : public BaseQLogger {
+  const static uint64_t kCompressionBufferSize = 1024; // 1 KB
+
  public:
+  inline const static std::string kQlogExtension = ".qlog";
+  inline const static std::string kCompressedQlogExtension = ".qlog.gz";
+
   using QLogger::TransportSummaryArgs;
   std::vector<std::unique_ptr<QLogEvent>> logs;
   FileQLogger(
@@ -28,11 +34,13 @@ class FileQLogger : public BaseQLogger {
       std::string protocolTypeIn = kHTTP3ProtocolType,
       std::string path = "",
       bool prettyJson = true,
-      bool streaming = false)
+      bool streaming = false,
+      bool compress = false)
       : BaseQLogger(vantagePointIn, std::move(protocolTypeIn)),
         path_(std::move(path)),
         prettyJson_(prettyJson),
-        streaming_(streaming) {}
+        streaming_(streaming),
+        compress_{compress} {}
 
   ~FileQLogger() override {
     if (streaming_ && dcid.hasValue()) {
@@ -119,10 +127,13 @@ class FileQLogger : public BaseQLogger {
 
  private:
   void setupStream();
+  void writeToStream(folly::StringPiece message);
   void finishStream();
   void handleEvent(std::unique_ptr<QLogEvent> event);
 
   std::unique_ptr<folly::AsyncFileWriter> writer_;
+  std::unique_ptr<folly::io::StreamCodec> compressionCodec_;
+  std::unique_ptr<folly::IOBuf> compressionBuffer_;
 
   std::string path_;
   std::string basePadding_ = "  ";
@@ -134,6 +145,7 @@ class FileQLogger : public BaseQLogger {
 
   bool prettyJson_;
   bool streaming_;
+  bool compress_;
   int numEvents_ = 0;
   std::chrono::microseconds startTime_ = std::chrono::microseconds::zero();
   std::chrono::microseconds endTime_;

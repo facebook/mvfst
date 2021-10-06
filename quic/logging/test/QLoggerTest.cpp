@@ -9,6 +9,7 @@
 #include <quic/logging/QLogger.h>
 
 #include <boost/filesystem.hpp>
+#include <folly/FileUtil.h>
 #include <folly/Random.h>
 #include <folly/json.h>
 #include <gtest/gtest.h>
@@ -1282,9 +1283,8 @@ TEST_F(QLoggerTest, PrettyStream) {
   EXPECT_EQ(expected, parsed);
 }
 
-TEST_F(QLoggerTest, NonPrettyStream) {
-  folly::dynamic expected = folly::parseJson(
-      R"({
+const std::string expectedJsonStr1 =
+    R"({
    "description": "Converted from file",
    "qlog_version": "draft-00",
    "summary": {
@@ -1342,7 +1342,10 @@ TEST_F(QLoggerTest, NonPrettyStream) {
        }
      }
    ]
- })");
+ })";
+
+TEST_F(QLoggerTest, NonPrettyStream) {
+  folly::dynamic expected = folly::parseJson(expectedJsonStr1);
 
   auto headerIn =
       ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
@@ -1392,6 +1395,94 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   EXPECT_EQ(expected["traces"], parsed["traces"]);
   std::string s;
   EXPECT_EQ((bool)getline(file, s), false);
+}
+
+TEST_F(QLoggerTest, CompressedStream) {
+  folly::dynamic expected = folly::parseJson(expectedJsonStr1);
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = boost::filesystem::temp_directory_path().string();
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      false /* prettyJson */,
+      true /* streaming */,
+      true /* compress */);
+
+  q->setDcid(ConnectionId::createRandom(8));
+  q->addPacket(regularQuicPacket, 10);
+  // Streaming. Packet has been immediately logged.
+  EXPECT_EQ(q->logs.size(), 0);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog.gz");
+  LOG(INFO) << outputPath;
+  delete q;
+
+  std::string compressedData;
+  auto success = folly::readFile(outputPath.c_str(), compressedData);
+  ASSERT_TRUE(success);
+
+  std::string str = folly::io::getCodec(folly::io::CodecType::GZIP)
+                        ->uncompress(compressedData);
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0202";
+
+  EXPECT_EQ(expected["summary"], parsed["summary"]);
+  EXPECT_EQ(expected["traces"], parsed["traces"]);
+}
+
+TEST_F(QLoggerTest, CompressedNonStream) {
+  folly::dynamic expected = folly::parseJson(expectedJsonStr1);
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = boost::filesystem::temp_directory_path().string();
+
+  FileQLogger q(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      false /* prettyJson */,
+      false /* streaming */,
+      true /* compress */);
+
+  q.setDcid(ConnectionId::createRandom(8));
+  q.addPacket(regularQuicPacket, 10);
+  // Not streaming. Packet has not been logged yet.
+  EXPECT_EQ(q.logs.size(), 1);
+
+  q.outputLogsToFile(dir, false);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q.dcid.value()).hex(), ".qlog.gz");
+
+  std::string compressedData;
+  auto success = folly::readFile(outputPath.c_str(), compressedData);
+  ASSERT_TRUE(success);
+
+  std::string str = folly::io::getCodec(folly::io::CodecType::GZIP)
+                        ->uncompress(compressedData);
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0202";
+
+  EXPECT_EQ(expected["summary"], parsed["summary"]);
+  EXPECT_EQ(expected["traces"], parsed["traces"]);
 }
 
 } // namespace quic::test
