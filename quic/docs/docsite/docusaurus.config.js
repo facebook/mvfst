@@ -9,43 +9,49 @@
 
 // With JSDoc @type annotations, IDEs can provide config autocompletion
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
-(module.exports = {
-  title: 'My Site',
-  tagline: 'The tagline of my site',
+module.exports = {
+  title: 'mvfst',
+  tagline: 'C++ QUIC Implementation',
   url: 'https://your-docusaurus-test-site.com',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  projectName: 'mvfst', // Usually your repo name.
 
   presets: [
     [
-      '@docusaurus/preset-classic',
-      /** @type {import('@docusaurus/preset-classic').Options} */
-      ({
+      require.resolve('docusaurus-plugin-internaldocs-fb/docusaurus-preset'),
+      {
         docs: {
+          path: '../docs',
           sidebarPath: require.resolve('./sidebars.js'),
-          // Please change this to your repo.
-          editUrl: 'https://github.com/facebook/docusaurus/edit/main/website/',
-        },
-        blog: {
-          showReadingTime: true,
-          // Please change this to your repo.
-          editUrl:
-            'https://github.com/facebook/docusaurus/edit/main/website/blog/',
+          editUrl: fbContent({
+            internal:
+              'https://www.internalfb.com/code/fbsource/fbcode/quic/docs/docsite',
+            external:
+              'https://github.com/facebookincubator/mvfst/tree/main/quic/docs/docsite',
+          }),
         },
         theme: {
-          customCss: require.resolve('./src/css/custom.css'),
+          customCss: require.resolve('./static/css/custom.css'),
         },
-      }),
+        staticDocsProject: 'mvfst',
+        trackingFile: 'xplat/staticdocs/WATCHED_FILES',
+        'remark-code-snippets': {
+          baseDir: '..',
+        },
+        enableEditor: true,
+      },
     ],
   ],
-
+  customFields: {
+    fbRepoName: 'fbsource',
+  },
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
-    ({
+    {
       navbar: {
         title: 'My Facebook Project',
         logo: {
@@ -145,5 +151,5 @@
         // Please do not remove the credits, help to publicize Docusaurus :)
         copyright: `Copyright © ${new Date().getFullYear()} Facebook, Inc. Built with Docusaurus.`,
       },
-    }),
-});
+    },
+};
