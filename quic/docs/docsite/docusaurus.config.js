@@ -7,6 +7,8 @@
  * @format
  */
 
+const {fbContent, fbInternalOnly} = require('internaldocs-fb-helpers');
+
 // With JSDoc @type annotations, IDEs can provide config autocompletion
 /** @type {import('@docusaurus/types').DocusaurusConfig} */
 module.exports = {
@@ -25,7 +27,7 @@ module.exports = {
       require.resolve('docusaurus-plugin-internaldocs-fb/docusaurus-preset'),
       {
         docs: {
-          path: '../docs',
+          path: './docs',
           sidebarPath: require.resolve('./sidebars.js'),
           editUrl: fbContent({
             internal:
@@ -34,9 +36,9 @@ module.exports = {
               'https://github.com/facebookincubator/mvfst/tree/main/quic/docs/docsite',
           }),
         },
-        theme: {
-          customCss: require.resolve('./static/css/custom.css'),
-        },
+//        theme: {
+//          customCss: require.resolve('./static/css/custom.css'),
+//        },
         staticDocsProject: 'mvfst',
         trackingFile: 'xplat/staticdocs/WATCHED_FILES',
         'remark-code-snippets': {
@@ -82,11 +84,7 @@ module.exports = {
             items: [
               {
                 label: 'Style Guide',
-                to: 'docs/',
-              },
-              {
-                label: 'Second Doc',
-                to: 'docs/doc2',
+                to: '/',
               },
             ],
           },
