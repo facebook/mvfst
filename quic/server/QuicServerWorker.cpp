@@ -679,6 +679,9 @@ void QuicServerWorker::dispatchPacketData(
           if (statsCallback_) {
             trans->setTransportStatsCallback(statsCallback_.get());
           }
+          if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
+            transportSettings_.initCwndInMss = 30;
+          }
           if (transportSettingsOverrideFn_) {
             folly::Optional<TransportSettings> overridenTransportSettings =
                 transportSettingsOverrideFn_(
