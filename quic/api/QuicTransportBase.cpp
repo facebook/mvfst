@@ -3012,6 +3012,10 @@ void QuicTransportBase::setTransportSettings(
   setCongestionControl(conn_->transportSettings.defaultCongestionController);
   if (conn_->transportSettings.datagramConfig.enabled) {
     conn_->datagramState.maxReadFrameSize = kMaxDatagramFrameSize;
+    conn_->datagramState.maxReadBufferSize =
+        conn_->transportSettings.datagramConfig.readBufSize;
+    conn_->datagramState.maxWriteBufferSize =
+        conn_->transportSettings.datagramConfig.writeBufSize;
   }
 }
 

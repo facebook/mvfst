@@ -115,6 +115,8 @@ struct DatagramConfig {
   bool framePerPacket{true};
   bool recvDropOldDataFirst{false};
   bool sendDropOldDataFirst{false};
+  uint32_t readBufSize{kDefaultMaxDatagramsBuffered};
+  uint32_t writeBufSize{kDefaultMaxDatagramsBuffered};
 };
 
 // JSON-serialized transport knobs
