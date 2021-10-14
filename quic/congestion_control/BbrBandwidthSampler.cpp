@@ -14,10 +14,16 @@
 namespace quic {
 
 BbrBandwidthSampler::BbrBandwidthSampler(QuicConnectionStateBase& conn)
-    : conn_(conn), windowedFilter_(kBandwidthWindowLength, Bandwidth(), 0) {}
+    : conn_(conn),
+      windowedFilter_(bandwidthWindowLength(kNumOfCycles), Bandwidth(), 0) {}
 
 Bandwidth BbrBandwidthSampler::getBandwidth() const noexcept {
   return windowedFilter_.GetBest();
+}
+
+void BbrBandwidthSampler::setWindowLength(
+    const uint64_t windowLength) noexcept {
+  windowedFilter_.SetWindowLength(windowLength);
 }
 
 void BbrBandwidthSampler::onPacketAcked(

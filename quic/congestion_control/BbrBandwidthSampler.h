@@ -36,6 +36,8 @@ class BbrBandwidthSampler : public BbrCongestionController::BandwidthSampler {
 
   bool isAppLimited() const noexcept override;
 
+  void setWindowLength(const uint64_t windowLength) noexcept override;
+
  private:
   QuicConnectionStateBase& conn_;
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>

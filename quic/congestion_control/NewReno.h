@@ -28,6 +28,13 @@ class NewReno : public CongestionController {
   void setAppIdle(bool, TimePoint) noexcept override;
   void setAppLimited() override;
 
+  void setBandwidthUtilizationFactor(
+      float /*bandwidthUtilizationFactor*/) noexcept override {}
+
+  bool isInBackgroundMode() const noexcept override {
+    return false;
+  }
+
   CongestionControlType type() const noexcept override;
 
   bool inSlowStart() const noexcept;

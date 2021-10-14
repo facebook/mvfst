@@ -46,6 +46,13 @@ class Copa : public CongestionController {
   void setAppLimited() override;
   bool isAppLimited() const noexcept override;
 
+  void setBandwidthUtilizationFactor(
+      float /*bandwidthUtilizationFactor*/) noexcept override {}
+
+  bool isInBackgroundMode() const noexcept override {
+    return false;
+  }
+
   void getStats(CongestionControllerStats& stats) const override;
 
  private:

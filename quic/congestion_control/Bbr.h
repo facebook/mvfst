@@ -16,7 +16,7 @@
 
 namespace quic {
 
-// Cwnd and pacing gain during STARSTUP
+// Cwnd and pacing gain during STARTUP
 constexpr float kStartupGain = 2.885f; // 2/ln(2)
 // Cwnd gain during ProbeBw
 constexpr float kProbeBwGain = 2.0f;
@@ -25,11 +25,14 @@ constexpr float kExpectedStartupGrowth = 1.25f;
 // How many rounds of rtt to stay in STARUP when the bandwidth isn't growing as
 // fast as kExpectedStartupGrowth
 constexpr uint8_t kStartupSlowGrowRoundLimit = 3;
-// Number of pacing cycles
+// Default number of pacing cycles
 constexpr uint8_t kNumOfCycles = 8;
-// Pacing cycles
+// Default pacing cycles
 constexpr std::array<float, kNumOfCycles> kPacingGainCycles =
     {1.25, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+// Background mode number of pacing cycles. Probe for the available BW less
+// frequently (once every 32 cycles).
+constexpr uint8_t kBGNumOfCycles = 32;
 // During ProbeRtt, we need to stay in low inflight condition for at least
 // kProbeRttDuration.
 constexpr std::chrono::milliseconds kProbeRttDuration{200};
@@ -37,7 +40,9 @@ constexpr std::chrono::milliseconds kProbeRttDuration{200};
 constexpr float kLargeProbeRttCwndGain = 0.75f;
 // Bandwidth WindowFilter length, in unit of RTT. This value is from Chromium
 // code. I don't know why.
-constexpr uint64_t kBandwidthWindowLength = kNumOfCycles + 2;
+constexpr uint8_t bandwidthWindowLength(const uint8_t numOfCycles) {
+  return numOfCycles + 2;
+}
 // RTT Sampler default expiration
 constexpr std::chrono::seconds kDefaultRttSamplerExpiration{10};
 // 64K, used in sendQuantum calculation:
@@ -90,6 +95,7 @@ class BbrCongestionController : public CongestionController {
 
     virtual void onAppLimited() = 0;
     virtual bool isAppLimited() const = 0;
+    virtual void setWindowLength(const uint64_t windowLength) noexcept = 0;
   };
 
   explicit BbrCongestionController(QuicConnectionStateBase& conn);
@@ -124,6 +130,26 @@ class BbrCongestionController : public CongestionController {
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
+  /**
+   * Sets a factor of the measured bottleneck BW that the congestion controller
+   * should make use of. Can be used to leave headroom for other flows and to
+   * reduce the risk of queuing in the case of network condition changes.
+   *
+   * A factor less than 1.0 makes BBR less aggressive:
+   *   - During startup, BBR will grow its pacing rate and congestion window
+   *     more slowly, and StartupGain is halved.
+   *   - After exiting the startup phase:
+   *      - ProbeBW NumberOfCycles is set to 32 instead of 8. This causes BBR
+   *        to probe for bandwidth less frequently.
+   *      - ProbeBW PacingGainCycles values=factor after probing. If factor < 1,
+   *.       then BBR will only use a fraction of the measured bandwidth.
+   *
+   * If bandwidthUtilizationFactor >= 1.0, background mode is disabled.
+   * If bandwidthUtilizationFactor < 0.25, a value of 0.25 is used instead.
+   */
+  void setBandwidthUtilizationFactor(
+      float bandwidthUtilizationFactor) noexcept override;
+
   bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
@@ -131,6 +157,7 @@ class BbrCongestionController : public CongestionController {
   // TODO: some of these do not have to be in public API.
   bool inRecovery() const noexcept;
   BbrState state() const noexcept;
+  [[nodiscard]] bool isInBackgroundMode() const noexcept override;
 
  private:
   /* prevInflightBytes: the inflightBytes value before the current
@@ -215,6 +242,11 @@ class BbrCongestionController : public CongestionController {
 
   float cwndGain_{kStartupGain};
   float pacingGain_{kStartupGain};
+
+  // ProbeBw parameters
+  uint64_t numOfCycles_{kNumOfCycles};
+  std::vector<float> pacingGainCycles_;
+  float bandwidthUtilizationFactor_{1.0};
 
   // Whether we have found the bottleneck link bandwidth
   bool btlbwFound_{false};

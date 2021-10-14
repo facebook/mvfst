@@ -38,6 +38,7 @@ class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
       onPacketAcked,
       void(const CongestionController::AckEvent&, uint64_t));
   MOCK_METHOD0(onAppLimited, void());
+  GMOCK_METHOD1_(, noexcept, , setWindowLength, void(const uint64_t));
 };
 
 } // namespace test

@@ -9,6 +9,7 @@
 #include <quic/server/QuicServerTransport.h>
 
 #include <quic/common/WindowedCounter.h>
+#include <quic/congestion_control/Bbr.h>
 #include <quic/d6d/BinarySearchProbeSizeRaiser.h>
 #include <quic/d6d/ConstantStepProbeSizeRaiser.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
@@ -721,6 +722,24 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         server_conn->congestionController =
             server_conn->congestionControllerFactory->makeCongestionController(
                 *server_conn, cctype);
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB),
+      [](QuicServerConnectionState* server_conn, uint64_t val) {
+        CHECK(server_conn);
+        if (val < 25 || val > 100) {
+          LOG(ERROR)
+              << "Invalid CC_AGRESSIVENESS_KNOB value received from client, value = "
+              << val << ". Supported values are between 25,100 (inclusive)";
+          return;
+        }
+        float targetFactor = val / 100.0f;
+        VLOG(3)
+            << "CC_AGRESSIVENESS_KNOB KnobParam received from client, setting congestion control aggressiveness to "
+            << targetFactor;
+        server_conn->congestionController->setBandwidthUtilizationFactor(
+            targetFactor);
       });
 
   registerTransportKnobParamHandler(

@@ -28,6 +28,8 @@ class MockCongestionController : public CongestionController {
   MOCK_CONST_METHOD0(type, CongestionControlType());
   GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
   MOCK_METHOD0(setAppLimited, void());
+  GMOCK_METHOD1_(, noexcept, , setBandwidthUtilizationFactor, void(float));
+  MOCK_CONST_METHOD0(isInBackgroundMode, bool());
   MOCK_CONST_METHOD0(isAppLimited, bool());
   MOCK_CONST_METHOD1(getStats, void(CongestionControllerStats&));
 };

@@ -142,7 +142,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   ackEvent2.ackTime = ackTime2;
   packet2.metadata.time = ackTime + 110us;
   ackEvent2.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet2));
-  sampler.onPacketAcked(ackEvent2, kBandwidthWindowLength / 4 + 1);
+  sampler.onPacketAcked(ackEvent2, bandwidthWindowLength(kNumOfCycles) / 4 + 1);
   auto secondBandwidthSample = sampler.getBandwidth();
   EXPECT_EQ(firstBandwidthSample, sampler.getBandwidth());
 
@@ -156,7 +156,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   ackEvent3.ackTime = ackTime3;
   packet3.metadata.time = ackTime + 210us;
   ackEvent3.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet3));
-  sampler.onPacketAcked(ackEvent3, kBandwidthWindowLength / 2 + 1);
+  sampler.onPacketAcked(ackEvent3, bandwidthWindowLength(kNumOfCycles) / 2 + 1);
   EXPECT_EQ(firstBandwidthSample, sampler.getBandwidth());
 
   pn++;
@@ -169,7 +169,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   ackEvent4.ackTime = ackTime4;
   packet4.metadata.time = ackTime + 310us;
   ackEvent4.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet4));
-  sampler.onPacketAcked(ackEvent4, kBandwidthWindowLength + 1);
+  sampler.onPacketAcked(ackEvent4, bandwidthWindowLength(kNumOfCycles) + 1);
   // The bandwidth we got from packet1 has expired. Packet2 should have
   // generated the current max:
   EXPECT_EQ(secondBandwidthSample, sampler.getBandwidth());
