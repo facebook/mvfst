@@ -14,7 +14,7 @@ class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
  public:
   ~QuicPlaintextReadRecordLayer() override = default;
 
-  folly::Optional<fizz::TLSMessage> read(
+  ReadResult<fizz::TLSMessage> read(
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
@@ -23,7 +23,7 @@ class QuicPlaintextReadRecordLayer : public fizz::PlaintextReadRecordLayer {
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;
     msg.fragment = buf.move();
-    return msg;
+    return ReadResult<fizz::TLSMessage>::from(std::move(msg));
   }
 };
 
@@ -34,7 +34,7 @@ class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
   explicit QuicEncryptedReadRecordLayer(fizz::EncryptionLevel encryptionLevel)
       : fizz::EncryptedReadRecordLayer(encryptionLevel) {}
 
-  folly::Optional<fizz::TLSMessage> read(
+  ReadResult<fizz::TLSMessage> read(
       folly::IOBufQueue& buf,
       fizz::Aead::AeadOptions) override {
     if (buf.empty()) {
@@ -43,7 +43,7 @@ class QuicEncryptedReadRecordLayer : public fizz::EncryptedReadRecordLayer {
     fizz::TLSMessage msg;
     msg.type = fizz::ContentType::handshake;
     msg.fragment = buf.move();
-    return msg;
+    return ReadResult<fizz::TLSMessage>::from(std::move(msg));
   }
 };
 
