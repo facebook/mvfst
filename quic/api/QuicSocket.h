@@ -146,10 +146,7 @@ class QuicSocket {
    * replace it.
    */
   class ConnectionCallback : public ConnectionSetupCallback,
-                             public ConnectionCallbackNew {
-    void onConnectionSetupError(
-        std::pair<QuicErrorCode, std::string>) noexcept override {}
-  };
+                             public ConnectionCallbackNew {};
 
   /**
    * Information about the transport, similar to what TCP has.

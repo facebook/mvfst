@@ -47,6 +47,11 @@ class EchoHandler : public quic::QuicSocket::ConnectionCallback,
     LOG(INFO) << "Socket closed";
   }
 
+  void onConnectionSetupError(
+      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+    onConnectionError(std::move(error));
+  }
+
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
     LOG(ERROR) << "Socket error=" << toString(error.first) << " "

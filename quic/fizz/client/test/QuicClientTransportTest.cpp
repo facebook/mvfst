@@ -1886,6 +1886,10 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
     GMOCK_METHOD0_(, noexcept, , onTransportReadyMock, void());
     GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
     GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
+    void onConnectionSetupError(
+        std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+      onConnectionError(std::move(error));
+    }
     GMOCK_METHOD1_(
         ,
         noexcept,

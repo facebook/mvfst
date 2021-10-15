@@ -36,6 +36,10 @@ class QuicClientAsyncTransport : public QuicStreamAsyncTransport,
   void onNewUnidirectionalStream(StreamId id) noexcept override;
   void onStopSending(StreamId id, ApplicationErrorCode error) noexcept override;
   void onConnectionEnd() noexcept override;
+  void onConnectionSetupError(
+      std::pair<QuicErrorCode, std::string> code) noexcept override {
+    onConnectionError(std::move(code));
+  }
   void onConnectionError(
       std::pair<QuicErrorCode, std::string> code) noexcept override;
   void onTransportReady() noexcept override;

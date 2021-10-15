@@ -115,6 +115,10 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       onStopSending,
       void(StreamId, ApplicationErrorCode));
   GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
+  void onConnectionSetupError(
+      std::pair<QuicErrorCode, std::string> code) noexcept override {
+    onConnectionError(std::move(code));
+  }
   GMOCK_METHOD1_(
       ,
       noexcept,

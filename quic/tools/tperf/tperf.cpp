@@ -275,6 +275,11 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
     sock_.reset();
   }
 
+  void onConnectionSetupError(
+      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+    onConnectionError(std::move(error));
+  }
+
   void onConnectionError(
       std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
     LOG(ERROR) << "Conn errorCoded=" << toString(error.first)
@@ -678,6 +683,11 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     LOG(INFO) << "TPerfClient connection end";
 
     eventBase_.terminateLoopSoon();
+  }
+
+  void onConnectionSetupError(
+      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+    onConnectionError(std::move(error));
   }
 
   void onConnectionError(
