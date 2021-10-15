@@ -37,8 +37,12 @@ void FileQLogger::setupStream() {
   auto extension = compress_ ? kCompressedQlogExtension : kQlogExtension;
   std::string outputPath =
       folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
-  std::ofstream file(outputPath);
-  writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
+  try {
+    writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
+  } catch (std::system_error err) {
+    LOG(ERROR) << "Error creating qlog file. " << err.what();
+    return;
+  }
   if (compress_) {
     compressionCodec_ = folly::io::getStreamCodec(folly::io::CodecType::GZIP);
     compressionBuffer_ = folly::IOBuf::createCombined(kCompressionBufferSize);
@@ -74,6 +78,9 @@ void FileQLogger::setupStream() {
 }
 
 void FileQLogger::writeToStream(folly::StringPiece message) {
+  if (!writer_) {
+    return;
+  }
   if (compress_) {
     bool inputConsumed = false;
     while (!inputConsumed) {
@@ -96,6 +103,9 @@ void FileQLogger::writeToStream(folly::StringPiece message) {
 }
 
 void FileQLogger::finishStream() {
+  if (!writer_) {
+    return;
+  }
   // finish copying the line that was stopped on
   std::string unfinishedLine(
       &eventLine_[pos_ + token_.size()],

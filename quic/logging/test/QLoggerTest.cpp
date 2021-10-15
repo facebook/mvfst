@@ -8,10 +8,10 @@
 
 #include <quic/logging/QLogger.h>
 
-#include <boost/filesystem.hpp>
 #include <folly/FileUtil.h>
 #include <folly/Random.h>
 #include <folly/json.h>
+#include <folly/portability/Filesystem.h>
 #include <gtest/gtest.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/Bbr.h>
@@ -1242,7 +1242,7 @@ TEST_F(QLoggerTest, PrettyStream) {
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
-  auto dir = boost::filesystem::temp_directory_path().string();
+  auto dir = folly::fs::temp_directory_path().string();
 
   auto* q = new FileQLogger(
       VantagePoint::Server,
@@ -1353,7 +1353,7 @@ TEST_F(QLoggerTest, NonPrettyStream) {
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
-  auto dir = boost::filesystem::temp_directory_path().string();
+  auto dir = folly::fs::temp_directory_path().string();
 
   auto* q = new FileQLogger(
       VantagePoint::Server,
@@ -1406,7 +1406,7 @@ TEST_F(QLoggerTest, CompressedStream) {
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
-  auto dir = boost::filesystem::temp_directory_path().string();
+  auto dir = folly::fs::temp_directory_path().string();
 
   auto* q = new FileQLogger(
       VantagePoint::Server,
@@ -1450,7 +1450,7 @@ TEST_F(QLoggerTest, CompressedNonStream) {
   ReadStreamFrame frame(streamId, offset, fin);
 
   regularQuicPacket.frames.emplace_back(std::move(frame));
-  auto dir = boost::filesystem::temp_directory_path().string();
+  auto dir = folly::fs::temp_directory_path().string();
 
   FileQLogger q(
       VantagePoint::Server,
@@ -1483,6 +1483,40 @@ TEST_F(QLoggerTest, CompressedNonStream) {
 
   EXPECT_EQ(expected["summary"], parsed["summary"]);
   EXPECT_EQ(expected["traces"], parsed["traces"]);
+}
+
+TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  ReadStreamFrame frame(streamId, offset, fin);
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = std::tmpnam(nullptr);
+  // Output directory does not exist.
+  ASSERT_FALSE(folly::fs::exists(dir));
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      false /* prettyJson */,
+      true /* streaming */,
+      true /* compress */);
+
+  EXPECT_NO_THROW(q->setDcid(ConnectionId::createRandom(8)));
+  q->addPacket(regularQuicPacket, 10);
+  EXPECT_EQ(
+      q->logs.size(),
+      0); // Packet is not written but also not being kept in memory
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog.gz");
+
+  delete q;
+
+  // Output file was not created
+  EXPECT_FALSE(folly::fs::exists(outputPath));
 }
 
 } // namespace quic::test
