@@ -18,8 +18,14 @@ class MockQuicSocket : public QuicSocket {
  public:
   using SharedBuf = std::shared_ptr<folly::IOBuf>;
 
-  MockQuicSocket(folly::EventBase* /*eventBase*/, ConnectionCallback& cb)
-      : cb_(&cb) {}
+  MockQuicSocket(folly::EventBase* /*eventBase*/, ConnectionCallback& connCb)
+      : setupCb_(&connCb), connCb_(&connCb) {}
+
+  MockQuicSocket(
+      folly::EventBase* /*eventBase*/,
+      ConnectionSetupCallback& setupCb,
+      ConnectionCallbackNew* connCb)
+      : setupCb_(&setupCb), connCb_(connCb) {}
 
   MOCK_CONST_METHOD0(good, bool());
   MOCK_CONST_METHOD0(replaySafe, bool());
@@ -271,7 +277,8 @@ class MockQuicSocket : public QuicSocket {
 
   MOCK_METHOD1(setCongestionControl, void(CongestionControlType));
 
-  ConnectionCallback* cb_;
+  ConnectionSetupCallback* setupCb_;
+  ConnectionCallbackNew* connCb_;
 
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
       earlyDataAppParamsValidator_;

@@ -2624,7 +2624,7 @@ void QuicTransportBase::setConnectionSetupCallback(
   if (!connCallback_) {
     connCallback_ = CallbackDispatcher::make();
   }
-  connCallback_->setConnectionSetupCallback(CHECK_NOTNULL(callback));
+  connCallback_->setConnectionSetupCallback(callback);
 }
 
 void QuicTransportBase::setConnectionCallbackNew(
