@@ -8,20 +8,21 @@
 
 #pragma once
 
+#include <initializer_list>
+
 #include <boost/iterator/iterator_facade.hpp>
 #include <folly/Portability.h>
+#include <folly/memory/Malloc.h>
 #include <glog/logging.h>
-#include <vector>
 
 namespace quic {
 
 /**
- * A container backed by another continuous memory container (std::vector). It
- * can pop and push from both ends like std::deque. Doing such operation with
- * CircularDeque should be faster than std::deque. It also supports APIs to
- * mutate the middle of the container (erase(), emplace() and insert() all
- * support arbitrary positions). But doing so with CircularDeque
- * is much slower than std::deque.
+ * A container backed by contiguous memory. It can pop and push from both ends
+ * like std::deque. Doing such operation with CircularDeque should be faster
+ * than std::deque. It also supports APIs to mutate the middle of the container
+ * (erase(), emplace() and insert() all support arbitrary positions). But doing
+ * so with CircularDeque is much slower than std::deque.
  */
 template <typename T>
 struct CircularDeque {
@@ -31,46 +32,46 @@ struct CircularDeque {
   using const_reference = const T&;
   using difference_type = std::ptrdiff_t;
 
-  CircularDeque() : begin_(0), end_(0) {}
-  CircularDeque(size_type n) : storage_(n), begin_(0), end_(0) {}
+  CircularDeque() = default;
+  CircularDeque(size_type n) {
+    resize(n);
+  }
   CircularDeque(std::initializer_list<T> init);
 
-  CircularDeque(const CircularDeque& other)
-      : storage_(other.storage_), begin_(other.begin_), end_(other.end_) {}
+  CircularDeque(const CircularDeque& other) {
+    *this = other;
+  }
 
-  // Move constructor will leave other in an invalid state.
-  CircularDeque(CircularDeque&& other) noexcept
-      : storage_(std::move(other.storage_)),
-        begin_(other.begin_),
-        end_(other.end_) {}
+  // Move constructor will leave other in a default-initialized state.
+  CircularDeque(CircularDeque&& other) noexcept {
+    swap(other);
+  }
 
   CircularDeque& operator=(const CircularDeque& other) {
     clear();
-    storage_ = other.storage_;
-    begin_ = other.begin_;
-    end_ = other.end_;
+    resize(other.size());
+    std::uninitialized_copy(other.begin(), other.end(), storage_);
+    end_ = other.size();
     return *this;
   }
 
-  // Move assignment will leave other in an invalid state.
+  // Move assignment will leave other in a default-initialized state.
   CircularDeque& operator=(CircularDeque&& other) noexcept {
-    clear();
-    storage_ = std::move(other.storage_);
-    begin_ = other.begin_;
-    end_ = other.end_;
+    swap(other);
+    CircularDeque{}.swap(other);
     return *this;
   }
 
   CircularDeque& operator=(std::initializer_list<T> ilist);
 
   ~CircularDeque() {
-    if (empty() || storage_.capacity() == 0) {
+    if (capacity_ == 0) {
+      DCHECK_EQ(storage_, nullptr);
       return;
     }
-    auto iter = begin();
-    while (iter != end()) {
-      iter++->~T();
-    }
+    clear();
+    folly::sizedFree(storage_, capacity_ * sizeof(T));
+    capacity_ = 0;
   }
   // Missing: more constructor overloads, and custom Allocator
   // Missing: comparison operators... I'm lazy. I'm waiting for my spaceship.
@@ -95,7 +96,7 @@ struct CircularDeque {
 
     void increment() {
       ++index_;
-      auto maxSize = deque_->storage_.capacity();
+      auto maxSize = deque_->capacity_;
       if (index_ > maxSize) {
         index_ = 0;
       }
@@ -105,7 +106,7 @@ struct CircularDeque {
     }
 
     void decrement() {
-      auto maxSize = deque_->storage_.capacity();
+      auto maxSize = deque_->capacity_;
       if (index_ == 0) {
         index_ = wrapped() ? maxSize - 1 : maxSize;
       } else {
@@ -118,7 +119,7 @@ struct CircularDeque {
         return;
       }
       if (n > 0) {
-        auto maxSize = deque_->storage_.capacity();
+        auto maxSize = deque_->capacity_;
         index_ = (index_ + n) % (wrapped() ? maxSize : maxSize + 1);
       } else {
         while (n++ != 0) {
@@ -239,46 +240,6 @@ struct CircularDeque {
 
   template <
       typename U = T,
-      std::enable_if_t<std::is_move_constructible<U>::value, int> = 0>
-  void resizeHelper(std::vector<T>& newStorage, size_type maxToMove) noexcept(
-      std::is_nothrow_move_constructible<T>::value) {
-    if (maxToMove > 0) {
-      auto iter = begin();
-      auto endIter = iter + maxToMove;
-      size_type index = 0;
-      while (iter != endIter) {
-        DCHECK_NE(iter.index_, storage_.capacity());
-        DCHECK_LT(index, newStorage.capacity());
-        new (&newStorage[index++]) T(std::move(*iter));
-        iter->~T();
-        ++iter;
-      }
-    }
-  }
-
-  template <
-      typename U = T,
-      std::enable_if_t<
-          !std::is_move_constructible<U>::value &&
-              std::is_copy_constructible<U>::value,
-          int> = 0>
-  void resizeHelper(std::vector<T>& newStorage, size_type maxToMove) noexcept(
-      std::is_nothrow_copy_constructible<T>::value) {
-    if (maxToMove > 0) {
-      auto iter = begin();
-      size_type index = 0;
-      while (iter != begin() + maxToMove) {
-        DCHECK_NE(iter.index_, storage_.capacity());
-        DCHECK_LT(index, newStorage.capacity());
-        new (&newStorage[index++]) T(*iter);
-        iter->~T();
-        ++iter;
-      }
-    }
-  }
-
-  template <
-      typename U = T,
       typename Iterator,
       std::enable_if_t<std::is_move_assignable<U>::value, int> = 0>
   void moveOrCopy(Iterator first, Iterator last, Iterator destFirst) noexcept(
@@ -290,7 +251,7 @@ struct CircularDeque {
     while (iter != last) {
       *destFirst = std::move(*iter++);
       // Different from iter, destFirst cannot reuse increment/advance.
-      if (destFirst.index_ == storage_.capacity() - 1) {
+      if (destFirst.index_ == capacity_ - 1) {
         destFirst.index_ = 0;
       } else {
         ++destFirst.index_;
@@ -320,7 +281,7 @@ struct CircularDeque {
     while (iter != last) {
       *destFirst = *iter++;
       // Different from iter, destFirst cannot reuse increment/advance.
-      if (destFirst.index_ == storage_.capacity() - 1) {
+      if (destFirst.index_ == capacity_ - 1) {
         destFirst.index_ = 0;
       } else {
         ++destFirst.index_;
@@ -342,7 +303,7 @@ struct CircularDeque {
     auto iter = last;
     while (iter != first) {
       if (destLast.index_ == 0) {
-        destLast.index_ = storage_.capacity() - 1;
+        destLast.index_ = capacity_ - 1;
       } else {
         --destLast.index_;
       }
@@ -371,7 +332,7 @@ struct CircularDeque {
     auto iter = last;
     while (iter != first) {
       if (destLast.index_ == 0) {
-        destLast.index_ = storage_.capacity() - 1;
+        destLast.index_ = capacity_ - 1;
       } else {
         --destLast.index_;
       }
@@ -404,7 +365,7 @@ struct CircularDeque {
     if (last.index_ >= first.index_) {
       return last.index_ - first.index_;
     }
-    return storage_.capacity() - first.index_ + last.index_;
+    return capacity_ - first.index_ + last.index_;
   }
 
   void indexSanityCheck(const_iterator iter) noexcept {
@@ -416,9 +377,10 @@ struct CircularDeque {
   }
 
  private:
-  std::vector<T> storage_;
-  typename std::vector<T>::size_type begin_;
-  typename std::vector<T>::size_type end_;
+  T* storage_ = nullptr;
+  size_type capacity_ = 0;
+  size_type begin_ = 0;
+  size_type end_ = 0;
 };
 } // namespace quic
 

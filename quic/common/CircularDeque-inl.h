@@ -6,9 +6,11 @@
  *
  */
 
-#include <folly/Likely.h>
 #include <algorithm>
 #include <iterator>
+
+#include <folly/Likely.h>
+#include <folly/ScopeGuard.h>
 
 namespace quic {
 
@@ -16,16 +18,18 @@ constexpr size_t kInitCapacity = 500;
 constexpr size_t kResizeFactor = 2;
 
 template <typename T>
-CircularDeque<T>::CircularDeque(std::initializer_list<T> init)
-    : storage_(init), begin_(0), end_(storage_.size()) {}
+CircularDeque<T>::CircularDeque(std::initializer_list<T> init) {
+  *this = std::move(init);
+}
 
 template <typename T>
 CircularDeque<T>& CircularDeque<T>::operator=(std::initializer_list<T> ilist) {
   clear();
-  storage_ = ilist;
-  CHECK(ilist.size() == 0 || storage_.size() > 0);
-  begin_ = 0;
-  end_ = storage_.size();
+  if (ilist.size() > max_size()) {
+    resize(ilist.size());
+  }
+  std::uninitialized_copy(ilist.begin(), ilist.end(), storage_);
+  end_ = ilist.size();
   return *this;
 }
 
@@ -35,8 +39,8 @@ bool CircularDeque<T>::needSpace() const noexcept {
    * size() and capacity can't be eq. Otherwise begin_ and end_ may point to the
    * same position, in which case I don't know if my container is full or empty.
    */
-  auto capacity = storage_.capacity();
-  return !capacity || size() == capacity - 1 || size() == capacity;
+  DCHECK_LE(size(), max_size());
+  return size() == max_size();
 }
 
 template <typename T>
@@ -46,43 +50,39 @@ bool CircularDeque<T>::empty() const noexcept {
 
 template <typename T>
 typename CircularDeque<T>::size_type CircularDeque<T>::size() const noexcept {
-  if (end_ >= begin_) {
-    return end_ - begin_;
-  }
-  return storage_.capacity() - (begin_ - end_);
+  return end_ - begin_ + (end_ < begin_ ? capacity_ : 0);
 }
 
 template <typename T>
 typename CircularDeque<T>::size_type CircularDeque<T>::max_size()
     const noexcept {
   // See the comments in resize() to see why this needs to minus 1.
-  auto capacity = storage_.capacity();
-  return capacity == 0 ? 0 : capacity - 1;
+  return capacity_ == 0 ? 0 : capacity_ - 1;
 }
 
 template <typename T>
 void CircularDeque<T>::resize(size_type count) {
-  auto oldCapacity = storage_.capacity();
-  if (oldCapacity == count) {
+  if (max_size() == count) {
     return;
   }
-  auto oldSize = size();
-  auto maxToMove = std::min(oldSize, count);
-  if (oldCapacity > count) {
-    auto iter = begin() + maxToMove;
-    while (iter != end()) {
-      iter->~T();
-    }
-  }
-  std::vector<T> newStorage;
   // The way we wrap around begin_ and end_ means for a vector of size S, we can
   // only store (S - 1) elements in them.
-  newStorage.reserve(count + 1);
-  resizeHelper(newStorage, maxToMove);
-  begin_ = 0;
-  end_ = maxToMove;
-  storage_ = std::move(newStorage);
-  DCHECK_EQ(size(), oldSize);
+  auto newCapacity = count + 1;
+  auto newSize = std::min(count, size());
+  auto newStorage =
+      reinterpret_cast<T*>(folly::checkedMalloc(newCapacity * sizeof(T)));
+  SCOPE_FAIL {
+    folly::sizedFree(newStorage, newCapacity * sizeof(T));
+  };
+  if constexpr (std::is_move_constructible_v<T>) {
+    std::uninitialized_move(begin(), end(), newStorage);
+  } else {
+    std::uninitialized_copy(begin(), end(), newStorage);
+  }
+  CircularDeque{}.swap(*this);
+  storage_ = newStorage;
+  capacity_ = newCapacity;
+  end_ = newSize;
 }
 
 template <typename T>
@@ -126,12 +126,12 @@ typename CircularDeque<T>::reference CircularDeque<T>::front() {
 
 template <typename T>
 typename CircularDeque<T>::const_reference CircularDeque<T>::back() const {
-  return storage_[(end_ == 0 ? storage_.capacity() : end_) - 1];
+  return storage_[(end_ == 0 ? capacity_ : end_) - 1];
 }
 
 template <typename T>
 typename CircularDeque<T>::reference CircularDeque<T>::back() {
-  return storage_[(end_ == 0 ? storage_.capacity() : end_) - 1];
+  return storage_[(end_ == 0 ? capacity_ : end_) - 1];
 }
 
 template <typename T>
@@ -208,13 +208,11 @@ template <class... Args>
 typename CircularDeque<T>::reference CircularDeque<T>::emplace_front(
     Args&&... args) {
   if (needSpace()) {
-    auto currentCapacity = storage_.capacity();
-    resize(
-        currentCapacity == 0 ? kInitCapacity : currentCapacity * kResizeFactor);
+    resize(capacity_ == 0 ? kInitCapacity : capacity_ * kResizeFactor);
   }
   if (begin_ == 0) {
-    DCHECK_NE(end_, storage_.capacity() - 1);
-    begin_ = storage_.capacity() - 1;
+    DCHECK_NE(end_, capacity_ - 1);
+    begin_ = capacity_ - 1;
   } else {
     DCHECK_NE(end_, begin_ - 1);
     --begin_;
@@ -229,12 +227,10 @@ template <class... Args>
 typename CircularDeque<T>::reference CircularDeque<T>::emplace_back(
     Args&&... args) {
   if (needSpace()) {
-    auto currentCapacity = storage_.capacity();
-    resize(
-        currentCapacity == 0 ? kInitCapacity : currentCapacity * kResizeFactor);
+    resize(capacity_ == 0 ? kInitCapacity : capacity_ * kResizeFactor);
   }
-  DCHECK_GT(storage_.capacity(), 0);
-  if (end_ == storage_.capacity()) {
+  DCHECK_GT(capacity_, 0);
+  if (end_ == capacity_) {
     end_ = 0;
     DCHECK_NE(0, begin_);
   }
@@ -254,8 +250,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   if (index == end_) {
     emplace_back(std::forward<Args>(args)...);
     DCHECK_NE(begin_, end_);
-    return CircularDequeIterator<T>(
-        this, end_ == 0 ? storage_.capacity() - 1 : end_ - 1);
+    return CircularDequeIterator<T>(this, end_ == 0 ? capacity_ - 1 : end_ - 1);
   }
   if (index == begin_) {
     emplace_front(std::forward<Args>(args)...);
@@ -266,14 +261,14 @@ typename CircularDeque<T>::iterator CircularDeque<T>::emplace(
   // Similar to erase(), emplace() in the middle is expensive
   auto dist = std::distance(begin(), pos);
   if (needSpace()) {
-    resize(storage_.capacity() * kResizeFactor);
+    resize(capacity_ * kResizeFactor);
     // After resize, pos is invalid. We need to find the new pos.
     pos = begin() + dist;
     index = pos.index_;
   }
   auto distIfMoveFront = wrappedDistance(begin(), pos);
   auto distIfMoveBack = wrappedDistance(pos, end());
-  auto lastGoodIndex = storage_.capacity() - 1;
+  auto lastGoodIndex = capacity_ - 1;
   if (distIfMoveBack <= distIfMoveFront) {
     auto prev =
         CircularDequeIterator<T>(this, end_ == 0 ? lastGoodIndex : end_ - 1);
@@ -334,7 +329,7 @@ template <typename T>
 void CircularDeque<T>::pop_front() {
   storage_[begin_].~T();
   // This if branch is actually faster than operator% on the machine I tested.
-  if (++begin_ == storage_.capacity()) {
+  if (++begin_ == capacity_) {
     begin_ = 0;
   }
 }
@@ -342,7 +337,7 @@ void CircularDeque<T>::pop_front() {
 template <typename T>
 void CircularDeque<T>::pop_back() {
   if (end_ == 0) {
-    end_ = storage_.capacity();
+    end_ = capacity_;
   }
   --end_;
   storage_[end_].~T();
@@ -358,7 +353,7 @@ template <typename T>
 typename CircularDeque<T>::iterator CircularDeque<T>::erase(
     typename CircularDeque<T>::const_iterator first,
     typename CircularDeque<T>::const_iterator last) {
-  DCHECK_NE(first.index_, storage_.capacity());
+  DCHECK_NE(first.index_, capacity_);
   if (first == last) {
     return CircularDequeIterator<T>(this, last.index_);
   }
@@ -431,7 +426,7 @@ typename CircularDeque<T>::iterator CircularDeque<T>::erase(
 
 template <typename T>
 void CircularDeque<T>::clear() noexcept {
-  if (empty() || storage_.capacity() == 0) {
+  if (empty() || capacity_ == 0) {
     return;
   }
   auto iter = begin();
@@ -444,9 +439,11 @@ void CircularDeque<T>::clear() noexcept {
 
 template <typename T>
 void CircularDeque<T>::swap(CircularDeque<T>& other) noexcept {
-  storage_.swap(other.storage_);
-  std::swap(begin_, other.begin_);
-  std::swap(end_, other.end_);
+  using std::swap;
+  swap(storage_, other.storage_);
+  swap(capacity_, other.capacity_);
+  swap(begin_, other.begin_);
+  swap(end_, other.end_);
 }
 
 } // namespace quic
