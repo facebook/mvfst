@@ -10,6 +10,7 @@
 
 #include <folly/io/async/EventBase.h>
 #include <folly/portability/GMock.h>
+#include "quic/QuicException.h"
 
 #include <quic/state/QuicTransportStatsCallback.h>
 
@@ -33,10 +34,10 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD1(onClientInitialReceived, void(QuicVersion));
   MOCK_METHOD0(onConnectionRateLimited, void());
   MOCK_METHOD0(onNewConnection, void());
-  MOCK_METHOD1(onConnectionClose, void(folly::Optional<ConnectionCloseReason>));
+  MOCK_METHOD1(onConnectionClose, void(folly::Optional<QuicErrorCode>));
   MOCK_METHOD0(onNewQuicStream, void());
   MOCK_METHOD0(onQuicStreamClosed, void());
-  MOCK_METHOD0(onQuicStreamReset, void());
+  MOCK_METHOD1(onQuicStreamReset, void(QuicErrorCode));
   MOCK_METHOD0(onConnFlowControlUpdate, void());
   MOCK_METHOD0(onConnFlowControlBlocked, void());
   MOCK_METHOD0(onStatelessReset, void());

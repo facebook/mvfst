@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <string>
+#include "quic/QuicConstants.h"
 
 #include <quic/QuicConstants.h>
 #include <quic/common/Variant.h>
@@ -103,6 +104,8 @@ std::string toString(
     const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>& error);
 
 std::string cryptoErrorToString(TransportErrorCode code);
+std::vector<TransportErrorCode> getAllTransportErrorCodes();
+std::vector<LocalErrorCode> getAllLocalErrorCodes();
 
 inline std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error) {
   os << toString(error);

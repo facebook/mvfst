@@ -11,6 +11,8 @@
 #include <glog/logging.h>
 #include <quic/codec/Types.h>
 #include <quic/state/QuicTransportStatsCallback.h>
+#include "quic/QuicConstants.h"
+#include "quic/QuicException.h"
 
 namespace quic {
 namespace samples {
@@ -87,9 +89,9 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
   }
 
   void onConnectionClose(
-      folly::Optional<ConnectionCloseReason> reason = folly::none) override {
+      folly::Optional<QuicErrorCode> code = folly::none) override {
     VLOG(2) << prefix_ << "onConnectionClose reason="
-            << toString(reason.value_or(ConnectionCloseReason::NONE));
+            << quic::toString(code.value_or(LocalErrorCode::NO_ERROR));
   }
 
   // stream level metrics
@@ -101,8 +103,8 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onQuicStreamClosed";
   }
 
-  void onQuicStreamReset() override {
-    VLOG(2) << prefix_ << "onQuicStreamReset";
+  void onQuicStreamReset(QuicErrorCode code) override {
+    VLOG(2) << prefix_ << "onQuicStreamReset reason=" << quic::toString(code);
   }
 
   // flow control / congestion control / loss recovery related metrics

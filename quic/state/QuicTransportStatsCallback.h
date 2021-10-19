@@ -14,6 +14,7 @@
 #include <string>
 
 #include <quic/QuicConstants.h>
+#include <quic/QuicException.h>
 
 namespace quic {
 
@@ -46,14 +47,6 @@ class QuicTransportStatsCallback {
     CLIENT_STATE_CLOSED,
     CLIENT_SHUTDOWN,
     INVALID_SRC_PORT,
-    // NOTE: MAX should always be at the end
-    MAX
-  };
-
-  enum class ConnectionCloseReason : uint8_t {
-    NONE,
-    CONN_ERROR,
-    IDLE_TIMEOUT,
     // NOTE: MAX should always be at the end
     MAX
   };
@@ -112,14 +105,14 @@ class QuicTransportStatsCallback {
   virtual void onNewConnection() = 0;
 
   virtual void onConnectionClose(
-      folly::Optional<ConnectionCloseReason> reason = folly::none) = 0;
+      folly::Optional<QuicErrorCode> code = folly::none) = 0;
 
   // stream level metrics
   virtual void onNewQuicStream() = 0;
 
   virtual void onQuicStreamClosed() = 0;
 
-  virtual void onQuicStreamReset() = 0;
+  virtual void onQuicStreamReset(QuicErrorCode code) = 0;
 
   // flow control / congestion control / loss recovery related metrics
   virtual void onConnFlowControlUpdate() = 0;
@@ -167,21 +160,6 @@ class QuicTransportStatsCallback {
   virtual void onZeroRttAccepted() = 0;
 
   virtual void onZeroRttRejected() = 0;
-
-  static const char* toString(ConnectionCloseReason reason) {
-    switch (reason) {
-      case ConnectionCloseReason::NONE:
-        return "NONE";
-      case ConnectionCloseReason::CONN_ERROR:
-        return "CONN_ERROR";
-      case ConnectionCloseReason::IDLE_TIMEOUT:
-        return "IDLE_TIMEOUT";
-      case ConnectionCloseReason::MAX:
-        return "MAX";
-      default:
-        throw std::runtime_error("Undefined ConnectionCloseReason passed");
-    }
-  }
 
   static const char* toString(PacketDropReason reason) {
     switch (reason) {

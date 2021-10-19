@@ -1268,7 +1268,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
       t->setTransportStatsCallback(nullptr);
       t->closeNow(
           std::make_pair(QuicErrorCode(error), std::string("shutting down")));
-      QUIC_STATS(statsCallback_, onConnectionClose, folly::none);
+      QUIC_STATS(statsCallback_, onConnectionClose, QuicErrorCode(error));
     }
   }
   sourceAddressMap_.clear();

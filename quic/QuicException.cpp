@@ -7,9 +7,11 @@
  */
 
 #include <quic/QuicException.h>
+#include "quic/QuicConstants.h"
 
 #include <fizz/record/Types.h>
 #include <glog/logging.h>
+#include <vector>
 
 namespace quic {
 
@@ -122,6 +124,8 @@ folly::StringPiece toString(LocalErrorCode code) {
       return "Knob Frame Not Supported";
     case LocalErrorCode::PACER_NOT_AVAILABLE:
       return "Pacer not available";
+    default:
+      break;
   }
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";
@@ -169,6 +173,61 @@ std::string toString(TransportErrorCode code) {
 
   LOG(WARNING) << "toString has unhandled ErrorCode";
   return "Unknown error";
+}
+
+std::vector<TransportErrorCode> getAllTransportErrorCodes() {
+  std::vector<TransportErrorCode> all = {
+      TransportErrorCode::NO_ERROR,
+      TransportErrorCode::INTERNAL_ERROR,
+      TransportErrorCode::SERVER_BUSY,
+      TransportErrorCode::FLOW_CONTROL_ERROR,
+      TransportErrorCode::STREAM_LIMIT_ERROR,
+      TransportErrorCode::STREAM_STATE_ERROR,
+      TransportErrorCode::FINAL_SIZE_ERROR,
+      TransportErrorCode::FRAME_ENCODING_ERROR,
+      TransportErrorCode::TRANSPORT_PARAMETER_ERROR,
+      TransportErrorCode::PROTOCOL_VIOLATION,
+      TransportErrorCode::INVALID_MIGRATION,
+      TransportErrorCode::CRYPTO_ERROR,
+      TransportErrorCode::CRYPTO_ERROR_MAX,
+      TransportErrorCode::INVALID_TOKEN};
+  return all;
+}
+
+std::vector<LocalErrorCode> getAllLocalErrorCodes() {
+  std::vector<LocalErrorCode> all = {
+      LocalErrorCode::NO_ERROR,
+      LocalErrorCode::CONNECT_FAILED,
+      LocalErrorCode::CODEC_ERROR,
+      LocalErrorCode::STREAM_CLOSED,
+      LocalErrorCode::STREAM_NOT_EXISTS,
+      LocalErrorCode::CREATING_EXISTING_STREAM,
+      LocalErrorCode::SHUTTING_DOWN,
+      LocalErrorCode::RESET_CRYPTO_STREAM,
+      LocalErrorCode::CWND_OVERFLOW,
+      LocalErrorCode::INFLIGHT_BYTES_OVERFLOW,
+      LocalErrorCode::LOST_BYTES_OVERFLOW,
+      LocalErrorCode::NEW_VERSION_NEGOTIATED,
+      LocalErrorCode::INVALID_WRITE_CALLBACK,
+      LocalErrorCode::TLS_HANDSHAKE_FAILED,
+      LocalErrorCode::APP_ERROR,
+      LocalErrorCode::INTERNAL_ERROR,
+      LocalErrorCode::TRANSPORT_ERROR,
+      LocalErrorCode::INVALID_WRITE_DATA,
+      LocalErrorCode::INVALID_STATE_TRANSITION,
+      LocalErrorCode::CONNECTION_CLOSED,
+      LocalErrorCode::EARLY_DATA_REJECTED,
+      LocalErrorCode::CONNECTION_RESET,
+      LocalErrorCode::IDLE_TIMEOUT,
+      LocalErrorCode::PACKET_NUMBER_ENCODING,
+      LocalErrorCode::INVALID_OPERATION,
+      LocalErrorCode::STREAM_LIMIT_EXCEEDED,
+      LocalErrorCode::CONNECTION_ABANDONED,
+      LocalErrorCode::CALLBACK_ALREADY_INSTALLED,
+      LocalErrorCode::KNOB_FRAME_UNSUPPORTED,
+      LocalErrorCode::PACER_NOT_AVAILABLE,
+  };
+  return all;
 }
 
 std::string cryptoErrorToString(TransportErrorCode code) {
