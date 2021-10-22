@@ -64,5 +64,10 @@ class MockPendingPathRateLimiter : public PendingPathRateLimiter {
       currentCredit,
       uint64_t(TimePoint, std::chrono::microseconds));
 };
+
+class MockQuicStreamPrioritiesObserver : public QuicStreamPrioritiesObserver {
+ public:
+  MOCK_METHOD0(onStreamPrioritiesChange, void());
+};
 } // namespace test
 } // namespace quic

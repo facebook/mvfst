@@ -11,7 +11,9 @@
 
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
+#include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamManager.h>
+#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/test/Mocks.h>
 
 using namespace testing;
@@ -336,6 +338,72 @@ TEST_F(QuicStreamManagerTest, WriteBufferMeta) {
   stream->recvState = StreamRecvState::Closed;
   manager.removeClosedStream(stream->id);
   EXPECT_TRUE(manager.writableDSRStreams().empty());
+}
+
+TEST_F(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
+  // Verify that the StreamPriorityChanges callback function is called
+  // upon stream creation, priority changes, stream removal.
+  // For different steps try local (uni/bi)directional streams and remote
+  // streams
+
+  MockQuicStreamPrioritiesObserver mObserver;
+
+  auto& manager = *conn.streamManager;
+  manager.setPriorityChangesObserver(&mObserver);
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(2); // On stream creation and on setting the priority
+  auto stream = manager.createNextUnidirectionalStream().value();
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
+
+  manager.setStreamPriority(stream->id, 1, false);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), 1);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(1); // On removing a closed stream
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  manager.removeClosedStream(stream->id);
+  // No active stream. Highest priority should return the max value (least
+  // priority).
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultMaxPriority);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(2); // On stream creation - create two streams - one bidirectional
+  auto stream2Id = manager.createNextUnidirectionalStream().value()->id;
+  auto stream3 = manager.createNextBidirectionalStream().value();
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(1); // On increasing the priority of one of the streams
+  manager.setStreamPriority(stream3->id, 0, false);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), 0);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(1); // On removing a closed stream;
+  stream3->sendState = StreamSendState::Closed;
+  stream3->recvState = StreamRecvState::Closed;
+  manager.removeClosedStream(stream3->id);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(1); // On stream creation - remote stream
+  auto peerStreamId = 20;
+  ASSERT_TRUE(isRemoteStream(conn.nodeType, peerStreamId));
+  auto stream4 = manager.getStream(peerStreamId);
+  EXPECT_NE(stream4, nullptr);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
+
+  EXPECT_CALL(mObserver, onStreamPrioritiesChange())
+      .Times(0); // Removing streams but observer removed
+  manager.resetPriorityChangesObserver();
+  stream4->sendState = StreamSendState::Closed;
+  stream4->recvState = StreamRecvState::Closed;
+  manager.removeClosedStream(stream4->id);
+  CHECK_NOTNULL(manager.getStream(stream2Id))->sendState =
+      StreamSendState::Closed;
+  CHECK_NOTNULL(manager.getStream(stream2Id))->recvState =
+      StreamRecvState::Closed;
+  manager.removeClosedStream(stream2Id);
 }
 
 } // namespace test

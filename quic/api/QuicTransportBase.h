@@ -35,7 +35,7 @@ enum class CloseState { OPEN, GRACEFUL_CLOSING, CLOSED };
  *    This is needed in order for QUIC to be able to live beyond the lifetime
  *    of the object that holds it to send graceful close messages to the peer.
  */
-class QuicTransportBase : public QuicSocket {
+class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       folly::EventBase* evb,
@@ -419,6 +419,22 @@ class QuicTransportBase : public QuicSocket {
       const ByteEvent::Type type,
       const StreamId id) const override;
 
+  /*
+   * Set the background mode priority threshold and the target bw utilization
+   * factor to use when in background mode.
+   *
+   * If all streams have equal or lower priority compares to the threshold
+   * (value >= threshold), the connection is considered to be in backround mode.
+   */
+  void setBackgroundModeParameters(
+      PriorityLevel maxBackgroundPriority,
+      float backgroundUtilizationFactor);
+
+  /*
+   * Disable background mode by clearing all related parameters.
+   */
+  void clearBackgroundModeParameters();
+
   // Timeout functions
   class LossTimeout : public folly::HHWheelTimer::Callback {
    public:
@@ -693,6 +709,13 @@ class QuicTransportBase : public QuicSocket {
       std::vector<StreamId>& streamStorage);
   void handleStreamStopSendingCallbacks();
   void handleConnWritable();
+
+  /*
+   * Observe changes in stream priorities and handle background mode.
+   *
+   * Implements the QuicStreamPrioritiesObserver interface
+   */
+  void onStreamPrioritiesChange() override;
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);
@@ -1000,6 +1023,12 @@ class QuicTransportBase : public QuicSocket {
   // callback object or two new split callback objects. Will be removed out once
   // mvfst is switched to the new split callbacks eventually.
   bool useSplitConnectionCallbacks_{false};
+
+  // Priority level threshold for background streams
+  // If all streams have equal or lower priority to the threshold
+  // (value >= threshold), the connection is considered to be in backround mode.
+  folly::Optional<PriorityLevel> backgroundPriorityThreshold_;
+  folly::Optional<float> backgroundUtilizationFactor_;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

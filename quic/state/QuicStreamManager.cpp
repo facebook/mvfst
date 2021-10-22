@@ -236,6 +236,15 @@ bool QuicStreamManager::setStreamPriority(
       return false;
     }
     stream->priority = newPriority;
+    auto priorityMapEntry = streamPriorityLevels_.find(id);
+    if (priorityMapEntry == streamPriorityLevels_.end()) {
+      throw QuicTransportException(
+          "Active stream not in stream priority map",
+          TransportErrorCode::STREAM_STATE_ERROR);
+    } else {
+      priorityMapEntry->second = newPriority.level;
+    }
+    notifyStreamPriorityChanges();
     // If this stream is already in the writable or loss queus, update the
     // priority there.
     writableStreams_.updateIfExist(id, stream->priority);
@@ -273,6 +282,7 @@ QuicStreamManager::getOrCreateOpenedLocalStream(StreamId streamId) {
       throw QuicTransportException(
           "Creating an active stream", TransportErrorCode::STREAM_STATE_ERROR);
     }
+    addToStreamPriorityMap(it.first->second);
     return &it.first->second;
   }
   return nullptr;
@@ -358,6 +368,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
         std::piecewise_construct,
         std::forward_as_tuple(streamId),
         std::forward_as_tuple(streamId, conn_));
+    addToStreamPriorityMap(it.first->second);
     QUIC_STATS(conn_.statsCallback, onNewQuicStream);
     return &it.first->second;
   }
@@ -386,6 +397,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       std::piecewise_construct,
       std::forward_as_tuple(streamId),
       std::forward_as_tuple(streamId, conn_));
+  addToStreamPriorityMap(it.first->second);
   QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   return &it.first->second;
 }
@@ -423,6 +435,7 @@ QuicStreamManager::createStream(StreamId streamId) {
       std::piecewise_construct,
       std::forward_as_tuple(streamId),
       std::forward_as_tuple(streamId, conn_));
+  addToStreamPriorityMap(it.first->second);
   QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   updateAppIdleState();
   return &it.first->second;
@@ -448,6 +461,15 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
   windowUpdates_.erase(streamId);
   stopSendingStreams_.erase(streamId);
   flowControlUpdated_.erase(streamId);
+  {
+    const auto streamPriorityIt = streamPriorityLevels_.find(streamId);
+    if (streamPriorityIt == streamPriorityLevels_.end()) {
+      throw QuicTransportException(
+          "Removed stream is not in the priority map",
+          TransportErrorCode::STREAM_STATE_ERROR);
+    }
+    streamPriorityLevels_.erase(streamPriorityIt);
+  }
   if (it->second.isControl) {
     DCHECK_GT(numControlStreams_, 0);
     numControlStreams_--;
@@ -495,6 +517,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
     openLocalStreams.erase(streamId);
   }
   updateAppIdleState();
+  notifyStreamPriorityChanges();
 }
 
 void QuicStreamManager::updateReadableStreams(QuicStreamState& stream) {
@@ -565,6 +588,61 @@ void QuicStreamManager::setStreamAsControl(QuicStreamState& stream) {
 
 bool QuicStreamManager::isAppIdle() const {
   return isAppIdle_;
+}
+
+PriorityLevel QuicStreamManager::getHighestPriorityLevel() const {
+  // Highest priority is minimum value
+  auto min = kDefaultMaxPriority;
+  for (auto& entry : streamPriorityLevels_) {
+    if (entry.second < min) {
+      min = entry.second;
+    }
+    if (min == 0) {
+      break;
+    }
+  }
+  return min;
+}
+
+void QuicStreamManager::setPriorityChangesObserver(
+    QuicStreamPrioritiesObserver* observer) {
+  priorityChangesObserver_ = observer;
+}
+
+void QuicStreamManager::resetPriorityChangesObserver() {
+  if (!priorityChangesObserver_) {
+    return;
+  }
+  priorityChangesObserver_ = nullptr;
+}
+
+void QuicStreamManager::notifyStreamPriorityChanges() {
+  if (priorityChangesObserver_) {
+    priorityChangesObserver_->onStreamPrioritiesChange();
+  }
+}
+
+void QuicStreamManager::addToStreamPriorityMap(
+    const QuicStreamState& streamState) {
+  auto entry = streamPriorityLevels_.emplace(
+      streamState.id, PriorityLevel(streamState.priority.level));
+
+  // Verify stream didn't already exist in streamPriorityLevels_
+  if (!entry.second) {
+    throw QuicTransportException(
+        "Attempted to add stream already in priority map",
+        TransportErrorCode::STREAM_STATE_ERROR);
+  }
+
+  // Verify inserted item
+  if (entry.first->second != PriorityLevel(streamState.priority.level)) {
+    throw QuicTransportException(
+        "Failed to add stream to priority map",
+        TransportErrorCode::STREAM_STATE_ERROR);
+  }
+
+  // Notify observer (if set)
+  notifyStreamPriorityChanges();
 }
 
 } // namespace quic
