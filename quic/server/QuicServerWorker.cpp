@@ -682,25 +682,24 @@ void QuicServerWorker::dispatchPacketData(
           if (quicVersion == QuicVersion::MVFST_EXPERIMENTAL) {
             transportSettings_.initCwndInMss = 30;
           }
-          if (transportSettingsOverrideFn_) {
-            folly::Optional<TransportSettings> overridenTransportSettings =
-                transportSettingsOverrideFn_(
-                    transportSettings_, client.getIPAddress());
-            if (overridenTransportSettings) {
-              if (overridenTransportSettings->dataPathType !=
-                  transportSettings_.dataPathType) {
-                // It's too complex to support that.
-                LOG(ERROR)
-                    << "Overriding DataPathType isn't supported. Requested daapath="
-                    << (overridenTransportSettings->dataPathType ==
-                                DataPathType::ContinuousMemory
-                            ? "ContinuousMemory"
-                            : "ChainedMemory");
-              }
-              trans->setTransportSettings(*overridenTransportSettings);
-            } else {
-              trans->setTransportSettings(transportSettings_);
+
+          auto overridenTransportSettings = transportSettingsOverrideFn_
+              ? transportSettingsOverrideFn_(
+                    transportSettings_, client.getIPAddress())
+              : folly::none;
+
+          if (overridenTransportSettings) {
+            if (overridenTransportSettings->dataPathType !=
+                transportSettings_.dataPathType) {
+              // It's too complex to support that.
+              LOG(ERROR)
+                  << "Overriding DataPathType isn't supported. Requested datapath="
+                  << (overridenTransportSettings->dataPathType ==
+                              DataPathType::ContinuousMemory
+                          ? "ContinuousMemory"
+                          : "ChainedMemory");
             }
+            trans->setTransportSettings(*overridenTransportSettings);
           } else {
             trans->setTransportSettings(transportSettings_);
           }
