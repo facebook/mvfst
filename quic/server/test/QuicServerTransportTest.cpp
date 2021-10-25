@@ -131,7 +131,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
 
   void registerKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerConnectionState*, uint64_t)>&& handler) {
+      std::function<void(QuicServerTransport*, uint64_t)>&& handler) {
     registerTransportKnobParamHandler(paramId, std::move(handler));
   }
 
@@ -4289,13 +4289,12 @@ TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {
 TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   int flag = 0;
   server->registerKnobParamHandler(
-      199, [&](QuicServerConnectionState* /* server_conn */, uint64_t val) {
+      199, [&](QuicServerTransport* /* server_conn */, uint64_t val) {
         EXPECT_EQ(val, 10);
         flag = 1;
       });
   server->registerKnobParamHandler(
-      200,
-      [&](QuicServerConnectionState* /* server_conn */, uint64_t /* val */) {
+      200, [&](QuicServerTransport* /* server_conn */, uint64_t /* val */) {
         flag = 2;
       });
   server->handleKnobParams({
@@ -4307,7 +4306,7 @@ TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
 
   // ovewrite will fail, the new handler won't be called
   server->registerKnobParamHandler(
-      199, [&](QuicServerConnectionState* /* server_conn */, uint64_t val) {
+      199, [&](QuicServerTransport* /* server_conn */, uint64_t val) {
         EXPECT_EQ(val, 30);
         flag = 3;
       });

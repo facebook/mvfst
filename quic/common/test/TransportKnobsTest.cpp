@@ -227,6 +227,47 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7, 25").str();
+  auto expectedCombinedVal = 7 * kPriorityThresholdKnobMultiplier + 25;
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = expectedCombinedVal}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeBadFormat) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7/25").str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeExtraValues) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7,25,25").str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidAutoBackgroundPriorityOutOfBounds) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "8,50").str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, InvalidAutoBackgroundUtilizationPercentOutOfBounds) {
+  auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
+  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "0,101").str();
+  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  run(fixture);
+
+  std::string args2 = folly::format(R"({{"{}" : "{}"}})", key, "0,24").str();
+  QuicKnobsParsingTestFixture fixture2 = {args2, true, {{.id = key, .val = 0}}};
+  run(fixture2);
+}
+
 TEST(QuicKnobsParsingTest, NonStringKey) {
   QuicKnobsParsingTestFixture fixture = {"{ 1 : 1 }", true, {}};
   run(fixture);

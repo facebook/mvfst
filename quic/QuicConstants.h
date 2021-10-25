@@ -133,6 +133,8 @@ enum class TransportKnobParamId : uint64_t {
   NOTSENT_BUFFER_SIZE_KNOB = 0x3333,
   // Set max pacing rate in bytes per second to be used if pacing is enabled
   MAX_PACING_RATE_KNOB = 0x4444,
+  // Set auto background mode (experimental)
+  AUTO_BACKGROUND_MODE = 0x5555,
 };
 
 enum class FrameType : uint64_t {

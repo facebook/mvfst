@@ -20,6 +20,8 @@ struct TransportKnobParam {
   uint64_t val;
 };
 
+constexpr uint64_t kPriorityThresholdKnobMultiplier = 1000;
+
 using TransportKnobParams = std::vector<TransportKnobParam>;
 
 folly::Optional<TransportKnobParams> parseTransportKnobs(

@@ -450,7 +450,7 @@ void QuicServerTransport::handleTransportKnobParams(
   for (const auto& param : params) {
     auto maybeParamHandler = transportKnobParamHandlers_.find(param.id);
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
-      (maybeParamHandler->second)(serverConn_, param.val);
+      (maybeParamHandler->second)(this, param.val);
       QUIC_STATS(
           conn_->statsCallback,
           onTransportKnobApplied,
@@ -633,7 +633,7 @@ void QuicServerTransport::maybeStartD6DProbing() {
 
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
-    std::function<void(QuicServerConnectionState*, uint64_t)>&& handler) {
+    std::function<void(QuicServerTransport*, uint64_t)>&& handler) {
   transportKnobParamHandlers_.emplace(paramId, std::move(handler));
 }
 
@@ -678,8 +678,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         if (static_cast<bool>(val)) {
           server_conn->d6d.noBlackholeDetection = true;
           VLOG(3)
@@ -690,8 +691,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         if (static_cast<bool>(val)) {
           server_conn->udpSendPacketLen = server_conn->peerMaxUdpPayloadSize;
           VLOG(3)
@@ -701,8 +703,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         auto cctype = static_cast<CongestionControlType>(val);
         VLOG(3) << "Knob param received, set congestion control type to "
                 << congestionControlTypeToString(cctype);
@@ -726,8 +729,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         if (val < 25 || val > 100) {
           LOG(ERROR)
               << "Invalid CC_AGRESSIVENESS_KNOB value received from client, value = "
@@ -744,8 +748,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         uint8_t numerator = (val / 100);
         uint8_t denominator = (val - (numerator * 100));
         VLOG(3) << "Knob param received, set STARTUP rtt factor to ("
@@ -756,8 +761,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         auto numerator = (uint8_t)(val / 100);
         auto denominator = (uint8_t)(val - (numerator * 100));
         VLOG(3) << "Knob param received, set DEFAULT rtt factor to ("
@@ -768,8 +774,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB),
-      [](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
         VLOG(3) << "Knob param received, set total buffer space available to ("
                 << unsigned(val) << ")";
         server_conn->transportSettings.totalBufferSpaceAvailable = val;
@@ -777,11 +784,27 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-      [this](QuicServerConnectionState* server_conn, uint64_t val) {
-        CHECK(server_conn);
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
         VLOG(3) << "Knob param received, set max pacing rate to ("
                 << unsigned(val) << " bytes per second)";
-        this->setMaxPacingRate(val);
+        serverTransport->setMaxPacingRate(val);
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        uint64_t priorityThreshold = val / kPriorityThresholdKnobMultiplier;
+        uint64_t utilizationPercent = val % kPriorityThresholdKnobMultiplier;
+        float utilizationFactor = float(utilizationPercent) / 100.0f;
+        VLOG(3) << fmt::format(
+            "AUTO_BACKGROUND_MODE KnobParam received, enabling auto background mode "
+            "with Priority Threshold={}, Utilization Factor={}",
+            priorityThreshold,
+            utilizationFactor);
+        serverTransport->setBackgroundModeParameters(
+            PriorityLevel(priorityThreshold), utilizationFactor);
       });
 }
 

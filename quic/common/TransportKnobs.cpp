@@ -91,6 +91,47 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
             // denominator into a single int here and unpack in the handler
             factor = numerator * kKnobFractionMax + denominator;
             knobParams.push_back({paramId, folly::to<uint64_t>(factor)});
+          } else if (
+              paramId ==
+              static_cast<uint64_t>(
+                  TransportKnobParamId::AUTO_BACKGROUND_MODE)) {
+            /*
+             * set the auto background mode parameters for the transport
+             * expected format: string
+             * "{priority_threshold},{percent_utilization}" priority_threshold:
+             * integer value [0-7] percent_utilization: integer value [25-100]
+             */
+            uint64_t combinedKnobVal = 0;
+            std::string priorityThresholdStr, utilizationPercentStr;
+            if (!folly::split(
+                    ',',
+                    val.asString(),
+                    priorityThresholdStr,
+                    utilizationPercentStr)) {
+              LOG(ERROR)
+                  << "auto background mode knob value is not in expected format: "
+                  << "{priority_threshold},{percent_utilization}";
+              return folly::none;
+            }
+            uint64_t priorityThreshold =
+                folly::tryTo<int>(priorityThresholdStr).value_or(-1);
+            uint64_t utilizationPercent =
+                folly::tryTo<int>(utilizationPercentStr).value_or(-1);
+            if (priorityThreshold < 0 ||
+                priorityThreshold > kDefaultMaxPriority ||
+                utilizationPercent < 25 || utilizationPercent > 100) {
+              LOG(ERROR) << "invalid auto background mode parameters."
+                         << "priority_threshold must be int [0-7]. "
+                         << "percent_utilization must be int [25-100]";
+              return folly::none;
+            }
+            // pack the values into one integer that will be unpacked in the
+            // handler
+            combinedKnobVal =
+                (priorityThreshold * kPriorityThresholdKnobMultiplier) +
+                utilizationPercent;
+            knobParams.push_back(
+                {paramId, folly::to<uint64_t>(combinedKnobVal)});
           } else {
             LOG(ERROR) << "string param type is not valid for this knob";
             return folly::none;

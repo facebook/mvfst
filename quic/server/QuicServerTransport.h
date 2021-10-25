@@ -158,7 +158,7 @@ class QuicServerTransport
   // Made it protected for testing purpose
   void registerTransportKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerConnectionState*, uint64_t)>&& handler);
+      std::function<void(QuicServerTransport*, uint64_t)>&& handler);
 
  private:
   void processPendingData(bool async);
@@ -180,7 +180,7 @@ class QuicServerTransport
   QuicServerConnectionState* serverConn_;
   std::unordered_map<
       uint64_t,
-      std::function<void(QuicServerConnectionState*, uint64_t)>>
+      std::function<void(QuicServerTransport*, uint64_t)>>
       transportKnobParamHandlers_;
 };
 } // namespace quic
