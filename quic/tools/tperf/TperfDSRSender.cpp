@@ -20,7 +20,7 @@ bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {
 }
 
 bool TperfDSRSender::flush() {
-  std::vector<PacketizationRequest> prs;
+  RequestGroup prs;
   for (const auto& instruction : instructions_) {
     prs.push_back(test::sendInstructionToPacketizationRequest(instruction));
   }

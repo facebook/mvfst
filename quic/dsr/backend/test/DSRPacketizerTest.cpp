@@ -171,7 +171,7 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
         sentData.push_back(buf->clone());
         return buf->computeChainDataLength();
       }));
-  std::vector<PacketizationRequest> requests;
+  RequestGroup requests;
   for (const auto& instruction : pendingInstructions_) {
     requests.push_back(sendInstructionToPacketizationRequest(instruction));
   }
