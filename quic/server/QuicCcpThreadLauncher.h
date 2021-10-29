@@ -27,7 +27,6 @@ class QuicCcpThreadLauncher {
 #ifdef CCP_ENABLED
   folly::ScopedEventBaseThread ccpEvb_;
 #endif
-  bool* handle_;
   uint64_t ccpId_;
 };
 

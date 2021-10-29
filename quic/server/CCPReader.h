@@ -106,11 +106,8 @@ class CCPReader : public folly::AsyncUDPSocket::ReadCallback {
   // Bind to our unix socket address
   void bind();
 
-  // Unique id of the CCP process we connect to
-  uint64_t ccpId_;
   // Each ccp reader is uniquely identified by its parent
   // QuicServer/QuicServerWorker pair
-  uint64_t serverId_;
   uint8_t workerId_;
   folly::SocketAddress sendAddr_;
   folly::SocketAddress recvAddr_;
@@ -120,7 +117,6 @@ class CCPReader : public folly::AsyncUDPSocket::ReadCallback {
 #ifdef CCP_ENABLED
   struct ccp_datapath ccpDatapath_;
 #endif
-  bool initialized_{false};
 };
 
 } // namespace quic
