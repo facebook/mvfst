@@ -98,6 +98,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     -Woverloaded-virtual
     -Wnon-virtual-dtor
     -Wtype-limits
+    -Wunused-value
   )
 endif()
 

@@ -226,7 +226,7 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequencyFromTolerance) {
   auto& ackState = getAckState(conn, GetParam());
   ackState.largestReceivedPacketNum = nextPacketNum - 1;
   ackState.tolerance = 2;
-  for (nextPacketNum; nextPacketNum <= 10; nextPacketNum++) {
+  for (; nextPacketNum <= 10; nextPacketNum++) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
     if (nextPacketNum < 2) {
       EXPECT_FALSE(ackState.needsToSendAckImmediately);
@@ -240,7 +240,7 @@ TEST_P(UpdateAckStateTest, TestUpdateAckStateFrequencyFromTolerance) {
     EXPECT_EQ(0, ackState.numNonRxPacketsRecvd);
   }
   ackState.tolerance = 10;
-  for (nextPacketNum; nextPacketNum <= 40; nextPacketNum++) {
+  for (; nextPacketNum <= 40; nextPacketNum++) {
     updateAckState(conn, GetParam(), nextPacketNum, true, false, Clock::now());
     if (nextPacketNum < 10) {
       EXPECT_FALSE(ackState.needsToSendAckImmediately);
