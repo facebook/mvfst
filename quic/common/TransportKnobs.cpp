@@ -114,11 +114,11 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
               return folly::none;
             }
             uint64_t priorityThreshold =
-                folly::tryTo<int>(priorityThresholdStr).value_or(-1);
+                folly::tryTo<uint64_t>(priorityThresholdStr)
+                    .value_or(kDefaultMaxPriority + 1);
             uint64_t utilizationPercent =
-                folly::tryTo<int>(utilizationPercentStr).value_or(-1);
-            if (priorityThreshold < 0 ||
-                priorityThreshold > kDefaultMaxPriority ||
+                folly::tryTo<uint64_t>(utilizationPercentStr).value_or(101);
+            if (priorityThreshold > kDefaultMaxPriority ||
                 utilizationPercent < 25 || utilizationPercent > 100) {
               LOG(ERROR) << "invalid auto background mode parameters."
                          << "priority_threshold must be int [0-7]. "

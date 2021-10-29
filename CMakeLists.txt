@@ -97,6 +97,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     _QUIC_COMMON_COMPILE_OPTIONS
     -Woverloaded-virtual
     -Wnon-virtual-dtor
+    -Wtype-limits
   )
 endif()
 
