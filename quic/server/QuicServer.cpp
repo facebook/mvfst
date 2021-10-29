@@ -172,7 +172,6 @@ void QuicServer::initializeWorkers(
     if (transportStatsFactory_) {
       workerEvb->runInEventBaseThread(
           [self = this->shared_from_this(),
-           workerEvb,
            workerPtr = worker.get(),
            transportStatsFactory = transportStatsFactory_.get()] {
             if (self->shutdown_) {

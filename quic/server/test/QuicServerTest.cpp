@@ -189,7 +189,6 @@ class QuicServerWorkerTest : public Test {
 
   void expectConnectionCreation(
       const folly::SocketAddress& addr,
-      ConnectionId connId,
       MockQuicTransport::Ptr transportOverride = nullptr);
 
   void testSendReset(
@@ -232,7 +231,6 @@ class QuicServerWorkerTest : public Test {
 
 void QuicServerWorkerTest::expectConnectionCreation(
     const folly::SocketAddress& addr,
-    ConnectionId connId,
     MockQuicTransport::Ptr transportOverride) {
   MockQuicTransport::Ptr transport = transport_;
   if (transportOverride) {
@@ -245,7 +243,7 @@ void QuicServerWorkerTest::expectConnectionCreation(
   EXPECT_CALL(*transport, setConnectionIdAlgo(_));
 
   EXPECT_CALL(*transport, setServerConnectionIdParams(_))
-      .WillOnce(Invoke([connId](ServerConnectionIdParams params) {
+      .WillOnce(Invoke([](ServerConnectionIdParams params) {
         EXPECT_EQ(params.processId, 1);
         EXPECT_EQ(params.workerId, 42);
       }));
@@ -303,7 +301,7 @@ void QuicServerWorkerTest::createQuicConnection(
   if (transportOverride) {
     transport = transportOverride;
   }
-  expectConnectionCreation(addr, connId, transport);
+  expectConnectionCreation(addr, transport);
   EXPECT_CALL(*transport, onNetworkData(addr, NetworkDataMatches(*data)));
   worker_->dispatchPacketData(
       addr,
