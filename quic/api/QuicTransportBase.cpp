@@ -3453,8 +3453,8 @@ void QuicTransportBase::onStreamPrioritiesChange() {
   VLOG(10) << fmt::format(
       "Updating transport background mode. Highest Priority={} Threshold={} TargetUtilization={}",
       conn_->streamManager->getHighestPriorityLevel(),
-      targetUtilization,
-      backgroundPriorityThreshold_.value());
+      backgroundPriorityThreshold_.value(),
+      targetUtilization);
   conn_->congestionController->setBandwidthUtilizationFactor(targetUtilization);
 }
 
