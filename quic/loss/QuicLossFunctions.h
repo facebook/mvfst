@@ -212,7 +212,10 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
-  Observer::LossEvent observerLossEvent(lossTime);
+  folly::Optional<Observer::LossEvent> observerLossEvent;
+  if (!conn.observers->empty()) {
+    observerLossEvent.emplace(lossTime);
+  }
   // Note that time based loss detection is also within the same PNSpace.
   auto iter = getFirstOutstandingPacket(conn, pnSpace);
   bool shouldSetTimer = false;
@@ -260,7 +263,9 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     }
     detectPMTUBlackhole(conn, pkt);
     lossEvent.addLostPacket(pkt);
-    observerLossEvent.addLostPacket(lostByTimeout, lostByReorder, pkt);
+    if (observerLossEvent) {
+      observerLossEvent->addLostPacket(lostByTimeout, lostByReorder, pkt);
+    }
 
     if (pkt.isDSRPacket) {
       CHECK_GT(conn.outstandings.dsrCount, 0);
@@ -302,12 +307,12 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
   } // while (iter != conn.outstandings.packets.end()) {
 
   // if there are observers, enqueue a function to call it
-  if (observerLossEvent.hasPackets()) {
+  if (observerLossEvent && observerLossEvent->hasPackets()) {
     for (const auto& observer : *(conn.observers)) {
       conn.pendingCallbacks.emplace_back(
           [observer, observerLossEvent](QuicSocket* qSocket) {
             if (observer->getConfig().lossEvents) {
-              observer->packetLossDetected(qSocket, observerLossEvent);
+              observer->packetLossDetected(qSocket, *observerLossEvent);
             }
           });
     }
