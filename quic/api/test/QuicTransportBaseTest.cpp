@@ -167,7 +167,9 @@ class TestByteEventCallback : public QuicSocket::ByteEventCallback {
     return folly::hash::hash_combine(e.id, e.offset, e.type);
   };
   ComparatorFn comparator = [](const ByteEvent& lhs, const ByteEvent& rhs) {
-    return ((lhs.id == rhs.id) && (lhs.offset == rhs.offset));
+    return (
+        (lhs.id == rhs.id) && (lhs.offset == rhs.offset) &&
+        (lhs.type == rhs.type));
   };
   std::unordered_map<ByteEvent, Status, HashFn, ComparatorFn> byteEventTracker_{
       /* bucket count */ 4,
