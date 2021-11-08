@@ -87,7 +87,7 @@ TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
   uint64_t val =
       static_cast<uint64_t>(congestionControlStrToType("cubic").value());
-  std::string args = folly::format(R"({{"{}" : "cubic"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "cubic"}})", key);
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = val}}};
   run(fixture);
@@ -95,7 +95,7 @@ TEST(QuicKnobsParsingTest, ValidCCAlgorithm) {
 
 TEST(QuicKnobsParsingTest, InvalidCCAlgorithm) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB);
-  std::string args = folly::format(R"({{"{}" : "foo"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "foo"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -103,7 +103,7 @@ TEST(QuicKnobsParsingTest, InvalidCCAlgorithm) {
 TEST(QuicKnobsParsingTest, InvalidStringParam) {
   auto key = static_cast<uint64_t>(
       TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE);
-  std::string args = folly::format(R"({{"{}" : "foo"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "foo"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -111,7 +111,7 @@ TEST(QuicKnobsParsingTest, InvalidStringParam) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamFormat) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -119,7 +119,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormat) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamFormatDefault) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -127,7 +127,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormatDefault) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamFormat2) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1,2"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1,2"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -135,7 +135,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamFormat2) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamZeroDenom) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1/0"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1/0"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -143,7 +143,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamZeroDenom) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamZeroNum) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "0/2"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "0/2"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -151,7 +151,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamZeroNum) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamLargeDenom) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1/1234567"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1/1234567"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -159,7 +159,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamLargeDenom) {
 TEST(QuicKnobsParsingTest, InvalidFractionParamLargeNum) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "1234567/1"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "1234567/1"}})", key);
   QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
@@ -167,7 +167,7 @@ TEST(QuicKnobsParsingTest, InvalidFractionParamLargeNum) {
 TEST(QuicKnobsParsingTest, ValidFractionParam) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "4/5"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = (4 * 100 + 5)}}};
   run(fixture);
@@ -176,7 +176,7 @@ TEST(QuicKnobsParsingTest, ValidFractionParam) {
 TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
-  std::string args = folly::format(R"({{"{}" : "4/5"}})", key).str();
+  std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = (4 * 100 + 5)}}};
   run(fixture);
@@ -186,7 +186,7 @@ TEST(QuicKnobsParsingTest, ValidNotSentBufferSize) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
   uint64_t val = 111;
-  std::string args = folly::format(R"({{"{}" : {}}})", key, val).str();
+  std::string args = fmt::format(R"({{"{}" : {}}})", key, val);
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = val}}};
   run(fixture);
@@ -196,7 +196,7 @@ TEST(QuicKnobsParsingTest, InvalidNotSentBufferSizeAsString) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
   uint64_t val = 111;
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, val).str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
   run(fixture);
 }
@@ -204,7 +204,7 @@ TEST(QuicKnobsParsingTest, InvalidNotSentBufferSizeAsString) {
 TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   uint64_t val = 111;
-  std::string args = folly::format(R"({{"{}" : {}}})", key, val).str();
+  std::string args = fmt::format(R"({{"{}" : {}}})", key, val);
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = val}}};
   run(fixture);
@@ -213,7 +213,7 @@ TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
 TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsString) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   uint64_t val = 111;
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, val).str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
   run(fixture);
 }
@@ -222,14 +222,14 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   // Decimal is UINT64_MAX + 1
   std::string args =
-      folly::format(R"({{"{}" : {}}})", key, "18446744073709551616").str();
+      fmt::format(R"({{"{}" : {}}})", key, "18446744073709551616");
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 1}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7, 25").str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7, 25");
   auto expectedCombinedVal = 7 * kPriorityThresholdKnobMultiplier + 25;
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = expectedCombinedVal}}};
@@ -238,32 +238,32 @@ TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeBadFormat) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7/25").str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7/25");
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeExtraValues) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "7,25,25").str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7,25,25");
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundPriorityOutOfBounds) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "8,50").str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "8,50");
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundUtilizationPercentOutOfBounds) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
-  std::string args = folly::format(R"({{"{}" : "{}"}})", key, "0,101").str();
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "0,101");
   QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
   run(fixture);
 
-  std::string args2 = folly::format(R"({{"{}" : "{}"}})", key, "0,24").str();
+  std::string args2 = fmt::format(R"({{"{}" : "{}"}})", key, "0,24");
   QuicKnobsParsingTestFixture fixture2 = {args2, true, {{.id = key, .val = 0}}};
   run(fixture2);
 }

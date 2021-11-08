@@ -6,7 +6,7 @@
  *
  */
 
-#include <folly/Format.h>
+#include <fmt/format.h>
 #include <folly/chrono/Conv.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/SocketOptionMap.h>
@@ -150,9 +150,9 @@ void QuicServerWorker::start() {
         evb_, transportSettings_.pacingTimerTickInterval);
   }
   socket_->resumeRead(this);
-  VLOG(10) << folly::format(
+  VLOG(10) << fmt::format(
       "Registered read on worker={}, thread={}, processId={}",
-      this,
+      fmt::ptr(this),
       folly::getCurrentThreadID(),
       (int)processId_);
 }
@@ -261,9 +261,9 @@ void QuicServerWorker::onDataAvailable(
   }
   largestPacketReceiveTime_ =
       std::max(largestPacketReceiveTime_, packetReceiveTime);
-  VLOG(10) << folly::format(
+  VLOG(10) << fmt::format(
       "Worker={}, Received data on thread={}, processId={}",
-      this,
+      fmt::ptr(this),
       folly::getCurrentThreadID(),
       (int)processId_);
   // Move readBuffer_ first so that we can get rid
@@ -509,7 +509,7 @@ void QuicServerWorker::forwardNetworkData(
   if (!routingData.isUsingClientConnId &&
       !connIdAlgo_->canParse(routingData.destinationConnId)) {
     if (packetForwardingEnabled_ && !isForwardedData) {
-      VLOG(3) << folly::format(
+      VLOG(3) << fmt::format(
           "Forwarding packet with unknown connId version from client={} to another process, routingInfo={}",
           client.describe(),
           logRoutingInfo(routingData.destinationConnId));
@@ -519,7 +519,7 @@ void QuicServerWorker::forwardNetworkData(
       QUIC_STATS(statsCallback_, onPacketForwarded);
       return;
     } else {
-      VLOG(3) << folly::format(
+      VLOG(3) << fmt::format(
           "Dropping packet due to unknown connectionId version, routingInfo={}",
           logRoutingInfo(routingData.destinationConnId));
       QUIC_STATS(
@@ -558,7 +558,7 @@ void QuicServerWorker::dispatchPacketData(
              << routingData.destinationConnId.hex() << " " << *transport;
   } else if (routingData.headerForm != HeaderForm::Long) {
     // Drop the packet if the header form is not long
-    VLOG(3) << folly::format(
+    VLOG(3) << fmt::format(
         "Dropping non-long header packet with no connid match"
         " headerForm={}, routingInfo={}",
         static_cast<typename std::underlying_type<HeaderForm>::type>(
@@ -592,13 +592,13 @@ void QuicServerWorker::dispatchPacketData(
         }
         return;
       } else if (!routingData.isInitial) {
-        VLOG(3) << folly::format(
+        VLOG(3) << fmt::format(
             "Dropping packet from client={}, routingInfo={}",
             client.describe(),
             logRoutingInfo(routingData.destinationConnId));
         dropPacket = true;
       } else {
-        VLOG(4) << folly::format(
+        VLOG(4) << fmt::format(
             "Creating new connection for client={}, routingInfo={}",
             client.describe(),
             logRoutingInfo(routingData.destinationConnId));
@@ -716,7 +716,7 @@ void QuicServerWorker::dispatchPacketData(
           auto result = sourceAddressMap_.emplace(std::make_pair(
               std::make_pair(client, routingData.destinationConnId), trans));
           if (!result.second) {
-            LOG(ERROR) << folly::format(
+            LOG(ERROR) << fmt::format(
                 "Routing entry already exists for client={}, routingInfo={}",
                 client.describe(),
                 logRoutingInfo(routingData.destinationConnId));
@@ -769,7 +769,7 @@ void QuicServerWorker::dispatchPacketData(
   auto connIdParam =
       connIdAlgo_->parseConnectionId(routingData.destinationConnId);
   if (connIdParam.hasError()) {
-    VLOG(3) << folly::format(
+    VLOG(3) << fmt::format(
         "Dropping packet due to DCID parsing error={}, , errorCode={}, routingInfo={}",
         connIdParam.error().what(),
         folly::to<std::string>(connIdParam.error().errorCode()),
@@ -779,7 +779,7 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   if (connIdParam->hostId != hostId_) {
-    VLOG_EVERY_N(2, 100) << folly::format(
+    VLOG_EVERY_N(2, 100) << fmt::format(
         "Dropping packet routed to wrong host, from client={}, routingInfo={},",
         client.describe(),
         logRoutingInfo(routingData.destinationConnId));
@@ -823,7 +823,7 @@ void QuicServerWorker::dispatchPacketData(
   // Optimistically route to another server
   // if the packet type is not Initial and if there is not any connection
   // associated with the given packet
-  VLOG(4) << folly::format(
+  VLOG(4) << fmt::format(
       "Forwarding packet from client={} to another process, routingInfo={}",
       client.describe(),
       logRoutingInfo(routingData.destinationConnId));
@@ -1198,7 +1198,7 @@ void QuicServerWorker::onConnectionUnbound(
   }
 
   for (auto& connId : connectionIdData) {
-    VLOG(4) << folly::format(
+    VLOG(4) << fmt::format(
         "Removing CID from connectionIdMap_, routingInfo={}",
         logRoutingInfo(connId.connId));
     auto it = connectionIdMap_.find(connId.connId);
@@ -1287,46 +1287,43 @@ bool QuicServerWorker::rejectConnectionId(
 }
 
 std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
-  folly::StringPiece base =
+  std::string base =
       "CID={}, cidVersion={}, workerId={}, processId={}, hostId={}, threadId={}, ";
   if (!connIdAlgo_->canParse(connId)) {
-    return folly::format(
-               base,
-               connId.hex(),
-               (uint32_t)cidVersion_,
-               (uint32_t)workerId_,
-               (uint32_t)processId_,
-               (uint32_t)hostId_,
-               folly::getCurrentThreadID())
-        .str();
+    return fmt::format(
+        base,
+        connId.hex(),
+        (uint32_t)cidVersion_,
+        (uint32_t)workerId_,
+        (uint32_t)processId_,
+        (uint32_t)hostId_,
+        folly::getCurrentThreadID());
   }
   auto connIdParam = connIdAlgo_->parseConnectionId(connId);
   if (connIdParam.hasError()) {
-    return folly::format(
-               base,
-               connId.hex(),
-               (uint32_t)cidVersion_,
-               (uint32_t)workerId_,
-               (uint32_t)processId_,
-               (uint32_t)hostId_,
-               folly::getCurrentThreadID())
-        .str();
+    return fmt::format(
+        base,
+        connId.hex(),
+        (uint32_t)cidVersion_,
+        (uint32_t)workerId_,
+        (uint32_t)processId_,
+        (uint32_t)hostId_,
+        folly::getCurrentThreadID());
   }
-  std::string extended = base.toString() +
+  std::string extended = base +
       "cidVersion in packet={}, workerId in packet={}, processId in packet={}, hostId in packet={}, ";
-  return folly::format(
-             extended,
-             connId.hex(),
-             (uint32_t)cidVersion_,
-             (uint32_t)workerId_,
-             (uint32_t)processId_,
-             (uint32_t)hostId_,
-             folly::getCurrentThreadID(),
-             (uint32_t)connIdParam->version,
-             (uint32_t)connIdParam->workerId,
-             (uint32_t)connIdParam->processId,
-             (uint32_t)connIdParam->hostId)
-      .str();
+  return fmt::format(
+      extended,
+      connId.hex(),
+      (uint32_t)cidVersion_,
+      (uint32_t)workerId_,
+      (uint32_t)processId_,
+      (uint32_t)hostId_,
+      folly::getCurrentThreadID(),
+      (uint32_t)connIdParam->version,
+      (uint32_t)connIdParam->workerId,
+      (uint32_t)connIdParam->processId,
+      (uint32_t)connIdParam->hostId);
 }
 
 QuicServerWorker::AcceptObserverList::AcceptObserverList(
