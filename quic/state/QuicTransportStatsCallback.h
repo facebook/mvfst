@@ -64,6 +64,13 @@ class QuicTransportStatsCallback {
   enum class TransportKnobType : uint8_t {
     ZERO_PMTU_BLACKHOLE,
     FORCIBLY_SET_UDP_PAYLOAD_SIZE,
+    CC_ALGORITHM_KNOB,
+    CC_AGRESSIVENESS_KNOB,
+    STARTUP_RTT_FACTOR_KNOB,
+    DEFAULT_RTT_FACTOR_KNOB,
+    NOTSENT_BUFFER_SIZE_KNOB,
+    MAX_PACING_RATE_KNOB,
+    AUTO_BACKGROUND_MODE,
     UNKNOWN,
     MAX
   };
@@ -248,6 +255,20 @@ class QuicTransportStatsCallback {
         return "ZERO_PMTU_BLACKHOLE";
       case TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
         return "FORCIBLY_SET_UDP_PAYLOAD_SIZE";
+      case TransportKnobType::CC_ALGORITHM_KNOB:
+        return "CC_ALGORITHM_KNOB";
+      case TransportKnobType::CC_AGRESSIVENESS_KNOB:
+        return "CC_AGRESSIVENESS_KNOB";
+      case TransportKnobType::STARTUP_RTT_FACTOR_KNOB:
+        return "STARTUP_RTT_FACTOR_KNOB";
+      case TransportKnobType::DEFAULT_RTT_FACTOR_KNOB:
+        return "DEFAULT_RTT_FACTOR_KNOB";
+      case TransportKnobType::NOTSENT_BUFFER_SIZE_KNOB:
+        return "NOTSENT_BUFFER_SIZE_KNOB";
+      case TransportKnobType::MAX_PACING_RATE_KNOB:
+        return "MAX_PACING_RATE_KNOB";
+      case TransportKnobType::AUTO_BACKGROUND_MODE:
+        return "AUTO_BACKGROUND_MODE";
       case TransportKnobType::UNKNOWN:
         return "UNKNOWN";
       case TransportKnobType::MAX:
@@ -265,6 +286,21 @@ class QuicTransportStatsCallback {
       case static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE):
         return TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE;
+      case static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB):
+        return TransportKnobType::CC_ALGORITHM_KNOB;
+      case static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB):
+        return TransportKnobType::CC_AGRESSIVENESS_KNOB;
+      case static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB):
+        return TransportKnobType::STARTUP_RTT_FACTOR_KNOB;
+      case static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB):
+        return TransportKnobType::DEFAULT_RTT_FACTOR_KNOB;
+      case static_cast<uint64_t>(
+          TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB):
+        return TransportKnobType::NOTSENT_BUFFER_SIZE_KNOB;
+      case static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB):
+        return TransportKnobType::MAX_PACING_RATE_KNOB;
+      case static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE):
+        return TransportKnobType::AUTO_BACKGROUND_MODE;
       default:
         return TransportKnobType::UNKNOWN;
     }
