@@ -171,7 +171,7 @@ struct PacketizationRequest {
   Buf packetProtectionKey;
 };
 
-using RequestGroup = SmallVec<PacketizationRequest, 16, uint16_t>;
+using RequestGroup = SmallVec<PacketizationRequest, 64, uint8_t>;
 
 size_t writePacketsGroup(
     folly::AsyncUDPSocket& sock,
