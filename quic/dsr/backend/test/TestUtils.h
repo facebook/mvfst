@@ -15,20 +15,14 @@ namespace quic::test {
 
 quic::PacketizationRequest sendInstructionToPacketizationRequest(
     const quic::SendInstruction& instruction) {
-  quic::PacketizationRequest request(instruction.dcid, instruction.scid);
-  request.clientAddress = instruction.clientAddress;
-  request.packetNum = instruction.packetNum;
-  request.largestAckedPacketNum = instruction.largestAckedPacketNum;
-  request.streamId = instruction.streamId;
-  request.offset = instruction.offset;
-  request.len = instruction.len;
-  request.fin = instruction.fin;
-  request.payloadOffset =
-      instruction.offset - instruction.bufMetaStartingOffset;
-  request.trafficKey.key = instruction.trafficKey.key->clone();
-  request.trafficKey.iv = instruction.trafficKey.iv->clone();
-  request.cipherSuite = instruction.cipherSuite;
-  request.packetProtectionKey = instruction.packetProtectionKey->clone();
+  quic::PacketizationRequest request(
+      instruction.packetNum,
+      instruction.largestAckedPacketNum,
+      instruction.streamId,
+      instruction.offset,
+      instruction.len,
+      instruction.fin,
+      instruction.offset - instruction.bufMetaStartingOffset);
   return request;
 }
 

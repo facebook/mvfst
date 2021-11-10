@@ -148,13 +148,23 @@ bool writeSingleQuicPacket(
     Buf buf);
 
 struct PacketizationRequest {
-  explicit PacketizationRequest(ConnectionId dcidIn, ConnectionId scidIn)
-      : dcid(dcidIn), scid(scidIn) {}
-  ConnectionId dcid;
-  ConnectionId scid;
-  folly::SocketAddress clientAddress;
-  PacketNum packetNum{0};
-  PacketNum largestAckedPacketNum{0};
+  PacketizationRequest(
+      PacketNum packetNumIn,
+      PacketNum largestAckedPacketNumIn,
+      StreamId streamIdIn,
+      uint64_t offsetIn,
+      uint64_t lenIn,
+      bool finIn,
+      uint64_t payloadOffsetIn)
+      : packetNum(packetNumIn),
+        largestAckedPacketNum(largestAckedPacketNumIn),
+        streamId(streamIdIn),
+        offset(offsetIn),
+        len(lenIn),
+        fin(finIn),
+        payloadOffset(payloadOffsetIn) {}
+  PacketNum packetNum;
+  PacketNum largestAckedPacketNum;
 
   // QUIC Stream info
   StreamId streamId;
@@ -164,14 +174,15 @@ struct PacketizationRequest {
   // This is the offset of the buffer payload. It is different from the offset
   // above which is the stream bytes offset.
   uint64_t payloadOffset;
-
-  // Cipher info
-  fizz::TrafficKey trafficKey;
-  fizz::CipherSuite cipherSuite;
-  Buf packetProtectionKey;
 };
 
-using RequestGroup = SmallVec<PacketizationRequest, 64, uint8_t>;
+struct RequestGroup {
+  ConnectionId dcid;
+  ConnectionId scid;
+  folly::SocketAddress clientAddress;
+  const CipherPair* cipherPair{nullptr};
+  SmallVec<PacketizationRequest, 64, uint8_t> requests;
+};
 
 size_t writePacketsGroup(
     folly::AsyncUDPSocket& sock,

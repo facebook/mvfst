@@ -171,9 +171,23 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
         sentData.push_back(buf->clone());
         return buf->computeChainDataLength();
       }));
-  RequestGroup requests;
-  for (const auto& instruction : pendingInstructions_) {
-    requests.push_back(sendInstructionToPacketizationRequest(instruction));
+  auto& instruction = pendingInstructions_.front();
+  CipherBuilder builder;
+  auto cipherPair = builder.buildCiphers(
+      fizz::TrafficKey{
+          std::move(instruction.trafficKey.key),
+          std::move(instruction.trafficKey.iv)},
+      instruction.cipherSuite,
+      instruction.packetProtectionKey->clone());
+  RequestGroup requests{
+      instruction.dcid,
+      instruction.scid,
+      instruction.clientAddress,
+      &cipherPair,
+      {}};
+
+  for (const auto& i : pendingInstructions_) {
+    requests.requests.push_back(sendInstructionToPacketizationRequest(i));
   }
   EXPECT_EQ(
       2,

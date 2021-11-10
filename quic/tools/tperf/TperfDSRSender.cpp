@@ -20,9 +20,25 @@ bool TperfDSRSender::addSendInstruction(const SendInstruction& instruction) {
 }
 
 bool TperfDSRSender::flush() {
-  RequestGroup prs;
+  // TODO remove this when we make instructions match the request.
+  auto& firstInstruction = instructions_.front();
+  CipherBuilder builder;
+  auto cipherPair = builder.buildCiphers(
+      fizz::TrafficKey{
+          std::move(firstInstruction.trafficKey.key),
+          std::move(firstInstruction.trafficKey.iv)},
+      firstInstruction.cipherSuite,
+      firstInstruction.packetProtectionKey->clone());
+
+  RequestGroup prs{
+      firstInstruction.dcid,
+      firstInstruction.scid,
+      firstInstruction.clientAddress,
+      &cipherPair,
+      {}};
   for (const auto& instruction : instructions_) {
-    prs.push_back(test::sendInstructionToPacketizationRequest(instruction));
+    prs.requests.push_back(
+        test::sendInstructionToPacketizationRequest(instruction));
   }
   auto written =
       writePacketsGroup(sock_, prs, [=](const PacketizationRequest& req) {

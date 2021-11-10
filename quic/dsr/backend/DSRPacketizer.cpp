@@ -95,7 +95,7 @@ size_t writePacketsGroup(
     folly::AsyncUDPSocket& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
-  if (reqGroup.empty()) {
+  if (reqGroup.requests.empty()) {
     LOG(ERROR) << "Empty packetization request";
     return 0;
   }
@@ -108,31 +108,24 @@ size_t writePacketsGroup(
       std::move(batchWriter),
       false /* thread local batching */,
       sock,
-      reqGroup[0].clientAddress,
+      reqGroup.clientAddress,
       nullptr /* statsCallback */,
       nullptr /* happyEyeballsState */);
-  // TODO: Instead of building ciphers every time, we should cache them into a
-  // CipherMap and look them up.
-  CipherBuilder cipherBuilder;
-  auto cipherPair = cipherBuilder.buildCiphers(
-      std::move(reqGroup[0].trafficKey),
-      reqGroup[0].cipherSuite,
-      std::move(reqGroup[0].packetProtectionKey));
-  if (!cipherPair.aead || !cipherPair.headerCipher) {
-    LOG(ERROR) << "Failed to create ciphers";
+  if (!reqGroup.cipherPair->aead || !reqGroup.cipherPair->headerCipher) {
+    LOG(ERROR) << "Missing ciphers";
     return 0;
   }
   // It's ok if reqGourp's size is larger than ioBufBatch's batch size. The
   // ioBufBatch will flush when it hits the limit then start a new batch
   // transparently.
-  for (const auto& request : reqGroup) {
+  for (const auto& request : reqGroup.requests) {
     auto ret = writeSingleQuicPacket(
         ioBufBatch,
-        request.dcid,
+        reqGroup.dcid,
         request.packetNum,
         request.largestAckedPacketNum,
-        *cipherPair.aead,
-        *cipherPair.headerCipher,
+        *reqGroup.cipherPair->aead,
+        *reqGroup.cipherPair->headerCipher,
         request.streamId,
         request.offset,
         request.len,
