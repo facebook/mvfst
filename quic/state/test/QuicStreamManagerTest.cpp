@@ -406,5 +406,25 @@ TEST_F(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
   manager.removeClosedStream(stream2Id);
 }
 
+TEST_F(QuicStreamManagerTest, StreamPriorityExcludesControl) {
+  MockQuicStreamPrioritiesObserver mObserver;
+
+  auto& manager = *conn.streamManager;
+
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultMaxPriority);
+  auto stream = manager.createNextUnidirectionalStream().value();
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultPriority.level);
+
+  manager.setStreamPriority(stream->id, 1, false);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), 1);
+
+  manager.setStreamAsControl(*stream);
+  EXPECT_EQ(manager.getHighestPriorityLevel(), kDefaultMaxPriority);
+
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  manager.removeClosedStream(stream->id);
+}
+
 } // namespace test
 } // namespace quic

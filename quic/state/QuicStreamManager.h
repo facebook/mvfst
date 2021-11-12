@@ -111,7 +111,7 @@ class QuicStreamManager {
     newPeerStreams_ = std::move(other.newPeerStreams_);
     blockedStreams_ = std::move(other.blockedStreams_);
     stopSendingStreams_ = std::move(other.stopSendingStreams_);
-    streamPriorityLevels_ = std::move(other.streamPriorityLevels_);
+    streamPriorityLevelsNoCtrl_ = std::move(other.streamPriorityLevelsNoCtrl_);
     windowUpdates_ = std::move(other.windowUpdates_);
     flowControlUpdated_ = std::move(other.flowControlUpdated_);
     lossStreams_ = std::move(other.lossStreams_);
@@ -959,8 +959,8 @@ class QuicStreamManager {
   // Map of streams where the peer was asked to stop sending
   folly::F14FastMap<StreamId, ApplicationErrorCode> stopSendingStreams_;
 
-  // Map of stream priority levels
-  folly::F14FastMap<StreamId, PriorityLevel> streamPriorityLevels_;
+  // Map of non-control stream priority levels
+  folly::F14FastMap<StreamId, PriorityLevel> streamPriorityLevelsNoCtrl_;
 
   // Streams that had their stream window change and potentially need a window
   // update sent
