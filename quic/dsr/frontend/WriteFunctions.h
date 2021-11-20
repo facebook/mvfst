@@ -20,5 +20,6 @@ uint64_t writePacketizationRequest(
     QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,
-    const Aead& aead);
+    const Aead& aead,
+    TimePoint writeLoopBeginTime = Clock::now());
 } // namespace quic

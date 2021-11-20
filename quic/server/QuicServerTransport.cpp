@@ -331,6 +331,7 @@ void QuicServerTransport::writeData() {
     // TODO(yangchi): I don't know which one to prioritize. I can see arguments
     // both ways. I'm going with writing regular packets first since they
     // contain ack and flow control update and other important info.
+    auto writeLoopBeginTime = Clock::now();
     packetLimit -= writeQuicDataToSocket(
                        *socket_,
                        *conn_,
@@ -339,11 +340,16 @@ void QuicServerTransport::writeData() {
                        *conn_->oneRttWriteCipher,
                        *conn_->oneRttWriteHeaderCipher,
                        version,
-                       packetLimit)
+                       packetLimit,
+                       writeLoopBeginTime)
                        .packetsWritten;
     if (packetLimit) {
       packetLimit -= writePacketizationRequest(
-          *serverConn_, destConnId, packetLimit, *conn_->oneRttWriteCipher);
+          *serverConn_,
+          destConnId,
+          packetLimit,
+          *conn_->oneRttWriteCipher,
+          writeLoopBeginTime);
     }
 
     // D6D probes should be paced

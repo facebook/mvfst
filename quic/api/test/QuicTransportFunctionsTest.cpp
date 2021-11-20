@@ -3172,6 +3172,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
+  conn->transportSettings.batchingMode = QuicBatchingMode::BATCHING_MODE_NONE;
 
   EventBase evb;
   auto socket =
@@ -3185,6 +3186,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
   EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(50));
+  auto writeLoopBeginTime = Clock::now();
   auto res = writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -3193,10 +3195,25 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       *aead,
       *headerCipher,
       getVersion(*conn),
-      500 /* packetLimit */);
+      500 /* packetLimit */,
+      writeLoopBeginTime);
 
   EXPECT_GT(500, res.packetsWritten);
   EXPECT_EQ(res.probesWritten, 0);
+
+  res = writeQuicDataToSocket(
+      *rawSocket,
+      *conn,
+      *conn->clientConnectionId,
+      *conn->serverConnectionId,
+      *aead,
+      *headerCipher,
+      getVersion(*conn),
+      500 /* packetLimit */,
+      writeLoopBeginTime);
+  EXPECT_EQ(
+      conn->transportSettings.writeConnectionDataPacketsLimit,
+      res.packetsWritten);
 }
 
 TEST_F(QuicTransportFunctionsTest, CongestionControlWritableBytesRoundUp) {

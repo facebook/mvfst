@@ -97,7 +97,8 @@ WriteQuicDataResult writeQuicDataToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
-    uint64_t packetLimit);
+    uint64_t packetLimit,
+    TimePoint writeLoopBeginTime = Clock::now());
 
 /**
  * Writes only the crypto and ack frames to the socket.
@@ -282,6 +283,7 @@ uint64_t writeConnectionDataToSocket(
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version,
+    TimePoint writeLoopBeginTime,
     const std::string& token = std::string());
 
 uint64_t writeProbingDataToSocket(

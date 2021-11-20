@@ -14,15 +14,18 @@ uint64_t writePacketizationRequest(
     QuicServerConnectionState& connection,
     const ConnectionId& dstCid,
     size_t packetLimit,
-    const Aead& aead) {
+    const Aead& aead,
+    TimePoint writeLoopBeginTime) {
   DSRStreamFrameScheduler scheduler(connection);
-  auto writeLoopBeginTime = Clock::now();
   uint64_t packetCounter = 0;
   std::set<DSRPacketizationRequestSender*> senders;
   SCOPE_EXIT {
     std::for_each(
         senders.begin(), senders.end(), [](auto* sender) { sender->flush(); });
   };
+  if (!writeLoopTimeLimit(writeLoopBeginTime, connection)) {
+    return packetCounter;
+  }
   while (scheduler.hasPendingData() && packetCounter < packetLimit &&
          (packetCounter < connection.transportSettings.maxBatchSize ||
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
