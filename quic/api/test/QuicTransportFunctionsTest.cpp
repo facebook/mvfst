@@ -165,13 +165,13 @@ class QuicTransportFunctionsTest : public Test {
     conn->clientConnectionId = getTestConnectionId();
     conn->version = QuicVersion::MVFST;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
-        kDefaultStreamWindowSize;
+        kDefaultStreamWindowSize * 1000;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
-        kDefaultStreamWindowSize;
+        kDefaultStreamWindowSize * 1000;
     conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
-        kDefaultStreamWindowSize;
+        kDefaultStreamWindowSize * 1000;
     conn->flowControlState.peerAdvertisedMaxOffset =
-        kDefaultConnectionWindowSize;
+        kDefaultConnectionWindowSize * 1000;
     conn->statsCallback = transportInfoCb_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
@@ -3167,7 +3167,7 @@ TEST_F(QuicTransportFunctionsTest, TimeoutBasedRetxCountUpdate) {
 
 TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
   auto conn = createConn();
-  conn->lossState.srtt = 150ms;
+  conn->lossState.srtt = 50ms;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -3180,7 +3180,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
   auto rawSocket = socket.get();
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  auto buf = buildRandomInputData(2048 * 1024);
+  auto buf = buildRandomInputData(2048 * 2048);
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
   EXPECT_CALL(*rawSocket, write(_, _)).WillRepeatedly(Return(1));
@@ -3195,10 +3195,10 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       *aead,
       *headerCipher,
       getVersion(*conn),
-      500 /* packetLimit */,
+      1000 /* packetLimit */,
       writeLoopBeginTime);
 
-  EXPECT_GT(500, res.packetsWritten);
+  EXPECT_GT(1000, res.packetsWritten);
   EXPECT_EQ(res.probesWritten, 0);
 
   res = writeQuicDataToSocket(
@@ -3209,7 +3209,7 @@ TEST_F(QuicTransportFunctionsTest, WriteLimitBytRttFraction) {
       *aead,
       *headerCipher,
       getVersion(*conn),
-      500 /* packetLimit */,
+      1000 /* packetLimit */,
       writeLoopBeginTime);
   EXPECT_EQ(
       conn->transportSettings.writeConnectionDataPacketsLimit,
