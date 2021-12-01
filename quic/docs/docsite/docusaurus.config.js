@@ -21,6 +21,7 @@ module.exports = {
   favicon: 'img/favicon.ico',
   organizationName: 'facebook', // Usually your GitHub org/user name.
   projectName: 'mvfst', // Usually your repo name.
+  trailingSlash: true,
 
   presets: [
     [
