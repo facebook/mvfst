@@ -130,12 +130,12 @@ class QuicServerWorkerTest : public Test {
     socketPtr_ = sock.get();
     workerCb_ = std::make_shared<NiceMock<MockWorkerCallback>>();
     worker_ = std::make_unique<QuicServerWorker>(workerCb_);
-    auto transportInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
+    auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
     TransportSettings settings;
     settings.statelessResetTokenSecret = getRandSecret();
     retryTokenSecret_ = getRandSecret();
     settings.retryTokenSecret = retryTokenSecret_;
-    worker_->setTransportStatsCallback(std::move(transportInfoCb));
+    worker_->setTransportStatsCallback(std::move(quicStats));
     worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
     worker_->setWorkerId(42);
@@ -144,7 +144,7 @@ class QuicServerWorkerTest : public Test {
     worker_->setConnectionIdAlgo(std::make_unique<DefaultConnectionIdAlgo>());
     worker_->setCongestionControllerFactory(
         std::make_shared<ServerCongestionControllerFactory>());
-    transportInfoCb_ = (MockQuicStats*)worker_->getTransportStatsCallback();
+    quicStats_ = (MockQuicStats*)worker_->getTransportStatsCallback();
 
     auto cb = [&](const folly::SocketAddress& addr,
                   std::unique_ptr<RoutingData>& routingData,
@@ -222,7 +222,7 @@ class QuicServerWorkerTest : public Test {
   std::unique_ptr<MockQuicServerTransportFactory> factory_;
   std::unique_ptr<MockQuicUDPSocketFactory> listenerSocketFactory_;
   std::unique_ptr<MockQuicUDPSocketFactory> socketFactory_;
-  MockQuicStats* transportInfoCb_{nullptr};
+  MockQuicStats* quicStats_{nullptr};
   folly::test::MockAsyncUDPSocket* socketPtr_{nullptr};
   uint16_t hostId_{49};
   bool hasShutdown_{false};
@@ -249,7 +249,7 @@ void QuicServerWorkerTest::expectConnectionCreation(
       }));
   EXPECT_CALL(*transport, setTransportSettings(_));
   EXPECT_CALL(*transport, accept());
-  EXPECT_CALL(*transport, setTransportStatsCallback(transportInfoCb_));
+  EXPECT_CALL(*transport, setTransportStatsCallback(quicStats_));
 }
 
 void QuicServerWorkerTest::expectConnCreateRefused() {
@@ -262,7 +262,7 @@ void QuicServerWorkerTest::expectConnCreateRefused() {
   EXPECT_CALL(*transport, setServerConnectionIdParams(_)).Times(0);
   EXPECT_CALL(*transport, setTransportSettings(_)).Times(0);
   EXPECT_CALL(*transport, accept()).Times(0);
-  EXPECT_CALL(*transport, setTransportStatsCallback(transportInfoCb_)).Times(0);
+  EXPECT_CALL(*transport, setTransportStatsCallback(quicStats_)).Times(0);
   EXPECT_CALL(*transport, onNetworkData(_, _)).Times(0);
 }
 
@@ -319,11 +319,11 @@ void QuicServerWorkerTest::testSendReset(
     ConnectionId,
     ShortHeader shortHeader,
     QuicTransportStatsCallback::PacketDropReason dropReason) {
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(dropReason)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketDropped(dropReason)).Times(1);
   // should write reset packet
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onStatelessReset()).Times(1);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
+  EXPECT_CALL(*quicStats_, onStatelessReset()).Times(1);
 
   // verify that the packet that gets written is stateless reset packet
   EXPECT_CALL(*socketPtr_, write(_, _))
@@ -371,9 +371,9 @@ std::string QuicServerWorkerTest::testSendRetry(
   // Retry packet will only be sent if rate-limiting is configured
   worker_->setRateLimiter(
       std::make_unique<SlidingWindowRateLimiter>([]() { return 0; }, 60s));
-  EXPECT_CALL(*transportInfoCb_, onConnectionRateLimited()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
+  EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
 
   // Send a client inital to the server - the server will respond with retry
   // packet
@@ -486,7 +486,7 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
 TEST_F(QuicServerWorkerTest, RateLimit) {
   worker_->setRateLimiter(
       std::make_unique<SlidingWindowRateLimiter>([]() { return 2; }, 60s));
-  EXPECT_CALL(*transportInfoCb_, onConnectionRateLimited()).Times(1);
+  EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
 
   NiceMock<MockConnectionCallback> connCb1;
   auto mockSock1 =
@@ -582,8 +582,7 @@ TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
 TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
   // The second client initial packet with the retry token is invalid
   // as the client IP is different from the one stored in the retry token
-  EXPECT_CALL(
-      *transportInfoCb_, onPacketDropped(PacketDropReason::INVALID_PACKET))
+  EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_PACKET))
       .Times(1);
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
@@ -593,8 +592,7 @@ TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
 
 TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialDstConnId) {
   // Dest conn ID is invalid as it is different from the original dst conn ID
-  EXPECT_CALL(
-      *transportInfoCb_, onPacketDropped(PacketDropReason::INVALID_PACKET))
+  EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_PACKET))
       .Times(1);
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
@@ -657,7 +655,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   PacketNum num = 2;
   ShortHeader shortHeaderConnId(ProtectionType::KeyPhaseZero, connId, num);
 
-  EXPECT_CALL(*transportInfoCb_, onNewConnection());
+  EXPECT_CALL(*quicStats_, onNewConnection());
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
   worker_.get()->onConnectionIdAvailable(transport_, connId);
   const auto& connIdMap = worker_->getConnectionIdMap();
@@ -701,7 +699,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       folly::none);
   eventbase_.loop();
 
-  EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onConnectionClose(_)).Times(1);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
       transport_.get(),
@@ -728,7 +726,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       ProtectionType::KeyPhaseZero, getTestConnectionId(hostId_), num);
 
   // Routing by connid before conn id available on a short packet.
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
 
   RoutingData routingData(
       HeaderForm::Short,
@@ -744,7 +742,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       folly::none);
   eventbase_.loop();
 
-  EXPECT_CALL(*transportInfoCb_, onNewConnection());
+  EXPECT_CALL(*quicStats_, onNewConnection());
   ConnectionId newConnId = getTestConnectionId(hostId_);
 
   transport_->QuicServerTransport::setRoutingCallback(worker_.get());
@@ -797,7 +795,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   ShortHeader shortHeaderConnId2(ProtectionType::KeyPhaseZero, connId2, num);
 
   // Will be dropped
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   RoutingData routingData3(
       HeaderForm::Short,
       false,
@@ -812,7 +810,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       folly::none);
   eventbase_.loop();
 
-  EXPECT_CALL(*transportInfoCb_, onConnectionClose(_)).Times(2);
+  EXPECT_CALL(*quicStats_, onConnectionClose(_)).Times(2);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   worker_->onConnectionUnbound(
       transport_.get(),
@@ -845,7 +843,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
       num,
       version);
   EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+  EXPECT_CALL(*quicStats_, onPacketDropped(_));
   RoutingData routingData(
       HeaderForm::Long,
       true,
@@ -864,8 +862,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
 TEST_F(QuicServerWorkerTest, QuicShedTest) {
   auto connId = getTestConnectionId(hostId_);
   EXPECT_CALL(
-      *transportInfoCb_,
-      onPacketDropped(PacketDropReason::CANNOT_MAKE_TRANSPORT));
+      *quicStats_, onPacketDropped(PacketDropReason::CANNOT_MAKE_TRANSPORT));
   createQuicConnectionDuringShedding(kClientAddr, connId);
 }
 
@@ -877,8 +874,7 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(
-      *transportInfoCb_, onPacketDropped(PacketDropReason::INVALID_SRC_PORT));
+  EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_SRC_PORT));
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -897,7 +893,7 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(0);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -921,7 +917,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       kDefaultUDPSendPacketLen, std::move(initialHeader), 0);
   initialBuilder.encodePacketHeader();
   auto initialPacket = packetToBuf(std::move(initialBuilder).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(QuicVersion::MVFST))
+  EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacket), Clock::now());
@@ -936,7 +932,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   initialBuilderBigNum.encodePacketHeader();
   auto initialPacketBigNum =
       packetToBuf(std::move(initialBuilderBigNum).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(QuicVersion::MVFST))
+  EXPECT_CALL(*quicStats_, onClientInitialReceived(QuicVersion::MVFST))
       .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacketBigNum), Clock::now());
@@ -948,7 +944,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       kDefaultUDPSendPacketLen, std::move(handshakeHeader), 0);
   handshakeBuilder.encodePacketHeader();
   auto handshakePacket = packetToBuf(std::move(handshakeBuilder).buildPacket());
-  EXPECT_CALL(*transportInfoCb_, onClientInitialReceived(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onClientInitialReceived(_)).Times(0);
   worker_->handleNetworkData(
       kClientAddr, std::move(handshakePacket), Clock::now());
   eventbase_.loop();
@@ -960,10 +956,10 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -1009,10 +1005,10 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   EXPECT_CALL(*rawConnIdAlgo, parseConnectionId(dstConnId))
       .WillOnce(Return(folly::makeUnexpected(QuicInternalException(
           "This CID has COVID-19", LocalErrorCode::INTERNAL_ERROR))));
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
   eventbase_.loop();
@@ -1026,10 +1022,10 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -1054,10 +1050,10 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onPacketProcessed()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPacketSent()).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -1078,12 +1074,12 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);
 
-  EXPECT_CALL(*transportInfoCb_, onNewConnection());
+  EXPECT_CALL(*quicStats_, onNewConnection());
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
-  EXPECT_CALL(*transportInfoCb_, onConnectionClose(_));
+  EXPECT_CALL(*quicStats_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
@@ -1118,12 +1114,12 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
   auto connId = getTestConnectionId(hostId_);
   createQuicConnection(kClientAddr, connId);
 
-  EXPECT_CALL(*transportInfoCb_, onNewConnection());
+  EXPECT_CALL(*quicStats_, onNewConnection());
   worker_->onConnectionIdAvailable(transport_, getTestConnectionId(hostId_));
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
-  EXPECT_CALL(*transportInfoCb_, onConnectionClose(_));
+  EXPECT_CALL(*quicStats_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
@@ -1401,12 +1397,11 @@ class QuicServerWorkerTakeoverTest : public Test {
         takeoverSocketFactory_.get());
     factory_ = std::make_unique<MockQuicServerTransportFactory>();
     takeoverWorker_->setTransportFactory(factory_.get());
-    auto transportInfoCb = std::make_unique<NiceMock<MockQuicStats>>();
+    auto quicStats = std::make_unique<NiceMock<MockQuicStats>>();
     takeoverWorker_->setConnectionIdAlgo(
         std::make_unique<DefaultConnectionIdAlgo>());
-    takeoverWorker_->setTransportStatsCallback(std::move(transportInfoCb));
-    transportInfoCb_ =
-        (MockQuicStats*)takeoverWorker_->getTransportStatsCallback();
+    takeoverWorker_->setTransportStatsCallback(std::move(quicStats));
+    quicStats_ = (MockQuicStats*)takeoverWorker_->getTransportStatsCallback();
 
     auto takeoverSock =
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&evb_);
@@ -1430,7 +1425,7 @@ class QuicServerWorkerTakeoverTest : public Test {
   folly::SocketAddress clientAddr{kClientAddr};
   std::unique_ptr<MockQuicUDPSocketFactory> takeoverSocketFactory_;
   std::unique_ptr<MockQuicServerTransportFactory> factory_;
-  MockQuicStats* transportInfoCb_{nullptr};
+  MockQuicStats* quicStats_{nullptr};
   std::vector<QuicVersion> supportedVersions{QuicVersion::MVFST, MVFST1};
   uint16_t clientHostId_{25};
 };
@@ -1517,9 +1512,9 @@ void QuicServerWorkerTakeoverTest::testNoPacketForwarding(
   };
   EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(cb));
-  EXPECT_CALL(*transportInfoCb_, onPacketReceived());
-  EXPECT_CALL(*transportInfoCb_, onRead(len));
-  EXPECT_CALL(*transportInfoCb_, onPacketForwarded()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketReceived());
+  EXPECT_CALL(*quicStats_, onRead(len));
+  EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(0);
   takeoverWorker_->onDataAvailable(
       clientAddr, len, false, OnDataAvailableParams());
 }
@@ -1623,9 +1618,9 @@ void QuicServerWorkerTakeoverTest::testPacketForwarding(
   };
   EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(cb));
-  EXPECT_CALL(*transportInfoCb_, onPacketReceived());
-  EXPECT_CALL(*transportInfoCb_, onRead(len));
-  EXPECT_CALL(*transportInfoCb_, onPacketForwarded()).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketReceived());
+  EXPECT_CALL(*quicStats_, onRead(len));
+  EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(1);
   takeoverWorker_->onDataAvailable(
       clientAddr, len, false, OnDataAvailableParams());
   takeoverWorker_->stopPacketForwarding();
@@ -1710,11 +1705,11 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverProcessForwardedPkt) {
   };
   EXPECT_CALL(*takeoverWorkerCb_, routeDataToWorkerLong(_, _, _, _, _))
       .WillOnce(Invoke(workerCb));
-  EXPECT_CALL(*transportInfoCb_, onPacketReceived());
-  EXPECT_CALL(*transportInfoCb_, onRead(len));
-  EXPECT_CALL(*transportInfoCb_, onPacketForwarded()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onForwardedPacketReceived()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onForwardedPacketProcessed()).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketReceived());
+  EXPECT_CALL(*quicStats_, onRead(len));
+  EXPECT_CALL(*quicStats_, onPacketForwarded()).Times(1);
+  EXPECT_CALL(*quicStats_, onForwardedPacketReceived()).Times(1);
+  EXPECT_CALL(*quicStats_, onForwardedPacketProcessed()).Times(1);
   takeoverWorker_->onDataAvailable(
       clientAddr, len, false, OnDataAvailableParams());
   // release this resource since MockQuicUDPSocketFactory::_make() hands its
@@ -2156,9 +2151,9 @@ class QuicServerTakeoverTest : public Test {
     auto transportStatsFactory = std::make_unique<MockQuicStatsFactory>();
     auto makeCbForOldServer = [&]() {
       oldTransInfoCb_ = new NiceMock<MockQuicStats>();
-      std::unique_ptr<MockQuicStats> transportInfoCb;
-      transportInfoCb.reset(oldTransInfoCb_);
-      return transportInfoCb;
+      std::unique_ptr<MockQuicStats> quicStats;
+      quicStats.reset(oldTransInfoCb_);
+      return quicStats;
     };
     EXPECT_CALL(*transportStatsFactory, make())
         .WillOnce(Invoke(makeCbForOldServer));
@@ -2197,9 +2192,9 @@ class QuicServerTakeoverTest : public Test {
     transportStatsFactory = std::make_unique<MockQuicStatsFactory>();
     auto makeCbForNewServer = [&]() {
       newTransInfoCb_ = new NiceMock<MockQuicStats>();
-      std::unique_ptr<MockQuicStats> transportInfoCb;
-      transportInfoCb.reset(newTransInfoCb_);
-      return transportInfoCb;
+      std::unique_ptr<MockQuicStats> quicStats;
+      quicStats.reset(newTransInfoCb_);
+      return quicStats;
     };
     EXPECT_CALL(*transportStatsFactory, make())
         .WillOnce(Invoke(makeCbForNewServer));

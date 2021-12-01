@@ -176,8 +176,8 @@ class QuicServerTransportTest : public Test {
     server->setServerConnectionIdParams(params);
     server->getNonConstConn().transportSettings.statelessResetTokenSecret =
         getRandSecret();
-    transportInfoCb_ = std::make_unique<NiceMock<MockQuicStats>>();
-    server->setTransportStatsCallback(transportInfoCb_.get());
+    quicStats_ = std::make_unique<NiceMock<MockQuicStats>>();
+    server->setTransportStatsCallback(quicStats_.get());
     initializeServerHandshake();
     server->getNonConstConn().handshakeLayer.reset(fakeHandshake);
     server->getNonConstConn().serverHandshakeLayer = fakeHandshake;
@@ -339,7 +339,7 @@ class QuicServerTransportTest : public Test {
 
   virtual void setupConnection() {
     EXPECT_EQ(server->getConn().readCodec, nullptr);
-    EXPECT_EQ(server->getConn().statsCallback, transportInfoCb_.get());
+    EXPECT_EQ(server->getConn().statsCallback, quicStats_.get());
     setupClientReadCodec();
     recvClientHello();
 
@@ -548,7 +548,7 @@ class QuicServerTransportTest : public Test {
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
 
   std::vector<QuicVersion> supportedVersions;
-  std::unique_ptr<MockQuicStats> transportInfoCb_;
+  std::unique_ptr<MockQuicStats> quicStats_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   std::shared_ptr<CongestionControllerFactory> ccFactory_;
   std::shared_ptr<TestingQuicServerTransport> server;
@@ -612,7 +612,7 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   server->getNonConstConn().ackStates.appDataAckState.largestRecvdPacketTime =
       folly::none;
 
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(2); // for x08, x0C
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2); // for x08, x0C
   deliverData(packetToBuf(packet));
 
   EXPECT_TRUE(
@@ -639,11 +639,11 @@ TEST_F(QuicServerTransportTest, TestReadMultipleStreams) {
   auto streamData2 = readDataFromQuicStream(*stream2);
   EXPECT_TRUE(eq(buf2, streamData2.first));
   EXPECT_TRUE(streamData2.second);
-  EXPECT_CALL(*transportInfoCb_, onQuicStreamClosed()).Times(2);
+  EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(2);
 }
 
 TEST_F(QuicServerTransportTest, TestInvalidServerStream) {
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(0);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(0);
   StreamId streamId = 0x01;
   auto data = IOBuf::copyBuffer("Aloha");
   EXPECT_THROW(recvEncryptedStream(streamId, *data), std::runtime_error);
@@ -660,7 +660,7 @@ TEST_F(QuicServerTransportTest, TestInvalidServerStream) {
 }
 
 TEST_F(QuicServerTransportTest, IdleTimerResetOnRecvNewData) {
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   StreamId streamId = server->createBidirectionalStream().value();
   auto expected = IOBuf::copyBuffer("hello");
   auto packet = packetToBuf(createStreamPacket(
@@ -676,11 +676,11 @@ TEST_F(QuicServerTransportTest, IdleTimerResetOnRecvNewData) {
   ASSERT_FALSE(server->idleTimeout().isScheduled());
   recvEncryptedStream(streamId, *expected);
   ASSERT_TRUE(server->idleTimeout().isScheduled());
-  EXPECT_CALL(*transportInfoCb_, onQuicStreamClosed());
+  EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
 TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   StreamId streamId = server->createBidirectionalStream().value();
 
   auto expected = IOBuf::copyBuffer("hello");
@@ -692,7 +692,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
   // Try delivering the same packet again
   deliverData(packet->clone(), false);
   ASSERT_FALSE(server->idleTimeout().isScheduled());
-  EXPECT_CALL(*transportInfoCb_, onQuicStreamClosed());
+  EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
 TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
@@ -981,7 +981,7 @@ TEST_F(QuicServerTransportTest, ReceiveCloseAfterLocalError) {
       currLargestReceivedPacketNum);
 
   // Deliver the same bad data again
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+  EXPECT_CALL(*quicStats_, onPacketDropped(_));
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   EXPECT_LT(
       server->getConn()
@@ -3236,7 +3236,7 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndDiscard) {
       datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
   writeFrame(datagramFrame, builder);
   auto packet = std::move(builder).buildPacket();
-  EXPECT_CALL(*transportInfoCb_, onDatagramDroppedOnRead()).Times(1);
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(1);
   deliverData(packetToBuf(packet));
   ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 0);
 }
@@ -3246,9 +3246,9 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndStore) {
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
   conn.datagramState.maxReadBufferSize = 10;
 
-  EXPECT_CALL(*transportInfoCb_, onDatagramRead(_))
+  EXPECT_CALL(*quicStats_, onDatagramRead(_))
       .Times(conn.datagramState.maxReadBufferSize);
-  EXPECT_CALL(*transportInfoCb_, onDatagramDroppedOnRead())
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead())
       .Times(conn.datagramState.maxReadBufferSize);
   for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
     ShortHeader header(
@@ -3470,7 +3470,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadPacketProtectionLevel) {
                     getTestConnectionId(1) /* dest */,
                     {QuicVersion::MVFST})
                     .buildPacket();
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+  EXPECT_CALL(*quicStats_, onPacketDropped(_));
   deliverData(packet.second->clone());
 }
 
@@ -3491,7 +3491,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
       *aead,
       *getInitialHeaderCipher(),
       nextPacket);
-  EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+  EXPECT_CALL(*quicStats_, onPacketDropped(_));
   deliverData(std::move(packetData));
   // If crypto data was processed, we would have generated some writes.
   EXPECT_NE(server->getConn().readCodec, nullptr);
@@ -3515,7 +3515,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestPendingZeroRttData) {
         0 /* cipherOverhead */,
         0 /* largestAcked */,
         std::make_pair(LongHeader::Types::ZeroRtt, QuicVersion::MVFST)));
-    EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+    EXPECT_CALL(*quicStats_, onPacketDropped(_));
     deliverData(std::move(packetData));
   }
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
@@ -3541,7 +3541,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestPendingOneRttData) {
         *data,
         0 /* cipherOverhead */,
         0 /* largestAcked */));
-    EXPECT_CALL(*transportInfoCb_, onPacketDropped(_));
+    EXPECT_CALL(*quicStats_, onPacketDropped(_));
     deliverData(std::move(packetData));
   }
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);

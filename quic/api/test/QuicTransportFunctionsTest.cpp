@@ -155,7 +155,7 @@ class QuicTransportFunctionsTest : public Test {
   void SetUp() override {
     aead = test::createNoOpAead();
     headerCipher = test::createNoOpHeaderCipher();
-    transportInfoCb_ = std::make_unique<NiceMock<MockQuicStats>>();
+    quicStats_ = std::make_unique<NiceMock<MockQuicStats>>();
   }
 
   std::unique_ptr<QuicServerConnectionState> createConn() {
@@ -172,7 +172,7 @@ class QuicTransportFunctionsTest : public Test {
         kDefaultStreamWindowSize * 1000;
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionWindowSize * 1000;
-    conn->statsCallback = transportInfoCb_.get();
+    conn->statsCallback = quicStats_.get();
     conn->initialWriteCipher = createNoOpAead();
     conn->initialHeaderCipher = createNoOpHeaderCipher();
     conn->streamManager->setMaxLocalBidirectionalStreams(
@@ -188,7 +188,7 @@ class QuicTransportFunctionsTest : public Test {
 
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
-  std::unique_ptr<MockQuicStats> transportInfoCb_;
+  std::unique_ptr<MockQuicStats> quicStats_;
 };
 
 TEST_F(QuicTransportFunctionsTest, PingPacketGoesToOPList) {
@@ -227,7 +227,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnection) {
   auto stream2 = conn->streamManager->findStream(stream2Id);
 
   auto buf = IOBuf::copyBuffer("hey whats up");
-  EXPECT_CALL(*transportInfoCb_, onPacketRetransmission()).Times(2);
+  EXPECT_CALL(*quicStats_, onPacketRetransmission()).Times(2);
   writeDataToQuicStream(*stream1, buf->clone(), true);
   writeDataToQuicStream(*stream2, buf->clone(), true);
 
@@ -1947,7 +1947,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_));
+  EXPECT_CALL(*quicStats_, onWrite(_));
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -1976,7 +1976,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicdataToSocketWithPacer) {
   writeDataToQuicStream(*stream1, buf->clone(), true);
 
   EXPECT_CALL(*rawPacer, onPacketSent()).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_));
+  EXPECT_CALL(*quicStats_, onWrite(_));
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2014,7 +2014,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
   conn->transportSettings.writeConnectionDataPacketsLimit = 0;
   EXPECT_CALL(*rawSocket, write(_, _)).Times(0);
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
   auto res = writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2041,7 +2041,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
         return iobuf->computeChainDataLength();
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_)).Times(1);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
   res = writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2072,7 +2072,7 @@ TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketLimitTest) {
       }));
   EXPECT_CALL(*rawCongestionController, onPacketSent(_))
       .Times(kDefaultWriteConnectionDataPacketLimit * 2);
-  EXPECT_CALL(*transportInfoCb_, onWrite(_))
+  EXPECT_CALL(*quicStats_, onWrite(_))
       .Times(kDefaultWriteConnectionDataPacketLimit * 2);
   res = writeQuicDataToSocket(
       *rawSocket,
@@ -2271,7 +2271,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   // Artificially Block the stream
   stream1->flowControlState.peerAdvertisedMaxOffset = 10;
   // writes blocked frame in additionally
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(2);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(2);
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2293,7 +2293,7 @@ TEST_F(QuicTransportFunctionsTest, WriteBlockedFrameWhenBlocked) {
   // Since everything is blocked, we shouldn't write a blocked again, so we
   // won't have any new packets to write if we trigger a write.
   auto previousPackets = conn->outstandings.packets.size();
-  EXPECT_CALL(*transportInfoCb_, onWrite(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2668,7 +2668,7 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   conn->oneRttWriteCipher = test::createNoOpAead();
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked()).Times(0);
+  EXPECT_CALL(*quicStats_, onCwndBlocked()).Times(0);
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
@@ -2690,11 +2690,11 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTest) {
   // Congestion control
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(0));
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_CALL(*quicStats_, onCwndBlocked());
   writeDataToQuicStream(*stream1, buf->clone(), true);
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_CALL(*quicStats_, onCwndBlocked());
   writeQuicDataToSocket(
       *rawSocket,
       *conn,
@@ -2733,28 +2733,28 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataTestDuringPathValidation) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
   EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
 
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked()).Times(0);
+  EXPECT_CALL(*quicStats_, onCwndBlocked()).Times(0);
   EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // CC has writableBytes, but PathLimiter doesn't.
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(1));
   EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
 
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_CALL(*quicStats_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // PathLimiter has writableBytes, CC doesn't
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
   EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(1));
 
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_CALL(*quicStats_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 
   // Neither PathLimiter or CC have writablebytes
   EXPECT_CALL(*rawCongestionController, getWritableBytes()).WillOnce(Return(0));
   EXPECT_CALL(*rawLimiter, currentCredit(_, _)).WillOnce(Return(0));
 
-  EXPECT_CALL(*transportInfoCb_, onCwndBlocked());
+  EXPECT_CALL(*quicStats_, onCwndBlocked());
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 

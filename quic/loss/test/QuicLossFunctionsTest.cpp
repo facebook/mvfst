@@ -75,7 +75,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   void SetUp() override {
     aead = createNoOpAead();
     headerCipher = createNoOpHeaderCipher();
-    transportInfoCb_ = std::make_unique<MockQuicStats>();
+    quicStats_ = std::make_unique<MockQuicStats>();
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
   }
 
@@ -107,7 +107,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         kDefaultMaxStreamsBidirectional);
     conn->streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
-    conn->statsCallback = transportInfoCb_.get();
+    conn->statsCallback = quicStats_.get();
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0
     ServerConnectionIdParams params(0, 0, 0);
@@ -135,7 +135,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
         kDefaultStreamWindowSize;
     conn->flowControlState.peerAdvertisedMaxOffset =
         kDefaultConnectionWindowSize;
-    conn->statsCallback = transportInfoCb_.get();
+    conn->statsCallback = quicStats_.get();
     // create a serverConnectionId that is different from the client connId
     // with bits for processId and workerId set to 0
     ServerConnectionIdParams params(0, 0, 0);
@@ -151,7 +151,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   MockLossTimeout timeout;
-  std::unique_ptr<MockQuicStats> transportInfoCb_;
+  std::unique_ptr<MockQuicStats> quicStats_;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
 
   auto getLossPacketMatcher(
@@ -298,7 +298,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
 
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
-  EXPECT_CALL(*transportInfoCb_, onPTO()).Times(0);
+  EXPECT_CALL(*quicStats_, onPTO()).Times(0);
   PacketEvent packetEvent1(
       PacketNumberSpace::AppData,
       conn->ackStates.appDataAckState.nextPacketNum);
@@ -651,7 +651,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   MockClock::mockNow = []() { return TimePoint(123ms); };
   std::vector<PacketNum> lostPacket;
   MockClock::mockNow = []() { return TimePoint(23ms); };
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_EQ(LossState::AlarmMethod::PTO, conn->lossState.currentAlarmMethod);
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPacket)), MockClock>(
@@ -662,7 +662,7 @@ TEST_F(QuicLossFunctionsTest, TestOnLossDetectionAlarm) {
   EXPECT_TRUE(lostPacket.empty());
 
   MockClock::mockNow = []() { return TimePoint(3ms); };
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   sendPacket(*conn, TimePoint(), folly::none, PacketType::OneRtt);
   setLossDetectionAlarm<decltype(timeout), MockClock>(*conn, timeout);
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
@@ -692,7 +692,7 @@ TEST_F(QuicLossFunctionsTest, TestOnPTOSkipProcessed) {
   EXPECT_EQ(10, conn->outstandings.packets.size());
   std::vector<PacketNum> lostPackets;
   EXPECT_CALL(*rawCongestionController, onRemoveBytesFromInflight(_)).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   onPTOAlarm(*conn);
   EXPECT_EQ(10, conn->outstandings.packets.size());
   EXPECT_TRUE(lostPackets.empty());
@@ -702,7 +702,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLoss) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
   auto conn = createConn();
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(2);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(2);
   auto stream1Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream2Id =
@@ -749,7 +749,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossMerge) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
   auto conn = createConn();
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   auto stream1Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream1 = conn->streamManager->findStream(stream1Id);
@@ -805,7 +805,7 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossNoMerge) {
   folly::EventBase evb;
   MockAsyncUDPSocket socket(&evb);
   auto conn = createConn();
-  EXPECT_CALL(*transportInfoCb_, onNewQuicStream()).Times(1);
+  EXPECT_CALL(*quicStats_, onNewQuicStream()).Times(1);
   auto stream1Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream1 = conn->streamManager->findStream(stream1Id);
@@ -1308,7 +1308,7 @@ TEST_F(QuicLossFunctionsTest, PTONoLongerMarksPacketsToBeRetransmitted) {
     startTime += 1ms;
   }
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), MockClock>(
       *conn, testingLossMarkFunc(lostPackets));
   EXPECT_EQ(1, conn->lossState.ptoCount);
@@ -1341,7 +1341,7 @@ TEST_F(QuicLossFunctionsTest, PTOWithHandshakePackets) {
     expectedLargestLostNum = std::max(
         expectedLargestLostNum, i % 2 ? sentPacketNum : expectedLargestLostNum);
   }
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   // Verify packet count doesn't change across PTO.
   auto originalPacketCount = conn->outstandings.packetCount;
   onLossDetectionAlarm<decltype(testingLossMarkFunc(lostPackets)), Clock>(
@@ -1605,7 +1605,7 @@ TEST_F(QuicLossFunctionsTest, TestTotalPTOCount) {
   conn->qLogger = mockQLogger;
   conn->lossState.totalPTOCount = 100;
   EXPECT_CALL(*mockQLogger, addLossAlarm(0, 1, 0, kPtoAlarm));
-  EXPECT_CALL(*transportInfoCb_, onPTO());
+  EXPECT_CALL(*quicStats_, onPTO());
   onPTOAlarm(*conn);
   EXPECT_EQ(101, conn->lossState.totalPTOCount);
 }
@@ -1618,7 +1618,7 @@ TEST_F(QuicLossFunctionsTest, TestExceedsMaxPTOThrows) {
   for (int i = 1; i <= 3; i++) {
     EXPECT_CALL(*mockQLogger, addLossAlarm(0, i, 0, kPtoAlarm));
   }
-  EXPECT_CALL(*transportInfoCb_, onPTO()).Times(3);
+  EXPECT_CALL(*quicStats_, onPTO()).Times(3);
   onPTOAlarm(*conn);
   onPTOAlarm(*conn);
   EXPECT_THROW(onPTOAlarm(*conn), QuicInternalException);
