@@ -2816,10 +2816,12 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::writeDatagram(
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
   if (conn_->datagramState.maxWriteFrameSize == 0) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     return folly::makeUnexpected(LocalErrorCode::INVALID_WRITE_DATA);
   }
   if (conn_->datagramState.writeBuffer.size() >=
       conn_->datagramState.maxWriteBufferSize) {
+    QUIC_STATS(conn_->statsCallback, onDatagramDroppedOnWrite);
     if (!conn_->transportSettings.datagramConfig.sendDropOldDataFirst) {
       // TODO(lniccolini) use different return codes to signal the application
       // exactly why the datagram got dropped

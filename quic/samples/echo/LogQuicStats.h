@@ -202,6 +202,22 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onZeroRttRejected";
   }
 
+  void onDatagramRead(size_t datagramSize) override {
+    VLOG(2) << prefix_ << "onDatagramRead size=" << datagramSize;
+  }
+
+  void onDatagramWrite(size_t datagramSize) override {
+    VLOG(2) << prefix_ << "onDatagramWrite size=" << datagramSize;
+  }
+
+  void onDatagramDroppedOnWrite() override {
+    VLOG(2) << prefix_ << "onDatagramDroppedOnWrite";
+  }
+
+  void onDatagramDroppedOnRead() override {
+    VLOG(2) << prefix_ << "onDatagramDroppedOnRead";
+  }
+
  private:
   std::string prefix_;
 };

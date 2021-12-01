@@ -1337,7 +1337,8 @@ class QuicClientTransportTest : public Test {
         client->getConn().selfConnectionIds[0].connId,
         *client->getConn().clientConnectionId);
     EXPECT_EQ(client->getConn().peerConnectionIds.size(), 0);
-
+    quicStats_ = std::make_shared<NiceMock<MockQuicStats>>();
+    client->setTransportStatsCallback(quicStats_);
     SetUpChild();
   }
 
@@ -1726,6 +1727,7 @@ class QuicClientTransportTest : public Test {
   folly::Optional<ConnectionId> originalConnId;
   folly::Optional<ConnectionId> serverChosenConnId;
   QuicVersion version{QuicVersion::QUIC_V1};
+  std::shared_ptr<NiceMock<MockQuicStats>> quicStats_;
 };
 
 TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
@@ -5447,6 +5449,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndDiscard) {
       0 /* largestAcked */);
   builder.encodePacketHeader();
 
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(1);
   StringPiece datagramPayload = "do not rely on me. I am unreliable";
   DatagramFrame datagramFrame(
       datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
@@ -5461,6 +5464,10 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndStore) {
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
   conn.datagramState.maxReadBufferSize = 10;
 
+  EXPECT_CALL(*quicStats_, onDatagramRead(_))
+      .Times(conn.datagramState.maxReadBufferSize);
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead())
+      .Times(conn.datagramState.maxReadBufferSize);
   for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
     ShortHeader header(
         ProtectionType::KeyPhaseZero, *originalConnId, appDataPacketNum++);
@@ -5508,6 +5515,7 @@ TEST_F(
       datagramPayload1.size(), IOBuf::copyBuffer(datagramPayload1));
   writeFrame(datagramFrame1, builder1);
   auto packet1 = packetToBuf(std::move(builder1).buildPacket());
+  EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
   deliverData(packet1->coalesce());
   ASSERT_EQ(
       client->getConn().datagramState.readBuffer.size(),
@@ -5525,6 +5533,8 @@ TEST_F(
       datagramPayload2.size(), IOBuf::copyBuffer(datagramPayload2));
   writeFrame(datagramFrame2, builder2);
   auto packet2 = packetToBuf(std::move(builder2).buildPacket());
+  EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(1);
+  EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
   deliverData(packet2->coalesce());
   ASSERT_EQ(
       client->getConn().datagramState.readBuffer.size(),

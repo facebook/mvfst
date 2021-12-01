@@ -3236,6 +3236,7 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndDiscard) {
       datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
   writeFrame(datagramFrame, builder);
   auto packet = std::move(builder).buildPacket();
+  EXPECT_CALL(*transportInfoCb_, onDatagramDroppedOnRead()).Times(1);
   deliverData(packetToBuf(packet));
   ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 0);
 }
@@ -3245,6 +3246,10 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndStore) {
   conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
   conn.datagramState.maxReadBufferSize = 10;
 
+  EXPECT_CALL(*transportInfoCb_, onDatagramRead(_))
+      .Times(conn.datagramState.maxReadBufferSize);
+  EXPECT_CALL(*transportInfoCb_, onDatagramDroppedOnRead())
+      .Times(conn.datagramState.maxReadBufferSize);
   for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
     ShortHeader header(
         ProtectionType::KeyPhaseZero,

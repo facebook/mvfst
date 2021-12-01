@@ -168,6 +168,14 @@ class QuicTransportStatsCallback {
 
   virtual void onZeroRttRejected() = 0;
 
+  virtual void onDatagramRead(size_t datagramSize) = 0;
+
+  virtual void onDatagramWrite(size_t datagramSize) = 0;
+
+  virtual void onDatagramDroppedOnWrite() = 0;
+
+  virtual void onDatagramDroppedOnRead() = 0;
+
   static const char* toString(PacketDropReason reason) {
     switch (reason) {
       case PacketDropReason::NONE:

@@ -22,6 +22,7 @@
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/test/MockQuicStats.h>
 
 using namespace quic;
 using namespace testing;
@@ -1859,6 +1860,9 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
     builder.frames_.push_back(f);
   }));
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(2);
   // Call scheduler
   auto& frames = builder.frames_;
   scheduler.writeDatagramFrames(builder);
@@ -1882,10 +1886,14 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
     builder.frames_.push_back(f);
   }));
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
   // Call scheduler
   auto& frames = builder.frames_;
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(1);
   scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 1);
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(1);
   scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 2);
 }
@@ -1906,12 +1914,15 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
   EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
     builder.frames_.push_back(f);
   }));
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
   // Call scheduler
   auto& frames = builder.frames_;
   scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 0);
   EXPECT_CALL(builder, remainingSpaceInPkt())
       .WillRepeatedly(Return(conn.udpSendPacketLen / 2));
+  EXPECT_CALL(quicStats, onDatagramWrite(_)).Times(1);
   scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 1);
 }

@@ -630,6 +630,7 @@ bool DatagramFrameScheduler::writeDatagramFrames(
     auto& payload = conn_.datagramState.writeBuffer.front();
     auto datagramFrame = DatagramFrame(payload.chainLength(), payload.move());
     if (writeFrame(datagramFrame, builder) > 0) {
+      QUIC_STATS(conn_.statsCallback, onDatagramWrite, payload.chainLength());
       conn_.datagramState.writeBuffer.pop_front();
       sent = true;
     }

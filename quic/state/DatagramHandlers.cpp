@@ -16,10 +16,12 @@ void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame) {
   // For now, max_datagram_size > 0 means the peer supports datagram frames
   if (conn.datagramState.maxReadFrameSize == 0) {
     frame.data.move();
+    QUIC_STATS(conn.statsCallback, onDatagramDroppedOnRead);
     return;
   }
   if (conn.datagramState.readBuffer.size() >=
       conn.datagramState.maxReadBufferSize) {
+    QUIC_STATS(conn.statsCallback, onDatagramDroppedOnRead);
     if (!conn.transportSettings.datagramConfig.recvDropOldDataFirst) {
       frame.data.move();
       return;
@@ -27,6 +29,7 @@ void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame) {
       conn.datagramState.readBuffer.pop_front();
     }
   }
+  QUIC_STATS(conn.statsCallback, onDatagramRead, frame.data.chainLength());
   conn.datagramState.readBuffer.emplace_back(std::move(frame.data));
 }
 
