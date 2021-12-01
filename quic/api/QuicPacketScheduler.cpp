@@ -632,9 +632,6 @@ bool DatagramFrameScheduler::writeDatagramFrames(
     if (writeFrame(datagramFrame, builder) > 0) {
       conn_.datagramState.writeBuffer.pop_front();
       sent = true;
-    } else {
-      payload = datagramFrame.data.move();
-      break;
     }
     if (conn_.transportSettings.datagramConfig.framePerPacket) {
       break;

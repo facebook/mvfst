@@ -1850,18 +1850,18 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerMultipleFramesPerPacket) {
   conn.transportSettings.datagramConfig.framePerPacket = false;
   DatagramFrameScheduler scheduler(conn);
   // Add datagrams
-  conn.datagramState.writeBuffer.emplace_back(
-      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
-  conn.datagramState.writeBuffer.emplace_back(
-      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
+  std::string s1(conn.udpSendPacketLen / 3, '*');
+  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s1));
+  std::string s2(conn.udpSendPacketLen / 3, '%');
+  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s2));
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder.frames_.push_back(f);
   }));
   // Call scheduler
-  auto& frames = builder2.frames_;
-  scheduler.writeDatagramFrames(builder2);
+  auto& frames = builder.frames_;
+  scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 2);
 }
 
@@ -1873,21 +1873,47 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameSchedulerOneFramePerPacket) {
   conn.transportSettings.datagramConfig.framePerPacket = true;
   DatagramFrameScheduler scheduler(conn);
   // Add datagrams
-  conn.datagramState.writeBuffer.emplace_back(
-      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
-  conn.datagramState.writeBuffer.emplace_back(
-      folly::IOBuf::createChain(conn.udpSendPacketLen / 3, 4096));
-  NiceMock<MockQuicPacketBuilder> builder2;
-  EXPECT_CALL(builder2, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
-  EXPECT_CALL(builder2, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
-    builder2.frames_.push_back(f);
+  std::string s1(conn.udpSendPacketLen / 3, '*');
+  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s1));
+  std::string s2(conn.udpSendPacketLen / 3, '%');
+  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s2));
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt()).WillRepeatedly(Return(4096));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder.frames_.push_back(f);
   }));
   // Call scheduler
-  auto& frames = builder2.frames_;
-  scheduler.writeDatagramFrames(builder2);
+  auto& frames = builder.frames_;
+  scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 1);
-  scheduler.writeDatagramFrames(builder2);
+  scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 2);
+}
+
+TEST_F(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+  conn.transportSettings.datagramConfig.framePerPacket = true;
+  DatagramFrameScheduler scheduler(conn);
+  // Add datagram
+  std::string s(conn.udpSendPacketLen / 3, '*');
+  conn.datagramState.writeBuffer.emplace_back(folly::IOBuf::copyBuffer(s));
+  NiceMock<MockQuicPacketBuilder> builder;
+  EXPECT_CALL(builder, remainingSpaceInPkt())
+      .WillRepeatedly(Return(conn.udpSendPacketLen / 4));
+  EXPECT_CALL(builder, appendFrame(_)).WillRepeatedly(Invoke([&](auto f) {
+    builder.frames_.push_back(f);
+  }));
+  // Call scheduler
+  auto& frames = builder.frames_;
+  scheduler.writeDatagramFrames(builder);
+  ASSERT_EQ(frames.size(), 0);
+  EXPECT_CALL(builder, remainingSpaceInPkt())
+      .WillRepeatedly(Return(conn.udpSendPacketLen / 2));
+  scheduler.writeDatagramFrames(builder);
+  ASSERT_EQ(frames.size(), 1);
 }
 
 INSTANTIATE_TEST_CASE_P(
