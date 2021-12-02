@@ -177,7 +177,9 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         break;
       }
       case QuicFrame::Type::DatagramFrame: {
-        // TODO
+        const auto& frame = *quicFrame.asDatagramFrame();
+        event->frames.push_back(
+            std::make_unique<quic::DatagramFrameLog>(frame.length));
         break;
       }
     }

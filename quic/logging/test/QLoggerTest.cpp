@@ -1519,4 +1519,112 @@ TEST_F(QLoggerTest, NoThrowOnStreamingWithNonExistentDirectory) {
   EXPECT_FALSE(folly::fs::exists(outputPath));
 }
 
+TEST_F(QLoggerTest, PrettyDatagram) {
+  folly::dynamic expected = folly::parseJson(
+      R"({
+   "description": "Converted from file",
+   "qlog_version": "draft-00",
+   "title": "mvfst qlog",
+   "traces": [
+     {
+       "common_fields": {
+         "dcid": "0101",
+         "protocol_type": "QUIC_HTTP3",
+         "reference_time": "0",
+         "scid": ""
+       },
+       "configuration": {
+         "time_offset": 0,
+         "time_units": "us"
+       },
+       "description": "Generated qlog from connection",
+       "event_fields": [
+         "relative_time",
+         "category",
+         "event",
+         "data"
+       ],
+       "events": [
+         [
+           "31",
+           "transport",
+           "packet_received",
+           {
+             "frames": [
+               {
+                 "frame_type": "datagram",
+                 "length": 10
+               }
+             ],
+             "header": {
+               "packet_number": 1,
+               "packet_size": 10
+             },
+             "packet_type": "1RTT"
+           }
+         ]
+       ],
+       "title": "mvfst qlog from single connection",
+       "vantage_point": {
+         "name": "server",
+         "type": "server"
+       }
+     }
+   ],
+   "summary": {
+     "max_duration": 0,
+     "total_event_count": 1,
+     "trace_count": 1
+   }
+ })");
+
+  auto headerIn =
+      ShortHeader(ProtectionType::KeyPhaseZero, getTestConnectionId(1), 1);
+  RegularQuicPacket regularQuicPacket(std::move(headerIn));
+  auto buf = folly::IOBuf::copyBuffer("0123456789");
+  auto len = buf->computeChainDataLength();
+  DatagramFrame frame(len, std::move(buf));
+
+  regularQuicPacket.frames.emplace_back(std::move(frame));
+  auto dir = folly::fs::temp_directory_path().string();
+
+  auto* q = new FileQLogger(
+      VantagePoint::Server,
+      kHTTP3ProtocolType,
+      dir,
+      true /* prettyJson */,
+      true /* streaming */);
+
+  folly::Random::DefaultGenerator rng;
+  rng.seed(
+      std::chrono::high_resolution_clock::now().time_since_epoch().count());
+
+  q->setDcid(ConnectionId(std::vector<uint8_t>{
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+      static_cast<uint8_t>(
+          folly::Random::rand32(0, std::numeric_limits<uint8_t>::max(), rng)),
+  }));
+  q->addPacket(regularQuicPacket, 10);
+  EXPECT_EQ(q->logs.size(), 0);
+
+  std::string outputPath =
+      folly::to<std::string>(dir, "/", (q->dcid.value()).hex(), ".qlog");
+  delete q;
+
+  std::ifstream file(outputPath, std::ifstream::in);
+  std::string str(
+      (std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  folly::dynamic parsed = folly::parseJson(str);
+
+  parsed["traces"][0]["events"][0][0] = "31"; // hardcode reference time
+  parsed["traces"][0]["common_fields"]["dcid"] = "0101";
+
+  EXPECT_EQ(expected, parsed);
+}
+
 } // namespace quic::test

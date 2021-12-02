@@ -31,7 +31,7 @@ class PaddingFrameLog : public QLogFrame {
   explicit PaddingFrameLog(uint64_t numFramesIn) : numFrames{numFramesIn} {}
 
   ~PaddingFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class RstStreamFrameLog : public QLogFrame {
@@ -47,7 +47,7 @@ class RstStreamFrameLog : public QLogFrame {
       : streamId{streamIdIn}, errorCode{errorCodeIn}, offset{offsetIn} {}
 
   ~RstStreamFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class ConnectionCloseFrameLog : public QLogFrame {
@@ -65,7 +65,7 @@ class ConnectionCloseFrameLog : public QLogFrame {
         closingFrameType{closingFrameTypeIn} {}
 
   ~ConnectionCloseFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class MaxDataFrameLog : public QLogFrame {
@@ -76,7 +76,7 @@ class MaxDataFrameLog : public QLogFrame {
       : maximumData{maximumDataIn} {}
 
   ~MaxDataFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class MaxStreamDataFrameLog : public QLogFrame {
@@ -88,7 +88,7 @@ class MaxStreamDataFrameLog : public QLogFrame {
       : streamId{streamIdIn}, maximumData{maximumDataIn} {}
 
   ~MaxStreamDataFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class MaxStreamsFrameLog : public QLogFrame {
@@ -99,7 +99,7 @@ class MaxStreamsFrameLog : public QLogFrame {
   MaxStreamsFrameLog(uint64_t maxStreamsIn, bool isForBidirectionalIn)
       : maxStreams{maxStreamsIn}, isForBidirectional{isForBidirectionalIn} {}
   ~MaxStreamsFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class StreamsBlockedFrameLog : public QLogFrame {
@@ -111,14 +111,14 @@ class StreamsBlockedFrameLog : public QLogFrame {
       : streamLimit{streamLimitIn}, isForBidirectional{isForBidirectionalIn} {}
 
   ~StreamsBlockedFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class PingFrameLog : public QLogFrame {
  public:
   PingFrameLog() = default;
   ~PingFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class DataBlockedFrameLog : public QLogFrame {
@@ -127,7 +127,7 @@ class DataBlockedFrameLog : public QLogFrame {
 
   explicit DataBlockedFrameLog(uint64_t dataLimitIn) : dataLimit{dataLimitIn} {}
   ~DataBlockedFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class KnobFrameLog : public QLogFrame {
@@ -173,7 +173,7 @@ class StreamDataBlockedFrameLog : public QLogFrame {
   StreamDataBlockedFrameLog(StreamId streamIdIn, uint64_t dataLimitIn)
       : streamId{streamIdIn}, dataLimit{dataLimitIn} {}
   ~StreamDataBlockedFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class ReadAckFrameLog : public QLogFrame {
@@ -186,7 +186,7 @@ class ReadAckFrameLog : public QLogFrame {
       std::chrono::microseconds ackDelayIn)
       : ackBlocks{ackBlocksIn}, ackDelay{ackDelayIn} {}
   ~ReadAckFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class WriteAckFrameLog : public QLogFrame {
@@ -199,7 +199,7 @@ class WriteAckFrameLog : public QLogFrame {
       std::chrono::microseconds ackDelayIn)
       : ackBlocks{ackBlocksIn}, ackDelay{ackDelayIn} {}
   ~WriteAckFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class StreamFrameLog : public QLogFrame {
@@ -217,7 +217,7 @@ class StreamFrameLog : public QLogFrame {
       : streamId{streamIdIn}, offset{offsetIn}, len{lenIn}, fin{finIn} {}
   ~StreamFrameLog() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class CryptoFrameLog : public QLogFrame {
@@ -228,7 +228,7 @@ class CryptoFrameLog : public QLogFrame {
   CryptoFrameLog(uint64_t offsetIn, uint64_t lenIn)
       : offset{offsetIn}, len{lenIn} {}
   ~CryptoFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class StopSendingFrameLog : public QLogFrame {
@@ -239,7 +239,7 @@ class StopSendingFrameLog : public QLogFrame {
   StopSendingFrameLog(StreamId streamIdIn, ApplicationErrorCode errorCodeIn)
       : streamId{streamIdIn}, errorCode{errorCodeIn} {}
   ~StopSendingFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class PathChallengeFrameLog : public QLogFrame {
@@ -248,7 +248,7 @@ class PathChallengeFrameLog : public QLogFrame {
 
   explicit PathChallengeFrameLog(uint64_t pathDataIn) : pathData{pathDataIn} {}
   ~PathChallengeFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class PathResponseFrameLog : public QLogFrame {
@@ -257,7 +257,7 @@ class PathResponseFrameLog : public QLogFrame {
 
   explicit PathResponseFrameLog(uint64_t pathDataIn) : pathData{pathDataIn} {}
   ~PathResponseFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class NewConnectionIdFrameLog : public QLogFrame {
@@ -268,7 +268,7 @@ class NewConnectionIdFrameLog : public QLogFrame {
   NewConnectionIdFrameLog(uint16_t sequenceIn, StatelessResetToken tokenIn)
       : sequence{sequenceIn}, token{tokenIn} {}
   ~NewConnectionIdFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class RetireConnectionIdFrameLog : public QLogFrame {
@@ -278,21 +278,31 @@ class RetireConnectionIdFrameLog : public QLogFrame {
   RetireConnectionIdFrameLog(uint64_t sequenceIn) : sequence(sequenceIn) {}
 
   ~RetireConnectionIdFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class ReadNewTokenFrameLog : public QLogFrame {
  public:
   ReadNewTokenFrameLog() = default;
   ~ReadNewTokenFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class HandshakeDoneFrameLog : public QLogFrame {
  public:
   HandshakeDoneFrameLog() = default;
   ~HandshakeDoneFrameLog() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
+};
+
+class DatagramFrameLog : public QLogFrame {
+ public:
+  uint64_t len;
+
+  explicit DatagramFrameLog(uint64_t lenIn) : len(lenIn) {}
+
+  ~DatagramFrameLog() override = default;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class VersionNegotiationLog {
@@ -302,7 +312,7 @@ class VersionNegotiationLog {
   explicit VersionNegotiationLog(const std::vector<QuicVersion>& versionsIn)
       : versions{versionsIn} {}
   ~VersionNegotiationLog() = default;
-  folly::dynamic toDynamic() const;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const;
 };
 
 enum class QLogEventType : uint32_t {
@@ -350,7 +360,7 @@ class QLogPacketEvent : public QLogEvent {
   PacketNum packetNum{0};
   uint64_t packetSize{0};
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogVersionNegotiationEvent : public QLogEvent {
@@ -361,7 +371,7 @@ class QLogVersionNegotiationEvent : public QLogEvent {
   std::string packetType;
   uint64_t packetSize{0};
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogRetryEvent : public QLogEvent {
@@ -373,7 +383,7 @@ class QLogRetryEvent : public QLogEvent {
   uint64_t packetSize{0};
   uint64_t tokenSize{0};
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogConnectionCloseEvent : public QLogEvent {
@@ -390,7 +400,7 @@ class QLogConnectionCloseEvent : public QLogEvent {
   bool drainConnection;
   bool sendCloseImmediately;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogTransportSummaryEvent : public QLogEvent {
@@ -429,7 +439,7 @@ class QLogTransportSummaryEvent : public QLogEvent {
   QuicVersion quicVersion;
   uint64_t dsrPacketCount;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogCongestionMetricUpdateEvent : public QLogEvent {
@@ -448,7 +458,7 @@ class QLogCongestionMetricUpdateEvent : public QLogEvent {
   std::string state;
   std::string recoveryState;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogAppLimitedUpdateEvent : public QLogEvent {
@@ -458,7 +468,7 @@ class QLogAppLimitedUpdateEvent : public QLogEvent {
       std::chrono::microseconds refTimeIn);
   ~QLogAppLimitedUpdateEvent() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
   bool limited;
 };
@@ -471,7 +481,7 @@ class QLogBandwidthEstUpdateEvent : public QLogEvent {
       std::chrono::microseconds refTimeIn);
   ~QLogBandwidthEstUpdateEvent() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
   uint64_t bytes;
   std::chrono::microseconds interval;
@@ -487,7 +497,7 @@ class QLogPacingMetricUpdateEvent : public QLogEvent {
   uint64_t pacingBurstSize;
   std::chrono::microseconds pacingInterval;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogPacingObservationEvent : public QLogEvent {
@@ -502,7 +512,7 @@ class QLogPacingObservationEvent : public QLogEvent {
   std::string conclusion;
 
   ~QLogPacingObservationEvent() override = default;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogAppIdleUpdateEvent : public QLogEvent {
@@ -515,7 +525,7 @@ class QLogAppIdleUpdateEvent : public QLogEvent {
   std::string idleEvent;
   bool idle;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogPacketDropEvent : public QLogEvent {
@@ -528,7 +538,7 @@ class QLogPacketDropEvent : public QLogEvent {
   size_t packetSize;
   std::string dropReason;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogDatagramReceivedEvent : public QLogEvent {
@@ -539,7 +549,7 @@ class QLogDatagramReceivedEvent : public QLogEvent {
   ~QLogDatagramReceivedEvent() override = default;
   uint64_t dataLen;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogLossAlarmEvent : public QLogEvent {
@@ -555,7 +565,7 @@ class QLogLossAlarmEvent : public QLogEvent {
   uint64_t alarmCount;
   uint64_t outstandingPackets;
   std::string type;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogPacketsLostEvent : public QLogEvent {
@@ -569,7 +579,7 @@ class QLogPacketsLostEvent : public QLogEvent {
   PacketNum largestLostPacketNum;
   uint64_t lostBytes;
   uint64_t lostPackets;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogTransportStateUpdateEvent : public QLogEvent {
@@ -579,7 +589,7 @@ class QLogTransportStateUpdateEvent : public QLogEvent {
       std::chrono::microseconds refTime);
   ~QLogTransportStateUpdateEvent() override = default;
   std::string update;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogPacketBufferedEvent : public QLogEvent {
@@ -591,7 +601,7 @@ class QLogPacketBufferedEvent : public QLogEvent {
   ~QLogPacketBufferedEvent() override = default;
   ProtectionType protectionType;
   uint64_t packetSize;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogPacketAckEvent : public QLogEvent {
@@ -603,7 +613,7 @@ class QLogPacketAckEvent : public QLogEvent {
   ~QLogPacketAckEvent() override = default;
   PacketNumberSpace packetNumSpace;
   PacketNum packetNum;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogMetricUpdateEvent : public QLogEvent {
@@ -619,7 +629,7 @@ class QLogMetricUpdateEvent : public QLogEvent {
   std::chrono::microseconds mrtt;
   std::chrono::microseconds srtt;
   std::chrono::microseconds ackDelay;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
 class QLogStreamStateUpdateEvent : public QLogEvent {
@@ -634,7 +644,7 @@ class QLogStreamStateUpdateEvent : public QLogEvent {
   StreamId id;
   std::string update;
   folly::Optional<std::chrono::milliseconds> timeSinceStreamCreation;
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
  private:
   VantagePoint vantagePoint_;
@@ -649,7 +659,7 @@ class QLogConnectionMigrationEvent : public QLogEvent {
 
   ~QLogConnectionMigrationEvent() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
   bool intentionalMigration_;
   VantagePoint vantagePoint_;
@@ -666,7 +676,7 @@ class QLogPathValidationEvent : public QLogEvent {
 
   ~QLogPathValidationEvent() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
   bool success_;
   VantagePoint vantagePoint_;
 };
@@ -680,7 +690,7 @@ class QLogPriorityUpdateEvent : public QLogEvent {
       std::chrono::microseconds refTimeIn);
   ~QLogPriorityUpdateEvent() override = default;
 
-  folly::dynamic toDynamic() const override;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 
  private:
   StreamId streamId_;

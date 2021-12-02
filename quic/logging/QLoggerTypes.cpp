@@ -138,6 +138,13 @@ folly::dynamic StreamFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic DatagramFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["frame_type"] = toQlogString(FrameType::DATAGRAM);
+  d["length"] = len;
+  return d;
+}
+
 folly::dynamic CryptoFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::CRYPTO_FRAME);
