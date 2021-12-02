@@ -582,6 +582,7 @@ TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
 TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
   // The second client initial packet with the retry token is invalid
   // as the client IP is different from the one stored in the retry token
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure());
   EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_PACKET))
       .Times(1);
   auto dstConnId = getTestConnectionId(hostId_);
@@ -592,6 +593,7 @@ TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
 
 TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialDstConnId) {
   // Dest conn ID is invalid as it is different from the original dst conn ID
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure());
   EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_PACKET))
       .Times(1);
   auto dstConnId = getTestConnectionId(hostId_);

@@ -108,6 +108,8 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionRateLimited() = 0;
 
+  virtual void onTokenDecryptFailure() = 0;
+
   // connection level metrics:
   virtual void onNewConnection() = 0;
 

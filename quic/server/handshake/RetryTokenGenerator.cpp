@@ -53,7 +53,6 @@ folly::Optional<RetryToken> RetryTokenGenerator::decryptToken(
     Buf encryptedToken) {
   auto maybeDecryptedToken = cipher_.decrypt(std::move(encryptedToken));
   if (!maybeDecryptedToken) {
-    LOG(ERROR) << "Failed to decrypt token.";
     return folly::none;
   }
 

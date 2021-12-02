@@ -629,6 +629,8 @@ void QuicServerWorker::dispatchPacketData(
               onPacketDropped,
               PacketDropReason::INVALID_PACKET);
           return;
+        } else if (!maybeEncryptedRetryToken) {
+          QUIC_STATS(statsCallback_, onTokenDecryptFailure);
         }
 
         // If rate-limiting is configured and there is no retry token,
