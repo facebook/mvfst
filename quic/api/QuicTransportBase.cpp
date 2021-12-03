@@ -247,12 +247,12 @@ void QuicTransportBase::closeImpl(
     folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode,
     bool drainConnection,
     bool sendCloseImmediately) {
-  for (const auto& cb : *observers_) {
-    cb->close(this, errorCode);
-  }
-
   if (closeState_ == CloseState::CLOSED) {
     return;
+  }
+
+  for (const auto& cb : *observers_) {
+    cb->close(this, errorCode);
   }
 
   drainConnection = drainConnection & conn_->transportSettings.shouldDrain;

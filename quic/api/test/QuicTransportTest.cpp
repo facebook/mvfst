@@ -374,7 +374,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
   EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb, close(transport_.get(), _));
   EXPECT_CALL(*cb, destroy(transport_.get()));
   transport_->close(folly::none);
   transport_ = nullptr;
@@ -407,7 +407,7 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
   EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb, close(transport_.get(), _));
   EXPECT_CALL(*cb, destroy(transport_.get()));
   transport_->close(folly::none);
   transport_ = nullptr;
@@ -447,8 +447,8 @@ TEST_F(QuicTransportTest, AppLimitedWithObservers) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
-  EXPECT_CALL(*cb1, close(transport_.get(), _)).Times(3);
-  EXPECT_CALL(*cb2, close(transport_.get(), _)).Times(3);
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
   transport_->close(folly::none);

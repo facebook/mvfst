@@ -3608,7 +3608,7 @@ TEST_F(QuicTransportImplTest, ObserverDestroyTransport) {
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
+  EXPECT_CALL(*cb, close(transport.get(), _));
   EXPECT_CALL(*cb, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3632,7 +3632,6 @@ TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
   EXPECT_CALL(*cb, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3655,7 +3654,6 @@ TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
   transport->close(testError);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;
-  EXPECT_CALL(*cb, close(transport.get(), _)).Times(2);
   EXPECT_CALL(*cb, destroy(transport.get()));
   transport = nullptr;
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3747,8 +3745,6 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
       transport->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   InSequence s;
-  EXPECT_CALL(*cb1, close(transport.get(), _));
-  EXPECT_CALL(*cb2, close(transport.get(), _));
   EXPECT_CALL(*cb1, close(transport.get(), _));
   EXPECT_CALL(*cb2, close(transport.get(), _));
   EXPECT_CALL(*cb1, destroy(transport.get()));
