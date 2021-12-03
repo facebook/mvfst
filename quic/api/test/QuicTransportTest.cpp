@@ -261,7 +261,6 @@ TEST_F(QuicTransportTest, WriteDataWithProbing) {
 
 TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -282,7 +281,6 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
 
 TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -306,7 +304,6 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytes) {
 
 TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -325,7 +322,6 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBuffer) {
 
 TEST_F(QuicTransportTest, AppLimited) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -343,9 +339,8 @@ TEST_F(QuicTransportTest, AppLimited) {
   transport_->close(folly::none);
 }
 
-TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
+TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -361,29 +356,41 @@ TEST_F(QuicTransportTest, NotAppLimitedWithNoWritableBytesWithObservers) {
   Observer::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
 
-  EXPECT_CALL(*cb, observerAttach(transport_.get()));
-  transport_->addObserver(cb.get());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb3, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  transport_->addObserver(cb2.get());
+  transport_->addObserver(cb3.get());
 
   auto stream = transport_->createBidirectionalStream().value();
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
-  EXPECT_CALL(*cb, startWritingFromAppLimited(transport_.get(), _));
-  EXPECT_CALL(*cb, packetsWritten(transport_.get(), _));
-  EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
+  EXPECT_CALL(*cb1, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb1, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb1, appRateLimited(transport_.get(), _)).Times(0);
+  EXPECT_CALL(*cb2, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb2, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb2, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
-  Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, close(transport_.get(), _));
-  EXPECT_CALL(*cb, destroy(transport_.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb3, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  EXPECT_CALL(*cb3, destroy(transport_.get()));
   transport_->close(folly::none);
   transport_ = nullptr;
-  Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
+TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -394,39 +401,54 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLargeBufferWithObservers) {
   Observer::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
 
-  EXPECT_CALL(*cb, observerAttach(transport_.get()));
-  transport_->addObserver(cb.get());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb3, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  transport_->addObserver(cb2.get());
+  transport_->addObserver(cb3.get());
 
   auto stream = transport_->createBidirectionalStream().value();
   auto buf = buildRandomInputData(100 * 2000);
   transport_->writeChain(stream, buf->clone(), false, nullptr);
-  EXPECT_CALL(*cb, startWritingFromAppLimited(transport_.get(), _));
-  EXPECT_CALL(*cb, packetsWritten(transport_.get(), _));
-  EXPECT_CALL(*cb, appRateLimited(transport_.get(), _)).Times(0);
+  EXPECT_CALL(*cb1, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb1, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb1, appRateLimited(transport_.get(), _)).Times(0);
+  EXPECT_CALL(*cb2, startWritingFromAppLimited(transport_.get(), _));
+  EXPECT_CALL(*cb2, packetsWritten(transport_.get(), _));
+  EXPECT_CALL(*cb2, appRateLimited(transport_.get(), _)).Times(0);
   loopForWrites();
-  Mock::VerifyAndClearExpectations(cb.get());
-  EXPECT_CALL(*cb, close(transport_.get(), _));
-  EXPECT_CALL(*cb, destroy(transport_.get()));
+  Mock::VerifyAndClearExpectations(cb1.get());
+  Mock::VerifyAndClearExpectations(cb2.get());
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb3, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  EXPECT_CALL(*cb3, destroy(transport_.get()));
   transport_->close(folly::none);
   transport_ = nullptr;
-  Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportTest, AppLimitedWithObservers) {
+TEST_F(QuicTransportTest, ObserverAppLimited) {
   Observer::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
   auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
   auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  EXPECT_CALL(*cb3, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   transport_->addObserver(cb2.get());
+  transport_->addObserver(cb3.get());
 
   auto& conn = transport_->getConnectionState();
-  // Replace with MockConnectionCallback:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
@@ -447,14 +469,369 @@ TEST_F(QuicTransportTest, AppLimitedWithObservers) {
   loopForWrites();
   Mock::VerifyAndClearExpectations(cb1.get());
   Mock::VerifyAndClearExpectations(cb2.get());
+  Mock::VerifyAndClearExpectations(cb3.get());
   EXPECT_CALL(*cb1, close(transport_.get(), _));
   EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb3, close(transport_.get(), _));
   EXPECT_CALL(*cb1, destroy(transport_.get()));
   EXPECT_CALL(*cb2, destroy(transport_.get()));
+  EXPECT_CALL(*cb3, destroy(transport_.get()));
   transport_->close(folly::none);
   transport_ = nullptr;
-  Mock::VerifyAndClearExpectations(cb1.get());
-  Mock::VerifyAndClearExpectations(cb2.get());
+}
+
+TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
+  InSequence s;
+
+  Observer::Config config = {};
+  config.packetsWrittenEvents = true;
+  config.appRateLimitedEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  const auto invokeForAllObservers =
+      [&cb1, &cb2, &cb3](const std::function<void(MockObserver&)>& fn) {
+        fn(*cb1);
+        fn(*cb2);
+        fn(*cb3);
+      };
+  const auto invokeForEachObserverWithTestEvents =
+      [&cb1, &cb2](const std::function<void(MockObserver&)>& fn) {
+        fn(*cb1);
+        fn(*cb2);
+      };
+
+  // install observers
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, observerAttach(transport_.get()));
+    transport_->addObserver(&observer);
+  }));
+  EXPECT_THAT(
+      transport_->getObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get(), cb3.get()));
+
+  auto& conn = transport_->getConnectionState();
+  uint64_t writeNum = 1;
+
+  /**
+   * part 1: write of non-ACK eliciting packet triggered by scheduled ACK.
+   */
+
+  // expectations:
+  //   - write number is 1.
+  //   - one packet sent, zero ACK eliciting packets sent.
+  //   - no outstanding packets from this write or previous writes.
+  {
+    const auto writeEventMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(0)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+    const auto packetsWrittenEventMatcher = AllOf(
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(0)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher](MockObserver& observer) {
+          EXPECT_CALL(
+              observer,
+              startWritingFromAppLimited(transport_.get(), writeEventMatcher));
+        }));
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
+             MockObserver& observer) {
+          EXPECT_CALL(
+              observer,
+              packetsWritten(
+                  transport_.get(),
+                  AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
+        }));
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher](MockObserver& observer) {
+          EXPECT_CALL(
+              observer, appRateLimited(transport_.get(), writeEventMatcher));
+        }));
+  }
+
+  // schedule the ACK
+  {
+    PacketNum start = 10;
+    PacketNum end = 15;
+    addAckStatesWithCurrentTimestamps(
+        conn.ackStates.appDataAckState, start, end);
+    conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+    conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+  }
+
+  // loop
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  /**
+   * part 2: write of ACK eliciting packets triggered by stream write.
+   *
+   * multiple writes back to back.
+   */
+
+  // expectations:
+  //   - two writes will be triggered, write numbers 2 and 3
+  //   - five ACK eliciting packets sent first write, two sent on second write
+  //   - total of seven outstanding packets
+  {
+    // part 2.1, we go from app limited to writing, no outstandings yet
+    writeNum++;
+    EXPECT_EQ(2, writeNum);
+    {
+      const auto writeEventMatcher = AllOf(
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(0)),
+          testing::Field(
+              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+
+      invokeForEachObserverWithTestEvents(([this, &writeEventMatcher](
+                                               MockObserver& observer) {
+        EXPECT_CALL(
+            observer,
+            startWritingFromAppLimited(transport_.get(), writeEventMatcher));
+      }));
+    }
+
+    // part 2.2, we write five ACK eliciting packets
+    {
+      const auto writeEventMatcher = AllOf(
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+          testing::Field(
+              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+      const auto packetsWrittenEventMatcher = AllOf(
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              testing::Eq(5)),
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              testing::Eq(5)));
+
+      invokeForEachObserverWithTestEvents(
+          ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
+               MockObserver& observer) {
+            EXPECT_CALL(
+                observer,
+                packetsWritten(
+                    transport_.get(),
+                    AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
+          }));
+    }
+
+    // part 2.3, we write two ACK eliciting packets, then become app limited
+    writeNum++;
+    EXPECT_EQ(3, writeNum);
+    {
+      const auto writeEventMatcher = AllOf(
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(7)),
+          testing::Field(
+              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+      const auto packetsWrittenEventMatcher = AllOf(
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              testing::Eq(2)),
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              testing::Eq(2)));
+
+      invokeForEachObserverWithTestEvents(
+          ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
+               MockObserver& observer) {
+            EXPECT_CALL(
+                observer,
+                packetsWritten(
+                    transport_.get(),
+                    AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
+          }));
+      invokeForEachObserverWithTestEvents(
+          ([this, &writeEventMatcher](MockObserver& observer) {
+            EXPECT_CALL(
+                observer, appRateLimited(transport_.get(), writeEventMatcher));
+          }));
+    }
+  }
+
+  // write some data
+  auto stream = transport_->createBidirectionalStream().value();
+  transport_->writeChain(stream, buildRandomInputData(8000), false, nullptr);
+
+  // loop twice to get all packets cleared out
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+  loopForWrites();
+
+  /**
+   * part 3: write of ACK eliciting frames with non-ACK eliciting frames.
+   *   - ACK eliciting frames triggered by stream write.
+   *   - non-ACK eliciting frames triggered by pending ACK.
+   *   - all packets will be ACK eliciting.
+   */
+
+  // expectations:
+  //   - write number is 4.
+  //   - two ACK eliciting packets written.
+  //   - total of nine outstanding packets.
+  {
+    writeNum++;
+    EXPECT_EQ(4, writeNum);
+
+    // part 3.1, we go from app limited to writing, previous outstandings
+    {
+      const auto writeEventMatcher = AllOf(
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(7)),
+          testing::Field(
+              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+
+      invokeForEachObserverWithTestEvents(([this, &writeEventMatcher](
+                                               MockObserver& observer) {
+        EXPECT_CALL(
+            observer,
+            startWritingFromAppLimited(transport_.get(), writeEventMatcher));
+      }));
+    }
+
+    // part 3.2, we write two ACK eliciting packets, then become app limited
+    // one of the ACK eliciting packets contains an ACK frame
+    {
+      const auto writeEventMatcher = AllOf(
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(9)),
+          testing::Property(
+              &Observer::WriteEvent::getOutstandingPackets,
+              testing::Contains(testing::ResultOf(
+                  [](auto& outstandingPacket) {
+                    for (auto& frame : outstandingPacket.packet.frames) {
+                      auto ackFrame = frame.asWriteAckFrame();
+                      if (ackFrame) {
+                        return true;
+                      }
+                    }
+                    return false;
+                  },
+                  testing::Eq(true)))),
+          testing::Field(
+              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+      const auto packetsWrittenEventMatcher = AllOf(
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              testing::Eq(2)),
+          testing::Field(
+              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              testing::Eq(2)));
+
+      invokeForEachObserverWithTestEvents(
+          ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
+               MockObserver& observer) {
+            EXPECT_CALL(
+                observer,
+                packetsWritten(
+                    transport_.get(),
+                    AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
+          }));
+      invokeForEachObserverWithTestEvents(
+          ([this, &writeEventMatcher](MockObserver& observer) {
+            EXPECT_CALL(
+                observer, appRateLimited(transport_.get(), writeEventMatcher));
+          }));
+    }
+  }
+
+  // schedule the ACK
+  {
+    PacketNum start = 20;
+    PacketNum end = 25;
+    addAckStatesWithCurrentTimestamps(
+        conn.ackStates.appDataAckState, start, end);
+    conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+    conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+  }
+
+  // write some more data
+  transport_->writeChain(stream, buildRandomInputData(2000), false, nullptr);
+
+  // loop
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  /**
+   * part 4: write of non-ACK eliciting packet triggered by scheduled ACK.
+   *
+   * (repeat of part 1, writing only non-ACK eliciting packets)
+   */
+
+  // expectations:
+  //   - write number is 5.
+  //   - one packet sent, zero ACK eliciting packets sent.
+  //   - outstanding packets from previous write remain
+  {
+    writeNum++;
+    EXPECT_EQ(5, writeNum);
+
+    const auto writeEventMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(9)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+    const auto packetsWrittenEventMatcher = AllOf(
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(0)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher](MockObserver& observer) {
+          EXPECT_CALL(
+              observer,
+              startWritingFromAppLimited(transport_.get(), writeEventMatcher));
+        }));
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
+             MockObserver& observer) {
+          EXPECT_CALL(
+              observer,
+              packetsWritten(
+                  transport_.get(),
+                  AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
+        }));
+    invokeForEachObserverWithTestEvents(
+        ([this, &writeEventMatcher](MockObserver& observer) {
+          EXPECT_CALL(
+              observer, appRateLimited(transport_.get(), writeEventMatcher));
+        }));
+  }
+
+  // schedule the ACK
+  {
+    PacketNum start = 30;
+    PacketNum end = 35;
+    addAckStatesWithCurrentTimestamps(
+        conn.ackStates.appDataAckState, start, end);
+    conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+    conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+  }
+
+  // loop
+  transport_->updateWriteLooper(true);
+  loopForWrites();
+
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, close(transport_.get(), _));
+  }));
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, destroy(transport_.get()));
+  }));
+  transport_->close(folly::none);
+  transport_ = nullptr;
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {

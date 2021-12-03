@@ -93,22 +93,84 @@ class Observer {
     return observerConfig_;
   }
 
-  struct AppLimitedEvent {
-    AppLimitedEvent(
-        const std::deque<OutstandingPacket>& outstandingPackets,
-        const uint64_t writeCount)
-        : outstandingPackets(outstandingPackets), writeCount(writeCount) {}
+  struct WriteEvent {
+    [[nodiscard]] const std::deque<OutstandingPacket>& getOutstandingPackets()
+        const {
+      return outstandingPackets;
+    }
 
-    // Cannot support copy ctors safely
-    AppLimitedEvent(const AppLimitedEvent&) = delete;
-    AppLimitedEvent(AppLimitedEvent&&) = delete;
-
-    // Reference to the current list of outstanding packets
+    // Reference to the current list of outstanding packets.
     const std::deque<OutstandingPacket>& outstandingPackets;
-    // The current write number for the write() call that
-    // caused this appLimitedEvent. Used by Observers to identify specific
-    // packets from the outstandingPacket list (above).
+
+    // Monotonically increasing number assigned to each write operation.
     const uint64_t writeCount;
+
+    struct BuilderFields {
+      folly::Optional<
+          std::reference_wrapper<const std::deque<OutstandingPacket>>>
+          maybeOutstandingPacketsRef;
+      folly::Optional<uint64_t> maybeWriteCount;
+      explicit BuilderFields() = default;
+    };
+
+    struct Builder : public BuilderFields {
+      Builder&& setOutstandingPackets(
+          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+      Builder&& setWriteCount(const uint64_t writeCountIn);
+      WriteEvent build() &&;
+      explicit Builder() = default;
+    };
+
+    // Do not support copy or move given that outstanding packets is a ref.
+    WriteEvent(const WriteEvent&) = delete;
+    WriteEvent(WriteEvent&&) = delete;
+    WriteEvent& operator=(const WriteEvent&) = delete;
+    WriteEvent& operator=(WriteEvent&& rhs) = delete;
+
+    // Use builder to construct.
+    explicit WriteEvent(const BuilderFields& builderFields);
+  };
+
+  struct AppLimitedEvent : public WriteEvent {
+    struct Builder : public WriteEvent::BuilderFields {
+      Builder&& setOutstandingPackets(
+          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+      Builder&& setWriteCount(const uint64_t writeCountIn);
+      AppLimitedEvent build() &&;
+      explicit Builder() = default;
+    };
+
+    // Use builder to construct.
+    explicit AppLimitedEvent(BuilderFields&& builderFields);
+  };
+
+  struct PacketsWrittenEvent : public WriteEvent {
+    // Number of packets just written, including ACK eliciting packets.
+    const uint64_t numPacketsWritten;
+
+    // Number of ACK eliciting packets written.
+    // These packets will appear in outstandingPackets.
+    const uint64_t numAckElicitingPacketsWritten;
+
+    struct BuilderFields : public WriteEvent::BuilderFields {
+      folly::Optional<uint64_t> maybeNumPacketsWritten;
+      folly::Optional<uint64_t> maybeNumAckElicitingPacketsWritten;
+      explicit BuilderFields() = default;
+    };
+
+    struct Builder : public BuilderFields {
+      Builder&& setOutstandingPackets(
+          const std::deque<OutstandingPacket>& outstandingPacketsIn);
+      Builder&& setWriteCount(const uint64_t writeCountIn);
+      Builder&& setNumPacketsWritten(const uint64_t numPacketsWrittenIn);
+      Builder&& setNumAckElicitingPacketsWritten(
+          const uint64_t numAckElicitingPacketsWrittenIn);
+      PacketsWrittenEvent build() &&;
+      explicit Builder() = default;
+    };
+
+    // Use builder to construct.
+    explicit PacketsWrittenEvent(BuilderFields&& builderFields);
   };
 
   struct LostPacket {
@@ -321,71 +383,54 @@ class Observer {
 
   /**
    * startWritingFromAppLimited() is invoked when the socket is currenty
-   * app rate limited and is being asked to write a new set of Bytes.
-   . This callback is invoked BEFORE we write the
-   * new bytes to the socket, this is done so that Observers can collect
-   * metadata about the connection BEFORE the start of a potential Write Block.
+   * app rate limited and is being given an opportunity to write packets.
    *
-   * @param socket   Socket that has potentially sent application data.
-                             reference to the number of outstanding packets
-                             BEFORE the call to write() socket data.
-
+   * @param socket   Socket that is starting to write from an app limited state.
+   * @param event    AppLimitedEvent with details.
    */
   virtual void startWritingFromAppLimited(
       QuicSocket* /* socket */,
-      const AppLimitedEvent& /* appLimitedEvent */) {}
+      const AppLimitedEvent& /* event */) {}
 
   /**
-   * packetsWritten() is invoked when the socket writes retransmittable packets
-   * to the wire, those packets will be present in the outstanding packets list.
-   * Observers can use this callback (which will always be invoked AFTER
-   * startWritingFromAppLimited) to *update* the transport's metadata within the
-   * currently tracked WriteBlock.
+   * packetsWritten() is invoked when the socket writes packets to the wire.
    *
-   * If an Observer receives startWritingFromAppLimited but doesn't receive
-   * packetsWritten (and instead directly receives appRateLimited), it means the
-   * socket witnessed non-app data writes - this scenario is irrelevant and
-   * should not be used to construct Write Blocks.
-   *
-   * @param socket   Socket that has sent application data.
-   * @param appLimitedEvent  The AppLimitedEvent details which contains a const
-                             reference to the number of outstanding packets
+   * @param socket   Socket for which packets were written to the wire.
+   * @param event    PacketsWrittenEvent with details.
    */
   virtual void packetsWritten(
       QuicSocket* /* socket */,
-      const AppLimitedEvent& /* appLimitedEvent */) {}
+      const PacketsWrittenEvent& /* event */) {}
 
   /**
-   * appRateLimited() is invoked when the socket is app rate limited.
+   * appRateLimited() is invoked when the socket becomes app rate limited.
    *
-   * @param socket      Socket that has become application rate limited.
-   * @param appLimitedEvent  The AppLimitedEvent details which contains a const
-                             reference to the number of outstanding packets
+   * @param socket   Socket that has become application rate limited.
+   * @param event    AppLimitedEvent with details.
    */
   virtual void appRateLimited(
       QuicSocket* /* socket */,
-      const AppLimitedEvent& /* appLimitedEvent */) {}
+      const AppLimitedEvent& /* event */) {}
 
   /**
    * packetLossDetected() is invoked when a packet loss is detected.
    *
-   * @param socket   Socket when the callback is processed.
-   * @param packet   const reference to the packet that was determined to be
-   * lost.
+   * @param socket   Socket for which packet loss was detected.
+   * @param event    LossEvent with details.
    */
   virtual void packetLossDetected(
       QuicSocket*, /* socket */
-      const struct LossEvent& /* lossEvent */) {}
+      const LossEvent& /* event */) {}
 
   /**
    * rttSampleGenerated() is invoked when a RTT sample is made.
    *
-   * @param socket   Socket when the callback is processed.
-   * @param packet   const reference to the packet with the RTT.
+   * @param socket   Socket for which an RTT sample was generated.
+   * @param event    PacketRTTEvent with details.
    */
   virtual void rttSampleGenerated(
       QuicSocket*, /* socket */
-      const PacketRTT& /* RTT sample */) {}
+      const PacketRTT& /* event */) {}
 
   /**
    * pmtuProbingStarted() is invoked when server starts d6d.
@@ -401,7 +446,7 @@ class Observer {
    */
   virtual void pmtuBlackholeDetected(
       QuicSocket*, /* socket */
-      const PMTUBlackholeEvent& /* pmtuBlackholeEvent */) {}
+      const PMTUBlackholeEvent& /* event */) {}
 
   /**
    * pmtuUpperBoundDetected() is invoked when a PMTU upperbound is detected.
@@ -410,7 +455,7 @@ class Observer {
    */
   virtual void pmtuUpperBoundDetected(
       QuicSocket*, /* socket */
-      const PMTUUpperBoundEvent& /* pmtuUpperBoundEvent */) {}
+      const PMTUUpperBoundEvent& /* event */) {}
 
   /**
    * spuriousLossDetected() is invoked when an ACK arrives for a packet that is
@@ -421,7 +466,7 @@ class Observer {
    */
   virtual void spuriousLossDetected(
       QuicSocket*, /* socket */
-      const SpuriousLossEvent& /* lost packet */) {}
+      const SpuriousLossEvent& /* event */) {}
 
   /**
    * knobFrameReceived() is invoked when a knob frame is received.

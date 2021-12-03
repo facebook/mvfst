@@ -353,7 +353,7 @@ class MockObserver : public Observer {
       noexcept,
       ,
       packetsWritten,
-      void(QuicSocket*, const AppLimitedEvent&));
+      void(QuicSocket*, const PacketsWrittenEvent&));
   GMOCK_METHOD2_(
       ,
       noexcept,

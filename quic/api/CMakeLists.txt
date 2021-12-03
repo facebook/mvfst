@@ -6,6 +6,7 @@
 add_library(
   mvfst_transport STATIC
   IoBufQuicBatch.cpp
+  Observer.cpp
   QuicBatchWriter.cpp
   QuicPacketScheduler.cpp
   QuicSocket.cpp

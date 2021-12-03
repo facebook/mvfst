@@ -801,7 +801,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   // Helpers to notify all registered observers about specific events during
   // socket write (if enabled in the observer's config).
   void notifyStartWritingFromAppRateLimited();
-  void notifyPacketsWritten();
+  void notifyPacketsWritten(
+      const uint64_t numPacketsWritten,
+      const uint64_t numAckElicitingPacketsWritten);
   void notifyAppRateLimited();
 
   /**
