@@ -160,8 +160,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   uint64_t getNumOpenableUnidirectionalStreams() const override;
   bool isClientStream(StreamId stream) noexcept override;
   bool isServerStream(StreamId stream) noexcept override;
+  StreamInitiator getStreamInitiator(StreamId stream) noexcept override;
   bool isUnidirectionalStream(StreamId stream) noexcept override;
   bool isBidirectionalStream(StreamId stream) noexcept override;
+  StreamDirectionality getStreamDirectionality(
+      StreamId stream) noexcept override;
 
   folly::Expected<folly::Unit, LocalErrorCode> notifyPendingWriteOnStream(
       StreamId id,

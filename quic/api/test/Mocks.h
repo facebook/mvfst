@@ -397,6 +397,18 @@ class MockObserver : public Observer {
       ,
       knobFrameReceived,
       void(QuicSocket*, const KnobFrameEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      streamOpened,
+      void(QuicSocket*, const StreamOpenEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
+      streamClosed,
+      void(QuicSocket*, const StreamCloseEvent&));
 
   static auto getLossPacketNum(PacketNum packetNum) {
     return testing::Field(
@@ -418,6 +430,17 @@ class MockObserver : public Observer {
             &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)),
         testing::Field(
             &Observer::LostPacket::packet, getLossPacketNum(packetNum)));
+  }
+
+  static auto getStreamEventMatcher(
+      const StreamId id,
+      StreamInitiator initiator,
+      StreamDirectionality directionality) {
+    return AllOf(
+        testing::Field(&StreamEvent::streamId, testing::Eq(id)),
+        testing::Field(&StreamEvent::streamInitiator, testing::Eq(initiator)),
+        testing::Field(
+            &StreamEvent::streamDirectionality, testing::Eq(directionality)));
   }
 };
 

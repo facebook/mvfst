@@ -8,6 +8,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "quic/state/QuicStreamUtilities.h"
 
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -1103,6 +1104,18 @@ TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
   EXPECT_FALSE(isBidirectionalStream(0xff));
 }
 
+TEST_F(QuicStreamFunctionsTest, GetStreamDirectionality) {
+  EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0x01));
+  EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf0));
+  EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf1));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional, getStreamDirectionality(0x02));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional, getStreamDirectionality(0x03));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional, getStreamDirectionality(0xff));
+}
+
 TEST_F(QuicStreamFunctionsTest, IsSendingStream) {
   QuicClientConnectionState clientState(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -1159,6 +1172,174 @@ TEST_F(QuicStreamFunctionsTest, IsReceivingStream) {
   nodeType = uniServerReceivingStream.conn.nodeType;
   id = uniServerReceivingStream.id;
   EXPECT_TRUE(isReceivingStream(nodeType, id));
+}
+
+TEST_F(QuicStreamFunctionsTest, GetStreamInitiatorBidirectional) {
+  const auto clientStream1Id =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 1);
+  const auto clientStream2Id =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 2);
+  EXPECT_EQ(clientStream1Id, 0x00);
+  EXPECT_EQ(clientStream2Id, 0x04);
+
+  const auto serverStream1Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(clientStream1Id + 1))->id;
+  const auto serverStream2Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(clientStream2Id + 1))->id;
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(clientStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(clientStream2Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(serverStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(serverStream2Id));
+
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, clientStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, clientStream2Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, serverStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, serverStream2Id));
+}
+
+TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorBidirectional) {
+  const auto serverStream1Id =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 1);
+  const auto serverStream2Id =
+      conn.streamManager->createNextBidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 2);
+  EXPECT_EQ(serverStream1Id, 0x01);
+  EXPECT_EQ(serverStream2Id, 0x05);
+
+  const auto clientStream1Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(serverStream1Id - 1))->id;
+  const auto clientStream2Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(serverStream2Id - 1))->id;
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(serverStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(serverStream2Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(clientStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      getStreamDirectionality(clientStream2Id));
+
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, serverStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, serverStream2Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, clientStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, clientStream2Id));
+}
+
+TEST_F(QuicStreamFunctionsTest, GetStreamInitiatorUnidirectional) {
+  const auto clientStream1Id =
+      conn.streamManager->createNextUnidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 1);
+  const auto clientStream2Id =
+      conn.streamManager->createNextUnidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 2);
+  EXPECT_EQ(clientStream1Id, 0x02);
+  EXPECT_EQ(clientStream2Id, 0x06);
+
+  const auto serverStream1Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(clientStream1Id + 1))->id;
+  const auto serverStream2Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(clientStream2Id + 1))->id;
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(clientStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(clientStream2Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(serverStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(serverStream2Id));
+
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, clientStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, clientStream2Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, serverStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, serverStream2Id));
+}
+
+TEST_F(QuicServerStreamFunctionsTest, GetStreamInitiatorUnidirectional) {
+  const auto serverStream1Id =
+      conn.streamManager->createNextUnidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 1);
+  const auto serverStream2Id =
+      conn.streamManager->createNextUnidirectionalStream().value()->id;
+  EXPECT_EQ(conn.streamManager->streamCount(), 2);
+  EXPECT_EQ(serverStream1Id, 0x03);
+  EXPECT_EQ(serverStream2Id, 0x07);
+
+  const auto clientStream1Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(serverStream1Id - 1))->id;
+  const auto clientStream2Id =
+      CHECK_NOTNULL(conn.streamManager->getStream(serverStream2Id - 1))->id;
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(serverStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(serverStream2Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(clientStream1Id));
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      getStreamDirectionality(clientStream2Id));
+
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, serverStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Local,
+      getStreamInitiator(conn.nodeType, serverStream2Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, clientStream1Id));
+  EXPECT_EQ(
+      StreamInitiator::Remote,
+      getStreamInitiator(conn.nodeType, clientStream2Id));
 }
 
 TEST_F(QuicStreamFunctionsTest, HasReadableDataNoData) {

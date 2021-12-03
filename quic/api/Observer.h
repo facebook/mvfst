@@ -11,6 +11,7 @@
 #include <quic/common/SmallVec.h>
 #include <quic/d6d/Types.h>
 #include <quic/state/OutstandingPacket.h>
+#include <quic/state/QuicStreamUtilities.h>
 
 namespace folly {
 class EventBase;
@@ -46,6 +47,7 @@ class Observer {
     bool pmtuEvents{false};
     bool rttSamples{false};
     bool knobFrameEvents{false};
+    bool streamEvents{false};
 
     virtual void enableAllEvents() {
       evbEvents = true;
@@ -56,6 +58,7 @@ class Observer {
       spuriousLossEvents = true;
       pmtuEvents = true;
       knobFrameEvents = true;
+      streamEvents = true;
     }
 
     /**
@@ -235,6 +238,23 @@ class Observer {
     const quic::KnobFrame knobFrame;
   };
 
+  struct StreamEvent {
+    StreamEvent(
+        const StreamId id,
+        StreamInitiator initiator,
+        StreamDirectionality directionality)
+        : streamId(id),
+          streamInitiator(initiator),
+          streamDirectionality(directionality) {}
+
+    const StreamId streamId;
+    const StreamInitiator streamInitiator;
+    const StreamDirectionality streamDirectionality;
+  };
+
+  using StreamOpenEvent = StreamEvent;
+  using StreamCloseEvent = StreamEvent;
+
   /**
    * observerAttach() will be invoked when an observer is added.
    *
@@ -412,6 +432,26 @@ class Observer {
   virtual void knobFrameReceived(
       QuicSocket*, /* socket */
       const KnobFrameEvent& /* event */) {}
+
+  /**
+   * streamOpened() is invoked when a new stream is opened.
+   *
+   * @param socket   Socket associated with the event.
+   * @param event    Event containing details.
+   */
+  virtual void streamOpened(
+      QuicSocket*, /* socket */
+      const StreamOpenEvent& /* event */) {}
+
+  /**
+   * streamClosed() is invoked when a stream is closed.
+   *
+   * @param socket   Socket associated with the event.
+   * @param event    Event containing details.
+   */
+  virtual void streamClosed(
+      QuicSocket*, /* socket */
+      const StreamCloseEvent& /* event */) {}
 
  protected:
   // observer configuration; cannot be changed post instantiation

@@ -1506,13 +1506,22 @@ void QuicTransportBase::handleNewStreamCallbacks(
   streamStorage =
       conn_->streamManager->consumeNewPeerStreams(std::move(streamStorage));
 
-  const auto& newPeerStreams = streamStorage;
-  for (const auto& stream : newPeerStreams) {
+  const auto& newPeerStreamIds = streamStorage;
+  for (const auto& streamId : newPeerStreamIds) {
     CHECK_NOTNULL(connCallback_.get());
-    if (isBidirectionalStream(stream)) {
-      connCallback_->onNewBidirectionalStream(stream);
+    if (isBidirectionalStream(streamId)) {
+      connCallback_->onNewBidirectionalStream(streamId);
     } else {
-      connCallback_->onNewUnidirectionalStream(stream);
+      connCallback_->onNewUnidirectionalStream(streamId);
+    }
+    const Observer::StreamOpenEvent streamEvent(
+        streamId,
+        getStreamInitiator(streamId),
+        getStreamDirectionality(streamId));
+    for (const auto& cb : *observers_) {
+      if (cb->getConfig().streamEvents) {
+        cb->streamOpened(this, streamEvent);
+      }
     }
 
     if (closeState_ != CloseState::OPEN) {
@@ -1818,7 +1827,17 @@ QuicTransportBase::createStreamInternal(bool bidirectional) {
     streamResult = conn_->streamManager->createNextUnidirectionalStream();
   }
   if (streamResult) {
-    return streamResult.value()->id;
+    const StreamId streamId = streamResult.value()->id;
+    const Observer::StreamOpenEvent streamEvent(
+        streamId,
+        getStreamInitiator(streamId),
+        getStreamDirectionality(streamId));
+    for (const auto& cb : *observers_) {
+      if (cb->getConfig().streamEvents) {
+        cb->streamOpened(this, streamEvent);
+      }
+    }
+    return streamId;
   } else {
     return folly::makeUnexpected(streamResult.error());
   }
@@ -1834,10 +1853,6 @@ QuicTransportBase::createUnidirectionalStream(bool /*replaySafe*/) {
   return createStreamInternal(false);
 }
 
-bool QuicTransportBase::isUnidirectionalStream(StreamId stream) noexcept {
-  return quic::isUnidirectionalStream(stream);
-}
-
 bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
   return quic::isClientStream(stream);
 }
@@ -1846,8 +1861,22 @@ bool QuicTransportBase::isServerStream(StreamId stream) noexcept {
   return quic::isServerStream(stream);
 }
 
+StreamInitiator QuicTransportBase::getStreamInitiator(
+    StreamId stream) noexcept {
+  return quic::getStreamInitiator(conn_->nodeType, stream);
+}
+
+bool QuicTransportBase::isUnidirectionalStream(StreamId stream) noexcept {
+  return quic::isUnidirectionalStream(stream);
+}
+
 bool QuicTransportBase::isBidirectionalStream(StreamId stream) noexcept {
   return quic::isBidirectionalStream(stream);
+}
+
+StreamDirectionality QuicTransportBase::getStreamDirectionality(
+    StreamId stream) noexcept {
+  return quic::getStreamDirectionality(stream);
 }
 
 folly::Expected<folly::Unit, LocalErrorCode>
@@ -2306,6 +2335,17 @@ void QuicTransportBase::checkForClosedStream() {
   }
   auto itr = conn_->streamManager->closedStreams().begin();
   while (itr != conn_->streamManager->closedStreams().end()) {
+    const auto& streamId = *itr;
+    const Observer::StreamCloseEvent streamEvent(
+        streamId,
+        getStreamInitiator(streamId),
+        getStreamDirectionality(streamId));
+    for (const auto& cb : *observers_) {
+      if (cb->getConfig().streamEvents) {
+        cb->streamClosed(this, streamEvent);
+      }
+    }
+
     // We may be in an active read cb when we close the stream
     auto readCbIt = readCallbacks_.find(*itr);
     if (readCbIt != readCallbacks_.end() &&

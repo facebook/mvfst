@@ -18,6 +18,7 @@
 #include <quic/common/SmallVec.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPriorityQueue.h>
+#include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
 
 #include <chrono>
@@ -783,6 +784,11 @@ class QuicSocket {
   virtual bool isServerStream(StreamId stream) noexcept = 0;
 
   /**
+   * Returns initiator (self or peer) of a stream by ID.
+   */
+  virtual StreamInitiator getStreamInitiator(StreamId stream) noexcept = 0;
+
+  /**
    * Returns whether a stream ID represents a unidirectional stream.
    */
   virtual bool isUnidirectionalStream(StreamId stream) noexcept = 0;
@@ -791,6 +797,12 @@ class QuicSocket {
    * Returns whether a stream ID represents a bidirectional stream.
    */
   virtual bool isBidirectionalStream(StreamId stream) noexcept = 0;
+
+  /**
+   * Returns directionality (unidirectional or bidirectional) of a stream by ID.
+   */
+  virtual StreamDirectionality getStreamDirectionality(
+      StreamId stream) noexcept = 0;
 
   /**
    * Callback class for receiving write readiness notifications

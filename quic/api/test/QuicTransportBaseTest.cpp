@@ -3006,6 +3006,20 @@ TEST_F(QuicTransportImplTest, IsBidirectionalStream) {
   EXPECT_TRUE(transport->isBidirectionalStream(stream));
 }
 
+TEST_F(QuicTransportImplTest, GetStreamDirectionalityUnidirectional) {
+  auto stream = transport->createUnidirectionalStream().value();
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      transport->getStreamDirectionality(stream));
+}
+
+TEST_F(QuicTransportImplTest, GetStreamDirectionalityBidirectional) {
+  auto stream = transport->createBidirectionalStream().value();
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      transport->getStreamDirectionality(stream));
+}
+
 TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();

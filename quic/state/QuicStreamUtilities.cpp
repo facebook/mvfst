@@ -7,7 +7,6 @@
  */
 
 #include <quic/state/QuicStreamUtilities.h>
-#include <quic/state/StateData.h>
 
 namespace quic {
 
@@ -25,6 +24,11 @@ bool isUnidirectionalStream(StreamId stream) {
 
 bool isBidirectionalStream(StreamId stream) {
   return !isUnidirectionalStream(stream);
+}
+
+StreamDirectionality getStreamDirectionality(StreamId stream) {
+  return isUnidirectionalStream(stream) ? StreamDirectionality::Unidirectional
+                                        : StreamDirectionality::Bidirectional;
 }
 
 bool isSendingStream(QuicNodeType nodeType, StreamId stream) {
@@ -48,4 +52,10 @@ bool isRemoteStream(QuicNodeType nodeType, StreamId stream) {
   return (nodeType == QuicNodeType::Client && isServerStream(stream)) ||
       (nodeType == QuicNodeType::Server && isClientStream(stream));
 }
+
+StreamInitiator getStreamInitiator(QuicNodeType nodeType, StreamId stream) {
+  return isLocalStream(nodeType, stream) ? StreamInitiator::Local
+                                         : StreamInitiator::Remote;
+}
+
 } // namespace quic

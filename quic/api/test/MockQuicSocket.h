@@ -160,8 +160,15 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(getNumOpenableUnidirectionalStreams, uint64_t());
   GMOCK_METHOD1_(, noexcept, , isClientStream, bool(StreamId));
   GMOCK_METHOD1_(, noexcept, , isServerStream, bool(StreamId));
+  GMOCK_METHOD1_(, noexcept, , getStreamInitiator, StreamInitiator(StreamId));
   GMOCK_METHOD1_(, noexcept, , isBidirectionalStream, bool(StreamId));
   GMOCK_METHOD1_(, noexcept, , isUnidirectionalStream, bool(StreamId));
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      getStreamDirectionality,
+      StreamDirectionality(StreamId));
   MOCK_METHOD1(
       notifyPendingWriteOnConnection,
       folly::Expected<folly::Unit, LocalErrorCode>(WriteCallback*));

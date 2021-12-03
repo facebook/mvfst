@@ -6,9 +6,16 @@
  *
  */
 
-#include <quic/state/StateData.h>
+#pragma once
+
+#include <quic/QuicConstants.h>
+#include <quic/codec/Types.h>
 
 namespace quic {
+
+enum class StreamInitiator : uint8_t { Local, Remote };
+
+enum class StreamDirectionality : uint8_t { Unidirectional, Bidirectional };
 
 /**
  * Returns whether the given StreamId identifies a client stream.
@@ -29,6 +36,11 @@ bool isUnidirectionalStream(StreamId stream);
  * Returns whether the given StreamId identifies a bidirectional stream.
  */
 bool isBidirectionalStream(StreamId stream);
+
+/**
+ * Returns directionality (unidirectional or bidirectional) of a stream by ID.
+ */
+StreamDirectionality getStreamDirectionality(StreamId stream);
 
 /**
  * Returns whether the given QuicNodeType and StreamId indicate a sending
@@ -55,5 +67,10 @@ bool isLocalStream(QuicNodeType nodeType, StreamId stream);
  * a remote stream (i.e. the stream initiator doesn't match the node type).
  */
 bool isRemoteStream(QuicNodeType nodeType, StreamId stream);
+
+/**
+ * Returns initiator (local or remote) of a stream by ID.
+ */
+StreamInitiator getStreamInitiator(QuicNodeType nodeType, StreamId stream);
 
 } // namespace quic

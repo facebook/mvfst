@@ -457,6 +457,211 @@ TEST_F(QuicTransportTest, AppLimitedWithObservers) {
   Mock::VerifyAndClearExpectations(cb2.get());
 }
 
+TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
+  Observer::Config configWithStreamEvents = {};
+  configWithStreamEvents.streamEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  transport_->addObserver(cb2.get());
+  EXPECT_THAT(
+      transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  const auto id = 0x01;
+  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+      id, StreamInitiator::Local, StreamDirectionality::Bidirectional);
+
+  EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
+  EXPECT_EQ(id, transport_->createBidirectionalStream().value());
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
+
+  EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
+  auto stream = CHECK_NOTNULL(
+      transport_->getConnectionState().streamManager->getStream(id));
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  transport_->getConnectionState().streamManager->addClosed(id);
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  transport_ = nullptr;
+}
+
+TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
+  Observer::Config configWithStreamEvents = {};
+  configWithStreamEvents.streamEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  transport_->addObserver(cb2.get());
+  EXPECT_THAT(
+      transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  const auto id = 0x00;
+  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+      id, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
+
+  EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
+  auto stream = CHECK_NOTNULL(
+      transport_->getConnectionState().streamManager->getStream(id));
+  EXPECT_THAT(stream, NotNull());
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Remote, transport_->getStreamInitiator(id));
+
+  EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  transport_->getConnectionState().streamManager->addClosed(id);
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  transport_ = nullptr;
+}
+
+TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
+  Observer::Config configWithStreamEvents = {};
+  configWithStreamEvents.streamEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  transport_->addObserver(cb2.get());
+  EXPECT_THAT(
+      transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  const auto id = 0x03;
+  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+      id, StreamInitiator::Local, StreamDirectionality::Unidirectional);
+
+  EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
+  EXPECT_EQ(id, transport_->createUnidirectionalStream().value());
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
+
+  EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
+  auto stream = CHECK_NOTNULL(
+      transport_->getConnectionState().streamManager->getStream(id));
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  transport_->getConnectionState().streamManager->addClosed(id);
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  transport_ = nullptr;
+}
+
+TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
+  Observer::Config configWithStreamEvents = {};
+  configWithStreamEvents.streamEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  EXPECT_CALL(*cb1, observerAttach(transport_.get()));
+  transport_->addObserver(cb1.get());
+  EXPECT_CALL(*cb2, observerAttach(transport_.get()));
+  transport_->addObserver(cb2.get());
+  EXPECT_THAT(
+      transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
+
+  const auto id = 0x02;
+  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+      id, StreamInitiator::Remote, StreamDirectionality::Unidirectional);
+
+  EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
+  auto stream = CHECK_NOTNULL(
+      transport_->getConnectionState().streamManager->getStream(id));
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Remote, transport_->getStreamInitiator(id));
+
+  EXPECT_CALL(*cb1, streamClosed(transport_.get(), streamEventMatcher));
+  stream->sendState = StreamSendState::Closed;
+  stream->recvState = StreamRecvState::Closed;
+  transport_->getConnectionState().streamManager->addClosed(id);
+  transport_->onNetworkData(
+      SocketAddress("::1", 10000),
+      NetworkData(IOBuf::copyBuffer("fake data"), Clock::now()));
+
+  EXPECT_CALL(*cb1, close(transport_.get(), _));
+  EXPECT_CALL(*cb2, close(transport_.get(), _));
+  EXPECT_CALL(*cb1, destroy(transport_.get()));
+  EXPECT_CALL(*cb2, destroy(transport_.get()));
+  transport_ = nullptr;
+}
+
+TEST_F(QuicTransportTest, StreamBidirectionalLocal) {
+  const auto id = 0x01;
+  EXPECT_EQ(id, transport_->createBidirectionalStream().value());
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
+}
+
+TEST_F(QuicTransportTest, StreamBidirectionalRemote) {
+  const auto id = 0x00;
+  // trigger tracking of new remote stream via getStream()
+  CHECK_NOTNULL(transport_->getConnectionState().streamManager->getStream(id));
+
+  EXPECT_EQ(
+      StreamDirectionality::Bidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Remote, transport_->getStreamInitiator(id));
+}
+
+TEST_F(QuicTransportTest, StreamUnidirectionalLocal) {
+  const auto id = 0x03;
+  EXPECT_EQ(id, transport_->createUnidirectionalStream().value());
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Local, transport_->getStreamInitiator(id));
+}
+
+TEST_F(QuicTransportTest, StreamUnidirectionalRemote) {
+  const auto id = 0x02;
+  // trigger tracking of new remote stream via getStream()
+  CHECK_NOTNULL(transport_->getConnectionState().streamManager->getStream(id));
+
+  EXPECT_EQ(
+      StreamDirectionality::Unidirectional,
+      transport_->getStreamDirectionality(id));
+  EXPECT_EQ(StreamInitiator::Remote, transport_->getStreamInitiator(id));
+}
+
 TEST_F(QuicTransportTest, WriteSmall) {
   // Testing writing a small buffer that could be fit in a single packet
   auto stream = transport_->createBidirectionalStream().value();
