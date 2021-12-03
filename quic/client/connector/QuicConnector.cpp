@@ -14,9 +14,7 @@
 #include <quic/congestion_control/CongestionControllerFactory.h>
 #include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 
-using namespace folly;
 using namespace std;
-using namespace fizz::client;
 
 namespace quic {
 
