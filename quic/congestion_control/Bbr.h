@@ -121,8 +121,13 @@ class BbrCongestionController : public CongestionController {
   void onRemoveBytesFromInflight(uint64_t bytesToRemove) override;
   void onPacketSent(const OutstandingPacket&) override;
   void onPacketAckOrLoss(
-      folly::Optional<AckEvent> ackEvent,
-      folly::Optional<LossEvent> lossEvent) override;
+      const AckEvent* FOLLY_NULLABLE,
+      const LossEvent* FOLLY_NULLABLE) override;
+  void onPacketAckOrLoss(
+      folly::Optional<AckEvent> ack,
+      folly::Optional<LossEvent> loss) {
+    onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
+  }
   uint64_t getWritableBytes() const noexcept override;
 
   uint64_t getCongestionWindow() const noexcept override;

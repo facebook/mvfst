@@ -1145,10 +1145,12 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke(
-          [&](folly::Optional<CongestionController::AckEvent> ackEvent,
-              folly::Optional<CongestionController::LossEvent> lossEvent) {
-            EXPECT_FALSE(ackEvent->largestAckedPacket.has_value());
-            EXPECT_TRUE(lossEvent->largestLostPacketNum.has_value());
+          [&](const CongestionController::AckEvent* FOLLY_NULLABLE ackEvent,
+              const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent) {
+            EXPECT_FALSE(
+                CHECK_NOTNULL(ackEvent)->largestAckedPacket.has_value());
+            EXPECT_TRUE(
+                CHECK_NOTNULL(lossEvent)->largestLostPacketNum.has_value());
           }));
 
   // But packet 1 has been outstanding for longer than delayUntilLost:

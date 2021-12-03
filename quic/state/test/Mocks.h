@@ -21,7 +21,7 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD1(onPacketSent, void(const OutstandingPacket&));
   MOCK_METHOD2(
       onPacketAckOrLoss,
-      void(folly::Optional<AckEvent>, folly::Optional<LossEvent>));
+      void(const AckEvent* FOLLY_NULLABLE, const LossEvent* FOLLY_NULLABLE));
   MOCK_CONST_METHOD0(getWritableBytes, uint64_t());
   MOCK_CONST_METHOD0(getCongestionWindow, uint64_t());
   MOCK_METHOD0(onSpuriousLoss, void());

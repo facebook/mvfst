@@ -24,8 +24,10 @@ using LossVisitor = std::function<
 /**
  * Processes an ack frame and removes any outstanding packets
  * from the connection that have already been sent.
+ *
+ * Returns AckEvent with information about what was observed during processing
  */
-void processAckFrame(
+AckEvent processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& ackFrame,

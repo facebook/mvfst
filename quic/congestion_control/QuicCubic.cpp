@@ -316,8 +316,8 @@ void Cubic::cubicReduction(TimePoint lossTime) noexcept {
 }
 
 void Cubic::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ackEvent,
-    folly::Optional<LossEvent> lossEvent) {
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
   // TODO: current code in detectLossPackets only gives back a loss event when
   // largestLostPacketNum isn't a folly::none. But we should probably also check
   // against it here anyway just in case the loss code is changed in the

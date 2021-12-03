@@ -54,8 +54,8 @@ void Copa2::onPacketSent(const OutstandingPacket& packet) {
 }
 
 void Copa2::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ack,
-    folly::Optional<LossEvent> loss) {
+    const AckEvent* FOLLY_NULLABLE ack,
+    const LossEvent* FOLLY_NULLABLE loss) {
   if (loss) {
     onPacketLoss(*loss);
     if (conn_.pacer) {

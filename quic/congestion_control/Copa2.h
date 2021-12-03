@@ -22,8 +22,14 @@ class Copa2 : public CongestionController {
   explicit Copa2(QuicConnectionStateBase& conn);
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacket& packet) override;
-  void onPacketAckOrLoss(folly::Optional<AckEvent>, folly::Optional<LossEvent>)
-      override;
+  void onPacketAckOrLoss(
+      const AckEvent* FOLLY_NULLABLE,
+      const LossEvent* FOLLY_NULLABLE) override;
+  void onPacketAckOrLoss(
+      folly::Optional<AckEvent> ack,
+      folly::Optional<LossEvent> loss) {
+    onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
+  }
 
   FOLLY_NODISCARD uint64_t getWritableBytes() const noexcept override;
   FOLLY_NODISCARD uint64_t getCongestionWindow() const noexcept override;

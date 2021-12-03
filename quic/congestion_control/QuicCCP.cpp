@@ -140,8 +140,8 @@ void CCP::onAckEvent(const AckEvent& ack) {
 }
 
 void CCP::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ackEvent,
-    folly::Optional<LossEvent> lossEvent) {
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
   // If we are in fallback mode, forward the call to the fallback algorithm.
   if (inFallback_) {
     fallbackCC_.onPacketAckOrLoss(ackEvent, lossEvent);
@@ -300,8 +300,8 @@ CCP::CCP(QuicConnectionStateBase& conn)
 void CCP::onRemoveBytesFromInflight(uint64_t) {}
 void CCP::onPacketSent(const OutstandingPacket&) {}
 void CCP::onPacketAckOrLoss(
-    folly::Optional<AckEvent>,
-    folly::Optional<LossEvent>) {}
+    const AckEvent* FOLLY_NULLABLE,
+    const LossEvent* FOLLY_NULLABLE) {}
 uint64_t CCP::getWritableBytes() const noexcept {
   return 0;
 }

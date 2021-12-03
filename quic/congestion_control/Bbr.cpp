@@ -139,8 +139,8 @@ uint64_t BbrCongestionController::updateAckAggregation(const AckEvent& ack) {
 }
 
 void BbrCongestionController::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ackEvent,
-    folly::Optional<LossEvent> lossEvent) {
+    const AckEvent* FOLLY_NULLABLE ackEvent,
+    const LossEvent* FOLLY_NULLABLE lossEvent) {
   auto prevInflightBytes = conn_.lossState.inflightBytes;
   if (ackEvent) {
     subtractAndCheckUnderflow(
@@ -158,7 +158,7 @@ void BbrCongestionController::onPacketAckOrLoss(
   }
   if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
     CHECK(!ackEvent->ackedPackets.empty());
-    onPacketAcked(*ackEvent, prevInflightBytes, lossEvent.has_value());
+    onPacketAcked(*ackEvent, prevInflightBytes, lossEvent != nullptr);
   }
 }
 

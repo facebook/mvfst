@@ -379,7 +379,7 @@ void onLossDetectionAlarm(
     if (conn.congestionController && lossEvent) {
       DCHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       conn.congestionController->onPacketAckOrLoss(
-          folly::none, std::move(lossEvent));
+          nullptr, lossEvent.get_pointer());
     }
   } else {
     onPTOAlarm(conn);

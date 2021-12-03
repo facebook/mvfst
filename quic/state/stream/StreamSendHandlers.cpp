@@ -102,6 +102,9 @@ void sendAckSMHandler(
         // Clean up the acked buffers from the retransmissionBuffer.
         auto ackedBuffer = stream.retransmissionBuffer.find(ackedFrame.offset);
         if (ackedBuffer != stream.retransmissionBuffer.end()) {
+          CHECK_EQ(ackedFrame.offset, ackedBuffer->second->offset);
+          CHECK_EQ(ackedFrame.len, ackedBuffer->second->data.chainLength());
+          CHECK_EQ(ackedFrame.fin, ackedBuffer->second->eof);
           VLOG(10) << "Open: acked stream data stream=" << stream.id
                    << " offset=" << ackedBuffer->second->offset
                    << " len=" << ackedBuffer->second->data.chainLength()

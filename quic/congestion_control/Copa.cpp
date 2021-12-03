@@ -132,8 +132,8 @@ void Copa::changeDirection(
 }
 
 void Copa::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ack,
-    folly::Optional<LossEvent> loss) {
+    const AckEvent* FOLLY_NULLABLE ack,
+    const LossEvent* FOLLY_NULLABLE loss) {
   if (loss) {
     onPacketLoss(*loss);
     if (conn_.pacer) {

@@ -29,7 +29,7 @@ namespace quic {
  *
  */
 
-void processAckFrame(
+AckEvent processAckFrame(
     QuicConnectionStateBase& conn,
     PacketNumberSpace pnSpace,
     const ReadAckFrame& frame,
@@ -37,7 +37,7 @@ void processAckFrame(
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
   // TODO: send error if we get an ack for a packet we've not sent t18721184
-  CongestionController::AckEvent ack;
+  AckEvent ack;
   ack.ackTime = ackReceiveTime;
   ack.implicit = frame.implicit;
   ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
@@ -275,8 +275,7 @@ void processAckFrame(
         QUIC_STATS(conn.statsCallback, onPersistentCongestion);
       }
     }
-    conn.congestionController->onPacketAckOrLoss(
-        std::move(ack), std::move(lossEvent));
+    conn.congestionController->onPacketAckOrLoss(&ack, lossEvent.get_pointer());
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
   if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {
@@ -289,6 +288,7 @@ void processAckFrame(
           });
     }
   }
+  return ack;
 }
 
 void clearOldOutstandingPackets(
