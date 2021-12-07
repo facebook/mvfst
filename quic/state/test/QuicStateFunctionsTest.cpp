@@ -293,6 +293,27 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsCrypto) {
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
+TEST_P(
+    UpdateAckStateTest,
+    UpdateAckSendStateOnRecvPacketsInitCryptoExperimental) {
+  /* EXPERIMENTAL – Crypto always leads to immediate ack unless init packet
+   * space.
+   */
+  QuicConnectionStateBase conn(QuicNodeType::Server);
+
+  conn.transportSettings.skipInitPktNumSpaceCryptoAck = true;
+  bool isInitPktNumSpace = GetParam() == PacketNumberSpace::Initial;
+
+  auto& ackState = getAckState(conn, GetParam());
+  updateAckSendStateOnRecvPacket(
+      conn, ackState, false, true, true, isInitPktNumSpace);
+
+  EXPECT_EQ(
+      verifyToAckImmediatelyAndZeroPacketsReceived(conn, ackState),
+      !isInitPktNumSpace);
+  EXPECT_EQ(verifyToScheduleAckTimeout(conn), isInitPktNumSpace);
+}
+
 TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsRxLimit) {
   // Retx packets reach thresh
   QuicConnectionStateBase conn(QuicNodeType::Client);

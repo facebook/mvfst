@@ -229,8 +229,9 @@ class QuicServerTransportTestBase {
 
   void recvClientHello(
       bool writes = true,
-      QuicVersion version = QuicVersion::MVFST) {
-    auto chlo = folly::IOBuf::copyBuffer("CHLO");
+      QuicVersion version = QuicVersion::MVFST,
+      const std::string& msg = "CHLO") {
+    auto chlo = folly::IOBuf::copyBuffer(msg);
     auto nextPacketNum = clientNextInitialPacketNum++;
     auto aead = getInitialCipher(version);
     auto headerCipher = getInitialHeaderCipher(version);

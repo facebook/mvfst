@@ -78,7 +78,8 @@ void updateAckSendStateOnRecvPacket(
     AckState& ackState,
     bool pktOutOfOrder,
     bool pktHasRetransmittableData,
-    bool pktHasCryptoData) {
+    bool pktHasCryptoData,
+    bool initPktNumSpace) {
   DCHECK(!pktHasCryptoData || pktHasRetransmittableData);
   auto thresh = kNonRtxRxPacketsPendingBeforeAck;
   if (pktHasRetransmittableData || ackState.numRxPacketsRecvd) {
@@ -95,7 +96,10 @@ void updateAckSendStateOnRecvPacket(
     pktOutOfOrder = false;
   }
   if (pktHasRetransmittableData) {
-    if (pktHasCryptoData || pktOutOfOrder ||
+    bool skipCryptoAck = conn.nodeType == QuicNodeType::Server &&
+        initPktNumSpace && conn.transportSettings.skipInitPktNumSpaceCryptoAck;
+
+    if ((pktHasCryptoData && !skipCryptoAck) || pktOutOfOrder ||
         ++ackState.numRxPacketsRecvd + ackState.numNonRxPacketsRecvd >=
             thresh) {
       VLOG(10) << conn

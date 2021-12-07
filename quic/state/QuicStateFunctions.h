@@ -19,7 +19,8 @@ void updateAckSendStateOnRecvPacket(
     AckState& ackState,
     bool pktOutOfOrder,
     bool pktHasRetransmittableData,
-    bool pktHasCryptoData);
+    bool pktHasCryptoData,
+    bool initPktNumSpace = false);
 
 void updateAckStateOnAckTimeout(QuicConnectionStateBase& conn);
 

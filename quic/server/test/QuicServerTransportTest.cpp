@@ -3174,6 +3174,56 @@ TEST_F(
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
 }
 
+TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.skipInitPktNumSpaceCryptoAck = true;
+  server->setTransportSettings(transportSettings);
+
+  // bypass doHandshake() in fakeServerHandshake by sending something other than
+  // "CHLO"
+  recvClientHello(true, QuicVersion::MVFST, "hello :)");
+
+  // we expect nothing to be written as we're skipping the initial ack-only
+  // packet
+  EXPECT_EQ(serverWrites.size(), 0);
+}
+
+TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.skipInitPktNumSpaceCryptoAck = true;
+  server->setTransportSettings(transportSettings);
+
+  recvClientHello();
+
+  EXPECT_GE(serverWrites.size(), 1);
+
+  AckStates ackStates;
+
+  auto clientCodec = makeClientEncryptedCodec(true);
+  for (auto& write : serverWrites) {
+    auto packetQueue = bufToQueue(write->clone());
+    auto result = clientCodec->parsePacket(packetQueue, ackStates);
+    auto& regularPacket = *result.regularPacket();
+    ProtectionType protectionType = regularPacket.header.getProtectionType();
+    bool handshakePacket = protectionType == ProtectionType::Initial ||
+        protectionType == ProtectionType::Handshake;
+    EXPECT_GE(regularPacket.frames.size(), 1);
+    bool hasCryptoFrame = false;
+    bool hasAckFrame = false;
+    for (auto& frame : regularPacket.frames) {
+      hasCryptoFrame |= frame.asReadCryptoFrame() != nullptr;
+      hasAckFrame |= frame.asReadAckFrame() != nullptr;
+    }
+
+    // The packet sent by the server shouldn't be a pure ack (i.e. contains some
+    // crypto data as well)
+    if (handshakePacket) {
+      EXPECT_TRUE(hasCryptoFrame);
+      EXPECT_TRUE(hasAckFrame);
+    }
+  }
+}
+
 TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
   getFakeHandshakeLayer()->allowZeroRttKeys();
   // This should trigger derivation of keys.
