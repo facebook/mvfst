@@ -239,6 +239,66 @@ class QuicStreamManager {
   }
 
   /*
+   * Returns the next acceptable (usable) remote bidirectional stream ID.
+   *
+   * If the maximum has been reached, empty optional returned.
+   */
+  folly::Optional<StreamId> nextAcceptablePeerBidirectionalStreamId() {
+    const auto max = maxRemoteBidirectionalStreamId_;
+    const auto next = nextAcceptablePeerBidirectionalStreamId_;
+    CHECK_GE(max, next);
+    if (max == next) {
+      return folly::none;
+    }
+    return next;
+  }
+
+  /*
+   * Returns the next acceptable (usable) remote undirectional stream ID.
+   *
+   * If the maximum has been reached, empty optional returned.
+   */
+  folly::Optional<StreamId> nextAcceptablePeerUnidirectionalStreamId() {
+    const auto max = maxRemoteUnidirectionalStreamId_;
+    const auto next = nextAcceptablePeerUnidirectionalStreamId_;
+    CHECK_GE(max, next);
+    if (max == next) {
+      return folly::none;
+    }
+    return next;
+  }
+
+  /*
+   * Returns the next acceptable (usable) local bidirectional stream ID.
+   *
+   * If the maximum has been reached, empty optional returned.
+   */
+  folly::Optional<StreamId> nextAcceptableLocalBidirectionalStreamId() {
+    const auto max = maxLocalBidirectionalStreamId_;
+    const auto next = nextAcceptableLocalBidirectionalStreamId_;
+    CHECK_GE(max, next);
+    if (max == next) {
+      return folly::none;
+    }
+    return next;
+  }
+
+  /*
+   * Returns the next acceptable (usable) local unidirectional stream ID.
+   *
+   * If the maximum has been reached, empty optional returned.
+   */
+  folly::Optional<StreamId> nextAcceptableLocalUnidirectionalStreamId() {
+    const auto max = maxLocalUnidirectionalStreamId_;
+    const auto next = nextAcceptableLocalUnidirectionalStreamId_;
+    CHECK_GE(max, next);
+    if (max == next) {
+      return folly::none;
+    }
+    return next;
+  }
+
+  /*
    * Clear the new peer streams, presumably after all have been processed.
    */
   void clearNewPeerStreams() {

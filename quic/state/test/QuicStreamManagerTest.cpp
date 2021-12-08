@@ -310,6 +310,262 @@ TEST_F(QuicStreamManagerTest, StreamLimitIncrementUni) {
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
+TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamId) {
+  auto& manager = *conn.streamManager;
+
+  // local is server
+  const StreamId serverStreamId1 = 0x03;
+  const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
+  const StreamId serverStreamId3 =
+      serverStreamId1 + (detail::kStreamIncrement * 2);
+  for (const auto& id : std::vector<StreamId>{
+           serverStreamId1, serverStreamId2, serverStreamId3}) {
+    EXPECT_EQ(
+        StreamDirectionality::Unidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Local, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId1);
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId2);
+  EXPECT_EQ(
+      serverStreamId3, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId3, manager.nextAcceptableLocalUnidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamId) {
+  auto& manager = *conn.streamManager;
+
+  // local is server
+  const StreamId serverStreamId1 = 0x01;
+  const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
+  const StreamId serverStreamId3 =
+      serverStreamId1 + (detail::kStreamIncrement * 2);
+  for (const auto& id : std::vector<StreamId>{
+           serverStreamId1, serverStreamId2, serverStreamId3}) {
+    EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Local, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId1);
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId2);
+  EXPECT_EQ(
+      serverStreamId3, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId3, manager.nextAcceptableLocalBidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
+  auto& manager = *conn.streamManager;
+  manager.setMaxLocalUnidirectionalStreams(2, true);
+
+  // local is server
+  const StreamId serverStreamId1 = 0x03;
+  const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
+  for (const auto& id :
+       std::vector<StreamId>{serverStreamId1, serverStreamId2}) {
+    EXPECT_EQ(
+        StreamDirectionality::Unidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Local, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalUnidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId1);
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalUnidirectionalStreamId());
+
+  // create next local stream, then check that limit is applied
+  manager.createStream(serverStreamId2);
+  EXPECT_EQ(folly::none, manager.nextAcceptableLocalUnidirectionalStreamId());
+  EXPECT_EQ(folly::none, manager.nextAcceptableLocalUnidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
+  auto& manager = *conn.streamManager;
+  manager.setMaxLocalBidirectionalStreams(2, true);
+
+  // local is server
+  const StreamId serverStreamId1 = 0x01;
+  const StreamId serverStreamId2 = serverStreamId1 + detail::kStreamIncrement;
+  for (const auto& id :
+       std::vector<StreamId>{serverStreamId1, serverStreamId2}) {
+    EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Local, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId1, manager.nextAcceptableLocalBidirectionalStreamId());
+
+  // create next local stream, then check increase in next acceptable stream ID
+  manager.createStream(serverStreamId1);
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(
+      serverStreamId2, manager.nextAcceptableLocalBidirectionalStreamId());
+
+  // create next local stream, then check that limit is applied
+  manager.createStream(serverStreamId2);
+  EXPECT_EQ(folly::none, manager.nextAcceptableLocalBidirectionalStreamId());
+  EXPECT_EQ(folly::none, manager.nextAcceptableLocalBidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
+  auto& manager = *conn.streamManager;
+
+  // local is server, so remote/peer is client
+  const StreamId clientStreamId1 = 0x02;
+  const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
+  const StreamId clientStreamId3 =
+      clientStreamId1 + (detail::kStreamIncrement * 2);
+  for (const auto& id : std::vector<StreamId>{
+           clientStreamId1, clientStreamId2, clientStreamId3}) {
+    EXPECT_EQ(
+        StreamDirectionality::Unidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Remote, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(
+      clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId1);
+  EXPECT_EQ(
+      clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(
+      clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId2);
+  EXPECT_EQ(
+      clientStreamId3, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(
+      clientStreamId3, manager.nextAcceptablePeerUnidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamId) {
+  auto& manager = *conn.streamManager;
+
+  // local is server, so remote/peer is client
+  const StreamId clientStreamId1 = 0x00;
+  const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
+  const StreamId clientStreamId3 =
+      clientStreamId1 + (detail::kStreamIncrement * 2);
+  for (const auto& id : std::vector<StreamId>{
+           clientStreamId1, clientStreamId2, clientStreamId3}) {
+    EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Remote, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId1);
+  EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId2);
+  EXPECT_EQ(clientStreamId3, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(clientStreamId3, manager.nextAcceptablePeerBidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsUni = 2;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  // local is server, so remote/peer is client
+  const StreamId clientStreamId1 = 0x02;
+  const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
+  for (const auto& id :
+       std::vector<StreamId>{clientStreamId1, clientStreamId2}) {
+    EXPECT_EQ(
+        StreamDirectionality::Unidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Remote, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(
+      clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(
+      clientStreamId1, manager.nextAcceptablePeerUnidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId1);
+  EXPECT_EQ(
+      clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(
+      clientStreamId2, manager.nextAcceptablePeerUnidirectionalStreamId());
+
+  // open next stream, then check that limit is applied
+  manager.getStream(clientStreamId2);
+  EXPECT_EQ(folly::none, manager.nextAcceptablePeerUnidirectionalStreamId());
+  EXPECT_EQ(folly::none, manager.nextAcceptablePeerUnidirectionalStreamId());
+}
+
+TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.advertisedInitialMaxStreamsBidi = 2;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  // local is server, so remote/peer is client
+  const StreamId clientStreamId1 = 0x00;
+  const StreamId clientStreamId2 = clientStreamId1 + detail::kStreamIncrement;
+  for (const auto& id :
+       std::vector<StreamId>{clientStreamId1, clientStreamId2}) {
+    EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(id));
+    EXPECT_EQ(StreamInitiator::Remote, getStreamInitiator(conn.nodeType, id));
+  }
+
+  EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(clientStreamId1, manager.nextAcceptablePeerBidirectionalStreamId());
+
+  // open next stream, then check for increase in next acceptable stream ID
+  manager.getStream(clientStreamId1);
+  EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(clientStreamId2, manager.nextAcceptablePeerBidirectionalStreamId());
+
+  // open next stream, then check that limit is applied
+  manager.getStream(clientStreamId2);
+  EXPECT_EQ(folly::none, manager.nextAcceptablePeerBidirectionalStreamId());
+  EXPECT_EQ(folly::none, manager.nextAcceptablePeerBidirectionalStreamId());
+}
+
 TEST_F(QuicStreamManagerTest, TestClearActionable) {
   auto& manager = *conn.streamManager;
 
