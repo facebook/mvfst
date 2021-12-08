@@ -37,8 +37,8 @@ bool isPersistentCongestion(
 
   auto it = std::find_if(
       ack.ackedPackets.cbegin(), ack.ackedPackets.cend(), [&](auto& ackPacket) {
-        return ackPacket.sentTime >= lostPeriodStart &&
-            ackPacket.sentTime <= lostPeriodEnd;
+        return ackPacket.outstandingPacketMetadata.time >= lostPeriodStart &&
+            ackPacket.outstandingPacketMetadata.time <= lostPeriodEnd;
       });
 
   return it == ack.ackedPackets.cend();

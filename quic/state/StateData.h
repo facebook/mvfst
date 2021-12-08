@@ -248,47 +248,39 @@ struct AckEvent {
    * Container to store information about ACKed packets
    */
   struct AckPacket {
-    // Packet sent time when this acked pakcet was first sent.
-    TimePoint sentTime;
-    // Packet's encoded size.
-    uint32_t encodedSize;
+    // Metadata of the previously outstanding (now acked) packet
+    OutstandingPacketMetadata outstandingPacketMetadata;
+
     // LastAckedPacketInfo from this acked packet'r original sent
     // OutstandingPacket structure.
     folly::Optional<OutstandingPacket::LastAckedPacketInfo> lastAckedPacketInfo;
-    // Total bytes sent on the connection when the acked packet was first
-    // sent.
-    uint64_t totalBytesSentThen;
+
     // Whether this packet was sent when CongestionController is in
     // app-limited state.
     bool isAppLimited;
 
     struct Builder {
-      Builder&& setSentTime(TimePoint sentTimeIn);
-      Builder&& setEncodedSize(uint32_t encodedSizeIn);
+      Builder&& setOutstandingPacketMetadata(
+          OutstandingPacketMetadata&& metadata);
       Builder&& setLastAckedPacketInfo(
           folly::Optional<OutstandingPacket::LastAckedPacketInfo>
               lastAckedPacketInfoIn);
-      Builder&& setTotalBytesSentThen(uint64_t totalBytesSentThenIn);
       Builder&& setAppLimited(bool appLimitedIn);
       AckPacket build() &&;
       explicit Builder() = default;
 
      private:
-      TimePoint sentTime;
-      uint32_t encodedSize{0};
+      folly::Optional<OutstandingPacketMetadata> outstandingPacketMetadata;
       folly::Optional<OutstandingPacket::LastAckedPacketInfo>
           lastAckedPacketInfo;
-      uint64_t totalBytesSentThen{0};
       bool isAppLimited{false};
     };
 
    private:
     explicit AckPacket(
-        TimePoint sentTimeIn,
-        uint32_t encodedSizeIn,
+        OutstandingPacketMetadata&& outstandingPacketMetadataIn,
         folly::Optional<OutstandingPacket::LastAckedPacketInfo>
             lastAckedPacketInfoIn,
-        uint64_t totalBytesSentThenIn,
         bool isAppLimitedIn);
   };
 

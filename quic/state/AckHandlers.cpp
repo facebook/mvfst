@@ -208,10 +208,8 @@ AckEvent processAckFrame(
       }
       ack.ackedPackets.push_back(
           CongestionController::AckEvent::AckPacket::Builder()
-              .setSentTime(rPacketIt->metadata.time)
-              .setEncodedSize(rPacketIt->metadata.encodedSize)
+              .setOutstandingPacketMetadata(std::move(rPacketIt->metadata))
               .setLastAckedPacketInfo(std::move(rPacketIt->lastAckedPacketInfo))
-              .setTotalBytesSentThen(rPacketIt->metadata.totalBytesSent)
               .setAppLimited(rPacketIt->isAppLimited)
               .build());
       rPacketIt++;

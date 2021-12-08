@@ -19,6 +19,8 @@
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 #include "quic/codec/QuicConnectionId.h"
+#include "quic/state/LossState.h"
+#include "quic/state/OutstandingPacket.h"
 
 using namespace testing;
 
@@ -562,8 +564,20 @@ CongestionController::AckEvent makeAck(
   ack.largestAckedPacket = seq;
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
-          .setSentTime(sentTime)
-          .setEncodedSize(ackedSize)
+          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
+              sentTime,
+              ackedSize /* encodedSize */,
+              ackedSize /* encodedBodySize */,
+              false /* isHandshake */,
+              false /* isD6DProbe */,
+              0 /* totalBytesSent */,
+              0 /* totalBodyBytesSent */,
+              0 /* inflightBytes */,
+              0 /* numOutstanding */,
+              LossState() /* lossState */,
+              0 /* writeCount */,
+              folly::none /* detailsPerStream) */
+              ))
           .build());
   ack.largestAckedPacketSentTime = sentTime;
   return ack;
@@ -718,10 +732,8 @@ bool matchError(
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacket outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
-      .setSentTime(outstandingPacket.metadata.time)
-      .setEncodedSize(outstandingPacket.metadata.encodedSize)
+      .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
-      .setTotalBytesSentThen(outstandingPacket.metadata.totalBytesSent)
       .setAppLimited(outstandingPacket.isAppLimited)
       .build();
 }

@@ -41,20 +41,22 @@ void BbrBandwidthSampler::onPacketAcked(
   // packets. Can we calculate the bandwidth based on aggregated stats?
   bool bandwidthUpdated = false;
   for (auto const& ackedPacket : ackEvent.ackedPackets) {
-    if (ackedPacket.encodedSize == 0) {
+    if (ackedPacket.outstandingPacketMetadata.encodedSize == 0) {
       continue;
     }
     Bandwidth sendRate, ackRate;
     if (ackedPacket.lastAckedPacketInfo) {
-      DCHECK(ackedPacket.sentTime > ackedPacket.lastAckedPacketInfo->sentTime);
+      DCHECK(
+          ackedPacket.outstandingPacketMetadata.time >
+          ackedPacket.lastAckedPacketInfo->sentTime);
       DCHECK_GE(
-          ackedPacket.totalBytesSentThen,
+          ackedPacket.outstandingPacketMetadata.totalBytesSent,
           ackedPacket.lastAckedPacketInfo->totalBytesSent);
       sendRate = Bandwidth(
-          ackedPacket.totalBytesSentThen -
+          ackedPacket.outstandingPacketMetadata.totalBytesSent -
               ackedPacket.lastAckedPacketInfo->totalBytesSent,
           std::chrono::duration_cast<std::chrono::microseconds>(
-              ackedPacket.sentTime -
+              ackedPacket.outstandingPacketMetadata.time -
               ackedPacket.lastAckedPacketInfo->sentTime));
 
       DCHECK(ackEvent.ackTime > ackedPacket.lastAckedPacketInfo->ackTime);
@@ -70,7 +72,7 @@ void BbrBandwidthSampler::onPacketAcked(
           conn_.lossState.totalBytesAcked -
               ackedPacket.lastAckedPacketInfo->totalBytesAcked,
           std::chrono::duration_cast<std::chrono::microseconds>(ackDuration));
-    } else if (ackEvent.ackTime > ackedPacket.sentTime) {
+    } else if (ackEvent.ackTime > ackedPacket.outstandingPacketMetadata.time) {
       // No previous ack info from outstanding packet, default to taking the
       // total acked bytes / ~RTT.
       //
@@ -82,7 +84,7 @@ void BbrBandwidthSampler::onPacketAcked(
       sendRate = Bandwidth(
           ackEvent.ackedBytes,
           std::chrono::duration_cast<std::chrono::microseconds>(
-              ackEvent.ackTime - ackedPacket.sentTime));
+              ackEvent.ackTime - ackedPacket.outstandingPacketMetadata.time));
     }
     Bandwidth measuredBandwidth = sendRate > ackRate ? sendRate : ackRate;
     // If a sample is from a packet sent during app-limited period, we should

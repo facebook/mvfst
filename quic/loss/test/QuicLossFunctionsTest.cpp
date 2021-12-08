@@ -1875,10 +1875,22 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
   conn->lossState.srtt = 1s;
 
   CongestionController::AckEvent ack;
-
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
-          .setSentTime(currentTime + 12s)
+          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
+              currentTime + 12s /* sentTime */,
+              0 /* encodedSize */,
+              0 /* encodedBodySize */,
+              false /* isHandshake */,
+              false /* isD6DProbe */,
+              0 /* totalBytesSent */,
+              0 /* totalBodyBytesSent */,
+              0 /* inflightBytes */,
+              0 /* numOutstanding */,
+              LossState() /* lossState */,
+              0 /* writeCount */,
+              folly::none /* detailsPerStream) */
+              ))
           .build());
 
   EXPECT_TRUE(isPersistentCongestion(
@@ -1891,10 +1903,22 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
   conn->lossState.srtt = 1s;
 
   CongestionController::AckEvent ack;
-
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
-          .setSentTime(currentTime + 4s)
+          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
+              currentTime + 4s /* sentTime */,
+              0 /* encodedSize */,
+              0 /* encodedBodySize */,
+              false /* isHandshake */,
+              false /* isD6DProbe */,
+              0 /* totalBytesSent */,
+              0 /* totalBodyBytesSent */,
+              0 /* inflightBytes */,
+              0 /* numOutstanding */,
+              LossState() /* lossState */,
+              0 /* writeCount */,
+              folly::none /* detailsPerStream) */
+              ))
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(
@@ -1906,10 +1930,22 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
   auto currentTime = Clock::now();
 
   CongestionController::AckEvent ack;
-
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
-          .setSentTime(currentTime + 12s)
+          .setOutstandingPacketMetadata(OutstandingPacketMetadata(
+              currentTime + 12s /* sentTime */,
+              0 /* encodedSize */,
+              0 /* encodedBodySize */,
+              false /* isHandshake */,
+              false /* isD6DProbe */,
+              0 /* totalBytesSent */,
+              0 /* totalBodyBytesSent */,
+              0 /* inflightBytes */,
+              0 /* numOutstanding */,
+              LossState() /* lossState */,
+              0 /* writeCount */,
+              folly::none /* detailsPerStream) */
+              ))
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(

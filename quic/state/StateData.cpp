@@ -6,9 +6,9 @@
  *
  */
 
-#include <quic/state/StateData.h>
-
+#include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
+#include <quic/state/StateData.h>
 
 namespace quic {
 QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
@@ -96,29 +96,18 @@ PacingRate PacingRate::Builder::build() && {
 }
 
 CongestionController::AckEvent::AckPacket::AckPacket(
-    TimePoint sentTimeIn,
-    uint32_t encodedSizeIn,
+    OutstandingPacketMetadata&& outstandingPacketMetadataIn,
     folly::Optional<OutstandingPacket::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
-    uint64_t totalBytesSentThenIn,
     bool isAppLimitedIn)
-    : sentTime(sentTimeIn),
-      encodedSize(encodedSizeIn),
+    : outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
-      totalBytesSentThen(totalBytesSentThenIn),
       isAppLimited(isAppLimitedIn) {}
 
-CongestionController::AckEvent::AckPacket::Builder&&
-CongestionController::AckEvent::AckPacket::Builder::setSentTime(
-    TimePoint sentTimeIn) {
-  sentTime = sentTimeIn;
-  return std::move(*this);
-}
-
-CongestionController::AckEvent::AckPacket::Builder&&
-CongestionController::AckEvent::AckPacket::Builder::setEncodedSize(
-    uint32_t encodedSizeIn) {
-  encodedSize = encodedSizeIn;
+CongestionController::AckEvent::AckPacket::Builder&& CongestionController::
+    AckEvent::AckPacket::Builder::setOutstandingPacketMetadata(
+        OutstandingPacketMetadata&& outstandingPacketMetadataIn) {
+  outstandingPacketMetadata = std::move(outstandingPacketMetadataIn);
   return std::move(*this);
 }
 
@@ -127,13 +116,6 @@ CongestionController::AckEvent::AckPacket::Builder::setLastAckedPacketInfo(
     folly::Optional<OutstandingPacket::LastAckedPacketInfo>
         lastAckedPacketInfoIn) {
   lastAckedPacketInfo = lastAckedPacketInfoIn;
-  return std::move(*this);
-}
-
-CongestionController::AckEvent::AckPacket::Builder&&
-CongestionController::AckEvent::AckPacket::Builder::setTotalBytesSentThen(
-    uint64_t totalBytesSentThenIn) {
-  totalBytesSentThen = totalBytesSentThenIn;
   return std::move(*this);
 }
 
@@ -147,10 +129,8 @@ CongestionController::AckEvent::AckPacket::Builder::setAppLimited(
 CongestionController::AckEvent::AckPacket
 CongestionController::AckEvent::AckPacket::Builder::build() && {
   return CongestionController::AckEvent::AckPacket(
-      sentTime,
-      encodedSize,
+      std::move(outstandingPacketMetadata.value()),
       std::move(lastAckedPacketInfo),
-      totalBytesSentThen,
       isAppLimited);
 }
 

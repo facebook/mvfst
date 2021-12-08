@@ -17,6 +17,7 @@
 #include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckHandlers.h>
+#include <quic/state/OutstandingPacket.h>
 #include <quic/state/StateData.h>
 #include <quic/state/test/Mocks.h>
 
@@ -828,8 +829,14 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
         EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSentThen);
+        EXPECT_EQ(
+            1,
+            ackEvent->ackedPackets.front()
+                .outstandingPacketMetadata.encodedSize);
+        EXPECT_EQ(
+            1,
+            ackEvent->ackedPackets.front()
+                .outstandingPacketMetadata.totalBytesSent);
       }));
 
   PacketNum packetNum = 0;
@@ -881,8 +888,14 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
         EXPECT_EQ(1, ackEvent->ackedPackets.size());
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().encodedSize);
-        EXPECT_EQ(1, ackEvent->ackedPackets.front().totalBytesSentThen);
+        EXPECT_EQ(
+            1,
+            ackEvent->ackedPackets.front()
+                .outstandingPacketMetadata.encodedSize);
+        EXPECT_EQ(
+            1,
+            ackEvent->ackedPackets.front()
+                .outstandingPacketMetadata.totalBytesSent);
       }));
 
   PacketNum packetNum = 0;
@@ -1270,19 +1283,34 @@ TEST_P(AckHandlersTest, AckEventCreation) {
     OutstandingPacket sentPacket(
         std::move(regularPacket),
         largestSentTime,
-        1,
-        0,
+        1 /* encodedSizeIn */,
+        0 /* encodedBodySizeIn */,
         false /* handshake */,
-        packetNum,
-        0,
-        0,
-        0,
+        1 * (packetNum + 1) /* totalBytesSentIn */,
+        0 /* totalBodyBytesSentIn */,
+        0 /* inflightBytesIn */,
+        0 /* packetsInflightIn */,
         LossState(),
-        0);
+        ((packetNum <= 4) ? 1 : 2) /* writeCountIn */,
+        OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(sentPacket);
     packetNum++;
   }
+
+  auto getAckPacketMatcher = [](const auto& packetNum) {
+    return testing::Field(
+        &AckEvent::AckPacket::outstandingPacketMetadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalBytesSent,
+                1 * (packetNum + 1)),
+            testing::Field(
+                &OutstandingPacketMetadata::writeCount,
+                ((packetNum <= 4) ? 1 : 2))
+
+                ));
+  };
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 9;
@@ -1300,6 +1328,22 @@ TEST_P(AckHandlersTest, AckEventCreation) {
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),
             ack->mrttSample.value());
+        EXPECT_THAT(ack->ackedPackets, SizeIs(10));
+        EXPECT_THAT(
+            ack->ackedPackets,
+            // packets are inserted in reverse order (today), so don't require
+            // specific ordering in the test
+            UnorderedElementsAre(
+                getAckPacketMatcher(0),
+                getAckPacketMatcher(1),
+                getAckPacketMatcher(2),
+                getAckPacketMatcher(3),
+                getAckPacketMatcher(4),
+                getAckPacketMatcher(5),
+                getAckPacketMatcher(6),
+                getAckPacketMatcher(7),
+                getAckPacketMatcher(8),
+                getAckPacketMatcher(9)));
       }));
 
   processAckFrame(

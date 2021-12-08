@@ -77,17 +77,20 @@ void NewReno::onAckEvent(const AckEvent& ack) {
 
 void NewReno::onPacketAcked(
     const CongestionController::AckEvent::AckPacket& packet) {
-  if (endOfRecovery_ && packet.sentTime < *endOfRecovery_) {
+  if (endOfRecovery_ &&
+      packet.outstandingPacketMetadata.time < *endOfRecovery_) {
     return;
   }
   if (cwndBytes_ < ssthresh_) {
-    addAndCheckOverflow(cwndBytes_, packet.encodedSize);
+    addAndCheckOverflow(
+        cwndBytes_, packet.outstandingPacketMetadata.encodedSize);
   } else {
     // TODO: I think this may be a bug in the specs. We should use
     // conn_.udpSendPacketLen for the cwnd calculation. But I need to
     // check how Linux handles this.
-    uint64_t additionFactor =
-        (kDefaultUDPSendPacketLen * packet.encodedSize) / cwndBytes_;
+    uint64_t additionFactor = (kDefaultUDPSendPacketLen *
+                               packet.outstandingPacketMetadata.encodedSize) /
+        cwndBytes_;
     addAndCheckOverflow(cwndBytes_, additionFactor);
   }
 }
