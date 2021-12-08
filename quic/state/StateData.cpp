@@ -95,45 +95,6 @@ PacingRate PacingRate::Builder::build() && {
   return PacingRate(interval_, burstSize_);
 }
 
-CongestionController::AckEvent::AckPacket::AckPacket(
-    OutstandingPacketMetadata&& outstandingPacketMetadataIn,
-    folly::Optional<OutstandingPacket::LastAckedPacketInfo>
-        lastAckedPacketInfoIn,
-    bool isAppLimitedIn)
-    : outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
-      lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
-      isAppLimited(isAppLimitedIn) {}
-
-CongestionController::AckEvent::AckPacket::Builder&& CongestionController::
-    AckEvent::AckPacket::Builder::setOutstandingPacketMetadata(
-        OutstandingPacketMetadata&& outstandingPacketMetadataIn) {
-  outstandingPacketMetadata = std::move(outstandingPacketMetadataIn);
-  return std::move(*this);
-}
-
-CongestionController::AckEvent::AckPacket::Builder&&
-CongestionController::AckEvent::AckPacket::Builder::setLastAckedPacketInfo(
-    folly::Optional<OutstandingPacket::LastAckedPacketInfo>
-        lastAckedPacketInfoIn) {
-  lastAckedPacketInfo = lastAckedPacketInfoIn;
-  return std::move(*this);
-}
-
-CongestionController::AckEvent::AckPacket::Builder&&
-CongestionController::AckEvent::AckPacket::Builder::setAppLimited(
-    bool appLimitedIn) {
-  isAppLimited = appLimitedIn;
-  return std::move(*this);
-}
-
-CongestionController::AckEvent::AckPacket
-CongestionController::AckEvent::AckPacket::Builder::build() && {
-  return CongestionController::AckEvent::AckPacket(
-      std::move(outstandingPacketMetadata.value()),
-      std::move(lastAckedPacketInfo),
-      isAppLimited);
-}
-
 bool QuicConnectionStateBase::retireAndSwitchPeerConnectionIds() {
   const auto end = peerConnectionIds.end();
   auto replacementConnIdDataIt{end};
