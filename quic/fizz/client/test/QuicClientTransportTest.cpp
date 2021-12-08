@@ -913,8 +913,7 @@ INSTANTIATE_TEST_CASE_P(
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
-class QuicClientTransportTest : public testing::Test,
-                                public QuicClientTransportTestBase {
+class QuicClientTransportTest : public QuicClientTransportTestBase {
  public:
   void SetUp() override {
     QuicClientTransportTestBase::SetUp();
@@ -2141,31 +2140,6 @@ TEST_P(
   client->setHappyEyeballsCachedFamily(AF_INET);
   fatalWriteErrorOnBothAfterSecondStarts(serverAddrV4, serverAddrV6);
 }
-
-class QuicClientTransportAfterStartTestBase : public QuicClientTransportTest {
- public:
-  void SetUpChild() override {
-    client->addNewPeerAddress(serverAddr);
-    client->setHostname(hostname_);
-    ON_CALL(*sock, write(_, _))
-        .WillByDefault(Invoke([&](const SocketAddress&,
-                                  const std::unique_ptr<folly::IOBuf>& buf) {
-          socketWrites.push_back(buf->clone());
-          return buf->computeChainDataLength();
-        }));
-    ON_CALL(*sock, address()).WillByDefault(ReturnRef(serverAddr));
-
-    setupCryptoLayer();
-    start();
-    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
-    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
-        std::numeric_limits<uint32_t>::max());
-  }
-
- protected:
-  std::string hostname_{"TestHost"};
-};
 
 class QuicClientTransportAfterStartTest
     : public QuicClientTransportAfterStartTestBase,

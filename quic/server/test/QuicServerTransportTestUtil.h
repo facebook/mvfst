@@ -36,6 +36,10 @@ class TestingQuicServerTransport : public QuicServerTransport {
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
       : QuicServerTransport(evb, std::move(sock), cb, std::move(ctx)) {}
 
+  QuicTransportBase* getTransport() {
+    return this;
+  }
+
   const QuicServerConnectionState& getConn() const {
     return *dynamic_cast<QuicServerConnectionState*>(conn_.get());
   }
@@ -99,7 +103,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
   }
 };
 
-class QuicServerTransportTestBase {
+class QuicServerTransportTestBase : public virtual testing::Test {
  public:
   QuicServerTransportTestBase() = default;
   virtual ~QuicServerTransportTestBase() = default;
@@ -166,6 +170,26 @@ class QuicServerTransportTestBase {
     EXPECT_EQ(
         *server->getConn().clientConnectionId,
         server->getConn().peerConnectionIds[0].connId);
+  }
+
+  void destroyTransport() {
+    server = nullptr;
+  }
+
+  QuicTransportBase* getTransport() {
+    return server->getTransport();
+  }
+
+  std::shared_ptr<TestingQuicServerTransport> getTestTransport() {
+    return server;
+  }
+
+  const QuicServerConnectionState& getConn() const {
+    return server->getConn();
+  }
+
+  QuicServerConnectionState& getNonConstConn() {
+    return server->getNonConstConn();
   }
 
   std::shared_ptr<FizzServerQuicHandshakeContext> getFizzServerContext() {

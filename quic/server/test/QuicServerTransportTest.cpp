@@ -54,8 +54,7 @@ struct MigrationParam {
   folly::Optional<uint64_t> clientSentActiveConnIdTransportParam;
 };
 
-class QuicServerTransportTest : public testing::Test,
-                                public QuicServerTransportTestBase {
+class QuicServerTransportTest : public QuicServerTransportTestBase {
  public:
   void SetUp() override {
     QuicServerTransportTestBase::SetUp();

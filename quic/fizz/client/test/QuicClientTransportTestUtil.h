@@ -8,6 +8,7 @@
 
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include "quic/api/QuicTransportBase.h"
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <quic/api/test/Mocks.h>
@@ -57,6 +58,10 @@ class TestingQuicClientTransport : public QuicClientTransport {
     if (destructionCallback_) {
       destructionCallback_->markDestroyed();
     }
+  }
+
+  QuicTransportBase* getTransport() {
+    return this;
   }
 
   const QuicClientConnectionState& getConn() const {
@@ -361,7 +366,7 @@ class FakeOneRttHandshakeLayer : public FizzClientHandshake {
   }
 };
 
-class QuicClientTransportTestBase {
+class QuicClientTransportTestBase : public virtual testing::Test {
  public:
   QuicClientTransportTestBase()
       : eventbase_(std::make_unique<folly::EventBase>()) {}
@@ -509,6 +514,27 @@ class QuicClientTransportTestBase {
     EXPECT_TRUE(
         client->getConn().readCodec->getStatelessResetToken().has_value());
     EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
+  }
+
+  void destroyTransport() {
+    client->unbindConnection();
+    client = nullptr;
+  }
+
+  QuicTransportBase* getTransport() {
+    return client->getTransport();
+  }
+
+  std::shared_ptr<TestingQuicClientTransport> getTestTransport() {
+    return client;
+  }
+
+  const QuicClientConnectionState& getConn() const {
+    return client->getConn();
+  }
+
+  QuicClientConnectionState& getNonConstConn() {
+    return client->getNonConstConn();
   }
 
   void setConnectionIds() {
@@ -837,6 +863,33 @@ class QuicClientTransportTestBase {
   folly::Optional<ConnectionId> serverChosenConnId;
   QuicVersion version{QuicVersion::QUIC_V1};
   std::shared_ptr<testing::NiceMock<MockQuicStats>> quicStats_;
+};
+
+class QuicClientTransportAfterStartTestBase
+    : public QuicClientTransportTestBase {
+ public:
+  void SetUpChild() override {
+    client->addNewPeerAddress(serverAddr);
+    client->setHostname(hostname_);
+    ON_CALL(*sock, write(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([&](const folly::SocketAddress&,
+                                const std::unique_ptr<folly::IOBuf>& buf) {
+              socketWrites.push_back(buf->clone());
+              return buf->computeChainDataLength();
+            }));
+    ON_CALL(*sock, address()).WillByDefault(testing::ReturnRef(serverAddr));
+
+    setupCryptoLayer();
+    start();
+    client->getNonConstConn().streamManager->setMaxLocalBidirectionalStreams(
+        std::numeric_limits<uint32_t>::max());
+    client->getNonConstConn().streamManager->setMaxLocalUnidirectionalStreams(
+        std::numeric_limits<uint32_t>::max());
+  }
+
+ protected:
+  std::string hostname_{"TestHost"};
 };
 
 } // namespace quic::test
