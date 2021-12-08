@@ -705,6 +705,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void updateWriteLooper(bool thisIteration);
   void handlePingCallback();
   void handleKnobCallbacks();
+  void handleAckEventCallbacks();
   void handleCancelByteEventCallbacks();
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
   void handleDeliveryCallbacks();
@@ -719,6 +720,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * Implements the QuicStreamPrioritiesObserver interface
    */
   void onStreamPrioritiesChange() override;
+
+  void cleanupAckEventState();
 
   void runOnEvbAsync(
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);

@@ -10,6 +10,7 @@
 #include <quic/QuicException.h>
 #include <quic/common/SmallVec.h>
 #include <quic/d6d/Types.h>
+#include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/QuicStreamUtilities.h>
 
@@ -48,6 +49,7 @@ class Observer {
     bool rttSamples{false};
     bool knobFrameEvents{false};
     bool streamEvents{false};
+    bool acksProcessedEvents{false};
 
     virtual void enableAllEvents() {
       evbEvents = true;
@@ -59,6 +61,7 @@ class Observer {
       pmtuEvents = true;
       knobFrameEvents = true;
       streamEvents = true;
+      acksProcessedEvents = true;
     }
 
     /**
@@ -171,6 +174,30 @@ class Observer {
 
     // Use builder to construct.
     explicit PacketsWrittenEvent(BuilderFields&& builderFields);
+  };
+
+  struct AcksProcessedEvent {
+    [[nodiscard]] const std::vector<AckEvent>& getAckEvents() const {
+      return ackEvents;
+    }
+
+    // Reference to last processed set of ack events.
+    const std::vector<AckEvent>& ackEvents;
+
+    struct BuilderFields {
+      folly::Optional<std::reference_wrapper<const std::vector<AckEvent>>>
+          maybeAckEventsRef;
+      explicit BuilderFields() = default;
+    };
+
+    struct Builder : public BuilderFields {
+      Builder&& setAckEvents(const std::vector<AckEvent>& ackEventsIn);
+      AcksProcessedEvent build() &&;
+      explicit Builder() = default;
+    };
+
+    // Use builder to construct.
+    explicit AcksProcessedEvent(BuilderFields builderFields);
   };
 
   struct LostPacket {
@@ -411,6 +438,16 @@ class Observer {
   virtual void appRateLimited(
       QuicSocket* /* socket */,
       const AppLimitedEvent& /* event */) {}
+
+  /**
+   * acksProcessed() is invoked when ACKs from remote are processed.
+   *
+   * @param socket   Socket when the callback is processed.
+   * @param event    Event with information about ACKs processed.
+   */
+  virtual void acksProcessed(
+      QuicSocket*, /* socket */
+      const struct AcksProcessedEvent& /* event */) {}
 
   /**
    * packetLossDetected() is invoked when a packet loss is detected.

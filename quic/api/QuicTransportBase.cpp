@@ -1490,6 +1490,22 @@ void QuicTransportBase::handleKnobCallbacks() {
   conn_->pendingEvents.knobs.clear();
 }
 
+void QuicTransportBase::handleAckEventCallbacks() {
+  const auto& lastProcessedAckEvents = conn_->lastProcessedAckEvents;
+  if (lastProcessedAckEvents.empty()) {
+    return; // nothing to do
+  }
+
+  const auto event = quic::Observer::AcksProcessedEvent::Builder()
+                         .setAckEvents(lastProcessedAckEvents)
+                         .build();
+  for (const auto& cb : *observers_) {
+    if (cb->getConfig().acksProcessedEvents) {
+      cb->acksProcessed(this, event);
+    }
+  }
+}
+
 void QuicTransportBase::handleCancelByteEventCallbacks() {
   for (auto pendingResetIt = conn_->pendingEvents.resets.begin();
        pendingResetIt != conn_->pendingEvents.resets.end();
@@ -1658,6 +1674,14 @@ void QuicTransportBase::handleConnWritable() {
   }
 }
 
+void QuicTransportBase::cleanupAckEventState() {
+  // if there's no bytes in flight, clear any memory allocated for AckEvents
+  if (conn_->outstandings.packets.empty()) {
+    std::vector<AckEvent> empty;
+    conn_->lastProcessedAckEvents.swap(empty);
+  } // memory allocated for vector will be freed
+}
+
 void QuicTransportBase::processCallbacksAfterNetworkData() {
   if (closeState_ != CloseState::OPEN) {
     return;
@@ -1682,6 +1706,14 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   }
 
   handleKnobCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleAckEventCallbacks();
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
 
   handleCancelByteEventCallbacks();
   if (closeState_ != CloseState::OPEN) {
@@ -1709,6 +1741,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   }
 
   invokeStreamsAvailableCallbacks();
+  cleanupAckEventState();
 }
 
 void QuicTransportBase::onNetworkData(
@@ -1722,6 +1755,7 @@ void QuicTransportBase::onNetworkData(
     updateWriteLooper(true);
   };
   try {
+    conn_->lastProcessedAckEvents.clear();
     conn_->lossState.totalBytesRecvd += networkData.totalData;
     auto originalAckVersion = currentAckStateVersion(*conn_);
     for (auto& packet : networkData.packets) {

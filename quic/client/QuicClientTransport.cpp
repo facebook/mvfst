@@ -369,7 +369,7 @@ void QuicClientTransport::processPacketData(
         VLOG(10) << "Client received ack frame in packet=" << packetNum << " "
                  << *this;
         ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
-        processAckFrame(
+        conn_->lastProcessedAckEvents.emplace_back(processAckFrame(
             *conn_,
             pnSpace,
             ackFrame,
@@ -444,7 +444,7 @@ void QuicClientTransport::processPacketData(
               }
             },
             markPacketLoss,
-            receiveTimePoint);
+            receiveTimePoint));
         break;
       }
       case QuicFrame::Type::RstStreamFrame: {

@@ -436,20 +436,27 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   }
 
   void deliverDataWithoutErrorCheck(
-      Buf data,
+      NetworkData&& data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
-    data->coalesce();
     server->onNetworkData(
-        peer == nullptr ? clientAddr : *peer,
-        NetworkData(std::move(data), Clock::now()));
+        peer == nullptr ? clientAddr : *peer, std::move(data));
     if (writes) {
       loopForWrites();
     }
   }
 
-  void deliverData(
+  void deliverDataWithoutErrorCheck(
       Buf data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    data->coalesce();
+    deliverDataWithoutErrorCheck(
+        NetworkData(std::move(data), Clock::now()), writes, peer);
+  }
+
+  void deliverData(
+      NetworkData&& data,
       bool writes = true,
       folly::SocketAddress* peer = nullptr) {
     deliverDataWithoutErrorCheck(std::move(data), writes, peer);
@@ -465,6 +472,14 @@ class QuicServerTransportTestBase : public virtual testing::Test {
             toString(server->getConn().localConnectionError->first));
       }
     }
+  }
+
+  void deliverData(
+      Buf data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    data->coalesce();
+    deliverData(NetworkData(std::move(data), Clock::now()), writes, peer);
   }
 
   void loopForWrites() {

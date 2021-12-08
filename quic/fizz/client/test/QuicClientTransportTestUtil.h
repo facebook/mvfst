@@ -665,6 +665,12 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     EXPECT_NE(client->getConn().readCodec->getOneRttHeaderCipher(), nullptr);
   }
 
+  void deliverNetworkError(int err) {
+    ASSERT_TRUE(networkReadCallback);
+    socketReads.emplace_back(err);
+    networkReadCallback->onNotifyDataAvailable(*sock);
+  }
+
   void deliverDataWithoutErrorCheck(
       const folly::SocketAddress& addr,
       folly::ByteRange data,
@@ -677,14 +683,22 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     }
   }
 
-  void deliverNetworkError(int err) {
-    ASSERT_TRUE(networkReadCallback);
-    socketReads.emplace_back(err);
-    networkReadCallback->onNotifyDataAvailable(*sock);
+  void deliverDataWithoutErrorCheck(
+      folly::ByteRange data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    deliverDataWithoutErrorCheck(
+        peer == nullptr ? serverAddr : *peer, data, writes);
   }
 
-  void deliverDataWithoutErrorCheck(folly::ByteRange data, bool writes = true) {
-    deliverDataWithoutErrorCheck(serverAddr, data, writes);
+  void deliverDataWithoutErrorCheck(
+      NetworkData&& data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    for (const auto& packetBuf : data.packets) {
+      deliverDataWithoutErrorCheck(
+          peer == nullptr ? serverAddr : *peer, packetBuf->coalesce(), writes);
+    }
   }
 
   void deliverData(
@@ -706,8 +720,21 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     }
   }
 
-  void deliverData(folly::ByteRange data, bool writes = true) {
-    deliverData(serverAddr, data, writes);
+  void deliverData(
+      folly::ByteRange data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    deliverData(peer == nullptr ? serverAddr : *peer, data, writes);
+  }
+
+  void deliverData(
+      NetworkData&& data,
+      bool writes = true,
+      folly::SocketAddress* peer = nullptr) {
+    for (const auto& packetBuf : data.packets) {
+      deliverData(
+          peer == nullptr ? serverAddr : *peer, packetBuf->coalesce(), writes);
+    }
   }
 
   void loopForWrites() {

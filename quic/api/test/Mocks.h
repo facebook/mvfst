@@ -364,6 +364,12 @@ class MockObserver : public Observer {
       ,
       noexcept,
       ,
+      acksProcessed,
+      void(QuicSocket*, const AcksProcessedEvent&));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
       packetLossDetected,
       void(QuicSocket*, const LossEvent&));
   GMOCK_METHOD2_(

@@ -79,6 +79,15 @@ struct NetworkData {
     }
   }
 
+  NetworkData(std::vector<Buf>&& packetBufs, const TimePoint& receiveTime)
+      : receiveTimePoint(receiveTime),
+        packets(std::move(packetBufs)),
+        totalData(0) {
+    for (const auto& buf : packets) {
+      totalData += buf->computeChainDataLength();
+    }
+  }
+
   std::unique_ptr<folly::IOBuf> moveAllData() && {
     std::unique_ptr<folly::IOBuf> buf;
     for (size_t i = 0; i < packets.size(); ++i) {
@@ -742,6 +751,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Vector of Observers that are attached to this socket.
   std::shared_ptr<const ObserverVec> observers;
+
+  // Recent ACK events, for use in processCallbacksAfterNetworkData.
+  // Holds the ACK events generated during the last round of ACK processing.
+  std::vector<AckEvent> lastProcessedAckEvents;
 
   // Type of node owning this connection (client or server).
   QuicNodeType nodeType;

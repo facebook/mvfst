@@ -922,7 +922,7 @@ void onServerReadDataFromOpen(
                    << conn;
           isNonProbingPacket = true;
           ReadAckFrame& ackFrame = *quicFrame.asReadAckFrame();
-          processAckFrame(
+          conn.lastProcessedAckEvents.emplace_back(processAckFrame(
               conn,
               packetNumberSpace,
               ackFrame,
@@ -994,7 +994,7 @@ void onServerReadDataFromOpen(
                 }
               },
               markPacketLoss,
-              readData.networkData.receiveTimePoint);
+              readData.networkData.receiveTimePoint));
           break;
         }
         case QuicFrame::Type::RstStreamFrame: {

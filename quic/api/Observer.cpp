@@ -96,4 +96,20 @@ Observer::PacketsWrittenEvent::PacketsWrittenEvent(
       numAckElicitingPacketsWritten(*CHECK_NOTNULL(
           builderFields.maybeNumAckElicitingPacketsWritten.get_pointer())) {}
 
+Observer::AcksProcessedEvent::Builder&&
+Observer::AcksProcessedEvent::Builder::setAckEvents(
+    const std::vector<AckEvent>& ackEventsIn) {
+  maybeAckEventsRef = ackEventsIn;
+  return std::move(*this);
+}
+
+Observer::AcksProcessedEvent Observer::AcksProcessedEvent::Builder::build() && {
+  return AcksProcessedEvent(*this);
+}
+
+Observer::AcksProcessedEvent::AcksProcessedEvent(
+    Observer::AcksProcessedEvent::BuilderFields builderFields)
+    : ackEvents(*CHECK_NOTNULL(builderFields.maybeAckEventsRef.get_pointer())) {
+}
+
 } // namespace quic
