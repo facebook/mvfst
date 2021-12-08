@@ -270,7 +270,17 @@ TEST_F(QuicTransportTest, NotAppLimitedWithLoss) {
 
   auto stream = transport_->createBidirectionalStream().value();
   auto lossStream = transport_->createBidirectionalStream().value();
-  conn.streamManager->addLoss(lossStream);
+  auto lossStreamState = conn.streamManager->findStream(lossStream);
+  ASSERT_TRUE(lossStreamState);
+  auto largeBuf = folly::IOBuf::createChain(conn.udpSendPacketLen * 20, 4096);
+  auto curBuf = largeBuf.get();
+  do {
+    curBuf->append(curBuf->capacity());
+    curBuf = curBuf->next();
+  } while (curBuf != largeBuf.get());
+  lossStreamState->lossBuffer.emplace_back(std::move(largeBuf), 31, false);
+  conn.streamManager->updateWritableStreams(*lossStreamState);
+  conn.streamManager->updateLossStreams(*lossStreamState);
   transport_->writeChain(
       stream, IOBuf::copyBuffer("An elephant sitting still"), false, nullptr);
   EXPECT_CALL(*rawCongestionController, setAppLimited()).Times(0);

@@ -1601,8 +1601,10 @@ WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn) {
   if (conn.streamManager->hasBlocked()) {
     return WriteDataReason::BLOCKED;
   }
-  if (getSendConnFlowControlBytesWire(conn) != 0 &&
-      conn.streamManager->hasWritable()) {
+  // If we have lost data or flow control + stream data.
+  if (conn.streamManager->hasLoss() ||
+      (getSendConnFlowControlBytesWire(conn) != 0 &&
+       conn.streamManager->hasWritable())) {
     return WriteDataReason::STREAM;
   }
   if (!conn.pendingEvents.frames.empty()) {

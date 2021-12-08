@@ -1641,6 +1641,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   conn.streamManager->updateWritableStreams(*stream);
 
   StreamFrameScheduler scheduler(conn);
+  EXPECT_TRUE(scheduler.hasPendingData());
   ShortHeader shortHeader1(
       ProtectionType::KeyPhaseZero,
       getTestConnectionId(),
@@ -1666,6 +1667,8 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   stream->lossBuffer.emplace_back(std::move(*stream->retransmissionBuffer[0]));
   stream->retransmissionBuffer.clear();
   conn.streamManager->updateWritableStreams(*stream);
+  conn.streamManager->updateLossStreams(*stream);
+  EXPECT_TRUE(scheduler.hasPendingData());
 
   // Write again
   ShortHeader shortHeader2(
