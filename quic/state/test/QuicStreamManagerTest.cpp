@@ -284,6 +284,17 @@ TEST_F(QuicStreamManagerTest, StreamLimitIncrementBidi) {
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
+TEST_F(QuicStreamManagerTest, ConsumeStopSending) {
+  auto& manager = *conn.streamManager;
+  manager.addStopSending(0, GenericApplicationErrorCode::NO_ERROR);
+  EXPECT_EQ(manager.stopSendingStreams().size(), 1);
+  auto result = manager.consumeStopSending();
+  ASSERT_EQ(result.size(), 1);
+  EXPECT_EQ(result.front().first, 0);
+  EXPECT_EQ(result.front().second, GenericApplicationErrorCode::NO_ERROR);
+  EXPECT_TRUE(manager.stopSendingStreams().empty());
+}
+
 TEST_F(QuicStreamManagerTest, StreamLimitIncrementUni) {
   auto& manager = *conn.streamManager;
   manager.setMaxLocalUnidirectionalStreams(100, true);

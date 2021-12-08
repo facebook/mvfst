@@ -790,6 +790,7 @@ class QuicStreamManager {
     result.reserve(stopSendingStreams_.size());
     result.insert(
         result.end(), stopSendingStreams_.begin(), stopSendingStreams_.end());
+    stopSendingStreams_.clear();
     return result;
   }
 
