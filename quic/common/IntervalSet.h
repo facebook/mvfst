@@ -68,6 +68,20 @@ class IntervalSet : private Container<Interval<T, Unit>> {
 
   IntervalSet(std::initializer_list<interval_type> intervals);
 
+  // Range-based for loops expect begin and end to be available, and there's no
+  // way to force them to instead use cbegin and cend. To provide support for
+  // range-based for loops while still meeting our requirement that changes to
+  // the set's contents should only be made through the exposed accessors,
+  // expose begin and end as const iterators.
+
+  auto begin() const {
+    return container_type::cbegin();
+  }
+
+  auto end() const {
+    return container_type::cend();
+  }
+
   void insert(const Interval<T, Unit>& interval);
 
   void insert(const T& start, const T& end);
