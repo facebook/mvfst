@@ -30,6 +30,22 @@ namespace quic {
     return nullptr;                  \
   }
 
+#define UNION_ACCESSOR_TYPE_TPL(X, ...) \
+  X* get(Identity<X>) {                 \
+    if (type_ == Type::X) {             \
+      return &X##_;                     \
+    }                                   \
+    return nullptr;                     \
+  }
+
+#define CONST_UNION_ACCESSOR_TYPE_TPL(X, ...) \
+  const X* get(Identity<X>) const {           \
+    if (type_ == Type::X) {                   \
+      return &X##_;                           \
+    }                                         \
+    return nullptr;                           \
+  }
+
 #define UNION_CTORS(X, NAME)     \
   NAME(X&& x) : type_(Type::X) { \
     new (&X##_) X(std::move(x)); \
@@ -111,10 +127,29 @@ namespace quic {
                                                               \
     X(CONST_UNION_ACCESSOR)                                   \
                                                               \
+    template <typename T>                                     \
+    T* get() {                                                \
+      return get(Identity<T>());                              \
+    }                                                         \
+                                                              \
+    template <typename T>                                     \
+    const T* get() const {                                    \
+      return get(Identity<T>());                              \
+    }                                                         \
+                                                              \
    private:                                                   \
+    template <typename T>                                     \
+    struct Identity {                                         \
+      typedef T type;                                         \
+    };                                                        \
+                                                              \
     union {                                                   \
       X(UNION_TYPE)                                           \
     };                                                        \
+                                                              \
+    X(UNION_ACCESSOR_TYPE_TPL)                                \
+                                                              \
+    X(CONST_UNION_ACCESSOR_TYPE_TPL)                          \
                                                               \
     void destroyVariant() {                                   \
       switch (type_) { X(DESTRUCTOR_CASES) }                  \
@@ -122,4 +157,5 @@ namespace quic {
                                                               \
     Type type_;                                               \
   };
+
 } // namespace quic
