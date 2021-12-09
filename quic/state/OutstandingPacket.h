@@ -49,6 +49,11 @@ struct OutstandingPacketMetadata {
   class DetailsPerStream {
    public:
     struct StreamDetails {
+      template <class T>
+      using IntervalSetVec = SmallVec<T, 2 /* stack size */, uint16_t>;
+      using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
+      StreamIntervals streamIntervals;
+
       bool finObserved{false};
       uint64_t streamBytesSent{0};
       uint64_t newStreamBytesSent{0};
@@ -60,12 +65,17 @@ struct OutstandingPacketMetadata {
           std::piecewise_construct,
           std::make_tuple(frame.streamId),
           std::make_tuple());
-
       auto& streamDetails = ret.first->second;
-      streamDetails.streamBytesSent += frame.len;
+
+      if (frame.len) { // could be zero byte if just contains a fin
+        streamDetails.streamIntervals.insert(
+            StreamDetails::StreamIntervals::interval_type(
+                frame.offset, frame.offset + frame.len - 1));
+      }
       if (frame.fin) {
         streamDetails.finObserved = true;
       }
+      streamDetails.streamBytesSent += frame.len;
       if (newData) {
         streamDetails.newStreamBytesSent += frame.len;
         if (streamDetails.maybeFirstNewStreamByteOffset) {
@@ -77,7 +87,7 @@ struct OutstandingPacketMetadata {
       }
     }
 
-    FOLLY_NODISCARD const folly::F14FastMap<StreamId, StreamDetails>
+    FOLLY_NODISCARD const folly::F14FastMap<StreamId, StreamDetails>&
     getDetails() const {
       return detailsPerStream;
     }
