@@ -2804,24 +2804,6 @@ TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControl) {
   EXPECT_EQ(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
 }
 
-TEST_F(QuicTransportFunctionsTest, ShouldWriteDataNoConnFlowControlLoss) {
-  auto conn = createConn();
-  conn->oneRttWriteCipher = test::createNoOpAead();
-  auto mockCongestionController =
-      std::make_unique<NiceMock<MockCongestionController>>();
-  auto rawCongestionController = mockCongestionController.get();
-  EXPECT_CALL(*rawCongestionController, getWritableBytes())
-      .WillRepeatedly(Return(1500));
-  auto stream1 = conn->streamManager->createNextBidirectionalStream().value();
-  auto buf = IOBuf::copyBuffer("0123456789");
-  writeDataToQuicStream(*stream1, buf->clone(), false);
-  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
-  // Artificially limit the connection flow control.
-  conn->streamManager->addLoss(stream1->id);
-  conn->flowControlState.peerAdvertisedMaxOffset = 0;
-  EXPECT_NE(WriteDataReason::NO_WRITE, shouldWriteData(*conn));
-}
-
 TEST_F(QuicTransportFunctionsTest, HasAckDataToWriteCipherAndAckStateMatch) {
   auto conn = createConn();
   EXPECT_FALSE(hasAckDataToWrite(*conn));
