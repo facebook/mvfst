@@ -8,9 +8,9 @@
 
 #include <quic/server/QuicServer.h>
 
-#if defined(__linux__) && !FOLLY_MOBILE && __has_include(<liburing.h>) && \
-    __has_include(<folly/experimental/io/IoUringBackend.h>)
 #include <folly/experimental/io/IoUringBackend.h>
+
+#if !FOLLY_MOBILE && __has_include(<liburing.h>)
 
 DEFINE_int32(
     qs_io_uring_capacity,
@@ -46,10 +46,13 @@ std::unique_ptr<folly::EventBaseBackendBase> QuicServer::getEventBaseBackend() {
   return folly::EventBase::getDefaultBackend();
 }
 } // namespace quic
+
 #else
+
 namespace quic {
 std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
   return folly::EventBase::getDefaultBackend();
 }
 } // namespace quic
+
 #endif
