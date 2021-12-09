@@ -34,6 +34,7 @@ class AcceptObserver;
 
 class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
                          public QuicServerTransport::RoutingCallback,
+                         public QuicServerTransport::HandshakeFinishedCallback,
                          public ServerConnectionIdRejector,
                          public folly::EventRecvmsgCallback {
  private:
@@ -324,6 +325,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
    */
   void setRateLimiter(std::unique_ptr<RateLimiter> rateLimiter);
 
+  void setUnfinishedHandshakeLimit(std::function<int()> limitFn);
+
   /*
    * Get a reference to this worker's corresponding CCPReader.
    * Each worker has a CCPReader that handles recieving messages from CCP
@@ -364,6 +367,10 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       QuicServerTransport* transport,
       const QuicServerTransport::SourceIdentity& source,
       const std::vector<ConnectionIdData>& connectionIdData) noexcept override;
+
+  void onHandshakeFinished() noexcept override;
+
+  void onHandshakeUnfinished() noexcept override;
 
   // From ServerConnectionIdRejector:
   bool rejectConnectionId(
@@ -596,6 +603,8 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
 
   // Rate limits the creation of new connections for this worker.
   std::unique_ptr<RateLimiter> newConnRateLimiter_;
+
+  folly::Optional<std::function<int()>> unfinishedHandshakeLimitFn_;
 
   // EventRecvmsgCallback data
   std::unique_ptr<MsgHdr> msgHdr_;

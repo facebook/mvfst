@@ -202,6 +202,11 @@ class QuicServerWorkerTest : public Test {
       ConnectionId& dstConnId,
       const folly::SocketAddress& clientAddr);
 
+  std::string testSendRetryUnfinished(
+      ConnectionId& srcConnId,
+      ConnectionId& dstConnId,
+      const folly::SocketAddress& clientAddr);
+
   void testSendInitialWithRetryToken(
       const std::string& retryToken,
       ConnectionId& srcConnId,
@@ -421,6 +426,61 @@ std::string QuicServerWorkerTest::testSendRetry(
   return encryptedRetryToken;
 }
 
+std::string QuicServerWorkerTest::testSendRetryUnfinished(
+    ConnectionId& srcConnId,
+    ConnectionId& dstConnId,
+    const folly::SocketAddress& clientAddr) {
+  worker_->setUnfinishedHandshakeLimit([]() { return 0; });
+  EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
+
+  // Send a client inital to the server - the server will respond with retry
+  // packet
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, dstConnId, srcConnId);
+  auto data = createData(kMinInitialPacketSize);
+
+  std::string encryptedRetryToken;
+  EXPECT_CALL(*socketPtr_, write(_, _))
+      .WillOnce(Invoke([&](const folly::SocketAddress&,
+                           const std::unique_ptr<folly::IOBuf>& buf) {
+        // Validate that the retry packet has been created
+        QuicReadCodec codec(QuicNodeType::Client);
+        auto packetQueue = bufToQueue(buf->clone());
+        AckStates ackStates;
+
+        auto parsedPacket = codec.parsePacket(packetQueue, ackStates);
+        EXPECT_NE(parsedPacket.retryPacket(), nullptr);
+
+        // Validate the generated retry token
+        RetryPacket* retryPacket = parsedPacket.retryPacket();
+        EXPECT_TRUE(retryPacket->header.hasToken());
+        encryptedRetryToken = retryPacket->header.getToken();
+        auto tokenBuf = folly::IOBuf::copyBuffer(encryptedRetryToken);
+
+        RetryTokenGenerator generator(retryTokenSecret_);
+        auto maybeDecryptedToken = generator.decryptToken(std::move(tokenBuf));
+        EXPECT_TRUE(maybeDecryptedToken.hasValue());
+
+        auto decryptedToken = *maybeDecryptedToken;
+        EXPECT_EQ(decryptedToken.clientIp, clientAddr.getIPAddress());
+        EXPECT_EQ(decryptedToken.clientPort, clientAddr.getPort());
+        EXPECT_EQ(decryptedToken.originalDstConnId, dstConnId);
+
+        return buf->computeChainDataLength();
+      }));
+
+  worker_->dispatchPacketData(
+      clientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()),
+      QuicVersion::MVFST);
+  eventbase_.loop();
+
+  return encryptedRetryToken;
+}
+
 // Helper method to send a client initial that contains the retry token to the
 // server in response to the retry packet
 void QuicServerWorkerTest::testSendInitialWithRetryToken(
@@ -570,12 +630,135 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   eventbase_.loop();
 }
 
+TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
+  worker_->setUnfinishedHandshakeLimit([]() { return 2; });
+  EXPECT_CALL(*quicStats_, onConnectionRateLimited()).Times(1);
+
+  NiceMock<MockConnectionCallback> connCb1;
+  auto mockSock1 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  EXPECT_CALL(*mockSock1, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  MockQuicTransport::Ptr testTransport1 = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock1), connCb1, nullptr);
+  EXPECT_CALL(*testTransport1, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+  EXPECT_CALL(*testTransport1, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(kClientAddr));
+  auto connId1 = getTestConnectionId(hostId_);
+  QuicVersion version = QuicVersion::MVFST;
+  RoutingData routingData(
+      HeaderForm::Long, true, false, true, connId1, connId1);
+
+  auto data = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(
+      *testTransport1, onNetworkData(kClientAddr, NetworkDataMatches(*data)));
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(testTransport1));
+
+  worker_->dispatchPacketData(
+      kClientAddr,
+      std::move(routingData),
+      NetworkData(data->clone(), Clock::now()),
+      version);
+
+  const auto& addrMap = worker_->getSrcToTransportMap();
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
+  eventbase_.loop();
+
+  auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
+  NiceMock<MockConnectionCallback> connCb2;
+  auto mockSock2 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  EXPECT_CALL(*mockSock2, address()).WillRepeatedly(ReturnRef(caddr2));
+  MockQuicTransport::Ptr testTransport2 = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock2), connCb2, nullptr);
+  EXPECT_CALL(*testTransport2, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+  EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(caddr2));
+  ConnectionId connId2({2, 4, 5, 6});
+  version = QuicVersion::MVFST;
+  RoutingData routingData2(
+      HeaderForm::Long, true, false, true, connId2, connId2);
+
+  auto data2 = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(
+      *testTransport2, onNetworkData(caddr2, NetworkDataMatches(*data2)));
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(testTransport2));
+  worker_->dispatchPacketData(
+      caddr2,
+      std::move(routingData2),
+      NetworkData(data2->clone(), Clock::now()),
+      version);
+
+  EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
+  eventbase_.loop();
+
+  auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
+  auto mockSock3 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  ConnectionId connId3({3, 4, 5, 6});
+  version = QuicVersion::MVFST;
+  RoutingData routingData3(
+      HeaderForm::Long, true, false, true, connId3, connId3);
+  auto data3 = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
+  worker_->dispatchPacketData(
+      caddr3,
+      std::move(routingData3),
+      NetworkData(data3->clone(), Clock::now()),
+      version);
+
+  EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
+  EXPECT_EQ(addrMap.size(), 2);
+  eventbase_.loop();
+
+  // Finish a handshake.
+  worker_->onHandshakeFinished();
+  auto caddr4 = folly::SocketAddress("4.3.4.5", 1234);
+  NiceMock<MockConnectionCallback> connCb4;
+  auto mockSock4 =
+      std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
+  EXPECT_CALL(*mockSock4, address()).WillRepeatedly(ReturnRef(caddr4));
+  MockQuicTransport::Ptr testTransport4 = std::make_shared<MockQuicTransport>(
+      worker_->getEventBase(), std::move(mockSock4), connCb4, nullptr);
+  EXPECT_CALL(*testTransport4, getEventBase())
+      .WillRepeatedly(Return(&eventbase_));
+  EXPECT_CALL(*testTransport4, getOriginalPeerAddress())
+      .WillRepeatedly(ReturnRef(caddr4));
+  ConnectionId connId4({4, 4, 5, 6});
+  version = QuicVersion::MVFST;
+  RoutingData routingData4(
+      HeaderForm::Long, true, false, true, connId4, connId4);
+
+  auto data4 = createData(kMinInitialPacketSize + 10);
+  EXPECT_CALL(
+      *testTransport4, onNetworkData(caddr4, NetworkDataMatches(*data4)));
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).WillOnce(Return(testTransport4));
+  worker_->dispatchPacketData(
+      caddr4,
+      std::move(routingData4),
+      NetworkData(data4->clone(), Clock::now()),
+      version);
+
+  EXPECT_EQ(addrMap.count(std::make_pair(caddr4, connId4)), 1);
+  eventbase_.loop();
+}
+
 TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
   // The second client initial packet with the retry token is valid
   // as the client IP is the same as the one stored in the retry token
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
   auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
+  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
+}
+
+TEST_F(QuicServerWorkerTest, TestRetryUnfinishedValidInitial) {
+  // The second client initial packet with the retry token is valid
+  // as the client IP is the same as the one stored in the retry token
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+  auto retryToken = testSendRetryUnfinished(srcConnId, dstConnId, kClientAddr);
   testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
 }
 
@@ -588,6 +771,18 @@ TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
   auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
+  testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr2);
+}
+
+TEST_F(QuicServerWorkerTest, TestRetryUnfinishedInvalidInitialClientIp) {
+  // The second client initial packet with the retry token is invalid
+  // as the client IP is different from the one stored in the retry token
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure());
+  EXPECT_CALL(*quicStats_, onPacketDropped(PacketDropReason::INVALID_PACKET))
+      .Times(1);
+  auto dstConnId = getTestConnectionId(hostId_);
+  auto srcConnId = getTestConnectionId(0);
+  auto retryToken = testSendRetryUnfinished(srcConnId, dstConnId, kClientAddr);
   testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr2);
 }
 
@@ -1124,6 +1319,7 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
   EXPECT_CALL(*quicStats_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
+  EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
     hasShutdown_ = true;
   }));

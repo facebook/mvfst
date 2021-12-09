@@ -76,6 +76,10 @@ void QuicServer::setRateLimit(
   rateLimit_ = folly::make_optional<RateLimit>(std::move(count), window);
 }
 
+void QuicServer::setUnfinishedHandshakeLimit(std::function<int()> limitFn) {
+  unfinishedHandshakeLimitFn_ = std::move(limitFn);
+}
+
 void QuicServer::setSupportedVersion(const std::vector<QuicVersion>& versions) {
   supportedVersions_ = versions;
 }
@@ -188,6 +192,7 @@ void QuicServer::initializeWorkers(
       worker->setRateLimiter(std::make_unique<SlidingWindowRateLimiter>(
           rateLimit_->count, rateLimit_->window));
     }
+    worker->setUnfinishedHandshakeLimit(unfinishedHandshakeLimitFn_);
     worker->setWorkerId(i);
     worker->setTransportSettingsOverrideFn(transportSettingsOverrideFn_);
     workers_.push_back(std::move(worker));

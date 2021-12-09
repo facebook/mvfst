@@ -50,6 +50,15 @@ class QuicServerTransport
         const std::vector<ConnectionIdData>& connectionIdData) noexcept = 0;
   };
 
+  class HandshakeFinishedCallback {
+   public:
+    virtual ~HandshakeFinishedCallback() = default;
+
+    virtual void onHandshakeFinished() noexcept = 0;
+
+    virtual void onHandshakeUnfinished() noexcept = 0;
+  };
+
   static QuicServerTransport::Ptr make(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
@@ -90,6 +99,9 @@ class QuicServerTransport
   ~QuicServerTransport() override;
 
   virtual void setRoutingCallback(RoutingCallback* callback) noexcept;
+
+  virtual void setHandshakeFinishedCallback(
+      HandshakeFinishedCallback* callback) noexcept;
 
   virtual void setOriginalPeerAddress(const folly::SocketAddress& addr);
 
@@ -166,12 +178,14 @@ class QuicServerTransport
   void maybeNotifyConnectionIdBound();
   void maybeWriteNewSessionTicket();
   void maybeIssueConnectionIds();
+  void maybeNotifyHandshakeFinished();
   bool hasReadCipher() const;
   void maybeStartD6DProbing();
   void registerAllTransportKnobParamHandlers();
 
  private:
   RoutingCallback* routingCb_{nullptr};
+  HandshakeFinishedCallback* handshakeFinishedCb_{nullptr};
   std::shared_ptr<const fizz::server::FizzServerContext> ctx_;
   bool notifiedRouting_{false};
   bool notifiedConnIdBound_{false};

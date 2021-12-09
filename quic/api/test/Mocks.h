@@ -264,6 +264,13 @@ class MockQuicTransport : public QuicServerTransport {
       ,
       noexcept,
       ,
+      setHandshakeFinishedCallback,
+      void(QuicServerTransport::HandshakeFinishedCallback*));
+
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
       setSupportedVersions,
       void(const std::vector<QuicVersion>&));
 

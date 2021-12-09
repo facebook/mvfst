@@ -140,6 +140,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     server->setCongestionControllerFactory(ccFactory_);
     server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
+    server->setHandshakeFinishedCallback(&handshakeFinishedCallback);
     server->setSupportedVersions(supportedVersions);
     server->setOriginalPeerAddress(clientAddr);
     server->setServerConnectionIdParams(params);
@@ -546,6 +547,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   folly::SocketAddress clientAddr;
   testing::NiceMock<MockConnectionCallback> connCallback;
   testing::NiceMock<MockRoutingCallback> routingCallback;
+  testing::NiceMock<MockHandshakeFinishedCallback> handshakeFinishedCallback;
   folly::Optional<ConnectionId> clientConnectionId;
   folly::Optional<ConnectionId> initialDestinationConnectionId;
   folly::Optional<ConnectionId> serverConnectionId;

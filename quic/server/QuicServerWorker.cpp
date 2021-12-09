@@ -14,6 +14,7 @@
 #include <quic/QuicConstants.h>
 #include <quic/common/SocketUtil.h>
 #include <quic/common/Timers.h>
+#include <atomic>
 
 #ifdef FOLLY_HAVE_MSG_ERRQUEUE
 #include <linux/net_tstamp.h>
@@ -33,6 +34,8 @@
 #include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
+
+std::atomic_int globalUnfinishedHandshakes{0};
 
 QuicServerWorker::QuicServerWorker(
     std::shared_ptr<QuicServerWorker::WorkerCallback> callback,
@@ -141,6 +144,11 @@ void QuicServerWorker::setCongestionControllerFactory(
 void QuicServerWorker::setRateLimiter(
     std::unique_ptr<RateLimiter> rateLimiter) {
   newConnRateLimiter_ = std::move(rateLimiter);
+}
+
+void QuicServerWorker::setUnfinishedHandshakeLimit(
+    std::function<int()> limitFn) {
+  unfinishedHandshakeLimitFn_ = std::move(limitFn);
 }
 
 void QuicServerWorker::start() {
@@ -635,8 +643,12 @@ void QuicServerWorker::dispatchPacketData(
 
         // If rate-limiting is configured and there is no retry token,
         // send a retry packet back to the client
-        if (!maybeEncryptedRetryToken && newConnRateLimiter_ &&
-            newConnRateLimiter_->check(networkData.receiveTimePoint)) {
+        if (!maybeEncryptedRetryToken &&
+            ((newConnRateLimiter_ &&
+              newConnRateLimiter_->check(networkData.receiveTimePoint)) ||
+             (unfinishedHandshakeLimitFn_.has_value() &&
+              globalUnfinishedHandshakes >=
+                  (*unfinishedHandshakeLimitFn_)()))) {
           if (transportSettings_.retryTokenSecret.hasValue()) {
             sendRetryPacket(
                 client,
@@ -664,6 +676,7 @@ void QuicServerWorker::dispatchPacketData(
           dropPacket = true;
           cannotMakeTransport = true;
         } else {
+          globalUnfinishedHandshakes++;
           CHECK(trans);
           if (transportSettings_.dataPathType ==
                   DataPathType::ContinuousMemory &&
@@ -672,6 +685,7 @@ void QuicServerWorker::dispatchPacketData(
           }
           trans->setPacingTimer(pacingTimer_);
           trans->setRoutingCallback(this);
+          trans->setHandshakeFinishedCallback(this);
           trans->setSupportedVersions(supportedVersions_);
           trans->setOriginalPeerAddress(client);
 #ifdef CCP_ENABLED
@@ -1233,6 +1247,14 @@ void QuicServerWorker::onConnectionUnbound(
   sourceAddressMap_.erase(source);
 }
 
+void QuicServerWorker::onHandshakeFinished() noexcept {
+  CHECK_GE(--globalUnfinishedHandshakes, 0);
+}
+
+void QuicServerWorker::onHandshakeUnfinished() noexcept {
+  CHECK_GE(--globalUnfinishedHandshakes, 0);
+}
+
 void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   VLOG(4) << "QuicServer shutdown all connections."
           << " addressMap=" << sourceAddressMap_.size()
@@ -1254,6 +1276,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     auto transport = it.second;
     transport->setRoutingCallback(nullptr);
     transport->setTransportStatsCallback(nullptr);
+    transport->setHandshakeFinishedCallback(nullptr);
     transport->closeNow(
         std::make_pair(QuicErrorCode(error), std::string("shutting down")));
   }
@@ -1263,6 +1286,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     if (auto t = transport.second.lock()) {
       t->setRoutingCallback(nullptr);
       t->setTransportStatsCallback(nullptr);
+      t->setHandshakeFinishedCallback(nullptr);
       t->closeNow(
           std::make_pair(QuicErrorCode(error), std::string("shutting down")));
       QUIC_STATS(statsCallback_, onConnectionClose, QuicErrorCode(error));

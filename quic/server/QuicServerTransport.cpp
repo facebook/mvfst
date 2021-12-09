@@ -130,6 +130,11 @@ void QuicServerTransport::setRoutingCallback(
   routingCb_ = callback;
 }
 
+void QuicServerTransport::setHandshakeFinishedCallback(
+    HandshakeFinishedCallback* callback) noexcept {
+  handshakeFinishedCb_ = callback;
+}
+
 void QuicServerTransport::setOriginalPeerAddress(
     const folly::SocketAddress& addr) {
   conn_->originalPeerAddress = addr;
@@ -188,6 +193,7 @@ void QuicServerTransport::onReadData(
   }
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
+  maybeNotifyHandshakeFinished();
   maybeIssueConnectionIds();
   maybeStartD6DProbing();
   maybeNotifyTransportReady();
@@ -369,6 +375,10 @@ void QuicServerTransport::writeData() {
 void QuicServerTransport::closeTransport() {
   if (!serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     QUIC_STATS(conn_->statsCallback, onServerUnfinishedHandshake);
+    if (handshakeFinishedCb_) {
+      handshakeFinishedCb_->onHandshakeUnfinished();
+      handshakeFinishedCb_ = nullptr;
+    }
   }
   serverConn_->serverHandshakeLayer->cancel();
   // Clear out pending data.
@@ -432,6 +442,7 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     }
     maybeWriteNewSessionTicket();
     maybeNotifyConnectionIdBound();
+    maybeNotifyHandshakeFinished();
     maybeIssueConnectionIds();
     writeSocketData();
     maybeNotifyTransportReady();
@@ -557,6 +568,14 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
     notifiedConnIdBound_ = true;
     routingCb_->onConnectionIdBound(shared_from_this());
+  }
+}
+
+void QuicServerTransport::maybeNotifyHandshakeFinished() {
+  if (handshakeFinishedCb_ &&
+      serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    handshakeFinishedCb_->onHandshakeFinished();
+    handshakeFinishedCb_ = nullptr;
   }
 }
 

@@ -135,4 +135,15 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
           const QuicServerTransport::SourceIdentity&,
           const std::vector<ConnectionIdData>& connIdData));
 };
+
+class MockHandshakeFinishedCallback
+    : public QuicServerTransport::HandshakeFinishedCallback {
+ public:
+  ~MockHandshakeFinishedCallback() override = default;
+
+  GMOCK_METHOD0_(, noexcept, , onHandshakeFinished, void());
+
+  GMOCK_METHOD0_(, noexcept, , onHandshakeUnfinished, void());
+};
+
 } // namespace quic

@@ -104,6 +104,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
       std::function<uint64_t()> count,
       std::chrono::seconds window);
 
+  void setUnfinishedHandshakeLimit(std::function<int()> limitFn);
+
   /**
    * Set list of supported QUICVersion for this server. These versions will be
    * used during the 'Version-Negotiation' phase with the client.
@@ -460,6 +462,8 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     std::chrono::seconds window;
   };
   folly::Optional<RateLimit> rateLimit_;
+
+  std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1024; }};
 
   // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
   folly::AsyncUDPSocket::BindOptions bindOptions_;
