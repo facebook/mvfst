@@ -463,7 +463,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
   };
   folly::Optional<RateLimit> rateLimit_;
 
-  std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1024; }};
+  std::function<int()> unfinishedHandshakeLimitFn_{[]() { return 1048576; }};
 
   // Options to AsyncUDPSocket::bind, only controls IPV6_ONLY currently.
   folly::AsyncUDPSocket::BindOptions bindOptions_;
