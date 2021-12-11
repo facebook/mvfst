@@ -64,6 +64,8 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD1(onDatagramWrite, void(size_t));
   MOCK_METHOD0(onDatagramDroppedOnWrite, void());
   MOCK_METHOD0(onDatagramDroppedOnRead, void());
+  MOCK_METHOD0(onNewTokenReceived, void());
+  MOCK_METHOD0(onNewTokenIssued, void());
   MOCK_METHOD0(onTokenDecryptFailure, void());
 };
 

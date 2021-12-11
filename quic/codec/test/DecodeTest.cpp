@@ -734,6 +734,25 @@ TEST_F(DecodeTest, NewTokenIncorrectDataLength) {
   EXPECT_THROW(decodeNewTokenFrame(cursor), QuicTransportException);
 }
 
+TEST_F(DecodeTest, ParsePlaintextNewToken) {
+  folly::IPAddress clientIp("127.0.0.1");
+  uint64_t timestampInMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch())
+          .count();
+
+  NewToken newToken(clientIp, timestampInMs);
+  Buf plaintextNewToken = newToken.getPlaintextToken();
+
+  folly::io::Cursor cursor(plaintextNewToken.get());
+
+  auto parseResult = parsePlaintextRetryOrNewToken(cursor);
+
+  EXPECT_TRUE(parseResult.hasValue());
+
+  EXPECT_EQ(parseResult.value(), timestampInMs);
+}
+
 TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   ConnectionId odcid = getTestConnectionId();
   folly::IPAddress clientIp("109.115.3.49");
@@ -747,23 +766,15 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   Buf plaintextRetryToken = retryToken.getPlaintextToken();
 
   folly::io::Cursor cursor(plaintextRetryToken.get());
-  auto parseResult = parsePlaintextRetryToken(cursor);
+
+  /**
+   * Now we continue with the parsing logic here.
+   */
+  auto parseResult = parsePlaintextRetryOrNewToken(cursor);
 
   EXPECT_TRUE(parseResult.hasValue());
-  EXPECT_EQ(parseResult->originalDstConnId, odcid);
-  EXPECT_EQ(parseResult->clientIp, clientIp);
-  EXPECT_EQ(parseResult->clientPort, clientPort);
-  EXPECT_EQ(parseResult->timestampInMs, timestampInMs);
-}
 
-TEST_F(DecodeTest, ParsePlaintextRetryTokenMalformed) {
-  Buf plaintextRetryToken = folly::IOBuf::copyBuffer("This is some garbage");
-
-  folly::io::Cursor cursor(plaintextRetryToken.get());
-  auto parseResult = parsePlaintextRetryToken(cursor);
-
-  EXPECT_TRUE(parseResult.hasError());
-  EXPECT_EQ(parseResult.error(), TransportErrorCode::INVALID_TOKEN);
+  EXPECT_EQ(parseResult.value(), timestampInMs);
 }
 
 } // namespace test

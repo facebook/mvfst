@@ -6,6 +6,7 @@
  *
  */
 
+#include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/state/ServerStateMachine.h>
 
 #include <quic/api/QuicTransportFunctions.h>
@@ -398,6 +399,25 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
     if (!conn.sentHandshakeDone) {
       sendSimpleFrame(conn, HandshakeDoneFrame());
       conn.sentHandshakeDone = true;
+    }
+
+    if (!conn.sentNewTokenFrame &&
+        conn.transportSettings.retryTokenSecret.has_value()) {
+      // Create NewToken struct – defaults timestamp to now
+      NewToken token(conn.peerAddress.getIPAddress());
+
+      // Encrypt two tuple -> (clientIp, curTimeInMs)
+      TokenGenerator generator(conn.transportSettings.retryTokenSecret.value());
+      auto encryptedToken = generator.encryptToken(token);
+      CHECK(encryptedToken.has_value());
+
+      std::string encryptedTokenStr =
+          encryptedToken.value()->moveToFbString().toStdString();
+
+      sendSimpleFrame(conn, NewTokenFrame(std::move(encryptedTokenStr)));
+      QUIC_STATS(conn.statsCallback, onNewTokenIssued);
+
+      conn.sentNewTokenFrame = true;
     }
   }
 }

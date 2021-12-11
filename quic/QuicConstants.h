@@ -512,6 +512,10 @@ constexpr auto kRetryTokenSecretLength = 32;
 // Set it to 5 minutes
 constexpr uint64_t kMaxRetryTokenValidMs = 1000 * 60 * 5;
 
+// Number of milliseconds the new token is valid for
+// Set to 24h
+constexpr uint64_t kMaxNewTokenValidMs = 1000 * 24 * 60 * 60;
+
 constexpr uint64_t kDefaultActiveConnectionIdLimit = 2;
 
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;

@@ -48,7 +48,7 @@ add_library(
   QuicCcpThreadLauncher.cpp
   SlidingWindowRateLimiter.cpp
   handshake/DefaultAppTokenValidator.cpp
-  handshake/RetryTokenGenerator.cpp
+  handshake/TokenGenerator.cpp
 
   # Fizz specific parts, will be split in its own lib eventually.
   ../fizz/server/handshake/AppToken.cpp

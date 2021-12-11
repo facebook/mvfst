@@ -6,9 +6,8 @@
  *
  */
 
-#include <quic/codec/Types.h>
-
 #include <quic/QuicException.h>
+#include <quic/codec/Types.h>
 
 namespace quic {
 
@@ -315,34 +314,27 @@ StreamTypeField StreamTypeField::Builder::build() {
   return StreamTypeField(field_);
 }
 
-Buf RetryToken::getPlaintextToken() {
-  // The plaintext token consists of the following:
-  // len(odcid) || odcid || port || ipaddr_len || ipaddr || timestamp
+/**
+ * Plaintext contains only the timestamp in ms. Token specific data is used as
+ * associated data during aead encryption/decryption.
+ */
+Buf QuicAddrValidationToken::getPlaintextToken() const {
   auto buf = std::make_unique<folly::IOBuf>();
-  folly::io::Appender appender(buf.get(), 20);
-
-  // Write the odcid length
-  uint8_t odcidLen = originalDstConnId.size();
-  appender.writeBE<uint8_t>(odcidLen);
-
-  // Write the odcid
-  appender.push(originalDstConnId.data(), odcidLen);
-
-  // Write the port
-  appender.writeBE<uint16_t>(clientPort);
-
-  std::string clientIpStr = clientIp.str();
-
-  // Write the ipaddr len
-  appender.writeBE<uint8_t>(clientIpStr.size());
-
-  // Write the ipaddr
-  appender.push((const uint8_t*)clientIpStr.data(), clientIpStr.size());
+  folly::io::Appender appender(buf.get(), sizeof(uint64_t));
 
   // Write the timestamp
   appender.writeBE<uint64_t>(timestampInMs);
 
   return buf;
+}
+
+Buf RetryToken::genAeadAssocData() const {
+  return folly::IOBuf::copyBuffer(
+      toString(tokenType) + originalDstConnId.hex() + clientIp.str());
+}
+
+Buf NewToken::genAeadAssocData() const {
+  return folly::IOBuf::copyBuffer(toString(tokenType) + clientIp.str());
 }
 
 std::string toString(PacketNumberSpace pnSpace) {
@@ -481,4 +473,16 @@ std::string toString(LongHeader::Types type) {
   LOG(WARNING) << "toString has unhandled long header type";
   return "UNKNOWN";
 }
+
+std::string toString(TokenType type) {
+  switch (type) {
+    case TokenType::RetryToken:
+      return "RetryToken";
+    case TokenType::NewToken:
+      return "NewToken";
+  }
+  LOG(WARNING) << "toString has unhandled token type";
+  return "UNKNOWN";
+}
+
 } // namespace quic

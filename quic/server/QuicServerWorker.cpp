@@ -29,8 +29,8 @@
 #include <quic/server/AcceptObserver.h>
 #include <quic/server/CCPReader.h>
 #include <quic/server/QuicServerWorker.h>
-#include <quic/server/handshake/RetryTokenGenerator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/server/handshake/TokenGenerator.h>
 #include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
@@ -624,32 +624,41 @@ void QuicServerWorker::dispatchPacketData(
           return;
         }
 
-        // If there is a retry token, validate it
+        // If there is a token present, decrypt it (could be either a retry
+        // token or a new token)
         folly::io::Cursor cursor(networkData.packets.front().get());
-        auto maybeEncryptedRetryToken = maybeGetEncryptedRetryToken(cursor);
-        if (maybeEncryptedRetryToken &&
-            !validateRetryToken(
-                *maybeEncryptedRetryToken,
-                routingData.destinationConnId,
-                client.getIPAddress())) {
-          QUIC_STATS(
-              statsCallback_,
-              onPacketDropped,
-              PacketDropReason::INVALID_PACKET);
-          return;
-        } else if (!maybeEncryptedRetryToken) {
+        auto maybeEncryptedToken = maybeGetEncryptedToken(cursor);
+        bool hasTokenSecret = transportSettings_.retryTokenSecret.hasValue();
+
+        // If the retryTokenSecret is not set, just skip evaluating validity of
+        // token and assume true
+        auto isValidRetryToken = !hasTokenSecret ||
+            (maybeEncryptedToken &&
+             validRetryToken(
+                 *maybeEncryptedToken,
+                 routingData.destinationConnId,
+                 client.getIPAddress()));
+
+        auto isValidNewToken = !hasTokenSecret ||
+            (maybeEncryptedToken &&
+             validNewToken(*maybeEncryptedToken, client.getIPAddress()));
+
+        if (isValidNewToken) {
+          QUIC_STATS(statsCallback_, onNewTokenReceived);
+        } else if (maybeEncryptedToken && !isValidRetryToken) {
+          // Failed to decrypt the token as either a new or retry token
           QUIC_STATS(statsCallback_, onTokenDecryptFailure);
         }
 
         // If rate-limiting is configured and there is no retry token,
         // send a retry packet back to the client
-        if (!maybeEncryptedRetryToken &&
+        if (!isValidRetryToken &&
             ((newConnRateLimiter_ &&
               newConnRateLimiter_->check(networkData.receiveTimePoint)) ||
              (unfinishedHandshakeLimitFn_.has_value() &&
               globalUnfinishedHandshakes >=
                   (*unfinishedHandshakeLimitFn_)()))) {
-          if (transportSettings_.retryTokenSecret.hasValue()) {
+          if (hasTokenSecret) {
             sendRetryPacket(
                 client,
                 routingData.destinationConnId,
@@ -881,7 +890,7 @@ void QuicServerWorker::sendResetPacket(
   QUIC_STATS(statsCallback_, onStatelessReset);
 }
 
-folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedRetryToken(
+folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedToken(
     folly::io::Cursor& cursor) {
   // Move cursor to the byte right after the initial byte
   if (!cursor.canAdvance(1)) {
@@ -902,56 +911,58 @@ folly::Optional<std::string> QuicServerWorker::maybeGetEncryptedRetryToken(
   return header.getToken();
 }
 
-bool QuicServerWorker::validateRetryToken(
-    std::string& encryptedToken,
-    const ConnectionId& dstConnId,
-    const folly::IPAddress& clientIp) {
-  // If for some reason there is a retry token, but no retry token
-  // secret, then just allow the packet
-  if (!transportSettings_.retryTokenSecret.hasValue()) {
-    LOG(ERROR) << "Received a retry token, but there is no retry token secret!";
-    return true;
-  }
-
-  // Try to decode the token
-  RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
-  auto buf = folly::IOBuf::copyBuffer(encryptedToken);
-
-  auto maybeDecryptedToken = generator.decryptToken(std::move(buf));
-  if (!maybeDecryptedToken) {
-    return false;
-  }
-
-  // Validate that the client IP address matches what is stored in the retry
-  // token
-  auto decryptedToken = maybeDecryptedToken.value();
-  if (decryptedToken.originalDstConnId != dstConnId) {
-    VLOG(4) << "Dst conn id doesn't match original dst conn id in retry token";
-    return false;
-  }
-
-  if (decryptedToken.clientIp != clientIp) {
-    VLOG(4) << "Client IP doesn't match the IP stored in the retry token";
-    return false;
-  }
-
+/**
+ * Helper method to calculate the delta between nowInMs and the time the token
+ * was issued. This delta is compared against the max lifetime of the token
+ * (e.g. 1 day for new tokens and 5 min for retry tokens) to determine
+ * validity.
+ */
+bool checkTokenAge(uint64_t tokenIssuedMs, uint64_t kTokenValidMs) {
   uint64_t nowInMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
 
   // Retry timestamps can also come from the future as the system clock can
   // move both forwards and backwards due to it being synchronized by NTP
-  auto retryTokenAgeMs = nowInMs > decryptedToken.timestampInMs
-      ? nowInMs - decryptedToken.timestampInMs
-      : decryptedToken.timestampInMs - nowInMs;
+  auto tokenAgeMs = nowInMs > tokenIssuedMs ? nowInMs - tokenIssuedMs
+                                            : tokenIssuedMs - nowInMs;
 
-  if (retryTokenAgeMs > kMaxRetryTokenValidMs) {
-    VLOG(4) << "Retry token was created more than " << kMaxRetryTokenValidMs
-            << " ms ago";
-    return false;
-  }
+  return tokenAgeMs <= kTokenValidMs;
+}
 
-  return true;
+bool QuicServerWorker::validRetryToken(
+    std::string& encryptedToken,
+    const ConnectionId& dstConnId,
+    const folly::IPAddress& clientIp) {
+  CHECK(transportSettings_.retryTokenSecret.hasValue());
+
+  TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
+
+  // Create a psuedo token to generate the assoc data.
+  RetryToken token(dstConnId, clientIp, 0);
+
+  auto maybeDecryptedRetryTokenMs = tokenGenerator.decryptToken(
+      folly::IOBuf::copyBuffer(encryptedToken), token.genAeadAssocData());
+
+  return maybeDecryptedRetryTokenMs &&
+      checkTokenAge(maybeDecryptedRetryTokenMs, kMaxRetryTokenValidMs);
+}
+
+bool QuicServerWorker::validNewToken(
+    std::string& encryptedToken,
+    const folly::IPAddress& clientIp) {
+  CHECK(transportSettings_.retryTokenSecret.hasValue());
+
+  TokenGenerator tokenGenerator(transportSettings_.retryTokenSecret.value());
+
+  // Create a psuedo token to generate the assoc data.
+  NewToken token(clientIp);
+
+  auto maybeDecryptedNewTokenMs = tokenGenerator.decryptToken(
+      folly::IOBuf::copyBuffer(encryptedToken), token.genAeadAssocData());
+
+  return maybeDecryptedNewTokenMs &&
+      checkTokenAge(maybeDecryptedNewTokenMs, kMaxNewTokenValidMs);
 }
 
 void QuicServerWorker::sendRetryPacket(
@@ -959,9 +970,12 @@ void QuicServerWorker::sendRetryPacket(
     const ConnectionId& dstConnId,
     const ConnectionId& srcConnId) {
   // Create the encrypted retry token
-  RetryTokenGenerator generator(transportSettings_.retryTokenSecret.value());
-  auto encryptedToken = generator.encryptToken(
-      dstConnId, client.getIPAddress(), client.getPort());
+  TokenGenerator generator(transportSettings_.retryTokenSecret.value());
+
+  // RetryToken defaults to currentTimeInMs
+  RetryToken retryToken(dstConnId, client.getIPAddress(), client.getPort());
+  auto encryptedToken = generator.encryptToken(retryToken);
+
   CHECK(encryptedToken.has_value());
   std::string encryptedTokenStr =
       encryptedToken.value()->moveToFbString().toStdString();

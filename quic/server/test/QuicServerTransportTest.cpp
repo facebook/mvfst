@@ -3338,6 +3338,69 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
   EXPECT_EQ(numHandshakeDone, 1);
 }
 
+/**
+ * Returns the number of new token frames (should either be zero or one).
+ */
+int numNewTokenFrames(const std::deque<OutstandingPacket>& packets) {
+  int numNewTokens = 0;
+  for (auto& p : packets) {
+    for (auto& f : p.packet.frames) {
+      auto s = f.asQuicSimpleFrame();
+      numNewTokens += (s && s->asNewTokenFrame());
+    }
+  }
+
+  return numNewTokens;
+}
+
+TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
+  std::array<uint8_t, kRetryTokenSecretLength> secret;
+  folly::Random::secureRandom(secret.data(), secret.size());
+  server->getNonConstConn().transportSettings.retryTokenSecret = secret;
+
+  getFakeHandshakeLayer()->allowZeroRttKeys();
+  setupClientReadCodec();
+  recvClientHello(true, QuicVersion::QUIC_DRAFT);
+
+  /**
+   * Receiving just the chlo should not issue a NewTokenFrame.
+   */
+  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 0);
+
+  EXPECT_CALL(*quicStats_, onNewTokenIssued());
+  recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
+
+  /**
+   * After the handshake is complete, we expect only one NewTokenFrame to be
+   * issued.
+   */
+  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 1);
+  loopForWrites();
+
+  /**
+   * Receiving client data post-handshake should not issue any NewTokenFrames.
+   */
+
+  // Remove any packets that might have been queued.
+  server->getNonConstConn().outstandings.packets.clear();
+  server->getNonConstConn().outstandings.packetCount = {};
+
+  StreamId streamId = server->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("data");
+  auto packet = packetToBuf(createStreamPacket(
+      *clientConnectionId,
+      *server->getConn().serverConnectionId,
+      clientNextAppDataPacketNum++,
+      streamId,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+  deliverData(std::move(packet));
+
+  EXPECT_EQ(server->getConn().streamManager->streamCount(), 1);
+  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 0);
+}
+
 TEST_F(
     QuicUnencryptedServerTransportTest,
     IncreaseLimitAfterReceivingNewPacket) {

@@ -133,7 +133,7 @@ ReadNewTokenFrame decodeNewTokenFrame(folly::io::Cursor& cursor);
 
 HandshakeDoneFrame decodeHandshakeDoneFrame(folly::io::Cursor& cursor);
 
-folly::Expected<RetryToken, TransportErrorCode> parsePlaintextRetryToken(
+folly::Expected<uint64_t, TransportErrorCode> parsePlaintextRetryOrNewToken(
     folly::io::Cursor& cursor);
 
 DatagramFrame decodeDatagramFrame(BufQueue& queue, bool hasLen);

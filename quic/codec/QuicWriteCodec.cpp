@@ -488,6 +488,25 @@ size_t writeSimpleFrame(
       // no space left in packet
       return size_t(0);
     }
+    case QuicSimpleFrame::Type::NewTokenFrame: {
+      const auto newTokenFrame = frame.asNewTokenFrame();
+      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::NEW_TOKEN));
+
+      auto& token = newTokenFrame->token;
+      auto tokenLength = static_cast<uint8_t>(token.size());
+      auto newTokenFrameLength = intFrameType.getSize() +
+          /*encoding token length*/ sizeof(uint8_t) + tokenLength;
+
+      if (packetSpaceCheck(spaceLeft, newTokenFrameLength)) {
+        builder.write(intFrameType);
+        builder.writeBE(tokenLength);
+        builder.push((uint8_t*)token.data(), tokenLength);
+        builder.appendFrame(QuicSimpleFrame(*newTokenFrame));
+        return newTokenFrameLength;
+      }
+      // no space left in packet
+      return size_t(0);
+    }
   }
   folly::assume_unreachable();
 }

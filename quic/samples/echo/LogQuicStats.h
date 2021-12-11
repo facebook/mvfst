@@ -83,6 +83,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onConnectionRateLimited";
   }
 
+  void onNewTokenReceived() override {
+    VLOG(2) << prefix_ << "onNewTokenReceived";
+  }
+
+  void onNewTokenIssued() override {
+    VLOG(2) << prefix_ << "onNewTokenIssued";
+  }
+
   void onTokenDecryptFailure() override {
     VLOG(2) << prefix_ << "onTokenDecryptFailure";
   }

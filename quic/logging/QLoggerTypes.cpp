@@ -19,6 +19,13 @@ folly::dynamic PaddingFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic NewTokenFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["frame_type"] = toQlogString(FrameType::NEW_TOKEN);
+  d["token"] = token;
+  return d;
+}
+
 folly::dynamic RstStreamFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::RST_STREAM);

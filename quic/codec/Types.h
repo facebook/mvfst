@@ -39,6 +39,8 @@ enum class PacketNumberSpace : uint8_t {
   MAX = PacketNumberSpace::AppData
 };
 
+enum class TokenType : uint8_t { RetryToken = 0, NewToken };
+
 constexpr uint8_t kHeaderFormMask = 0x80;
 constexpr auto kMaxPacketNumEncodingSize = 4;
 constexpr auto kNumInitialAckBlocksPerFrame = 32;
@@ -267,6 +269,22 @@ struct WriteCryptoFrame {
 
   bool operator==(const WriteCryptoFrame& rhs) const {
     return offset == rhs.offset && len == rhs.len;
+  }
+};
+
+struct NewTokenFrame {
+  std::string token;
+
+  explicit NewTokenFrame(std::string tokenIn) {
+    token = std::move(tokenIn);
+  }
+
+  NewTokenFrame(const NewTokenFrame& other) {
+    token = other.token;
+  }
+
+  bool operator==(const NewTokenFrame& rhs) const {
+    return token == rhs.token;
   }
 };
 
@@ -622,26 +640,77 @@ struct StatelessReset {
       : token(std::move(tokenIn)) {}
 };
 
-struct RetryToken {
+struct QuicAddrValidationToken {
+  QuicAddrValidationToken(folly::IPAddress clientIpIn, uint64_t timestampInMsIn)
+      : clientIp(clientIpIn), timestampInMs(timestampInMsIn) {}
+
+  QuicAddrValidationToken(const QuicAddrValidationToken& other) = default;
+
+  QuicAddrValidationToken& operator=(const QuicAddrValidationToken& other) =
+      default;
+
+  FOLLY_NODISCARD Buf getPlaintextToken() const;
+  FOLLY_NODISCARD virtual TokenType getTokenType() const = 0;
+  FOLLY_NODISCARD virtual Buf genAeadAssocData() const = 0;
+  virtual ~QuicAddrValidationToken() = default;
+
+  folly::IPAddress clientIp;
+  uint64_t timestampInMs;
+};
+
+struct RetryToken : QuicAddrValidationToken {
   RetryToken(
       ConnectionId originalDstConnIdIn,
       folly::IPAddress clientIpIn,
       uint16_t clientPortIn,
-      uint64_t timestampInMsIn)
-      : originalDstConnId(originalDstConnIdIn),
-        clientIp(clientIpIn),
-        clientPort(clientPortIn),
-        timestampInMs(timestampInMsIn) {}
+      uint64_t timestampInMsIn =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count())
+      : QuicAddrValidationToken(clientIpIn, timestampInMsIn),
+        originalDstConnId(originalDstConnIdIn),
+        clientPort(clientPortIn) {}
 
-  // We serialize the members to obtain a plaintext token.
-  // This token is encrypted before it's placed in the outgoing
-  // Retry packet.
-  Buf getPlaintextToken();
+  RetryToken(const RetryToken& other) = default;
+
+  RetryToken& operator=(const RetryToken& other) = default;
+
+  FOLLY_NODISCARD TokenType getTokenType() const override {
+    return tokenType;
+  }
+
+  FOLLY_NODISCARD Buf genAeadAssocData() const override;
 
   ConnectionId originalDstConnId;
-  folly::IPAddress clientIp;
   uint16_t clientPort;
-  uint64_t timestampInMs;
+
+  static constexpr TokenType tokenType = TokenType::RetryToken;
+};
+
+struct NewToken : QuicAddrValidationToken {
+  explicit NewToken(
+      folly::IPAddress clientIpIn,
+      uint64_t timestampInMsIn =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::system_clock::now().time_since_epoch())
+              .count())
+      : QuicAddrValidationToken(clientIpIn, timestampInMsIn) {}
+
+  NewToken(const NewToken& other) = default;
+
+  NewToken& operator=(const NewToken& other) = default;
+
+  FOLLY_NODISCARD TokenType getTokenType() const override {
+    return tokenType;
+  }
+
+  FOLLY_NODISCARD Buf genAeadAssocData() const override;
+
+  bool operator==(const NewToken& other) const {
+    return clientIp == other.clientIp && timestampInMs == other.timestampInMs;
+  }
+
+  static constexpr TokenType tokenType = TokenType::NewToken;
 };
 
 #define QUIC_SIMPLE_FRAME(F, ...)         \
@@ -653,7 +722,8 @@ struct RetryToken {
   F(RetireConnectionIdFrame, __VA_ARGS__) \
   F(HandshakeDoneFrame, __VA_ARGS__)      \
   F(KnobFrame, __VA_ARGS__)               \
-  F(AckFrequencyFrame, __VA_ARGS__)
+  F(AckFrequencyFrame, __VA_ARGS__)       \
+  F(NewTokenFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
 
@@ -1044,5 +1114,7 @@ inline std::ostream& operator<<(std::ostream& os, PacketNumberSpace pnSpace) {
 }
 
 std::string toString(ProtectionType protectionType);
+
+std::string toString(TokenType type);
 
 } // namespace quic

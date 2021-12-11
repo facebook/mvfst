@@ -129,6 +129,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // Whether we've sent the handshake done signal yet.
   bool sentHandshakeDone{false};
 
+  // Whether we've sent the new_token frame yet.
+  bool sentNewTokenFrame{false};
+
 #ifdef CCP_ENABLED
   // Pointer to struct that maintains state needed for interacting with libccp.
   // Once instance of this struct is created for each instance of

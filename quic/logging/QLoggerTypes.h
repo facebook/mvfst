@@ -130,6 +130,14 @@ class DataBlockedFrameLog : public QLogFrame {
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
+class NewTokenFrameLog : public QLogFrame {
+ public:
+  std::string token;
+  explicit NewTokenFrameLog(std::string tokenIn) : token(std::move(tokenIn)) {}
+  ~NewTokenFrameLog() override = default;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
+};
+
 class KnobFrameLog : public QLogFrame {
  public:
   uint64_t knobSpace;

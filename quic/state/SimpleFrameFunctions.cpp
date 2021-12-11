@@ -6,11 +6,10 @@
  *
  */
 
-#include "SimpleFrameFunctions.h"
-
 #include <quic/QuicConstants.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/SimpleFrameFunctions.h>
 #include <quic/state/stream/StreamSendHandlers.h>
 
 namespace quic {
@@ -45,6 +44,7 @@ folly::Optional<QuicSimpleFrame> updateSimpleFrameOnPacketClone(
     case QuicSimpleFrame::Type::KnobFrame:
     case QuicSimpleFrame::Type::AckFrequencyFrame:
     case QuicSimpleFrame::Type::RetireConnectionIdFrame:
+    case QuicSimpleFrame::Type::NewTokenFrame:
       // TODO junqiw
       return QuicSimpleFrame(frame);
   }
@@ -105,6 +105,7 @@ void updateSimpleFrameOnPacketLoss(
     case QuicSimpleFrame::Type::RetireConnectionIdFrame:
     case QuicSimpleFrame::Type::KnobFrame:
     case QuicSimpleFrame::Type::AckFrequencyFrame:
+    case QuicSimpleFrame::Type::NewTokenFrame:
       conn.pendingEvents.frames.push_back(frame);
       break;
   }
@@ -264,6 +265,10 @@ bool updateSimpleFrameOnPacketReceived(
                 conn.transportSettings.minAckDelay->count(),
                 ackFrequencyFrame->updateMaxAckDelay));
       }
+      return true;
+    }
+    case QuicSimpleFrame::Type::NewTokenFrame: {
+      // TODO: client impl
       return true;
     }
   }

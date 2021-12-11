@@ -66,6 +66,12 @@ void addQuicSimpleFrameToEvent(
           frame.ignoreOrder));
       break;
     }
+    case quic::QuicSimpleFrame::Type::NewTokenFrame: {
+      const quic::NewTokenFrame& frame = *simpleFrame.asNewTokenFrame();
+      event->frames.push_back(
+          std::make_unique<quic::NewTokenFrameLog>(frame.token));
+      break;
+    }
   }
 }
 } // namespace
