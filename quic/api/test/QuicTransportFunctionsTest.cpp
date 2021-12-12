@@ -26,6 +26,8 @@ using namespace testing;
 namespace quic {
 namespace test {
 
+using PacketStreamDetails = OutstandingPacketMetadata::StreamDetails;
+
 uint64_t writeProbingDataToSocketForTest(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& conn,
@@ -1647,7 +1649,7 @@ TEST_F(QuicTransportFunctionsTest, TestUpdateConnectionConnWindowUpdate) {
   EXPECT_EQ(frame->maximumData, conn->flowControlState.advertisedMaxOffset);
 }
 
-TEST_F(QuicTransportFunctionsTest, TestStreamDetailsEmptyPacket) {
+TEST_F(QuicTransportFunctionsTest, StreamDetailsEmptyPacket) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   updateConnection(
@@ -1658,12 +1660,12 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsEmptyPacket) {
       getEncodedSize(packet),
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
-  // Since there is no ACK eliciting frame in this packet, it is not included as
-  // an outstanding packet
+  // Since there is no ACK eliciting frame in this packet,
+  // it is not included as an outstanding packet, and there's no StreamDetails
   EXPECT_EQ(0, conn->outstandings.packets.size());
 }
 
-TEST_F(QuicTransportFunctionsTest, TestStreamDetailsControlPacket) {
+TEST_F(QuicTransportFunctionsTest, StreamDetailsNoStreamsInPacket) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
@@ -1684,16 +1686,19 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsControlPacket) {
   const auto& detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
           ->metadata.detailsPerStream;
-  EXPECT_EQ(0, detailsPerStream.size());
+  EXPECT_THAT(detailsPerStream, IsEmpty());
 }
 
-TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
+TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStream) {
+  uint64_t frameOffset = 0;
+  uint64_t frameLen = 10;
+
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
   writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
   WriteStreamFrame writeStreamFrame(
-      stream->id, 0 /* offset */, 10 /* length */, false /* fin */);
+      stream->id, frameOffset, frameLen, false /* fin */);
   packet.packet.frames.push_back(writeStreamFrame);
   updateConnection(
       *conn,
@@ -1704,21 +1709,31 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
 
-  ASSERT_EQ(1, conn->outstandings.packets.size());
-  auto detailsPerStream =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(false, streamDetail.finObserved);
-  EXPECT_EQ(10, streamDetail.streamBytesSent);
-  EXPECT_EQ(10, streamDetail.newStreamBytesSent);
-  EXPECT_EQ(0, streamDetail.maybeFirstNewStreamByteOffset.value());
+  const auto streamMatcher = testing::Pair(
+      stream->id,
+      testing::AllOf(
+          testing::Field(&PacketStreamDetails::finObserved, false),
+          testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
+          testing::Field(&PacketStreamDetails::newStreamBytesSent, frameLen),
+          testing::Field(
+              &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+              folly::Optional<uint64_t>(frameOffset)),
+          testing::Field(
+              &PacketStreamDetails::streamIntervals,
+              testing::ElementsAre(Interval<uint64_t>(
+                  frameOffset, frameOffset + frameLen - 1)))));
+  const auto pktMatcher = testing::Field(
+      &OutstandingPacket::metadata,
+      testing::AllOf(
+          testing::Field(
+              &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+          testing::Field(
+              &OutstandingPacketMetadata::detailsPerStream,
+              testing::UnorderedElementsAre(streamMatcher))));
+  EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
 }
 
-TEST_F(
-    QuicTransportFunctionsTest,
-    TestStreamDetailsAppDataPacketSingleStreamMultipleFrames) {
+TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamMultipleFrames) {
   auto conn = createConn();
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
@@ -1739,25 +1754,35 @@ TEST_F(
       getEncodedBodySize(packet),
       false /* isDSRPacket */);
 
-  ASSERT_EQ(1, conn->outstandings.packets.size());
-  auto detailsPerStream =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(true, streamDetail.finObserved);
-  EXPECT_EQ(15, streamDetail.streamBytesSent);
-  EXPECT_EQ(15, streamDetail.newStreamBytesSent);
-  EXPECT_EQ(0, streamDetail.maybeFirstNewStreamByteOffset.value());
+  const auto streamMatcher = testing::Pair(
+      stream->id,
+      testing::AllOf(
+          testing::Field(&PacketStreamDetails::finObserved, true),
+          testing::Field(&PacketStreamDetails::streamBytesSent, 15),
+          testing::Field(&PacketStreamDetails::newStreamBytesSent, 15),
+          testing::Field(
+              &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+              folly::Optional<uint64_t>(0)),
+          testing::Field(
+              &PacketStreamDetails::streamIntervals,
+              testing::ElementsAre(Interval<uint64_t>(0, 14)))));
+  const auto pktMatcher = testing::Field(
+      &OutstandingPacket::metadata,
+      testing::AllOf(
+          testing::Field(
+              &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+          testing::Field(
+              &OutstandingPacketMetadata::detailsPerStream,
+              testing::UnorderedElementsAre(streamMatcher))));
+  EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
 }
 
-TEST_F(
-    QuicTransportFunctionsTest,
-    TestStreamDetailsAppDataPacketSingleStreamRetransmit) {
+TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamRetransmit) {
   auto conn = createConn();
   auto stream = conn->streamManager->createNextBidirectionalStream().value();
 
-  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("abcdefghij"), false /* eof */);
   uint64_t frame1Offset = 0;
   uint64_t frame1Len = 10;
   auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -1775,15 +1800,30 @@ TEST_F(
   ASSERT_EQ(1, conn->outstandings.packets.size());
 
   // The first outstanding packet is the one with new data
-  auto detailsPerStream =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(false, streamDetail.finObserved);
-  EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
-  EXPECT_EQ(frame1Len, streamDetail.newStreamBytesSent);
-  EXPECT_EQ(frame1Offset, streamDetail.maybeFirstNewStreamByteOffset.value());
+  {
+    const auto streamMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, frame1Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, frame1Len),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(frame1Offset)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    frame1Offset, frame1Offset + frame1Len - 1)))));
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
+  }
 
   // retransmit the same frame1 again.
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -1800,18 +1840,34 @@ TEST_F(
   ASSERT_EQ(2, conn->outstandings.packets.size());
 
   // The second outstanding packet is the one with retransmit data
-  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(false, streamDetail.finObserved);
-  EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
-  EXPECT_EQ(0, streamDetail.newStreamBytesSent);
-  EXPECT_FALSE(streamDetail.maybeFirstNewStreamByteOffset.has_value());
+  {
+    const auto streamMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, frame1Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    frame1Offset, frame1Offset + frame1Len - 1)))));
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
+  }
 
   // Retransmit frame1 and send new data in frame2.
   writeDataToQuicStream(
-      *stream, folly::IOBuf::copyBuffer("klmnopqrstuvwxy"), true);
+      *stream, folly::IOBuf::copyBuffer("klmnopqrstuvwxy"), false /* eof */);
   uint64_t frame2Offset = 10;
   uint64_t frame2Len = 15;
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -1830,14 +1886,31 @@ TEST_F(
   ASSERT_EQ(3, conn->outstandings.packets.size());
 
   // The third outstanding packet will have both new and retransmitted data.
-  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(false, streamDetail.finObserved);
-  EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
-  EXPECT_EQ(frame2Len, streamDetail.newStreamBytesSent);
-  EXPECT_EQ(frame2Offset, streamDetail.maybeFirstNewStreamByteOffset.value());
+  {
+    const auto streamMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(
+                &PacketStreamDetails::streamBytesSent, frame1Len + frame2Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, frame2Len),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(frame2Offset)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    frame1Offset, frame2Offset + frame2Len - 1)))));
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
+  }
 
   // Retransmit frame1 aand frame2.
   packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
@@ -1855,65 +1928,640 @@ TEST_F(
   ASSERT_EQ(4, conn->outstandings.packets.size());
 
   // The forth outstanding packet will have only retransmit data.
-  detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream;
-  EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream.at(stream->id);
-  EXPECT_EQ(false, streamDetail.finObserved);
-  EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
-  EXPECT_EQ(0, streamDetail.newStreamBytesSent);
-  EXPECT_FALSE(streamDetail.maybeFirstNewStreamByteOffset.has_value());
+  {
+    const auto streamMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(
+                &PacketStreamDetails::streamBytesSent, frame1Len + frame2Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    frame1Offset, frame2Offset + frame2Len - 1)))));
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, StreamDetailsSingleStreamFinWithRetransmit) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const uint64_t frameLen = 1;
+
+  // write two packets, each containing one byte of frame data
+  // second packet contains FIN
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("a"), false /* eof */);
+  uint64_t frame1Offset = 0;
+  auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
+  packet1.packet.frames.push_back(frame1);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet1.packet,
+      TimePoint(),
+      getEncodedSize(packet1),
+      getEncodedBodySize(packet1),
+      false /* isDSRPacket */);
+
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("b"), true /* eof */);
+  uint64_t frame2Offset = (frameLen * 2) - 1;
+  auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, true /* fin */);
+  packet2.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet2),
+      getEncodedBodySize(packet2),
+      false /* isDSRPacket */);
+
+  // Should be two packets at this point, each with 1 frame of data
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(2));
+  {
+    auto getStreamDetailsMatcher = [&stream, &frameLen](
+                                       auto frameOffset, bool finObserved) {
+      return testing::Pair(
+          stream->id,
+          testing::AllOf(
+              testing::Field(&PacketStreamDetails::finObserved, finObserved),
+              testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::newStreamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                  folly::Optional<uint64_t>(frameOffset)),
+              testing::Field(
+                  &PacketStreamDetails::streamIntervals,
+                  testing::ElementsAre(Interval<uint64_t>(
+                      frameOffset, frameOffset + frameLen - 1)))));
+    };
+
+    const auto pkt1Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(getStreamDetailsMatcher(
+                    frame1Offset, false /* finObserved */)))));
+    const auto pkt2Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(getStreamDetailsMatcher(
+                    frame2Offset, true /* finObserved */)))));
+    EXPECT_THAT(
+        conn->outstandings.packets, ElementsAre(pkt1Matcher, pkt2Matcher));
+  }
+
+  // retransmit both frames in packet3
+  auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet3.packet.frames.push_back(frame1);
+  packet3.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet3.packet,
+      TimePoint(),
+      getEncodedSize(packet3),
+      getEncodedBodySize(packet3),
+      false /* isDSRPacket */);
+
+  // Should be three packets at this point
+  //
+  // StreamDetails should report fin since frame2 is in packet3
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(3));
+  {
+    auto streamDetailsMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, true),
+            testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                // contains frame1 and frame2
+                testing::ElementsAre(Interval<uint64_t>(
+                    frame1Offset, frame2Offset + frameLen - 1)))));
+
+    const auto pkt3Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pkt3Matcher));
+  }
 }
 
 TEST_F(
     QuicTransportFunctionsTest,
-    TestStreamDetailsAppDataPacketMultipleStreams) {
+    StreamDetailsSingleStreamSingleBytePktsPartialAckRetransmit) {
   auto conn = createConn();
-  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const uint64_t frameLen = 1;
+
+  // write three packets, each containing one byte of frame data
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("a"), false /* eof */);
+  uint64_t frame1Offset = 0;
+  auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
+  packet1.packet.frames.push_back(frame1);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet1.packet,
+      TimePoint(),
+      getEncodedSize(packet1),
+      getEncodedBodySize(packet1),
+      false /* isDSRPacket */);
+
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("b"), false /* eof */);
+  uint64_t frame2Offset = frameLen;
+  auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, false /* fin */);
+  packet2.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet2),
+      getEncodedBodySize(packet2),
+      false /* isDSRPacket */);
+
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("c"), false /* eof */);
+  uint64_t frame3Offset = frameLen * 2;
+  auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame3(stream->id, frame3Offset, frameLen, false /* fin */);
+  packet3.packet.frames.push_back(frame3);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet3.packet,
+      TimePoint(),
+      getEncodedSize(packet3),
+      getEncodedBodySize(packet3),
+      false /* isDSRPacket */);
+
+  // Should be three packets at this point, each with 1 frame of data
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(3));
+  {
+    auto getStreamDetailsMatcher = [&stream, &frameLen](auto frameOffset) {
+      return testing::Pair(
+          stream->id,
+          testing::AllOf(
+              testing::Field(&PacketStreamDetails::finObserved, false),
+              testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::newStreamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                  folly::Optional<uint64_t>(frameOffset)),
+              testing::Field(
+                  &PacketStreamDetails::streamIntervals,
+                  testing::ElementsAre(Interval<uint64_t>(
+                      frameOffset, frameOffset + frameLen - 1)))));
+    };
+
+    const auto pkt1Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
+    const auto pkt2Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
+    const auto pkt3Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame3Offset)))));
+    EXPECT_THAT(
+        conn->outstandings.packets,
+        ElementsAre(pkt1Matcher, pkt2Matcher, pkt3Matcher));
+  }
+
+  // retransmit contents of packet1 and packet3 (frame1 and frame3) in packet4
+  // simulates ACK of packet2 and loss of packet1 and packet3
+  auto packet4 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet4.packet.frames.push_back(frame1);
+  packet4.packet.frames.push_back(frame3);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet4.packet,
+      TimePoint(),
+      getEncodedSize(packet4),
+      getEncodedBodySize(packet4),
+      false /* isDSRPacket */);
+
+  // Should be four packets at this point
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(4));
+  {
+    auto streamDetailsMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                // contains frame1 and frame 3
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame1Offset + frameLen - 1),
+                    Interval<uint64_t>(
+                        frame3Offset, frame3Offset + frameLen - 1)))));
+
+    const auto pkt4Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pkt4Matcher));
+  }
+}
+
+TEST_F(
+    QuicTransportFunctionsTest,
+    StreamDetailsSingleStreamTwoBytePktsPartialAckRetransmit) {
+  auto conn = createConn();
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const uint64_t frameLen = 2;
+
+  // write three packets, each containing two bytes of frame data
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("ab"), false /* eof */);
+  uint64_t frame1Offset = 0;
+  auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame1(stream->id, frame1Offset, frameLen, false /* fin */);
+  packet1.packet.frames.push_back(frame1);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet1.packet,
+      TimePoint(),
+      getEncodedSize(packet1),
+      getEncodedBodySize(packet1),
+      false /* isDSRPacket */);
+
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("cd"), false /* eof */);
+  uint64_t frame2Offset = frameLen;
+  LOG(INFO) << "frame2Offset = " << frame2Offset;
+  auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame2(stream->id, frame2Offset, frameLen, false /* fin */);
+  packet2.packet.frames.push_back(frame2);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet2),
+      getEncodedBodySize(packet2),
+      false /* isDSRPacket */);
+
+  writeDataToQuicStream(
+      *stream, folly::IOBuf::copyBuffer("ef"), false /* eof */);
+  uint64_t frame3Offset = (frameLen * 2);
+  LOG(INFO) << "frame3Offset = " << frame3Offset;
+  auto packet3 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame frame3(stream->id, frame3Offset, frameLen, false /* fin */);
+  packet3.packet.frames.push_back(frame3);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet3.packet,
+      TimePoint(),
+      getEncodedSize(packet3),
+      getEncodedBodySize(packet3),
+      false /* isDSRPacket */);
+
+  // Should be three packets at this point, each with 1 frame of data
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(3));
+  {
+    auto getStreamDetailsMatcher = [&stream, &frameLen](auto frameOffset) {
+      return testing::Pair(
+          stream->id,
+          testing::AllOf(
+              testing::Field(&PacketStreamDetails::finObserved, false),
+              testing::Field(&PacketStreamDetails::streamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::newStreamBytesSent, frameLen),
+              testing::Field(
+                  &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                  folly::Optional<uint64_t>(frameOffset)),
+              testing::Field(
+                  &PacketStreamDetails::streamIntervals,
+                  testing::ElementsAre(Interval<uint64_t>(
+                      frameOffset, frameOffset + frameLen - 1)))));
+    };
+
+    const auto pkt1Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame1Offset)))));
+    const auto pkt2Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame2Offset)))));
+    const auto pkt3Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(3)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    getStreamDetailsMatcher(frame3Offset)))));
+    EXPECT_THAT(
+        conn->outstandings.packets,
+        ElementsAre(pkt1Matcher, pkt2Matcher, pkt3Matcher));
+  }
+
+  // retransmit contents of packet1 and packet3 (frame1 and frame3) in packet4
+  // simulates ACK of packet2 and loss of packet1 and packet3
+  auto packet4 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet4.packet.frames.push_back(frame1);
+  packet4.packet.frames.push_back(frame3);
+  updateConnection(
+      *conn,
+      folly::none,
+      packet4.packet,
+      TimePoint(),
+      getEncodedSize(packet4),
+      getEncodedBodySize(packet4),
+      false /* isDSRPacket */);
+
+  // Should be four packets at this point
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(4));
+  {
+    auto streamDetailsMatcher = testing::Pair(
+        stream->id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, frameLen * 2),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                // contains frame1 and frame 3
+                testing::ElementsAre(
+                    Interval<uint64_t>(
+                        frame1Offset, frame1Offset + frameLen - 1),
+                    Interval<uint64_t>(
+                        frame3Offset, frame3Offset + frameLen - 1)))));
+
+    const auto pkt4Matcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(4)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(streamDetailsMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pkt4Matcher));
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, StreamDetailsMultipleStreams) {
+  auto conn = createConn();
   auto stream1Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream2Id =
       conn->streamManager->createNextBidirectionalStream().value()->id;
+  auto stream3Id =
+      conn->streamManager->createNextBidirectionalStream().value()->id;
   auto stream1 = conn->streamManager->findStream(stream1Id);
   auto stream2 = conn->streamManager->findStream(stream2Id);
-  EXPECT_NE(nullptr, stream1);
-  EXPECT_NE(nullptr, stream2);
+  auto stream3 = conn->streamManager->findStream(stream3Id);
+  ASSERT_NE(nullptr, stream1);
+  ASSERT_NE(nullptr, stream2);
+  ASSERT_NE(nullptr, stream3);
 
   auto buf = IOBuf::copyBuffer("hey whats up");
   writeDataToQuicStream(*stream1, buf->clone(), true);
   writeDataToQuicStream(*stream2, buf->clone(), true);
+  writeDataToQuicStream(*stream3, buf->clone(), true);
 
-  WriteStreamFrame writeStreamFrame1(stream1->id, 0, 5, false),
-      writeStreamFrame2(stream2->id, 0, 12, true);
-  packet.packet.frames.push_back(writeStreamFrame1);
-  packet.packet.frames.push_back(writeStreamFrame2);
+  uint64_t stream1Offset = 0;
+  uint64_t stream2Offset = 0;
+  uint64_t stream3Offset = 0;
+  uint64_t stream1Len = 5;
+  uint64_t stream2Len = 12;
+  uint64_t stream3Len = 5;
+
+  auto packet1 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  WriteStreamFrame writeStreamFrame1(
+      stream1->id, stream1Offset, stream1Len, false);
+  WriteStreamFrame writeStreamFrame2(
+      stream2->id, stream2Offset, stream2Len, true);
+  WriteStreamFrame writeStreamFrame3(
+      stream3->id, stream3Offset, stream3Len, true);
+  packet1.packet.frames.push_back(writeStreamFrame1);
+  packet1.packet.frames.push_back(writeStreamFrame2);
+  packet1.packet.frames.push_back(writeStreamFrame3);
 
   updateConnection(
       *conn,
       folly::none,
-      packet.packet,
+      packet1.packet,
       TimePoint(),
-      getEncodedSize(packet),
-      getEncodedBodySize(packet),
+      getEncodedSize(packet1),
+      getEncodedBodySize(packet1),
       false /* isDSRPacket */);
 
-  ASSERT_EQ(1, conn->outstandings.packets.size());
-  auto detailsPerStream =
-      getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream;
-  EXPECT_EQ(2, detailsPerStream.size());
-  auto stream1Detail = detailsPerStream.at(stream1Id);
-  auto stream2Detail = detailsPerStream.at(stream2Id);
+  // check stream details for the sent packet
+  {
+    auto stream1DetailsMatcher = testing::Pair(
+        stream1Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream1Len),
+            testing::Field(
+                &PacketStreamDetails::newStreamBytesSent, stream1Len),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(stream1Offset)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream1Offset, stream1Offset + stream1Len - 1)))));
+    auto stream2DetailsMatcher = testing::Pair(
+        stream2Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, true),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream2Len),
+            testing::Field(
+                &PacketStreamDetails::newStreamBytesSent, stream2Len),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(stream2Offset)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream2Offset, stream2Offset + stream2Len - 1)))));
+    auto stream3DetailsMatcher = testing::Pair(
+        stream3Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, true),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream3Len),
+            testing::Field(
+                &PacketStreamDetails::newStreamBytesSent, stream3Len),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(stream3Offset)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream3Offset, stream3Offset + stream3Len - 1)))));
 
-  EXPECT_EQ(false, stream1Detail.finObserved);
-  EXPECT_EQ(5, stream1Detail.streamBytesSent);
-  EXPECT_EQ(5, stream1Detail.newStreamBytesSent);
-  EXPECT_EQ(0, stream1Detail.maybeFirstNewStreamByteOffset.value());
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(1)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    stream1DetailsMatcher,
+                    stream2DetailsMatcher,
+                    stream3DetailsMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, ElementsAre(pktMatcher));
+  }
 
-  EXPECT_EQ(true, stream2Detail.finObserved);
-  EXPECT_EQ(12, stream2Detail.streamBytesSent);
-  EXPECT_EQ(12, stream2Detail.newStreamBytesSent);
-  EXPECT_EQ(0, stream2Detail.maybeFirstNewStreamByteOffset.value());
+  // retransmit the packet
+  auto packet2 = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  packet2.packet.frames.push_back(writeStreamFrame1);
+  packet2.packet.frames.push_back(writeStreamFrame2);
+  packet2.packet.frames.push_back(writeStreamFrame3);
+
+  updateConnection(
+      *conn,
+      folly::none,
+      packet2.packet,
+      TimePoint(),
+      getEncodedSize(packet1),
+      getEncodedBodySize(packet1),
+      false /* isDSRPacket */);
+
+  // check stream details for the retransmitted packet
+  EXPECT_THAT(conn->outstandings.packets, SizeIs(2));
+  {
+    auto stream1DetailsMatcher = testing::Pair(
+        stream1Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, false),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream1Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream1Offset, stream1Offset + stream1Len - 1)))));
+    auto stream2DetailsMatcher = testing::Pair(
+        stream2Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, true),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream2Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream2Offset, stream2Offset + stream2Len - 1)))));
+    auto stream3DetailsMatcher = testing::Pair(
+        stream3Id,
+        testing::AllOf(
+            testing::Field(&PacketStreamDetails::finObserved, true),
+            testing::Field(&PacketStreamDetails::streamBytesSent, stream3Len),
+            testing::Field(&PacketStreamDetails::newStreamBytesSent, 0),
+            testing::Field(
+                &PacketStreamDetails::maybeFirstNewStreamByteOffset,
+                folly::Optional<uint64_t>(/* empty */)),
+            testing::Field(
+                &PacketStreamDetails::streamIntervals,
+                testing::ElementsAre(Interval<uint64_t>(
+                    stream3Offset, stream3Offset + stream3Len - 1)))));
+
+    const auto pktMatcher = testing::Field(
+        &OutstandingPacket::metadata,
+        testing::AllOf(
+            testing::Field(
+                &OutstandingPacketMetadata::totalPacketsSent, testing::Eq(2)),
+            testing::Field(
+                &OutstandingPacketMetadata::detailsPerStream,
+                testing::UnorderedElementsAre(
+                    stream1DetailsMatcher,
+                    stream2DetailsMatcher,
+                    stream3DetailsMatcher))));
+    EXPECT_THAT(conn->outstandings.packets, Contains(pktMatcher));
+  }
 }
 
 TEST_F(QuicTransportFunctionsTest, WriteQuicDataToSocketWithCC) {
