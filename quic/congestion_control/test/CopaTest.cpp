@@ -41,7 +41,8 @@ class CopaTest : public Test {
           0,
           0,
           LossState(),
-          0));
+          0,
+          OutstandingPacketMetadata::DetailsPerStream()));
       loss.lostBytes = packetData.second;
     }
     loss.lostPackets = lostPackets.size();
@@ -67,7 +68,8 @@ class CopaTest : public Test {
         inflight,
         0,
         LossState(),
-        0);
+        0,
+        OutstandingPacketMetadata::DetailsPerStream());
   }
 
   CongestionController::AckEvent createAckEvent(

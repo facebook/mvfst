@@ -39,7 +39,8 @@ OutstandingPacket makeDummyOutstandingPacket(
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   return packet;
 }
 

@@ -256,7 +256,8 @@ PacketNum QuicLossFunctionsTest::sendPacket(
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   outstandingPacket.associatedEvent = associatedEvent;
   conn.lossState.lastRetransmittablePacketSentTime = time;
   if (conn.congestionController) {
@@ -1007,8 +1008,19 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
       conn->version.value());
   RegularQuicWritePacket outstandingRegularPacket(std::move(longHeader));
   auto now = Clock::now();
-  conn->outstandings.packets.emplace_back(OutstandingPacket(
-      outstandingRegularPacket, now, 0, 0, false, 0, 0, 0, 0, LossState(), 0));
+  conn->outstandings.packets.emplace_back(
+      outstandingRegularPacket,
+      now,
+      0,
+      0,
+      false,
+      0,
+      0,
+      0,
+      0,
+      LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   conn->outstandings.packetCount[PacketNumberSpace::Handshake]++;
 
   bool testLossMarkFuncCalled = false;
@@ -1889,8 +1901,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
               0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
-              folly::none /* detailsPerStream) */
-              ))
+              OutstandingPacketMetadata::DetailsPerStream()))
           .build());
 
   EXPECT_TRUE(isPersistentCongestion(
@@ -1917,8 +1928,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
               0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
-              folly::none /* detailsPerStream) */
-              ))
+              OutstandingPacketMetadata::DetailsPerStream()))
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(
@@ -1944,8 +1954,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
               0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
-              folly::none /* detailsPerStream) */
-              ))
+              OutstandingPacketMetadata::DetailsPerStream()))
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(

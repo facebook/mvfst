@@ -96,8 +96,8 @@ struct OutstandingPacketMetadata {
     folly::F14FastMap<StreamId, StreamDetails> detailsPerStream;
   };
 
-  // When enabled, details about each stream with frames in this packet
-  folly::Optional<DetailsPerStream> maybeDetailsPerStream;
+  // Details about each stream with frames in this packet
+  DetailsPerStream detailsPerStream;
 
   OutstandingPacketMetadata(
       TimePoint timeIn,
@@ -111,7 +111,7 @@ struct OutstandingPacketMetadata {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      folly::Optional<DetailsPerStream> maybeDetailsPerStream)
+      DetailsPerStream detailsPerStream)
       : time(timeIn),
         encodedSize(encodedSizeIn),
         encodedBodySize(encodedBodySizeIn),
@@ -124,7 +124,7 @@ struct OutstandingPacketMetadata {
         totalPacketsSent(lossStateIn.totalPacketsSent),
         totalAckElicitingPacketsSent(lossStateIn.totalAckElicitingPacketsSent),
         writeCount(writeCount),
-        maybeDetailsPerStream(std::move(maybeDetailsPerStream)) {}
+        detailsPerStream(std::move(detailsPerStream)) {}
 };
 
 // Data structure to represent outstanding retransmittable packets
@@ -198,8 +198,7 @@ struct OutstandingPacket {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      folly::Optional<Metadata::DetailsPerStream> maybeDetailsPerStream =
-          folly::none)
+      Metadata::DetailsPerStream detailsPerStream)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -213,7 +212,7 @@ struct OutstandingPacket {
             packetsInflightIn,
             lossStateIn,
             writeCount,
-            std::move(maybeDetailsPerStream))) {}
+            std::move(detailsPerStream))) {}
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
@@ -228,8 +227,7 @@ struct OutstandingPacket {
       uint64_t packetsInflightIn,
       const LossState& lossStateIn,
       uint64_t writeCount,
-      folly::Optional<Metadata::DetailsPerStream> maybeDetailsPerStream =
-          folly::none)
+      Metadata::DetailsPerStream detailsPerStream)
       : packet(std::move(packetIn)),
         metadata(OutstandingPacketMetadata(
             timeIn,
@@ -243,6 +241,6 @@ struct OutstandingPacket {
             packetsInflightIn,
             lossStateIn,
             writeCount,
-            std::move(maybeDetailsPerStream))) {}
+            std::move(detailsPerStream))) {}
 };
 } // namespace quic

@@ -1681,11 +1681,10 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsControlPacket) {
   // If we have only control frames sent, there should be no stream data in the
   // outstanding packet.
   ASSERT_EQ(1, conn->outstandings.packets.size());
-  auto detailsPerStream =
+  const auto& detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.maybeDetailsPerStream;
-  EXPECT_EQ(true, detailsPerStream.has_value());
-  EXPECT_EQ(0, detailsPerStream->getDetails().size());
+          ->metadata.detailsPerStream.getDetails();
+  EXPECT_EQ(0, detailsPerStream.size());
 }
 
 TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
@@ -1708,7 +1707,7 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.maybeDetailsPerStream->getDetails();
+          ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   auto streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(false, streamDetail.finObserved);
@@ -1743,7 +1742,7 @@ TEST_F(
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.maybeDetailsPerStream->getDetails();
+          ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   auto streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(true, streamDetail.finObserved);
@@ -1778,7 +1777,7 @@ TEST_F(
   // The first outstanding packet is the one with new data
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.maybeDetailsPerStream->getDetails();
+          ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   auto streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(false, streamDetail.finObserved);
@@ -1802,7 +1801,7 @@ TEST_F(
 
   // The second outstanding packet is the one with retransmit data
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.maybeDetailsPerStream->getDetails();
+                         ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(false, streamDetail.finObserved);
@@ -1832,7 +1831,7 @@ TEST_F(
 
   // The third outstanding packet will have both new and retransmitted data.
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.maybeDetailsPerStream->getDetails();
+                         ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(false, streamDetail.finObserved);
@@ -1857,7 +1856,7 @@ TEST_F(
 
   // The forth outstanding packet will have only retransmit data.
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.maybeDetailsPerStream->getDetails();
+                         ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(1, detailsPerStream.size());
   streamDetail = detailsPerStream[stream->id];
   EXPECT_EQ(false, streamDetail.finObserved);
@@ -1901,7 +1900,7 @@ TEST_F(
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.maybeDetailsPerStream->getDetails();
+          ->metadata.detailsPerStream.getDetails();
   EXPECT_EQ(2, detailsPerStream.size());
   auto stream1Detail = detailsPerStream[stream1Id];
   auto stream2Detail = detailsPerStream[stream2Id];

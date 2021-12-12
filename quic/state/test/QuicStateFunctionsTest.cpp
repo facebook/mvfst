@@ -8,6 +8,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "quic/state/OutstandingPacket.h"
 
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -705,7 +706,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Handshake),
       Clock::now(),
@@ -717,7 +719,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
@@ -729,7 +732,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(
       makeTestLongPacket(LongHeader::Types::Initial),
       Clock::now(),
@@ -741,7 +745,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   conn.outstandings.packets.emplace_back(
       makeTestShortPacket(),
       Clock::now(),
@@ -753,7 +758,8 @@ TEST_F(QuicStateFunctionsTest, GetOutstandingPackets) {
       0,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
   EXPECT_EQ(
       135,
       getFirstOutstandingPacket(conn, PacketNumberSpace::Initial)

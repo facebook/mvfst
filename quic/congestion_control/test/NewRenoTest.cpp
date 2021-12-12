@@ -37,7 +37,8 @@ CongestionController::LossEvent createLossEvent(
         0,
         0,
         LossState(),
-        0));
+        0,
+        OutstandingPacketMetadata::DetailsPerStream()));
     loss.lostBytes = packetData.second;
   }
   loss.lostPackets = lostPackets.size();
@@ -66,7 +67,8 @@ CongestionController::AckEvent createAckEvent(
           0,
           0,
           LossState(),
-          0)));
+          0,
+          OutstandingPacketMetadata::DetailsPerStream())));
   return ack;
 }
 
@@ -89,7 +91,8 @@ OutstandingPacket createPacket(
       inflight,
       0,
       LossState(),
-      0);
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
 }
 
 TEST_F(NewRenoTest, TestLoss) {

@@ -547,7 +547,8 @@ OutstandingPacket makeTestingWritePacket(
       inflightBytes,
       0,
       LossState(),
-      writeCount);
+      writeCount,
+      OutstandingPacketMetadata::DetailsPerStream());
 }
 
 CongestionController::AckEvent makeAck(
@@ -576,8 +577,7 @@ CongestionController::AckEvent makeAck(
               0 /* numOutstanding */,
               LossState() /* lossState */,
               0 /* writeCount */,
-              folly::none /* detailsPerStream) */
-              ))
+              OutstandingPacketMetadata::DetailsPerStream()))
           .build());
   ack.largestAckedPacketSentTime = sentTime;
   return ack;
