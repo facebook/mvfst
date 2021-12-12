@@ -3665,5 +3665,126 @@ TEST_F(QuicTransportFunctionsTest, UpdateConnectionWithBufferMeta) {
   EXPECT_TRUE(conn->outstandings.packets.back().isDSRPacket);
 }
 
+TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytes) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer("abcdefghij"), true);
+
+  // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
+  {
+    WriteStreamFrame writeStreamFrame(
+        stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */);
+  }
+
+  // write frame with bytes 5 -> 6 (start at offset 5, write 2 bytes)
+  // should throw since we never wrote byte offset 4
+  {
+    WriteStreamFrame writeStreamFrame(
+        stream->id, 5 /* offset */, 2 /* len */, false /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    EXPECT_ANY_THROW(updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */));
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesEof) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const std::string str = "abcdefg";
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true);
+
+  // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
+  {
+    WriteStreamFrame writeStreamFrame(
+        stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */);
+  }
+
+  // write frame with bytes 5 -> 6 (start at offset 5, write 2 bytes)
+  // offset 6 should be last byte in original stream, so we'll mark fin
+  //
+  // should throw since we never wrote byte offset 4
+  {
+    const auto offset = 5;
+    const auto len = 2;
+    EXPECT_EQ(str.length(), offset + len); // should be end of string
+    WriteStreamFrame writeStreamFrame(
+        stream->id, offset /* offset */, len /* len */, true /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    EXPECT_ANY_THROW(updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */));
+  }
+}
+
+TEST_F(QuicTransportFunctionsTest, MissingStreamFrameBytesSingleByteWrite) {
+  auto conn = createConn();
+  auto packet = buildEmptyPacket(*conn, PacketNumberSpace::AppData);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  const std::string str = "abcdefg";
+  writeDataToQuicStream(*stream, folly::IOBuf::copyBuffer(str), true);
+
+  // write frame with bytes 0 -> 3 (start at offset 0, write 4 bytes)
+  {
+    WriteStreamFrame writeStreamFrame(
+        stream->id, 0 /* offset */, 4 /* len */, false /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */);
+  }
+
+  // write frame with bytes 5 -> 5 (start at offset 5, write 1 byte)
+  // should throw since we never wrote byte offset 4
+  {
+    WriteStreamFrame writeStreamFrame(
+        stream->id, 5 /* offset */, 1 /* len */, false /* fin */);
+    packet.packet.frames.push_back(writeStreamFrame);
+    EXPECT_ANY_THROW(updateConnection(
+        *conn,
+        folly::none,
+        packet.packet,
+        TimePoint(),
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */));
+  }
+}
+
 } // namespace test
 } // namespace quic

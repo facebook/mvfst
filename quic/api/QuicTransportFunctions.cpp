@@ -503,6 +503,14 @@ bool handleStreamWritten(
   if (frameOffset == stream.currentWriteOffset) {
     handleNewStreamDataWritten(stream, frameLen, frameFin);
     writtenNewData = true;
+  } else if (frameOffset > stream.currentWriteOffset) {
+    throw QuicTransportException(
+        fmt::format(
+            "Byte offset of first byte in written stream frame ({}) is "
+            "greater than stream's current write offset ({})",
+            frameOffset,
+            stream.currentWriteOffset),
+        TransportErrorCode::INTERNAL_ERROR);
   }
 
   if (writtenNewData) {
