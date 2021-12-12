@@ -1683,7 +1683,7 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsControlPacket) {
   ASSERT_EQ(1, conn->outstandings.packets.size());
   const auto& detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream.getDetails();
+          ->metadata.detailsPerStream;
   EXPECT_EQ(0, detailsPerStream.size());
 }
 
@@ -1707,9 +1707,9 @@ TEST_F(QuicTransportFunctionsTest, TestStreamDetailsAppDataPacketSingleStream) {
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream.getDetails();
+          ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream[stream->id];
+  auto streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(false, streamDetail.finObserved);
   EXPECT_EQ(10, streamDetail.streamBytesSent);
   EXPECT_EQ(10, streamDetail.newStreamBytesSent);
@@ -1742,9 +1742,9 @@ TEST_F(
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream.getDetails();
+          ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream[stream->id];
+  auto streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(true, streamDetail.finObserved);
   EXPECT_EQ(15, streamDetail.streamBytesSent);
   EXPECT_EQ(15, streamDetail.newStreamBytesSent);
@@ -1777,9 +1777,9 @@ TEST_F(
   // The first outstanding packet is the one with new data
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream.getDetails();
+          ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  auto streamDetail = detailsPerStream[stream->id];
+  auto streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(false, streamDetail.finObserved);
   EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
   EXPECT_EQ(frame1Len, streamDetail.newStreamBytesSent);
@@ -1801,9 +1801,9 @@ TEST_F(
 
   // The second outstanding packet is the one with retransmit data
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream.getDetails();
+                         ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream[stream->id];
+  streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(false, streamDetail.finObserved);
   EXPECT_EQ(frame1Len, streamDetail.streamBytesSent);
   EXPECT_EQ(0, streamDetail.newStreamBytesSent);
@@ -1831,9 +1831,9 @@ TEST_F(
 
   // The third outstanding packet will have both new and retransmitted data.
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream.getDetails();
+                         ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream[stream->id];
+  streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(false, streamDetail.finObserved);
   EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
   EXPECT_EQ(frame2Len, streamDetail.newStreamBytesSent);
@@ -1856,9 +1856,9 @@ TEST_F(
 
   // The forth outstanding packet will have only retransmit data.
   detailsPerStream = getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-                         ->metadata.detailsPerStream.getDetails();
+                         ->metadata.detailsPerStream;
   EXPECT_EQ(1, detailsPerStream.size());
-  streamDetail = detailsPerStream[stream->id];
+  streamDetail = detailsPerStream.at(stream->id);
   EXPECT_EQ(false, streamDetail.finObserved);
   EXPECT_EQ(frame1Len + frame2Len, streamDetail.streamBytesSent);
   EXPECT_EQ(0, streamDetail.newStreamBytesSent);
@@ -1900,10 +1900,10 @@ TEST_F(
   ASSERT_EQ(1, conn->outstandings.packets.size());
   auto detailsPerStream =
       getFirstOutstandingPacket(*conn, PacketNumberSpace::AppData)
-          ->metadata.detailsPerStream.getDetails();
+          ->metadata.detailsPerStream;
   EXPECT_EQ(2, detailsPerStream.size());
-  auto stream1Detail = detailsPerStream[stream1Id];
-  auto stream2Detail = detailsPerStream[stream2Id];
+  auto stream1Detail = detailsPerStream.at(stream1Id);
+  auto stream2Detail = detailsPerStream.at(stream2Id);
 
   EXPECT_EQ(false, stream1Detail.finObserved);
   EXPECT_EQ(5, stream1Detail.streamBytesSent);

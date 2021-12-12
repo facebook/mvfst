@@ -45,23 +45,22 @@ struct OutstandingPacketMetadata {
   // tracks the number of writes on this socket.
   uint64_t writeCount{0};
 
-  // Structure used to hold information about each stream with frames in packet
-  class DetailsPerStream {
+  struct StreamDetails {
+    template <class T>
+    using IntervalSetVec = SmallVec<T, 2 /* stack size */, uint16_t>;
+    using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
+    StreamIntervals streamIntervals;
+
+    bool finObserved{false};
+    uint64_t streamBytesSent{0};
+    uint64_t newStreamBytesSent{0};
+    folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
+  };
+
+  class DetailsPerStream : private folly::F14FastMap<StreamId, StreamDetails> {
    public:
-    struct StreamDetails {
-      template <class T>
-      using IntervalSetVec = SmallVec<T, 2 /* stack size */, uint16_t>;
-      using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
-      StreamIntervals streamIntervals;
-
-      bool finObserved{false};
-      uint64_t streamBytesSent{0};
-      uint64_t newStreamBytesSent{0};
-      folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
-    };
-
     void addFrame(const WriteStreamFrame& frame, const bool newData) {
-      auto ret = detailsPerStream.emplace(
+      auto ret = emplace(
           std::piecewise_construct,
           std::make_tuple(frame.streamId),
           std::make_tuple());
@@ -87,13 +86,26 @@ struct OutstandingPacketMetadata {
       }
     }
 
-    FOLLY_NODISCARD const folly::F14FastMap<StreamId, StreamDetails>&
-    getDetails() const {
-      return detailsPerStream;
+    [[nodiscard]] auto at(StreamId id) const {
+      return folly::F14FastMap<StreamId, StreamDetails>::at(id);
     }
 
-   private:
-    folly::F14FastMap<StreamId, StreamDetails> detailsPerStream;
+    [[nodiscard]] auto begin() const {
+      return cbegin();
+    }
+
+    [[nodiscard]] auto end() const {
+      return cend();
+    }
+
+    using folly::F14FastMap<StreamId, StreamDetails>::cbegin;
+    using folly::F14FastMap<StreamId, StreamDetails>::cend;
+    using folly::F14FastMap<StreamId, StreamDetails>::const_iterator;
+    using folly::F14FastMap<StreamId, StreamDetails>::empty;
+    using folly::F14FastMap<StreamId, StreamDetails>::find;
+    using folly::F14FastMap<StreamId, StreamDetails>::mapped_type;
+    using folly::F14FastMap<StreamId, StreamDetails>::size;
+    using folly::F14FastMap<StreamId, StreamDetails>::value_type;
   };
 
   // Details about each stream with frames in this packet
