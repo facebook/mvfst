@@ -35,6 +35,11 @@ struct Interval {
       throw std::invalid_argument("Interval bound too large");
     }
   }
+
+  bool operator==(Interval& rhs) const {
+    return start == rhs.start && end == rhs.end;
+  }
+
   friend bool operator==(const Interval& a, const Interval& b) {
     return a.start == b.start && a.end == b.end;
   }
@@ -94,6 +99,16 @@ class IntervalSet : private Container<Interval<T, Unit>> {
    * The version changes whenever we insert into the ack list.
    */
   uint64_t insertVersion() const;
+
+  bool operator==(const IntervalSet& rhs) const {
+    return static_cast<container_type>(*this) ==
+        static_cast<container_type>(rhs);
+  }
+
+  bool operator!=(const IntervalSet& rhs) const {
+    return static_cast<container_type>(*this) !=
+        static_cast<container_type>(rhs);
+  }
 
   using container_type::back;
   using container_type::cbegin;

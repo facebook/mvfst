@@ -303,3 +303,79 @@ TEST(IntervalSet, withdrawWithOverflow) {
   auto interval = set.front();
   EXPECT_EQ(interval, Interval<int>(3, 5));
 }
+
+TEST(IntervalSet, equalityComparatorEqual) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+
+  IntervalSet<int> set2;
+  set2.insert(0, 5);
+
+  EXPECT_EQ(set1, set2);
+  EXPECT_TRUE(set1 == set2);
+  EXPECT_FALSE(set1 != set2);
+}
+
+TEST(IntervalSet, equalityComparatorEqualMultiInterval) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+  set1.insert(6, 10);
+
+  IntervalSet<int> set2;
+  set2.insert(0, 5);
+  set2.insert(6, 10);
+
+  EXPECT_EQ(set1, set2);
+  EXPECT_TRUE(set1 == set2);
+  EXPECT_FALSE(set1 != set2);
+}
+
+TEST(IntervalSet, equalityComparatorNotEqualEmpty) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+
+  IntervalSet<int> set2;
+
+  EXPECT_NE(set1, set2);
+  EXPECT_FALSE(set1 == set2);
+  EXPECT_TRUE(set1 != set2);
+}
+
+TEST(IntervalSet, equalityComparatorNotEqualDiffInterval) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+
+  IntervalSet<int> set2;
+  set2.insert(0, 6);
+
+  EXPECT_NE(set1, set2);
+  EXPECT_FALSE(set1 == set2);
+  EXPECT_TRUE(set1 != set2);
+}
+
+TEST(IntervalSet, equalityComparatorNotEqualDiffIntervals1) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+
+  IntervalSet<int> set2;
+  set2.insert(0, 5);
+  set2.insert(6, 10);
+
+  EXPECT_NE(set1, set2);
+  EXPECT_FALSE(set1 == set2);
+  EXPECT_TRUE(set1 != set2);
+}
+
+TEST(IntervalSet, equalityComparatorNotEqualDiffIntervals2) {
+  IntervalSet<int> set1;
+  set1.insert(0, 5);
+  set1.insert(6, 11);
+
+  IntervalSet<int> set2;
+  set2.insert(0, 5);
+  set2.insert(6, 10);
+
+  EXPECT_NE(set1, set2);
+  EXPECT_FALSE(set1 == set2);
+  EXPECT_TRUE(set1 != set2);
+}
