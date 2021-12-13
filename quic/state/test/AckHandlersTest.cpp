@@ -1331,9 +1331,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
                 1 * (packetNum + 1)),
             testing::Field(
                 &OutstandingPacketMetadata::writeCount,
-                ((packetNum <= 4) ? 1 : 2))
-
-                ));
+                ((packetNum <= 4) ? 1 : 2))));
   };
 
   ReadAckFrame ackFrame;
@@ -1348,6 +1346,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
         EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestAckedPacketAppLimited);
+        EXPECT_EQ(GetParam(), ack->packetNumberSpace);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),

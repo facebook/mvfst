@@ -76,9 +76,12 @@ class CopaTest : public Test {
       PacketNum largestAcked,
       uint64_t ackedSize,
       TimePoint ackTime) {
-    CongestionController::AckEvent ack;
+    auto ack = AckEvent::Builder()
+                   .setAckTime(ackTime)
+                   .setAdjustedAckTime(ackTime)
+                   .setPacketNumberSpace(PacketNumberSpace::AppData)
+                   .build();
     ack.largestAckedPacket = largestAcked;
-    ack.ackTime = ackTime;
     ack.ackedBytes = ackedSize;
     ack.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(createPacket(
         largestAcked,
@@ -543,7 +546,12 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
   conn.qLogger = qLogger;
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
-  CongestionController::AckEvent ack;
+  const auto now = TimePoint::clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(now)
+                 .setAdjustedAckTime(now)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   copa.onPacketAckOrLoss(ack, loss);
 
   std::vector<int> indices =

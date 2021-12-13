@@ -42,9 +42,14 @@ class Copa2Test : public Test {
       PacketNum largestAcked,
       uint64_t ackedSize,
       TimePoint ackTime) {
-    CongestionController::AckEvent ack;
+    auto ackTime = Clock::now();
+    auto ackEvent = AckEvent::Builder()
+                        .setAckTime(ackTime)
+                        .setAdjustedAckTime(ackTime)
+                        .setImplicit(false)
+                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                        .build();
     ack.largestAckedPacket = largestAcked;
-    ack.ackTime = ackTime;
     ack.ackedBytes = ackedSize;
     ack.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(createPacket(
         largestAcked,

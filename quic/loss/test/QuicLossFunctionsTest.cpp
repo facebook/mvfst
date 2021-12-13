@@ -8,6 +8,8 @@
 
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
+#include "quic/codec/Types.h"
+#include "quic/state/AckEvent.h"
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/io/async/test/MockTimeoutManager.h>
@@ -1029,8 +1031,12 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   };
   EXPECT_CALL(*mockQLogger, addPacketsLost(1, 0, 1));
 
-  CongestionController::AckEvent ackEvent;
-  ackEvent.ackTime = now;
+  auto ackTime = Clock::now();
+  auto ackEvent = AckEvent::Builder()
+                      .setAckTime(ackTime)
+                      .setAdjustedAckTime(ackTime)
+                      .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .build();
   ackEvent.largestAckedPacket = 1000;
   handleAckForLoss(
       *conn, testLossMarkFunc, ackEvent, PacketNumberSpace::Handshake);
@@ -1848,7 +1854,12 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
   auto currentTime = Clock::now();
   conn->lossState.srtt = 1s;
 
-  CongestionController::AckEvent ack;
+  auto ackTime = Clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
 
   EXPECT_TRUE(isPersistentCongestion(
       calculatePTO(*conn), currentTime - 10s, currentTime, ack));
@@ -1886,7 +1897,12 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
   auto currentTime = Clock::now();
   conn->lossState.srtt = 1s;
 
-  CongestionController::AckEvent ack;
+  const auto now = TimePoint::clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(now)
+                 .setAdjustedAckTime(now)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
@@ -1914,7 +1930,12 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
   auto currentTime = Clock::now();
   conn->lossState.srtt = 1s;
 
-  CongestionController::AckEvent ack;
+  const auto now = TimePoint::clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(now)
+                 .setAdjustedAckTime(now)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
@@ -1941,7 +1962,12 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
   auto conn = createConn();
   auto currentTime = Clock::now();
 
-  CongestionController::AckEvent ack;
+  const auto now = TimePoint::clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(now)
+                 .setAdjustedAckTime(now)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(

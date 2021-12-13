@@ -8,6 +8,7 @@
 
 #include <folly/MapUtil.h>
 #include <quic/state/AckEvent.h>
+#include <utility>
 
 namespace quic {
 
@@ -100,5 +101,39 @@ AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
       std::move(lastAckedPacketInfo),
       isAppLimited);
 }
+
+AckEvent::Builder&& AckEvent::Builder::setAckTime(TimePoint ackTimeIn) {
+  maybeAckTime = ackTimeIn;
+  return std::move(*this);
+}
+
+AckEvent::Builder&& AckEvent::Builder::setAdjustedAckTime(
+    TimePoint adjustedAckTimeIn) {
+  maybeAdjustedAckTime = adjustedAckTimeIn;
+  return std::move(*this);
+}
+
+AckEvent::Builder&& AckEvent::Builder::setPacketNumberSpace(
+    PacketNumberSpace packetNumberSpaceIn) {
+  maybePacketNumberSpace = packetNumberSpaceIn;
+  return std::move(*this);
+}
+
+AckEvent::Builder&& AckEvent::Builder::setIsImplicitAck(bool isImplicitAckIn) {
+  isImplicitAck = isImplicitAckIn;
+  return std::move(*this);
+}
+
+AckEvent AckEvent::Builder::build() && {
+  return AckEvent(std::move(*this));
+}
+
+AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
+    : ackTime(*CHECK_NOTNULL(builderFields.maybeAckTime.get_pointer())),
+      adjustedAckTime(
+          *CHECK_NOTNULL(builderFields.maybeAdjustedAckTime.get_pointer())),
+      packetNumberSpace(
+          *CHECK_NOTNULL(builderFields.maybePacketNumberSpace.get_pointer())),
+      implicit(builderFields.isImplicitAck) {}
 
 } // namespace quic

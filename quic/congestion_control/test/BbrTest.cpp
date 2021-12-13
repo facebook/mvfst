@@ -394,12 +394,45 @@ TEST_F(BbrTest, ProbeRtt) {
   EXPECT_EQ(BbrCongestionController::BbrState::Startup, bbr.state());
 }
 
-TEST_F(BbrTest, NoLargestAckedPacketNoCrash) {
+TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrCongestionController bbr(conn);
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
-  CongestionController::AckEvent ack;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setPacketNumberSpace(PacketNumberSpace::Initial)
+                 .build();
+  bbr.onPacketAckOrLoss(ack, loss);
+}
+
+TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  CongestionController::LossEvent loss;
+  loss.largestLostPacketNum = 0;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setPacketNumberSpace(PacketNumberSpace::Handshake)
+                 .build();
+  bbr.onPacketAckOrLoss(ack, loss);
+}
+
+TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  CongestionController::LossEvent loss;
+  loss.largestLostPacketNum = 0;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   bbr.onPacketAckOrLoss(ack, loss);
 }
 
@@ -434,7 +467,12 @@ TEST_F(BbrTest, AckAggregation) {
         .WillRepeatedly(Return(
             mockedBandwidth * (growFast ? kExpectedStartupGrowth : 1.0)));
     bbr.onPacketAckOrLoss(
-        makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time),
+        makeAck(
+            currentLatest,
+            1000,
+            // force send time < ack time
+            Clock::now() + std::chrono::milliseconds(10),
+            packet.metadata.time),
         folly::none);
     conn.lossState.totalBytesAcked += 1000;
     if (growFast) {
@@ -472,9 +510,8 @@ TEST_F(BbrTest, AckAggregation) {
       conn.lossState.largestSent.value(), 1000, 1000 + totalSent);
   bbr.onPacketSent(packet);
   totalSent += 1000;
-  auto ackEvent =
-      makeAck(currentLatest, 1000, Clock::now(), packet.metadata.time);
-  ackEvent.ackTime = Clock::now();
+  auto ackEvent = makeAck(
+      currentLatest, 1000, packet.metadata.time + 10ms, packet.metadata.time);
   // use a real large bandwidth to clear accumulated ack aggregation during
   // startup
   auto currentCwnd = bbr.getCongestionWindow();
@@ -495,16 +532,16 @@ TEST_F(BbrTest, AckAggregation) {
   auto packet1 = makeTestingWritePacket(
       conn.lossState.largestSent.value(),
       currentMaxAckHeight * 2 + 100,
-      currentMaxAckHeight * 2 + 100 + totalSent);
+      currentMaxAckHeight * 2 + 100 + totalSent,
+      packet.metadata.time + 1us);
   bbr.onPacketSent(packet1);
   totalSent += (currentMaxAckHeight * 2 + 100);
   auto ackEvent2 = makeAck(
       currentLatest,
       currentMaxAckHeight * 2 + 100,
-      Clock::now(),
+      ackEvent.ackTime + 1ms,
       packet1.metadata.time);
-  // This will make the expected ack arrival rate very low:
-  ackEvent2.ackTime = ackEvent.ackTime + 1us;
+
   bbr.onPacketAckOrLoss(ackEvent2, folly::none);
   newCwnd = bbr.getCongestionWindow();
   EXPECT_GT(newCwnd, expectedBdp * kProbeBwGain + currentMaxAckHeight);

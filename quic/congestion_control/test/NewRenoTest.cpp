@@ -51,9 +51,13 @@ CongestionController::AckEvent createAckEvent(
     TimePoint packetSentTime) {
   RegularQuicWritePacket packet(ShortHeader(
       ProtectionType::KeyPhaseZero, getTestConnectionId(), largestAcked));
-  CongestionController::AckEvent ack;
+  auto ackTime = Clock::now();
+  auto ack = AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .build();
   ack.largestAckedPacket = largestAcked;
-  ack.ackTime = Clock::now();
   ack.ackedBytes = ackedSize;
   ack.ackedPackets.push_back(
       makeAckPacketFromOutstandingPacket(OutstandingPacket(

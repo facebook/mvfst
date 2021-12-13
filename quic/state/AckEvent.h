@@ -8,31 +8,53 @@
 
 #pragma once
 
-#include <quic/codec/Types.h>
-#include <quic/state/OutstandingPacket.h>
-
 #include <folly/Optional.h>
 #include <folly/container/F14Map.h>
+#include <quic/codec/Types.h>
+#include <quic/state/OutstandingPacket.h>
 
 namespace quic {
 
 struct AckEvent {
-  /**
-   * The reason that this is an optional type, is that we construct an
-   * AckEvent first, then go through the acked packets that are still
-   * outstanding, and figure out the largest acked packet along the way.
-   */
-  folly::Optional<PacketNum> largestAckedPacket;
-  TimePoint largestAckedPacketSentTime;
-  bool largestAckedPacketAppLimited{false};
+  // ack receive time
+  const TimePoint ackTime;
+
+  // ack receive time minus ack delay
+  const TimePoint adjustedAckTime;
+
+  // packet number space that (newly) acked packets are in
+  const PacketNumberSpace packetNumberSpace;
+
+  // for all packets (newly) acked during this event, sum of encoded sizes
+  // encoded size includes header and body
+  //
+  // this value does not directly translate to the number of stream bytes newly
+  // acked; see the DetailsPerStream structure in each of the AckedPackets to
+  // determine information about stream bytes.
   uint64_t ackedBytes{0};
-  TimePoint ackTime;
-  TimePoint adjustedAckTime;
-  // The minimal RTT sample among packets acked by this AckEvent. This RTT
-  // includes ack delay.
+
+  // the highest packet number (newly) acked by this event
+  //
+  // the reason that this is an optional type, is that we construct an
+  // AckEvent first, then go through the acked packets that are still
+  // outstanding, and figure out the largest acked packet along the way.
+  folly::Optional<PacketNum> largestAckedPacket;
+
+  // when largestAckedPacket was sent
+  TimePoint largestAckedPacketSentTime;
+
+  // minimal RTT sample among packets newly acked; includes ack delay
   folly::Optional<std::chrono::microseconds> mrttSample;
-  // If this AckEvent came from an implicit ACK rather than a real one.
+
+  /**
+   * Booleans grouped together to avoid padding.
+   */
+
+  // if this AckEvent came from an implicit ACK rather than a real one
   bool implicit{false};
+
+  // whether the transport was app limited when largestAckedPacket was sent
+  bool largestAckedPacketAppLimited{false};
 
   /**
    * Container to store information about ACKed packets
@@ -184,6 +206,26 @@ struct AckEvent {
 
   // Information about each packet ACKed during this event
   std::vector<AckPacket> ackedPackets;
+
+  struct BuilderFields {
+    folly::Optional<TimePoint> maybeAckTime;
+    folly::Optional<TimePoint> maybeAdjustedAckTime;
+    folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
+    bool isImplicitAck{false};
+    explicit BuilderFields() = default;
+  };
+
+  struct Builder : public BuilderFields {
+    Builder&& setAckTime(TimePoint ackTimeIn);
+    Builder&& setAdjustedAckTime(TimePoint adjustedAckTimeIn);
+    Builder&& setPacketNumberSpace(PacketNumberSpace packetNumberSpaceIn);
+    Builder&& setIsImplicitAck(bool isImplicitAckIn);
+    AckEvent build() &&;
+    explicit Builder() = default;
+  };
+
+  // Use builder to construct.
+  explicit AckEvent(BuilderFields&& fields);
 };
 
 } // namespace quic

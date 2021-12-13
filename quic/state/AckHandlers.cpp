@@ -56,10 +56,12 @@ AckEvent processAckFrame(
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
   // TODO: send error if we get an ack for a packet we've not sent t18721184
-  AckEvent ack;
-  ack.ackTime = ackReceiveTime;
-  ack.implicit = frame.implicit;
-  ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
+  auto ack = AckEvent::Builder()
+                 .setAckTime(ackReceiveTime)
+                 .setAdjustedAckTime(ackReceiveTime - frame.ackDelay)
+                 .setPacketNumberSpace(pnSpace)
+                 .setIsImplicitAck(frame.implicit)
+                 .build();
 
   // temporary storage to enable packets to be processed in sent order
   std::deque<OutstandingPacketWithHandlerContext> packetsWithHandlerContext;
