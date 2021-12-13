@@ -13,14 +13,15 @@
 #include <fizz/protocol/test/Mocks.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/codec/QuicConnectionId.h>
 #include <quic/fizz/handshake/QuicFizzFactory.h>
 #include <quic/fizz/server/handshake/AppToken.h>
 #include <quic/handshake/test/Mocks.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
+#include <quic/state/AckEvent.h>
+#include <quic/state/LossState.h>
+#include <quic/state/OutstandingPacket.h>
 #include <quic/state/stream/StreamSendHandlers.h>
-#include "quic/codec/QuicConnectionId.h"
-#include "quic/state/LossState.h"
-#include "quic/state/OutstandingPacket.h"
 
 using namespace testing;
 
@@ -578,6 +579,7 @@ CongestionController::AckEvent makeAck(
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
+          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
   ack.largestAckedPacketSentTime = sentTime;
   return ack;
@@ -735,6 +737,8 @@ CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
       .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
       .setAppLimited(outstandingPacket.isAppLimited)
+      .setDetailsPerStream(
+          CongestionController::AckEvent::AckPacket::DetailsPerStream())
       .build();
 }
 

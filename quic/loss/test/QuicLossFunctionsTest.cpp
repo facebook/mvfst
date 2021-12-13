@@ -1902,6 +1902,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
+          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
   EXPECT_TRUE(isPersistentCongestion(
@@ -1929,6 +1930,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
+          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(
@@ -1955,6 +1957,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
               LossState() /* lossState */,
               0 /* writeCount */,
               OutstandingPacketMetadata::DetailsPerStream()))
+          .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
 
   EXPECT_FALSE(isPersistentCongestion(

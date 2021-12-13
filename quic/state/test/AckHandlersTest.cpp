@@ -9,16 +9,17 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <quic/common/test/TestUtils.h>
-
 #include <quic/QuicConstants.h>
 #include <quic/api/test/Mocks.h>
+#include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/logging/test/Mocks.h>
 #include <quic/server/state/ServerStateMachine.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/StateData.h>
+#include <quic/state/stream/StreamSendHandlers.h>
+#include <quic/state/test/AckEventTestUtil.h>
 #include <quic/state/test/Mocks.h>
 
 #include <numeric>
@@ -82,7 +83,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
-  StreamId currentStreamId = 10;
+  const StreamId startStreamId = 10;
+  StreamId currentStreamId = startStreamId;
   auto sentTime = Clock::now();
   for (PacketNum packetNum = 10; packetNum <= 101; packetNum++) {
     RegularQuicWritePacket regularPacket =
@@ -140,10 +142,10 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
       Clock::now());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
-  StreamId start = currentStreamId - 1;
+  StreamId nextExpectedStream = 21; // packets (streams) 21 - 101 are ACKed
   for (auto& stream : streams) {
-    EXPECT_EQ(stream.streamId, start);
-    start--;
+    EXPECT_EQ(stream.streamId, nextExpectedStream);
+    nextExpectedStream++;
   }
   // only unacked packets should be remaining
   auto numDeclaredLost = std::count_if(
@@ -226,11 +228,12 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       Clock::now());
   EXPECT_EQ(lostPacketsCounter, lostPackets.empty() ? 0 : 1);
 
-  StreamId start = currentStreamId - 1;
+  StreamId nextExpectedStream = 21; // packets (streams) 21 - 101 are ACKed
   for (auto& stream : streams) {
-    EXPECT_EQ(stream.streamId, start);
-    start--;
+    EXPECT_EQ(stream.streamId, nextExpectedStream);
+    nextExpectedStream++;
   }
+
   // only unacked packets should be remaining
   auto numDeclaredLost = std::count_if(
       conn.outstandings.packets.begin(),
@@ -376,8 +379,8 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   std::vector<StreamId> ids(45 - 33 + 1);
   std::generate(ids.begin(), ids.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
-      streams.begin(),
-      streams.begin() + (45 - 33 + 1),
+      streams.rbegin(),
+      streams.rbegin() + (45 - 33 + 1),
       ids.begin(),
       ids.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
@@ -386,8 +389,8 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   std::vector<StreamId> ids2(10);
   std::generate(ids2.begin(), ids2.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
-      streams.begin() + (45 - 33 + 1),
-      streams.end(),
+      streams.rbegin() + (45 - 33 + 1),
+      streams.rend(),
       ids2.begin(),
       ids2.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
@@ -501,14 +504,14 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
       testLossHandler(lostPackets),
       Clock::now());
 
-  EXPECT_EQ(26, streams.begin()->streamId);
+  EXPECT_EQ(26, streams.rbegin()->streamId);
 
   StreamId start = 20;
   std::vector<StreamId> ids(20 - 10 + 1);
   std::generate(ids.begin(), ids.end(), [&]() { return start--; });
   EXPECT_TRUE(std::equal(
-      streams.begin() + 1,
-      streams.end(),
+      streams.rbegin() + 1,
+      streams.rend(),
       ids.begin(),
       ids.end(),
       [](const auto& frame, auto id) { return frame.streamId == id; }));
@@ -1537,7 +1540,7 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   // see above
   EXPECT_EQ(6, size(conn.pendingCallbacks));
 
-  for (const auto ackData : ackVec) {
+  for (const auto& ackData : ackVec) {
     auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
         ackData.ackTime - packetRcvTime[ackData.endSeq]);
     EXPECT_CALL(
@@ -1778,6 +1781,3446 @@ TEST_P(AckHandlersTest, SubMicrosecondRTT) {
       [](auto&, auto&, bool) {},
       ackReceiveTime);
   EXPECT_EQ(conn.lossState.lrtt, 1us);
+}
+
+class AckEventForAppDataTest : public Test {
+ public:
+  void SetUp() override {
+    aead_ = test::createNoOpAead();
+    headerCipher_ = test::createNoOpHeaderCipher();
+    conn_ = createConn();
+  }
+
+  static std::unique_ptr<QuicServerConnectionState> createConn() {
+    auto conn = std::make_unique<QuicServerConnectionState>(
+        FizzServerQuicHandshakeContext::Builder().build());
+    conn->serverConnectionId = getTestConnectionId();
+    conn->clientConnectionId = getTestConnectionId();
+    conn->version = QuicVersion::MVFST;
+    conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
+        kDefaultStreamWindowSize;
+    conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote =
+        kDefaultStreamWindowSize;
+    conn->flowControlState.peerAdvertisedInitialMaxStreamOffsetUni =
+        kDefaultStreamWindowSize;
+    conn->flowControlState.peerAdvertisedMaxOffset =
+        kDefaultConnectionWindowSize;
+    conn->initialWriteCipher = createNoOpAead();
+    conn->initialHeaderCipher = createNoOpHeaderCipher();
+    conn->streamManager->setMaxLocalBidirectionalStreams(
+        kDefaultMaxStreamsBidirectional);
+    conn->streamManager->setMaxLocalUnidirectionalStreams(
+        kDefaultMaxStreamsUnidirectional);
+    return conn;
+  }
+
+  auto writeDataToQuicStreamAndGetFrame(
+      QuicStreamState& stream,
+      Buf&& data,
+      const bool eof) {
+    const auto offset = getLargestWriteOffsetSeen(stream);
+    const auto len = data->computeChainDataLength();
+    writeDataToQuicStream(stream, data->clone(), eof);
+    return WriteStreamFrame(stream.id, offset, len, eof);
+  }
+
+  auto writeDataToQuicStreamAndGetFrame(
+      const StreamId streamId,
+      Buf&& data,
+      const bool eof) {
+    auto stream = conn_->streamManager->findStream(streamId);
+    CHECK_NOTNULL(stream);
+    return writeDataToQuicStreamAndGetFrame(*stream, std::move(data), eof);
+  }
+
+  auto writeDataToQuicStreamAndGetFrame(
+      const StreamId streamId,
+      const std::string& str,
+      const bool eof) {
+    return writeDataToQuicStreamAndGetFrame(
+        streamId, folly::IOBuf::copyBuffer(str), eof);
+  }
+
+  auto buildEmptyPacket(
+      const PacketNumberSpace pnSpace,
+      const bool shortHeader = false) {
+    folly::Optional<PacketHeader> header;
+    if (shortHeader) {
+      header = ShortHeader(
+          ProtectionType::KeyPhaseZero,
+          *conn_->clientConnectionId,
+          conn_->ackStates.appDataAckState.nextPacketNum);
+    } else {
+      if (pnSpace == PacketNumberSpace::Initial) {
+        header = LongHeader(
+            LongHeader::Types::Initial,
+            *conn_->clientConnectionId,
+            *conn_->serverConnectionId,
+            conn_->ackStates.initialAckState.nextPacketNum,
+            *conn_->version);
+      } else if (pnSpace == PacketNumberSpace::Handshake) {
+        header = LongHeader(
+            LongHeader::Types::Handshake,
+            *conn_->clientConnectionId,
+            *conn_->serverConnectionId,
+            conn_->ackStates.handshakeAckState.nextPacketNum,
+            *conn_->version);
+      } else if (pnSpace == PacketNumberSpace::AppData) {
+        header = LongHeader(
+            LongHeader::Types::ZeroRtt,
+            *conn_->clientConnectionId,
+            *conn_->serverConnectionId,
+            conn_->ackStates.appDataAckState.nextPacketNum,
+            *conn_->version);
+      }
+    }
+    RegularQuicPacketBuilder builder(
+        conn_->udpSendPacketLen,
+        std::move(*header),
+        getAckState(*conn_, pnSpace).largestAckedByPeer.value_or(0));
+    builder.encodePacketHeader();
+    DCHECK(builder.canBuildPacket());
+    return std::move(builder).buildPacket();
+  }
+
+  uint64_t getEncodedSize(const RegularQuicPacketBuilder::Packet& packet) {
+    // calculate size as the plaintext size
+    uint32_t encodedSize = 0;
+    if (packet.header) {
+      encodedSize += packet.header->computeChainDataLength();
+    }
+    if (packet.body) {
+      encodedSize += packet.body->computeChainDataLength();
+    }
+    return encodedSize;
+  }
+
+  uint64_t getEncodedBodySize(const RegularQuicPacketBuilder::Packet& packet) {
+    // calculate size as the plaintext size
+    uint32_t encodedBodySize = 0;
+    if (packet.body) {
+      encodedBodySize += packet.body->computeChainDataLength();
+    }
+    return encodedBodySize;
+  }
+
+  void sendAppDataPacket(
+      const RegularQuicPacketBuilder::Packet& packet,
+      const TimePoint timepoint = TimePoint()) {
+    updateConnection(
+        *conn_,
+        folly::none,
+        packet.packet,
+        timepoint,
+        getEncodedSize(packet),
+        getEncodedBodySize(packet),
+        false /* isDSRPacket */);
+  }
+
+  auto deliverAckForAppDataPackets(
+      const quic::AckBlocks& ackBlocks,
+      const TimePoint timepoint = TimePoint(),
+      const std::chrono::microseconds ackDelay = 0us) {
+    ReadAckFrame ackFrame = {};
+    ackFrame.largestAcked = ackBlocks.back().end;
+    ackFrame.ackDelay = ackDelay;
+
+    // ack blocks are ordered based on the end packet number in the interval
+    auto it = ackBlocks.crbegin();
+    while (it != ackBlocks.crend()) {
+      ackFrame.ackBlocks.emplace_back(it->start, it->end);
+      it++;
+    }
+
+    return processAckFrame(
+        *conn_,
+        PacketNumberSpace::AppData,
+        ackFrame,
+        [&](const OutstandingPacket& /* packet */,
+            const QuicWriteFrame& packetFrame,
+            const ReadAckFrame&) {
+          switch (packetFrame.type()) {
+            case QuicWriteFrame::Type::WriteStreamFrame: {
+              const WriteStreamFrame& frame = *packetFrame.asWriteStreamFrame();
+              VLOG(4) << "Received ack for stream=" << frame.streamId
+                      << " offset=" << frame.offset << " fin=" << frame.fin
+                      << " len=" << frame.len << " " << *conn_;
+              auto ackedStream =
+                  conn_->streamManager->getStream(frame.streamId);
+              if (ackedStream) {
+                sendAckSMHandler(*ackedStream, frame);
+              }
+            } break;
+            default:
+              FAIL();
+          }
+        },
+        [&](auto&, auto&, auto) { /* lossVisitor */ },
+        timepoint);
+  }
+
+  auto deliverAckForAppDataPackets(
+      const quic::PacketNum intervalStart,
+      const quic::PacketNum intervalEnd,
+      const TimePoint timepoint = TimePoint(),
+      const std::chrono::microseconds ackDelay = 0us) {
+    quic::AckBlocks acks = {{intervalStart, intervalEnd}};
+    return deliverAckForAppDataPackets(acks, timepoint, ackDelay);
+  }
+
+  auto getConn() {
+    return conn_.get();
+  }
+
+ private:
+  std::unique_ptr<Aead> aead_;
+  std::unique_ptr<PacketNumberCipher> headerCipher_;
+  std::unique_ptr<QuicServerConnectionState> conn_;
+};
+
+/**
+ * Check AckEvent::ackTime, adjustedAckTime, and mrttSample.
+ *
+ * Two packets sent, ACKed in single ACK.
+ */
+TEST_F(AckEventForAppDataTest, AckEventAckTimeAndMrttSample) {
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  TimePoint startTime = TimePoint::clock::now();
+
+  // packet 1, frame 1 from stream 1
+  auto packet1 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet1.packet.frames.push_back(s1f1);
+  const auto packet1SendTime = startTime + 500ms;
+  sendAppDataPacket(packet1, packet1SendTime);
+  appDataPacketNumSent.push_back(packet1.packet.header.getPacketSequenceNum());
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  // mimics a retransmission
+  auto packet2 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet2.packet.frames.push_back(s1f1);
+  packet2.packet.frames.push_back(s2f1);
+  const auto packet2SendTime = packet1SendTime + 7ms;
+  sendAppDataPacket(packet2, packet2SendTime);
+  appDataPacketNumSent.push_back(packet2.packet.header.getPacketSequenceNum());
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet1 and packet2
+  const auto ackArrivalTime = packet2SendTime + 50ms;
+  const auto ackDelay = 11ms;
+  const auto ackEvent = deliverAckForAppDataPackets(
+      appDataPacketNumSent[0],
+      appDataPacketNumSent[1],
+      ackArrivalTime,
+      ackDelay);
+
+  // check ackTime and adjustedAckTime
+  EXPECT_EQ(ackArrivalTime, ackEvent.ackTime);
+  EXPECT_EQ(ackArrivalTime - ackDelay, ackEvent.adjustedAckTime);
+
+  // check mrtt sample (includes ack delay)
+  EXPECT_EQ(ackArrivalTime - packet2SendTime, ackEvent.mrttSample);
+}
+
+/**
+ * Check AckEvent::ackedBytes, verify it includes bytes even if spurious.
+ *
+ * Two packets sent, ACKed in single ACK.
+ */
+TEST_F(AckEventForAppDataTest, AckEventAckedBytes) {
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  auto packet1 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet1.packet.frames.push_back(s1f1);
+  sendAppDataPacket(packet1);
+  appDataPacketNumSent.push_back(packet1.packet.header.getPacketSequenceNum());
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  // mimics a retransmission
+  auto packet2 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet2.packet.frames.push_back(s1f1);
+  packet2.packet.frames.push_back(s2f1);
+  sendAppDataPacket(packet2);
+  appDataPacketNumSent.push_back(packet2.packet.header.getPacketSequenceNum());
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet1 and packet2
+  const auto ackEvent = deliverAckForAppDataPackets(
+      appDataPacketNumSent[0], appDataPacketNumSent[1]);
+
+  // check ackedBytes
+  EXPECT_EQ(
+      getEncodedSize(packet1) + getEncodedSize(packet2), ackEvent.ackedBytes);
+}
+
+/**
+ * Check AckEvent::ackedBytes, verify it includes bytes even if spurious.
+ *
+ * Two packets sent, ACKed in two separate ACKs.
+ */
+TEST_F(AckEventForAppDataTest, AckEventAckedBytesSeparateAcks) {
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  auto packet1 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet1.packet.frames.push_back(s1f1);
+  sendAppDataPacket(packet1);
+  appDataPacketNumSent.push_back(packet1.packet.header.getPacketSequenceNum());
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  // mimics a retransmission
+  auto packet2 = buildEmptyPacket(PacketNumberSpace::AppData);
+  packet2.packet.frames.push_back(s1f1);
+  packet2.packet.frames.push_back(s2f1);
+  sendAppDataPacket(packet2);
+  appDataPacketNumSent.push_back(packet2.packet.header.getPacketSequenceNum());
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedBytes
+    EXPECT_EQ(getEncodedSize(packet1), ackEvent.ackedBytes);
+  }
+
+  // deliver ACK for packet2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedBytes
+    EXPECT_EQ(getEncodedSize(packet2), ackEvent.ackedBytes);
+  }
+}
+
+/**
+ * Verify that AckEventStreamDetailsMatcherBuilder matcher works correctly.
+ */
+TEST_F(AckEventForAppDataTest, AckEventStreamDetailsMatcher) {
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up?", false);
+
+  // anon lambda to enable us to construct detailsPerStream and keep it const
+  // this ensures the rest of our test does not modify it inadvertently
+  const auto detailsPerStream = [&]() {
+    AckEvent::AckPacket::DetailsPerStream detailsPerStreamL;
+    detailsPerStreamL.recordFrameAlreadyDelivered(s1f1, true);
+    detailsPerStreamL.recordFrameDelivered(s1f2, false);
+    detailsPerStreamL.recordFrameDelivered(s1f3, true);
+    detailsPerStreamL.recordDeliveryOffsetUpdate(s1Id, s1f3.offset + s1f3.len);
+    return detailsPerStreamL;
+  }();
+
+  // default matcher builder
+  const auto&& getDefaultBuilder = [&]() {
+    return AckEventStreamDetailsMatcherBuilder()
+        .setStreamID(s1Id)
+        .setStreamBytesAcked(s1f2.len + s1f3.len)
+        .setStreamBytesAckedByRetrans(s1f3.len)
+        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+        .addDupAckedStreamInterval(s1f1.offset, s1f1.offset + s1f1.len - 1);
+  };
+
+  // correct
+  {
+    EXPECT_THAT(
+        detailsPerStream, UnorderedElementsAre(getDefaultBuilder().build()));
+  }
+
+  // wrong stream id
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder().setStreamID(s2Id).build())));
+
+    // prove that matcher works if fixed
+    EXPECT_THAT(
+        detailsPerStream,
+        UnorderedElementsAre(getDefaultBuilder().setStreamID(s1Id).build()));
+  }
+
+  // wrong stream bytes acked
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .setStreamBytesAcked(s1f2.len + s1f3.len + 1)
+                .build())));
+
+    // prove that matcher works if fixed
+    EXPECT_THAT(
+        detailsPerStream,
+        UnorderedElementsAre(getDefaultBuilder()
+                                 .setStreamBytesAcked(s1f2.len + s1f3.len)
+                                 .build()));
+  }
+
+  // wrong stream bytes acked (empty)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder().setStreamBytesAcked(0).build())));
+  }
+
+  // wrong stream bytes acked by retransmission
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(getDefaultBuilder()
+                                     .setStreamBytesAckedByRetrans(s1f3.len + 1)
+                                     .build())));
+
+    // prove that matcher works if fixed
+    EXPECT_THAT(
+        detailsPerStream,
+        UnorderedElementsAre(getDefaultBuilder()
+                                 .setStreamBytesAckedByRetrans(s1f3.len)
+                                 .build()));
+  }
+
+  // wrong stream bytes acked by retransmission (empty)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder().setStreamBytesAckedByRetrans(0).build())));
+  }
+
+  // wrong new delivery offset
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len + 1)
+                .build())));
+
+    // prove that matcher works if fixed
+    EXPECT_THAT(
+        detailsPerStream,
+        UnorderedElementsAre(
+            getDefaultBuilder()
+                .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+                .build()));
+  }
+
+  // wrong new delivery offset (empty)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(getDefaultBuilder()
+                                     .setMaybeNewDeliveryOffset(folly::none)
+                                     .build())));
+  }
+
+  // wrong dup acked stream intervals (add f3)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .addDupAckedStreamInterval(
+                    s1f3.offset, s1f3.offset + s1f3.len - 1) // wrong
+                .build())));
+  }
+
+  // wrong dup acked stream intervals (clear and add f1 wrong)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder()
+                .clearDupAckedStreamIntervals()
+                .addDupAckedStreamInterval(
+                    s1f1.offset, s1f1.offset + s1f1.len) // wrong
+                .build())));
+  }
+
+  // wrong dup acked stream intervals (empty)
+  {
+    EXPECT_THAT(
+        detailsPerStream,
+        Not(UnorderedElementsAre(
+            getDefaultBuilder().clearDupAckedStreamIntervals().build())));
+  }
+}
+
+/**
+ * Verify handling of stream details: five packets, one ACK for all five.
+ */
+TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketSingleAck) {
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // deliver an ACK with all five packets at once
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+  const auto ackEvent = deliverAckForAppDataPackets(
+      appDataPacketNumSent.front(), appDataPacketNumSent.back());
+
+  // check ackedPackets
+  EXPECT_THAT(
+      ackEvent.ackedPackets,
+      ElementsAre(
+          // pkt1
+          Field(
+              &AckEvent::AckPacket::detailsPerStream,
+              UnorderedElementsAre(
+                  // s1f1
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f1.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                      .build(),
+                  // s2f1
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f1.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                      .build())),
+          // pkt2
+          Field(
+              &AckEvent::AckPacket::detailsPerStream,
+              UnorderedElementsAre(
+                  // s1f2
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f2.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                      .build(),
+                  // s2f2
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f2.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len)
+                      .build())),
+          // pkt3
+          Field(
+              &AckEvent::AckPacket::detailsPerStream,
+              UnorderedElementsAre(
+                  // s1f3
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f3.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+                      .build(),
+                  // s2f3
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f3.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len)
+                      .build())),
+          // pkt4
+          Field(
+              &AckEvent::AckPacket::detailsPerStream,
+              UnorderedElementsAre(
+                  // s3f1
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s3Id)
+                      .setStreamBytesAcked(s3f1.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                      .build())),
+          // pkt5
+          Field(
+              &AckEvent::AckPacket::detailsPerStream,
+              UnorderedElementsAre(
+                  // s1f4 w/ EOR
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s1Id)
+                      .setStreamBytesAcked(s1f4.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                      .build(),
+                  // s2f4 w/ EOR
+                  AckEventStreamDetailsMatcherBuilder()
+                      .setStreamID(s2Id)
+                      .setStreamBytesAcked(s2f4.len)
+                      .setStreamBytesAckedByRetrans(0)
+                      .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                      .build()))));
+}
+
+/**
+ * Verify handling of stream details: five packets, five ACKs.
+ */
+TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketIndividualAcks) {
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packet 1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        .build(),
+                    // s2f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 3
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[2], appDataPacketNumSent[2]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 4
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[3], appDataPacketNumSent[3]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 5
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[4], appDataPacketNumSent[4]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Deliver packets out of order, with packet one arriving late.
+ *
+ * No delivery offset updates for stream 1 or stream 2 until packet 1 arrives.
+ * Stream 3 won't be affected
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketTwoAcksPacketOneOutOfOrder) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 2 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[1], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f1 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Deliver packets out of order, with packet two arriving late.
+ *
+ * No delivery offset updates for stream 1 or stream 2 for frames in packets 4
+ * and 5 until ACK for packet 2 arrives. Stream 3 won't be affected.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketTwoAcksPacketTwoOutOfOrder) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1, 3 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // not affected by out of order
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Deliver packets out of order, with packet four arriving late.
+ *
+ * Since packet four contains only bytes for stream 3, and is the first packet
+ * with bytes for stream 3, there should be no impact on delivery offsets.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketTwoAcksPacketFourOutOfOrder) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1 - 3, and 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[2]);
+    blocks.insert(appDataPacketNumSent[4], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build())),
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        .build(),
+                    // s2f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f2.offset + s2f2.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f3.offset + s2f3.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 4
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[3], appDataPacketNumSent[3]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Deliver packets out of order, with packet two arriving late.
+ *
+ * Each packet is ACKed individually.
+ *
+ * No delivery offset updates for stream 1 or stream 2 for frames in packets 4
+ * and 5 until ACK for packet 2 arrives. Stream 3 won't be affected.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketTwoAcksPacketTwoOutOfOrderIndividualAcks) {
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packet 1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 3
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[2], appDataPacketNumSent[2]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 4
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[3], appDataPacketNumSent[3]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 5
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[4], appDataPacketNumSent[4]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frames in packet two retransmitted in packet six.
+ * Packet six ACKed, packet two never ACKed.
+ */
+TEST_F(AckEventForAppDataTest, AckEventMultiStreamPacketPacketTwoRetrans) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1, 3 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // not affected by out of order
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // packet 6, frame 2 from streams 1 & 2 (retrans of frame packet 1)
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(6));
+
+  // deliver ACK for packet 6
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[5], appDataPacketNumSent[5]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f2.len) // retrans
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(s1f2.len) // retrans
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frames in packet two retransmitted in packet six.
+ * Packet two and packet six ACKed at the same time.
+ *
+ * No stream bytes should be recorded as ACKed (including by retransmission) for
+ * packet six, since packet two already arrived. We will however record frames
+ * as having been duplicate ACKed for packet six.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketPacketTwoRetransSpuriousOrigAckedSameTime) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1, 3 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // not affected by out of order
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // packet 6, frame 2 from streams 1 & 2 (retrans of frame packet 1)
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(6));
+
+  // deliver ACK for packets 2 and 6
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[1], appDataPacketNumSent[1]);
+    blocks.insert(appDataPacketNumSent[5], appDataPacketNumSent[5]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build())),
+            // pkt6
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0) // original arrived
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // no change, since already ACKed by original
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f2.offset, s1f2.offset + s1f2.len - 1)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(0) // original arrived
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // no change, since already ACKed by original
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s2f2.offset, s2f2.offset + s2f2.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frames in packet two retransmitted in packet six.
+ * Packet six ACKed, then two ACKed.
+ *
+ * Stream bytes should be recorded for packet six as ACKed by retransmission.
+ *
+ * No stream bytes should be recorded as ACKed (including by retransmission) for
+ * packet two, since packet six already arrived. We will however record frames
+ * as having been duplicate ACKed for packet two.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketPacketTwoRetransSpuriousOrigThenRetransAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1, 3 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // not affected by out of order
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // packet 6, frame 2 from streams 1 & 2 (retrans of frame packet 1)
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(6));
+
+  // deliver ACK for packet 6
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[5], appDataPacketNumSent[5]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt6
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f2.len)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(s2f2.len)
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0) // retrans ACKed earlier
+                        .setStreamBytesAckedByRetrans(0) // retrans ACK earlier
+                        // no change, since already ACKed by retrans
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // orig ACKed after retrans, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f2.offset, s1f2.offset + s1f2.len - 1)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(0) // retrans ACKed earlier
+                        .setStreamBytesAckedByRetrans(0) // retrans ACK earlier
+                        // no change, since already ACKed by retrans
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // orig ACKed after retrans, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s2f2.offset, s2f2.offset + s2f2.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frames in packet two retransmitted in packet six.
+ * Packet two ACKed, then six ACKed.
+ *
+ * No stream bytes should be recorded as ACKed (including by retransmission) for
+ * packet six, since packet two already arrived. We will however record frames
+ * as having been duplicate ACKed for packet six.
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventMultiStreamPacketPacketTwoRetransSpuriousRetransThenOrigAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two streams, both writing "hey whats up!" split across four frames
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "hey ", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s2f2 = writeDataToQuicStreamAndGetFrame(s2Id, "whats ", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up-", false);
+  auto s2f3 = writeDataToQuicStreamAndGetFrame(s2Id, "up ", false);
+  auto s1f4 = writeDataToQuicStreamAndGetFrame(s1Id, "!", true);
+  auto s2f4 = writeDataToQuicStreamAndGetFrame(s2Id, "!", true);
+
+  // third stream in which "yt??" is written in a single frame
+  auto s3Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s3f1 = writeDataToQuicStreamAndGetFrame(s3Id, "yt??", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    packet.packet.frames.push_back(s2f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 4, frame 1 from stream 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s3f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 5, frame 4 from streams 1 & 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f4);
+    packet.packet.frames.push_back(s2f4);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(5));
+
+  // deliver ACK for packets 1, 3 - 5
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[4]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f3
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build())),
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s3f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s3Id)
+                        .setStreamBytesAcked(s3f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // not affected by out of order
+                        .setMaybeNewDeliveryOffset(s3f1.offset + s3f1.len)
+                        .build())),
+            // pkt5
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build(),
+                    // s2f4 w/ EOR
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f4.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // no update due to out of order, f2 not received yet
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // packet 6, frame 2 from streams 1 & 2 (retrans of frame packet 1)
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    packet.packet.frames.push_back(s2f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(6));
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s1f4.offset + s1f4.len)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f2.len)
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // f1 - f4 now done, delivery offset = end of f4
+                        .setMaybeNewDeliveryOffset(s2f4.offset + s2f4.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 6
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[5], appDataPacketNumSent[5]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt6
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0) // original arrived
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // no change, since already ACKed by original
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f2.offset, s1f2.offset + s1f2.len - 1)
+                        .build(),
+                    // s2f1
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(0) // original arrived
+                        .setStreamBytesAckedByRetrans(0) // original arrived
+                        // no change, since already ACKed by original
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f2 dupacked
+                        .addDupAckedStreamInterval(
+                            s2f2.offset, s2f2.offset + s2f2.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for same stream.
+ * Second packet ACKed, original never ACKed.
+ */
+TEST_F(AckEventForAppDataTest, AckEventRetransHasNewFrame) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frames 1 and 2 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s1f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    // s1f1 + s1f2
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len + s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for same stream.
+ * Original and second packet ACKed at same time (spurious).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewFrameSpuriousOrigAckedSameTime) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frames 1 and 2 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s1f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packets 1 and 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len) // only f2
+                        .setStreamBytesAckedByRetrans(0) // f1 ACKed earlier
+                        // moved forward to f2
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        // retrans ACKed after original, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for same stream.
+ * Original packet ACKed then second packet ACKed (spurious retrans).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewFrameSpuriousOrigThenRetransAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frames 1 and 2 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s1f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        // p1 acked earlier, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for same stream.
+ * Second packet ACKed, then original packet ACKed (spurious + out of order).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewFrameSpuriousRetransThenOrigAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frames 1 and 2 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s1f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len + s1f2.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0) // p2 ACKed earlier
+                        .setStreamBytesAckedByRetrans(0) // p2 ACKed earlier
+                        // no change, since already advanced by p2
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // orig ACKed after retrans, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for new stream.
+ * Second packet ACKed, original never ACKed.
+ */
+TEST_F(AckEventForAppDataTest, AckEventRetransHasNewStreamFrame) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for new stream.
+ * Original and second packet ACKed at same time (spurious).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewStreamFrameSpuriousOrigAckedSameTime) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packets 1 and 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build())),
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build(),
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for new stream.
+ * Original packet ACKed then second packet ACKed (spurious retrans).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewStreamFrameSpuriousOrigThenRetransAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet 1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build(),
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+}
+
+/**
+ * Frame retransmitted in a packet with a new frame (new data) for new stream.
+ * Second packet ACKed, then original packet ACKed (spurious + out of order).
+ */
+TEST_F(
+    AckEventForAppDataTest,
+    AckEventRetransHasNewStreamFrameSpuriousRetransThenOrigAcked) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // two writes to two different streams
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s2Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s2f1 = writeDataToQuicStreamAndGetFrame(s2Id, "whats-", false);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 1 from stream 1 and frame 1 from stream 2
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s2f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(2));
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(s1f1.len)
+                        .setMaybeNewDeliveryOffset(s1f1.offset + s1f1.len)
+                        .build(),
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s2Id)
+                        .setStreamBytesAcked(s2f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s2f1.offset + s2f1.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet1
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[0], appDataPacketNumSent[0]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0) // p2 ACKed earlier
+                        .setStreamBytesAckedByRetrans(0) // p2 ACKed earlier
+                        // no change, since already advanced by p2
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // orig ACKed after retrans, thus making f1 dupacked
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .build()))));
+  }
+}
+
+/**
+ * Scenario where there are multiple dupacked intervals on a packet ACK.
+ */
+TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  getConn()->lossState.srtt = 1ms;
+  getConn()->lossState.lrtt = 1ms;
+  getConn()->lossState.reorderingThreshold = 10;
+  getConn()->transportSettings.timeReorderingThreshDividend = 1000;
+  getConn()->transportSettings.timeReorderingThreshDivisor = 1;
+
+  // three writes to a single stream
+  auto s1Id =
+      getConn()->streamManager->createNextBidirectionalStream().value()->id;
+  auto s1f1 = writeDataToQuicStreamAndGetFrame(s1Id, "hey-", false);
+  auto s1f2 = writeDataToQuicStreamAndGetFrame(s1Id, "whats-", false);
+  auto s1f3 = writeDataToQuicStreamAndGetFrame(s1Id, "up?", true);
+
+  std::vector<PacketNum> appDataPacketNumSent;
+
+  // packet 1, frame 1 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 2, frame 2 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f2);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  // packet 3, frame 3 from stream 1
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(3));
+
+  // deliver ACK for packet 2
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[1], appDataPacketNumSent[1]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt2
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f2.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // missing f1, so delivery offset cannot increase
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        .build()))));
+  }
+
+  // packet 4, retransmission of frame 1 and frame 3
+  {
+    auto packet = buildEmptyPacket(PacketNumberSpace::AppData);
+    packet.packet.frames.push_back(s1f1);
+    packet.packet.frames.push_back(s1f3);
+    sendAppDataPacket(packet);
+    appDataPacketNumSent.push_back(packet.packet.header.getPacketSequenceNum());
+  }
+
+  ASSERT_THAT(appDataPacketNumSent, SizeIs(4));
+
+  // deliver ACK for packet 1 and packet 3
+  {
+    AckBlocks blocks;
+    blocks.insert(appDataPacketNumSent[0], appDataPacketNumSent[0]);
+    blocks.insert(appDataPacketNumSent[2], appDataPacketNumSent[2]);
+    const auto ackEvent = deliverAckForAppDataPackets(blocks);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt1
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f1.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        // since f2 ACKed already, advance to there
+                        .setMaybeNewDeliveryOffset(s1f2.offset + s1f2.len)
+                        .build())),
+            // pkt3
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(s1f3.len)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(s1f3.offset + s1f3.len)
+                        .build()))));
+  }
+
+  // deliver ACK for packet 4
+  {
+    const auto ackEvent = deliverAckForAppDataPackets(
+        appDataPacketNumSent[3], appDataPacketNumSent[3]);
+
+    // check ackedPackets
+    EXPECT_THAT(
+        ackEvent.ackedPackets,
+        ElementsAre(
+            // pkt4
+            Field(
+                &AckEvent::AckPacket::detailsPerStream,
+                UnorderedElementsAre(
+                    AckEventStreamDetailsMatcherBuilder()
+                        .setStreamID(s1Id)
+                        .setStreamBytesAcked(0)
+                        .setStreamBytesAckedByRetrans(0)
+                        .setMaybeNewDeliveryOffset(folly::none)
+                        // retrans ACKed after original, thus making dupacks
+                        // for both f1 and f3 (in ACKed packets p1 and p3)
+                        .addDupAckedStreamInterval(
+                            s1f1.offset, s1f1.offset + s1f1.len - 1)
+                        .addDupAckedStreamInterval(
+                            s1f3.offset, s1f3.offset + s1f3.len - 1)
+                        .build()))));
+  }
 }
 
 INSTANTIATE_TEST_CASE_P(

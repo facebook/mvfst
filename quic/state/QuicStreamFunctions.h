@@ -119,6 +119,13 @@ folly::Optional<uint64_t> getLargestDeliverableOffset(
     const QuicStreamState& stream);
 
 /**
+ * Get the version associated with the stream's ACK IntervalSet.
+ *
+ * The version changes every time a new interval is added to the IntervalSet.
+ */
+uint64_t getAckIntervalSetVersion(const QuicStreamState& stream);
+
+/**
  * Get the cumulative number of packets that contains STREAM frame for this
  * stream. It does not count retransmissions.
  */

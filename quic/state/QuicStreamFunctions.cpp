@@ -449,6 +449,10 @@ folly::Optional<uint64_t> getLargestDeliverableOffset(
   return stream.ackedIntervals.front().end;
 }
 
+uint64_t getAckIntervalSetVersion(const QuicStreamState& stream) {
+  return stream.ackedIntervals.insertVersion();
+}
+
 uint64_t getNumPacketsTxWithNewData(const QuicStreamState& stream) {
   return stream.numPacketsTxWithNewData;
 }

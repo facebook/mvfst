@@ -3716,7 +3716,6 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
   auto streamId =
       client->createBidirectionalStream(false /* replaySafe */).value();
 
-  auto data = IOBuf::copyBuffer("some data");
   client->writeChain(streamId, nullptr, true, &deliveryCallback);
   loopForWrites();
 

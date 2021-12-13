@@ -6,12 +6,31 @@
  *
  */
 
+#include <folly/MapUtil.h>
 #include <quic/loss/QuicLossFunctions.h>
 #include <quic/state/AckHandlers.h>
 #include <quic/state/QuicStateFunctions.h>
+#include <quic/state/QuicStreamFunctions.h>
 #include <iterator>
 
 namespace quic {
+
+namespace {
+/**
+ * Structure used to to enable packets to be processed in sent order.
+ *
+ * Contains context required for deferred processing.
+ */
+struct OutstandingPacketWithHandlerContext {
+  explicit OutstandingPacketWithHandlerContext(
+      OutstandingPacket&& outstandingPacketIn)
+      : outstandingPacket(outstandingPacketIn) {}
+
+  OutstandingPacket outstandingPacket;
+  bool processAllFrames{false};
+};
+
+} // namespace
 
 /**
  * Process ack frame and acked outstanding packets.
@@ -41,11 +60,10 @@ AckEvent processAckFrame(
   ack.ackTime = ackReceiveTime;
   ack.implicit = frame.implicit;
   ack.adjustedAckTime = ackReceiveTime - frame.ackDelay;
-  // Using kDefaultRxPacketsBeforeAckAfterInit to reseve for ackedPackets
-  // container is a hueristic. Other quic implementations may have very
-  // different acking policy. It's also possibly that all acked packets are pure
-  // acks which leads to different number of packets being acked usually.
-  ack.ackedPackets.reserve(kDefaultRxPacketsBeforeAckAfterInit);
+
+  // temporary storage to enable packets to be processed in sent order
+  std::deque<OutstandingPacketWithHandlerContext> packetsWithHandlerContext;
+
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
   uint64_t dsrPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
@@ -170,15 +188,6 @@ AckEvent processAckFrame(
           }
         }
       }
-      // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
-      // frame types only if the packet doesn't have an associated PacketEvent;
-      // or the PacketEvent is in conn.outstandings.packetEvents
-      for (auto& packetFrame : rPacketIt->packet.frames) {
-        if (needsProcess ||
-            packetFrame.type() == QuicWriteFrame::Type::WriteAckFrame) {
-          ackVisitor(*rPacketIt, packetFrame, frame);
-        }
-      }
       // Remove this PacketEvent from the outstandings.packetEvents set
       if (rPacketIt->associatedEvent) {
         conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
@@ -206,12 +215,21 @@ AckEvent processAckFrame(
         conn.lossState.lastAckedTime = ackReceiveTime;
         conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       }
-      ack.ackedPackets.push_back(
-          CongestionController::AckEvent::AckPacket::Builder()
-              .setOutstandingPacketMetadata(std::move(rPacketIt->metadata))
-              .setLastAckedPacketInfo(std::move(rPacketIt->lastAckedPacketInfo))
-              .setAppLimited(rPacketIt->isAppLimited)
-              .build());
+
+      // temporarily store the packet to facilitate in-order ACK processing
+      {
+        auto tmpIt = packetsWithHandlerContext.emplace(
+            std::find_if(
+                packetsWithHandlerContext.begin(),
+                packetsWithHandlerContext.end(),
+                [&currentPacketNum](const auto& packetWithHandlerContext) {
+                  return packetWithHandlerContext.outstandingPacket.packet
+                             .header.getPacketSequenceNum() > currentPacketNum;
+                }),
+            std::move(*rPacketIt));
+        tmpIt->processAllFrames = needsProcess;
+      }
+
       rPacketIt++;
     }
     // Done searching for acked outstanding packets in current ack block. Erase
@@ -226,6 +244,127 @@ AckEvent processAckFrame(
       currentPacketIt = rPacketIt;
     }
     ackBlockIt++;
+  }
+
+  // Invoke AckVisitor for WriteAckFrames all the time. Invoke it for other
+  // frame types only if the packet doesn't have an associated PacketEvent;
+  // or the PacketEvent is in conn.outstandings.packetEvents
+  ack.ackedPackets.reserve(packetsWithHandlerContext.size());
+  for (auto& packetWithHandlerContext : packetsWithHandlerContext) {
+    auto& outstandingPacket = packetWithHandlerContext.outstandingPacket;
+    const auto processAllFrames = packetWithHandlerContext.processAllFrames;
+    AckEvent::AckPacket::DetailsPerStream detailsPerStream;
+    for (auto& packetFrame : outstandingPacket.packet.frames) {
+      if (!processAllFrames &&
+          packetFrame.type() != QuicWriteFrame::Type::WriteAckFrame) {
+        continue; // skip processing this frame
+      }
+
+      // We do a few things here for ACKs of WriteStreamFrames:
+      //  1. To understand whether the ACK of this frame changes the
+      //     stream's delivery offset, we record the delivery offset before
+      //     running the ackVisitor, run it, and then check if the stream's
+      //     delivery offset changed.
+      //
+      //  2. To understand whether the ACK of this frame is redundant (e.g.
+      //     the frame was already ACKed before), we record the version of
+      //     the stream's ACK IntervalSet before running the ackVisitor,
+      //     run it, and then check if the version changed. If it changed,
+      //     we know that _this_ ACK of _this_ frame had an impact.
+      //
+      //  3. If we determine that the ACK of the frame is not-redundant,
+      //     and the frame was retransmitted, we record the number of bytes
+      //     ACKed by a retransmit as well.
+
+      // Part 1: Record delivery offset prior to running ackVisitor.
+      struct PreAckVisitorState {
+        const uint64_t ackIntervalSetVersion;
+        const folly::Optional<uint64_t> maybeLargestDeliverableOffset;
+      };
+      const auto maybePreAckVisitorState =
+          [&conn](
+              const auto& packetFrame) -> folly::Optional<PreAckVisitorState> {
+        // check if it's a WriteStreamFrame being ACKed
+        if (packetFrame.type() != QuicWriteFrame::Type::WriteStreamFrame) {
+          return folly::none;
+        }
+
+        // check if the stream is alive (could be ACK for dead stream)
+        const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
+        if (!conn.streamManager->streamExists(ackedFrame.streamId)) {
+          return folly::none;
+        }
+        auto ackedStream =
+            CHECK_NOTNULL(conn.streamManager->getStream(ackedFrame.streamId));
+
+        // stream is alive and frame is WriteStreamFrame
+        return PreAckVisitorState{
+            getAckIntervalSetVersion(*ackedStream),
+            getLargestDeliverableOffset(*ackedStream)};
+      }(packetFrame);
+
+      // run the ACK visitor
+      ackVisitor(outstandingPacket, packetFrame, frame);
+
+      // Part 2 and 3: Process current state relative to the PreAckVistorState.
+      if (maybePreAckVisitorState.has_value()) {
+        const auto& preAckVisitorState = maybePreAckVisitorState.value();
+        const WriteStreamFrame& ackedFrame = *packetFrame.asWriteStreamFrame();
+        auto ackedStream =
+            CHECK_NOTNULL(conn.streamManager->getStream(ackedFrame.streamId));
+
+        // determine if this frame was a retransmission
+        const bool retransmission = ([&outstandingPacket, &ackedFrame]() {
+          // in some cases (some unit tests), stream details are not available
+          // in these cases, we assume it is not a retransmission
+          if (const auto maybeStreamDetails = folly::get_optional(
+                  outstandingPacket.metadata.detailsPerStream,
+                  ackedFrame.streamId)) {
+            const auto& maybeFirstNewStreamByteOffset =
+                maybeStreamDetails->maybeFirstNewStreamByteOffset;
+            return (
+                !maybeFirstNewStreamByteOffset.has_value() ||
+                maybeFirstNewStreamByteOffset.value() > ackedFrame.offset);
+          }
+          return false; // assume not a retransmission
+        })();
+
+        // check for change in ACK IntervalSet version
+        if (preAckVisitorState.ackIntervalSetVersion !=
+            getAckIntervalSetVersion(*ackedStream)) {
+          // we were able to fill in a hole in the ACK interval
+          detailsPerStream.recordFrameDelivered(ackedFrame, retransmission);
+
+          // check for change in delivery offset
+          const auto maybeLargestDeliverableOffset =
+              getLargestDeliverableOffset(*ackedStream);
+          if (preAckVisitorState.maybeLargestDeliverableOffset !=
+              maybeLargestDeliverableOffset) {
+            CHECK(maybeLargestDeliverableOffset.has_value());
+            detailsPerStream.recordDeliveryOffsetUpdate(
+                ackedFrame.streamId, maybeLargestDeliverableOffset.value());
+          }
+        } else {
+          // we got an ACK of a frame that was already marked as delivered
+          // when handling the ACK of some earlier packet; mark as such
+          detailsPerStream.recordFrameAlreadyDelivered(
+              ackedFrame, retransmission);
+
+          // should be no change in delivery offset
+          DCHECK(
+              preAckVisitorState.maybeLargestDeliverableOffset ==
+              getLargestDeliverableOffset(*CHECK_NOTNULL(ackedStream)));
+        }
+      }
+    }
+    ack.ackedPackets.emplace_back(
+        CongestionController::AckEvent::AckPacket::Builder()
+            .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
+            .setDetailsPerStream(std::move(detailsPerStream))
+            .setLastAckedPacketInfo(
+                std::move(outstandingPacket.lastAckedPacketInfo))
+            .setAppLimited(outstandingPacket.isAppLimited)
+            .build());
   }
   if (lastAckedPacketSentTime) {
     conn.lossState.lastAckedPacketSentTime = *lastAckedPacketSentTime;

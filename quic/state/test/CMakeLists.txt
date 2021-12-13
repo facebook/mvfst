@@ -39,6 +39,7 @@ quic_add_test(TARGET QuicStreamManagerTest
 
 quic_add_test(TARGET AckHandlersTest
   SOURCES
+  AckEventTestUtil.cpp
   AckHandlersTest.cpp
   DEPENDS
   mvfst_server
