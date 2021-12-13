@@ -77,6 +77,56 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Return the number of packets written in the write interval.
+   */
+  uint64_t getNumPacketsWritten(
+      const NewOutstandingPacketInterval& writeInterval) {
+    const quic::PacketNum firstPacketNum = writeInterval.start;
+    const quic::PacketNum lastPacketNum = writeInterval.end;
+    CHECK_LE(firstPacketNum, lastPacketNum);
+    return writeInterval.end - writeInterval.start + 1;
+  }
+
+  /**
+   * Return the number of packets written in the write interval.
+   */
+  uint64_t getNumPacketsWritten(
+      const folly::Optional<NewOutstandingPacketInterval>& maybeWriteInterval) {
+    if (!maybeWriteInterval.has_value()) {
+      return 0;
+    }
+    return getNumPacketsWritten(maybeWriteInterval.value());
+  }
+
+  /**
+   * Returns the last outstanding packet written of the specified type.
+   *
+   * Since this is a reference to a packet in the outstanding packets deque, it
+   * should not be stored.
+   */
+  const OutstandingPacket* FOLLY_NULLABLE
+  getLastPacketWritten(const quic::PacketNumberSpace packetNumberSpace) {
+    const auto outstandingPacketIt =
+        getLastOutstandingPacket(this->getNonConstConn(), packetNumberSpace);
+    CHECK(
+        outstandingPacketIt !=
+        this->getNonConstConn().outstandings.packets.rend());
+    return &*outstandingPacketIt;
+  }
+
+  /**
+   * Returns the last outstanding AppData packet written of the specified type.
+   *
+   * If no packet, nullptr returned.
+   *
+   * Since this is a reference to a packet in the outstanding packets deque, it
+   * should not be stored.
+   */
+  const OutstandingPacket* FOLLY_NULLABLE getLastAppDataPacketWritten() {
+    return getLastPacketWritten(PacketNumberSpace::AppData);
+  }
+
+  /**
    * Deliver a single packet from the remote.
    */
   void deliverPacket(
@@ -96,6 +146,26 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
         quic::PacketNumberSpace::AppData));
     buf->coalesce();
     return buf;
+  }
+
+  /**
+   * Build a packet with ACK frame for previously sent AppData packets.
+   */
+  quic::Buf buildAckPacketForSentAppDataPackets(
+      NewOutstandingPacketInterval writeInterval) {
+    const quic::PacketNum firstPacketNum = writeInterval.start;
+    const quic::PacketNum lastPacketNum = writeInterval.end;
+    quic::AckBlocks acks = {{firstPacketNum, lastPacketNum}};
+    return buildAckPacketForSentAppDataPackets(acks);
+  }
+
+  /**
+   * Build a packet with ACK frame for previously sent AppData packets.
+   */
+  quic::Buf buildAckPacketForSentAppDataPackets(
+      folly::Optional<NewOutstandingPacketInterval> maybeWriteInterval) {
+    CHECK(maybeWriteInterval.has_value());
+    return buildAckPacketForSentAppDataPackets(maybeWriteInterval.value());
   }
 
   /**
