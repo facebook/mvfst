@@ -702,22 +702,31 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     // part 3.2, we write two ACK eliciting packets, then become app limited
     // one of the ACK eliciting packets contains an ACK frame
     {
+      // older versions of gtest do not seem to accept lambdas for ResultOf
+      // matcher, so define an std::function
+      std::function<uint64_t(const Observer::WriteEvent&)>
+          countPacketsWithAckFrames =
+              [](const Observer::WriteEvent& event) -> uint64_t {
+        uint64_t packetsWithAckFrames = 0;
+        for (auto& outstandingPacket : event.outstandingPackets) {
+          bool hasAckFrame = false;
+          for (auto& frame : outstandingPacket.packet.frames) {
+            if (frame.asWriteAckFrame()) {
+              hasAckFrame = true;
+            }
+          }
+
+          if (hasAckFrame) {
+            packetsWithAckFrames++;
+          }
+        }
+        return packetsWithAckFrames;
+      };
+
       const auto writeEventMatcher = AllOf(
+          testing::ResultOf(countPacketsWithAckFrames, 1),
           testing::Property(
               &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(9)),
-          testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets,
-              testing::Contains(testing::ResultOf(
-                  [](auto& outstandingPacket) {
-                    for (auto& frame : outstandingPacket.packet.frames) {
-                      auto ackFrame = frame.asWriteAckFrame();
-                      if (ackFrame) {
-                        return true;
-                      }
-                    }
-                    return false;
-                  },
-                  testing::Eq(true)))),
           testing::Field(
               &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
       const auto packetsWrittenEventMatcher = AllOf(

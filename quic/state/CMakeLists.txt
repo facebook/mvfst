@@ -54,6 +54,7 @@ target_link_libraries(
 
 add_library(
   mvfst_state_ack_handler
+  AckEvent.cpp
   AckHandlers.cpp
 )
 

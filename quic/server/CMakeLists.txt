@@ -8,6 +8,7 @@ add_library(
   handshake/AppToken.cpp
   handshake/ServerHandshake.cpp
   handshake/StatelessResetGenerator.cpp
+  handshake/TokenGenerator.cpp
   state/ServerStateMachine.cpp)
 
 target_include_directories(

@@ -3063,7 +3063,7 @@ TEST_F(
 
   folly::SocketAddress newPeer("100.101.102.103", 23456);
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   try {
     recvClientFinished(true, &newPeer);
   } catch (const std::runtime_error& ex) {
@@ -3097,7 +3097,7 @@ TEST_F(
   auto data = IOBuf::copyBuffer("bad data");
   folly::SocketAddress newPeer("100.101.102.103", 23456);
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   try {
     recvClientFinished(true, &newPeer);
   } catch (const std::runtime_error& ex) {
@@ -3296,7 +3296,7 @@ TEST_F(
       *server->getNonConstConn().writableBytesLimit,
       server->getConn().transportSettings.limitedCwndInMss * originalUdpSize);
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   loopForWrites();
   EXPECT_EQ(server->getConn().writableBytesLimit, folly::none);
@@ -3317,7 +3317,7 @@ TEST_F(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();
   recvClientHello(true, QuicVersion::QUIC_DRAFT);
@@ -3535,7 +3535,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   IOBufEqualTo eq;
   EXPECT_TRUE(eq(getCryptoStreamData(), IOBuf::copyBuffer("SHLO")));
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   recvClientFinished();
 
   server->close(std::make_pair(
@@ -3661,7 +3661,7 @@ TEST_P(
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
   EXPECT_EQ(server->getConn().pendingOneRttData->size(), 1);
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 1);
   EXPECT_EQ(server->getConn().pendingZeroRttData, nullptr);
@@ -3721,7 +3721,7 @@ TEST_P(
       GetParam().acceptZeroRtt ? 1 : 0);
   EXPECT_EQ(server->getConn().pendingOneRttData->size(), 1);
 
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   EXPECT_EQ(
       server->getConn().streamManager->streamCount(),
@@ -3839,7 +3839,7 @@ class QuicServerTransportHandshakeTest
     EXPECT_CALL(routingCallback, onConnectionIdBound(_));
     // NST is always written after CFIN is processed
     expectWriteNewSessionTicket();
-    EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+    EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
     recvClientFinished();
   }
 
@@ -3902,7 +3902,7 @@ TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
 TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {
   setupClientReadCodec();
   recvClientHello();
-  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished);
+  EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   recvClientFinished();
   loopForWrites();
   try {
