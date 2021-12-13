@@ -55,6 +55,8 @@ AckEvent processAckFrame(
     const AckVisitor& ackVisitor,
     const LossVisitor& lossVisitor,
     const TimePoint& ackReceiveTime) {
+  const auto nowTime = Clock::now();
+
   // TODO: send error if we get an ack for a packet we've not sent t18721184
   auto ack = AckEvent::Builder()
                  .setAckTime(ackReceiveTime)
@@ -160,25 +162,47 @@ AckEvent processAckFrame(
       if (rPacketIt->isDSRPacket) {
         ++dsrPacketsAcked;
       }
-      // Update RTT if current packet is the largestAcked in the frame:
-      auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
-          ? ackReceiveTime
-          : Clock::now();
-      auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
-          ackReceiveTimeOrNow - rPacketIt->metadata.time);
+
+      // Update RTT if current packet is the largestAcked in the frame
+      //
+      // An RTT sample is generated using only the largest acknowledged packet
+      // in the received ACK frame. To avoid generating multiple RTT samples
+      // for a single packet, an ACK frame SHOULD NOT be used to update RTT
+      // estimates if it does not newly acknowledge the largest acknowledged
+      // packet (RFC9002). This includes for minRTT estimates.
       if (!ack.implicit && currentPacketNum == frame.largestAcked) {
-        Observer::PacketRTT packetRTT(
-            ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
-        for (const auto& observer : *(conn.observers)) {
-          conn.pendingCallbacks.emplace_back(
-              [observer, packetRTT](QuicSocket* qSocket) {
-                if (observer->getConfig().rttSamples) {
-                  observer->rttSampleGenerated(qSocket, packetRTT);
-                }
-              });
-        }
-        updateRtt(conn, rttSample, frame.ackDelay);
-      }
+        auto ackReceiveTimeOrNow = ackReceiveTime > rPacketIt->metadata.time
+            ? ackReceiveTime
+            : nowTime;
+
+        // Use ceil to round up to next microsecond during conversion.
+        //
+        // While unlikely, it's still technically possible for the RTT to be
+        // zero; ignore if this is the case.
+        auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
+            ackReceiveTimeOrNow - rPacketIt->metadata.time);
+        if (rttSample != rttSample.zero()) {
+          // notify observers
+          Observer::PacketRTT packetRTT(
+              ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
+          for (const auto& observer : *(conn.observers)) {
+            conn.pendingCallbacks.emplace_back(
+                [observer, packetRTT](QuicSocket* qSocket) {
+                  if (observer->getConfig().rttSamples) {
+                    observer->rttSampleGenerated(qSocket, packetRTT);
+                  }
+                });
+          }
+
+          // update AckEvent RTTs, which are used by CCA and other procesisng
+          ack.mrttSample =
+              std::min(ack.mrttSample.value_or(rttSample), rttSample);
+
+          // update transport RTT
+          updateRtt(conn, rttSample, frame.ackDelay);
+        } // if (rttSample != rttSample.zero())
+      } // if (!ack.implicit && currentPacketNum == frame.largestAcked)
+
       // D6D probe acked. Only if it's for the last probe do we
       // trigger state change
       if (rPacketIt->metadata.isD6DProbe) {
@@ -199,10 +223,6 @@ AckEvent processAckFrame(
         ack.largestAckedPacket = currentPacketNum;
         ack.largestAckedPacketSentTime = rPacketIt->metadata.time;
         ack.largestAckedPacketAppLimited = rPacketIt->isAppLimited;
-      }
-      if (!ack.implicit && ackReceiveTime > rPacketIt->metadata.time) {
-        ack.mrttSample =
-            std::min(ack.mrttSample.value_or(rttSample), rttSample);
       }
       if (!ack.implicit) {
         conn.lossState.totalBytesAcked += rPacketIt->metadata.encodedSize;
