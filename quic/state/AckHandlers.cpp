@@ -361,6 +361,8 @@ AckEvent processAckFrame(
     }
     ack.ackedPackets.emplace_back(
         CongestionController::AckEvent::AckPacket::Builder()
+            .setPacketNum(
+                outstandingPacket.packet.header.getPacketSequenceNum())
             .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
             .setDetailsPerStream(std::move(detailsPerStream))
             .setLastAckedPacketInfo(

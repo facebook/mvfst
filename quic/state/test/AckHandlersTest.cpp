@@ -1293,20 +1293,28 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
+  TimePoint startTime = TimePoint::clock::now();
+  TimePoint largestSentTime = startTime;
   PacketNum packetNum = 0;
   StreamId streamid = 0;
-  TimePoint largestSentTime;
+
+  // write 10 packets, with half in write #1, the other half in write #2
+  // packets in each write have the same timestamp and writeCount
   while (packetNum < 10) {
     auto regularPacket = createNewPacket(packetNum, GetParam());
     WriteStreamFrame frame(streamid++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
-    largestSentTime =
-        Clock::now() - 100ms + std::chrono::milliseconds(packetNum);
+
+    const auto writeCount = ((packetNum <= 4) ? 1 : 2);
+    const auto sentTime = startTime +
+        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
+    largestSentTime = sentTime;
+
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
     OutstandingPacket sentPacket(
         std::move(regularPacket),
-        largestSentTime,
+        sentTime,
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         false /* handshake */,
@@ -1315,29 +1323,35 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         0 /* inflightBytesIn */,
         0 /* packetsInflightIn */,
         LossState(),
-        ((packetNum <= 4) ? 1 : 2) /* writeCountIn */,
+        writeCount /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(sentPacket);
     packetNum++;
   }
 
-  auto getAckPacketMatcher = [](const auto& packetNum) {
-    return testing::Field(
-        &AckEvent::AckPacket::outstandingPacketMetadata,
-        testing::AllOf(
-            testing::Field(
-                &OutstandingPacketMetadata::totalBytesSent,
-                1 * (packetNum + 1)),
-            testing::Field(
-                &OutstandingPacketMetadata::writeCount,
-                ((packetNum <= 4) ? 1 : 2))));
+  auto getAckPacketMatcher = [&startTime](const auto& packetNum) {
+    const auto writeCount = ((packetNum <= 4) ? 1 : 2);
+    const auto sentTime = startTime +
+        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
+
+    return testing::AllOf(
+        testing::Field(&AckEvent::AckPacket::packetNum, packetNum),
+        testing::Field(
+            &AckEvent::AckPacket::outstandingPacketMetadata,
+            testing::AllOf(
+                testing::Field(&OutstandingPacketMetadata::time, sentTime),
+                testing::Field(
+                    &OutstandingPacketMetadata::totalBytesSent,
+                    1 * (packetNum + 1)),
+                testing::Field(
+                    &OutstandingPacketMetadata::writeCount, writeCount))));
   };
 
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 9;
   ackFrame.ackBlocks.emplace_back(0, 9);
-  auto ackTime = Clock::now() + 10ms;
+  auto ackTime = largestSentTime + 10ms;
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {

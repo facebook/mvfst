@@ -1905,6 +1905,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 12s /* sentTime */,
               0 /* encodedSize */,
@@ -1938,6 +1939,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 4s /* sentTime */,
               0 /* encodedSize */,
@@ -1970,6 +1972,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(1)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               currentTime + 12s /* sentTime */,
               0 /* encodedSize */,

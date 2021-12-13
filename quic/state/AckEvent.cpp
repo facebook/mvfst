@@ -54,15 +54,23 @@ void AckEvent::AckPacket::DetailsPerStream::recordDeliveryOffsetUpdate(
 }
 
 AckEvent::AckPacket::AckPacket(
+    quic::PacketNum packetNumIn,
     OutstandingPacketMetadata&& outstandingPacketMetadataIn,
     DetailsPerStream&& detailsPerStreamIn,
     folly::Optional<OutstandingPacket::LastAckedPacketInfo>
         lastAckedPacketInfoIn,
     bool isAppLimitedIn)
-    : outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
+    : packetNum(packetNumIn),
+      outstandingPacketMetadata(std::move(outstandingPacketMetadataIn)),
       detailsPerStream(std::move(detailsPerStreamIn)),
       lastAckedPacketInfo(std::move(lastAckedPacketInfoIn)),
       isAppLimited(isAppLimitedIn) {}
+
+AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setPacketNum(
+    quic::PacketNum packetNumIn) {
+  packetNum = packetNumIn;
+  return std::move(*this);
+}
 
 AckEvent::AckPacket::Builder&&
 AckEvent::AckPacket::Builder::setOutstandingPacketMetadata(
@@ -93,9 +101,11 @@ AckEvent::AckPacket::Builder&& AckEvent::AckPacket::Builder::setAppLimited(
 }
 
 AckEvent::AckPacket AckEvent::AckPacket::Builder::build() && {
+  CHECK(packetNum.has_value());
   CHECK(outstandingPacketMetadata.has_value());
   CHECK(detailsPerStream.has_value());
   return AckEvent::AckPacket(
+      packetNum.value(),
       std::move(outstandingPacketMetadata.value()),
       std::move(detailsPerStream.value()),
       std::move(lastAckedPacketInfo),

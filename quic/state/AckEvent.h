@@ -60,6 +60,9 @@ struct AckEvent {
    * Container to store information about ACKed packets
    */
   struct AckPacket {
+    // Sequence number of previously outstanding (now acked) packet
+    quic::PacketNum packetNum;
+
     // Metadata of the previously outstanding (now acked) packet
     OutstandingPacketMetadata outstandingPacketMetadata;
 
@@ -177,6 +180,7 @@ struct AckEvent {
     bool isAppLimited;
 
     struct Builder {
+      Builder&& setPacketNum(quic::PacketNum packetNumIn);
       Builder&& setOutstandingPacketMetadata(
           OutstandingPacketMetadata&& outstandingPacketMetadataIn);
       Builder&& setDetailsPerStream(DetailsPerStream&& detailsPerStreamIn);
@@ -188,6 +192,7 @@ struct AckEvent {
       explicit Builder() = default;
 
      private:
+      folly::Optional<quic::PacketNum> packetNum;
       folly::Optional<OutstandingPacketMetadata> outstandingPacketMetadata;
       folly::Optional<DetailsPerStream> detailsPerStream;
       folly::Optional<OutstandingPacket::LastAckedPacketInfo>
@@ -197,6 +202,7 @@ struct AckEvent {
 
    private:
     explicit AckPacket(
+        quic::PacketNum packetNumIn,
         OutstandingPacketMetadata&& outstandingPacketMetadataIn,
         DetailsPerStream&& detailsPerStreamIn,
         folly::Optional<OutstandingPacket::LastAckedPacketInfo>

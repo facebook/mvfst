@@ -570,6 +570,7 @@ CongestionController::AckEvent makeAck(
   ack.largestAckedPacket = seq;
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
+          .setPacketNum(seq)
           .setOutstandingPacketMetadata(OutstandingPacketMetadata(
               sentTime,
               ackedSize /* encodedSize */,
@@ -738,6 +739,7 @@ bool matchError(
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(
     OutstandingPacket outstandingPacket) {
   return CongestionController::AckEvent::AckPacket::Builder()
+      .setPacketNum(outstandingPacket.packet.header.getPacketSequenceNum())
       .setOutstandingPacketMetadata(std::move(outstandingPacket.metadata))
       .setLastAckedPacketInfo(std::move(outstandingPacket.lastAckedPacketInfo))
       .setAppLimited(outstandingPacket.isAppLimited)
