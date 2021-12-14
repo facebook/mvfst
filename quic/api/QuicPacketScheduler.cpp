@@ -433,7 +433,7 @@ void StreamFrameScheduler::writeStreamsHelper(
     } else {
       // walk the sequential streams in order until we run out of space
       for (auto streamIt = level.streams.begin();
-           streamIt != level.streams.end() && connWritableBytes > 0;
+           streamIt != level.streams.end();
            ++streamIt) {
         auto stream = conn_.streamManager->findStream(*streamIt);
         CHECK(stream);
@@ -473,8 +473,9 @@ void StreamFrameScheduler::writeStreams(PacketBuilderInterface& builder) {
 } // namespace quic
 
 bool StreamFrameScheduler::hasPendingData() const {
-  return conn_.streamManager->hasNonDSRWritable() &&
-      getSendConnFlowControlBytesWire(conn_) > 0;
+  return conn_.streamManager->hasLoss() ||
+      (conn_.streamManager->hasNonDSRWritable() &&
+       getSendConnFlowControlBytesWire(conn_) > 0);
 }
 
 bool StreamFrameScheduler::writeStreamFrame(

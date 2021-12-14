@@ -1674,6 +1674,7 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   conn.streamManager->updateWritableStreams(*stream);
 
   StreamFrameScheduler scheduler(conn);
+  EXPECT_TRUE(scheduler.hasPendingData());
   ShortHeader shortHeader1(
       ProtectionType::KeyPhaseZero,
       getTestConnectionId(),
@@ -1699,6 +1700,75 @@ TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControl) {
   stream->lossBuffer.emplace_back(std::move(*stream->retransmissionBuffer[0]));
   stream->retransmissionBuffer.clear();
   conn.streamManager->updateWritableStreams(*stream);
+  conn.streamManager->updateLossStreams(*stream);
+  EXPECT_TRUE(scheduler.hasPendingData());
+
+  // Write again
+  ShortHeader shortHeader2(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(shortHeader2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder2.encodePacketHeader();
+  scheduler.writeStreams(builder2);
+  auto packet2 = std::move(builder2).buildPacket().packet;
+  updateConnection(
+      conn, folly::none, packet2, Clock::now(), 1000, 0, false /* isDSR */);
+  EXPECT_EQ(1, packet2.frames.size());
+  auto& writeStreamFrame2 = *packet2.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamId, writeStreamFrame2.streamId);
+  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
+  EXPECT_TRUE(stream->lossBuffer.empty());
+  EXPECT_EQ(1, stream->retransmissionBuffer.size());
+  EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
+}
+
+TEST_F(QuicPacketSchedulerTest, WriteLossWithoutFlowControlSequential) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.streamManager->setMaxLocalBidirectionalStreams(10);
+  conn.flowControlState.peerAdvertisedMaxOffset = 1000;
+  conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiRemote = 1000;
+
+  auto streamId = (*conn.streamManager->createNextBidirectionalStream())->id;
+  conn.streamManager->setStreamPriority(streamId, 0, false);
+  auto stream = conn.streamManager->findStream(streamId);
+  auto data = buildRandomInputData(1000);
+  writeDataToQuicStream(*stream, std::move(data), true);
+  conn.streamManager->updateWritableStreams(*stream);
+
+  StreamFrameScheduler scheduler(conn);
+  EXPECT_TRUE(scheduler.hasPendingData());
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseZero,
+      getTestConnectionId(),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  builder1.encodePacketHeader();
+  scheduler.writeStreams(builder1);
+  auto packet1 = std::move(builder1).buildPacket().packet;
+  updateConnection(
+      conn, folly::none, packet1, Clock::now(), 1000, 0, false /* isDSR */);
+  EXPECT_EQ(1, packet1.frames.size());
+  auto& writeStreamFrame1 = *packet1.frames[0].asWriteStreamFrame();
+  EXPECT_EQ(streamId, writeStreamFrame1.streamId);
+  EXPECT_EQ(0, getSendConnFlowControlBytesWire(conn));
+  EXPECT_EQ(0, stream->writeBuffer.chainLength());
+  EXPECT_EQ(1, stream->retransmissionBuffer.size());
+  EXPECT_EQ(1000, stream->retransmissionBuffer[0]->data.chainLength());
+
+  // Move the bytes to loss buffer:
+  stream->lossBuffer.emplace_back(std::move(*stream->retransmissionBuffer[0]));
+  stream->retransmissionBuffer.clear();
+  conn.streamManager->updateWritableStreams(*stream);
+  conn.streamManager->updateLossStreams(*stream);
+  EXPECT_TRUE(scheduler.hasPendingData());
 
   // Write again
   ShortHeader shortHeader2(
