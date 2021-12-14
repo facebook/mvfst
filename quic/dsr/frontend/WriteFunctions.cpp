@@ -18,7 +18,7 @@ uint64_t writePacketizationRequest(
     TimePoint writeLoopBeginTime) {
   DSRStreamFrameScheduler scheduler(connection);
   uint64_t packetCounter = 0;
-  std::set<DSRPacketizationRequestSender*> senders;
+  folly::F14FastSet<DSRPacketizationRequestSender*> senders;
   SCOPE_EXIT {
     std::for_each(
         senders.begin(), senders.end(), [](auto* sender) { sender->flush(); });
