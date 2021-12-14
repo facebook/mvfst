@@ -56,9 +56,9 @@ module.exports = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     {
       navbar: {
-        title: 'My Facebook Project',
+        title: 'Mvfst',
         logo: {
-          alt: 'My Facebook Project Logo',
+          alt: 'Mvfst',
           src: 'img/logo.svg',
         },
         items: [
@@ -66,9 +66,8 @@ module.exports = {
             type: 'doc',
             docId: 'intro',
             position: 'left',
-            label: 'Tutorial',
+            label: 'Architecture',
           },
-          {to: 'blog', label: 'Blog', position: 'left'},
           // Please keep GitHub link to the right for consistency.
           {
             href: 'https://github.com/facebook/docusaurus',
@@ -103,19 +102,6 @@ module.exports = {
               {
                 label: 'Discord',
                 href: 'https://discordapp.com/invite/docusaurus',
-              },
-            ],
-          },
-          {
-            title: 'More',
-            items: [
-              {
-                label: 'Blog',
-                to: 'blog',
-              },
-              {
-                label: 'GitHub',
-                href: 'https://github.com/facebook/docusaurus',
               },
             ],
           },
