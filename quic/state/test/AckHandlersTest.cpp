@@ -1293,7 +1293,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
-  TimePoint startTime = TimePoint::clock::now();
+  TimePoint startTime = Clock::now();
   TimePoint largestSentTime = startTime;
   PacketNum packetNum = 0;
   StreamId streamid = 0;
@@ -1919,7 +1919,7 @@ class AckEventForAppDataTest : public Test {
 
   void sendAppDataPacket(
       const RegularQuicPacketBuilder::Packet& packet,
-      const TimePoint timepoint = TimePoint()) {
+      const TimePoint timepoint = Clock::now()) {
     updateConnection(
         *conn_,
         folly::none,
@@ -1932,7 +1932,7 @@ class AckEventForAppDataTest : public Test {
 
   auto deliverAckForAppDataPackets(
       const quic::AckBlocks& ackBlocks,
-      const TimePoint timepoint = TimePoint(),
+      const TimePoint timepoint = Clock::now(),
       const std::chrono::microseconds ackDelay = 0us) {
     ReadAckFrame ackFrame = {};
     ackFrame.largestAcked = ackBlocks.back().end;
@@ -1975,7 +1975,7 @@ class AckEventForAppDataTest : public Test {
   auto deliverAckForAppDataPackets(
       const quic::PacketNum intervalStart,
       const quic::PacketNum intervalEnd,
-      const TimePoint timepoint = TimePoint(),
+      const TimePoint timepoint = Clock::now(),
       const std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks = {{intervalStart, intervalEnd}};
     return deliverAckForAppDataPackets(acks, timepoint, ackDelay);
@@ -2007,7 +2007,7 @@ TEST_F(AckEventForAppDataTest, AckEventAckTimeAndMrttSample) {
 
   std::vector<PacketNum> appDataPacketNumSent;
 
-  TimePoint startTime = TimePoint::clock::now();
+  TimePoint startTime = Clock::now();
 
   // packet 1, frame 1 from stream 1
   auto packet1 = buildEmptyPacket(PacketNumberSpace::AppData);
