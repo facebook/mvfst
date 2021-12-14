@@ -24,6 +24,9 @@ void TokenlessPacer::refreshPacingRate(
     uint64_t cwndBytes,
     std::chrono::microseconds rtt,
     TimePoint /*currentTime*/) {
+  if (rtt == kDefaultMinRtt) {
+    return;
+  }
   uint64_t targetRateBytesPerSec = (rtt == 0us)
       ? std::numeric_limits<uint64_t>::max()
       : cwndBytes * 1s / rtt;

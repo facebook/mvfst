@@ -216,5 +216,36 @@ TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsZero) {
   EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
 }
 
+TEST_F(TokenlessPacerTest, RefreshPacingRateWhenRTTIsDefault) {
+  auto timestamp = Clock::now();
+  auto tick = 1000us;
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t cwnd,
+                                   uint64_t,
+                                   std::chrono::microseconds rtt) {
+    return PacingRate::Builder().setInterval(rtt).setBurstSize(cwnd).build();
+  });
+  conn.transportSettings.pacingTimerTickInterval = tick;
+
+  // rtt=kDefaultMinRTT should result in this update being skipped
+  // There should be no pacing. Interval and Burst should use the defaults
+  pacer.refreshPacingRate(100, kDefaultMinRtt);
+  EXPECT_EQ(
+      conn.transportSettings.writeConnectionDataPacketsLimit,
+      pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(0us, pacer.getTimeUntilNextWrite(timestamp));
+
+  // This won't be skipped
+  pacer.refreshPacingRate(
+      20, tick); // writes these values to the burst and interval directly
+  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(timestamp));
+  EXPECT_EQ(tick, pacer.getTimeUntilNextWrite(timestamp));
+
+  // rtt=kDefaultMinRTT should result in this update being skipped
+  // Interval should not change.
+  pacer.refreshPacingRate(100, kDefaultMinRtt);
+  EXPECT_EQ(tick, pacer.getTimeUntilNextWrite(timestamp));
+}
+
 } // namespace test
 } // namespace quic
