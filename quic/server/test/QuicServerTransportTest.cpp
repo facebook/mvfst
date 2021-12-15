@@ -3357,6 +3357,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
   std::array<uint8_t, kRetryTokenSecretLength> secret;
   folly::Random::secureRandom(secret.data(), secret.size());
   server->getNonConstConn().transportSettings.retryTokenSecret = secret;
+  server->getNonConstConn().transportSettings.issueNewTokens = true;
 
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();

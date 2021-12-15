@@ -401,7 +401,7 @@ void updateHandshakeState(QuicServerConnectionState& conn) {
       conn.sentHandshakeDone = true;
     }
 
-    if (!conn.sentNewTokenFrame &&
+    if (conn.transportSettings.issueNewTokens && !conn.sentNewTokenFrame &&
         conn.transportSettings.retryTokenSecret.has_value()) {
       // Create NewToken struct – defaults timestamp to now
       NewToken token(conn.peerAddress.getIPAddress());

@@ -275,6 +275,8 @@ struct TransportSettings {
   // Whether to skip sending the ACK-only initial in response to crypto data in
   // initial packet num space
   bool skipInitPktNumSpaceCryptoAck{false};
+  // Whether to issue new tokens via NewToken frames.
+  bool issueNewTokens{false};
 };
 
 } // namespace quic
