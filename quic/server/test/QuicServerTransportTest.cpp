@@ -2750,7 +2750,8 @@ TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndStore) {
   conn.datagramState.maxReadBufferSize = 10;
 
   EXPECT_CALL(*quicStats_, onDatagramRead(_))
-      .Times(conn.datagramState.maxReadBufferSize);
+      .Times(conn.datagramState.maxReadBufferSize)
+      .WillRepeatedly(Invoke([](uint64_t bytes) { EXPECT_GT(bytes, 0); }));
   EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead())
       .Times(conn.datagramState.maxReadBufferSize);
   for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {

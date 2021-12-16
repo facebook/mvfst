@@ -4629,7 +4629,8 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveDatagramFrameAndStore) {
   conn.datagramState.maxReadBufferSize = 10;
 
   EXPECT_CALL(*quicStats_, onDatagramRead(_))
-      .Times(conn.datagramState.maxReadBufferSize);
+      .Times(conn.datagramState.maxReadBufferSize)
+      .WillRepeatedly(Invoke([](uint64_t bytes) { EXPECT_GT(bytes, 0); }));
   EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead())
       .Times(conn.datagramState.maxReadBufferSize);
   for (uint64_t i = 0; i < conn.datagramState.maxReadBufferSize * 2; i++) {
@@ -4679,7 +4680,9 @@ TEST_F(
       datagramPayload1.size(), IOBuf::copyBuffer(datagramPayload1));
   writeFrame(datagramFrame1, builder1);
   auto packet1 = packetToBuf(std::move(builder1).buildPacket());
-  EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onDatagramRead(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([](uint64_t bytes) { EXPECT_GT(bytes, 0); }));
   deliverData(packet1->coalesce());
   ASSERT_EQ(
       client->getConn().datagramState.readBuffer.size(),
@@ -4698,7 +4701,9 @@ TEST_F(
   writeFrame(datagramFrame2, builder2);
   auto packet2 = packetToBuf(std::move(builder2).buildPacket());
   EXPECT_CALL(*quicStats_, onDatagramDroppedOnRead()).Times(1);
-  EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onDatagramRead(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([](uint64_t bytes) { EXPECT_GT(bytes, 0); }));
   deliverData(packet2->coalesce());
   ASSERT_EQ(
       client->getConn().datagramState.readBuffer.size(),

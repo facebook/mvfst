@@ -630,9 +630,18 @@ bool DatagramFrameScheduler::writeDatagramFrames(
   for (size_t i = 0; i <= conn_.datagramState.writeBuffer.size(); ++i) {
     auto& payload = conn_.datagramState.writeBuffer.front();
     auto len = payload.chainLength();
-    auto datagramFrame = DatagramFrame(len, payload.move());
-    if (writeFrame(datagramFrame, builder) > 0) {
-      QUIC_STATS(conn_.statsCallback, onDatagramWrite, payload.chainLength());
+    uint64_t spaceLeft = builder.remainingSpaceInPkt();
+    QuicInteger frameTypeQuicInt(static_cast<uint8_t>(FrameType::DATAGRAM_LEN));
+    QuicInteger datagramLenInt(len);
+    auto datagramFrameLength =
+        frameTypeQuicInt.getSize() + len + datagramLenInt.getSize();
+    if (folly::to<uint64_t>(datagramFrameLength) <= spaceLeft) {
+      auto datagramFrame = DatagramFrame(len, payload.move());
+      auto res = writeFrame(datagramFrame, builder);
+      // Must always succeed since we have already checked that there is enough
+      // space to write the frame
+      CHECK_GT(res, 0);
+      QUIC_STATS(conn_.statsCallback, onDatagramWrite, len);
       conn_.datagramState.writeBuffer.pop_front();
       sent = true;
     }
