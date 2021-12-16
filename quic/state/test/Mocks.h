@@ -32,6 +32,7 @@ class MockCongestionController : public CongestionController {
   MOCK_CONST_METHOD0(isInBackgroundMode, bool());
   MOCK_CONST_METHOD0(isAppLimited, bool());
   MOCK_CONST_METHOD1(getStats, void(CongestionControllerStats&));
+  MOCK_METHOD1(setExperimental, void(bool));
 };
 
 class MockPacer : public Pacer {

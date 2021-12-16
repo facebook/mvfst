@@ -21,9 +21,8 @@ Cubic::Cubic(
     uint64_t initCwndBytes,
     uint64_t initSsthresh,
     bool tcpFriendly,
-    bool ackTrain,
-    bool spreadAcrossRtt)
-    : conn_(conn), ssthresh_(initSsthresh), spreadAcrossRtt_(spreadAcrossRtt) {
+    bool ackTrain)
+    : conn_(conn), ssthresh_(initSsthresh) {
   cwndBytes_ = std::min(
       conn.transportSettings.maxCwndInMss * conn.udpSendPacketLen,
       std::max(
@@ -507,13 +506,13 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
 
     if (!hystartState_.lastSampledRtt.has_value() ||
         (*hystartState_.lastSampledRtt >=
-         std::chrono::microseconds::max() - kDelayIncreaseLowerBound)) {
+         std::chrono::microseconds::max() - delayIncreaseLowerBound)) {
       return;
     }
     auto eta = std::min(
-        kDelayIncreaseUpperBound,
+        delayIncreaseUpperBound,
         std::max(
-            kDelayIncreaseLowerBound,
+            delayIncreaseLowerBound,
             std::chrono::microseconds(
                 hystartState_.lastSampledRtt.value().count() >> 4)));
     // lastSampledRtt + eta may overflow:
@@ -662,6 +661,16 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 void Cubic::getStats(CongestionControllerStats& stats) const {
   stats.cubicStats.state = static_cast<uint8_t>(state_);
   stats.cubicStats.ssthresh = ssthresh_;
+}
+
+void Cubic::setExperimental(bool experimental) {
+  if (experimental) {
+    delayIncreaseLowerBound = kDelayIncreaseLowerBoundExperimental;
+    delayIncreaseUpperBound = kDelayIncreaseUpperBoundExperimental;
+  } else {
+    delayIncreaseLowerBound = kDelayIncreaseLowerBound;
+    delayIncreaseUpperBound = kDelayIncreaseUpperBound;
+  }
 }
 
 folly::StringPiece cubicStateToString(CubicStates state) {

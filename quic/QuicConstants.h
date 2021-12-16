@@ -125,6 +125,8 @@ enum class TransportKnobParamId : uint64_t {
   CC_ALGORITHM_KNOB = 0xccaa,
   // Set congestion control aggressiveness (experimental)
   CC_AGRESSIVENESS_KNOB = 0xccab,
+  // Enable experimental CC settings
+  CC_EXPERIMENTAL = 0xccac,
   // Set pacing rtt factor used only during startup phase
   STARTUP_RTT_FACTOR_KNOB = 0x1111,
   // Set pacing rtt factor used when not in startup
@@ -393,6 +395,10 @@ constexpr std::chrono::microseconds kAckCountingGap(2);
 constexpr std::chrono::microseconds kDelayIncreaseUpperBound(8);
 // Hystart's lower bound for DelayIncrease
 constexpr std::chrono::microseconds kDelayIncreaseLowerBound(2);
+// Hystart's upper bound for DelayIncrease (Experimental)
+constexpr std::chrono::microseconds kDelayIncreaseUpperBoundExperimental(16ms);
+// Hystart's lower bound for DelayIncrease (Experimental)
+constexpr std::chrono::microseconds kDelayIncreaseLowerBoundExperimental(4ms);
 
 /* Cubic */
 // Default cwnd reduction factor:

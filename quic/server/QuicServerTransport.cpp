@@ -831,6 +831,24 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         serverTransport->setBackgroundModeParameters(
             PriorityLevel(priorityThreshold), utilizationFactor);
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
+        if (server_conn->congestionController) {
+          auto enableExperimental = static_cast<bool>(val);
+          server_conn->congestionController->setExperimental(
+              enableExperimental);
+          VLOG(3) << fmt::format(
+              "CC_EXPERIMENTAL KnobParam received, setting experimental={} "
+              "settings for congestion controller. Current congestion controller={}",
+              enableExperimental,
+              congestionControlTypeToString(
+                  server_conn->congestionController->type()));
+        }
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

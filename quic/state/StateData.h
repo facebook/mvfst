@@ -345,6 +345,11 @@ struct CongestionController {
   virtual bool isAppLimited() const = 0;
 
   virtual void getStats(CongestionControllerStats& stats) const = 0;
+
+  /**
+   * Enable experimental settings of the congestion controller
+   */
+  virtual void setExperimental(bool /*experimental*/) {}
 };
 
 struct QuicCryptoStream : public QuicStreamLike {

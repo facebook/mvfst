@@ -18,15 +18,8 @@ class TestingCubic : public Cubic {
       uint64_t initCwndBytes = 0,
       uint64_t initSsthresh = Cubic::INIT_SSTHRESH,
       bool tcpFriendly = true,
-      bool ackTrain = false,
-      bool spreadAcrossRtt = false)
-      : Cubic(
-            conn,
-            initCwndBytes,
-            initSsthresh,
-            tcpFriendly,
-            ackTrain,
-            spreadAcrossRtt) {}
+      bool ackTrain = false)
+      : Cubic(conn, initCwndBytes, initSsthresh, tcpFriendly, ackTrain) {}
 
   void setStateForTest(CubicStates state) {
     state_ = state;

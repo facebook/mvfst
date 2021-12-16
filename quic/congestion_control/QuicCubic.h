@@ -60,8 +60,7 @@ class Cubic : public CongestionController {
       uint64_t initCwndBytes = 0,
       uint64_t initSsthresh = INIT_SSTHRESH,
       bool tcpFriendly = true,
-      bool ackTrain = false,
-      bool spreadAcrossRtt = false);
+      bool ackTrain = false);
 
   CubicStates state() const noexcept;
 
@@ -103,6 +102,8 @@ class Cubic : public CongestionController {
   bool isAppLimited() const noexcept override;
 
   void getStats(CongestionControllerStats& stats) const override;
+
+  void setExperimental(bool experimental) override;
 
   void handoff(uint64_t newCwnd, uint64_t newInflight) noexcept;
 
@@ -195,10 +196,9 @@ class Cubic : public CongestionController {
   SteadyState steadyState_;
   RecoveryState recoveryState_;
 
-  // When spreadAcrossRtt_ is set to true, the pacing writes will be distributed
-  // evenly across an RTT. Otherwise, we will use the first N number of pacing
-  // intervals to send all N bursts.
-  bool spreadAcrossRtt_{false};
+  // Experimental settings for CUBIC
+  std::chrono::microseconds delayIncreaseUpperBound{kDelayIncreaseUpperBound};
+  std::chrono::microseconds delayIncreaseLowerBound{kDelayIncreaseLowerBound};
 };
 
 folly::StringPiece cubicStateToString(CubicStates state);

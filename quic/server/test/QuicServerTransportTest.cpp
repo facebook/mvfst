@@ -16,6 +16,7 @@
 #include <quic/logging/FileQLogger.h>
 #include <quic/server/handshake/ServerHandshake.h>
 #include <quic/state/QuicStreamFunctions.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace testing;
 using namespace folly;
@@ -3954,6 +3955,24 @@ TEST_F(QuicServerTransportTest, TestRegisterPMTUZeroBlackholeDetection) {
             TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
         1}});
   EXPECT_TRUE(server->getConn().d6d.noBlackholeDetection);
+}
+
+TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  server->getNonConstConn().congestionController =
+      std::move(mockCongestionController);
+
+  EXPECT_CALL(*rawCongestionController, setExperimental(true)).Times(2);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 1}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 2}});
+
+  EXPECT_CALL(*rawCongestionController, setExperimental(false)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 0}});
 }
 
 class QuicServerTransportForciblySetUDUPayloadSizeTest
