@@ -56,11 +56,11 @@ TEST_F(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
   EXPECT_TRUE(manager.setStreamPriority(
       streamId,
       (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-      ~currentPriority.incremental));
+      !currentPriority.incremental));
   EXPECT_FALSE(manager.setStreamPriority(
       streamId,
       (currentPriority.level + 1) % (kDefaultMaxPriority + 1),
-      ~currentPriority.incremental));
+      !currentPriority.incremental));
 }
 
 TEST_F(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
