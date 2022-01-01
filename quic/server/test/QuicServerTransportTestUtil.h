@@ -193,6 +193,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     return server->getNonConstConn();
   }
 
+  MockConnectionCallback& getConnCallback() {
+    return connCallback;
+  }
+
   std::shared_ptr<FizzServerQuicHandshakeContext> getFizzServerContext() {
     if (!fizzServerContext) {
       fizzServerContext = FizzServerQuicHandshakeContext::Builder()

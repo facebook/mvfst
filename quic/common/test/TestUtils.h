@@ -288,6 +288,16 @@ std::vector<int> getQLogEventIndices(
     QLogEventType type,
     const std::shared_ptr<FileQLogger>& q);
 
+template <QuicWriteFrame::Type Type>
+auto findFrameInPacketFunc() {
+  return [&](auto& p) {
+    return std::find_if(
+               p.packet.frames.begin(), p.packet.frames.end(), [&](auto& f) {
+                 return f.type() == Type;
+               }) != p.packet.frames.end();
+  };
+}
+
 template <QuicSimpleFrame::Type Type>
 auto findFrameInPacketFunc() {
   return [&](auto& p) {

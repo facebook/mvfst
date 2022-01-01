@@ -537,6 +537,10 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     return client->getNonConstConn();
   }
 
+  MockConnectionCallback& getConnCallback() {
+    return clientConnCallback;
+  }
+
   void setConnectionIds() {
     originalConnId = client->getConn().clientConnectionId;
     ServerConnectionIdParams params(0, 0, 0);
