@@ -618,11 +618,13 @@ void QuicClientTransport::processPacketData(
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttRejected);
       }
+      QUIC_STATS(conn_->statsCallback, onZeroRttRejected);
       handshakeLayer->removePsk(hostname_);
     } else if (zeroRttRejected.has_value()) {
       if (conn_->qLogger) {
         conn_->qLogger->addTransportStateUpdate(kZeroRttAccepted);
       }
+      QUIC_STATS(conn_->statsCallback, onZeroRttAccepted);
       conn_->usedZeroRtt = true;
     }
     // We should get transport parameters if we've derived 1-rtt keys and 0-rtt
