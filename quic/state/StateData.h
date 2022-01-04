@@ -392,7 +392,7 @@ class LoopDetectorCallback;
 class PendingPathRateLimiter;
 
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
-  virtual ~QuicConnectionStateBase() = default;
+  virtual ~QuicConnectionStateBase() override = default;
 
   explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {
     observers = std::make_shared<ObserverVec>();
