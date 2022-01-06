@@ -493,14 +493,15 @@ size_t writeSimpleFrame(
       QuicInteger intFrameType(static_cast<uint8_t>(FrameType::NEW_TOKEN));
 
       auto& token = newTokenFrame->token;
-      auto tokenLength = static_cast<uint8_t>(token.size());
+      QuicInteger tokenLength(token.size());
       auto newTokenFrameLength = intFrameType.getSize() +
-          /*encoding token length*/ sizeof(uint8_t) + tokenLength;
+          /*encoding token length*/ tokenLength.getSize() +
+          tokenLength.getValue();
 
       if (packetSpaceCheck(spaceLeft, newTokenFrameLength)) {
         builder.write(intFrameType);
-        builder.writeBE(tokenLength);
-        builder.push((uint8_t*)token.data(), tokenLength);
+        builder.write(tokenLength);
+        builder.push((uint8_t*)token.data(), tokenLength.getValue());
         builder.appendFrame(QuicSimpleFrame(*newTokenFrame));
         return newTokenFrameLength;
       }

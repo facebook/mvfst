@@ -29,7 +29,7 @@ using ByteEvent = QuicTransportBase::ByteEvent;
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
 } // namespace
 
-bool verifyFramePresent(
+folly::Optional<QuicFrame> getFrameIfPresent(
     std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
     QuicReadCodec& readCodec,
     QuicFrame::Type frameType) {
@@ -45,10 +45,17 @@ bool verifyFramePresent(
       if (frame.type() != frameType) {
         continue;
       }
-      return true;
+      return frame;
     }
   }
-  return false;
+  return folly::none;
+}
+
+bool verifyFramePresent(
+    std::vector<std::unique_ptr<folly::IOBuf>>& socketWrites,
+    QuicReadCodec& readCodec,
+    QuicFrame::Type frameType) {
+  return getFrameIfPresent(socketWrites, readCodec, frameType).hasValue();
 }
 
 struct MigrationParam {
@@ -3343,23 +3350,28 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
 /**
  * Returns the number of new token frames (should either be zero or one).
  */
-int numNewTokenFrames(const std::deque<OutstandingPacket>& packets) {
+std::pair<int, std::vector<const NewTokenFrame*>> getNewTokenFrame(
+    const std::deque<OutstandingPacket>& packets) {
   int numNewTokens = 0;
+  std::vector<const NewTokenFrame*> frames;
+
   for (auto& p : packets) {
     for (auto& f : p.packet.frames) {
       auto s = f.asQuicSimpleFrame();
-      numNewTokens += (s && s->asNewTokenFrame());
+      if (s && s->asNewTokenFrame()) {
+        numNewTokens++;
+        frames.push_back(s->asNewTokenFrame());
+      }
     }
   }
 
-  return numNewTokens;
+  return std::make_pair(numNewTokens, std::move(frames));
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
   std::array<uint8_t, kRetryTokenSecretLength> secret;
   folly::Random::secureRandom(secret.data(), secret.size());
   server->getNonConstConn().transportSettings.retryTokenSecret = secret;
-  server->getNonConstConn().transportSettings.issueNewTokens = true;
 
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();
@@ -3368,7 +3380,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
   /**
    * Receiving just the chlo should not issue a NewTokenFrame.
    */
-  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 0);
+  EXPECT_EQ(getNewTokenFrame(server->getConn().outstandings.packets).first, 0);
 
   EXPECT_CALL(*quicStats_, onNewTokenIssued());
   recvClientFinished(true, nullptr, QuicVersion::QUIC_DRAFT);
@@ -3377,7 +3389,26 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
    * After the handshake is complete, we expect only one NewTokenFrame to be
    * issued.
    */
-  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 1);
+  auto serverWriteNewTokenFrame =
+      getNewTokenFrame(server->getConn().outstandings.packets);
+  EXPECT_EQ(serverWriteNewTokenFrame.first, 1);
+
+  // Verify that the client parses the same token as what was written
+  auto clientParsedFrame = getFrameIfPresent(
+      serverWrites,
+      *makeClientEncryptedCodec(true),
+      QuicFrame::Type::ReadNewTokenFrame);
+
+  EXPECT_TRUE(
+      clientParsedFrame.hasValue() && clientParsedFrame->asReadNewTokenFrame());
+
+  auto clientReadNewTokenFrame = clientParsedFrame->asReadNewTokenFrame();
+
+  auto serverToken = serverWriteNewTokenFrame.second[0]->token;
+  auto clientToken =
+      clientReadNewTokenFrame->token->moveToFbString().toStdString();
+
+  EXPECT_EQ(clientToken, serverToken);
   loopForWrites();
 
   /**
@@ -3401,7 +3432,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
   deliverData(std::move(packet));
 
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 1);
-  EXPECT_EQ(numNewTokenFrames(server->getConn().outstandings.packets), 0);
+  EXPECT_EQ(getNewTokenFrame(server->getConn().outstandings.packets).first, 0);
 }
 
 TEST_F(
