@@ -286,17 +286,20 @@ void QuicServerTransport::writeData() {
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialWriteCipher);
       CHECK(conn_->initialHeaderCipher);
-      packetLimit -= writeCryptoAndAckDataToSocket(
-                         *socket_,
-                         *conn_,
-                         srcConnId /* src */,
-                         destConnId /* dst */,
-                         LongHeader::Types::Initial,
-                         *conn_->initialWriteCipher,
-                         *conn_->initialHeaderCipher,
-                         version,
-                         packetLimit)
-                         .packetsWritten;
+
+      auto res = writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          LongHeader::Types::Initial,
+          *conn_->initialWriteCipher,
+          *conn_->initialHeaderCipher,
+          version,
+          packetLimit);
+
+      packetLimit -= res.packetsWritten;
+      serverConn_->numHandshakeBytesSent += res.bytesWritten;
     }
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;
@@ -316,17 +319,19 @@ void QuicServerTransport::writeData() {
          hasAcksToSchedule(conn_->ackStates.handshakeAckState))) {
       CHECK(conn_->handshakeWriteCipher);
       CHECK(conn_->handshakeWriteHeaderCipher);
-      packetLimit -= writeCryptoAndAckDataToSocket(
-                         *socket_,
-                         *conn_,
-                         srcConnId /* src */,
-                         destConnId /* dst */,
-                         LongHeader::Types::Handshake,
-                         *conn_->handshakeWriteCipher,
-                         *conn_->handshakeWriteHeaderCipher,
-                         version,
-                         packetLimit)
-                         .packetsWritten;
+      auto res = writeCryptoAndAckDataToSocket(
+          *socket_,
+          *conn_,
+          srcConnId /* src */,
+          destConnId /* dst */,
+          LongHeader::Types::Handshake,
+          *conn_->handshakeWriteCipher,
+          *conn_->handshakeWriteHeaderCipher,
+          version,
+          packetLimit);
+
+      packetLimit -= res.packetsWritten;
+      serverConn_->numHandshakeBytesSent += res.bytesWritten;
     }
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {
       return;

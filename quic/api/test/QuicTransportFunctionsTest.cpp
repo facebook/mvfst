@@ -3149,6 +3149,7 @@ TEST_F(QuicTransportFunctionsTest, TestCryptoWritingIsHandshakeInOutstanding) {
 
   EXPECT_EQ(1, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
+  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
   ASSERT_EQ(1, conn->outstandings.packets.size());
   EXPECT_TRUE(getFirstOutstandingPacket(*conn, PacketNumberSpace::Initial)
                   ->metadata.isHandshake);
@@ -3173,6 +3174,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
+  EXPECT_GE(res.bytesWritten, buf->computeChainDataLength());
 
   EXPECT_EQ(1, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
@@ -3195,7 +3197,7 @@ TEST_F(QuicTransportFunctionsTest, NoCryptoProbeWriteIfNoProbeCredit) {
       *conn->initialHeaderCipher,
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
-
+  EXPECT_EQ(0, res.bytesWritten);
   EXPECT_EQ(0, res.packetsWritten);
   EXPECT_EQ(0, res.probesWritten);
 }
@@ -3208,7 +3210,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
   auto rawSocket = socket.get();
 
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Initial] = 2;
-  writeCryptoAndAckDataToSocket(
+  auto writeRes1 = writeCryptoAndAckDataToSocket(
       *rawSocket,
       *conn,
       *conn->clientConnectionId,
@@ -3219,11 +3221,12 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
+  EXPECT_EQ(0, writeRes1.bytesWritten);
 
   conn->handshakeWriteCipher = createNoOpAead();
   conn->handshakeWriteHeaderCipher = createNoOpHeaderCipher();
   conn->pendingEvents.numProbePackets[PacketNumberSpace::Handshake] = 2;
-  writeCryptoAndAckDataToSocket(
+  auto writeRes2 = writeCryptoAndAckDataToSocket(
       *rawSocket,
       *conn,
       *conn->clientConnectionId,
@@ -3234,6 +3237,7 @@ TEST_F(QuicTransportFunctionsTest, ResetNumProbePackets) {
       getVersion(*conn),
       conn->transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_FALSE(conn->pendingEvents.anyProbePackets());
+  EXPECT_EQ(0, writeRes2.bytesWritten);
 
   conn->oneRttWriteCipher = createNoOpAead();
   conn->oneRttWriteHeaderCipher = createNoOpHeaderCipher();

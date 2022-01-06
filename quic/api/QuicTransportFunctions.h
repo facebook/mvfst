@@ -83,6 +83,7 @@ using WritableBytesFunc =
 struct WriteQuicDataResult {
   uint64_t packetsWritten{};
   uint64_t probesWritten{};
+  uint64_t bytesWritten{};
 };
 
 /**
@@ -270,7 +271,7 @@ void encryptPacketHeader(
  * data allowed by the writableBytesFunc and will only write a maximum
  * number of packetLimit packets at each invocation.
  */
-uint64_t writeConnectionDataToSocket(
+WriteQuicDataResult writeConnectionDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,

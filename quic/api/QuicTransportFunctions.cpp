@@ -164,19 +164,20 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
   }
   FrameScheduler scheduler = std::move(schedulerBuilder).build();
   packetsWritten = writeConnectionDataToSocket(
-      sock,
-      connection,
-      srcConnId,
-      dstConnId,
-      std::move(builder),
-      PacketNumberSpace::AppData,
-      scheduler,
-      congestionControlWritableBytes,
-      packetLimit,
-      aead,
-      headerCipher,
-      version,
-      writeLoopBeginTime);
+                       sock,
+                       connection,
+                       srcConnId,
+                       dstConnId,
+                       std::move(builder),
+                       PacketNumberSpace::AppData,
+                       scheduler,
+                       congestionControlWritableBytes,
+                       packetLimit,
+                       aead,
+                       headerCipher,
+                       version,
+                       writeLoopBeginTime)
+                       .packetsWritten;
   VLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType) << " written data "
       << (exceptCryptoStream ? "without crypto data " : "")
@@ -984,6 +985,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
   auto builder = LongHeaderBuilder(packetType);
   WriteQuicDataResult result;
   auto& packetsWritten = result.packetsWritten;
+  auto& bytesWritten = result.bytesWritten;
   auto& probesWritten = result.probesWritten;
   auto& cryptoStream =
       *getCryptoStream(*connection.cryptoState, encryptionLevel);
@@ -1011,7 +1013,7 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
   // Only get one chance to write probes.
   numProbePackets = 0;
   // Crypto data is written without aead protection.
-  packetsWritten += writeConnectionDataToSocket(
+  auto writeResult = writeConnectionDataToSocket(
       sock,
       connection,
       srcConnId,
@@ -1026,6 +1028,10 @@ WriteQuicDataResult writeCryptoAndAckDataToSocket(
       version,
       Clock::now(),
       token);
+
+  packetsWritten += writeResult.packetsWritten;
+  bytesWritten += writeResult.bytesWritten;
+
   VLOG_IF(10, packetsWritten || probesWritten)
       << nodeToString(connection.nodeType)
       << " written crypto and acks data type=" << packetType
@@ -1108,19 +1114,20 @@ uint64_t writeZeroRttDataToSocket(
                     .simpleFrames())
           .build();
   auto written = writeConnectionDataToSocket(
-      socket,
-      connection,
-      srcConnId,
-      dstConnId,
-      std::move(builder),
-      LongHeader::typeToPacketNumberSpace(type),
-      scheduler,
-      congestionControlWritableBytes,
-      packetLimit,
-      aead,
-      headerCipher,
-      version,
-      Clock::now());
+                     socket,
+                     connection,
+                     srcConnId,
+                     dstConnId,
+                     std::move(builder),
+                     LongHeader::typeToPacketNumberSpace(type),
+                     scheduler,
+                     congestionControlWritableBytes,
+                     packetLimit,
+                     aead,
+                     headerCipher,
+                     version,
+                     Clock::now())
+                     .packetsWritten;
   VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
                            << " written zero rtt data, packets=" << written
                            << " " << connection;
@@ -1308,7 +1315,7 @@ void encryptPacketHeader(
   }
 }
 
-uint64_t writeConnectionDataToSocket(
+WriteQuicDataResult writeConnectionDataToSocket(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& srcConnId,
@@ -1358,6 +1365,9 @@ uint64_t writeConnectionDataToSocket(
           QuicBatchingMode::BATCHING_MODE_NONE
       ? connection.transportSettings.writeConnectionDataPacketsLimit
       : connection.transportSettings.maxBatchSize;
+
+  uint64_t bytesWritten = 0;
+
   while (scheduler.hasData() && ioBufBatch.getPktSent() < packetLimit &&
          ((ioBufBatch.getPktSent() < batchSize) ||
           writeLoopTimeLimit(writeLoopBeginTime, connection))) {
@@ -1389,13 +1399,15 @@ uint64_t writeConnectionDataToSocket(
         headerCipher);
 
     if (!ret.buildSuccess) {
-      return ioBufBatch.getPktSent();
+      return {ioBufBatch.getPktSent(), 0, bytesWritten};
     }
     // If we build a packet, we updateConnection(), even if write might have
     // been failed. Because if it builds, a lot of states need to be updated no
     // matter the write result. We are basically treating this case as if we
     // pretend write was also successful but packet is lost somewhere in the
     // network.
+    bytesWritten += ret.encodedSize;
+
     auto& result = ret.result;
     updateConnection(
         connection,
@@ -1413,7 +1425,7 @@ uint64_t writeConnectionDataToSocket(
         connection.writeDebugState.noWriteReason =
             NoWriteReason::SOCKET_FAILURE;
       }
-      return ioBufBatch.getPktSent();
+      return {ioBufBatch.getPktSent(), 0, bytesWritten};
     }
   }
 
@@ -1425,7 +1437,7 @@ uint64_t writeConnectionDataToSocket(
     CHECK(buf->length() == 0 && buf->headroom() == 0);
     connection.bufAccessor->release(std::move(buf));
   }
-  return ioBufBatch.getPktSent();
+  return {ioBufBatch.getPktSent(), 0, bytesWritten};
 }
 
 uint64_t writeProbingDataToSocket(
@@ -1448,20 +1460,21 @@ uint64_t writeProbingDataToSocket(
       scheduler, connection, "CloningScheduler", aead.getCipherOverhead());
   auto writeLoopBeginTime = Clock::now();
   auto written = writeConnectionDataToSocket(
-      sock,
-      connection,
-      srcConnId,
-      dstConnId,
-      builder,
-      pnSpace,
-      cloningScheduler,
-      unlimitedWritableBytes,
-      probesToSend,
-      aead,
-      headerCipher,
-      version,
-      writeLoopBeginTime,
-      token);
+                     sock,
+                     connection,
+                     srcConnId,
+                     dstConnId,
+                     builder,
+                     pnSpace,
+                     cloningScheduler,
+                     unlimitedWritableBytes,
+                     probesToSend,
+                     aead,
+                     headerCipher,
+                     version,
+                     writeLoopBeginTime,
+                     token)
+                     .packetsWritten;
   if (probesToSend && !written) {
     // Fall back to send a ping:
     connection.pendingEvents.sendPing = true;
@@ -1471,19 +1484,20 @@ uint64_t writeProbingDataToSocket(
                       .pingFrames())
             .build();
     written += writeConnectionDataToSocket(
-        sock,
-        connection,
-        srcConnId,
-        dstConnId,
-        builder,
-        pnSpace,
-        pingScheduler,
-        unlimitedWritableBytes,
-        probesToSend - written,
-        aead,
-        headerCipher,
-        version,
-        writeLoopBeginTime);
+                   sock,
+                   connection,
+                   srcConnId,
+                   dstConnId,
+                   builder,
+                   pnSpace,
+                   pingScheduler,
+                   unlimitedWritableBytes,
+                   probesToSend - written,
+                   aead,
+                   headerCipher,
+                   version,
+                   writeLoopBeginTime)
+                   .packetsWritten;
   }
   VLOG_IF(10, written > 0)
       << nodeToString(connection.nodeType)
@@ -1513,19 +1527,20 @@ uint64_t writeD6DProbeToSocket(
       aead.getCipherOverhead(),
       connection.d6d.currentProbeSize);
   auto written = writeConnectionDataToSocket(
-      sock,
-      connection,
-      srcConnId,
-      dstConnId,
-      builder,
-      pnSpace,
-      d6dProbeScheduler,
-      unlimitedWritableBytes,
-      1,
-      aead,
-      headerCipher,
-      version,
-      Clock::now());
+                     sock,
+                     connection,
+                     srcConnId,
+                     dstConnId,
+                     builder,
+                     pnSpace,
+                     d6dProbeScheduler,
+                     unlimitedWritableBytes,
+                     1,
+                     aead,
+                     headerCipher,
+                     version,
+                     Clock::now())
+                     .packetsWritten;
   VLOG_IF(10, written > 0) << nodeToString(connection.nodeType)
                            << " writing d6d probes using scheduler=D6DScheduler"
                            << connection;
