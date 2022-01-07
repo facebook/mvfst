@@ -284,7 +284,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool datagramFrameScheduler_{false};
   };
 
-  explicit FrameScheduler(folly::StringPiece name);
+  FrameScheduler(folly::StringPiece name, QuicConnectionStateBase& conn);
 
   SchedulingResult scheduleFramesForPacket(
       PacketBuilderInterface&& builder,
@@ -309,6 +309,7 @@ class FrameScheduler : public QuicPacketScheduler {
   folly::Optional<PingFrameScheduler> pingFrameScheduler_;
   folly::Optional<DatagramFrameScheduler> datagramFrameScheduler_;
   folly::StringPiece name_;
+  QuicConnectionStateBase& conn_;
 };
 
 /**

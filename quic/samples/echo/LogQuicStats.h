@@ -230,6 +230,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onDatagramDroppedOnRead";
   }
 
+  void onShortHeaderPadding(size_t padSize) override {
+    VLOG(2) << prefix_ << "onShortHeaderPadding size=" << padSize;
+  }
+
  private:
   std::string prefix_;
 };

@@ -275,6 +275,14 @@ struct TransportSettings {
   // Whether to skip sending the ACK-only initial in response to crypto data in
   // initial packet num space
   bool skipInitPktNumSpaceCryptoAck{false};
+  // Whether to issue new tokens via NewToken frames.
+  bool issueNewTokens{false};
+  // Used to generate the number of frames to add to short header packets.
+  // Packets will have padding frames added such that the total space remaining
+  // in a packet is always an increment of paddingModulo, hiding the actual
+  // packet size from packet analysis.
+  // Padding Modulo of 0 turns off padding for short header packets.
+  size_t paddingModulo{0};
 };
 
 } // namespace quic

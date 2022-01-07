@@ -6,14 +6,13 @@
  *
  */
 
-#include <quic/server/QuicServerTransport.h>
-
 #include <quic/common/WindowedCounter.h>
 #include <quic/congestion_control/Bbr.h>
 #include <quic/d6d/BinarySearchProbeSizeRaiser.h>
 #include <quic/d6d/ConstantStepProbeSizeRaiser.h>
 #include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
+#include <quic/server/QuicServerTransport.h>
 #include <quic/server/handshake/AppToken.h>
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
@@ -853,6 +852,16 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               congestionControlTypeToString(
                   server_conn->congestionController->type()));
         }
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        serverTransport->serverConn_->transportSettings.paddingModulo = val;
+        VLOG(3) << fmt::format(
+            "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
+            val);
       });
 }
 

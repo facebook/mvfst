@@ -188,7 +188,7 @@ FrameScheduler::Builder& FrameScheduler::Builder::datagramFrames() {
 }
 
 FrameScheduler FrameScheduler::Builder::build() && {
-  FrameScheduler scheduler(std::move(name_));
+  FrameScheduler scheduler(name_, conn_);
   if (streamFrameScheduler_) {
     scheduler.streamFrameScheduler_.emplace(StreamFrameScheduler(conn_));
   }
@@ -221,7 +221,10 @@ FrameScheduler FrameScheduler::Builder::build() && {
   return scheduler;
 }
 
-FrameScheduler::FrameScheduler(folly::StringPiece name) : name_(name) {}
+FrameScheduler::FrameScheduler(
+    folly::StringPiece name,
+    QuicConnectionStateBase& conn)
+    : name_(name), conn_(conn) {}
 
 SchedulingResult FrameScheduler::scheduleFramesForPacket(
     PacketBuilderInterface&& builder,
@@ -292,6 +295,17 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
       // This is the initial packet, we need to fill er up.
       while (wrapper.remainingSpaceInPkt() > 0) {
         writeFrame(PaddingFrame(), builder);
+      }
+    }
+    const ShortHeader* shortHeader = builder.getPacketHeader().asShort();
+    if (shortHeader) {
+      size_t paddingModulo = conn_.transportSettings.paddingModulo;
+      if (paddingModulo > 0) {
+        size_t paddingIncrement = wrapper.remainingSpaceInPkt() % paddingModulo;
+        for (size_t i = 0; i < paddingIncrement; i++) {
+          writeFrame(PaddingFrame(), builder);
+        }
+        QUIC_STATS(conn_.statsCallback, onShortHeaderPadding, paddingIncrement);
       }
     }
   }

@@ -6,10 +6,9 @@
  *
  */
 
-#include <quic/api/QuicPacketScheduler.h>
-
 #include <folly/portability/GTest.h>
 
+#include <quic/api/QuicPacketScheduler.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/state/ClientStateMachine.h>
@@ -517,7 +516,7 @@ TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerStreamNotExists) {
 TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "Juice WRLD", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
@@ -543,7 +542,7 @@ TEST_F(QuicPacketSchedulerTest, NoCloningForDSR) {
 TEST_F(QuicPacketSchedulerTest, CloningSchedulerTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
@@ -610,7 +609,7 @@ TEST_P(QuicPacketSchedulerTest, NoCloningWithOnlyD6DProbes) {
       false /* isDSRPacket */);
   ASSERT_EQ(1, conn.outstandings.packets.size());
   EXPECT_TRUE(conn.outstandings.packets.back().metadata.isD6DProbe);
-  FrameScheduler noopScheduler("noopScheduler");
+  FrameScheduler noopScheduler("noopScheduler", conn);
   CloningScheduler cloningScheduler(
       noopScheduler, conn, "MarShall Mathers", cipherOverhead);
   EXPECT_FALSE(cloningScheduler.hasData());
@@ -619,7 +618,7 @@ TEST_P(QuicPacketSchedulerTest, NoCloningWithOnlyD6DProbes) {
 TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
@@ -688,7 +687,7 @@ TEST_F(QuicPacketSchedulerTest, WriteOnlyOutstandingPacketsTest) {
 TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, but then mark the second one processed by
   // adding a PacketEvent that's missing from the outstandings.packetEvents set
@@ -720,7 +719,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneProcessedClonedPacket) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
 
@@ -731,7 +730,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
 
@@ -742,7 +741,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   EXPECT_FALSE(cloningScheduler.hasData());
 
@@ -753,7 +752,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasAppDataData) {
 TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
   // Add two outstanding packets, with second one being handshake
   auto expected = addOutstandingPacket(conn);
@@ -781,7 +780,7 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
-  NiceMock<MockFrameScheduler> mockScheduler;
+  NiceMock<MockFrameScheduler> mockScheduler(&conn);
   CloningScheduler cloningScheduler(mockScheduler, conn, "Mocker", 0);
   ShortHeader header(
       ProtectionType::KeyPhaseOne,
@@ -831,7 +830,7 @@ TEST_F(QuicPacketSchedulerTest, CloneWillGenerateNewWindowUpdate) {
       FizzClientQuicHandshakeContext::Builder().build());
   conn.streamManager->setMaxLocalBidirectionalStreams(10);
   auto stream = conn.streamManager->createNextBidirectionalStream().value();
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   CloningScheduler cloningScheduler(noopScheduler, conn, "GiantsShoulder", 0);
   PacketEvent expectedPacketEvent(
       PacketNumberSpace::AppData, addOutstandingPacket(conn));
@@ -917,7 +916,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilder) {
   bufAccessor.release(std::move(buf));
   conn.bufAccessor = &bufAccessor;
 
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "93MillionMiles", 0);
   auto packetNum = addOutstandingPacket(conn);
@@ -999,7 +998,7 @@ TEST_F(QuicPacketSchedulerTest, CloningSchedulerWithInplaceBuilderFullPacket) {
   buf->clear();
   bufAccessor.release(std::move(buf));
 
-  FrameScheduler noopScheduler("noopScheduler");
+  FrameScheduler noopScheduler("noopScheduler", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "93MillionMiles", 0);
   EXPECT_TRUE(cloningScheduler.hasData());
@@ -1077,7 +1076,7 @@ TEST_F(QuicPacketSchedulerTest, CloneLargerThanOriginalPacket) {
       conn.udpSendPacketLen,
       std::move(cloneHeader),
       conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
-  FrameScheduler noopScheduler("noopScheduler");
+  FrameScheduler noopScheduler("noopScheduler", conn);
   CloningScheduler cloningScheduler(
       noopScheduler, conn, "CopyCat", cipherOverhead);
   auto cloneResult = cloningScheduler.scheduleFramesForPacket(
@@ -1547,7 +1546,7 @@ TEST_F(
   bufAccessor.release(std::move(buf));
   conn.bufAccessor = &bufAccessor;
 
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "Little Hurry", 0);
   addOutstandingPacket(conn);
@@ -1591,7 +1590,7 @@ TEST_F(
   bufAccessor.release(std::move(buf));
   conn.bufAccessor = &bufAccessor;
 
-  FrameScheduler noopScheduler("frame");
+  FrameScheduler noopScheduler("frame", conn);
   ASSERT_FALSE(noopScheduler.hasData());
   CloningScheduler cloningScheduler(noopScheduler, conn, "HotPot", 0);
   addOutstandingPacket(conn);
@@ -2036,6 +2035,179 @@ TEST_F(QuicPacketSchedulerTest, DatagramFrameWriteWhenRoomAvailable) {
       .WillRepeatedly(Invoke([](uint64_t bytes) { EXPECT_GT(bytes, 0); }));
   scheduler.writeDatagramFrames(builder);
   ASSERT_EQ(frames.size(), 1);
+}
+
+TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingWithSpaceForPadding) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  size_t paddingModulo = 16;
+  conn.transportSettings.paddingModulo = paddingModulo;
+  // create enough input data to partially fill packet
+  size_t inputDataLength1 = conn.udpSendPacketLen / 2;
+  size_t inputDataLength2 = inputDataLength1 + 1;
+  auto inputData1 = buildRandomInputData(inputDataLength1);
+  auto inputData2 = buildRandomInputData(inputDataLength2);
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+
+  ShortHeader shortHeader1(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+  ShortHeader shortHeader2(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+
+  RegularQuicPacketBuilder builder1(
+      conn.udpSendPacketLen,
+      std::move(shortHeader1),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+  RegularQuicPacketBuilder builder2(
+      conn.udpSendPacketLen,
+      std::move(shortHeader2),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  DatagramFrame frame1(inputDataLength1, std::move(inputData1));
+  DatagramFrame frame2(inputDataLength2, std::move(inputData2));
+  writeFrame(frame1, builder1);
+  writeFrame(frame2, builder2);
+
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+
+  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
+  auto result1 = scheduler.scheduleFramesForPacket(
+      std::move(builder1), conn.udpSendPacketLen);
+  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
+  auto result2 = scheduler.scheduleFramesForPacket(
+      std::move(builder2), conn.udpSendPacketLen);
+
+  auto headerLength1 = result1.packet->header->computeChainDataLength();
+  auto bodyLength1 = result1.packet->body->computeChainDataLength();
+  auto packetLength1 = headerLength1 + bodyLength1;
+  auto expectedPadding1 =
+      (conn.udpSendPacketLen - (inputDataLength1 + headerLength1)) %
+      paddingModulo;
+
+  auto headerLength2 = result2.packet->header->computeChainDataLength();
+  auto bodyLength2 = result2.packet->body->computeChainDataLength();
+  auto packetLength2 = headerLength2 + bodyLength2;
+  auto expectedPadding2 =
+      (conn.udpSendPacketLen - (inputDataLength2 + headerLength2)) %
+      paddingModulo;
+
+  EXPECT_EQ(packetLength1, headerLength1 + inputDataLength1 + expectedPadding1);
+  EXPECT_EQ(packetLength2, headerLength2 + inputDataLength2 + expectedPadding2);
+  // ensure two similar size input data get padded up to same length
+  EXPECT_EQ(packetLength1, packetLength2);
+}
+
+TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingNearMaxPacketLength) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.udpSendPacketLen = 1000;
+  size_t paddingModulo = 50;
+  conn.transportSettings.paddingModulo = paddingModulo;
+  // create enough input data to almost fill packet
+  size_t inputDataLength = conn.udpSendPacketLen - 20;
+  auto inputData = buildRandomInputData(inputDataLength);
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(shortHeader),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  DatagramFrame frame(inputDataLength, std::move(inputData));
+  writeFrame(frame, builder);
+
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+
+  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+
+  auto headerLength = result.packet->header->computeChainDataLength();
+  auto bodyLength = result.packet->body->computeChainDataLength();
+
+  auto packetLength = headerLength + bodyLength;
+
+  auto expectedPadding =
+      (conn.udpSendPacketLen - (inputDataLength + headerLength)) %
+      paddingModulo;
+
+  EXPECT_EQ(packetLength, headerLength + inputDataLength + expectedPadding);
+  EXPECT_EQ(packetLength, conn.udpSendPacketLen);
+}
+
+TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.udpSendPacketLen = 1000;
+  size_t paddingModulo = 50;
+  conn.transportSettings.paddingModulo = paddingModulo;
+
+  FrameScheduler scheduler = std::move(FrameScheduler::Builder(
+                                           conn,
+                                           EncryptionLevel::AppData,
+                                           PacketNumberSpace::AppData,
+                                           "streamScheduler")
+                                           .streamFrames())
+                                 .build();
+
+  ShortHeader shortHeader(
+      ProtectionType::KeyPhaseOne,
+      conn.clientConnectionId.value_or(getTestConnectionId()),
+      getNextPacketNum(conn, PacketNumberSpace::AppData));
+
+  size_t largestAckedPacketNum =
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0);
+  auto packetNumberEncoding = encodePacketNumber(
+      shortHeader.getPacketSequenceNum(), largestAckedPacketNum);
+  auto connectionIdSize = shortHeader.getConnectionId().size();
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(shortHeader), largestAckedPacketNum);
+
+  // create enough input data to fully fill packet
+  while (builder.remainingSpaceInPkt() >
+         connectionIdSize + packetNumberEncoding.length + 1) {
+    writeFrame(PaddingFrame(), builder);
+  }
+
+  NiceMock<MockQuicStats> quicStats;
+  conn.statsCallback = &quicStats;
+
+  EXPECT_CALL(quicStats, onShortHeaderPadding(_)).Times(1);
+  auto result = scheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+
+  auto headerLength = result.packet->header->computeChainDataLength();
+  auto bodyLength = result.packet->body->computeChainDataLength();
+
+  auto packetLength = headerLength + bodyLength;
+
+  EXPECT_EQ(packetLength, conn.udpSendPacketLen);
 }
 
 INSTANTIATE_TEST_CASE_P(

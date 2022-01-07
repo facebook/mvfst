@@ -182,6 +182,8 @@ class QuicTransportStatsCallback {
 
   virtual void onDatagramDroppedOnRead() = 0;
 
+  virtual void onShortHeaderPadding(size_t padSize) = 0;
+
   static const char* toString(PacketDropReason reason) {
     switch (reason) {
       case PacketDropReason::NONE:

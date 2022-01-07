@@ -25,7 +25,8 @@ class MockFrameScheduler : public FrameScheduler {
  public:
   ~MockFrameScheduler() override = default;
 
-  MockFrameScheduler() : FrameScheduler("mock") {}
+  explicit MockFrameScheduler(QuicConnectionStateBase* conn)
+      : FrameScheduler("mock", *conn) {}
 
   // override methods accepting rvalue ref since gmock doesn't support it
   SchedulingResult scheduleFramesForPacket(
