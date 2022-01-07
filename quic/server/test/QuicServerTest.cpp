@@ -180,6 +180,7 @@ class QuicServerWorkerTest : public Test {
     EXPECT_CALL(*transport_, hasShutdown())
         .WillRepeatedly(ReturnPointee(&hasShutdown_));
     worker_->setTransportFactory(factory_.get());
+    EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(0);
   }
 
   void createQuicConnection(
@@ -735,6 +736,8 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
 // Validate that when the worker receives a valid NewToken, it invokes
 // transportInfo->onNewTokenReceived().
 TEST_F(QuicServerWorkerTest, TestNewTokenStatsCallback) {
+  EXPECT_CALL(*quicStats_, onNewTokenReceived());
+
   NewToken newToken(kClientAddr.getIPAddress());
   // Create the encrypted retry token
   TokenGenerator generator(tokenSecret_);
@@ -747,7 +750,6 @@ TEST_F(QuicServerWorkerTest, TestNewTokenStatsCallback) {
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
 
-  EXPECT_CALL(*quicStats_, onNewTokenReceived());
   // we piggyback the retrytoken logic with a new token
   testSendInitialWithRetryToken(
       encryptedTokenStr, srcConnId, dstConnId, kClientAddr);
@@ -756,6 +758,7 @@ TEST_F(QuicServerWorkerTest, TestNewTokenStatsCallback) {
 TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
   // The second client initial packet with the retry token is valid
   // as the client IP is the same as the one stored in the retry token
+
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
   auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
@@ -783,14 +786,14 @@ TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialClientIp) {
   std::string encryptedRetryToken;
   expectServerRetryPacketWrite(encryptedRetryToken, dstConnId, kClientAddr2);
 
-  EXPECT_CALL(*quicStats_, onTokenDecryptFailure());
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
   testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr2);
 }
 
 TEST_F(QuicServerWorkerTest, TestRetryUnfinishedInvalidInitialClientIp) {
   // The second client initial packet with the retry token is invalid
   // as the client IP is different from the one stored in the retry token
-  EXPECT_CALL(*quicStats_, onTokenDecryptFailure());
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
 
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
@@ -804,6 +807,7 @@ TEST_F(QuicServerWorkerTest, TestRetryUnfinishedInvalidInitialClientIp) {
 
 TEST_F(QuicServerWorkerTest, TestRetryInvalidInitialDstConnId) {
   // Dest conn ID is invalid as it is different from the original dst conn ID
+  EXPECT_CALL(*quicStats_, onTokenDecryptFailure()).Times(1);
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
   auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
