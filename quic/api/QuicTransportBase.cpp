@@ -290,6 +290,9 @@ void QuicTransportBase::closeImpl(
              ? conn_->congestionController->getWritableBytes()
              : std::numeric_limits<uint64_t>::max(),
          getSendConnFlowControlBytesWire(*conn_),
+         conn_->lossState.totalPacketsSpuriouslyMarkedLost,
+         conn_->lossState.reorderingThreshold,
+         uint64_t(conn_->transportSettings.timeReorderingThreshDividend),
          conn_->usedZeroRtt,
          conn_->version.value_or(QuicVersion::MVFST_INVALID),
          conn_->dsrPacketCount});

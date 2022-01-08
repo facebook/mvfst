@@ -66,6 +66,9 @@ class QLogger {
     uint64_t totalCryptoDataRecvd{};
     uint64_t currentWritableBytes{};
     uint64_t currentConnFlowControl{};
+    uint64_t totalPacketsSpuriouslyMarkedLost{};
+    uint64_t finalPacketLossReorderingThreshold{};
+    uint64_t finalPacketLossTimeReorderingThreshDividend{};
     bool usedZeroRtt{};
     QuicVersion quicVersion{QuicVersion::MVFST_INVALID};
     uint64_t dsrPacketCount{};

@@ -426,6 +426,9 @@ class QLogTransportSummaryEvent : public QLogEvent {
       uint64_t totalCryptoDataRecvd,
       uint64_t currentWritableBytes,
       uint64_t currentConnFlowControl,
+      uint64_t totalPacketsSpuriouslyMarkedLost,
+      uint64_t finalPacketLossReorderingThreshold,
+      uint64_t finalPacketLossTimeReorderingThreshDividend,
       bool usedZeroRtt,
       QuicVersion version,
       uint64_t dsrPacketCount,
@@ -443,6 +446,9 @@ class QLogTransportSummaryEvent : public QLogEvent {
   uint64_t totalCryptoDataRecvd;
   uint64_t currentWritableBytes;
   uint64_t currentConnFlowControl;
+  uint64_t totalPacketsSpuriouslyMarkedLost;
+  uint64_t finalPacketLossReorderingThreshold;
+  uint64_t finalPacketLossTimeReorderingThreshDividend;
   bool usedZeroRtt;
   QuicVersion quicVersion;
   uint64_t dsrPacketCount;

@@ -112,6 +112,9 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
        238,
        22,
        44,
+       45,
+       46,
+       47,
        false,
        QuicVersion::MVFST,
        37});
@@ -131,6 +134,9 @@ TEST_F(QLoggerTest, TransportSummaryEvent) {
   EXPECT_EQ(gotEvent->totalCryptoDataRecvd, 238);
   EXPECT_EQ(gotEvent->currentWritableBytes, 22);
   EXPECT_EQ(gotEvent->currentConnFlowControl, 44);
+  EXPECT_EQ(gotEvent->totalPacketsSpuriouslyMarkedLost, 45);
+  EXPECT_EQ(gotEvent->finalPacketLossReorderingThreshold, 46);
+  EXPECT_EQ(gotEvent->finalPacketLossTimeReorderingThreshDividend, 47);
   EXPECT_EQ(gotEvent->usedZeroRtt, false);
   EXPECT_EQ(gotEvent->dsrPacketCount, 37);
 }
@@ -759,6 +765,9 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
        "total_crypto_data_recvd": 10,
        "current_writable_bytes": 11,
        "current_conn_flow_control": 12,
+       "total_packets_spuriously_marked_lost": 13,
+       "final_packet_loss_reordering_threshold": 14,
+       "final_packet_loss_time_reordering_threshold_dividend": 15,
        "used_zero_rtt": true,
        "quic_version": 4207849474,
        "dsr_packet_count": 37
@@ -768,7 +777,24 @@ TEST_F(QLoggerTest, TransportSummaryFollyDynamic) {
 
   FileQLogger q(VantagePoint::Client);
   q.addTransportSummary(
-      {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, true, QuicVersion::MVFST, 37});
+      {1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14,
+       15,
+       true,
+       QuicVersion::MVFST,
+       37});
   folly::dynamic gotDynamic = q.toDynamic();
   gotDynamic["traces"][0]["events"][0][0] = "0"; // hardcode reference time
   folly::dynamic gotEvents = gotDynamic["traces"][0]["events"];

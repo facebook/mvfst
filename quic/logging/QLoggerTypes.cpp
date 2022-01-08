@@ -355,6 +355,9 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
     uint64_t totalCryptoDataRecvdIn,
     uint64_t currentWritableBytesIn,
     uint64_t currentConnFlowControlIn,
+    uint64_t totalPacketsSpuriouslyMarkedLost,
+    uint64_t finalPacketLossReorderingThreshold,
+    uint64_t finalPacketLossTimeReorderingThreshDividend,
     bool usedZeroRttIn,
     QuicVersion quicVersionIn,
     uint64_t dsrPacketCountIn,
@@ -371,6 +374,10 @@ QLogTransportSummaryEvent::QLogTransportSummaryEvent(
       totalCryptoDataRecvd{totalCryptoDataRecvdIn},
       currentWritableBytes{currentWritableBytesIn},
       currentConnFlowControl{currentConnFlowControlIn},
+      totalPacketsSpuriouslyMarkedLost{totalPacketsSpuriouslyMarkedLost},
+      finalPacketLossReorderingThreshold{finalPacketLossReorderingThreshold},
+      finalPacketLossTimeReorderingThreshDividend{
+          finalPacketLossTimeReorderingThreshDividend},
       usedZeroRtt{usedZeroRttIn},
       quicVersion{quicVersionIn},
       dsrPacketCount{dsrPacketCountIn} {
@@ -399,6 +406,12 @@ folly::dynamic QLogTransportSummaryEvent::toDynamic() const {
   data["total_crypto_data_recvd"] = totalCryptoDataRecvd;
   data["current_writable_bytes"] = currentWritableBytes;
   data["current_conn_flow_control"] = currentConnFlowControl;
+  data["total_packets_spuriously_marked_lost"] =
+      totalPacketsSpuriouslyMarkedLost;
+  data["final_packet_loss_reordering_threshold"] =
+      finalPacketLossReorderingThreshold;
+  data["final_packet_loss_time_reordering_threshold_dividend"] =
+      finalPacketLossTimeReorderingThreshDividend;
   data["used_zero_rtt"] = usedZeroRtt;
   data["quic_version"] =
       static_cast<std::underlying_type<decltype(quicVersion)>::type>(
