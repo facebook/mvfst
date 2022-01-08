@@ -138,6 +138,20 @@ AckEvent processAckFrame(
       if (rPacketIt->declaredLost) {
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.lossState.totalPacketsSpuriouslyMarkedLost++;
+        if (conn.transportSettings.useAdaptiveLossThresholds) {
+          if (rPacketIt->lossReorderDistance.hasValue() &&
+              rPacketIt->lossReorderDistance.value() >
+                  conn.lossState.reorderingThreshold) {
+            conn.lossState.reorderingThreshold =
+                rPacketIt->lossReorderDistance.value();
+          }
+          if (rPacketIt->lossTimeoutDividend.hasValue() &&
+              rPacketIt->lossTimeoutDividend.value() >
+                  conn.transportSettings.timeReorderingThreshDividend) {
+            conn.transportSettings.timeReorderingThreshDividend =
+                rPacketIt->lossTimeoutDividend.value();
+          }
+        }
         QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
         // Decrement the counter, trust that we will erase this as part of
         // the bulk erase.

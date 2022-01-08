@@ -137,6 +137,8 @@ enum class TransportKnobParamId : uint64_t {
   MAX_PACING_RATE_KNOB = 0x4444,
   // Set auto background mode (experimental)
   AUTO_BACKGROUND_MODE = 0x5555,
+  // Use adaptive loss detection thresholds for reordering and timeout
+  ADAPTIVE_LOSS_DETECTION = 0x5556,
   // Set short header padding modulo size
   SHORT_HEADER_PADDING_KNOB = 0x6666,
 };

@@ -314,7 +314,10 @@ class Observer {
     }
 
     void addSpuriousPacket(const quic::OutstandingPacket& pkt) {
-      spuriousPackets.emplace_back(pkt.lostByTimeout, pkt.lostByReorder, pkt);
+      spuriousPackets.emplace_back(
+          pkt.lossTimeoutDividend.hasValue(),
+          pkt.lossReorderDistance.hasValue(),
+          pkt);
     }
     const TimePoint rcvTime;
     std::vector<LostPacket> spuriousPackets;

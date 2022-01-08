@@ -283,6 +283,8 @@ struct TransportSettings {
   // packet size from packet analysis.
   // Padding Modulo of 0 turns off padding for short header packets.
   size_t paddingModulo{0};
+  // Whether to use adaptive loss thresholds for reodering and timeout
+  bool useAdaptiveLossThresholds{false};
 };
 
 } // namespace quic

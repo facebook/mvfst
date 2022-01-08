@@ -203,8 +203,9 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     TimePoint lossTime,
     PacketNumberSpace pnSpace) {
   getLossTime(conn, pnSpace).reset();
-  std::chrono::microseconds delayUntilLost =
-      std::max(conn.lossState.srtt, conn.lossState.lrtt) *
+  std::chrono::microseconds rttSample =
+      std::max(conn.lossState.srtt, conn.lossState.lrtt);
+  std::chrono::microseconds delayUntilLost = rttSample *
       conn.transportSettings.timeReorderingThreshDividend /
       conn.transportSettings.timeReorderingThreshDivisor;
   VLOG(10) << __func__ << " outstanding=" << conn.outstandings.numOutstanding()
@@ -251,8 +252,13 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
       if (!pkt.declaredLost) {
         ++conn.outstandings.declaredLostCount;
         pkt.declaredLost = true;
-        pkt.lostByTimeout = lostByTimeout;
-        pkt.lostByReorder = lostByReorder;
+        if (lostByTimeout && rttSample.count() > 0) {
+          pkt.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
+              conn.transportSettings.timeReorderingThreshDivisor / rttSample;
+        }
+        if (lostByReorder) {
+          pkt.lossReorderDistance = *largestAcked - currentPacketNum;
+        }
         ++conn.d6d.meta.totalLostProbes;
         if (currentPacketNum == conn.d6d.lastProbe->packetNum) {
           onD6DLastProbeLost(conn);
@@ -293,16 +299,17 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
     // Rather than erasing here, instead mark the packet as lost so we can
     // determine if this was spurious later.
     conn.lossState.totalPacketsMarkedLost++;
-    if (lostByTimeout) {
+    if (lostByTimeout && rttSample.count() > 0) {
       conn.lossState.totalPacketsMarkedLostByPto++;
+      pkt.lossTimeoutDividend = (lossTime - pkt.metadata.time) *
+          conn.transportSettings.timeReorderingThreshDivisor / rttSample;
     }
     if (lostByReorder) {
       conn.lossState.totalPacketsMarkedLostByReorderingThreshold++;
+      iter->lossReorderDistance = *largestAcked - currentPacketNum;
     }
     conn.outstandings.declaredLostCount++;
     iter->declaredLost = true;
-    iter->lostByTimeout = lostByTimeout;
-    iter->lostByReorder = lostByReorder;
     iter++;
   } // while (iter != conn.outstandings.packets.end()) {
 

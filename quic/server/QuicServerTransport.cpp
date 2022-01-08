@@ -863,6 +863,19 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
             val);
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::ADAPTIVE_LOSS_DETECTION),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
+        auto useAdaptiveLossThresholds = static_cast<bool>(val);
+        server_conn->transportSettings.useAdaptiveLossThresholds =
+            useAdaptiveLossThresholds;
+        VLOG(3) << fmt::format(
+            "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossThresholds is now set to {}",
+            useAdaptiveLossThresholds);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

@@ -192,11 +192,14 @@ struct OutstandingPacket {
   // lost.
   bool declaredLost{false};
 
-  // True if packet was declared lost due to timeout.
-  bool lostByTimeout{false};
+  // Has value if the packet is lost by timout. The value is the loss timeout
+  // dividend that was used to declare this packet.
+  folly::Optional<DurationRep> lossTimeoutDividend;
 
-  // True if packet was declared lost due to reordering.
-  bool lostByReorder{false};
+  // Has value if the packet is lost by reorder. The value is the distance
+  // between this packet and the acknowleded packet when it was declared lost
+  // due to reordering
+  folly::Optional<uint32_t> lossReorderDistance;
 
   OutstandingPacket(
       RegularQuicWritePacket packetIn,
