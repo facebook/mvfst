@@ -1,4 +1,4 @@
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+// (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
 #include <gtest/gtest.h>
 #include <quic/client/connector/QuicConnector.h>

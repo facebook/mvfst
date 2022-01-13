@@ -1,4 +1,4 @@
-// (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
+// (c) Meta Platforms, Inc. and affiliates. Confidential and proprietary.
 
 // #include <folly/portability/GMock.h>
 // #include <folly/portability/GTest.h>
