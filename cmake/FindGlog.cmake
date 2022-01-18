@@ -1,10 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-# - Try to find Glog
-# Once done, this will define
 #
-# GLOG_FOUND - system has Glog
-# GLOG_INCLUDE_DIRS - the Glog include directories
-# GLOG_LIBRARIES - link these to use Glog
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
 
 include(FindPackageHandleStandardArgs)
 
