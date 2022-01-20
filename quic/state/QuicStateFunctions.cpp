@@ -95,8 +95,8 @@ void updateAckSendStateOnRecvPacket(
     pktOutOfOrder = false;
   }
   if (pktHasRetransmittableData) {
-    bool skipCryptoAck = conn.nodeType == QuicNodeType::Server &&
-        initPktNumSpace && conn.transportSettings.skipInitPktNumSpaceCryptoAck;
+    bool skipCryptoAck =
+        conn.nodeType == QuicNodeType::Server && initPktNumSpace;
 
     if ((pktHasCryptoData && !skipCryptoAck) || pktOutOfOrder ||
         ++ackState.numRxPacketsRecvd + ackState.numNonRxPacketsRecvd >=

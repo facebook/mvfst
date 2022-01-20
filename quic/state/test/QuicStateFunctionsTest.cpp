@@ -301,7 +301,6 @@ TEST_P(
    */
   QuicConnectionStateBase conn(QuicNodeType::Server);
 
-  conn.transportSettings.skipInitPktNumSpaceCryptoAck = true;
   bool isInitPktNumSpace = GetParam() == PacketNumberSpace::Initial;
 
   auto& ackState = getAckState(conn, GetParam());

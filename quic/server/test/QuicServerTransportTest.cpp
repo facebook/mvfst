@@ -3185,7 +3185,6 @@ TEST_F(
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
   auto transportSettings = server->getTransportSettings();
-  transportSettings.skipInitPktNumSpaceCryptoAck = true;
   server->setTransportSettings(transportSettings);
 
   // bypass doHandshake() in fakeServerHandshake by sending something other than
@@ -3199,7 +3198,6 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSkipAckOnlyCryptoInitial) {
 
 TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
   auto transportSettings = server->getTransportSettings();
-  transportSettings.skipInitPktNumSpaceCryptoAck = true;
   server->setTransportSettings(transportSettings);
 
   recvClientHello();

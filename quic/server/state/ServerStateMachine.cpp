@@ -90,10 +90,9 @@ void recoverOrResetCongestionAndRttState(
   }
 }
 
-void setExperimentalSettings(QuicServerConnectionState& conn) {
+void setExperimentalSettings(QuicServerConnectionState& /*conn*/) {
   // MVFST_EXPERIMENTAL is currently using initCwnd=30 set in
   // QuicServerWorker.cpp before CC is initialized.
-  conn.transportSettings.skipInitPktNumSpaceCryptoAck = true;
 }
 } // namespace
 

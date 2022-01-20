@@ -271,9 +271,6 @@ struct TransportSettings {
   bool earlyRetransmit0Rtt{false};
   // Whether to use JumpStarter as the CongestionControllerFactory
   bool useJumpStart{false};
-  // Whether to skip sending the ACK-only initial in response to crypto data in
-  // initial packet num space
-  bool skipInitPktNumSpaceCryptoAck{false};
   // Whether to issue new tokens via NewToken frames.
   bool issueNewTokens{false};
   // Used to generate the number of frames to add to short header packets.
