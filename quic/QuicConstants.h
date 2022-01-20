@@ -272,7 +272,6 @@ enum class QuicVersion : uint32_t {
   // QuicTransportBase::isKnobSupported() and make sure that knob support is not
   // broken.
   MVFST = 0xfaceb002,
-  QUIC_DRAFT_LEGACY = 0xff00001b, // Draft-27
   QUIC_DRAFT = 0xff00001d, // Draft-29
   QUIC_V1 = 0x00000001,
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST

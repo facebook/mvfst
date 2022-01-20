@@ -169,8 +169,7 @@ inline void validateTransportExtensions(
                 extension.extension_type),
             fizz::AlertDescription::illegal_parameter);
       } else if (
-          (encodingVersion == quic::QuicVersion::QUIC_DRAFT ||
-           encodingVersion == quic::QuicVersion::QUIC_DRAFT_LEGACY) &&
+          encodingVersion == quic::QuicVersion::QUIC_DRAFT &&
           extension.extension_type !=
               fizz::ExtensionType::quic_transport_parameters_draft) {
         // This is a QUIC draft version using an incorrect transport parameters

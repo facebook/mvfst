@@ -28,7 +28,6 @@ Buf FizzCryptoFactory::makeInitialTrafficSecret(
     case QuicVersion::QUIC_DRAFT:
       salt = kQuicDraft29Salt;
       break;
-    case QuicVersion::QUIC_DRAFT_LEGACY:
     case QuicVersion::MVFST:
       salt = kQuicDraft23Salt;
       break;
