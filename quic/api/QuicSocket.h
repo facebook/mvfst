@@ -1124,17 +1124,24 @@ class QuicSocket {
      * Invoked if the ping times out
      */
     virtual void pingTimeout() noexcept = 0;
+
+    /**
+     * Invoked when a ping is received
+     */
+    virtual void onPing() noexcept = 0;
   };
+
+  /**
+   * Set the ping callback
+   */
+  virtual folly::Expected<folly::Unit, LocalErrorCode> setPingCallback(
+      PingCallback* cb) = 0;
 
   /**
    * Send a ping to the peer.  When the ping is acknowledged by the peer or
    * times out, the transport will invoke the callback.
-   *
-   * If 'callback' is nullptr, or pingTimeout is 0, no callback is scheduled.
    */
-  virtual void sendPing(
-      PingCallback* callback,
-      std::chrono::milliseconds pingTimeout) = 0;
+  virtual void sendPing(std::chrono::milliseconds pingTimeout) = 0;
 
   /**
    * Get information on the state of the quic connection. Should only be used
