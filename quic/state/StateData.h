@@ -560,8 +560,6 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     bool cancelPingTimeout{false};
 
-    bool notifyPingReceived{false};
-
     // close transport when the next packet number reaches kMaxPacketNum
     bool closeTransport{false};
 

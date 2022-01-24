@@ -131,7 +131,6 @@ class TestPingCallback : public QuicSocket::PingCallback {
  public:
   void pingAcknowledged() noexcept override {}
   void pingTimeout() noexcept override {}
-  void onPing() noexcept override {}
 };
 
 class TestByteEventCallback : public QuicSocket::ByteEventCallback {
@@ -311,16 +310,18 @@ class TestQuicTransport
     ackTimeout_.timeoutExpired();
   }
 
-  void invokeSendPing(std::chrono::milliseconds interval) {
-    sendPing(interval);
+  void invokeSendPing(
+      quic::QuicSocket::PingCallback* cb,
+      std::chrono::milliseconds interval) {
+    sendPing(cb, interval);
   }
 
   void invokeCancelPingTimeout() {
     pingTimeout_.cancelTimeout();
   }
 
-  void invokeHandlePingCallbacks() {
-    handlePingCallbacks();
+  void invokeHandlePingCallback() {
+    handlePingCallback();
   }
 
   void invokeHandleKnobCallbacks() {
@@ -3456,12 +3457,11 @@ TEST_F(QuicTransportImplTest, SuccessfulPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
   TestPingCallback pingCallback;
-  transport->setPingCallback(&pingCallback);
-  transport->invokeSendPing(interval);
+  transport->invokeSendPing(&pingCallback, interval);
   EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
   conn->pendingEvents.cancelPingTimeout = true;
-  transport->invokeHandlePingCallbacks();
+  transport->invokeHandlePingCallback();
   evb->loopOnce();
   EXPECT_EQ(transport->isPingTimeoutScheduled(), false);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
@@ -3471,13 +3471,12 @@ TEST_F(QuicTransportImplTest, FailedPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
   TestPingCallback pingCallback;
-  transport->setPingCallback(&pingCallback);
-  transport->invokeSendPing(interval);
+  transport->invokeSendPing(&pingCallback, interval);
   EXPECT_EQ(transport->isPingTimeoutScheduled(), true);
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
   conn->pendingEvents.cancelPingTimeout = true;
   transport->invokeCancelPingTimeout();
-  transport->invokeHandlePingCallbacks();
+  transport->invokeHandlePingCallback();
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
 

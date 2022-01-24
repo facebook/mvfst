@@ -1149,7 +1149,6 @@ void onServerReadDataFromOpen(
           // Ping isn't retransmittable data. But we would like to ack them
           // early.
           pktHasRetransmittableData = true;
-          conn.pendingEvents.notifyPingReceived = true;
           break;
         case QuicFrame::Type::PaddingFrame:
           break;

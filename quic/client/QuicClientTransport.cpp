@@ -566,7 +566,6 @@ void QuicClientTransport::processPacketData(
         // Ping isn't retransmittable. But we would like to ack them early.
         // So, make Ping frames count towards ack policy
         pktHasRetransmittableData = true;
-        conn_->pendingEvents.notifyPingReceived = true;
         break;
       case QuicFrame::Type::PaddingFrame:
         break;

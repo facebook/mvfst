@@ -1400,16 +1400,7 @@ folly::
   }
 }
 
-void QuicTransportBase::handlePingCallbacks() {
-  if (conn_->pendingEvents.notifyPingReceived && pingCallback_ != nullptr) {
-    conn_->pendingEvents.notifyPingReceived = false;
-    runOnEvbAsync([](auto self) {
-      if (self->pingCallback_) {
-        self->pingCallback_->onPing();
-      }
-    });
-  }
-
+void QuicTransportBase::handlePingCallback() {
   if (!conn_->pendingEvents.cancelPingTimeout) {
     return; // nothing to cancel
   }
@@ -1420,11 +1411,7 @@ void QuicTransportBase::handlePingCallbacks() {
   }
   pingTimeout_.cancelTimeout();
   if (pingCallback_ != nullptr) {
-    runOnEvbAsync([](auto self) {
-      if (self->pingCallback_) {
-        self->pingCallback_->pingAcknowledged();
-      }
-    });
+    runOnEvbAsync([](auto self) { self->pingCallback_->pingAcknowledged(); });
   }
   conn_->pendingEvents.cancelPingTimeout = false;
 }
@@ -1717,7 +1704,7 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   }
   conn_->pendingCallbacks.clear();
 
-  handlePingCallbacks();
+  handlePingCallback();
   if (closeState_ != CloseState::OPEN) {
     return;
   }
@@ -2446,19 +2433,9 @@ void QuicTransportBase::checkForClosedStream() {
   }
 }
 
-folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::setPingCallback(
-    PingCallback* cb) {
-  if (closeState_ != CloseState::OPEN) {
-    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
-  }
-  VLOG(4) << "Setting ping callback "
-          << " cb=" << cb << " " << *this;
-
-  pingCallback_ = cb;
-  return folly::unit;
-}
-
-void QuicTransportBase::sendPing(std::chrono::milliseconds pingTimeout) {
+void QuicTransportBase::sendPing(
+    PingCallback* callback,
+    std::chrono::milliseconds pingTimeout) {
   /* Step 0: Connection should not be closed */
   if (closeState_ == CloseState::CLOSED) {
     return;
@@ -2469,8 +2446,8 @@ void QuicTransportBase::sendPing(std::chrono::milliseconds pingTimeout) {
   updateWriteLooper(true);
 
   // Step 2: Schedule the timeout on event base
-  if (pingCallback_ && pingTimeout != 0ms) {
-    schedulePingTimeout(pingCallback_, pingTimeout);
+  if (callback && pingTimeout != 0ms) {
+    schedulePingTimeout(callback, pingTimeout);
   }
 }
 
@@ -2522,11 +2499,7 @@ void QuicTransportBase::pingTimeoutExpired() noexcept {
   if (pingCallback_ == nullptr) {
     return;
   }
-  runOnEvbAsync([](auto self) {
-    if (self->pingCallback_) {
-      self->pingCallback_->pingTimeout();
-    }
-  });
+  runOnEvbAsync([](auto self) { self->pingCallback_->pingTimeout(); });
 }
 
 void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
