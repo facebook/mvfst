@@ -208,8 +208,10 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       StreamId id,
       QuicErrorCode error) override;
 
-  void sendPing(PingCallback* callback, std::chrono::milliseconds pingTimeout)
-      override;
+  folly::Expected<folly::Unit, LocalErrorCode> setPingCallback(
+      PingCallback* cb) override;
+
+  void sendPing(std::chrono::milliseconds pingTimeout) override;
 
   const QuicConnectionStateBase* getState() const override {
     return conn_.get();
@@ -702,7 +704,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void updateReadLooper();
   void updatePeekLooper();
   void updateWriteLooper(bool thisIteration);
-  void handlePingCallback();
+  void handlePingCallbacks();
   void handleKnobCallbacks();
   void handleAckEventCallbacks();
   void handleCancelByteEventCallbacks();

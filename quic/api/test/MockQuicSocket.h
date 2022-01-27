@@ -244,7 +244,10 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD2(
       maybeResetStreamFromReadError,
       folly::Expected<folly::Unit, LocalErrorCode>(StreamId, QuicErrorCode));
-  MOCK_METHOD2(sendPing, void(PingCallback*, std::chrono::milliseconds));
+  MOCK_METHOD1(
+      setPingCallback,
+      folly::Expected<folly::Unit, LocalErrorCode>(PingCallback*));
+  MOCK_METHOD1(sendPing, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(getState, const QuicConnectionStateBase*());
   MOCK_METHOD0(isDetachable, bool());
   MOCK_METHOD1(attachEventBase, void(folly::EventBase*));
