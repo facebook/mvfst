@@ -8,7 +8,7 @@
 #include <quic/client/QuicClientAsyncTransport.h>
 
 #include <folly/Conv.h>
-#include <folly/detail/SingletonStackTrace.h>
+#include <folly/experimental/symbolizer/Symbolizer.h>
 
 namespace quic {
 
