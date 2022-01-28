@@ -21,6 +21,10 @@ Bandwidth BbrBandwidthSampler::getBandwidth() const noexcept {
   return windowedFilter_.GetBest();
 }
 
+Bandwidth BbrBandwidthSampler::getLatestSample() const noexcept {
+  return latestSample_;
+}
+
 void BbrBandwidthSampler::setWindowLength(
     const uint64_t windowLength) noexcept {
   windowedFilter_.SetWindowLength(windowLength);
@@ -87,6 +91,13 @@ void BbrBandwidthSampler::onPacketAcked(
               ackEvent.ackTime - ackedPacket.outstandingPacketMetadata.time));
     }
     Bandwidth measuredBandwidth = sendRate > ackRate ? sendRate : ackRate;
+
+    // This is a valid sample if the packet was sent while app-limited or
+    // it's higher than the current sample.
+    if (!ackedPacket.isAppLimited || measuredBandwidth > latestSample_) {
+      latestSample_ = measuredBandwidth;
+    }
+
     // If a sample is from a packet sent during app-limited period, we should
     // still use this sample if it's >= current best value.
     if (measuredBandwidth >= windowedFilter_.GetBest() ||

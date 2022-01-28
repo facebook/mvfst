@@ -89,6 +89,8 @@ class BbrCongestionController : public CongestionController {
 
     virtual Bandwidth getBandwidth() const = 0;
 
+    [[nodiscard]] virtual Bandwidth getLatestSample() const = 0;
+
     virtual void onPacketAcked(
         const CongestionController::AckEvent&,
         uint64_t roundTripCounter) = 0;
@@ -164,6 +166,19 @@ class BbrCongestionController : public CongestionController {
   BbrState state() const noexcept;
   [[nodiscard]] bool isInBackgroundMode() const noexcept override;
 
+ protected:
+  [[nodiscard]] virtual Bandwidth bandwidth() const noexcept;
+
+  std::unique_ptr<MinRttSampler> minRttSampler_;
+  std::unique_ptr<BandwidthSampler> bandwidthSampler_;
+
+  float cwndGain_{kStartupGain};
+  float pacingGain_{kStartupGain};
+
+  QuicConnectionStateBase& conn_;
+  BbrState state_{BbrState::Startup};
+  RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
+
  private:
   /* prevInflightBytes: the inflightBytes value before the current
    *                    onPacketAckOrLoss invocation.
@@ -222,11 +237,6 @@ class BbrCongestionController : public CongestionController {
   uint64_t calculateTargetCwnd(float gain) const noexcept;
   void updateCwnd(uint64_t ackedBytes, uint64_t excessiveBytes) noexcept;
   std::chrono::microseconds minRtt() const noexcept;
-  Bandwidth bandwidth() const noexcept;
-
-  QuicConnectionStateBase& conn_;
-  BbrState state_{BbrState::Startup};
-  RecoveryState recoveryState_{RecoveryState::NOT_RECOVERY};
 
   // Number of round trips the connection has witnessed
   uint64_t roundTripCounter_{0};
@@ -245,9 +255,6 @@ class BbrCongestionController : public CongestionController {
   // Number of bytes we expect to send over one RTT when paced write.
   uint64_t pacingWindow_{0};
 
-  float cwndGain_{kStartupGain};
-  float pacingGain_{kStartupGain};
-
   // ProbeBw parameters
   uint64_t numOfCycles_{kNumOfCycles};
   std::vector<float> pacingGainCycles_;
@@ -256,9 +263,6 @@ class BbrCongestionController : public CongestionController {
   // Whether we have found the bottleneck link bandwidth
   bool btlbwFound_{false};
   uint64_t sendQuantum_{0};
-
-  std::unique_ptr<MinRttSampler> minRttSampler_;
-  std::unique_ptr<BandwidthSampler> bandwidthSampler_;
 
   Bandwidth previousStartupBandwidth_;
 

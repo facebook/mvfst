@@ -3242,7 +3242,8 @@ folly::Expected<Priority, LocalErrorCode> QuicTransportBase::getStreamPriority(
 void QuicTransportBase::validateCongestionAndPacing(
     CongestionControlType& type) {
   // Fallback to Cubic if Pacing isn't enabled with BBR together
-  if (type == CongestionControlType::BBR &&
+  if ((type == CongestionControlType::BBR ||
+       type == CongestionControlType::BBRTesting) &&
       (!conn_->transportSettings.pacingEnabled ||
        !writeLooper_->hasPacingTimer())) {
     LOG(ERROR) << "Unpaced BBR isn't supported";

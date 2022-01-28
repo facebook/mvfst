@@ -21,6 +21,8 @@ class BbrBandwidthSampler : public BbrCongestionController::BandwidthSampler {
 
   Bandwidth getBandwidth() const noexcept override;
 
+  [[nodiscard]] Bandwidth getLatestSample() const noexcept override;
+
   void onPacketAcked(const CongestionController::AckEvent&, uint64_t rttCounter)
       override;
 
@@ -42,6 +44,7 @@ class BbrBandwidthSampler : public BbrCongestionController::BandwidthSampler {
   QuicConnectionStateBase& conn_;
   WindowedFilter<Bandwidth, MaxFilter<Bandwidth>, uint64_t, uint64_t>
       windowedFilter_;
+  Bandwidth latestSample_;
   bool appLimited_{false};
 
   // When a packet with a send time later than appLimitedExitTarget_ is acked,

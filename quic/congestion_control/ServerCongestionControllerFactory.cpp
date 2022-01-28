@@ -10,6 +10,7 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/BbrRttSampler.h>
+#include <quic/congestion_control/BbrTesting.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/congestion_control/Copa2.h>
 #include <quic/congestion_control/NewReno.h>
@@ -23,6 +24,11 @@ std::unique_ptr<CongestionController>
 ServerCongestionControllerFactory::makeCongestionController(
     QuicConnectionStateBase& conn,
     CongestionControlType type) {
+  auto setupBBR = [&conn](BbrCongestionController* bbr) {
+    bbr->setRttSampler(std::make_unique<BbrRttSampler>(
+        std::chrono::seconds(kDefaultRttSamplerExpiration)));
+    bbr->setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
+  };
   std::unique_ptr<CongestionController> congestionController;
   switch (type) {
     case CongestionControlType::NewReno:
@@ -47,9 +53,13 @@ ServerCongestionControllerFactory::makeCongestionController(
       break;
     case CongestionControlType::BBR: {
       auto bbr = std::make_unique<BbrCongestionController>(conn);
-      bbr->setRttSampler(std::make_unique<BbrRttSampler>(
-          std::chrono::seconds(kDefaultRttSamplerExpiration)));
-      bbr->setBandwidthSampler(std::make_unique<BbrBandwidthSampler>(conn));
+      setupBBR(bbr.get());
+      congestionController = std::move(bbr);
+      break;
+    }
+    case CongestionControlType::BBRTesting: {
+      auto bbr = std::make_unique<BbrTestingCongestionController>(conn);
+      setupBBR(bbr.get());
       congestionController = std::move(bbr);
       break;
     }

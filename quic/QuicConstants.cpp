@@ -15,6 +15,8 @@ folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
       return kCongestionControlCubicStr;
     case CongestionControlType::BBR:
       return kCongestionControlBbrStr;
+    case CongestionControlType::BBRTesting:
+      return kCongestionControlBbrTestingStr;
     case CongestionControlType::Copa:
       return kCongestionControlCopaStr;
     case CongestionControlType::Copa2:
@@ -38,6 +40,8 @@ folly::Optional<CongestionControlType> congestionControlStrToType(
     return quic::CongestionControlType::Cubic;
   } else if (str == kCongestionControlBbrStr) {
     return quic::CongestionControlType::BBR;
+  } else if (str == kCongestionControlBbrTestingStr) {
+    return quic::CongestionControlType::BBRTesting;
   } else if (str == kCongestionControlCopaStr) {
     return quic::CongestionControlType::Copa;
   } else if (str == kCongestionControlCopa2Str) {

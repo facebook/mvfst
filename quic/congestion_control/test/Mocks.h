@@ -31,6 +31,7 @@ class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
   ~MockBandwidthSampler() override = default;
 
   MOCK_CONST_METHOD0(getBandwidth, Bandwidth());
+  MOCK_CONST_METHOD0(getLatestSample, Bandwidth());
   MOCK_CONST_METHOD0(isAppLimited, bool());
 
   MOCK_METHOD2(

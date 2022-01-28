@@ -346,6 +346,7 @@ constexpr DurationRep kDefaultWriteLimitRttFraction = 25;
 // Congestion control:
 constexpr folly::StringPiece kCongestionControlCubicStr = "cubic";
 constexpr folly::StringPiece kCongestionControlBbrStr = "bbr";
+constexpr folly::StringPiece kCongestionControlBbrTestingStr = "bbr_testing";
 constexpr folly::StringPiece kCongestionControlCopaStr = "copa";
 constexpr folly::StringPiece kCongestionControlCopa2Str = "copa2";
 constexpr folly::StringPiece kCongestionControlNewRenoStr = "newreno";
@@ -359,6 +360,7 @@ enum class CongestionControlType : uint8_t {
   Copa,
   Copa2,
   BBR,
+  BBRTesting,
   CCP,
   None,
   // NOTE: MAX should always be at the end

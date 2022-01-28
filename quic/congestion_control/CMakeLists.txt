@@ -9,6 +9,7 @@ add_library(
   Bbr.cpp
   BbrBandwidthSampler.cpp
   BbrRttSampler.cpp
+  BbrTesting.cpp
   CongestionControlFunctions.cpp
   CongestionControllerFactory.cpp
   Copa.cpp
