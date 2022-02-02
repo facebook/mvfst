@@ -313,7 +313,8 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   auto quicStats = std::make_shared<MockQuicStats>();
   conn.statsCallback = quicStats.get();
 
-  MockConnectionCallback connCallback;
+  MockConnectionSetupCallback connSetupCallback;
+  MockConnectionCallbackNew connCallback;
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(

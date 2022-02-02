@@ -39,6 +39,24 @@ QuicServerTransport::QuicServerTransport(
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> sock,
+    ConnectionSetupCallback* connSetupCb,
+    ConnectionCallbackNew* connStreamsCb,
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+    std::unique_ptr<CryptoFactory> cryptoFactory,
+    PacketNum startingPacketNum)
+    : QuicServerTransport(
+          evb,
+          std::move(sock),
+          connSetupCb,
+          connStreamsCb,
+          std::move(ctx),
+          std::move(cryptoFactory)) {
+  conn_->ackStates = AckStates(startingPacketNum);
+}
+
+QuicServerTransport::QuicServerTransport(
+    folly::EventBase* evb,
+    std::unique_ptr<folly::AsyncUDPSocket> sock,
     ConnectionCallback& cb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory)

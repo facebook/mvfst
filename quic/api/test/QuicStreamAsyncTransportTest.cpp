@@ -43,7 +43,11 @@ class QuicStreamAsyncTransportTest : public Test {
                 const folly::SocketAddress& /*addr*/,
                 std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
               auto transport = quic::QuicServerTransport::make(
-                  evb, std::move(socket), serverConnectionCB_, std::move(ctx));
+                  evb,
+                  std::move(socket),
+                  &serverConnectionSetupCB_,
+                  &serverConnectionCB_,
+                  std::move(ctx));
               CHECK(serverSocket_.get() == nullptr);
               serverSocket_ = transport;
               return transport;
@@ -91,13 +95,14 @@ class QuicStreamAsyncTransportTest : public Test {
   void createClient() {
     clientEvbThread_ = std::thread([&]() { clientEvb_.loopForever(); });
 
-    EXPECT_CALL(clientConnectionCB_, onTransportReady()).WillOnce(Invoke([&]() {
-      clientAsyncWrapper_ =
-          QuicStreamAsyncTransport::createWithNewStream(client_);
-      ASSERT_TRUE(clientAsyncWrapper_);
-      clientAsyncWrapper_->setReadCB(&clientReadCB_);
-      startPromise_.setValue();
-    }));
+    EXPECT_CALL(clientConnectionSetupCB_, onTransportReady())
+        .WillOnce(Invoke([&]() {
+          clientAsyncWrapper_ =
+              QuicStreamAsyncTransport::createWithNewStream(client_);
+          ASSERT_TRUE(clientAsyncWrapper_);
+          clientAsyncWrapper_->setReadCB(&clientReadCB_);
+          startPromise_.setValue();
+        }));
 
     EXPECT_CALL(clientReadCB_, isBufferMovable_())
         .WillRepeatedly(Return(false));
@@ -128,7 +133,7 @@ class QuicStreamAsyncTransportTest : public Test {
           &clientEvb_, std::move(sock), std::move(fizzClientContext));
       client_->setHostname("echo.com");
       client_->addNewPeerAddress(serverAddr_);
-      client_->start(&clientConnectionCB_);
+      client_->start(&clientConnectionSetupCB_, &clientConnectionCB_);
     });
 
     std::move(future).get(1s);
@@ -152,7 +157,8 @@ class QuicStreamAsyncTransportTest : public Test {
  protected:
   std::shared_ptr<QuicServer> server_;
   folly::SocketAddress serverAddr_;
-  NiceMock<MockConnectionCallback> serverConnectionCB_;
+  NiceMock<MockConnectionSetupCallback> serverConnectionSetupCB_;
+  NiceMock<MockConnectionCallbackNew> serverConnectionCB_;
   std::shared_ptr<quic::QuicSocket> serverSocket_;
   QuicStreamAsyncTransport::UniquePtr serverAsyncWrapper_;
   folly::test::MockWriteCallback serverWriteCB_;
@@ -162,7 +168,8 @@ class QuicStreamAsyncTransportTest : public Test {
   std::shared_ptr<QuicClientTransport> client_;
   folly::EventBase clientEvb_;
   std::thread clientEvbThread_;
-  NiceMock<MockConnectionCallback> clientConnectionCB_;
+  NiceMock<MockConnectionSetupCallback> clientConnectionSetupCB_;
+  NiceMock<MockConnectionCallbackNew> clientConnectionCB_;
   QuicStreamAsyncTransport::UniquePtr clientAsyncWrapper_;
   folly::Promise<folly::Unit> startPromise_;
   folly::test::MockWriteCallback clientWriteCB_;

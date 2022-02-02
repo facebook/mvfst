@@ -21,9 +21,11 @@ class TestQuicTransport
   TestQuicTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
-      ConnectionCallback& cb)
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connCb)
       : QuicTransportBase(evb, std::move(socket)) {
-    setConnectionCallback(&cb);
+    setConnectionSetupCallback(connSetupCb);
+    setConnectionCallbackNew(connCb);
     conn_.reset(new QuicServerConnectionState(
         FizzServerQuicHandshakeContext::Builder().build()));
     conn_->clientConnectionId = ConnectionId({9, 8, 7, 6});

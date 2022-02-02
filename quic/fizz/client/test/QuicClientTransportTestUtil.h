@@ -498,10 +498,10 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   }
 
   virtual void start() {
-    EXPECT_CALL(clientConnCallback, onTransportReady());
-    EXPECT_CALL(clientConnCallback, onReplaySafe());
+    EXPECT_CALL(clientConnSetupCallback, onTransportReady());
+    EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     setUpSocketExpectations();
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
     EXPECT_TRUE(client->idleTimeout().isScheduled());
 
@@ -536,7 +536,11 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     return client->getNonConstConn();
   }
 
-  MockConnectionCallback& getConnCallback() {
+  MockConnectionSetupCallback& getConnSetupCallback() {
+    return clientConnSetupCallback;
+  }
+
+  MockConnectionCallbackNew& getConnCallback() {
     return clientConnCallback;
   }
 
@@ -877,7 +881,8 @@ class QuicClientTransportTestBase : public virtual testing::Test {
   std::deque<TestReadData> socketReads;
   testing::NiceMock<MockDeliveryCallback> deliveryCallback;
   testing::NiceMock<MockReadCallback> readCb;
-  testing::NiceMock<MockConnectionCallback> clientConnCallback;
+  testing::NiceMock<MockConnectionSetupCallback> clientConnSetupCallback;
+  testing::NiceMock<MockConnectionCallbackNew> clientConnCallback;
   folly::test::MockAsyncUDPSocket* sock;
   std::shared_ptr<TestingQuicClientTransport::DestructionCallback>
       destructionCallback;

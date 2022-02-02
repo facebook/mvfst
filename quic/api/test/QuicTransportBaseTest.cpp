@@ -198,9 +198,11 @@ class TestQuicTransport
   TestQuicTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
-      ConnectionCallback& cb)
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connCb)
       : QuicTransportBase(evb, std::move(socket)) {
-    setConnectionCallback(&cb);
+    setConnectionSetupCallback(connSetupCb);
+    setConnectionCallbackNew(connCb);
     auto conn = std::make_unique<QuicServerConnectionState>(
         FizzServerQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
@@ -504,7 +506,7 @@ class QuicTransportImplTest : public Test {
         std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(evb.get());
     socketPtr = socket.get();
     transport = std::make_shared<TestQuicTransport>(
-        evb.get(), std::move(socket), connCallback);
+        evb.get(), std::move(socket), &connSetupCallback, &connCallback);
     auto& conn = *transport->transportConn;
     conn.flowControlState.peerAdvertisedInitialMaxStreamOffsetBidiLocal =
         kDefaultStreamWindowSize;
@@ -530,7 +532,8 @@ class QuicTransportImplTest : public Test {
 
  protected:
   std::unique_ptr<folly::EventBase> evb;
-  NiceMock<MockConnectionCallback> connCallback;
+  NiceMock<MockConnectionSetupCallback> connSetupCallback;
+  NiceMock<MockConnectionCallbackNew> connCallback;
   TestByteEventCallback byteEventCallback;
   std::shared_ptr<TestQuicTransport> transport;
   folly::test::MockAsyncUDPSocket* socketPtr;
@@ -2812,8 +2815,8 @@ TEST_F(QuicTransportImplTest, GetLocalAddressUnboundSocket) {
 }
 
 TEST_F(QuicTransportImplTest, GetLocalAddressBadSocket) {
-  auto badTransport =
-      std::make_shared<TestQuicTransport>(evb.get(), nullptr, connCallback);
+  auto badTransport = std::make_shared<TestQuicTransport>(
+      evb.get(), nullptr, &connSetupCallback, &connCallback);
   badTransport->closeWithoutWrite();
   SocketAddress localAddr = badTransport->getLocalAddress();
   EXPECT_FALSE(localAddr.isInitialized());

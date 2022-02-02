@@ -21,7 +21,7 @@ using folly::IOBuf;
 class QuicSocketTest : public Test {
  public:
   void SetUp() override {
-    socket_ = std::make_shared<MockQuicSocket>(&evb_, handler_);
+    socket_ = std::make_shared<MockQuicSocket>(&evb_, &handler_, &handler_);
     handler_.setQuicSocket(socket_);
   }
 

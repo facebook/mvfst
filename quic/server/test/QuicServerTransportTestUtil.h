@@ -31,9 +31,15 @@ class TestingQuicServerTransport : public QuicServerTransport {
   TestingQuicServerTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
-      ConnectionCallback& cb,
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
-      : QuicServerTransport(evb, std::move(sock), cb, std::move(ctx)) {}
+      : QuicServerTransport(
+            evb,
+            std::move(sock),
+            connSetupCb,
+            connCb,
+            std::move(ctx)) {}
 
   QuicTransportBase* getTransport() {
     return this;
@@ -135,7 +141,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     connIdAlgo_ = std::make_unique<DefaultConnectionIdAlgo>();
     ccFactory_ = std::make_shared<ServerCongestionControllerFactory>();
     server = std::make_shared<TestingQuicServerTransport>(
-        &evb, std::move(sock), connCallback, serverCtx);
+        &evb, std::move(sock), &connSetupCallback, &connCallback, serverCtx);
     server->setCongestionControllerFactory(ccFactory_);
     server->setCongestionControl(CongestionControlType::Cubic);
     server->setRoutingCallback(&routingCallback);
@@ -192,7 +198,11 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     return server->getNonConstConn();
   }
 
-  MockConnectionCallback& getConnCallback() {
+  MockConnectionSetupCallback& getConnSetupCallback() {
+    return connSetupCallback;
+  }
+
+  MockConnectionCallbackNew& getConnCallback() {
     return connCallback;
   }
 
@@ -548,7 +558,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   folly::EventBase evb;
   folly::SocketAddress serverAddr;
   folly::SocketAddress clientAddr;
-  testing::NiceMock<MockConnectionCallback> connCallback;
+  testing::NiceMock<MockConnectionSetupCallback> connSetupCallback;
+  testing::NiceMock<MockConnectionCallbackNew> connCallback;
   testing::NiceMock<MockRoutingCallback> routingCallback;
   testing::NiceMock<MockHandshakeFinishedCallback> handshakeFinishedCallback;
   folly::Optional<ConnectionId> clientConnectionId;

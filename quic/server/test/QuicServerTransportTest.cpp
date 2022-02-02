@@ -2896,14 +2896,14 @@ class QuicUnencryptedServerTransportTest : public QuicServerTransportTest {
 
 TEST_F(QuicUnencryptedServerTransportTest, FirstPacketProcessedCallback) {
   getFakeHandshakeLayer()->allowZeroRttKeys();
-  EXPECT_CALL(connCallback, onFirstPeerPacketProcessed()).Times(1);
+  EXPECT_CALL(connSetupCallback, onFirstPeerPacketProcessed()).Times(1);
   recvClientHello();
   loopForWrites();
   AckBlocks acks;
   acks.insert(0);
   auto aead = getInitialCipher();
   auto headerCipher = getInitialHeaderCipher();
-  EXPECT_CALL(connCallback, onFirstPeerPacketProcessed()).Times(0);
+  EXPECT_CALL(connSetupCallback, onFirstPeerPacketProcessed()).Times(0);
   deliverData(packetToBufCleartext(
       createAckPacket(
           server->getNonConstConn(),
@@ -3857,14 +3857,14 @@ class QuicServerTransportHandshakeTest
     // If 0-rtt is accepted, one rtt write cipher will be available after CHLO
     // is processed
     if (GetParam().acceptZeroRtt) {
-      EXPECT_CALL(connCallback, onTransportReady());
+      EXPECT_CALL(connSetupCallback, onTransportReady());
     }
     recvClientHello();
 
     // If 0-rtt is disabled, one rtt write cipher will be available after CFIN
     // is processed
     if (!GetParam().acceptZeroRtt) {
-      EXPECT_CALL(connCallback, onTransportReady());
+      EXPECT_CALL(connSetupCallback, onTransportReady());
     }
     // onConnectionIdBound is always invoked after CFIN is processed
     EXPECT_CALL(routingCallback, onConnectionIdBound(_));

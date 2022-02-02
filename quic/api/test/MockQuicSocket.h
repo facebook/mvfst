@@ -17,14 +17,11 @@ class MockQuicSocket : public QuicSocket {
  public:
   using SharedBuf = std::shared_ptr<folly::IOBuf>;
 
-  MockQuicSocket(folly::EventBase* /*eventBase*/, ConnectionCallback& connCb)
-      : setupCb_(&connCb), connCb_(&connCb) {}
-
   MockQuicSocket(
       folly::EventBase* /*eventBase*/,
-      ConnectionSetupCallback& setupCb,
+      ConnectionSetupCallback* setupCb,
       ConnectionCallbackNew* connCb)
-      : setupCb_(&setupCb), connCb_(connCb) {}
+      : setupCb_(setupCb), connCb_(connCb) {}
 
   MOCK_CONST_METHOD0(good, bool());
   MOCK_CONST_METHOD0(replaySafe, bool());

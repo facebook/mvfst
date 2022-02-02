@@ -101,9 +101,23 @@ class MockWriteCallback : public QuicSocket::WriteCallback {
       void(std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
 };
 
-class MockConnectionCallback : public QuicSocket::ConnectionCallback {
+class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
  public:
-  ~MockConnectionCallback() override = default;
+  ~MockConnectionSetupCallback() override = default;
+  GMOCK_METHOD1_(
+      ,
+      noexcept,
+      ,
+      onConnectionSetupError,
+      void(std::pair<QuicErrorCode, std::string>));
+  GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
+  GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
+  GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
+};
+
+class MockConnectionCallbackNew : public QuicSocket::ConnectionCallbackNew {
+ public:
+  ~MockConnectionCallbackNew() override = default;
 
   GMOCK_METHOD1_(, noexcept, , onFlowControlUpdate, void(StreamId));
   GMOCK_METHOD1_(, noexcept, , onNewBidirectionalStream, void(StreamId));
@@ -115,19 +129,12 @@ class MockConnectionCallback : public QuicSocket::ConnectionCallback {
       onStopSending,
       void(StreamId, ApplicationErrorCode));
   GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
-  void onConnectionSetupError(
-      std::pair<QuicErrorCode, std::string> code) noexcept override {
-    onConnectionError(std::move(code));
-  }
   GMOCK_METHOD1_(
       ,
       noexcept,
       ,
       onConnectionError,
       void(std::pair<QuicErrorCode, std::string>));
-  GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
-  GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
-  GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
   GMOCK_METHOD1_(, noexcept, , onBidirectionalStreamsAvailable, void(uint64_t));
   GMOCK_METHOD1_(
       ,
@@ -211,9 +218,10 @@ class MockQuicTransport : public QuicServerTransport {
   MockQuicTransport(
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
-      ConnectionCallback& cb,
+      ConnectionSetupCallback* connSetupCb,
+      ConnectionCallbackNew* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
-      : QuicServerTransport(evb, std::move(sock), cb, ctx) {}
+      : QuicServerTransport(evb, std::move(sock), connSetupCb, connCb, ctx) {}
 
   virtual ~MockQuicTransport() {
     customDestructor();

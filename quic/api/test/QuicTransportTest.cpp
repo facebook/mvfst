@@ -69,8 +69,8 @@ class QuicTransportTest : public Test {
     std::unique_ptr<MockAsyncUDPSocket> sock =
         std::make_unique<NiceMock<MockAsyncUDPSocket>>(&evb_);
     socket_ = sock.get();
-    transport_.reset(
-        new TestQuicTransport(&evb_, std::move(sock), connCallback_));
+    transport_.reset(new TestQuicTransport(
+        &evb_, std::move(sock), &connSetupCallback_, &connCallback_));
     // Set the write handshake state to tell the client that the handshake has
     // a cipher.
     auto aead = std::make_unique<NiceMock<MockAead>>();
@@ -114,7 +114,8 @@ class QuicTransportTest : public Test {
  protected:
   folly::EventBase evb_;
   MockAsyncUDPSocket* socket_;
-  NiceMock<MockConnectionCallback> connCallback_;
+  NiceMock<MockConnectionSetupCallback> connSetupCallback_;
+  NiceMock<MockConnectionCallbackNew> connCallback_;
   NiceMock<MockWriteCallback> writeCallback_;
   MockAead* aead_;
   std::unique_ptr<PacketNumberCipher> headerCipher_;

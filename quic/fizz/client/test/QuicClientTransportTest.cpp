@@ -67,9 +67,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     serverCtx->setSupportedAlpns({"h1q-fb", "hq"});
     server_ = createServer(ProcessId::ZERO);
     serverAddr = server_->getAddress();
-    ON_CALL(clientConnCallback, onTransportReady()).WillByDefault(Invoke([&] {
-      connected_ = true;
-    }));
+    ON_CALL(clientConnSetupCallback, onTransportReady())
+        .WillByDefault(Invoke([&] { connected_ = true; }));
 
     clientCtx = createClientContext();
     verifier = createTestCertificateVerifier();
@@ -165,7 +164,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   }
 
   void expectTransportCallbacks() {
-    EXPECT_CALL(clientConnCallback, onReplaySafe());
+    EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   }
 
   void expectStatsCallbacks() {
@@ -244,7 +243,8 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   std::string hostname;
   folly::EventBase eventbase_;
   folly::SocketAddress serverAddr;
-  NiceMock<MockConnectionCallback> clientConnCallback;
+  NiceMock<MockConnectionSetupCallback> clientConnSetupCallback;
+  NiceMock<MockConnectionCallbackNew> clientConnCallback;
   NiceMock<MockReadCallback> readCb;
   std::shared_ptr<TestingQuicClientTransport> client;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
@@ -328,9 +328,9 @@ void QuicClientTransportIntegrationTest::sendRequestAndResponseAndWait(
 TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
   expectTransportCallbacks();
   expectStatsCallbacks();
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     EXPECT_EQ(client->getConn().peerConnectionIds.size(), 1);
     EXPECT_EQ(
@@ -349,9 +349,9 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTest) {
 
 TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
   expectTransportCallbacks();
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -369,13 +369,13 @@ TEST_P(QuicClientTransportIntegrationTest, FlowControlLimitedTest) {
 }
 
 TEST_P(QuicClientTransportIntegrationTest, ALPNTest) {
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
     client->close(folly::none);
     eventbase_.terminateLoopSoon();
   }));
   ASSERT_EQ(client->getAppProtocol(), folly::none);
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 }
 
@@ -399,7 +399,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
 
   ASSERT_EQ(client->getAppProtocol(), folly::none);
 
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loopForever();
 }
 
@@ -418,7 +418,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
         EXPECT_NE(localError, nullptr);
         this->checkTransportSummaryEvent(qLogger);
       }));
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   eventbase_.loop();
 }
 
@@ -429,9 +429,9 @@ TEST_P(QuicClientTransportIntegrationTest, NetworkTestConnected) {
   TransportSettings settings;
   settings.connectUDP = true;
   client->setTransportSettings(settings);
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -451,9 +451,9 @@ TEST_P(QuicClientTransportIntegrationTest, SetTransportSettingsAfterStart) {
   TransportSettings settings;
   settings.connectUDP = true;
   client->setTransportSettings(settings);
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -484,7 +484,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
         return true;
       },
       []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
@@ -499,7 +499,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -514,7 +514,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttSuccess) {
   auto data = IOBuf::copyBuffer("hello");
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
   expected->prependChain(data->clone());
-  EXPECT_CALL(clientConnCallback, onReplaySafe());
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
@@ -561,7 +561,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
         return true;
       },
       []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
@@ -576,7 +576,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   EXPECT_EQ(
       client->peerAdvertisedInitialMaxStreamDataUni(),
       kDefaultStreamWindowSize);
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -592,7 +592,7 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
   auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
   expected->prependChain(data->clone());
 
-  EXPECT_CALL(clientConnCallback, onReplaySafe()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).WillOnce(Invoke([&] {
     EXPECT_TRUE(!client->getConn().retryToken.empty());
   }));
   sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
@@ -622,7 +622,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
         return true;
       },
       []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
   CHECK(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->serverInitialParamsSet());
@@ -639,7 +639,7 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {
       kDefaultStreamWindowSize);
   client->serverInitialParamsSet() = false;
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     ASSERT_EQ(client->getAppProtocol(), "h1q-fb");
     CHECK(client->getConn().zeroRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -685,9 +685,9 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttNotAttempted) {
         return true;
       },
       []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -726,10 +726,10 @@ TEST_P(QuicClientTransportIntegrationTest, TestZeroRttInvalidAppParams) {
         return false;
       },
       []() -> Buf { return nullptr; });
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_TRUE(performedValidation);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
@@ -759,9 +759,9 @@ TEST_P(QuicClientTransportIntegrationTest, ChangeEventBase) {
   NiceMock<MockReadCallback> readCb2;
   folly::ScopedEventBaseThread newEvb;
   expectTransportCallbacks();
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -799,9 +799,9 @@ TEST_P(QuicClientTransportIntegrationTest, ResetClient) {
     server2 = nullptr;
   };
 
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     CHECK(client->getConn().oneRttWriteCipher);
     eventbase_.terminateLoopSoon();
   }));
@@ -844,9 +844,9 @@ TEST_P(QuicClientTransportIntegrationTest, TestStatelessResetToken) {
     server2 = nullptr;
   };
 
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
-  EXPECT_CALL(clientConnCallback, onTransportReady()).WillOnce(Invoke([&] {
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
     token1 = client->getConn().statelessResetToken;
     eventbase_.terminateLoopSoon();
   }));
@@ -895,7 +895,7 @@ TEST_P(QuicClientTransportIntegrationTest, D6DEnabledTest) {
   server_->setTransportSettings(serverSettings);
 
   // we only use 1 worker in test
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_EQ(1, statsCallbacks_.size());
   EXPECT_CALL(*statsCallbacks_[0], onConnectionD6DStarted())
       .WillOnce(Invoke([&] { eventbase_.terminateLoopSoon(); }));
@@ -933,7 +933,7 @@ TEST_F(QuicClientTransportTest, ReadErrorCloseTransprot) {
 
 TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   client->addNewPeerAddress(serverAddr);
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
   originalConnId = client->getConn().clientConnectionId;
   ServerConnectionIdParams params(0, 0, 0);
@@ -955,7 +955,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
       headerCipher,
       initialPacketNum);
   initialPacketNum++;
-  EXPECT_CALL(clientConnCallback, onFirstPeerPacketProcessed()).Times(1);
+  EXPECT_CALL(clientConnSetupCallback, onFirstPeerPacketProcessed()).Times(1);
   deliverData(serverAddr, ackPacket->coalesce());
   EXPECT_FALSE(client->hasWriteCipher());
 
@@ -971,7 +971,7 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
       headerCipher,
       initialPacketNum);
   initialPacketNum++;
-  EXPECT_CALL(clientConnCallback, onFirstPeerPacketProcessed()).Times(0);
+  EXPECT_CALL(clientConnSetupCallback, onFirstPeerPacketProcessed()).Times(0);
   deliverData(serverAddr, oneMoreAckPacket->coalesce());
   EXPECT_FALSE(client->hasWriteCipher());
 
@@ -988,7 +988,7 @@ TEST_F(QuicClientTransportTest, CustomTransportParam) {
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->addNewPeerAddress(serverAddr);
   EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_FALSE(client->isClosed());
   EXPECT_CALL(clientConnCallback, onConnectionError(_));
@@ -1115,7 +1115,7 @@ TEST_F(QuicClientTransportTest, NetworkUnreachableIsFatalToConn) {
   setupCryptoLayer();
   EXPECT_CALL(clientConnCallback, onConnectionError(_));
   EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   loopForWrites();
 }
 
@@ -1131,7 +1131,7 @@ TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV4Address) {
 
   EXPECT_FALSE(conn.happyEyeballsState.finished);
   EXPECT_FALSE(conn.peerAddress.isInitialized());
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
   EXPECT_TRUE(conn.happyEyeballsState.finished);
   EXPECT_EQ(conn.peerAddress, serverAddr);
@@ -1150,7 +1150,7 @@ TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV6Address) {
 
   EXPECT_FALSE(conn.happyEyeballsState.finished);
   EXPECT_FALSE(conn.peerAddress.isInitialized());
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
   EXPECT_TRUE(conn.happyEyeballsState.finished);
   EXPECT_EQ(conn.peerAddress, serverAddrV6);
@@ -1159,7 +1159,7 @@ TEST_F(QuicClientTransportTest, HappyEyeballsWithSingleV6Address) {
 TEST_F(QuicClientTransportTest, IdleTimerResetOnWritingFirstData) {
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
-  client->start(&clientConnCallback);
+  client->start(&clientConnSetupCallback, &clientConnCallback);
   loopForWrites();
   ASSERT_FALSE(client->getConn().receivedNewPacketBeforeWrite);
   ASSERT_TRUE(client->idleTimeout().isScheduled());
@@ -1320,7 +1320,7 @@ class QuicClientTransportHappyEyeballsTest
           return buf->computeChainDataLength();
         }));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
 
     EXPECT_EQ(conn.peerAddress, firstAddress);
@@ -1334,8 +1334,8 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_FALSE(conn.happyEyeballsState.finished);
     if (firstPacketType == ServerFirstPacketType::ServerHello) {
-      EXPECT_CALL(clientConnCallback, onTransportReady());
-      EXPECT_CALL(clientConnCallback, onReplaySafe());
+      EXPECT_CALL(clientConnSetupCallback, onTransportReady());
+      EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
     EXPECT_CALL(*secondSock, pauseRead());
@@ -1365,7 +1365,7 @@ class QuicClientTransportHappyEyeballsTest
           return buf->computeChainDataLength();
         }));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
 
     EXPECT_EQ(conn.peerAddress, firstAddress);
@@ -1402,8 +1402,8 @@ class QuicClientTransportHappyEyeballsTest
     socketWrites.clear();
     EXPECT_FALSE(conn.happyEyeballsState.finished);
     if (firstPacketType == ServerFirstPacketType::ServerHello) {
-      EXPECT_CALL(clientConnCallback, onTransportReady());
-      EXPECT_CALL(clientConnCallback, onReplaySafe());
+      EXPECT_CALL(clientConnSetupCallback, onTransportReady());
+      EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
     EXPECT_CALL(*sock, write(firstAddress, _))
         .Times(AtLeast(1))
@@ -1441,7 +1441,7 @@ class QuicClientTransportHappyEyeballsTest
           return buf->computeChainDataLength();
         }));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
@@ -1479,8 +1479,8 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_FALSE(conn.happyEyeballsState.finished);
     if (firstPacketType == ServerFirstPacketType::ServerHello) {
-      EXPECT_CALL(clientConnCallback, onTransportReady());
-      EXPECT_CALL(clientConnCallback, onReplaySafe());
+      EXPECT_CALL(clientConnSetupCallback, onTransportReady());
+      EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
     }
     EXPECT_CALL(*sock, write(_, _)).Times(0);
     EXPECT_CALL(*sock, pauseRead());
@@ -1514,7 +1514,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*secondSock, bind(_, _))
         .WillOnce(Invoke(
             [](const folly::SocketAddress&, auto) { throw std::exception(); }));
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_FALSE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1531,7 +1531,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*sock, write(firstAddress, _))
         .WillOnce(SetErrnoAndReturn(EAGAIN, -1));
     EXPECT_CALL(*secondSock, write(_, _));
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     // Continue trying first socket
@@ -1556,7 +1556,7 @@ class QuicClientTransportHappyEyeballsTest
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
     EXPECT_CALL(*secondSock, write(_, _));
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     // Give up first socket
@@ -1580,7 +1580,7 @@ class QuicClientTransportHappyEyeballsTest
     // Socket is paused read for the second time when QuicClientTransport dies
     EXPECT_CALL(*sock, pauseRead()).Times(2);
     EXPECT_CALL(*sock, close()).Times(1);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     // Give up first socket
@@ -1613,7 +1613,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1649,7 +1649,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1690,7 +1690,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1734,7 +1734,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1770,7 +1770,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1811,7 +1811,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1860,7 +1860,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1897,7 +1897,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -1931,7 +1931,7 @@ class QuicClientTransportHappyEyeballsTest
 
     EXPECT_CALL(*sock, write(firstAddress, _));
     EXPECT_CALL(*secondSock, write(_, _)).Times(0);
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     EXPECT_EQ(conn.peerAddress, firstAddress);
     EXPECT_EQ(conn.happyEyeballsState.secondPeerAddress, secondAddress);
     EXPECT_TRUE(client->happyEyeballsConnAttemptDelayTimeout().isScheduled());
@@ -2155,7 +2155,7 @@ class QuicClientTransportVersionAndRetryTest
   ~QuicClientTransportVersionAndRetryTest() override = default;
 
   void start() override {
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     originalConnId = client->getConn().clientConnectionId;
     // create server chosen connId with processId = 0 and workerId = 0
     ServerConnectionIdParams params(0, 0, 0);
@@ -2186,7 +2186,7 @@ class QuicClientVersionParamInvalidTest
     // force the server to declare that the version negotiated was invalid.;
     mockClientHandshake->negotiatedVersion = MVFST2;
 
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     originalConnId = client->getConn().clientConnectionId;
   }
 };
@@ -3934,8 +3934,8 @@ TEST_F(
   EXPECT_THROW(deliverData(packet.second->coalesce()), std::runtime_error);
 
   EXPECT_EQ(client->getConn().oneRttWriteCipher.get(), nullptr);
-  EXPECT_CALL(clientConnCallback, onTransportReady()).Times(0);
-  EXPECT_CALL(clientConnCallback, onReplaySafe()).Times(0);
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).Times(0);
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe()).Times(0);
   client->close(folly::none);
 }
 
@@ -4886,8 +4886,8 @@ class QuicZeroRttClientTest : public QuicClientTransportAfterStartTestBase {
   }
 
   void startClient() {
-    EXPECT_CALL(clientConnCallback, onTransportReady());
-    client->start(&clientConnCallback);
+    EXPECT_CALL(clientConnSetupCallback, onTransportReady());
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
     EXPECT_EQ(socketWrites.size(), 1);
     EXPECT_TRUE(
@@ -4947,7 +4947,7 @@ TEST_F(QuicZeroRttClientTest, TestReplaySafeCallback) {
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
-  EXPECT_CALL(clientConnCallback, onReplaySafe());
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   mockClientHandshake->setZeroRttRejected(false);
   recvServerHello();
 
@@ -5021,7 +5021,7 @@ TEST_F(QuicZeroRttClientTest, TestEarlyRetransmit0Rtt) {
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
   assertWritten(false, LongHeader::Types::ZeroRtt);
-  EXPECT_CALL(clientConnCallback, onReplaySafe());
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   mockClientHandshake->setZeroRttRejected(false);
   recvServerHello();
 
@@ -5091,7 +5091,7 @@ TEST_F(QuicZeroRttClientTest, TestZeroRttRejection) {
   client->writeChain(streamId, IOBuf::copyBuffer("hello"), true);
   loopForWrites();
   EXPECT_TRUE(zeroRttPacketsOutstanding());
-  EXPECT_CALL(clientConnCallback, onReplaySafe());
+  EXPECT_CALL(clientConnSetupCallback, onReplaySafe());
   mockClientHandshake->setZeroRttRejected(true);
   EXPECT_CALL(*mockQuicPskCache_, removePsk(hostname_));
   recvServerHello();
@@ -5353,7 +5353,7 @@ class QuicProcessDataTest : public QuicClientTransportAfterStartTestBase,
     // force the server to declare that the version negotiated was invalid.;
     mockClientHandshake->negotiatedVersion = QuicVersion::QUIC_V1;
     client->setSupportedVersions({QuicVersion::QUIC_V1});
-    client->start(&clientConnCallback);
+    client->start(&clientConnSetupCallback, &clientConnCallback);
     setConnectionIds();
   }
 };
