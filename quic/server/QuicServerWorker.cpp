@@ -1326,7 +1326,7 @@ bool QuicServerWorker::rejectConnectionId(
 }
 
 std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
-  std::string base =
+  constexpr auto base =
       "CID={}, cidVersion={}, workerId={}, processId={}, hostId={}, threadId={}, ";
   if (!connIdAlgo_->canParse(connId)) {
     return fmt::format(
@@ -1349,20 +1349,21 @@ std::string QuicServerWorker::logRoutingInfo(const ConnectionId& connId) const {
         (uint32_t)hostId_,
         folly::getCurrentThreadID());
   }
-  std::string extended = base +
+  std::string extended = std::string(base) +
       "cidVersion in packet={}, workerId in packet={}, processId in packet={}, hostId in packet={}, ";
-  return fmt::format(
+  return fmt::vformat(
       extended,
-      connId.hex(),
-      (uint32_t)cidVersion_,
-      (uint32_t)workerId_,
-      (uint32_t)processId_,
-      (uint32_t)hostId_,
-      folly::getCurrentThreadID(),
-      (uint32_t)connIdParam->version,
-      (uint32_t)connIdParam->workerId,
-      (uint32_t)connIdParam->processId,
-      (uint32_t)connIdParam->hostId);
+      fmt::make_format_args(
+          connId.hex(),
+          (uint32_t)cidVersion_,
+          (uint32_t)workerId_,
+          (uint32_t)processId_,
+          (uint32_t)hostId_,
+          folly::getCurrentThreadID(),
+          (uint32_t)connIdParam->version,
+          (uint32_t)connIdParam->workerId,
+          (uint32_t)connIdParam->processId,
+          (uint32_t)connIdParam->hostId));
 }
 
 QuicServerWorker::AcceptObserverList::AcceptObserverList(
