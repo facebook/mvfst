@@ -26,7 +26,8 @@
 
 namespace quic {
 namespace samples {
-class EchoClient : public quic::QuicSocket::ConnectionCallback,
+class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
+                   public quic::QuicSocket::ConnectionCallbackNew,
                    public quic::QuicSocket::ReadCallback,
                    public quic::QuicSocket::WriteCallback {
  public:
@@ -134,7 +135,7 @@ class EchoClient : public quic::QuicSocket::ConnectionCallback,
           std::make_shared<LogQuicStats>("client"));
 
       LOG(INFO) << "EchoClient connecting to " << addr.describe();
-      quicClient_->start(this);
+      quicClient_->start(this, this);
     });
 
     startDone_.wait();

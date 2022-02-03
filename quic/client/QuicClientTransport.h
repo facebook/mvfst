@@ -31,8 +31,7 @@ class QuicClientTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-      size_t connectionIdSize = 0,
-      bool useSplitConnectionCallbacks = false);
+      size_t connectionIdSize = 0);
 
   // Testing only API:
   QuicClientTransport(
@@ -40,8 +39,7 @@ class QuicClientTransport
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connectionIdSize,
-      PacketNum startingPacketNum,
-      bool useSplitConnectionCallbacks = false);
+      PacketNum startingPacketNum);
 
   ~QuicClientTransport() override;
 
@@ -60,14 +58,9 @@ class QuicClientTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-      size_t connectionIdSize = 0,
-      bool useSplitConnectionCallbacks = false) {
+      size_t connectionIdSize = 0) {
     auto client = std::make_shared<TransportType>(
-        evb,
-        std::move(sock),
-        std::move(handshakeFactory),
-        connectionIdSize,
-        useSplitConnectionCallbacks);
+        evb, std::move(sock), std::move(handshakeFactory), connectionIdSize);
     client->setSelfOwning();
     return client;
   }
@@ -94,11 +87,6 @@ class QuicClientTransport
 
   /**
    * Starts the connection.
-   */
-  virtual void start(ConnectionCallback* cb);
-
-  /**
-   * Starts the connection with split callbacks.
    */
   virtual void start(
       ConnectionSetupCallback* connSetupCb,
@@ -238,11 +226,6 @@ class QuicClientTransport
    * calls setKnobs() internally.
    */
   void maybeSendTransportKnobs();
-
-  void startBase(
-      ConnectionCallback* cb,
-      ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connStreamsCb);
 
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned

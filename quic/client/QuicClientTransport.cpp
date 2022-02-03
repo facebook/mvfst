@@ -38,14 +38,12 @@ QuicClientTransport::QuicClientTransport(
     std::unique_ptr<folly::AsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
-    PacketNum startingPacketNum,
-    bool useSplitConnectionCallbacks)
+    PacketNum startingPacketNum)
     : QuicClientTransport(
           evb,
           std::move(socket),
           std::move(handshakeFactory),
-          connectionIdSize,
-          useSplitConnectionCallbacks) {
+          connectionIdSize) {
   conn_->ackStates = AckStates(startingPacketNum);
 }
 
@@ -53,9 +51,8 @@ QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-    size_t connectionIdSize,
-    bool useSplitConnectionCallbacks)
-    : QuicTransportBase(evb, std::move(socket), useSplitConnectionCallbacks),
+    size_t connectionIdSize)
+    : QuicTransportBase(evb, std::move(socket)),
       happyEyeballsConnAttemptDelayTimeout_(this) {
   DCHECK(handshakeFactory);
   auto tempConn =
@@ -1494,18 +1491,7 @@ void QuicClientTransport::
   runOnEvbAsync([&](auto) { markZeroRttPacketsLost(*conn_, markPacketLoss); });
 }
 
-void QuicClientTransport::start(ConnectionCallback* cb) {
-  startBase(cb, nullptr, nullptr);
-}
-
 void QuicClientTransport::start(
-    ConnectionSetupCallback* connSetupCb,
-    ConnectionCallbackNew* connCb) {
-  startBase(nullptr, connSetupCb, connCb);
-}
-
-void QuicClientTransport::startBase(
-    ConnectionCallback* cb,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallbackNew* connCb) {
   if (happyEyeballsEnabled_) {
@@ -1528,12 +1514,10 @@ void QuicClientTransport::startBase(
   if (conn_->qLogger) {
     conn_->qLogger->addTransportStateUpdate(kStart);
   }
-  if (cb) {
-    setConnectionCallback(cb);
-  } else {
-    setConnectionSetupCallback(connSetupCb);
-    setConnectionCallbackNew(connCb);
-  }
+
+  setConnectionSetupCallback(connSetupCb);
+  setConnectionCallbackNew(connCb);
+
   clientConn_->pendingOneRttData.reserve(
       conn_->transportSettings.maxPacketsToBuffer);
   try {

@@ -17,7 +17,8 @@ namespace quic {
  * for experiments with QUIC in code using folly::AsyncSockets.
  */
 class QuicClientAsyncTransport : public QuicStreamAsyncTransport,
-                                 public QuicSocket::ConnectionCallback {
+                                 public QuicSocket::ConnectionSetupCallback,
+                                 public QuicSocket::ConnectionCallbackNew {
  public:
   using UniquePtr = std::unique_ptr<
       QuicClientAsyncTransport,

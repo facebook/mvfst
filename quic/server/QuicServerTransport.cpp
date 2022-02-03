@@ -23,22 +23,6 @@ namespace quic {
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> sock,
-    ConnectionCallback& cb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
-    std::unique_ptr<CryptoFactory> cryptoFactory,
-    PacketNum startingPacketNum)
-    : QuicServerTransport(
-          evb,
-          std::move(sock),
-          cb,
-          std::move(ctx),
-          std::move(cryptoFactory)) {
-  conn_->ackStates = AckStates(startingPacketNum);
-}
-
-QuicServerTransport::QuicServerTransport(
-    folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallbackNew* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
@@ -57,40 +41,11 @@ QuicServerTransport::QuicServerTransport(
 QuicServerTransport::QuicServerTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> sock,
-    ConnectionCallback& cb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
-    std::unique_ptr<CryptoFactory> cryptoFactory)
-    : QuicTransportBase(
-          evb,
-          std::move(sock),
-          false /* useSplitConnectionCallbacks */),
-      ctx_(std::move(ctx)) {
-  auto tempConn = std::make_unique<QuicServerConnectionState>(
-      FizzServerQuicHandshakeContext::Builder()
-          .setFizzServerContext(ctx_)
-          .setCryptoFactory(std::move(cryptoFactory))
-          .build());
-  tempConn->serverAddr = socket_->address();
-  serverConn_ = tempConn.get();
-  conn_.reset(tempConn.release());
-  conn_->observers = observers_;
-
-  setConnectionCallback(&cb);
-  registerAllTransportKnobParamHandlers();
-}
-
-QuicServerTransport::QuicServerTransport(
-    folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallbackNew* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
     std::unique_ptr<CryptoFactory> cryptoFactory)
-    : QuicTransportBase(
-          evb,
-          std::move(sock),
-          true /* useSplitConnectionCallbacks */),
-      ctx_(std::move(ctx)) {
+    : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)
@@ -116,14 +71,6 @@ QuicServerTransport::~QuicServerTransport() {
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from server destructor")),
       false);
-}
-
-QuicServerTransport::Ptr QuicServerTransport::make(
-    folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> sock,
-    ConnectionCallback& cb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
-  return std::make_shared<QuicServerTransport>(evb, std::move(sock), cb, ctx);
 }
 
 QuicServerTransport::Ptr QuicServerTransport::make(

@@ -229,7 +229,8 @@ class TPerfAcceptObserver : public AcceptObserver {
 
 } // namespace
 
-class ServerStreamHandler : public quic::QuicSocket::ConnectionCallback,
+class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
+                            public quic::QuicSocket::ConnectionCallbackNew,
                             public quic::QuicSocket::ReadCallback,
                             public quic::QuicSocket::WriteCallback {
  public:
@@ -444,7 +445,7 @@ class TPerfServerTransportFactory : public quic::QuicServerTransportFactory {
     auto serverHandler = std::make_unique<ServerStreamHandler>(
         evb, blockSize_, numStreams_, maxBytesPerStream_, *sock, dsrEnabled_);
     auto transport = quic::QuicServerTransport::make(
-        evb, std::move(sock), *serverHandler, ctx);
+        evb, std::move(sock), serverHandler.get(), serverHandler.get(), ctx);
     if (!FLAGS_server_qlogger_path.empty()) {
       auto qlogger = std::make_shared<TperfQLogger>(
           VantagePoint::Server, FLAGS_server_qlogger_path);
@@ -572,7 +573,8 @@ class TPerfServer {
   quic::QuicCcpThreadLauncher quicCcpThreadLauncher_;
 };
 
-class TPerfClient : public quic::QuicSocket::ConnectionCallback,
+class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
+                    public quic::QuicSocket::ConnectionCallbackNew,
                     public quic::QuicSocket::ReadCallback,
                     public quic::QuicSocket::WriteCallback,
                     public folly::HHWheelTimer::Callback {
@@ -759,7 +761,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionCallback,
     quicClient_->setTransportSettings(settings);
 
     LOG(INFO) << "TPerfClient connecting to " << addr.describe();
-    quicClient_->start(this);
+    quicClient_->start(this, this);
     eventBase_.loopForever();
   }
 

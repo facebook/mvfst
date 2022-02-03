@@ -30,8 +30,8 @@ quic::QuicServerTransport::Ptr QuicAsyncTransportAcceptor::make(
   CHECK_EQ(evb, evb_);
   quic::QuicServerAsyncTransport::UniquePtr asyncWrapper(
       new quic::QuicServerAsyncTransport());
-  auto transport =
-      quic::QuicServerTransport::make(evb, std::move(sock), *asyncWrapper, ctx);
+  auto transport = quic::QuicServerTransport::make(
+      evb, std::move(sock), asyncWrapper.get(), asyncWrapper.get(), ctx);
   asyncWrapper->setServerSocket(transport);
   wangle::ManagedConnection* managedConnection =
       connectionFactory_(std::move(asyncWrapper));

@@ -28,8 +28,7 @@ namespace quic {
 
 QuicTransportBase::QuicTransportBase(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket,
-    bool useSplitConnectionCallbacks)
+    std::unique_ptr<folly::AsyncUDPSocket> socket)
     : evb_(evb),
       socket_(std::move(socket)),
       lossTimeout_(this),
@@ -52,8 +51,7 @@ QuicTransportBase::QuicTransportBase(
       writeLooper_(new FunctionLooper(
           evb,
           [this](bool fromTimer) { pacedWriteDataToSocket(fromTimer); },
-          LooperType::WriteLooper)),
-      useSplitConnectionCallbacks_(useSplitConnectionCallbacks) {
+          LooperType::WriteLooper)) {
   writeLooper_->setPacingFunction([this]() -> auto {
     if (isConnectionPaced(*conn_)) {
       return conn_->pacer->getTimeUntilNextWrite();
@@ -398,11 +396,7 @@ void QuicTransportBase::closeImpl(
   // connCallback_ could be null if start() was never invoked and the
   // transport was destroyed or if the app initiated close.
   if (connCallback_) {
-    if (!useSplitConnectionCallbacks_) {
-      processConnectionEndError(cancelCode);
-    } else {
-      processConnectionEndErrorSplitCallbacks(cancelCode);
-    }
+    processConnectionEndErrorSplitCallbacks(cancelCode);
   }
 
   // can't invoke connection callbacks any more.
@@ -2704,13 +2698,6 @@ void QuicTransportBase::setSupportedVersions(
     const std::vector<QuicVersion>& versions) {
   conn_->originalVersion = versions.at(0);
   conn_->supportedVersions = versions;
-}
-
-void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
-  if (!connCallback_) {
-    connCallback_ = CallbackDispatcher::make();
-  }
-  connCallback_->setConnectionCallback(CHECK_NOTNULL(callback));
 }
 
 void QuicTransportBase::setConnectionSetupCallback(

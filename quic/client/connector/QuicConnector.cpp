@@ -64,8 +64,7 @@ void QuicConnector::connect(
           .setCertificateVerifier(std::move(verifier))
           .setPskCache(std::move(quicPskCache))
           .build(),
-      0, /* connectionIdSize */
-      true /* useSplitConnectionCallbacks */);
+      0 /* connectionIdSize */);
   quicClient_->setHostname(sni.value_or(connectAddr.getAddressStr()));
   quicClient_->addNewPeerAddress(connectAddr);
   if (localAddr.hasValue()) {

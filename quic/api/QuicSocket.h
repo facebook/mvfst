@@ -140,15 +140,6 @@ class QuicSocket {
   };
 
   /**
-   * Callback for connection level events.  This callback must be set at all
-   * times.
-   * This callback will be phased out with the two separate callbacks above to
-   * replace it.
-   */
-  class ConnectionCallback : public ConnectionSetupCallback,
-                             public ConnectionCallbackNew {};
-
-  /**
    * Information about the transport, similar to what TCP has.
    */
   struct TransportInfo {
@@ -215,11 +206,6 @@ class QuicSocket {
     // Number of packets transmitted that carry new STREAM frame for this stream
     uint64_t numPacketsTxWithNewData{0};
   };
-
-  /**
-   * Sets connection callback, must be set BEFORE using the socket.
-   */
-  virtual void setConnectionCallback(ConnectionCallback* callback) = 0;
 
   /**
    * Sets connection setup callback. This callback must be set before using the

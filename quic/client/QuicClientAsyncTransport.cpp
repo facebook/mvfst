@@ -15,7 +15,7 @@ namespace quic {
 QuicClientAsyncTransport::QuicClientAsyncTransport(
     const std::shared_ptr<quic::QuicClientTransport>& clientSock) {
   setSocket(clientSock);
-  clientSock->start(this);
+  clientSock->start(this, this);
 }
 
 void QuicClientAsyncTransport::onNewBidirectionalStream(

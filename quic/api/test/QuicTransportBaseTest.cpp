@@ -553,9 +553,8 @@ TEST_F(QuicTransportImplTest, AckTimeoutExpiredWillResetTimeoutFlag) {
 }
 
 TEST_F(QuicTransportImplTest, IdleTimeoutExpiredDestroysTransport) {
-  EXPECT_CALL(connCallback, onConnectionEnd()).WillOnce(Invoke([&]() {
-    transport = nullptr;
-  }));
+  EXPECT_CALL(connSetupCallback, onConnectionSetupError(_))
+      .WillOnce(Invoke([&](auto) { transport = nullptr; }));
   transport->invokeIdleTimeout();
 }
 
@@ -1171,8 +1170,8 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
 
 TEST_F(QuicTransportImplTest, OnInvalidServerStream) {
   EXPECT_CALL(
-      connCallback,
-      onConnectionError(IsError(TransportErrorCode::STREAM_STATE_ERROR)));
+      connSetupCallback,
+      onConnectionSetupError(IsError(TransportErrorCode::STREAM_STATE_ERROR)));
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   StreamId stream1 = 29;
   transport->addDataToStream(stream1, StreamBuffer(readData->clone(), 0, true));
@@ -1412,8 +1411,8 @@ TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(
-      connCallback,
-      onConnectionError(std::make_pair(
+      connSetupCallback,
+      onConnectionSetupError(std::make_pair(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string("Well there's your problem"))));
   EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
@@ -2844,9 +2843,8 @@ TEST_F(QuicTransportImplTest, ExceptionInWriteLooperDoesNotCrash) {
   transport->addDataToStream(
       stream, StreamBuffer(IOBuf::copyBuffer("hello"), 0, false));
   EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));
-  EXPECT_CALL(connCallback, onConnectionError(_)).WillOnce(Invoke([&](auto) {
-    transport.reset();
-  }));
+  EXPECT_CALL(connSetupCallback, onConnectionSetupError(_))
+      .WillOnce(Invoke([&](auto) { transport.reset(); }));
   transport->writeLooper()->runLoopCallback();
 }
 

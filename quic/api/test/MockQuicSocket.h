@@ -112,7 +112,6 @@ class MockQuicSocket : public QuicSocket {
           StreamId,
           ReadCallback*,
           folly::Optional<ApplicationErrorCode> err));
-  MOCK_METHOD1(setConnectionCallback, void(ConnectionCallback*));
   MOCK_METHOD1(setConnectionSetupCallback, void(ConnectionSetupCallback*));
   MOCK_METHOD1(setConnectionCallbackNew, void(ConnectionCallbackNew*));
   void setEarlyDataAppParamsFunctions(

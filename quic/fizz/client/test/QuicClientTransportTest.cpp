@@ -385,7 +385,7 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
 
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
-  EXPECT_CALL(clientConnCallback, onConnectionError(_))
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
         const TransportErrorCode* transportError =
@@ -411,7 +411,7 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   auto tp = client->getTransportSettings();
   tp.maxNumPTOs = 4;
   client->setTransportSettings(tp);
-  EXPECT_CALL(clientConnCallback, onConnectionError(_))
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
         LOG(ERROR) << "error: " << errorCode.second;
         const LocalErrorCode* localError = errorCode.first.asLocalErrorCode();
@@ -991,7 +991,7 @@ TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->start(&clientConnSetupCallback, &clientConnCallback);
 
   EXPECT_FALSE(client->isClosed());
-  EXPECT_CALL(clientConnCallback, onConnectionError(_));
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
   eventbase_->loopOnce();
   EXPECT_TRUE(client->isClosed());
 }
@@ -1053,7 +1053,8 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
 
 TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
   class ConnectionCallbackThatWritesOnTransportReady
-      : public QuicSocket::ConnectionCallback {
+      : public QuicSocket::ConnectionSetupCallback,
+        public QuicSocket::ConnectionCallbackNew {
    public:
     explicit ConnectionCallbackThatWritesOnTransportReady(
         std::shared_ptr<QuicSocket> socket)
@@ -1105,7 +1106,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
 
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
-  client->start(&callback);
+  client->start(&callback, &callback);
   setConnectionIds();
   EXPECT_THROW(recvServerHello(), std::runtime_error);
 }
@@ -1113,7 +1114,7 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
 TEST_F(QuicClientTransportTest, NetworkUnreachableIsFatalToConn) {
   client->addNewPeerAddress(serverAddr);
   setupCryptoLayer();
-  EXPECT_CALL(clientConnCallback, onConnectionError(_));
+  EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
   EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(ENETUNREACH, -1));
   client->start(&clientConnSetupCallback, &clientConnCallback);
   loopForWrites();
@@ -1915,7 +1916,7 @@ class QuicClientTransportHappyEyeballsTest
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
     EXPECT_CALL(*secondSock, write(secondAddress, _))
         .WillOnce(SetErrnoAndReturn(EBADF, -1));
-    EXPECT_CALL(clientConnCallback, onConnectionError(_));
+    EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_));
     client->lossTimeout().cancelTimeout();
     client->lossTimeout().timeoutExpired();
 

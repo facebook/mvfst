@@ -38,8 +38,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket,
-      bool useSplitConnectionCallbacks = false);
+      std::unique_ptr<folly::AsyncUDPSocket> socket);
 
   ~QuicTransportBase() override;
 
@@ -224,8 +223,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       NetworkData&& data) noexcept;
 
   virtual void setSupportedVersions(const std::vector<QuicVersion>& versions);
-
-  void setConnectionCallback(ConnectionCallback* callback) final;
 
   void setConnectionSetupCallback(ConnectionSetupCallback* callback) final;
 
@@ -862,7 +859,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
 
   class CallbackDispatcher : public folly::DelayedDestruction,
-                             public ConnectionCallback {
+                             public ConnectionSetupCallback,
+                             public ConnectionCallbackNew {
    public:
     using UniquePtr = std::unique_ptr<CallbackDispatcher, Destructor>;
 
@@ -940,10 +938,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     }
 
     // Callback setters.
-    void setConnectionCallback(ConnectionCallback* callback) {
-      connSetupCallback_ = callback;
-      connStreamsCallback_ = callback;
-    }
     void setConnectionSetupCallback(ConnectionSetupCallback* callback) {
       connSetupCallback_ = callback;
     }
@@ -1027,11 +1021,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   std::shared_ptr<ObserverVec> observers_{std::make_shared<ObserverVec>()};
 
   uint64_t qlogRefcnt_{0};
-
-  // Temp flag controlling which connection callbacks to use - old single
-  // callback object or two new split callback objects. Will be removed out once
-  // mvfst is switched to the new split callbacks eventually.
-  bool useSplitConnectionCallbacks_{false};
 
   // Priority level threshold for background streams
   // If all streams have equal or lower priority to the threshold
