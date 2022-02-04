@@ -1026,7 +1026,7 @@ TEST_F(QuicTransportImplTest, ReadDataInvalidStream) {
   StreamId invalidStream = 10;
   EXPECT_THROW(
       transport->read(invalidStream, 100).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   transport.reset();
 }
 
@@ -2927,20 +2927,20 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidReadFuncs) {
   auto stream = transport->createUnidirectionalStream().value();
   EXPECT_THROW(
       transport->read(stream, 100).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->setReadCallback(stream, nullptr).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->pauseRead(stream).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->resumeRead(stream).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->stopSending(stream, GenericApplicationErrorCode::UNKNOWN)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
 }
 
 TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
@@ -2949,40 +2949,40 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
   transport->addDataToStream(stream, StreamBuffer(readData->clone(), 0, true));
   EXPECT_THROW(
       transport->getStreamWriteOffset(stream).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->getStreamWriteBufferedBytes(stream).thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->notifyPendingWriteOnStream(stream, nullptr)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), false)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->registerDeliveryCallback(stream, 0, nullptr)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->registerTxCallback(stream, 0, nullptr).thenOrThrow([&](auto) {
       }),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport
           ->registerByteEventCallback(ByteEvent::Type::ACK, stream, 0, nullptr)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport
           ->registerByteEventCallback(ByteEvent::Type::TX, stream, 0, nullptr)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
   EXPECT_THROW(
       transport->resetStream(stream, GenericApplicationErrorCode::UNKNOWN)
           .thenOrThrow([&](auto) {}),
-      folly::Unexpected<LocalErrorCode>::BadExpectedAccess);
+      folly::BadExpectedAccess<LocalErrorCode>);
 }
 
 TEST_P(QuicTransportImplTestUniBidi, IsServerStream) {
