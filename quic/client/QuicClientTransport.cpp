@@ -486,6 +486,17 @@ void QuicClientTransport::processPacketData(
         receiveReadStreamFrameSMHandler(*stream, std::move(frame));
         break;
       }
+      case QuicFrame::Type::ReadNewTokenFrame: {
+        ReadNewTokenFrame& newTokenFrame = *quicFrame.asReadNewTokenFrame();
+        std::string tokenStr =
+            newTokenFrame.token->moveToFbString().toStdString();
+        VLOG(10) << "client received new token token="
+                 << folly::hexlify(tokenStr);
+        if (newTokenCallback_) {
+          newTokenCallback_(std::move(tokenStr));
+        }
+        break;
+      }
       case QuicFrame::Type::MaxDataFrame: {
         MaxDataFrame& connWindowUpdate = *quicFrame.asMaxDataFrame();
         VLOG(10) << "Client received max data offset="

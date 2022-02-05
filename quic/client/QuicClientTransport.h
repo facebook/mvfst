@@ -149,6 +149,23 @@ class QuicClientTransport
   void setTransportStatsCallback(
       std::shared_ptr<QuicTransportStatsCallback> statsCallback) noexcept;
 
+  /**
+   * Set a callback function to be invoked and passed
+   * the new token upon receiving a NEW_TOKEN (0x07) frame.
+   */
+  void setNewTokenCallback(
+      std::function<void(std::string)> newTokenCallback) noexcept {
+    newTokenCallback_ = std::move(newTokenCallback);
+  }
+
+  /**
+   * Set a new token to be included in the initial packet. Must be set before
+   * attempting to connect.
+   */
+  void setNewToken(std::string token) noexcept {
+    clientConn_->retryToken = std::move(token);
+  }
+
   class HappyEyeballsConnAttemptDelayTimeout
       : public folly::HHWheelTimer::Callback {
    public:
@@ -243,5 +260,7 @@ class QuicClientTransport
   RecvmmsgStorage recvmmsgStorage_;
   // We will only send transport knobs once, this flag keeps track of it
   bool transportKnobsSent_{false};
+  // Callback function to invoke when the client receives a new token
+  std::function<void(std::string)> newTokenCallback_;
 };
 } // namespace quic
