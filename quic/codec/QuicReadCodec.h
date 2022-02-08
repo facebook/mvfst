@@ -77,6 +77,14 @@ struct CodecResult {
   Type type_;
 };
 
+/**
+ * Reads given data and returns parsed long header.
+ * Returns an error if parsing is unsuccessful.
+ */
+folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
+    folly::io::Cursor& cursor,
+    QuicNodeType nodeType);
+
 class QuicReadCodec {
  public:
   virtual ~QuicReadCodec() = default;

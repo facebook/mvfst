@@ -708,6 +708,41 @@ TEST_F(QuicReadCodecTest, TestInitialPacket) {
   EXPECT_FALSE(longPacketHeader->hasToken());
 }
 
+TEST_F(QuicReadCodecTest, TestInitialPacketExtractToken) {
+  auto connId = getTestConnectionId();
+
+  FizzCryptoFactory cryptoFactory;
+  PacketNum packetNum = 1;
+  uint64_t offset = 0;
+  auto aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  auto headerCipher =
+      cryptoFactory.makeClientInitialHeaderCipher(connId, QuicVersion::MVFST);
+  std::string token = "aswerdfewdewrgetg";
+  auto packet = createInitialCryptoPacket(
+      getTestConnectionId(),
+      connId,
+      packetNum,
+      QuicVersion::MVFST,
+      *folly::IOBuf::copyBuffer("CHLO"),
+      *aead,
+      offset,
+      0 /* offset */,
+      token);
+
+  auto codec = makeEncryptedCodec(connId, std::move(aead), nullptr);
+  aead = cryptoFactory.getClientInitialCipher(connId, QuicVersion::MVFST);
+  auto packetQueue =
+      bufToQueue(packetToBufCleartext(packet, *aead, *headerCipher, packetNum));
+
+  folly::io::Cursor cursor(packetQueue.front());
+  auto res = tryParseLongHeader(cursor, QuicNodeType::Client);
+  EXPECT_FALSE(res.hasError());
+  auto parsedLongHeader = std::move(res.value());
+  EXPECT_EQ(parsedLongHeader.header.getDestinationConnId(), connId);
+  EXPECT_TRUE(parsedLongHeader.header.hasToken());
+  EXPECT_EQ(parsedLongHeader.header.getToken(), token);
+}
+
 TEST_F(QuicReadCodecTest, TestHandshakeDone) {
   auto connId = getTestConnectionId();
 

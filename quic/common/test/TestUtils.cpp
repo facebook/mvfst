@@ -338,9 +338,15 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset,
+    std::string token,
     const BuilderProvider& builderProvider) {
   LongHeader header(
-      LongHeader::Types::Initial, srcConnId, dstConnId, packetNum, version);
+      LongHeader::Types::Initial,
+      srcConnId,
+      dstConnId,
+      packetNum,
+      version,
+      std::move(token));
   LongHeader copyHeader(header);
   PacketBuilderInterface* builder = nullptr;
   if (builderProvider) {

@@ -209,6 +209,7 @@ TEST_P(QuicPacketBuilderTest, LongHeaderRegularPacket) {
       *cleartextAead,
       0 /* largestAcked */,
       0 /* offset */,
+      "" /* token */,
       builderProvider);
   auto resultBuf = packetToBufCleartext(
       resultRegularPacket, *cleartextAead, *headerCipher, pktNum);

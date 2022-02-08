@@ -47,19 +47,17 @@ QuicReadCodec::tryParsingVersionNegotiation(BufQueue& queue) {
   return decodeVersionNegotiation(*longHeaderInvariant, cursor);
 }
 
-CodecResult QuicReadCodec::parseLongHeaderPacket(
-    BufQueue& queue,
-    const AckStates& ackStates) {
-  folly::io::Cursor cursor(queue.front());
+folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
+    folly::io::Cursor& cursor,
+    QuicNodeType nodeType) {
   auto initialByte = cursor.readBE<uint8_t>();
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
-    VLOG(4) << "Dropping packet, failed to parse invariant " << connIdToHex();
+    VLOG(4) << "Dropping packet, failed to parse invariant";
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
-    queue.move();
-    return CodecResult(Nothing());
+    return folly::makeUnexpected(longHeaderInvariant.error());
   }
   if (longHeaderInvariant->invariant.version ==
       QuicVersion::VERSION_NEGOTIATION) {
@@ -68,25 +66,42 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
     // function.
     // Since VN is not allowed to be coalesced with another packet
     // type, we clear out the buffer to avoid anyone else parsing it.
-    queue.move();
-    return CodecResult(Nothing());
+    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
   }
   auto type = parseLongHeaderType(initialByte);
 
-  auto parsedLongHeader = parseLongHeaderVariants(
-      type, std::move(*longHeaderInvariant), cursor, nodeType_);
+  auto parsedLongHeader =
+      parseLongHeaderVariants(type, *longHeaderInvariant, cursor, nodeType);
   if (!parsedLongHeader) {
-    VLOG(4) << "Dropping due to failed to parse header " << connIdToHex();
+    VLOG(4) << "Dropping due to failed to parse header";
     // We've failed to parse the long header, so we have no idea where this
     // packet ends. Clear the queue since no other data in this packet is
     // parse-able.
+    return folly::makeUnexpected(parsedLongHeader.error());
+  }
+
+  return std::move(parsedLongHeader.value());
+}
+
+CodecResult QuicReadCodec::parseLongHeaderPacket(
+    BufQueue& queue,
+    const AckStates& ackStates) {
+  folly::io::Cursor cursor(queue.front());
+  const uint8_t initialByte = *cursor.peekBytes().data();
+
+  auto res = tryParseLongHeader(cursor, nodeType_);
+  if (res.hasError()) {
+    VLOG(4) << "Failed to parse long header " << connIdToHex();
     queue.move();
     return CodecResult(Nothing());
   }
+  auto parsedLongHeader = std::move(res.value());
+  auto type = parsedLongHeader.header.getHeaderType();
+
   // As soon as we have parsed out the long header we can split off any
   // coalesced packets. We do this early since the spec mandates that decryption
   // failure must not stop the processing of subsequent coalesced packets.
-  auto longHeader = std::move(parsedLongHeader->header);
+  auto longHeader = std::move(parsedLongHeader.header);
 
   if (type == LongHeader::Types::Retry) {
     Buf integrityTag;
@@ -98,7 +113,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
 
   uint64_t packetNumberOffset = cursor.getCurrentPosition();
   size_t currentPacketLen =
-      packetNumberOffset + parsedLongHeader->packetLength.packetLength;
+      packetNumberOffset + parsedLongHeader.packetLength.packetLength;
   if (queue.chainLength() < currentPacketLen) {
     // Packet appears truncated, there's no parse-able data left.
     queue.move();
@@ -204,7 +219,7 @@ CodecResult QuicReadCodec::parseLongHeaderPacket(
   auto headerData = decryptQueue.splitAtMost(aadLen);
   // parsing verifies that packetLength >= packet number length.
   auto encryptedData = decryptQueue.splitAtMost(
-      parsedLongHeader->packetLength.packetLength - packetNum.second);
+      parsedLongHeader.packetLength.packetLength - packetNum.second);
   if (!encryptedData) {
     // There should normally be some integrity tag at least in the data,
     // however allowing the aead to process the data even if the tag is not

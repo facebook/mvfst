@@ -99,6 +99,7 @@ RegularQuicPacketBuilder::Packet createInitialCryptoPacket(
     const Aead& aead,
     PacketNum largestAcked,
     uint64_t offset = 0,
+    std::string token = "",
     const BuilderProvider& builderProvider = nullptr);
 
 RegularQuicPacketBuilder::Packet createCryptoPacket(
