@@ -112,7 +112,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                << " error=" << toString(error);
   }
 
-  void start() {
+  void start(std::string token) {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
     folly::SocketAddress addr(host_.c_str(), port_);
@@ -127,6 +127,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
           evb, std::move(sock), std::move(fizzClientContext));
       quicClient_->setHostname("echo.com");
       quicClient_->addNewPeerAddress(addr);
+      if (!token.empty()) {
+        quicClient_->setNewToken(token);
+      }
 
       TransportSettings settings;
       quicClient_->setTransportSettings(settings);

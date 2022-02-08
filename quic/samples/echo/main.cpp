@@ -17,6 +17,10 @@
 DEFINE_string(host, "::1", "Echo server hostname/IP");
 DEFINE_int32(port, 6666, "Echo server port");
 DEFINE_string(mode, "server", "Mode to run in: 'client' or 'server'");
+DEFINE_string(
+    token,
+    "",
+    "Client new token string to attach to connection initiation");
 
 using namespace quic::samples;
 
@@ -39,7 +43,7 @@ int main(int argc, char* argv[]) {
       return -2;
     }
     EchoClient client(FLAGS_host, FLAGS_port);
-    client.start();
+    client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
     return -1;
