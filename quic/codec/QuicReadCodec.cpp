@@ -479,7 +479,7 @@ folly::Optional<TimePoint> QuicReadCodec::getHandshakeDoneTime() {
   return handshakeDoneTime_;
 }
 
-std::string QuicReadCodec::connIdToHex() {
+std::string QuicReadCodec::connIdToHex() const {
   static ConnectionId zeroConn = zeroConnId();
   const auto& serverId = serverConnectionId_.value_or(zeroConn);
   const auto& clientId = clientConnectionId_.value_or(zeroConn);

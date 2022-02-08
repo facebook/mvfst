@@ -160,7 +160,7 @@ class QuicReadCodec {
       BufQueue& queue,
       const AckStates& ackStates);
 
-  std::string connIdToHex();
+  [[nodiscard]] std::string connIdToHex() const;
 
   QuicNodeType nodeType_;
 
