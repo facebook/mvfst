@@ -442,7 +442,8 @@ bool QuicTransportBase::processCancelCode(
     case QuicErrorCode::Type::LocalErrorCode: {
       LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
       noError = localErrorCode == LocalErrorCode::NO_ERROR ||
-          localErrorCode == LocalErrorCode::IDLE_TIMEOUT;
+          localErrorCode == LocalErrorCode::IDLE_TIMEOUT ||
+          localErrorCode == LocalErrorCode::SHUTTING_DOWN;
       break;
     }
     case QuicErrorCode::Type::TransportErrorCode: {
@@ -2536,11 +2537,13 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
   // send connection close immediately depending on 'drain'
   DCHECK_NE(closeState_, CloseState::CLOSED);
   uint64_t numOpenStreans = conn_->streamManager->streamCount();
+  auto localError =
+      drain ? LocalErrorCode::IDLE_TIMEOUT : LocalErrorCode::SHUTTING_DOWN;
   closeImpl(
       std::make_pair(
-          QuicErrorCode(LocalErrorCode::IDLE_TIMEOUT),
+          QuicErrorCode(localError),
           folly::to<std::string>(
-              toString(LocalErrorCode::IDLE_TIMEOUT),
+              toString(localError),
               ", num non control streams: ",
               numOpenStreans - conn_->streamManager->numControlStreams())),
       drain /* drainConnection */,
