@@ -1167,7 +1167,7 @@ void onServerReadDataFromOpen(
           // Datagram isn't retransmittable. But we would like to ack them
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
-          handleDatagram(conn, frame);
+          handleDatagram(conn, frame, readData.networkData.receiveTimePoint);
           break;
         }
         default: {

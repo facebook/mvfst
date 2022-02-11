@@ -9,7 +9,10 @@
 
 namespace quic {
 
-void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame) {
+void handleDatagram(
+    QuicConnectionStateBase& conn,
+    DatagramFrame& frame,
+    TimePoint recvTimePoint) {
   // TODO(lniccolini) update max datagram frame size
   // https://github.com/quicwg/datagram/issues/3
   // For now, max_datagram_size > 0 means the peer supports datagram frames
@@ -29,7 +32,8 @@ void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame) {
     }
   }
   QUIC_STATS(conn.statsCallback, onDatagramRead, frame.data.chainLength());
-  conn.datagramState.readBuffer.emplace_back(std::move(frame.data));
+  conn.datagramState.readBuffer.emplace_back(
+      recvTimePoint, std::move(frame.data));
 }
 
 } // namespace quic

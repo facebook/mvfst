@@ -678,7 +678,14 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
    */
-  folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagrams(
+  folly::Expected<std::vector<ReadDatagram>, LocalErrorCode> readDatagrams(
+      size_t atMost = 0) override;
+
+  /**
+   * Returns the currently available received Datagram IOBufs.
+   * Returns all datagrams if atMost is 0.
+   */
+  folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) override;
 
   /**

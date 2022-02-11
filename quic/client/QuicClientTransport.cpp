@@ -592,7 +592,7 @@ void QuicClientTransport::processPacketData(
         // Datagram isn't retransmittable. But we would like to ack them early.
         // So, make Datagram frames count towards ack policy
         pktHasRetransmittableData = true;
-        handleDatagram(*conn_, frame);
+        handleDatagram(*conn_, frame, receiveTimePoint);
         break;
       }
       default:

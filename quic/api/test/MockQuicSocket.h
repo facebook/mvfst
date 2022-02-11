@@ -308,6 +308,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(writeDatagram, WriteResult(SharedBuf));
   MOCK_METHOD1(
       readDatagrams,
+      folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>(size_t));
+  MOCK_METHOD1(
+      readDatagramBufs,
       folly::Expected<std::vector<Buf>, LocalErrorCode>(size_t));
 };
 } // namespace quic

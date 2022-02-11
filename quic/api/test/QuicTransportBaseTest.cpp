@@ -255,7 +255,7 @@ class TestQuicTransport
       } else if (type == TestFrameType::DATAGRAM) {
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
-        handleDatagram(*conn_, frame);
+        handleDatagram(*conn_, frame, data.receiveTimePoint);
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         QuicStreamState* stream = conn_->streamManager->getStream(buffer.first);
@@ -372,10 +372,10 @@ class TestQuicTransport
     updateReadLooper();
   }
 
-  void addDatagram(Buf data) {
+  void addDatagram(Buf data, TimePoint recvTime = Clock::now()) {
     auto buf = encodeDatagramFrame(std::move(data));
     SocketAddress addr("127.0.0.1", 1000);
-    onNetworkData(addr, NetworkData(std::move(buf), Clock::now()));
+    onNetworkData(addr, NetworkData(std::move(buf), recvTime));
   }
 
   void closeStream(StreamId id) {
@@ -3866,11 +3866,27 @@ TEST_F(QuicTransportImplTest, ZeroLengthDatagram) {
   transport->addDatagram(folly::IOBuf::copyBuffer(""));
   EXPECT_CALL(datagramCb, onDatagramsAvailable());
   transport->driveReadCallbacks();
-  auto datagrams = transport->readDatagrams();
+  auto datagrams = transport->readDatagramBufs();
   EXPECT_FALSE(datagrams.hasError());
   EXPECT_EQ(datagrams->size(), 1);
   EXPECT_TRUE(datagrams->front() != nullptr);
   EXPECT_EQ(datagrams->front()->computeChainDataLength(), 0);
+}
+
+TEST_F(QuicTransportImplTest, ZeroLengthDatagramBufs) {
+  NiceMock<MockDatagramCallback> datagramCb;
+  transport->enableDatagram();
+  transport->setDatagramCallback(&datagramCb);
+  auto recvTime = Clock::now() + 5000ns;
+  transport->addDatagram(folly::IOBuf::copyBuffer(""), recvTime);
+  EXPECT_CALL(datagramCb, onDatagramsAvailable());
+  transport->driveReadCallbacks();
+  auto datagrams = transport->readDatagrams();
+  EXPECT_FALSE(datagrams.hasError());
+  EXPECT_EQ(datagrams->size(), 1);
+  EXPECT_TRUE(datagrams->front().bufQueue().front() != nullptr);
+  EXPECT_EQ(datagrams->front().receiveTimePoint(), recvTime);
+  EXPECT_EQ(datagrams->front().bufQueue().front()->computeChainDataLength(), 0);
 }
 
 TEST_F(QuicTransportImplTest, Cmsgs) {

@@ -390,6 +390,33 @@ class CongestionControllerFactory;
 class LoopDetectorCallback;
 class PendingPathRateLimiter;
 
+struct ReadDatagram {
+  ReadDatagram(TimePoint recvTimePoint, BufQueue data)
+      : receiveTimePoint_{recvTimePoint}, buf_{std::move(data)} {}
+
+  [[nodiscard]] TimePoint receiveTimePoint() const noexcept {
+    return receiveTimePoint_;
+  }
+
+  [[nodiscard]] BufQueue& bufQueue() noexcept {
+    return buf_;
+  }
+
+  [[nodiscard]] const BufQueue& bufQueue() const noexcept {
+    return buf_;
+  }
+
+  // Move only to match BufQueue behavior
+  ReadDatagram(ReadDatagram&& other) noexcept = default;
+  ReadDatagram& operator=(ReadDatagram&& other) = default;
+  ReadDatagram(const ReadDatagram&) = delete;
+  ReadDatagram& operator=(const ReadDatagram&) = delete;
+
+ private:
+  TimePoint receiveTimePoint_;
+  BufQueue buf_;
+};
+
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
   virtual ~QuicConnectionStateBase() override = default;
 
@@ -798,7 +825,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
     uint32_t maxReadBufferSize{kDefaultMaxDatagramsBuffered};
     uint32_t maxWriteBufferSize{kDefaultMaxDatagramsBuffered};
     // Buffers Incoming Datagrams
-    std::deque<BufQueue> readBuffer;
+    std::deque<ReadDatagram> readBuffer;
     // Buffers Outgoing Datagrams
     std::deque<BufQueue> writeBuffer;
   };

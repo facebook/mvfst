@@ -1248,7 +1248,14 @@ class QuicSocket {
    * Returns the currently available received Datagrams.
    * Returns all datagrams if atMost is 0.
    */
-  virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagrams(
+  virtual folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>
+  readDatagrams(size_t atMost = 0) = 0;
+
+  /**
+   * Returns the currently available received Datagram IOBufs.
+   * Returns all datagrams if atMost is 0.
+   */
+  virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) = 0;
 };
 } // namespace quic

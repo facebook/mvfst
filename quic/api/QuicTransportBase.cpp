@@ -2922,8 +2922,31 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::writeDatagram(
   return folly::unit;
 }
 
-folly::Expected<std::vector<Buf>, LocalErrorCode>
+folly::Expected<std::vector<ReadDatagram>, LocalErrorCode>
 QuicTransportBase::readDatagrams(size_t atMost) {
+  CHECK(conn_);
+  auto datagrams = &conn_->datagramState.readBuffer;
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  if (atMost == 0) {
+    atMost = datagrams->size();
+  } else {
+    atMost = std::min(atMost, datagrams->size());
+  }
+  std::vector<ReadDatagram> retDatagrams;
+  retDatagrams.reserve(atMost);
+  std::transform(
+      datagrams->begin(),
+      datagrams->begin() + atMost,
+      std::back_inserter(retDatagrams),
+      [](ReadDatagram& dg) { return std::move(dg); });
+  datagrams->erase(datagrams->begin(), datagrams->begin() + atMost);
+  return retDatagrams;
+}
+
+folly::Expected<std::vector<Buf>, LocalErrorCode>
+QuicTransportBase::readDatagramBufs(size_t atMost) {
   CHECK(conn_);
   auto datagrams = &conn_->datagramState.readBuffer;
   if (closeState_ != CloseState::OPEN) {
@@ -2940,7 +2963,7 @@ QuicTransportBase::readDatagrams(size_t atMost) {
       datagrams->begin(),
       datagrams->begin() + atMost,
       std::back_inserter(retDatagrams),
-      [](BufQueue& bq) { return bq.move(); });
+      [](ReadDatagram& dg) { return dg.bufQueue().move(); });
   datagrams->erase(datagrams->begin(), datagrams->begin() + atMost);
   return retDatagrams;
 }

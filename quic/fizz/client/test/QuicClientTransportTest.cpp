@@ -4711,6 +4711,7 @@ TEST_F(
 
   auto payload = client->getConn()
                      .datagramState.readBuffer[0]
+                     .bufQueue()
                      .front()
                      ->clone()
                      ->moveToFbString();

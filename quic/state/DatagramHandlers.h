@@ -15,6 +15,9 @@ namespace quic {
 /**
  * Processes a Datagram frame
  */
-void handleDatagram(QuicConnectionStateBase& conn, DatagramFrame& frame);
+void handleDatagram(
+    QuicConnectionStateBase& conn,
+    DatagramFrame& frame,
+    TimePoint recvTimePoint);
 
 } // namespace quic
