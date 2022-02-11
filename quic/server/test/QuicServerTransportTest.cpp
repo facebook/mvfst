@@ -4004,6 +4004,22 @@ TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
       {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 0}});
 }
 
+TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  EXPECT_CALL(*rawPacer, setExperimental(true)).Times(2);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 1}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 2}});
+
+  EXPECT_CALL(*rawPacer, setExperimental(false)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 0}});
+}
+
 class QuicServerTransportForciblySetUDUPayloadSizeTest
     : public QuicServerTransportTest {
  public:

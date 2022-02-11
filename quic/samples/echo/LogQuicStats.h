@@ -233,6 +233,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onShortHeaderPadding size=" << padSize;
   }
 
+  void onPacerTimerLagged() override {
+    VLOG(2) << prefix_ << __func__;
+  }
+
  private:
   std::string prefix_;
 };

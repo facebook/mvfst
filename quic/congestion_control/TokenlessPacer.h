@@ -46,6 +46,8 @@ class TokenlessPacer : public Pacer {
   void onPacketSent() override;
   void onPacketsLoss() override;
 
+  void setExperimental(bool experimental) override;
+
  private:
   const QuicConnectionStateBase& conn_;
   uint64_t minCwndInMss_;
@@ -56,5 +58,12 @@ class TokenlessPacer : public Pacer {
   folly::Optional<TimePoint> lastWriteTime_;
   uint8_t rttFactorNumerator_{1};
   uint8_t rttFactorDenominator_{1};
+  bool experimental_{false};
+
+  // Experimental
+  // Maximum factor the batchSize can be multiplied by to account for pacer
+  // timer delays. I.e., if the pacing function is late by up to 5 intervals, it
+  // will be allowed to write 5 times as many packets
+  static constexpr int maxBurstIntervals{5};
 };
 } // namespace quic

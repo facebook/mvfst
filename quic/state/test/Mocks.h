@@ -51,6 +51,7 @@ class MockPacer : public Pacer {
   MOCK_METHOD1(setAppLimited, void(bool));
   MOCK_METHOD0(onPacketSent, void());
   MOCK_METHOD0(onPacketsLoss, void());
+  MOCK_METHOD1(setExperimental, void(bool));
 };
 
 class MockPendingPathRateLimiter : public PendingPathRateLimiter {

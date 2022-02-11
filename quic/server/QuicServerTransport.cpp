@@ -840,6 +840,21 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
             "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossThresholds is now set to {}",
             useAdaptiveLossThresholds);
       });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
+        if (server_conn->pacer) {
+          auto enableExperimental = static_cast<bool>(val);
+          server_conn->pacer->setExperimental(enableExperimental);
+          VLOG(3) << fmt::format(
+              "PACER_EXPERIMENTAL KnobParam received, "
+              "setting experimental={} for pacer",
+              enableExperimental);
+        }
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

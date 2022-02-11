@@ -9,6 +9,8 @@
 
 #include <folly/portability/GTest.h>
 #include <quic/congestion_control/TokenlessPacer.h>
+#include <quic/state/test/MockQuicStats.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace testing;
 
@@ -50,6 +52,38 @@ TEST_F(TokenlessPacerTest, NoCompensateTimerDrift) {
   pacer.refreshPacingRate(20, 100us); // These two values do not matter here
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
   EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 2000us));
+}
+
+TEST_F(TokenlessPacerTest, CompensateTimerDriftForExperimental) {
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+  EXPECT_CALL(*rawCongestionController, isAppLimited())
+      .WillRepeatedly(Return(false));
+
+  auto mockStats = std::make_shared<MockQuicStats>();
+  conn.statsCallback = mockStats.get();
+  // This should be called for two of the three updateAndGetWriteBatchSize calls
+  // below.
+  EXPECT_CALL(*mockStats, onPacerTimerLagged()).Times(2);
+
+  pacer.setPacingRateCalculator([](const QuicConnectionStateBase&,
+                                   uint64_t,
+                                   uint64_t,
+                                   std::chrono::microseconds) {
+    return PacingRate::Builder().setInterval(1000us).setBurstSize(10).build();
+  });
+
+  pacer.setExperimental(true);
+  auto currentTime = Clock::now();
+  pacer.refreshPacingRate(20, 100us); // These two values do not matter here
+  EXPECT_EQ(10, pacer.updateAndGetWriteBatchSize(currentTime + 1000us));
+
+  // 2 intervals later should return twice the burst size
+  EXPECT_EQ(20, pacer.updateAndGetWriteBatchSize(currentTime + 3000us));
+
+  // 6 intervals later should only return 50 (maxBurstInterval * 10)
+  EXPECT_EQ(50, pacer.updateAndGetWriteBatchSize(currentTime + 9000us));
 }
 
 TEST_F(TokenlessPacerTest, NextWriteTime) {

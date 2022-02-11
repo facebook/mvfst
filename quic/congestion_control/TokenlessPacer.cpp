@@ -45,7 +45,9 @@ void TokenlessPacer::refreshPacingRate(
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
   }
-  lastWriteTime_.reset();
+  if (!experimental_) {
+    lastWriteTime_.reset();
+  }
 }
 
 // rate_bps is *bytes* per second
@@ -69,7 +71,9 @@ void TokenlessPacer::setPacingRate(uint64_t rateBps) {
   if (conn_.qLogger) {
     conn_.qLogger->addPacingMetricUpdate(batchSize_, writeInterval_);
   }
-  lastWriteTime_.reset();
+  if (!experimental_) {
+    lastWriteTime_.reset();
+  }
 }
 
 void TokenlessPacer::setMaxPacingRate(uint64_t maxRateBytesPerSec) {
@@ -116,8 +120,29 @@ std::chrono::microseconds TokenlessPacer::getTimeUntilNextWrite(
 }
 
 uint64_t TokenlessPacer::updateAndGetWriteBatchSize(TimePoint currentTime) {
+  auto sendBatch = batchSize_;
+  if (lastWriteTime_.hasValue() && writeInterval_ > 0us &&
+      conn_.congestionController &&
+      !conn_.congestionController->isAppLimited()) {
+    // The pacer timer is expected to trigger every writeInterval_
+    auto timeSinceLastWrite =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            currentTime - lastWriteTime_.value());
+    if (conn_.congestionController &&
+        !conn_.congestionController->isAppLimited() &&
+        timeSinceLastWrite > (writeInterval_ * 110 / 100)) {
+      // Log if connection is not application-limited and the timer has been
+      // delayed by more than 10% of the expected write interval
+      QUIC_STATS(conn_.statsCallback, onPacerTimerLagged);
+    }
+    if (experimental_) {
+      sendBatch = (timeSinceLastWrite / writeInterval_ >= maxBurstIntervals)
+          ? batchSize_ * maxBurstIntervals
+          : batchSize_ * timeSinceLastWrite / writeInterval_;
+    }
+  }
   lastWriteTime_ = currentTime;
-  return batchSize_;
+  return sendBatch;
 }
 
 uint64_t TokenlessPacer::getCachedWriteBatchSize() const {
@@ -127,5 +152,9 @@ uint64_t TokenlessPacer::getCachedWriteBatchSize() const {
 void TokenlessPacer::setPacingRateCalculator(
     PacingRateCalculator pacingRateCalculator) {
   pacingRateCalculator_ = std::move(pacingRateCalculator);
+}
+
+void TokenlessPacer::setExperimental(bool experimental) {
+  experimental_ = experimental;
 }
 } // namespace quic

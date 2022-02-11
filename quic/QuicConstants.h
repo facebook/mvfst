@@ -138,6 +138,8 @@ enum class TransportKnobParamId : uint64_t {
   AUTO_BACKGROUND_MODE = 0x5555,
   // Use adaptive loss detection thresholds for reordering and timeout
   ADAPTIVE_LOSS_DETECTION = 0x5556,
+  // Enable experimental pacer settings
+  PACER_EXPERIMENTAL = 0x5557,
   // Set short header padding modulo size
   SHORT_HEADER_PADDING_KNOB = 0x6666,
 };
