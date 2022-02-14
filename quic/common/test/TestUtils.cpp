@@ -706,39 +706,19 @@ std::vector<int> getQLogEventIndices(
   return indices;
 }
 
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    LocalErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::LocalErrorCode &&
-      *errorCode.first.asLocalErrorCode() == error;
+bool matchError(QuicError errorCode, LocalErrorCode error) {
+  return errorCode.code.type() == QuicErrorCode::Type::LocalErrorCode &&
+      *errorCode.code.asLocalErrorCode() == error;
 }
 
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    TransportErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode &&
-      *errorCode.first.asTransportErrorCode() == error;
+bool matchError(QuicError errorCode, TransportErrorCode error) {
+  return errorCode.code.type() == QuicErrorCode::Type::TransportErrorCode &&
+      *errorCode.code.asTransportErrorCode() == error;
 }
 
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    ApplicationErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::ApplicationErrorCode &&
-      *errorCode.first.asApplicationErrorCode() == error;
-}
-
-bool matchError(
-    std::pair<QuicErrorCode, std::string> errorCode,
-    ApplicationErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::ApplicationErrorCode &&
-      *errorCode.first.asApplicationErrorCode() == error;
-}
-
-bool matchError(
-    std::pair<QuicErrorCode, std::string> errorCode,
-    TransportErrorCode error) {
-  return errorCode.first.type() == QuicErrorCode::Type::TransportErrorCode &&
-      *errorCode.first.asTransportErrorCode() == error;
+bool matchError(QuicError errorCode, ApplicationErrorCode error) {
+  return errorCode.code.type() == QuicErrorCode::Type::ApplicationErrorCode &&
+      *errorCode.code.asApplicationErrorCode() == error;
 }
 
 CongestionController::AckEvent::AckPacket makeAckPacketFromOutstandingPacket(

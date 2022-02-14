@@ -716,13 +716,13 @@ class QuicClientTransportTestBase : public virtual testing::Test {
     if (client->getConn().localConnectionError) {
       bool idleTimeout = false;
       const LocalErrorCode* localError =
-          client->getConn().localConnectionError->first.asLocalErrorCode();
+          client->getConn().localConnectionError->code.asLocalErrorCode();
       if (localError) {
         idleTimeout = (*localError == LocalErrorCode::IDLE_TIMEOUT);
       }
       if (!idleTimeout) {
         throw std::runtime_error(
-            toString(client->getConn().localConnectionError->first));
+            toString(client->getConn().localConnectionError->code));
       }
     }
   }

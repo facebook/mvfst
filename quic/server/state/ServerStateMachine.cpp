@@ -1134,8 +1134,8 @@ void onServerReadDataFromOpen(
           if (conn.qLogger) {
             conn.qLogger->addTransportStateUpdate(getPeerClose(errMsg));
           }
-          conn.peerConnectionError = std::make_pair(
-              QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+          conn.peerConnectionError =
+              QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
           if (getSendConnFlowControlBytesWire(conn) == 0 &&
               conn.flowControlState.sumCurStreamBufferLen) {
             VLOG(2) << "Client gives up a flow control blocked connection";
@@ -1384,8 +1384,8 @@ void onServerReadDataFromClosed(
         }
         // we want to deliver app callbacks with the peer supplied error,
         // but send a NO_ERROR to the peer.
-        conn.peerConnectionError = std::make_pair(
-            QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+        conn.peerConnectionError =
+            QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
         break;
       }
       default:

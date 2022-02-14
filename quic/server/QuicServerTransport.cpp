@@ -67,7 +67,7 @@ QuicServerTransport::~QuicServerTransport() {
   // transport.
   resetConnectionCallbacks();
   closeImpl(
-      std::make_pair(
+      QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from server destructor")),
       false);
@@ -416,15 +416,13 @@ void QuicServerTransport::onCryptoEventAvailable() noexcept {
     maybeNotifyTransportReady();
   } catch (const QuicTransportException& ex) {
     VLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;
-    closeImpl(
-        std::make_pair(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+    closeImpl(QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const QuicInternalException& ex) {
     VLOG(4) << "onCryptoEventAvailable() error " << ex.what() << " " << *this;
-    closeImpl(
-        std::make_pair(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+    closeImpl(QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const std::exception& ex) {
     VLOG(4) << "read() error " << ex.what() << " " << *this;
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string(ex.what())));
   }

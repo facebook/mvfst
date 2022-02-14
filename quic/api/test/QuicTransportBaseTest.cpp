@@ -218,7 +218,7 @@ class TestQuicTransport
     resetConnectionCallbacks();
     // we need to call close in the derived class.
     closeImpl(
-        std::make_pair(
+        QuicError(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
             std::string("shutdown")),
         false);
@@ -439,7 +439,7 @@ class TestQuicTransport
   }
 
   QuicErrorCode getConnectionError() {
-    return conn_->localConnectionError->first;
+    return conn_->localConnectionError->code;
   }
 
   bool isClosed() const noexcept {
@@ -578,8 +578,7 @@ TEST_F(QuicTransportImplTest, IdleTimeoutStreamMaessage) {
   EXPECT_CALL(readCb1, readError(stream1, _))
       .Times(1)
       .WillOnce(Invoke([](auto, auto error) {
-        EXPECT_EQ(
-            "Idle timeout, num non control streams: 2", error.second->str());
+        EXPECT_EQ("Idle timeout, num non control streams: 2", error.message);
       }));
   transport->invokeIdleTimeout();
 }
@@ -1386,12 +1385,9 @@ TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
   transport->setReadCallback(stream, &rcb);
   EXPECT_CALL(rcb, readError(stream, _))
       .Times(1)
-      .WillOnce(Invoke(
-          [](StreamId,
-             std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
-                 error) {
-            EXPECT_EQ("You need to calm down.", *error.second);
-          }));
+      .WillOnce(Invoke([](StreamId, QuicError error) {
+        EXPECT_EQ("You need to calm down.", error.message);
+      }));
 
   EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
     throw std::runtime_error("You need to calm down.");
@@ -1412,7 +1408,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(
       connSetupCallback,
-      onConnectionSetupError(std::make_pair(
+      onConnectionSetupError(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string("Well there's your problem"))));
   EXPECT_CALL(*socketPtr, write(_, _)).WillOnce(Invoke([](auto&, auto&) {
@@ -2505,7 +2501,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
         wcb,
         onConnectionWriteError(
             IsAppError(GenericApplicationErrorCode::UNKNOWN)));
-    transport->close(std::make_pair(
+    transport->close(QuicError(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("Bye")));
   } else {
@@ -2546,7 +2542,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
         wcb,
         onStreamWriteError(
             stream, IsAppError(GenericApplicationErrorCode::UNKNOWN)));
-    transport->close(std::make_pair(
+    transport->close(QuicError(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("Bye")));
   } else {
@@ -2709,7 +2705,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   EXPECT_CALL(txCb, onByteEventRegistered(getTxMatcher(stream, 4)));
   EXPECT_FALSE(transport->registerTxCallback(stream, 0, &txCb).hasError());
   EXPECT_FALSE(transport->registerTxCallback(stream, 4, &txCb).hasError());
-  transport->close(std::make_pair(
+  transport->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("Error")));
 
@@ -3635,15 +3631,11 @@ TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
 
-  const std::pair<QuicErrorCode, std::string> defaultError = std::make_pair(
+  const QuicError defaultError = QuicError(
       GenericApplicationErrorCode::NO_ERROR,
       toString(GenericApplicationErrorCode::NO_ERROR));
   EXPECT_CALL(
-      *cb,
-      close(
-          transport.get(),
-          folly::Optional<std::pair<QuicErrorCode, std::string>>(
-              defaultError)));
+      *cb, close(transport.get(), folly::Optional<QuicError>(defaultError)));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;
@@ -3658,14 +3650,11 @@ TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
 
-  const auto testError = std::make_pair(
+  const auto testError = QuicError(
       QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
       std::string("testError"));
   EXPECT_CALL(
-      *cb,
-      close(
-          transport.get(),
-          folly::Optional<std::pair<QuicErrorCode, std::string>>(testError)));
+      *cb, close(transport.get(), folly::Optional<QuicError>(testError)));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(cb.get());
   InSequence s;

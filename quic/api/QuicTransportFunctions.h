@@ -219,7 +219,7 @@ void writeCloseCommon(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher);
 
@@ -233,7 +233,7 @@ void writeLongClose(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     LongHeader::Types headerType,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion);
@@ -246,7 +246,7 @@ void writeShortClose(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher);
 

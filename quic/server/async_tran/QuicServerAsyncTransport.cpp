@@ -37,11 +37,10 @@ void QuicServerAsyncTransport::onConnectionEnd() noexcept {
   closeNowImpl(std::move(ex));
 }
 
-void QuicServerAsyncTransport::onConnectionError(
-    std::pair<QuicErrorCode, std::string> code) noexcept {
+void QuicServerAsyncTransport::onConnectionError(QuicError code) noexcept {
   folly::AsyncSocketException ex(
       folly::AsyncSocketException::UNKNOWN,
-      folly::to<std::string>("Quic connection error", code.second));
+      folly::to<std::string>("Quic connection error", code.message));
   closeNowImpl(std::move(ex));
 }
 

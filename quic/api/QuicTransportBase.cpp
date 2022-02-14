@@ -143,7 +143,7 @@ QuicTransportBase::~QuicTransportBase() {
   resetConnectionCallbacks();
 
   closeImpl(
-      std::make_pair(
+      QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from base destructor")),
       false);
@@ -173,8 +173,7 @@ bool QuicTransportBase::error() const {
   return conn_->localConnectionError.has_value();
 }
 
-void QuicTransportBase::close(
-    folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode) {
+void QuicTransportBase::close(folly::Optional<QuicError> errorCode) {
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   // The caller probably doesn't need a conn callback any more because they
   // explicitly called close.
@@ -183,7 +182,7 @@ void QuicTransportBase::close(
   // If we were called with no error code, ensure that we are going to write
   // an application close, so the peer knows it didn't come from the transport.
   if (!errorCode) {
-    errorCode = std::make_pair(
+    errorCode = QuicError(
         GenericApplicationErrorCode::NO_ERROR,
         toString(GenericApplicationErrorCode::NO_ERROR));
   }
@@ -191,13 +190,12 @@ void QuicTransportBase::close(
   conn_->logger.reset();
 }
 
-void QuicTransportBase::closeNow(
-    folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode) {
+void QuicTransportBase::closeNow(folly::Optional<QuicError> errorCode) {
   DCHECK(getEventBase() && getEventBase()->isInEventBaseThread());
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
   VLOG(4) << __func__ << " " << *this;
   if (!errorCode) {
-    errorCode = std::make_pair(
+    errorCode = QuicError(
         GenericApplicationErrorCode::NO_ERROR,
         toString(GenericApplicationErrorCode::NO_ERROR));
   }
@@ -230,8 +228,8 @@ void QuicTransportBase::closeGracefully() {
   VLOG(10) << "Stopping read and peek loopers due to graceful close " << *this;
   readLooper_->stop();
   peekLooper_->stop();
-  cancelAllAppCallbacks(std::make_pair(
-      QuicErrorCode(LocalErrorCode::NO_ERROR), "Graceful Close"));
+  cancelAllAppCallbacks(
+      QuicError(QuicErrorCode(LocalErrorCode::NO_ERROR), "Graceful Close"));
   // All streams are closed, close the transport for realz.
   if (conn_->streamManager->streamCount() == 0) {
     closeImpl(folly::none);
@@ -241,7 +239,7 @@ void QuicTransportBase::closeGracefully() {
 // TODO: t64691045 change the closeImpl API to include both the sanitized and
 // unsanited error message, remove exceptionCloseWhat_.
 void QuicTransportBase::closeImpl(
-    folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode,
+    folly::Optional<QuicError> errorCode,
     bool drainConnection,
     bool sendCloseImmediately) {
   if (closeState_ == CloseState::CLOSED) {
@@ -298,9 +296,9 @@ void QuicTransportBase::closeImpl(
   // TODO: truncate the error code string to be 1MSS only.
   closeState_ = CloseState::CLOSED;
   updatePacingOnClose(*conn_);
-  auto cancelCode = std::make_pair(
+  auto cancelCode = QuicError(
       QuicErrorCode(LocalErrorCode::NO_ERROR),
-      toString(LocalErrorCode::NO_ERROR));
+      toString(LocalErrorCode::NO_ERROR).str());
   if (conn_->peerConnectionError) {
     cancelCode = *conn_->peerConnectionError;
   } else if (errorCode) {
@@ -310,14 +308,14 @@ void QuicTransportBase::closeImpl(
   // errorCode will be used for localConnectionError, and sent in close frames.
   // It's safe to include the unsanitized error message in cancelCode
   if (exceptionCloseWhat_) {
-    cancelCode.second = exceptionCloseWhat_.value();
+    cancelCode.message = exceptionCloseWhat_.value();
   }
 
   bool isReset = false;
   bool isAbandon = false;
   bool isInvalidMigration = false;
-  LocalErrorCode* localError = cancelCode.first.asLocalErrorCode();
-  TransportErrorCode* transportError = cancelCode.first.asTransportErrorCode();
+  LocalErrorCode* localError = cancelCode.code.asLocalErrorCode();
+  TransportErrorCode* transportError = cancelCode.code.asTransportErrorCode();
   if (localError) {
     isReset = *localError == LocalErrorCode::CONNECTION_RESET;
     isAbandon = *localError == LocalErrorCode::CONNECTION_ABANDONED;
@@ -329,8 +327,8 @@ void QuicTransportBase::closeImpl(
                         << *this;
   if (errorCode) {
     conn_->localConnectionError = errorCode;
-    std::string errorStr = conn_->localConnectionError->second;
-    std::string errorCodeStr = errorCode->second;
+    std::string errorStr = conn_->localConnectionError->message;
+    std::string errorCodeStr = errorCode->message;
     if (conn_->qLogger) {
       conn_->qLogger->addConnectionClose(
           errorStr, errorCodeStr, drainConnection, sendCloseImmediately);
@@ -435,12 +433,11 @@ void QuicTransportBase::closeImpl(
   }
 }
 
-bool QuicTransportBase::processCancelCode(
-    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
   bool noError = false;
-  switch (cancelCode.first.type()) {
+  switch (cancelCode.code.type()) {
     case QuicErrorCode::Type::LocalErrorCode: {
-      LocalErrorCode localErrorCode = *cancelCode.first.asLocalErrorCode();
+      LocalErrorCode localErrorCode = *cancelCode.code.asLocalErrorCode();
       noError = localErrorCode == LocalErrorCode::NO_ERROR ||
           localErrorCode == LocalErrorCode::IDLE_TIMEOUT ||
           localErrorCode == LocalErrorCode::SHUTTING_DOWN;
@@ -448,45 +445,44 @@ bool QuicTransportBase::processCancelCode(
     }
     case QuicErrorCode::Type::TransportErrorCode: {
       TransportErrorCode transportErrorCode =
-          *cancelCode.first.asTransportErrorCode();
+          *cancelCode.code.asTransportErrorCode();
       noError = transportErrorCode == TransportErrorCode::NO_ERROR;
       break;
     }
     case QuicErrorCode::Type::ApplicationErrorCode:
-      auto appErrorCode = *cancelCode.first.asApplicationErrorCode();
+      auto appErrorCode = *cancelCode.code.asApplicationErrorCode();
       noError = appErrorCode == GenericApplicationErrorCode::NO_ERROR;
   }
   return noError;
 }
 
-void QuicTransportBase::processConnectionEndError(
-    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+void QuicTransportBase::processConnectionEndError(const QuicError& cancelCode) {
   bool noError = processCancelCode(cancelCode);
   if (noError) {
     connCallback_->onConnectionEnd();
   } else {
     connCallback_->onConnectionError(
-        std::make_pair(cancelCode.first, cancelCode.second.str()));
+        QuicError(cancelCode.code, cancelCode.message));
   }
 }
 
 void QuicTransportBase::processConnectionEndErrorSplitCallbacks(
-    const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode) {
+    const QuicError& cancelCode) {
   bool noError = processCancelCode(cancelCode);
   if (noError) {
     if (transportReadyNotified_) {
       connCallback_->onConnectionEnd();
     } else {
       connCallback_->onConnectionSetupError(
-          std::make_pair(cancelCode.first, cancelCode.second.str()));
+          QuicError(cancelCode.code, cancelCode.message));
     }
   } else {
     if (transportReadyNotified_) {
       connCallback_->onConnectionError(
-          std::make_pair(cancelCode.first, cancelCode.second.str()));
+          QuicError(cancelCode.code, cancelCode.message));
     } else {
       connCallback_->onConnectionSetupError(
-          std::make_pair(cancelCode.first, cancelCode.second.str()));
+          QuicError(cancelCode.code, cancelCode.message));
     }
   }
 }
@@ -849,8 +845,7 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
       peekCallbacks_.erase(streamId);
       VLOG(10) << "invoking read error callbacks on stream=" << streamId << " "
                << *this;
-      readCb->readError(
-          streamId, std::make_pair(*stream->streamReadError, folly::none));
+      readCb->readError(streamId, QuicError(*stream->streamReadError));
     } else if (
         readCb && callback->second.resumed && stream->hasReadableData()) {
       VLOG(10) << "invoking read callbacks on stream=" << streamId << " "
@@ -996,8 +991,7 @@ void QuicTransportBase::invokePeekDataAndCallbacks() {
     if (peekCb && stream->streamReadError) {
       VLOG(10) << "invoking peek error callbacks on stream=" << streamId << " "
                << *this;
-      peekCb->peekError(
-          streamId, std::make_pair(*stream->streamReadError, folly::none));
+      peekCb->peekError(streamId, QuicError(*stream->streamReadError));
     } else if (
         peekCb && !stream->streamReadError && stream->hasPeekableData()) {
       VLOG(10) << "invoking peek callbacks on stream=" << streamId << " "
@@ -1263,19 +1257,19 @@ folly::Expected<std::pair<Buf, bool>, LocalErrorCode> QuicTransportBase::read(
   } catch (const QuicTransportException& ex) {
     VLOG(4) << "read() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
-        QuicErrorCode(ex.errorCode()), std::string("read() error")));
+    closeImpl(
+        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
     return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
-        QuicErrorCode(ex.errorCode()), std::string("read() error")));
+    closeImpl(
+        QuicError(QuicErrorCode(ex.errorCode()), std::string("read() error")));
     return folly::makeUnexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << "read()  error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("read() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
@@ -1374,20 +1368,20 @@ folly::
   } catch (const QuicTransportException& ex) {
     VLOG(4) << "consume() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("consume() error")));
     return folly::makeUnexpected(
         ConsumeError{LocalErrorCode::TRANSPORT_ERROR, readOffset});
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("consume() error")));
     return folly::makeUnexpected(ConsumeError{ex.errorCode(), readOffset});
   } catch (const std::exception& ex) {
     VLOG(4) << "consume() error " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("consume() error")));
     return folly::makeUnexpected(
@@ -1809,21 +1803,21 @@ void QuicTransportBase::onNetworkData(
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     return closeImpl(
-        std::make_pair(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     return closeImpl(
-        std::make_pair(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const QuicApplicationException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
     return closeImpl(
-        std::make_pair(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+        QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    return closeImpl(std::make_pair(
+    return closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("error onNetworkData()")));
   }
@@ -1997,14 +1991,14 @@ QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
     if (!self->conn_->streamManager->streamExists(id)) {
       self->pendingWriteCallbacks_.erase(wcbIt);
       writeCallback->onStreamWriteError(
-          id, std::make_pair(LocalErrorCode::STREAM_NOT_EXISTS, folly::none));
+          id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
       return;
     }
     auto stream = self->conn_->streamManager->getStream(id);
     if (!stream->writable()) {
       self->pendingWriteCallbacks_.erase(wcbIt);
       writeCallback->onStreamWriteError(
-          id, std::make_pair(LocalErrorCode::STREAM_NOT_EXISTS, folly::none));
+          id, QuicError(LocalErrorCode::STREAM_NOT_EXISTS));
       return;
     }
     auto maxCanWrite = self->maxWritableOnStream(*stream);
@@ -2077,21 +2071,21 @@ QuicSocket::WriteResult QuicTransportBase::writeChain(
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
@@ -2153,21 +2147,21 @@ QuicSocket::WriteResult QuicTransportBase::writeBufMeta(
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
@@ -2347,21 +2341,21 @@ folly::Expected<folly::Unit, LocalErrorCode> QuicTransportBase::resetStream(
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
     return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("resetStream() error")));
     return folly::makeUnexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("resetStream() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);
@@ -2480,19 +2474,19 @@ void QuicTransportBase::lossTimeoutExpired() noexcept {
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()),
         std::string("lossTimeoutExpired() error")));
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()),
         std::string("lossTimeoutExpired() error")));
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << "  " << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("lossTimeoutExpired() error")));
   }
@@ -2525,7 +2519,7 @@ void QuicTransportBase::pathValidationTimeoutExpired() noexcept {
   // TODO junqiw probing is not supported, so pathValidation==connMigration
   // We decide to close conn when pathValidation to migrated path fails.
   FOLLY_MAYBE_UNUSED auto self = sharedGuard();
-  closeImpl(std::make_pair(
+  closeImpl(QuicError(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("Path validation timed out")));
 }
@@ -2540,7 +2534,7 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
   auto localError =
       drain ? LocalErrorCode::IDLE_TIMEOUT : LocalErrorCode::SHUTTING_DOWN;
   closeImpl(
-      std::make_pair(
+      quic::QuicError(
           QuicErrorCode(localError),
           folly::to<std::string>(
               toString(localError),
@@ -2727,8 +2721,7 @@ void QuicTransportBase::setEarlyDataAppParamsFunctions(
   conn_->earlyDataAppParamsGetter = std::move(getter);
 }
 
-void QuicTransportBase::cancelAllAppCallbacks(
-    const std::pair<QuicErrorCode, folly::StringPiece>& err) noexcept {
+void QuicTransportBase::cancelAllAppCallbacks(const QuicError& err) noexcept {
   SCOPE_EXIT {
     checkForClosedStream();
     updateReadLooper();
@@ -2795,7 +2788,8 @@ void QuicTransportBase::resetNonControlStreams(
     if (isSendingStream(conn_->nodeType, id) || isBidirectionalStream(id)) {
       auto writeCallbackIt = pendingWriteCallbacks_.find(id);
       if (writeCallbackIt != pendingWriteCallbacks_.end()) {
-        writeCallbackIt->second->onStreamWriteError(id, {error, errorMsg});
+        writeCallbackIt->second->onStreamWriteError(
+            id, QuicError(error, errorMsg.str()));
       }
       resetStream(id, error);
     }
@@ -2803,7 +2797,8 @@ void QuicTransportBase::resetNonControlStreams(
       auto readCallbackIt = readCallbacks_.find(id);
       if (readCallbackIt != readCallbacks_.end() &&
           readCallbackIt->second.readCb) {
-        readCallbackIt->second.readCb->readError(id, {error, errorMsg});
+        readCallbackIt->second.readCb->readError(
+            id, QuicError(error, errorMsg.str()));
       }
       peekCallbacks_.erase(id);
       stopSending(id, error);
@@ -3083,19 +3078,19 @@ void QuicTransportBase::writeSocketDataAndCatch() {
   } catch (const QuicTransportException& ex) {
     VLOG(4) << __func__ << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()),
         std::string("writeSocketDataAndCatch()  error")));
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()),
         std::string("writeSocketDataAndCatch()  error")));
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " error=" << ex.what() << " " << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeSocketDataAndCatch()  error")));
   }
@@ -3497,21 +3492,21 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::TRANSPORT_ERROR);
   } catch (const QuicInternalException& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(ex.errorCode()), std::string("writeChain() error")));
     return folly::makeUnexpected(ex.errorCode());
   } catch (const std::exception& ex) {
     VLOG(4) << __func__ << " streamId=" << id << " " << ex.what() << " "
             << *this;
     exceptionCloseWhat_ = ex.what();
-    closeImpl(std::make_pair(
+    closeImpl(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("writeChain() error")));
     return folly::makeUnexpected(LocalErrorCode::INTERNAL_ERROR);

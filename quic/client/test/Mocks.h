@@ -76,9 +76,7 @@ class MockClientHandshake : public ClientHandshake {
 
 class MockQuicConnectorCallback : public quic::QuicConnector::Callback {
  public:
-  MOCK_METHOD1(
-      onConnectError,
-      void(std::pair<quic::QuicErrorCode, std::string>));
+  MOCK_METHOD1(onConnectError, void(QuicError));
   MOCK_METHOD0(onConnectSuccess, void());
 };
 
@@ -99,7 +97,7 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
 
   void start(ConnectionSetupCallback* connSetupCb, ConnectionCallbackNew*)
       override {
-    auto cancelCode = std::make_pair(
+    auto cancelCode = QuicError(
         QuicErrorCode(LocalErrorCode::NO_ERROR),
         toString(LocalErrorCode::NO_ERROR).str());
 

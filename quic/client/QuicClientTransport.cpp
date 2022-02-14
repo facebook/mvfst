@@ -93,7 +93,7 @@ QuicClientTransport::~QuicClientTransport() {
   resetConnectionCallbacks();
   // Close without draining.
   closeImpl(
-      std::make_pair(
+      QuicError(
           QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
           std::string("Closing from client destructor")),
       false);
@@ -181,7 +181,7 @@ void QuicClientTransport::processPacketData(
     const auto& token = clientConn_->statelessResetToken;
     if (statelessReset->token == token) {
       VLOG(4) << "Received Stateless Reset " << *this;
-      conn_->peerConnectionError = std::make_pair(
+      conn_->peerConnectionError = QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
           toString(LocalErrorCode::CONNECTION_RESET).str());
       throw QuicInternalException("Peer reset", LocalErrorCode::NO_ERROR);
@@ -564,8 +564,8 @@ void QuicClientTransport::processPacketData(
         if (conn_->qLogger) {
           conn_->qLogger->addTransportStateUpdate(getPeerClose(errMsg));
         }
-        conn_->peerConnectionError = std::make_pair(
-            QuicErrorCode(connFrame.errorCode), std::move(errMsg));
+        conn_->peerConnectionError =
+            QuicError(QuicErrorCode(connFrame.errorCode), std::move(errMsg));
         throw QuicTransportException(
             "Peer closed", TransportErrorCode::NO_ERROR);
         break;
@@ -1051,8 +1051,8 @@ void QuicClientTransport::errMessage(
     if (!happyEyeballsState.shouldWriteToFirstSocket &&
         !happyEyeballsState.shouldWriteToSecondSocket) {
       runOnEvbAsync([errString = std::move(errStr)](auto self) {
-        auto quicError = std::make_pair(
-            QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
+        auto quicError =
+            QuicError(QuicErrorCode(LocalErrorCode::CONNECT_FAILED), errString);
         auto clientPtr = static_cast<QuicClientTransport*>(self.get());
         clientPtr->closeImpl(std::move(quicError), false, false);
       });
@@ -1069,7 +1069,7 @@ void QuicClientTransport::onReadError(
     // draining the socket.
     runOnEvbAsync([ex](auto self) {
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeNow(std::make_pair(
+      clientPtr->closeNow(QuicError(
           QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED),
           std::string(ex.what())));
     });
@@ -1546,20 +1546,20 @@ void QuicClientTransport::start(
   } catch (const QuicTransportException& ex) {
     runOnEvbAsync([ex](auto self) {
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(std::make_pair(
-          QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+      clientPtr->closeImpl(
+          QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
     });
   } catch (const QuicInternalException& ex) {
     runOnEvbAsync([ex](auto self) {
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(std::make_pair(
-          QuicErrorCode(ex.errorCode()), std::string(ex.what())));
+      clientPtr->closeImpl(
+          QuicError(QuicErrorCode(ex.errorCode()), std::string(ex.what())));
     });
   } catch (const std::exception& ex) {
     LOG(ERROR) << "Connect failed " << ex.what();
     runOnEvbAsync([ex](auto self) {
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      clientPtr->closeImpl(std::make_pair(
+      clientPtr->closeImpl(QuicError(
           QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
           std::string(ex.what())));
     });

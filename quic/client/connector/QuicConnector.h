@@ -31,8 +31,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
   class Callback {
    public:
     virtual ~Callback() = default;
-    virtual void onConnectError(
-        std::pair<quic::QuicErrorCode, std::string> errorCode) = 0;
+    virtual void onConnectError(QuicError errorCode) = 0;
     virtual void onConnectSuccess() = 0;
   };
 
@@ -78,8 +77,7 @@ class QuicConnector : private quic::QuicSocket::ConnectionSetupCallback,
 
   // QuicSocket::ConnectionSetupCallback overrides.
   void onFirstPeerPacketProcessed() noexcept override {}
-  void onConnectionSetupError(
-      std::pair<quic::QuicErrorCode, std::string> code) noexcept override;
+  void onConnectionSetupError(QuicError code) noexcept override;
   void onTransportReady() noexcept override {}
   void onReplaySafe() noexcept override;
 

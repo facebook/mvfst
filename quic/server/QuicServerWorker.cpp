@@ -1296,7 +1296,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
     transport->setTransportStatsCallback(nullptr);
     transport->setHandshakeFinishedCallback(nullptr);
     transport->closeNow(
-        std::make_pair(QuicErrorCode(error), std::string("shutting down")));
+        QuicError(QuicErrorCode(error), std::string("shutting down")));
   }
 
   // Shut down all transports with bound connection ids.
@@ -1306,7 +1306,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
       t->setTransportStatsCallback(nullptr);
       t->setHandshakeFinishedCallback(nullptr);
       t->closeNow(
-          std::make_pair(QuicErrorCode(error), std::string("shutting down")));
+          QuicError(QuicErrorCode(error), std::string("shutting down")));
       QUIC_STATS(statsCallback_, onConnectionClose, QuicErrorCode(error));
     }
   }

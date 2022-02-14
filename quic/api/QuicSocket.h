@@ -48,8 +48,7 @@ class QuicSocket {
     /**
      * Invoked when the connection setup fails.
      */
-    virtual void onConnectionSetupError(
-        std::pair<QuicErrorCode, std::string> code) noexcept = 0;
+    virtual void onConnectionSetupError(QuicError code) noexcept = 0;
 
     /**
      * Called when the transport is ready to send/receive data.
@@ -110,8 +109,7 @@ class QuicSocket {
     /**
      * Invoked when the connection closed in error
      */
-    virtual void onConnectionError(
-        std::pair<QuicErrorCode, std::string> code) noexcept = 0;
+    virtual void onConnectionError(QuicError code) noexcept = 0;
 
     /**
      * Called when more bidirectional streams become available for creation
@@ -333,8 +331,7 @@ class QuicSocket {
    * Close this socket with a drain period. If closing with an error, it may be
    * specified.
    */
-  virtual void close(
-      folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode) = 0;
+  virtual void close(folly::Optional<QuicError> errorCode) = 0;
 
   /**
    * Close this socket gracefully, by waiting for all the streams to be idle
@@ -346,8 +343,7 @@ class QuicSocket {
    * Close this socket without a drain period. If closing with an error, it may
    * be specified.
    */
-  virtual void closeNow(
-      folly::Optional<std::pair<QuicErrorCode, std::string>> errorCode) = 0;
+  virtual void closeNow(folly::Optional<QuicError> errorCode) = 0;
 
   /**
    * Returns the event base associated with this socket
@@ -532,10 +528,7 @@ class QuicSocket {
     /**
      * Called from the transport layer when there is an error on the stream.
      */
-    virtual void readError(
-        StreamId id,
-        std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
-            error) noexcept = 0;
+    virtual void readError(StreamId id, QuicError error) noexcept = 0;
   };
 
   /**
@@ -661,10 +654,7 @@ class QuicSocket {
      * Called from the transport layer during peek time when there is an error
      * on the stream.
      */
-    virtual void peekError(
-        StreamId id,
-        std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
-            error) noexcept = 0;
+    virtual void peekError(StreamId id, QuicError error) noexcept = 0;
   };
 
   virtual folly::Expected<folly::Unit, LocalErrorCode> setPeekCallback(
@@ -824,16 +814,14 @@ class QuicSocket {
      */
     virtual void onStreamWriteError(
         StreamId /* id */,
-        std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
-        /* error */) noexcept {}
+        QuicError /* error */) noexcept {}
 
     /**
      * Invoked when a connection is being torn down after
      * notifyPendingWriteOnConnection has been called
      */
-    virtual void onConnectionWriteError(
-        std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>
-        /* error */) noexcept {}
+    virtual void onConnectionWriteError(QuicError
+                                        /* error */) noexcept {}
   };
 
   /**

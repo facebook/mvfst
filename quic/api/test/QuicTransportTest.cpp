@@ -1675,9 +1675,9 @@ TEST_F(QuicTransportTest, PathValidationTimeoutExpired) {
   EXPECT_EQ(transport_->closeState(), CloseState::CLOSED);
   EXPECT_TRUE(conn.localConnectionError);
   EXPECT_EQ(
-      conn.localConnectionError->first,
+      conn.localConnectionError->code,
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION));
-  EXPECT_EQ(conn.localConnectionError->second, "Path validation timed out");
+  EXPECT_EQ(conn.localConnectionError->message, "Path validation timed out");
 }
 
 TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {

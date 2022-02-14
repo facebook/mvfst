@@ -174,25 +174,9 @@ uint64_t computeExpectedDelay(
     uint8_t ackDelayExponent);
 
 // match error functions
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    LocalErrorCode error);
-
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    TransportErrorCode error);
-
-bool matchError(
-    std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>> errorCode,
-    ApplicationErrorCode error);
-
-bool matchError(
-    std::pair<QuicErrorCode, std::string> errorCode,
-    ApplicationErrorCode error);
-
-bool matchError(
-    std::pair<QuicErrorCode, std::string> errorCode,
-    TransportErrorCode error);
+bool matchError(QuicError errorCode, LocalErrorCode error);
+bool matchError(QuicError errorCode, TransportErrorCode error);
+bool matchError(QuicError errorCode, ApplicationErrorCode error);
 
 ConnectionId getTestConnectionId(
     uint32_t hostId = 0,

@@ -255,26 +255,24 @@ std::string toString(QuicErrorCode code) {
   folly::assume_unreachable();
 }
 
-std::string toString(
-    const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>&
-        error) {
+std::string toString(const QuicError& error) {
   std::string err;
-  switch (error.first.type()) {
+  switch (error.code.type()) {
     case QuicErrorCode::Type::ApplicationErrorCode:
       err = "ApplicationError: " +
-          toString(*error.first.asApplicationErrorCode()) + ", ";
+          toString(*error.code.asApplicationErrorCode()) + ", ";
       break;
     case QuicErrorCode::Type::LocalErrorCode:
       err = "LocalError: " +
-          folly::to<std::string>(toString(*error.first.asLocalErrorCode())) +
+          folly::to<std::string>(toString(*error.code.asLocalErrorCode())) +
           ", ";
       break;
     case QuicErrorCode::Type::TransportErrorCode:
-      err = "TransportError: " + toString(*error.first.asTransportErrorCode()) +
+      err = "TransportError: " + toString(*error.code.asTransportErrorCode()) +
           ", ";
   }
-  if (error.second) {
-    err = folly::to<std::string>(err, error.second.value());
+  if (!error.message.empty()) {
+    err = folly::to<std::string>(err, error.message);
   }
   return err;
 }

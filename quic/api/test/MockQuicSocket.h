@@ -26,13 +26,9 @@ class MockQuicSocket : public QuicSocket {
   MOCK_CONST_METHOD0(good, bool());
   MOCK_CONST_METHOD0(replaySafe, bool());
   MOCK_CONST_METHOD0(error, bool());
-  MOCK_METHOD1(
-      close,
-      void(folly::Optional<std::pair<QuicErrorCode, std::string>>));
+  MOCK_METHOD1(close, void(folly::Optional<QuicError>));
   MOCK_METHOD0(closeGracefully, void());
-  MOCK_METHOD1(
-      closeNow,
-      void(folly::Optional<std::pair<QuicErrorCode, std::string>>));
+  MOCK_METHOD1(closeNow, void(folly::Optional<QuicError>));
   MOCK_CONST_METHOD0(
       getClientConnectionId,
       folly::Optional<quic::ConnectionId>());

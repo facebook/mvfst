@@ -23,6 +23,18 @@ namespace quic {
 
 DECLARE_VARIANT_TYPE(QuicErrorCode, QUIC_ERROR_CODE)
 
+struct QuicError {
+  QuicError(QuicErrorCode codeIn, const std::string& messageIn)
+      : code(codeIn), message(messageIn) {}
+  explicit QuicError(QuicErrorCode codeIn) : code(codeIn) {}
+  bool operator==(const QuicError& other) const {
+    return code == other.code && message == other.message;
+  }
+
+  QuicErrorCode code;
+  std::string message;
+};
+
 class QuicTransportException : public std::runtime_error {
  public:
   explicit QuicTransportException(
@@ -99,8 +111,7 @@ folly::StringPiece toString(LocalErrorCode code);
 // copy on return here as well.
 std::string toString(TransportErrorCode code);
 std::string toString(QuicErrorCode code);
-std::string toString(
-    const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>& error);
+std::string toString(const QuicError& error);
 
 std::string cryptoErrorToString(TransportErrorCode code);
 std::vector<TransportErrorCode> getAllTransportErrorCodes();
@@ -111,10 +122,7 @@ inline std::ostream& operator<<(std::ostream& os, const QuicErrorCode& error) {
   return os;
 }
 
-inline std::ostream& operator<<(
-    std::ostream& os,
-    const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>&
-        error) {
+inline std::ostream& operator<<(std::ostream& os, const QuicError& error) {
   os << toString(error);
   return os;
 }

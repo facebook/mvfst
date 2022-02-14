@@ -68,13 +68,11 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   bool error() const override;
 
-  void close(
-      folly::Optional<std::pair<QuicErrorCode, std::string>> error) override;
+  void close(folly::Optional<QuicError> error) override;
 
   void closeGracefully() override;
 
-  void closeNow(
-      folly::Optional<std::pair<QuicErrorCode, std::string>> error) override;
+  void closeNow(folly::Optional<QuicError> error) override;
 
   folly::Expected<size_t, LocalErrorCode> getStreamReadOffset(
       StreamId id) const override;
@@ -622,8 +620,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     conn_->loopDetectorCallback = std::move(callback);
   }
 
-  virtual void cancelAllAppCallbacks(
-      const std::pair<QuicErrorCode, folly::StringPiece>& error) noexcept;
+  virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
   /**
    * Adds an observer.
@@ -732,7 +729,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       folly::Function<void(std::shared_ptr<QuicTransportBase>)> func);
 
   void closeImpl(
-      folly::Optional<std::pair<QuicErrorCode, std::string>> error,
+      folly::Optional<QuicError> error,
       bool drainConnection = true,
       bool sendCloseImmediately = true);
   folly::Expected<folly::Unit, LocalErrorCode> pauseOrResumeRead(
@@ -858,12 +855,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     connCallback_ = nullptr;
   }
 
-  bool processCancelCode(
-      const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
-  void processConnectionEndError(
-      const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
-  void processConnectionEndErrorSplitCallbacks(
-      const std::pair<QuicErrorCode, folly::StringPiece>& cancelCode);
+  bool processCancelCode(const QuicError& cancelCode);
+  void processConnectionEndError(const QuicError& cancelCode);
+  void processConnectionEndErrorSplitCallbacks(const QuicError& cancelCode);
 
   class CallbackDispatcher : public folly::DelayedDestruction,
                              public ConnectionSetupCallback,
@@ -888,8 +882,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       folly::DelayedDestruction::DestructorGuard dg(this);
       CHECK_NOTNULL(connSetupCallback_)->onFirstPeerPacketProcessed();
     }
-    void onConnectionSetupError(
-        std::pair<QuicErrorCode, std::string> code) noexcept override {
+    void onConnectionSetupError(QuicError code) noexcept override {
       folly::DelayedDestruction::DestructorGuard dg(this);
       CHECK_NOTNULL(connSetupCallback_)
           ->onConnectionSetupError(std::move(code));
@@ -917,8 +910,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       folly::DelayedDestruction::DestructorGuard dg(this);
       CHECK_NOTNULL(connStreamsCallback_)->onConnectionEnd();
     }
-    void onConnectionError(
-        std::pair<QuicErrorCode, std::string> code) noexcept override {
+    void onConnectionError(QuicError code) noexcept override {
       folly::DelayedDestruction::DestructorGuard dg(this);
       CHECK_NOTNULL(connStreamsCallback_)->onConnectionError(std::move(code));
     }

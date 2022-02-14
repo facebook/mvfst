@@ -386,8 +386,7 @@ class Observer {
    */
   virtual void close(
       QuicSocket* /* socket */,
-      const folly::Optional<
-          std::pair<QuicErrorCode, std::string>>& /* errorOpt */) noexcept {}
+      const folly::Optional<QuicError>& /* errorOpt */) noexcept {}
 
   /**
    * evbAttach() will be invoked when a new event base is attached to this

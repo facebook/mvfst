@@ -519,10 +519,10 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   folly::Optional<folly::SocketAddress> localAddress;
 
   // Local error on the connection.
-  folly::Optional<std::pair<QuicErrorCode, std::string>> localConnectionError;
+  folly::Optional<QuicError> localConnectionError;
 
   // Error sent on the connection by the peer.
-  folly::Optional<std::pair<QuicErrorCode, std::string>> peerConnectionError;
+  folly::Optional<QuicError> peerConnectionError;
 
   // Supported versions in order of preference. Only meaningful to clients.
   // TODO: move to client only conn state.

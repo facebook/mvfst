@@ -245,7 +245,7 @@ TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("how about no")));
   server->idleTimeout().cancelTimeout();
@@ -270,7 +270,7 @@ TEST_F(QuicServerTransportTest, InvalidMigrationNoDrain) {
       *expected,
       0 /* cipherOverhead */,
       0 /* largestAcked */));
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("migration disabled")));
   server->idleTimeout().cancelTimeout();
@@ -314,7 +314,7 @@ TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("stopping")));
   EXPECT_TRUE(verifyFramePresent(
@@ -324,7 +324,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithError) {
 }
 
 TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoError) {
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("stopping")));
   EXPECT_TRUE(verifyFramePresent(
@@ -377,7 +377,7 @@ TEST_F(QuicServerTransportTest, TestCloseConnectionWithNoErrorPendingStreams) {
       ++clientNextAppDataPacketNum,
       acks,
       PacketNumberSpace::AppData)));
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("stopping")));
 
@@ -534,7 +534,7 @@ TEST_F(QuicServerTransportTest, NoDataExceptCloseProcessedAfterClosing) {
 
   auto packet = std::move(builder).buildPacket();
 
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("hello")));
   EXPECT_TRUE(verifyFramePresent(
@@ -1288,14 +1288,14 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   deliverDataWithoutErrorCheck(packetToBuf(packet));
   // Now the transport should be closed
   EXPECT_EQ(
-      server->getConn().localConnectionError->first,
+      server->getConn().localConnectionError->code,
       QuicErrorCode(TransportErrorCode::NO_ERROR));
   EXPECT_EQ(
-      server->getConn().peerConnectionError->first,
+      server->getConn().peerConnectionError->code,
       QuicErrorCode(TransportErrorCode::NO_ERROR));
   auto closedMsg =
       folly::to<std::string>("Server closed by peer reason=", errMsg);
-  EXPECT_EQ(server->getConn().peerConnectionError->second, closedMsg);
+  EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
@@ -1331,13 +1331,13 @@ TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   // Now the transport should be closed
   EXPECT_EQ(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
-      server->getConn().localConnectionError->first);
+      server->getConn().localConnectionError->code);
   EXPECT_EQ(
-      server->getConn().peerConnectionError->first,
+      server->getConn().peerConnectionError->code,
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN));
   auto closedMsg =
       folly::to<std::string>("Server closed by peer reason=", errMsg);
-  EXPECT_EQ(server->getConn().peerConnectionError->second, closedMsg);
+  EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
@@ -1368,13 +1368,13 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionCloseTwice) {
   // Now the transport should be closed
   EXPECT_EQ(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
-      server->getConn().localConnectionError->first);
+      server->getConn().localConnectionError->code);
   EXPECT_EQ(
-      server->getConn().peerConnectionError->first,
+      server->getConn().peerConnectionError->code,
       QuicErrorCode(TransportErrorCode::NO_ERROR));
   auto closedMsg =
       folly::to<std::string>("Server closed by peer reason=", errMsg);
-  EXPECT_EQ(server->getConn().peerConnectionError->second, closedMsg);
+  EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
   EXPECT_TRUE(server->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       serverWrites,
@@ -1533,7 +1533,7 @@ TEST_F(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second, "Migration disabled");
+      server->getConn().localConnectionError->message, "Migration disabled");
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
 }
 
@@ -1650,7 +1650,7 @@ TEST_F(QuicServerTransportTest, ShortHeaderPacketWithNoFramesAfterClose) {
       }));
 
   // Close the connection
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("test close")));
   server->idleTimeout().cancelTimeout();
@@ -1746,7 +1746,7 @@ TEST_P(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second,
+      server->getConn().localConnectionError->message,
       "Probing not supported yet");
 
   std::vector<int> indices =
@@ -2068,7 +2068,7 @@ TEST_P(
 
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second,
+      server->getConn().localConnectionError->message,
       "Probing not supported yet");
 }
 
@@ -2100,7 +2100,7 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second, "Too many migrations");
+      server->getConn().localConnectionError->message, "Too many migrations");
   EXPECT_TRUE(server->isClosed());
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
@@ -3079,7 +3079,7 @@ TEST_F(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second,
+      server->getConn().localConnectionError->message,
       "Migration not allowed during handshake");
   EXPECT_TRUE(server->isClosed());
 
@@ -3113,7 +3113,7 @@ TEST_F(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second,
+      server->getConn().localConnectionError->message,
       "Migration not allowed during handshake");
 }
 
@@ -3146,7 +3146,7 @@ TEST_F(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second,
+      server->getConn().localConnectionError->message,
       "Migration not allowed during handshake");
 }
 
@@ -3177,7 +3177,7 @@ TEST_F(
   }
   EXPECT_TRUE(server->getConn().localConnectionError);
   EXPECT_EQ(
-      server->getConn().localConnectionError->second, "Migration disabled");
+      server->getConn().localConnectionError->message, "Migration disabled");
   EXPECT_EQ(server->getConn().streamManager->streamCount(), 0);
   EXPECT_EQ(server->getConn().pendingZeroRttData, nullptr);
   EXPECT_EQ(server->getConn().pendingOneRttData, nullptr);
@@ -3569,7 +3569,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestCloseWhileAsyncPending) {
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeUnfinished());
   recvClientFinished();
 
-  server->close(std::make_pair(
+  server->close(QuicError(
       QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
       std::string("hello")));
   EXPECT_TRUE(server->isClosed());

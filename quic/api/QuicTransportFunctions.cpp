@@ -1138,7 +1138,7 @@ void writeCloseCommon(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     PacketHeader&& header,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   // close is special, we're going to bypass all the packet sent logic for all
@@ -1161,20 +1161,20 @@ void writeCloseCommon(
             std::string("No error")),
         packetBuilder);
   } else {
-    switch (closeDetails->first.type()) {
+    switch (closeDetails->code.type()) {
       case QuicErrorCode::Type::ApplicationErrorCode:
         written = writeFrame(
             ConnectionCloseFrame(
-                QuicErrorCode(*closeDetails->first.asApplicationErrorCode()),
-                closeDetails->second,
+                QuicErrorCode(*closeDetails->code.asApplicationErrorCode()),
+                closeDetails->message,
                 quic::FrameType::CONNECTION_CLOSE_APP_ERR),
             packetBuilder);
         break;
       case QuicErrorCode::Type::TransportErrorCode:
         written = writeFrame(
             ConnectionCloseFrame(
-                QuicErrorCode(*closeDetails->first.asTransportErrorCode()),
-                closeDetails->second,
+                QuicErrorCode(*closeDetails->code.asTransportErrorCode()),
+                closeDetails->message,
                 quic::FrameType::CONNECTION_CLOSE),
             packetBuilder);
         break;
@@ -1240,7 +1240,7 @@ void writeLongClose(
     const ConnectionId& srcConnId,
     const ConnectionId& dstConnId,
     LongHeader::Types headerType,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher,
     QuicVersion version) {
@@ -1269,7 +1269,7 @@ void writeShortClose(
     folly::AsyncUDPSocket& sock,
     QuicConnectionStateBase& connection,
     const ConnectionId& connId,
-    folly::Optional<std::pair<QuicErrorCode, std::string>> closeDetails,
+    folly::Optional<QuicError> closeDetails,
     const Aead& aead,
     const PacketNumberCipher& headerCipher) {
   auto header = ShortHeader(

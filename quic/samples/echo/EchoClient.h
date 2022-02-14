@@ -50,10 +50,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
               << " on stream=" << streamId;
   }
 
-  void readError(
-      quic::StreamId streamId,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void readError(quic::StreamId streamId, QuicError error) noexcept override {
     LOG(ERROR) << "EchoClient failed read from stream=" << streamId
                << ", error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
@@ -81,15 +78,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     LOG(INFO) << "EchoClient connection end";
   }
 
-  void onConnectionSetupError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+  void onConnectionSetupError(QuicError error) noexcept override {
     onConnectionError(std::move(error));
   }
 
-  void onConnectionError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "EchoClient error: " << toString(error.first)
-               << "; errStr=" << error.second;
+  void onConnectionError(QuicError error) noexcept override {
+    LOG(ERROR) << "EchoClient error: " << toString(error.code)
+               << "; errStr=" << error.message;
     startDone_.post();
   }
 
@@ -104,10 +99,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     sendMessage(id, pendingOutput_[id]);
   }
 
-  void onStreamWriteError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
+      override {
     LOG(ERROR) << "EchoClient write error with stream=" << id
                << " error=" << toString(error);
   }

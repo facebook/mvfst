@@ -266,9 +266,7 @@ class StreamData {
 
   explicit StreamData(StreamId id) : id(id) {}
 
-  void setException(
-      const std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>&
-          err) {
+  void setException(const QuicError& err) {
     promise.setException(std::runtime_error(toString(err)));
     delete this;
   }
@@ -387,9 +385,9 @@ TEST_P(QuicClientTransportIntegrationTest, TLSAlert) {
   client->getNonConstConn().qLogger = qLogger;
   EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
-        LOG(ERROR) << "error: " << errorCode.second;
+        LOG(ERROR) << "error: " << errorCode.message;
         const TransportErrorCode* transportError =
-            errorCode.first.asTransportErrorCode();
+            errorCode.code.asTransportErrorCode();
         EXPECT_NE(transportError, nullptr);
         client->close(folly::none);
         this->checkTransportSummaryEvent(qLogger);
@@ -413,8 +411,8 @@ TEST_P(QuicClientTransportIntegrationTest, BadServerTest) {
   client->setTransportSettings(tp);
   EXPECT_CALL(clientConnSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](const auto& errorCode) {
-        LOG(ERROR) << "error: " << errorCode.second;
-        const LocalErrorCode* localError = errorCode.first.asLocalErrorCode();
+        LOG(ERROR) << "error: " << errorCode.message;
+        const LocalErrorCode* localError = errorCode.code.asLocalErrorCode();
         EXPECT_NE(localError, nullptr);
         this->checkTransportSummaryEvent(qLogger);
       }));
@@ -1078,16 +1076,10 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
     GMOCK_METHOD0_(, noexcept, , onTransportReadyMock, void());
     GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
     GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
-    void onConnectionSetupError(
-        std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+    void onConnectionSetupError(QuicError error) noexcept override {
       onConnectionError(std::move(error));
     }
-    GMOCK_METHOD1_(
-        ,
-        noexcept,
-        ,
-        onConnectionError,
-        void(std::pair<QuicErrorCode, std::string>));
+    GMOCK_METHOD1_(, noexcept, , onConnectionError, void(QuicError));
 
    private:
     std::shared_ptr<QuicSocket> socket_;
@@ -3036,7 +3028,7 @@ TEST_P(
   socketWrites.clear();
   EXPECT_CALL(readCb, readError(streamId, _));
   if (GetParam()) {
-    client->close(std::make_pair(
+    client->close(QuicError(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent(
@@ -3203,7 +3195,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, CloseConnectionWithError) {
   deliverData(packet->coalesce());
   socketWrites.clear();
   if (GetParam()) {
-    client->close(std::make_pair(
+    client->close(QuicError(
         QuicErrorCode(GenericApplicationErrorCode::UNKNOWN),
         std::string("stopping")));
     EXPECT_TRUE(verifyFramePresent(
@@ -3336,7 +3328,7 @@ TEST_P(QuicClientTransportAfterStartTestClose, TimeoutsNotSetAfterClose) {
       0 /* largestAcked */));
 
   if (GetParam()) {
-    client->close(std::make_pair(
+    client->close(QuicError(
         QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
         std::string("how about no")));
   } else {
@@ -4359,7 +4351,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveConnectionClose) {
   // Now the transport should be closed
   EXPECT_EQ(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
-      client->getConn().localConnectionError->first);
+      client->getConn().localConnectionError->code);
   EXPECT_TRUE(client->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
@@ -4391,7 +4383,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationClose) {
   // Now the transport should be closed
   EXPECT_EQ(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
-      client->getConn().localConnectionError->first);
+      client->getConn().localConnectionError->code);
   EXPECT_TRUE(client->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
@@ -4428,7 +4420,7 @@ TEST_F(QuicClientTransportAfterStartTest, ReceiveApplicationCloseNoError) {
   // Now the transport should be closed
   EXPECT_EQ(
       QuicErrorCode(TransportErrorCode::NO_ERROR),
-      client->getConn().localConnectionError->first);
+      client->getConn().localConnectionError->code);
   EXPECT_TRUE(client->isClosed());
   EXPECT_TRUE(verifyFramePresent(
       socketWrites,
@@ -4472,7 +4464,7 @@ TEST_F(QuicClientTransportAfterStartTest, DestroyWhileDraining) {
 
 TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
   // Drain first with no active streams
-  auto err = std::make_pair<QuicErrorCode, std::string>(
+  auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str());
   client->close(err);
@@ -4484,7 +4476,7 @@ TEST_F(QuicClientTransportAfterStartTest, CloseNowWhileDraining) {
 }
 
 TEST_F(QuicClientTransportAfterStartTest, ExpiredDrainTimeout) {
-  auto err = std::make_pair<QuicErrorCode, std::string>(
+  auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str());
   client->close(err);
@@ -4497,7 +4489,7 @@ TEST_F(QuicClientTransportAfterStartTest, ExpiredDrainTimeout) {
 
 TEST_F(QuicClientTransportAfterStartTest, WriteThrowsExceptionWhileDraining) {
   // Drain first with no active streams
-  auto err = std::make_pair<QuicErrorCode, std::string>(
+  auto err = QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str());
   EXPECT_CALL(*sock, write(_, _)).WillRepeatedly(SetErrnoAndReturn(EBADF, -1));
@@ -4729,7 +4721,7 @@ TEST_F(QuicClientTransportAfterStartTest, OneCloseFramePerRtt) {
   // Close the client transport. There could be multiple writes given how many
   // ciphers we have.
   EXPECT_CALL(*sock, write(_, _)).Times(AtLeast(1)).WillRepeatedly(Return(10));
-  client->close(std::make_pair<QuicErrorCode, std::string>(
+  client->close(QuicError(
       QuicErrorCode(LocalErrorCode::INTERNAL_ERROR),
       toString(LocalErrorCode::INTERNAL_ERROR).str()));
   EXPECT_TRUE(conn.lastCloseSentTime.hasValue());

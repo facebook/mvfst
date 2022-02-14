@@ -39,7 +39,7 @@ class TestQuicTransport
     // we need to call close in the derived class.
     resetConnectionCallbacks();
     closeImpl(
-        std::make_pair(
+        QuicError(
             QuicErrorCode(LocalErrorCode::SHUTTING_DOWN),
             std::string("shutdown")),
         false);

@@ -275,15 +275,13 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     sock_.reset();
   }
 
-  void onConnectionSetupError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+  void onConnectionSetupError(QuicError error) noexcept override {
     onConnectionError(std::move(error));
   }
 
-  void onConnectionError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "Conn errorCoded=" << toString(error.first)
-               << ", errorMsg=" << error.second;
+  void onConnectionError(QuicError error) noexcept override {
+    LOG(ERROR) << "Conn errorCoded=" << toString(error.code)
+               << ", errorMsg=" << error.message;
   }
 
   void onTransportReady() noexcept override {
@@ -325,10 +323,7 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     LOG(INFO) << "read available for stream id=" << id;
   }
 
-  void readError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void readError(quic::StreamId id, QuicError error) noexcept override {
     LOG(ERROR) << "Got read error on stream=" << id
                << " error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
@@ -361,10 +356,8 @@ class ServerStreamHandler : public quic::QuicSocket::ConnectionSetupCallback,
     }
   }
 
-  void onStreamWriteError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
+      override {
     LOG(ERROR) << "write error with stream=" << id
                << " error=" << toString(error);
   }
@@ -648,7 +641,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   void readError(
       quic::StreamId /*streamId*/,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
+      QuicError
       /*error*/) noexcept override {
     // A read error only terminates the ingress portion of the stream state.
     // Your application should probably terminate the egress portion via
@@ -686,14 +679,12 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     eventBase_.terminateLoopSoon();
   }
 
-  void onConnectionSetupError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+  void onConnectionSetupError(QuicError error) noexcept override {
     onConnectionError(std::move(error));
   }
 
-  void onConnectionError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "TPerfClient error: " << toString(error.first);
+  void onConnectionError(QuicError error) noexcept override {
+    LOG(ERROR) << "TPerfClient error: " << toString(error.code);
     eventBase_.terminateLoopSoon();
   }
 
@@ -703,10 +694,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
               << " is write ready with maxToSend=" << maxToSend;
   }
 
-  void onStreamWriteError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void onStreamWriteError(quic::StreamId id, QuicError error) noexcept
+      override {
     LOG(ERROR) << "TPerfClient write error with stream=" << id
                << " error=" << toString(error);
   }

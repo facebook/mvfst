@@ -356,8 +356,7 @@ void QuicStreamAsyncTransport::readAvailable(
 
 void QuicStreamAsyncTransport::readError(
     quic::StreamId /*streamId*/,
-    std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-        error) noexcept {
+    QuicError error) noexcept {
   ex_ = folly::AsyncSocketException(
       folly::AsyncSocketException::UNKNOWN,
       folly::to<std::string>("Quic read error: ", toString(error)));
@@ -513,8 +512,7 @@ void QuicStreamAsyncTransport::onStreamWriteReady(
 
 void QuicStreamAsyncTransport::onStreamWriteError(
     StreamId /*id*/,
-    std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-        error) noexcept {
+    QuicError error) noexcept {
   closeNowImpl(folly::AsyncSocketException(
       folly::AsyncSocketException::UNKNOWN,
       folly::to<std::string>("Quic write error: ", toString(error))));

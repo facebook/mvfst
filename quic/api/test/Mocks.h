@@ -44,14 +44,7 @@ class MockReadCallback : public QuicSocket::ReadCallback {
  public:
   ~MockReadCallback() override = default;
   GMOCK_METHOD1_(, noexcept, , readAvailable, void(StreamId));
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
-      readError,
-      void(
-          StreamId,
-          std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
+  GMOCK_METHOD2_(, noexcept, , readError, void(StreamId, QuicError));
 };
 
 class MockPeekCallback : public QuicSocket::PeekCallback {
@@ -63,14 +56,7 @@ class MockPeekCallback : public QuicSocket::PeekCallback {
       ,
       onDataAvailable,
       void(StreamId, const folly::Range<PeekIterator>&));
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
-      peekError,
-      void(
-          StreamId,
-          std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
+  GMOCK_METHOD2_(, noexcept, , peekError, void(StreamId, QuicError));
 };
 
 class MockDatagramCallback : public QuicSocket::DatagramCallback {
@@ -85,31 +71,14 @@ class MockWriteCallback : public QuicSocket::WriteCallback {
 
   GMOCK_METHOD2_(, noexcept, , onStreamWriteReady, void(StreamId, uint64_t));
   GMOCK_METHOD1_(, noexcept, , onConnectionWriteReady, void(uint64_t));
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
-      onStreamWriteError,
-      void(
-          StreamId,
-          std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      onConnectionWriteError,
-      void(std::pair<QuicErrorCode, folly::Optional<folly::StringPiece>>));
+  GMOCK_METHOD2_(, noexcept, , onStreamWriteError, void(StreamId, QuicError));
+  GMOCK_METHOD1_(, noexcept, , onConnectionWriteError, void(QuicError));
 };
 
 class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
  public:
   ~MockConnectionSetupCallback() override = default;
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      onConnectionSetupError,
-      void(std::pair<QuicErrorCode, std::string>));
+  GMOCK_METHOD1_(, noexcept, , onConnectionSetupError, void(QuicError));
   GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
   GMOCK_METHOD0_(, noexcept, , onTransportReady, void());
   GMOCK_METHOD0_(, noexcept, , onFirstPeerPacketProcessed, void());
@@ -129,12 +98,7 @@ class MockConnectionCallbackNew : public QuicSocket::ConnectionCallbackNew {
       onStopSending,
       void(StreamId, ApplicationErrorCode));
   GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      onConnectionError,
-      void(std::pair<QuicErrorCode, std::string>));
+  GMOCK_METHOD1_(, noexcept, , onConnectionError, void(QuicError));
   GMOCK_METHOD1_(, noexcept, , onBidirectionalStreamsAvailable, void(uint64_t));
   GMOCK_METHOD1_(
       ,
@@ -289,19 +253,9 @@ class MockQuicTransport : public QuicServerTransport {
       setServerConnectionIdParams,
       void(ServerConnectionIdParams));
 
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      close,
-      void(folly::Optional<std::pair<QuicErrorCode, std::string>>));
+  GMOCK_METHOD1_(, noexcept, , close, void(folly::Optional<QuicError>));
 
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
-      closeNow,
-      void(folly::Optional<std::pair<QuicErrorCode, std::string>>));
+  GMOCK_METHOD1_(, noexcept, , closeNow, void(folly::Optional<QuicError>));
 
   GMOCK_METHOD0_(, const, , hasShutdown, bool());
 
@@ -354,9 +308,7 @@ class MockObserver : public Observer {
       noexcept,
       ,
       close,
-      void(
-          QuicSocket*,
-          const folly::Optional<std::pair<QuicErrorCode, std::string>>&));
+      void(QuicSocket*, const folly::Optional<QuicError>&));
   GMOCK_METHOD2_(
       ,
       noexcept,

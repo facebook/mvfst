@@ -490,15 +490,11 @@ TYPED_TEST(
   transport->addObserver(observer.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
-  const std::pair<QuicErrorCode, std::string> defaultError = std::make_pair(
+  const QuicError defaultError = QuicError(
       GenericApplicationErrorCode::NO_ERROR,
       toString(GenericApplicationErrorCode::NO_ERROR));
   EXPECT_CALL(
-      *observer,
-      close(
-          transport,
-          folly::Optional<std::pair<QuicErrorCode, std::string>>(
-              defaultError)));
+      *observer, close(transport, folly::Optional<QuicError>(defaultError)));
   transport->close(folly::none);
   Mock::VerifyAndClearExpectations(observer.get());
   InSequence s;
@@ -517,14 +513,11 @@ TYPED_TEST(
   transport->addObserver(observer.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
-  const auto testError = std::make_pair(
+  const auto testError = QuicError(
       QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
       std::string("testError"));
   EXPECT_CALL(
-      *observer,
-      close(
-          transport,
-          folly::Optional<std::pair<QuicErrorCode, std::string>>(testError)));
+      *observer, close(transport, folly::Optional<QuicError>(testError)));
   transport->close(testError);
   Mock::VerifyAndClearExpectations(observer.get());
   InSequence s;

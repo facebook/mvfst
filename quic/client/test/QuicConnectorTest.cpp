@@ -63,9 +63,7 @@ TEST_F(QuicConnectorTest, TestConnectSuccess) {
 TEST_F(QuicConnectorTest, TestConnectFailure) {
   EXPECT_CALL(cb_, onConnectError(_))
       .Times(1)
-      .WillOnce(Invoke([this](std::pair<quic::QuicErrorCode, std::string>) {
-        eventBase_.terminateLoopSoon();
-      }));
+      .WillOnce(Invoke([this](QuicError) { eventBase_.terminateLoopSoon(); }));
   executeMockConnect(
       MockQuicClientTransport::TestType::Failure,
       std::chrono::milliseconds(200));
@@ -75,9 +73,7 @@ TEST_F(QuicConnectorTest, TestConnectFailure) {
 TEST_F(QuicConnectorTest, TestConnectTimeout) {
   EXPECT_CALL(cb_, onConnectError(_))
       .Times(1)
-      .WillOnce(Invoke([this](std::pair<quic::QuicErrorCode, std::string>) {
-        eventBase_.terminateLoopSoon();
-      }));
+      .WillOnce(Invoke([this](QuicError) { eventBase_.terminateLoopSoon(); }));
   executeMockConnect(
       MockQuicClientTransport::TestType::Timeout, std::chrono::milliseconds(1));
   eventBase_.loopForever();

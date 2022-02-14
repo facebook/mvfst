@@ -19,8 +19,7 @@ namespace quic {
 
 QuicConnector::QuicConnector(Callback* cb) : cb_(CHECK_NOTNULL(cb)) {}
 
-void QuicConnector::onConnectionSetupError(
-    std::pair<quic::QuicErrorCode, std::string> code) noexcept {
+void QuicConnector::onConnectionSetupError(QuicError code) noexcept {
   if (cb_) {
     cb_->onConnectError(std::move(code));
   }
@@ -108,7 +107,7 @@ void QuicConnector::cleanUp() {
 
 void QuicConnector::cleanUpAndCloseSocket() {
   if (quicClient_) {
-    auto error = std::make_pair(
+    auto error = QuicError(
         quic::QuicErrorCode(quic::LocalErrorCode::SHUTTING_DOWN),
         std::string("shutting down"));
     quicClient_->close(std::move(error));
@@ -122,7 +121,7 @@ std::chrono::milliseconds QuicConnector::timeElapsed() {
 }
 
 void QuicConnector::timeoutExpired() noexcept {
-  auto error = std::make_pair(
+  auto error = QuicError(
       quic::QuicErrorCode(quic::LocalErrorCode::CONNECT_FAILED),
       std::string("connect operation timed out"));
   if (quicClient_) {
