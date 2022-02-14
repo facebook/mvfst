@@ -298,7 +298,7 @@ void Cubic::cubicReduction(TimePoint lossTime) noexcept {
     // We need to reduce cwnd before it goes back to previous reduction point.
     // In this case, reduce the steadyState_.lastMaxCwndBytes as well:
     steadyState_.lastMaxCwndBytes =
-        cwndBytes_ * steadyState_.lastMaxReductionFactor;
+        folly::to_integral(cwndBytes_ * steadyState_.lastMaxReductionFactor);
   }
   steadyState_.lastReductionTime = lossTime;
   lossCwndBytes_ = cwndBytes_;
