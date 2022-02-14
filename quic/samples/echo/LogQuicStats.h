@@ -105,6 +105,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
             << quic::toString(code.value_or(LocalErrorCode::NO_ERROR));
   }
 
+  void onConnectionCloseZeroBytesWritten() override {
+    VLOG(2) << prefix_ << "onConnectionCloseZeroBytesWritten";
+  }
+
   // stream level metrics
   void onNewQuicStream() override {
     VLOG(2) << prefix_ << "onNewQuicStream";

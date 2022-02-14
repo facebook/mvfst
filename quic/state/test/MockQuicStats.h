@@ -34,6 +34,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onConnectionRateLimited, void());
   MOCK_METHOD0(onNewConnection, void());
   MOCK_METHOD1(onConnectionClose, void(folly::Optional<QuicErrorCode>));
+  MOCK_METHOD0(onConnectionCloseZeroBytesWritten, void());
   MOCK_METHOD0(onNewQuicStream, void());
   MOCK_METHOD0(onQuicStreamClosed, void());
   MOCK_METHOD1(onQuicStreamReset, void(QuicErrorCode));

@@ -1218,6 +1218,11 @@ void QuicServerWorker::onConnectionUnbound(
     const QuicServerTransport::SourceIdentity& source,
     const std::vector<ConnectionIdData>& connectionIdData) noexcept {
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
+
+  if (transport->getConnectionsStats().totalBytesSent == 0) {
+    QUIC_STATS(statsCallback_, onConnectionCloseZeroBytesWritten);
+  }
+
   // Ensures we only process `onConnectionUnbound()` once.
   transport->setRoutingCallback(nullptr);
   boundServerTransports_.erase(transport);

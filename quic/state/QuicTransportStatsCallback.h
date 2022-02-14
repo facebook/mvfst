@@ -119,6 +119,8 @@ class QuicTransportStatsCallback {
   virtual void onConnectionClose(
       folly::Optional<QuicErrorCode> code = folly::none) = 0;
 
+  virtual void onConnectionCloseZeroBytesWritten() = 0;
+
   // stream level metrics
   virtual void onNewQuicStream() = 0;
 
