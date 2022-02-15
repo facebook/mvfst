@@ -18,7 +18,6 @@
 #include <quic/state/OutstandingPacket.h>
 
 using namespace folly;
-using namespace folly::test;
 using namespace testing;
 
 namespace {
