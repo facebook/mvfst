@@ -26,7 +26,7 @@
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 
 #include <folly/ssl/Init.h>
-#include "quic/codec/QuicConnectionId.h"
+#include <quic/codec/QuicConnectionId.h>
 
 namespace quic {
 namespace test {

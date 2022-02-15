@@ -20,8 +20,8 @@
 #include <quic/state/QuicStreamUtilities.h>
 #include <quic/state/StateData.h>
 
+#include <folly/Portability.h>
 #include <chrono>
-#include "folly/Portability.h"
 
 namespace folly {
 class EventBase;
@@ -866,7 +866,7 @@ class QuicSocket {
    * Structure used to communicate cancellation of a ByteEvent.
    *
    * According to Dictionary.com, cancellation is more frequent in American
-   * English than cancelation. Yet in American English, the preferred style is
+   * English than cancellation. Yet in American English, the preferred style is
    * typically not to double the final L, so cancel generally becomes canceled.
    */
   using ByteEventCancellation = ByteEvent;

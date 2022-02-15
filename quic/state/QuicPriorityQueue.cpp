@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include "quic/state/QuicPriorityQueue.h"
+#include <quic/state/QuicPriorityQueue.h>
 
 namespace quic {
 

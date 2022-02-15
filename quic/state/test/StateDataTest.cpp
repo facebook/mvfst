@@ -9,8 +9,8 @@
 #include <gtest/gtest.h>
 
 #include <quic/common/test/TestUtils.h>
+#include <quic/state/LossState.h>
 #include <quic/state/StateData.h>
-#include "quic/state/LossState.h"
 
 using namespace quic;
 using namespace testing;

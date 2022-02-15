@@ -15,6 +15,7 @@
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
+#include <quic/codec/QuicConnectionId.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <quic/codec/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
@@ -25,7 +26,6 @@
 #include <quic/server/handshake/TokenGenerator.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
-#include "quic/codec/QuicConnectionId.h"
 
 using namespace testing;
 using namespace folly;

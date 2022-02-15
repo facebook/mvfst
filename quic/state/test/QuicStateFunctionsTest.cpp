@@ -7,7 +7,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "quic/state/OutstandingPacket.h"
+#include <quic/state/OutstandingPacket.h>
 
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>

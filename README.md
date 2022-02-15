@@ -1,4 +1,3 @@
-
 ![alt text](logo.png "MVFST")
 
 [![Linux Build Status](https://github.com/facebookincubator/mvfst/workflows/linux/badge.svg)](https://github.com/facebookincubator/mvfst/actions?workflow=linux)

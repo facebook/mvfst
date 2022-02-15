@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/QuicConstants.h>
 #include <quic/QuicException.h>
-#include "quic/QuicConstants.h"
 
 #include <fizz/record/Types.h>
 #include <glog/logging.h>

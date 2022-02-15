@@ -7,8 +7,8 @@
 
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
-#include "quic/codec/Types.h"
-#include "quic/state/AckEvent.h"
+#include <quic/codec/Types.h>
+#include <quic/state/AckEvent.h>
 
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
 #include <folly/io/async/test/MockTimeoutManager.h>

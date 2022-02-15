@@ -7,7 +7,7 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "quic/state/QuicStreamUtilities.h"
+#include <quic/state/QuicStreamUtilities.h>
 
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/QuicStreamUtilities.h>

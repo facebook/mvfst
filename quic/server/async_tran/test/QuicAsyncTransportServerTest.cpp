@@ -10,6 +10,7 @@
 #include <folly/portability/GMock.h>
 #include <folly/portability/GTest.h>
 
+#include <folly/io/async/AsyncTransport.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/client/QuicClientAsyncTransport.h>
 #include <quic/client/QuicClientTransport.h>
@@ -22,7 +23,6 @@
 #include <quic/server/async_tran/QuicAsyncTransportServer.h>
 #include <quic/server/async_tran/QuicServerAsyncTransport.h>
 #include <quic/server/test/Mocks.h>
-#include "folly/io/async/AsyncTransport.h"
 
 using namespace testing;
 

@@ -7,9 +7,9 @@
 
 #pragma once
 
+#include <quic/QuicConstants.h>
 #include <stdexcept>
 #include <string>
-#include "quic/QuicConstants.h"
 
 #include <quic/QuicConstants.h>
 #include <quic/common/Variant.h>
