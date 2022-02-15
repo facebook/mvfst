@@ -19,8 +19,12 @@ uint64_t writePacketizationRequest(
   uint64_t packetCounter = 0;
   folly::F14FastSet<DSRPacketizationRequestSender*> senders;
   SCOPE_EXIT {
-    std::for_each(
-        senders.begin(), senders.end(), [](auto* sender) { sender->flush(); });
+    for (auto sender : senders) {
+      if (connection.qLogger) {
+        connection.qLogger->addTransportStateUpdate("DSR flushing sender");
+      }
+      sender->flush();
+    }
   };
   if (!writeLoopTimeLimit(writeLoopBeginTime, connection)) {
     return packetCounter;
