@@ -856,7 +856,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   }
 
   bool processCancelCode(const QuicError& cancelCode);
-  void processConnectionEndError(const QuicError& cancelCode);
   void processConnectionEndErrorSplitCallbacks(const QuicError& cancelCode);
 
   class CallbackDispatcher : public folly::DelayedDestruction,

@@ -456,16 +456,6 @@ bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
   return noError;
 }
 
-void QuicTransportBase::processConnectionEndError(const QuicError& cancelCode) {
-  bool noError = processCancelCode(cancelCode);
-  if (noError) {
-    connCallback_->onConnectionEnd();
-  } else {
-    connCallback_->onConnectionError(
-        QuicError(cancelCode.code, cancelCode.message));
-  }
-}
-
 void QuicTransportBase::processConnectionEndErrorSplitCallbacks(
     const QuicError& cancelCode) {
   bool noError = processCancelCode(cancelCode);
