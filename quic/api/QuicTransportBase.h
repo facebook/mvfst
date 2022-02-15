@@ -848,118 +848,17 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   }
 
   void resetConnectionCallbacks() {
-    if (!connCallback_) {
-      return;
-    }
-    connCallback_->resetConnectionCallbacks();
+    connSetupCallback_ = nullptr;
     connCallback_ = nullptr;
   }
 
   bool processCancelCode(const QuicError& cancelCode);
   void processConnectionEndErrorSplitCallbacks(const QuicError& cancelCode);
 
-  class CallbackDispatcher : public folly::DelayedDestruction,
-                             public ConnectionSetupCallback,
-                             public ConnectionCallbackNew {
-   public:
-    using UniquePtr = std::unique_ptr<CallbackDispatcher, Destructor>;
-
-    static UniquePtr make() {
-      return UniquePtr(new CallbackDispatcher());
-    }
-
-    // Connection set up callbacks.
-    void onTransportReady() noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connSetupCallback_)->onTransportReady();
-    }
-    void onReplaySafe() noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connSetupCallback_)->onReplaySafe();
-    }
-    void onFirstPeerPacketProcessed() noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connSetupCallback_)->onFirstPeerPacketProcessed();
-    }
-    void onConnectionSetupError(QuicError code) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connSetupCallback_)
-          ->onConnectionSetupError(std::move(code));
-    }
-
-    // Connection callbacks.
-    void onFlowControlUpdate(StreamId id) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onFlowControlUpdate(id);
-    }
-    void onNewBidirectionalStream(StreamId id) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onNewBidirectionalStream(id);
-    }
-    void onNewUnidirectionalStream(StreamId id) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onNewUnidirectionalStream(id);
-    }
-    void onStopSending(StreamId id, ApplicationErrorCode error) noexcept
-        override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onStopSending(id, error);
-    }
-    void onConnectionEnd() noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onConnectionEnd();
-    }
-    void onConnectionError(QuicError code) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onConnectionError(std::move(code));
-    }
-    void onBidirectionalStreamsAvailable(
-        uint64_t numStreamsAvailable) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)
-          ->onBidirectionalStreamsAvailable(numStreamsAvailable);
-    }
-    void onUnidirectionalStreamsAvailable(
-        uint64_t numStreamsAvailable) noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)
-          ->onUnidirectionalStreamsAvailable(numStreamsAvailable);
-    }
-    void onAppRateLimited() noexcept override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)->onAppRateLimited();
-    }
-    void onKnob(uint64_t knobSpace, uint64_t knobId, Buf knobBlob) override {
-      folly::DelayedDestruction::DestructorGuard dg(this);
-      CHECK_NOTNULL(connStreamsCallback_)
-          ->onKnob(knobSpace, knobId, std::move(knobBlob));
-    }
-
-    // Callback setters.
-    void setConnectionSetupCallback(ConnectionSetupCallback* callback) {
-      connSetupCallback_ = callback;
-    }
-    void setConnectionCallbackNew(ConnectionCallbackNew* callback) {
-      connStreamsCallback_ = callback;
-    }
-
-    // Util.
-    void resetConnectionCallbacks() {
-      connSetupCallback_ = nullptr;
-      connStreamsCallback_ = nullptr;
-    }
-
-   private:
-    CallbackDispatcher() = default;
-    ~CallbackDispatcher() override = default;
-
-    ConnectionSetupCallback* connSetupCallback_{nullptr};
-    ConnectionCallbackNew* connStreamsCallback_{nullptr};
-  };
-
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
-  CallbackDispatcher::UniquePtr connCallback_;
+  ConnectionSetupCallback* connSetupCallback_{nullptr};
+  ConnectionCallbackNew* connCallback_{nullptr};
 
   std::
       unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>

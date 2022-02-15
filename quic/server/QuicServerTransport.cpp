@@ -151,8 +151,9 @@ void QuicServerTransport::onReadData(
           shared_from_this(), *conn_->serverConnectionId);
     }
   }
-  if (connCallback_ && waitingForFirstPacket && hasReceivedPackets(*conn_)) {
-    connCallback_->onFirstPeerPacketProcessed();
+  if (connSetupCallback_ && waitingForFirstPacket &&
+      hasReceivedPackets(*conn_)) {
+    connSetupCallback_->onFirstPeerPacketProcessed();
   }
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
@@ -580,12 +581,12 @@ void QuicServerTransport::maybeIssueConnectionIds() {
 }
 
 void QuicServerTransport::maybeNotifyTransportReady() {
-  if (!transportReadyNotified_ && connCallback_ && hasWriteCipher()) {
+  if (!transportReadyNotified_ && connSetupCallback_ && hasWriteCipher()) {
     if (conn_->qLogger) {
       conn_->qLogger->addTransportStateUpdate(kTransportReady);
     }
     transportReadyNotified_ = true;
-    connCallback_->onTransportReady();
+    connSetupCallback_->onTransportReady();
   }
 }
 

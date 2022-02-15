@@ -391,11 +391,7 @@ void QuicTransportBase::closeImpl(
   conn_->ackStates.handshakeAckState.acks.clear();
   conn_->ackStates.appDataAckState.acks.clear();
 
-  // connCallback_ could be null if start() was never invoked and the
-  // transport was destroyed or if the app initiated close.
-  if (connCallback_) {
-    processConnectionEndErrorSplitCallbacks(cancelCode);
-  }
+  processConnectionEndErrorSplitCallbacks(cancelCode);
 
   // can't invoke connection callbacks any more.
   resetConnectionCallbacks();
@@ -459,20 +455,31 @@ bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
 void QuicTransportBase::processConnectionEndErrorSplitCallbacks(
     const QuicError& cancelCode) {
   bool noError = processCancelCode(cancelCode);
+
+  // connSetupCallback_ or connCallback_ could be null if start() was never
+  // invoked and the transport was destroyed or if the app initiated close.
   if (noError) {
     if (transportReadyNotified_) {
-      connCallback_->onConnectionEnd();
+      if (connCallback_) {
+        connCallback_->onConnectionEnd();
+      }
     } else {
-      connCallback_->onConnectionSetupError(
-          QuicError(cancelCode.code, cancelCode.message));
+      if (connSetupCallback_) {
+        connSetupCallback_->onConnectionSetupError(
+            QuicError(cancelCode.code, cancelCode.message));
+      }
     }
   } else {
     if (transportReadyNotified_) {
-      connCallback_->onConnectionError(
-          QuicError(cancelCode.code, cancelCode.message));
+      if (connCallback_) {
+        connCallback_->onConnectionError(
+            QuicError(cancelCode.code, cancelCode.message));
+      }
     } else {
-      connCallback_->onConnectionSetupError(
-          QuicError(cancelCode.code, cancelCode.message));
+      if (connSetupCallback_) {
+        connSetupCallback_->onConnectionSetupError(
+            QuicError(cancelCode.code, cancelCode.message));
+      }
     }
   }
 }
@@ -1514,7 +1521,7 @@ void QuicTransportBase::handleNewStreamCallbacks(
 
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
-    CHECK_NOTNULL(connCallback_.get());
+    CHECK_NOTNULL(connCallback_);
     if (isBidirectionalStream(streamId)) {
       connCallback_->onNewBidirectionalStream(streamId);
     } else {
@@ -2689,18 +2696,12 @@ void QuicTransportBase::setSupportedVersions(
 
 void QuicTransportBase::setConnectionSetupCallback(
     ConnectionSetupCallback* callback) {
-  if (!connCallback_) {
-    connCallback_ = CallbackDispatcher::make();
-  }
-  connCallback_->setConnectionSetupCallback(callback);
+  connSetupCallback_ = callback;
 }
 
 void QuicTransportBase::setConnectionCallbackNew(
     ConnectionCallbackNew* callback) {
-  if (!connCallback_) {
-    connCallback_ = CallbackDispatcher::make();
-  }
-  connCallback_->setConnectionCallbackNew(callback);
+  connCallback_ = callback;
 }
 
 void QuicTransportBase::setEarlyDataAppParamsFunctions(

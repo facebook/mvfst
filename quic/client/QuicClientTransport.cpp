@@ -766,18 +766,19 @@ void QuicClientTransport::onReadData(
   }
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
   processUDPData(peer, std::move(networkData));
-  if (connCallback_ && waitingForFirstPacket && hasReceivedPackets(*conn_)) {
-    connCallback_->onFirstPeerPacketProcessed();
+  if (connSetupCallback_ && waitingForFirstPacket &&
+      hasReceivedPackets(*conn_)) {
+    connSetupCallback_->onFirstPeerPacketProcessed();
   }
   if (!transportReadyNotified_ && hasWriteCipher()) {
     transportReadyNotified_ = true;
-    connCallback_->onTransportReady();
+    connSetupCallback_->onTransportReady();
   }
 
-  // Checking connCallback_ because application will start to write data
+  // Checking connSetupCallback_ because application will start to write data
   // in onTransportReady, if the write fails, QuicSocket can be closed
-  // and connCallback_ is set nullptr.
-  if (connCallback_ && !replaySafeNotified_ && conn_->oneRttWriteCipher) {
+  // and connSetupCallback_ is set nullptr.
+  if (connSetupCallback_ && !replaySafeNotified_ && conn_->oneRttWriteCipher) {
     // If there is 0RTT data still outstanding, opportunistically retransmit
     // it rather than waiting for the loss recovery.
     if (conn_->transportSettings.earlyRetransmit0Rtt) {
@@ -787,7 +788,7 @@ void QuicClientTransport::onReadData(
     // We don't need this any more. Also unset it so that we don't allow random
     // middleboxes to shutdown our connection once we have crypto keys.
     socket_->setErrMessageCallback(nullptr);
-    connCallback_->onReplaySafe();
+    connSetupCallback_->onReplaySafe();
   }
 
   maybeSendTransportKnobs();
@@ -998,8 +999,8 @@ void QuicClientTransport::startCryptoHandshake() {
     transportReadyNotified_ = true;
     runOnEvbAsync([](auto self) {
       auto clientPtr = static_cast<QuicClientTransport*>(self.get());
-      if (clientPtr->connCallback_) {
-        clientPtr->connCallback_->onTransportReady();
+      if (clientPtr->connSetupCallback_) {
+        clientPtr->connSetupCallback_->onTransportReady();
       }
     });
   }
