@@ -3,10 +3,7 @@
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
- *
  */
-
-// Copyright 2004-present Facebook.  All rights reserved.
 
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 
