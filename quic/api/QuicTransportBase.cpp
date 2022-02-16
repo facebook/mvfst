@@ -391,7 +391,11 @@ void QuicTransportBase::closeImpl(
   conn_->ackStates.handshakeAckState.acks.clear();
   conn_->ackStates.appDataAckState.acks.clear();
 
-  processConnectionEndErrorSplitCallbacks(cancelCode);
+  if (transportReadyNotified_) {
+    processConnectionCallbacks(cancelCode);
+  } else {
+    processConnectionSetupCallbacks(cancelCode);
+  }
 
   // can't invoke connection callbacks any more.
   resetConnectionCallbacks();
@@ -452,35 +456,31 @@ bool QuicTransportBase::processCancelCode(const QuicError& cancelCode) {
   return noError;
 }
 
-void QuicTransportBase::processConnectionEndErrorSplitCallbacks(
+void QuicTransportBase::processConnectionSetupCallbacks(
     const QuicError& cancelCode) {
-  bool noError = processCancelCode(cancelCode);
-
-  // connSetupCallback_ or connCallback_ could be null if start() was never
+  // connSetupCallback_ could be null if start() was never
   // invoked and the transport was destroyed or if the app initiated close.
+  if (!connSetupCallback_) {
+    return;
+  }
+  connSetupCallback_->onConnectionSetupError(
+      QuicError(cancelCode.code, cancelCode.message));
+}
+
+void QuicTransportBase::processConnectionCallbacks(
+    const QuicError& cancelCode) {
+  // connCallback_ could be null if start() was never
+  // invoked and the transport was destroyed or if the app initiated close.
+  if (!connCallback_) {
+    return;
+  }
+
+  bool noError = processCancelCode(cancelCode);
   if (noError) {
-    if (transportReadyNotified_) {
-      if (connCallback_) {
-        connCallback_->onConnectionEnd();
-      }
-    } else {
-      if (connSetupCallback_) {
-        connSetupCallback_->onConnectionSetupError(
-            QuicError(cancelCode.code, cancelCode.message));
-      }
-    }
+    connCallback_->onConnectionEnd();
   } else {
-    if (transportReadyNotified_) {
-      if (connCallback_) {
-        connCallback_->onConnectionError(
-            QuicError(cancelCode.code, cancelCode.message));
-      }
-    } else {
-      if (connSetupCallback_) {
-        connSetupCallback_->onConnectionSetupError(
-            QuicError(cancelCode.code, cancelCode.message));
-      }
-    }
+    connCallback_->onConnectionError(
+        QuicError(cancelCode.code, cancelCode.message));
   }
 }
 

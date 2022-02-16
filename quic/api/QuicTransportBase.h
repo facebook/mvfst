@@ -853,7 +853,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   }
 
   bool processCancelCode(const QuicError& cancelCode);
-  void processConnectionEndErrorSplitCallbacks(const QuicError& cancelCode);
+  void processConnectionSetupCallbacks(const QuicError& cancelCode);
+  void processConnectionCallbacks(const QuicError& cancelCode);
 
   std::atomic<folly::EventBase*> evb_;
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
