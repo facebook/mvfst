@@ -90,9 +90,15 @@ void recoverOrResetCongestionAndRttState(
   }
 }
 
-void setExperimentalSettings(QuicServerConnectionState& /*conn*/) {
-  // MVFST_EXPERIMENTAL is currently using initCwnd=30 set in
-  // QuicServerWorker.cpp before CC is initialized.
+void setExperimentalSettings(QuicServerConnectionState& conn) {
+  // MVFST_EXPERIMENTAL currently enables experimental congestion control
+  // and experimental pacer. (here and in the client transport)
+  if (conn.congestionController) {
+    conn.congestionController->setExperimental(true);
+  }
+  if (conn.pacer) {
+    conn.pacer->setExperimental(true);
+  }
 }
 } // namespace
 

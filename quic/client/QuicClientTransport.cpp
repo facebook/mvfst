@@ -327,6 +327,17 @@ void QuicClientTransport::processPacketData(
   // that the version is now bound to the new packet.
   if (!conn_->version) {
     conn_->version = conn_->originalVersion;
+
+    if (conn_->version == QuicVersion::MVFST_EXPERIMENTAL) {
+      // MVFST_EXPERIMENTAL currently enables experimental congestion control
+      // and experimental pacer. (here and in the server state machine)
+      if (conn_->congestionController) {
+        conn_->congestionController->setExperimental(true);
+      }
+      if (conn_->pacer) {
+        conn_->pacer->setExperimental(true);
+      }
+    }
   }
 
   if (!conn_->serverConnectionId && longHeader) {
