@@ -37,7 +37,8 @@ DEFINE_uint64(
     4096,
     "Amount of data written to stream each iteration");
 DEFINE_uint64(writes_per_loop, 5, "Amount of socket writes per event loop");
-DEFINE_uint64(window, 64 * 1024, "Flow control window size");
+DEFINE_uint64(window, 1024 * 1024, "Flow control window size");
+DEFINE_bool(autotune_window, true, "Automatically increase the receive window");
 DEFINE_string(congestion, "newreno", "newreno/cubic/bbr/ccp/none");
 DEFINE_string(ccp_config, "", "Additional args to pass to ccp");
 DEFINE_bool(pacing, false, "Enable pacing");
@@ -578,6 +579,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       std::chrono::milliseconds transportTimerResolution,
       int32_t duration,
       uint64_t window,
+      bool autotuneWindow,
       bool gso,
       quic::CongestionControlType congestionControlType,
       uint32_t maxReceivePacketSize)
@@ -586,6 +588,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
         eventBase_(transportTimerResolution),
         duration_(duration),
         window_(window),
+        autotuneWindow_(autotuneWindow),
         gso_(gso),
         congestionControlType_(congestionControlType),
         maxReceivePacketSize_(maxReceivePacketSize) {
@@ -715,11 +718,10 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     quicClient_->setCongestionControllerFactory(
         std::make_shared<DefaultCongestionControllerFactory>());
     auto settings = quicClient_->getTransportSettings();
-    settings.advertisedInitialUniStreamWindowSize = window_;
-    // TODO figure out what actually to do with conn flow control and not sent
-    // limit.
-    settings.advertisedInitialConnectionWindowSize =
+    settings.advertisedInitialUniStreamWindowSize =
         std::numeric_limits<uint32_t>::max();
+    settings.advertisedInitialConnectionWindowSize = window_;
+    settings.autotuneReceiveConnFlowControl = autotuneWindow_;
     settings.connectUDP = true;
     settings.shouldRecvBatch = true;
     settings.shouldUseRecvmmsgForBatchRecv = true;
@@ -771,6 +773,7 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
       1024 * 1024 * 1024};
   std::chrono::seconds duration_;
   uint64_t window_;
+  bool autotuneWindow_{false};
   bool gso_;
   quic::CongestionControlType congestionControlType_;
   uint32_t maxReceivePacketSize_;
@@ -832,6 +835,7 @@ int main(int argc, char* argv[]) {
         std::chrono::milliseconds(FLAGS_client_transport_timer_resolution_ms),
         FLAGS_duration,
         FLAGS_window,
+        FLAGS_autotune_window,
         FLAGS_gso,
         flagsToCongestionControlType(FLAGS_congestion),
         FLAGS_max_receive_packet_size);
