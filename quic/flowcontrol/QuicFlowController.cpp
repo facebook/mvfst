@@ -33,7 +33,8 @@ folly::Optional<uint64_t> calculateNewWindowUpdate(
   bool enoughTimeElapsed = lastSendTime && updateTime > *lastSendTime &&
       (updateTime - *lastSendTime) >
           transportSettings.flowControlRttFrequency * srtt;
-  if (enoughTimeElapsed) {
+  // If we are autotuning then frequent updates aren't required.
+  if (enoughTimeElapsed && !transportSettings.autotuneReceiveConnFlowControl) {
     return nextAdvertisedOffset;
   }
   bool enoughWindowElapsed = (curAdvertisedOffset - curReadOffset) *
@@ -70,6 +71,21 @@ inline uint64_t calculateMaximumData(const QuicStreamState& stream) {
 }
 } // namespace
 
+void maybeIncreaseConnectionFlowControlWindow(
+    QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt) {
+  if (!flowControlState.timeOfLastFlowControlUpdate || srtt == 0us) {
+    return;
+  }
+  CHECK(updateTime > *flowControlState.timeOfLastFlowControlUpdate);
+  if (std::chrono::duration_cast<decltype(srtt)>(
+          updateTime - *flowControlState.timeOfLastFlowControlUpdate) <
+      2 * srtt) {
+    flowControlState.windowSize *= 2;
+  }
+}
+
 bool maybeSendConnWindowUpdate(
     QuicConnectionStateBase& conn,
     TimePoint updateTime) {
@@ -93,6 +109,10 @@ bool maybeSendConnWindowUpdate(
     if (conn.qLogger) {
       conn.qLogger->addTransportStateUpdate(
           getFlowControlEvent(newAdvertisedOffset.value()));
+    }
+    if (conn.transportSettings.autotuneReceiveConnFlowControl) {
+      maybeIncreaseConnectionFlowControlWindow(
+          flowControlState, updateTime, conn.lossState.srtt);
     }
     return true;
   }

@@ -11,6 +11,11 @@
 
 namespace quic {
 
+void maybeIncreaseConnectionFlowControlWindow(
+    QuicConnectionStateBase::ConnectionFlowControlState& flowControlState,
+    TimePoint updateTime,
+    std::chrono::microseconds srtt);
+
 bool maybeSendConnWindowUpdate(
     QuicConnectionStateBase& conn,
     TimePoint updateTime);

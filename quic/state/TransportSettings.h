@@ -281,6 +281,11 @@ struct TransportSettings {
   size_t paddingModulo{0};
   // Whether to use adaptive loss thresholds for reodering and timeout
   bool useAdaptiveLossThresholds{false};
+  // Whether to automatically increase receive conn flow control. The
+  // determination is based on the frequency we are sending flow control
+  // updates. If there has been less than 2SRTTs between flow control updates
+  // this will double the target window.
+  bool autotuneReceiveConnFlowControl{false};
 };
 
 } // namespace quic
