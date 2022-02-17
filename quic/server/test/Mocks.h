@@ -18,12 +18,20 @@ namespace quic {
 
 class MockServerConnectionIdRejector : public ServerConnectionIdRejector {
  public:
+#if defined(MOCK_METHOD)
+  MOCK_METHOD(
+      (bool),
+      rejectConnectionIdNonConst,
+      (const ConnectionId),
+      (noexcept));
+#else
   GMOCK_METHOD1_(
       ,
       noexcept,
       ,
       rejectConnectionIdNonConst,
       bool(const ConnectionId));
+#endif
 
   bool rejectConnectionId(const ConnectionId& id) const noexcept override {
     return const_cast<MockServerConnectionIdRejector&>(*this)
@@ -46,6 +54,16 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
     return _make(evb, socket, addr, ctx);
   }
 
+#if defined(MOCK_METHOD)
+  MOCK_METHOD(
+      (QuicServerTransport::Ptr),
+      _make,
+      (folly::EventBase*,
+       std::unique_ptr<folly::AsyncUDPSocket>&,
+       const folly::SocketAddress&,
+       std::shared_ptr<const fizz::server::FizzServerContext>),
+      (noexcept));
+#else
   GMOCK_METHOD4_(
       ,
       noexcept,
@@ -56,6 +74,7 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
           std::unique_ptr<folly::AsyncUDPSocket>& sock,
           const folly::SocketAddress&,
           std::shared_ptr<const fizz::server::FizzServerContext>));
+#endif
 };
 
 class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
@@ -112,6 +131,25 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
  public:
   ~MockRoutingCallback() override = default;
 
+#if defined(MOCK_METHOD)
+  MOCK_METHOD(
+      (void),
+      onConnectionIdAvailable,
+      (QuicServerTransport::Ptr, ConnectionId),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
+      onConnectionIdBound,
+      (QuicServerTransport::Ptr),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
+      onConnectionUnbound,
+      (QuicServerTransport*,
+       const QuicServerTransport::SourceIdentity&,
+       const std::vector<ConnectionIdData>&),
+      (noexcept));
+#else
   GMOCK_METHOD2_(
       ,
       noexcept,
@@ -133,6 +171,7 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
           QuicServerTransport*,
           const QuicServerTransport::SourceIdentity&,
           const std::vector<ConnectionIdData>& connIdData));
+#endif
 };
 
 class MockHandshakeFinishedCallback
@@ -140,9 +179,13 @@ class MockHandshakeFinishedCallback
  public:
   ~MockHandshakeFinishedCallback() override = default;
 
+#if defined(MOCK_METHOD)
+  MOCK_METHOD((void), onHandshakeFinished, (), (noexcept));
+  MOCK_METHOD((void), onHandshakeUnfinished, (), (noexcept));
+#else
   GMOCK_METHOD0_(, noexcept, , onHandshakeFinished, void());
-
   GMOCK_METHOD0_(, noexcept, , onHandshakeUnfinished, void());
+#endif
 };
 
 } // namespace quic
