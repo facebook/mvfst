@@ -1219,7 +1219,11 @@ void QuicServerWorker::onConnectionUnbound(
     const std::vector<ConnectionIdData>& connectionIdData) noexcept {
   VLOG(4) << "Removing from sourceAddressMap_ address=" << source.first;
 
-  if (transport->getConnectionsStats().totalBytesSent == 0) {
+  auto& localConnectionError = transport->getState()->localConnectionError;
+  if (transport->getConnectionsStats().totalBytesSent == 0 &&
+      !(localConnectionError && localConnectionError->code.asLocalErrorCode() &&
+        *localConnectionError->code.asLocalErrorCode() ==
+            LocalErrorCode::CONNECTION_ABANDONED)) {
     QUIC_STATS(statsCallback_, onConnectionCloseZeroBytesWritten);
   }
 

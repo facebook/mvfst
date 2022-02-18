@@ -664,8 +664,10 @@ void onServerReadDataFromOpen(
       readData.networkData.data->computeChainDataLength() == 0) {
     return;
   }
+
+  bool firstPacketFromPeer = false;
   if (!conn.readCodec) {
-    // First packet from the peer
+    firstPacketFromPeer = true;
     folly::io::Cursor cursor(readData.networkData.data.get());
     auto initialByte = cursor.readBE<uint8_t>();
     auto parsedLongHeader = parseLongHeaderInvariant(initialByte, cursor);
@@ -802,6 +804,11 @@ void onServerReadDataFromOpen(
         VLOG(10) << "drop cipher unavailable, no data " << conn;
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
+        }
+        if (firstPacketFromPeer) {
+          throw QuicInternalException(
+              "Failed to decrypt first packet from peer",
+              LocalErrorCode::CONNECTION_ABANDONED);
         }
         break;
       }

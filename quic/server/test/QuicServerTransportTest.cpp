@@ -2943,12 +2943,11 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
   AckBlocks acks = {{1, 2}};
-  auto expected = IOBuf::copyBuffer("hello");
   PacketNum nextPacketNum = clientNextInitialPacketNum++;
   LongHeader header(
       LongHeader::Types::Initial,
       *clientConnectionId,
-      server->getConn().serverConnectionId.value_or(getTestConnectionId(1)),
+      *initialDestinationConnectionId,
       nextPacketNum,
       QuicVersion::MVFST);
   RegularQuicPacketBuilder builder(
@@ -2962,7 +2961,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestUnencryptedAck) {
       *getInitialCipher(),
       *getInitialHeaderCipher(),
       nextPacketNum);
-  EXPECT_NO_THROW(deliverData(std::move(packet)));
+  EXPECT_THROW(deliverData(std::move(packet)), std::runtime_error);
   std::vector<int> indices =
       getQLogEventIndices(QLogEventType::PacketDrop, qLogger);
   EXPECT_EQ(indices.size(), 1);
@@ -3001,8 +3000,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestBadCleartextEncryption) {
       *aead,
       *getInitialHeaderCipher(),
       nextPacket);
-  EXPECT_CALL(*quicStats_, onPacketDropped(_));
-  deliverData(std::move(packetData));
+  EXPECT_THROW(deliverData(std::move(packetData)), std::runtime_error);
   // If crypto data was processed, we would have generated some writes.
   EXPECT_NE(server->getConn().readCodec, nullptr);
   EXPECT_TRUE(server->getConn().cryptoState->initialStream.writeBuffer.empty());
@@ -3229,6 +3227,40 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
       EXPECT_TRUE(hasAckFrame);
     }
   }
+}
+
+TEST_F(QuicUnencryptedServerTransportTest, TestCorruptedDstCidInitialTest) {
+  auto chlo = folly::IOBuf::copyBuffer("CHLO");
+  auto nextPacketNum = clientNextInitialPacketNum++;
+
+  /*
+   * generate ciphers based off of initialDestinationConnectionId and include a
+   * different DstCid in the packet header.
+   */
+  auto aead = getInitialCipher();
+  auto headerCipher = getInitialHeaderCipher();
+  auto corruptedDstCid = getTestConnectionId(1);
+
+  EXPECT_TRUE(initialDestinationConnectionId);
+  EXPECT_TRUE(clientConnectionId);
+  EXPECT_NE(*initialDestinationConnectionId, corruptedDstCid);
+
+  auto initialPacket = packetToBufCleartext(
+      createInitialCryptoPacket(
+          *clientConnectionId,
+          corruptedDstCid,
+          nextPacketNum,
+          QuicVersion::MVFST,
+          *chlo,
+          *aead,
+          0 /* largestAcked */),
+      *aead,
+      *headerCipher,
+      nextPacketNum);
+
+  EXPECT_CALL(routingCallback, onConnectionUnbound(_, _, _)).Times(1);
+
+  EXPECT_THROW(deliverData(initialPacket->clone(), true), std::runtime_error);
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestWriteHandshakeAndZeroRtt) {
@@ -3488,9 +3520,9 @@ TEST_F(QuicUnencryptedServerTransportTest, TestGarbageData) {
   auto headerCipher = getInitialHeaderCipher();
   auto packet = createCryptoPacket(
       *clientConnectionId,
-      *clientConnectionId,
+      *initialDestinationConnectionId,
       nextPacket,
-      QuicVersion::QUIC_DRAFT,
+      QuicVersion::MVFST,
       ProtectionType::Initial,
       *IOBuf::copyBuffer("CHLO"),
       *aead,
