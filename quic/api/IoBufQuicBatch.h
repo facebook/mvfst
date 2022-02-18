@@ -12,6 +12,12 @@
 #include <quic/state/QuicTransportStatsCallback.h>
 
 namespace quic {
+
+struct BufQuicBatchResult {
+  uint64_t packetsSent{0};
+  uint64_t bytesSent{0};
+};
+
 class IOBufQuicBatch {
  public:
   enum class FlushType {
@@ -36,7 +42,11 @@ class IOBufQuicBatch {
       FlushType flushType = FlushType::FLUSH_TYPE_ALLOW_THREAD_LOCAL_DELAY);
 
   FOLLY_ALWAYS_INLINE uint64_t getPktSent() const {
-    return pktSent_;
+    return result_.packetsSent;
+  }
+
+  FOLLY_ALWAYS_INLINE BufQuicBatchResult getResult() const {
+    return result_;
   }
 
  private:
@@ -56,7 +66,7 @@ class IOBufQuicBatch {
   const folly::SocketAddress& peerAddress_;
   QuicTransportStatsCallback* statsCallback_{nullptr};
   QuicClientConnectionState::HappyEyeballsState* happyEyeballsState_;
-  uint64_t pktSent_{0};
+  BufQuicBatchResult result_;
 };
 
 } // namespace quic

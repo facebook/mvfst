@@ -194,11 +194,11 @@ TEST_F(DSRMultiWriteTest, TwoRequestsWithLoss) {
   for (const auto& i : pendingInstructions_) {
     requests.requests.push_back(sendInstructionToPacketizationRequest(i));
   }
-  EXPECT_EQ(
-      2,
+  auto result =
       writePacketsGroup(*sock, requests, [](const PacketizationRequest& req) {
         return buildRandomInputData(req.len);
-      }));
+      });
+  EXPECT_EQ(2, result.packetsSent);
   EXPECT_EQ(2, sentData.size());
   EXPECT_GT(sentData[0]->computeChainDataLength(), 500);
   EXPECT_GT(sentData[1]->computeChainDataLength(), 500);

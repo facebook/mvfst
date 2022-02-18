@@ -183,7 +183,7 @@ struct RequestGroup {
   SmallVec<PacketizationRequest, 64, uint32_t> requests;
 };
 
-size_t writePacketsGroup(
+BufQuicBatchResult writePacketsGroup(
     folly::AsyncUDPSocket& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider);

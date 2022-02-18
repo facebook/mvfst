@@ -50,7 +50,7 @@ bool TperfDSRSender::flush() {
         return buf;
       });
   instructions_.clear();
-  return written > 0;
+  return written.packetsSent > 0;
 }
 
 void TperfDSRSender::release() {}

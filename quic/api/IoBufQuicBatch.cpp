@@ -28,7 +28,8 @@ IOBufQuicBatch::IOBufQuicBatch(
 bool IOBufQuicBatch::write(
     std::unique_ptr<folly::IOBuf>&& buf,
     size_t encodedSize) {
-  pktSent_++;
+  result_.packetsSent++;
+  result_.bytesSent += encodedSize;
 
   // see if we need to flush the prev buffer(s)
   if (batchWriter_->needsFlush(encodedSize)) {

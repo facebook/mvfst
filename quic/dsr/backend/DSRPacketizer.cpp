@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/api/IoBufQuicBatch.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/dsr/backend/DSRPacketizer.h>
 
@@ -90,13 +91,13 @@ bool writeSingleQuicPacket(
   return ret;
 }
 
-size_t writePacketsGroup(
+BufQuicBatchResult writePacketsGroup(
     folly::AsyncUDPSocket& sock,
     RequestGroup& reqGroup,
     const std::function<Buf(const PacketizationRequest& req)>& bufProvider) {
   if (reqGroup.requests.empty()) {
     LOG(ERROR) << "Empty packetization request";
-    return 0;
+    return {};
   }
   // TODO: Why don't I just limit the batch size to reqGroup.size()? What can go
   //  wrong?
@@ -112,7 +113,7 @@ size_t writePacketsGroup(
       nullptr /* happyEyeballsState */);
   if (!reqGroup.cipherPair->aead || !reqGroup.cipherPair->headerCipher) {
     LOG(ERROR) << "Missing ciphers";
-    return 0;
+    return {};
   }
   // It's ok if reqGourp's size is larger than ioBufBatch's batch size. The
   // ioBufBatch will flush when it hits the limit then start a new batch
@@ -131,11 +132,11 @@ size_t writePacketsGroup(
         request.fin,
         bufProvider(request));
     if (!ret) {
-      return ioBufBatch.getPktSent();
+      return ioBufBatch.getResult();
     }
   }
   ioBufBatch.flush();
-  return ioBufBatch.getPktSent();
+  return ioBufBatch.getResult();
 }
 
 } // namespace quic
