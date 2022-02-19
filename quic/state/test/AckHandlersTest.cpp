@@ -1539,7 +1539,7 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   // 0 pending callbacks
   EXPECT_EQ(0, size(conn.pendingCallbacks));
 
-  for (const auto ackData : ackVec) {
+  for (const auto& ackData : ackVec) {
     processAckFrame(
         conn,
         GetParam(),
