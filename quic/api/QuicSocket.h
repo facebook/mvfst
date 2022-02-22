@@ -112,6 +112,13 @@ class QuicSocket {
     virtual void onConnectionError(QuicError code) noexcept = 0;
 
     /**
+     * Invoked on transport closure. No callbacks will be delivered after this.
+     * onConnectionEnd() and onConnectionError(QuicError code) will be
+     * deprecated in favor of this new combined callback soon.
+     */
+    virtual void onConnectionEnd(QuicError /* error */) noexcept {}
+
+    /**
      * Called when more bidirectional streams become available for creation
      * (max local bidirectional stream ID was increased).
      */
