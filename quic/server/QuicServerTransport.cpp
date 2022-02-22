@@ -44,8 +44,13 @@ QuicServerTransport::QuicServerTransport(
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallbackNew* connStreamsCb,
     std::shared_ptr<const fizz::server::FizzServerContext> ctx,
-    std::unique_ptr<CryptoFactory> cryptoFactory)
-    : QuicTransportBase(evb, std::move(sock)), ctx_(std::move(ctx)) {
+    std::unique_ptr<CryptoFactory> cryptoFactory,
+    bool useConnectionEndWithErrorCallback)
+    : QuicTransportBase(
+          evb,
+          std::move(sock),
+          useConnectionEndWithErrorCallback),
+      ctx_(std::move(ctx)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)
@@ -78,14 +83,16 @@ QuicServerTransport::Ptr QuicServerTransport::make(
     std::unique_ptr<folly::AsyncUDPSocket> sock,
     ConnectionSetupCallback* connSetupCb,
     ConnectionCallbackNew* connStreamsCb,
-    std::shared_ptr<const fizz::server::FizzServerContext> ctx) {
+    std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+    bool useConnectionEndWithErrorCallback) {
   return std::make_shared<QuicServerTransport>(
       evb,
       std::move(sock),
       connSetupCb,
       connStreamsCb,
       ctx,
-      nullptr /* cryptoFactory */);
+      nullptr /* cryptoFactory */,
+      useConnectionEndWithErrorCallback);
 }
 
 void QuicServerTransport::setRoutingCallback(

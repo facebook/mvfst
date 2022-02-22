@@ -38,7 +38,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
  public:
   QuicTransportBase(
       folly::EventBase* evb,
-      std::unique_ptr<folly::AsyncUDPSocket> socket);
+      std::unique_ptr<folly::AsyncUDPSocket> socket,
+      bool useConnectionEndWithErrorCallback = false);
 
   ~QuicTransportBase() override;
 
@@ -860,6 +861,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   std::unique_ptr<folly::AsyncUDPSocket> socket_;
   ConnectionSetupCallback* connSetupCallback_{nullptr};
   ConnectionCallbackNew* connCallback_{nullptr};
+  // A flag telling transport if the new onConnectionEnd(error) cb must be used.
+  bool useConnectionEndWithErrorCallback_{false};
 
   std::
       unique_ptr<QuicConnectionStateBase, folly::DelayedDestruction::Destructor>

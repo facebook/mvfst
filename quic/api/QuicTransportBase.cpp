@@ -28,9 +28,11 @@ namespace quic {
 
 QuicTransportBase::QuicTransportBase(
     folly::EventBase* evb,
-    std::unique_ptr<folly::AsyncUDPSocket> socket)
+    std::unique_ptr<folly::AsyncUDPSocket> socket,
+    bool useConnectionEndWithErrorCallback)
     : evb_(evb),
       socket_(std::move(socket)),
+      useConnectionEndWithErrorCallback_(useConnectionEndWithErrorCallback),
       lossTimeout_(this),
       ackTimeout_(this),
       pathValidationTimeout_(this),
@@ -475,12 +477,16 @@ void QuicTransportBase::processConnectionCallbacks(
     return;
   }
 
+  if (useConnectionEndWithErrorCallback_) {
+    connCallback_->onConnectionEnd(cancelCode);
+    return;
+  }
+
   bool noError = processCancelCode(cancelCode);
   if (noError) {
     connCallback_->onConnectionEnd();
   } else {
-    connCallback_->onConnectionError(
-        QuicError(cancelCode.code, cancelCode.message));
+    connCallback_->onConnectionError(cancelCode);
   }
 }
 

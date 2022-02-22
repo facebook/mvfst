@@ -38,12 +38,14 @@ QuicClientTransport::QuicClientTransport(
     std::unique_ptr<folly::AsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
     size_t connectionIdSize,
-    PacketNum startingPacketNum)
+    PacketNum startingPacketNum,
+    bool useConnectionEndWithErrorCallback)
     : QuicClientTransport(
           evb,
           std::move(socket),
           std::move(handshakeFactory),
-          connectionIdSize) {
+          connectionIdSize,
+          useConnectionEndWithErrorCallback) {
   conn_->ackStates = AckStates(startingPacketNum);
 }
 
@@ -51,8 +53,12 @@ QuicClientTransport::QuicClientTransport(
     folly::EventBase* evb,
     std::unique_ptr<folly::AsyncUDPSocket> socket,
     std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
-    size_t connectionIdSize)
-    : QuicTransportBase(evb, std::move(socket)),
+    size_t connectionIdSize,
+    bool useConnectionEndWithErrorCallback)
+    : QuicTransportBase(
+          evb,
+          std::move(socket),
+          useConnectionEndWithErrorCallback),
       happyEyeballsConnAttemptDelayTimeout_(this) {
   DCHECK(handshakeFactory);
   auto tempConn =

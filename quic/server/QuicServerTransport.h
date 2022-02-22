@@ -63,7 +63,8 @@ class QuicServerTransport
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallbackNew* connStreamsCb,
-      std::shared_ptr<const fizz::server::FizzServerContext> ctx);
+      std::shared_ptr<const fizz::server::FizzServerContext> ctx,
+      bool useConnectionEndWithErrorCallback = false);
 
   QuicServerTransport(
       folly::EventBase* evb,
@@ -71,7 +72,8 @@ class QuicServerTransport
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallbackNew* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
-      std::unique_ptr<CryptoFactory> cryptoFactory = nullptr);
+      std::unique_ptr<CryptoFactory> cryptoFactory = nullptr,
+      bool useConnectionEndWithErrorCallback = false);
 
   // Testing only API:
   QuicServerTransport(
