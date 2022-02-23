@@ -9,6 +9,7 @@
 
 #include <folly/Range.h>
 #include <folly/String.h>
+#include <quic/common/third-party/enum.h>
 #include <chrono>
 #include <cstdint>
 #include <ostream>
@@ -114,35 +115,38 @@ constexpr uint64_t kDefaultQuicTransportKnobSpace = 0xfaceb001;
 // Default knob id for transport knobs (used for internal use-cases only)
 constexpr uint64_t kDefaultQuicTransportKnobId = 1;
 
-enum class TransportKnobParamId : uint64_t {
-  // Disabling pmtu blackhole detection
-  ZERO_PMTU_BLACKHOLE_DETECTION = 0x8830,
-  // Force udp payload size to be equal to max
-  // udp payload size
-  FORCIBLY_SET_UDP_PAYLOAD_SIZE = 0xba92,
-  // Set congestion control algorithm
-  CC_ALGORITHM_KNOB = 0xccaa,
-  // Set congestion control aggressiveness (experimental)
-  CC_AGRESSIVENESS_KNOB = 0xccab,
-  // Enable experimental CC settings
-  CC_EXPERIMENTAL = 0xccac,
-  // Set pacing rtt factor used only during startup phase
-  STARTUP_RTT_FACTOR_KNOB = 0x1111,
-  // Set pacing rtt factor used when not in startup
-  DEFAULT_RTT_FACTOR_KNOB = 0x2222,
-  // Set total buffer size (in bytes) for not yet sent packets
-  NOTSENT_BUFFER_SIZE_KNOB = 0x3333,
-  // Set max pacing rate in bytes per second to be used if pacing is enabled
-  MAX_PACING_RATE_KNOB = 0x4444,
-  // Set auto background mode (experimental)
-  AUTO_BACKGROUND_MODE = 0x5555,
-  // Use adaptive loss detection thresholds for reordering and timeout
-  ADAPTIVE_LOSS_DETECTION = 0x5556,
-  // Enable experimental pacer settings
-  PACER_EXPERIMENTAL = 0x5557,
-  // Set short header padding modulo size
-  SHORT_HEADER_PADDING_KNOB = 0x6666,
-};
+BETTER_ENUM(
+    TransportKnobParamId,
+    uint64_t,
+    // Any value not in the list below
+    UNKNOWN = 0x0,
+    // Disabling pmtu blackhole detection
+    ZERO_PMTU_BLACKHOLE_DETECTION = 0x8830,
+    // Force udp payload size to be equal to max
+    // udp payload size
+    FORCIBLY_SET_UDP_PAYLOAD_SIZE = 0xba92,
+    // Set congestion control algorithm
+    CC_ALGORITHM_KNOB = 0xccaa,
+    // Set congestion control aggressiveness (experimental)
+    CC_AGRESSIVENESS_KNOB = 0xccab,
+    // Enable experimental CC settings
+    CC_EXPERIMENTAL = 0xccac,
+    // Set pacing rtt factor used only during startup phase
+    STARTUP_RTT_FACTOR_KNOB = 0x1111,
+    // Set pacing rtt factor used when not in startup
+    DEFAULT_RTT_FACTOR_KNOB = 0x2222,
+    // Set total buffer size (in bytes) for not yet sent packets
+    NOTSENT_BUFFER_SIZE_KNOB = 0x3333,
+    // Set max pacing rate in bytes per second to be used if pacing is enabled
+    MAX_PACING_RATE_KNOB = 0x4444,
+    // Set auto background mode (experimental)
+    AUTO_BACKGROUND_MODE = 0x5555,
+    // Use adaptive loss detection thresholds for reordering and timeout
+    ADAPTIVE_LOSS_DETECTION = 0x5556,
+    // Enable experimental pacer settings
+    PACER_EXPERIMENTAL = 0x5557,
+    // Set short header padding modulo size
+    SHORT_HEADER_PADDING_KNOB = 0x6666)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

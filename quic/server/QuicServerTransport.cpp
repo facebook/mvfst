@@ -440,17 +440,15 @@ void QuicServerTransport::handleTransportKnobParams(
     const TransportKnobParams& params) {
   for (const auto& param : params) {
     auto maybeParamHandler = transportKnobParamHandlers_.find(param.id);
+    TransportKnobParamId knobParamId = TransportKnobParamId::UNKNOWN;
+    if (TransportKnobParamId::_is_valid(param.id)) {
+      knobParamId = TransportKnobParamId::_from_integral(param.id);
+    }
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
       (maybeParamHandler->second)(this, param.val);
-      QUIC_STATS(
-          conn_->statsCallback,
-          onTransportKnobApplied,
-          QuicTransportStatsCallback::paramIdToTransportKnobType(param.id));
+      QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
     } else {
-      QUIC_STATS(
-          conn_->statsCallback,
-          onTransportKnobError,
-          QuicTransportStatsCallback::paramIdToTransportKnobType(param.id));
+      QUIC_STATS(conn_->statsCallback, onTransportKnobError, knobParamId);
     }
   }
 }
@@ -668,7 +666,7 @@ void QuicServerTransport::onTransportKnobs(Buf knobBlob) {
       QUIC_STATS(
           conn_->statsCallback,
           onTransportKnobError,
-          QuicTransportStatsCallback::TransportKnobType::UNKNOWN);
+          TransportKnobParamId::UNKNOWN);
     }
   }
 }

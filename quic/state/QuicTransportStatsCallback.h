@@ -60,20 +60,6 @@ class QuicTransportStatsCallback {
     MAX
   };
 
-  enum class TransportKnobType : uint8_t {
-    ZERO_PMTU_BLACKHOLE,
-    FORCIBLY_SET_UDP_PAYLOAD_SIZE,
-    CC_ALGORITHM_KNOB,
-    CC_AGRESSIVENESS_KNOB,
-    STARTUP_RTT_FACTOR_KNOB,
-    DEFAULT_RTT_FACTOR_KNOB,
-    NOTSENT_BUFFER_SIZE_KNOB,
-    MAX_PACING_RATE_KNOB,
-    AUTO_BACKGROUND_MODE,
-    UNKNOWN,
-    MAX
-  };
-
   virtual ~QuicTransportStatsCallback() = default;
 
   // packet level metrics
@@ -161,9 +147,9 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionPMTUUpperBoundDetected() = 0;
 
-  virtual void onTransportKnobApplied(TransportKnobType knobType) = 0;
+  virtual void onTransportKnobApplied(TransportKnobParamId knobType) = 0;
 
-  virtual void onTransportKnobError(TransportKnobType knobType) = 0;
+  virtual void onTransportKnobError(TransportKnobParamId knobType) = 0;
 
   virtual void onServerUnfinishedHandshake() = 0;
 
@@ -265,63 +251,6 @@ class QuicTransportStatsCallback {
         return SocketErrorType::NOMEM;
       default:
         return SocketErrorType::OTHER;
-    }
-  }
-
-  static const char* toString(TransportKnobType knobType) {
-    switch (knobType) {
-      case TransportKnobType::ZERO_PMTU_BLACKHOLE:
-        return "ZERO_PMTU_BLACKHOLE";
-      case TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE:
-        return "FORCIBLY_SET_UDP_PAYLOAD_SIZE";
-      case TransportKnobType::CC_ALGORITHM_KNOB:
-        return "CC_ALGORITHM_KNOB";
-      case TransportKnobType::CC_AGRESSIVENESS_KNOB:
-        return "CC_AGRESSIVENESS_KNOB";
-      case TransportKnobType::STARTUP_RTT_FACTOR_KNOB:
-        return "STARTUP_RTT_FACTOR_KNOB";
-      case TransportKnobType::DEFAULT_RTT_FACTOR_KNOB:
-        return "DEFAULT_RTT_FACTOR_KNOB";
-      case TransportKnobType::NOTSENT_BUFFER_SIZE_KNOB:
-        return "NOTSENT_BUFFER_SIZE_KNOB";
-      case TransportKnobType::MAX_PACING_RATE_KNOB:
-        return "MAX_PACING_RATE_KNOB";
-      case TransportKnobType::AUTO_BACKGROUND_MODE:
-        return "AUTO_BACKGROUND_MODE";
-      case TransportKnobType::UNKNOWN:
-        return "UNKNOWN";
-      case TransportKnobType::MAX:
-        return "MAX";
-      default:
-        throw std::runtime_error("Undefined TransportKnobType passed");
-    }
-  }
-
-  static TransportKnobType paramIdToTransportKnobType(uint64_t paramId) {
-    switch (paramId) {
-      case static_cast<uint64_t>(
-          TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION):
-        return TransportKnobType::ZERO_PMTU_BLACKHOLE;
-      case static_cast<uint64_t>(
-          TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE):
-        return TransportKnobType::FORCIBLY_SET_UDP_PAYLOAD_SIZE;
-      case static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB):
-        return TransportKnobType::CC_ALGORITHM_KNOB;
-      case static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB):
-        return TransportKnobType::CC_AGRESSIVENESS_KNOB;
-      case static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB):
-        return TransportKnobType::STARTUP_RTT_FACTOR_KNOB;
-      case static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB):
-        return TransportKnobType::DEFAULT_RTT_FACTOR_KNOB;
-      case static_cast<uint64_t>(
-          TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB):
-        return TransportKnobType::NOTSENT_BUFFER_SIZE_KNOB;
-      case static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB):
-        return TransportKnobType::MAX_PACING_RATE_KNOB;
-      case static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE):
-        return TransportKnobType::AUTO_BACKGROUND_MODE;
-      default:
-        return TransportKnobType::UNKNOWN;
     }
   }
 };

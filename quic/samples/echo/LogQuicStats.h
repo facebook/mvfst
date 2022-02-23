@@ -187,14 +187,14 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onConnectionPMTUUpperBoundDetected";
   }
 
-  void onTransportKnobApplied(TransportKnobType knobType) override {
+  void onTransportKnobApplied(TransportKnobParamId knobType) override {
     VLOG(2) << prefix_
-            << "onTransportKnobApplied knobType=" << toString(knobType);
+            << "onTransportKnobApplied knobType=" << knobType._to_string();
   }
 
-  void onTransportKnobError(TransportKnobType knobType) override {
+  void onTransportKnobError(TransportKnobParamId knobType) override {
     VLOG(2) << prefix_
-            << "onTransportKnboError knobType=" << toString(knobType);
+            << "onTransportKnboError knobType=" << knobType._to_string();
   }
 
   void onServerUnfinishedHandshake() override {
