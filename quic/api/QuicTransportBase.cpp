@@ -2705,8 +2705,7 @@ void QuicTransportBase::setConnectionSetupCallback(
   connSetupCallback_ = callback;
 }
 
-void QuicTransportBase::setConnectionCallbackNew(
-    ConnectionCallbackNew* callback) {
+void QuicTransportBase::setConnectionCallback(ConnectionCallback* callback) {
   connCallback_ = callback;
 }
 

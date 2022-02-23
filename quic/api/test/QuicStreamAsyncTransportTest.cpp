@@ -158,7 +158,7 @@ class QuicStreamAsyncTransportTest : public Test {
   std::shared_ptr<QuicServer> server_;
   folly::SocketAddress serverAddr_;
   NiceMock<MockConnectionSetupCallback> serverConnectionSetupCB_;
-  NiceMock<MockConnectionCallbackNew> serverConnectionCB_;
+  NiceMock<MockConnectionCallback> serverConnectionCB_;
   std::shared_ptr<quic::QuicSocket> serverSocket_;
   QuicStreamAsyncTransport::UniquePtr serverAsyncWrapper_;
   folly::test::MockWriteCallback serverWriteCB_;
@@ -169,7 +169,7 @@ class QuicStreamAsyncTransportTest : public Test {
   folly::EventBase clientEvb_;
   std::thread clientEvbThread_;
   NiceMock<MockConnectionSetupCallback> clientConnectionSetupCB_;
-  NiceMock<MockConnectionCallbackNew> clientConnectionCB_;
+  NiceMock<MockConnectionCallback> clientConnectionCB_;
   QuicStreamAsyncTransport::UniquePtr clientAsyncWrapper_;
   folly::Promise<folly::Unit> startPromise_;
   folly::test::MockWriteCallback clientWriteCB_;

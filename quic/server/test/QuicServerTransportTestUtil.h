@@ -32,7 +32,7 @@ class TestingQuicServerTransport : public QuicServerTransport {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connCb,
+      ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
       : QuicServerTransport(
             evb,
@@ -202,7 +202,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     return connSetupCallback;
   }
 
-  MockConnectionCallbackNew& getConnCallback() {
+  MockConnectionCallback& getConnCallback() {
     return connCallback;
   }
 
@@ -559,7 +559,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   folly::SocketAddress serverAddr;
   folly::SocketAddress clientAddr;
   testing::NiceMock<MockConnectionSetupCallback> connSetupCallback;
-  testing::NiceMock<MockConnectionCallbackNew> connCallback;
+  testing::NiceMock<MockConnectionCallback> connCallback;
   testing::NiceMock<MockRoutingCallback> routingCallback;
   testing::NiceMock<MockHandshakeFinishedCallback> handshakeFinishedCallback;
   folly::Optional<ConnectionId> clientConnectionId;

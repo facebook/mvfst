@@ -20,7 +20,7 @@ class MockQuicSocket : public QuicSocket {
   MockQuicSocket(
       folly::EventBase* /*eventBase*/,
       ConnectionSetupCallback* setupCb,
-      ConnectionCallbackNew* connCb)
+      ConnectionCallback* connCb)
       : setupCb_(setupCb), connCb_(connCb) {}
 
   MOCK_CONST_METHOD0(good, bool());
@@ -109,7 +109,7 @@ class MockQuicSocket : public QuicSocket {
           ReadCallback*,
           folly::Optional<ApplicationErrorCode> err));
   MOCK_METHOD1(setConnectionSetupCallback, void(ConnectionSetupCallback*));
-  MOCK_METHOD1(setConnectionCallbackNew, void(ConnectionCallbackNew*));
+  MOCK_METHOD1(setConnectionCallback, void(ConnectionCallback*));
   void setEarlyDataAppParamsFunctions(
       folly::Function<bool(const folly::Optional<std::string>&, const Buf&)
                           const> validator,
@@ -292,7 +292,7 @@ class MockQuicSocket : public QuicSocket {
   MOCK_METHOD1(setCongestionControl, void(CongestionControlType));
 
   ConnectionSetupCallback* setupCb_;
-  ConnectionCallbackNew* connCb_;
+  ConnectionCallback* connCb_;
 
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
       earlyDataAppParamsValidator_;

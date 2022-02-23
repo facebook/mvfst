@@ -13,7 +13,7 @@ namespace quic {
 
 class QuicServerAsyncTransport : public QuicStreamAsyncTransport,
                                  public QuicSocket::ConnectionSetupCallback,
-                                 public QuicSocket::ConnectionCallbackNew {
+                                 public QuicSocket::ConnectionCallback {
  public:
   using UniquePtr = std::unique_ptr<
       QuicServerAsyncTransport,

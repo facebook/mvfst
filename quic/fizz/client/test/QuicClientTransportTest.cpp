@@ -244,7 +244,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
   folly::EventBase eventbase_;
   folly::SocketAddress serverAddr;
   NiceMock<MockConnectionSetupCallback> clientConnSetupCallback;
-  NiceMock<MockConnectionCallbackNew> clientConnCallback;
+  NiceMock<MockConnectionCallback> clientConnCallback;
   NiceMock<MockReadCallback> readCb;
   std::shared_ptr<TestingQuicClientTransport> client;
   std::shared_ptr<fizz::server::FizzServerContext> serverCtx;
@@ -1052,7 +1052,7 @@ TEST_F(QuicClientTransportTest, onNetworkSwitchReplaceNoHandshake) {
 TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
   class ConnectionCallbackThatWritesOnTransportReady
       : public QuicSocket::ConnectionSetupCallback,
-        public QuicSocket::ConnectionCallbackNew {
+        public QuicSocket::ConnectionCallback {
    public:
     explicit ConnectionCallbackThatWritesOnTransportReady(
         std::shared_ptr<QuicSocket> socket)

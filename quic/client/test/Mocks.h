@@ -95,7 +95,7 @@ class MockQuicClientTransport : public quic::QuicClientTransport {
             std::move(handshakeFactory)),
         testType_(testType) {}
 
-  void start(ConnectionSetupCallback* connSetupCb, ConnectionCallbackNew*)
+  void start(ConnectionSetupCallback* connSetupCb, ConnectionCallback*)
       override {
     auto cancelCode = QuicError(
         QuicErrorCode(LocalErrorCode::NO_ERROR),

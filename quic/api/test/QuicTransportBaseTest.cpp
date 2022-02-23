@@ -199,10 +199,10 @@ class TestQuicTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connCb)
+      ConnectionCallback* connCb)
       : QuicTransportBase(evb, std::move(socket)) {
     setConnectionSetupCallback(connSetupCb);
-    setConnectionCallbackNew(connCb);
+    setConnectionCallback(connCb);
     auto conn = std::make_unique<QuicServerConnectionState>(
         FizzServerQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
@@ -533,7 +533,7 @@ class QuicTransportImplTest : public Test {
  protected:
   std::unique_ptr<folly::EventBase> evb;
   NiceMock<MockConnectionSetupCallback> connSetupCallback;
-  NiceMock<MockConnectionCallbackNew> connCallback;
+  NiceMock<MockConnectionCallback> connCallback;
   TestByteEventCallback byteEventCallback;
   std::shared_ptr<TestQuicTransport> transport;
   folly::test::MockAsyncUDPSocket* socketPtr;

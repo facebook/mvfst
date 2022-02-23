@@ -69,9 +69,9 @@ class QuicSocket {
    * Callback for connection level events once connection is set up.
    * The name is temporary until we phase out the old monolithic callback.
    */
-  class ConnectionCallbackNew {
+  class ConnectionCallback {
    public:
-    virtual ~ConnectionCallbackNew() = default;
+    virtual ~ConnectionCallback() = default;
 
     /**
      * Invoked when stream id's flow control state changes.  This is an edge
@@ -223,7 +223,7 @@ class QuicSocket {
    * Sets connection streams callback. This callback must be set after
    * connection set up is finished and is ready for streams processing.
    */
-  virtual void setConnectionCallbackNew(ConnectionCallbackNew* callback) = 0;
+  virtual void setConnectionCallback(ConnectionCallback* callback) = 0;
 
   /**
    * Sets the functions that mvfst will invoke to validate early data params

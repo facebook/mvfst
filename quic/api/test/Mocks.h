@@ -120,9 +120,9 @@ class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
 #endif
 };
 
-class MockConnectionCallbackNew : public QuicSocket::ConnectionCallbackNew {
+class MockConnectionCallback : public QuicSocket::ConnectionCallback {
  public:
-  ~MockConnectionCallbackNew() override = default;
+  ~MockConnectionCallback() override = default;
 
 #if defined(MOCK_METHOD)
   MOCK_METHOD((void), onFlowControlUpdate, (StreamId), (noexcept));
@@ -240,7 +240,7 @@ class MockQuicTransport : public QuicServerTransport {
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connCb,
+      ConnectionCallback* connCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx)
       : QuicServerTransport(evb, std::move(sock), connSetupCb, connCb, ctx) {}
 

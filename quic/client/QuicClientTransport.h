@@ -97,7 +97,7 @@ class QuicClientTransport
    */
   virtual void start(
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connCb);
+      ConnectionCallback* connCb);
 
   /**
    * Returns whether or not TLS is resumed.

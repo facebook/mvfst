@@ -115,7 +115,7 @@ class QuicTransportTest : public Test {
   folly::EventBase evb_;
   MockAsyncUDPSocket* socket_;
   NiceMock<MockConnectionSetupCallback> connSetupCallback_;
-  NiceMock<MockConnectionCallbackNew> connCallback_;
+  NiceMock<MockConnectionCallback> connCallback_;
   NiceMock<MockWriteCallback> writeCallback_;
   MockAead* aead_;
   std::unique_ptr<PacketNumberCipher> headerCipher_;

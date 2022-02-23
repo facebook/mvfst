@@ -314,7 +314,7 @@ TEST(DefaultAppTokenValidatorTest, TestInvalidAppParams) {
   conn.statsCallback = quicStats.get();
 
   MockConnectionSetupCallback connSetupCallback;
-  MockConnectionCallbackNew connCallback;
+  MockConnectionCallback connCallback;
 
   AppToken appToken;
   appToken.transportParams = createTicketTransportParameters(

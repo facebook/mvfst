@@ -1522,7 +1522,7 @@ void QuicClientTransport::
 
 void QuicClientTransport::start(
     ConnectionSetupCallback* connSetupCb,
-    ConnectionCallbackNew* connCb) {
+    ConnectionCallback* connCb) {
   if (happyEyeballsEnabled_) {
     // TODO Supply v4 delay amount from somewhere when we want to tune this
     startHappyEyeballs(
@@ -1545,7 +1545,7 @@ void QuicClientTransport::start(
   }
 
   setConnectionSetupCallback(connSetupCb);
-  setConnectionCallbackNew(connCb);
+  setConnectionCallback(connCb);
 
   clientConn_->pendingOneRttData.reserve(
       conn_->transportSettings.maxPacketsToBuffer);

@@ -62,7 +62,7 @@ class QuicServerTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connStreamsCb,
+      ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       bool useConnectionEndWithErrorCallback = false);
 
@@ -70,7 +70,7 @@ class QuicServerTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connStreamsCb,
+      ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory = nullptr,
       bool useConnectionEndWithErrorCallback = false);
@@ -80,7 +80,7 @@ class QuicServerTransport
       folly::EventBase* evb,
       std::unique_ptr<folly::AsyncUDPSocket> sock,
       ConnectionSetupCallback* connSetupCb,
-      ConnectionCallbackNew* connStreamsCb,
+      ConnectionCallback* connStreamsCb,
       std::shared_ptr<const fizz::server::FizzServerContext> ctx,
       std::unique_ptr<CryptoFactory> cryptoFactory,
       PacketNum startingPacketNum);

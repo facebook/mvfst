@@ -27,7 +27,7 @@
 namespace quic {
 namespace samples {
 class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
-                   public quic::QuicSocket::ConnectionCallbackNew,
+                   public quic::QuicSocket::ConnectionCallback,
                    public quic::QuicSocket::ReadCallback,
                    public quic::QuicSocket::WriteCallback {
  public:
