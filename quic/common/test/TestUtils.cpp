@@ -162,7 +162,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
  public:
   ~AcceptingTicketCipher() override = default;
 
-  folly::Future<folly::Optional<
+  folly::SemiFuture<folly::Optional<
       std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     // Fake handshake, no need todo anything here.
@@ -199,7 +199,7 @@ class AcceptingTicketCipher : public fizz::server::TicketCipher {
     return resState;
   }
 
-  folly::Future<
+  folly::SemiFuture<
       std::pair<fizz::PskType, folly::Optional<fizz::server::ResumptionState>>>
   decrypt(std::unique_ptr<folly::IOBuf>) const override {
     return std::make_pair(fizz::PskType::Resumption, createResumptionState());
