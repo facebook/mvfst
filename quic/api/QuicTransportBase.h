@@ -539,6 +539,24 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
     QuicTransportBase* transport_;
   };
 
+  class KeepaliveTimeout : public folly::HHWheelTimer::Callback {
+   public:
+    ~KeepaliveTimeout() override = default;
+
+    explicit KeepaliveTimeout(QuicTransportBase* transport)
+        : transport_(transport) {}
+
+    void timeoutExpired() noexcept override {
+      transport_->keepaliveTimeoutExpired();
+    }
+    void callbackCanceled() noexcept override {
+      // Specifically do nothing since if we got canceled we shouldn't write.
+    }
+
+   private:
+    QuicTransportBase* transport_;
+  };
+
   // DrainTimeout is a bit different from other timeouts. It needs to hold a
   // shared_ptr to the transport, since if a DrainTimeout is scheduled,
   // transport cannot die.
@@ -792,6 +810,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void ackTimeoutExpired() noexcept;
   void pathValidationTimeoutExpired() noexcept;
   void idleTimeoutExpired(bool drain) noexcept;
+  void keepaliveTimeoutExpired() noexcept;
   void drainTimeoutExpired() noexcept;
   void pingTimeoutExpired() noexcept;
   void d6dProbeTimeoutExpired() noexcept;
@@ -908,6 +927,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   AckTimeout ackTimeout_;
   PathValidationTimeout pathValidationTimeout_;
   IdleTimeout idleTimeout_;
+  KeepaliveTimeout keepaliveTimeout_;
   DrainTimeout drainTimeout_;
   PingTimeout pingTimeout_;
   D6DProbeTimeout d6dProbeTimeout_;

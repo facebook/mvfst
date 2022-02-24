@@ -61,6 +61,10 @@ class TestingQuicServerTransport : public QuicServerTransport {
     return idleTimeout_;
   }
 
+  auto& keepaliveTimeout() {
+    return keepaliveTimeout_;
+  }
+
   auto& drainTimeout() {
     return drainTimeout_;
   }
@@ -161,6 +165,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         getCanIgnorePathMTU();
     server->getNonConstConn().transportSettings.disableMigration =
         getDisableMigration();
+    server->getNonConstConn().transportSettings.enableKeepalive = true;
     server->setConnectionIdAlgo(connIdAlgo_.get());
     server->setClientConnectionId(*clientConnectionId);
     server->setClientChosenDestConnectionId(*initialDestinationConnectionId);

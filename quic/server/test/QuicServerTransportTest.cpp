@@ -185,6 +185,7 @@ TEST_F(QuicServerTransportTest, IdleTimerResetOnRecvNewData) {
   ASSERT_FALSE(server->idleTimeout().isScheduled());
   recvEncryptedStream(streamId, *expected);
   ASSERT_TRUE(server->idleTimeout().isScheduled());
+  ASSERT_TRUE(server->keepaliveTimeout().isScheduled());
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
@@ -195,12 +196,16 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
   auto expected = IOBuf::copyBuffer("hello");
   auto packet = recvEncryptedStream(streamId, *expected);
   ASSERT_TRUE(server->idleTimeout().isScheduled());
+  ASSERT_TRUE(server->keepaliveTimeout().isScheduled());
 
   server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
   ASSERT_FALSE(server->idleTimeout().isScheduled());
+  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
   // Try delivering the same packet again
   deliverData(packet->clone(), false);
   ASSERT_FALSE(server->idleTimeout().isScheduled());
+  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
   EXPECT_CALL(*quicStats_, onQuicStreamClosed());
 }
 
@@ -213,6 +218,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   StreamId streamId = server->createBidirectionalStream().value();
 
   server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
   ASSERT_FALSE(server->idleTimeout().isScheduled());
   server->writeChain(
       streamId,
@@ -221,9 +227,11 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   loopForWrites();
   // It was the first packet
   EXPECT_TRUE(server->idleTimeout().isScheduled());
+  EXPECT_TRUE(server->keepaliveTimeout().isScheduled());
 
   // cancel it and write something else. This time idle timer shouldn't set.
   server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
   EXPECT_FALSE(server->idleTimeout().isScheduled());
   server->writeChain(
       streamId,
@@ -231,6 +239,7 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
       false);
   loopForWrites();
   EXPECT_FALSE(server->idleTimeout().isScheduled());
+  EXPECT_FALSE(server->keepaliveTimeout().isScheduled());
 }
 
 TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
@@ -249,10 +258,12 @@ TEST_F(QuicServerTransportTest, TimeoutsNotSetAfterClose) {
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR),
       std::string("how about no")));
   server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
   ASSERT_FALSE(server->idleTimeout().isScheduled());
 
   deliverDataWithoutErrorCheck(packet->clone());
   ASSERT_FALSE(server->idleTimeout().isScheduled());
+  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
   ASSERT_FALSE(server->lossTimeout().isScheduled());
   ASSERT_FALSE(server->ackTimeout().isScheduled());
   ASSERT_TRUE(server->drainTimeout().isScheduled());
@@ -274,10 +285,12 @@ TEST_F(QuicServerTransportTest, InvalidMigrationNoDrain) {
       QuicErrorCode(TransportErrorCode::INVALID_MIGRATION),
       std::string("migration disabled")));
   server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
   ASSERT_FALSE(server->idleTimeout().isScheduled());
 
   deliverDataWithoutErrorCheck(packet->clone());
   ASSERT_FALSE(server->idleTimeout().isScheduled());
+  ASSERT_FALSE(server->keepaliveTimeout().isScheduled());
   ASSERT_FALSE(server->lossTimeout().isScheduled());
   ASSERT_FALSE(server->ackTimeout().isScheduled());
   ASSERT_FALSE(server->drainTimeout().isScheduled());
@@ -296,10 +309,29 @@ TEST_F(QuicServerTransportTest, IdleTimeoutExpired) {
       serverWrites, *serverReadCodec, QuicFrame::Type::ConnectionCloseFrame));
 }
 
+TEST_F(QuicServerTransportTest, KeepaliveTimeoutExpired) {
+  server->keepaliveTimeout().timeoutExpired();
+
+  EXPECT_FALSE(server->isDraining());
+  EXPECT_FALSE(server->isClosed());
+  server->idleTimeout().cancelTimeout();
+  server->keepaliveTimeout().cancelTimeout();
+  server->getNonConstConn().receivedNewPacketBeforeWrite = true;
+  // After we write, the idletimout and keepalive timeout should be
+  // scheduled and there should be a ping written.
+  loopForWrites();
+  EXPECT_TRUE(server->idleTimeout().isScheduled());
+  EXPECT_TRUE(server->keepaliveTimeout().isScheduled());
+  auto serverReadCodec = makeClientEncryptedCodec();
+  EXPECT_TRUE(verifyFramePresent(
+      serverWrites, *serverReadCodec, QuicFrame::Type::PingFrame));
+}
+
 TEST_F(QuicServerTransportTest, RecvDataAfterIdleTimeout) {
   server->idleTimeout().timeoutExpired();
 
   EXPECT_FALSE(server->idleTimeout().isScheduled());
+  EXPECT_FALSE(server->keepaliveTimeout().isScheduled());
   EXPECT_TRUE(server->isDraining());
   EXPECT_TRUE(server->isClosed());
 

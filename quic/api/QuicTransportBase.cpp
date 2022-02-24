@@ -37,6 +37,7 @@ QuicTransportBase::QuicTransportBase(
       ackTimeout_(this),
       pathValidationTimeout_(this),
       idleTimeout_(this),
+      keepaliveTimeout_(this),
       drainTimeout_(this),
       pingTimeout_(this),
       d6dProbeTimeout_(this),
@@ -357,6 +358,9 @@ void QuicTransportBase::closeImpl(
   }
   if (idleTimeout_.isScheduled()) {
     idleTimeout_.cancelTimeout();
+  }
+  if (keepaliveTimeout_.isScheduled()) {
+    keepaliveTimeout_.cancelTimeout();
   }
   if (pingTimeout_.isScheduled()) {
     pingTimeout_.cancelTimeout();
@@ -1833,6 +1837,9 @@ void QuicTransportBase::setIdleTimer() {
   if (idleTimeout_.isScheduled()) {
     idleTimeout_.cancelTimeout();
   }
+  if (keepaliveTimeout_.isScheduled()) {
+    keepaliveTimeout_.cancelTimeout();
+  }
   auto localIdleTimeout = conn_->transportSettings.idleTimeout;
   // The local idle timeout being zero means it is disabled.
   if (localIdleTimeout == 0ms) {
@@ -1842,6 +1849,13 @@ void QuicTransportBase::setIdleTimer() {
       conn_->peerIdleTimeout > 0ms ? conn_->peerIdleTimeout : localIdleTimeout;
   auto idleTimeout = timeMin(localIdleTimeout, peerIdleTimeout);
   getEventBase()->timer().scheduleTimeout(&idleTimeout_, idleTimeout);
+  auto idleTimeoutCount = idleTimeout.count();
+  if (conn_->transportSettings.enableKeepalive) {
+    std::chrono::milliseconds keepaliveTimeout = std::chrono::milliseconds(
+        idleTimeoutCount - static_cast<int64_t>(idleTimeoutCount * .15));
+    getEventBase()->timer().scheduleTimeout(
+        &keepaliveTimeout_, keepaliveTimeout);
+  }
 }
 
 uint64_t QuicTransportBase::getNumOpenableBidirectionalStreams() const {
@@ -2545,6 +2559,12 @@ void QuicTransportBase::idleTimeoutExpired(bool drain) noexcept {
               numOpenStreans - conn_->streamManager->numControlStreams())),
       drain /* drainConnection */,
       !drain /* sendCloseImmediately */);
+}
+
+void QuicTransportBase::keepaliveTimeoutExpired() noexcept {
+  FOLLY_MAYBE_UNUSED auto self = sharedGuard();
+  conn_->pendingEvents.sendPing = true;
+  updateWriteLooper(true);
 }
 
 void QuicTransportBase::d6dProbeTimeoutExpired() noexcept {
@@ -3311,6 +3331,7 @@ void QuicTransportBase::detachEventBase() {
   ackTimeout_.cancelTimeout();
   pathValidationTimeout_.cancelTimeout();
   idleTimeout_.cancelTimeout();
+  keepaliveTimeout_.cancelTimeout();
   drainTimeout_.cancelTimeout();
   readLooper_->detachEventBase();
   peekLooper_->detachEventBase();

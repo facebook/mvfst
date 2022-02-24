@@ -146,7 +146,9 @@ BETTER_ENUM(
     // Enable experimental pacer settings
     PACER_EXPERIMENTAL = 0x5557,
     // Set short header padding modulo size
-    SHORT_HEADER_PADDING_KNOB = 0x6666)
+    SHORT_HEADER_PADDING_KNOB = 0x6666,
+    // Keepalive timer enabled
+    KEEPALIVE_ENABLED = 0x7777)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

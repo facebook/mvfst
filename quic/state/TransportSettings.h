@@ -286,6 +286,10 @@ struct TransportSettings {
   // updates. If there has been less than 2SRTTs between flow control updates
   // this will double the target window.
   bool autotuneReceiveConnFlowControl{false};
+  // Enable a keepalive timer. This schedules a timer to send a PING ~15%
+  // before an idle timeout. To work effectively this means the idle timer
+  // has to be set to something >> the RTT of the connection.
+  bool enableKeepalive{false};
 };
 
 } // namespace quic

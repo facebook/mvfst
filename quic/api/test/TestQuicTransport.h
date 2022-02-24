@@ -117,6 +117,10 @@ class TestQuicTransport
     return idleTimeout_;
   }
 
+  auto& keepalivetimeout() {
+    return keepaliveTimeout_;
+  }
+
   CloseState closeState() {
     return closeState_;
   }

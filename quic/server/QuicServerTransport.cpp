@@ -859,6 +859,15 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
               enableExperimental);
         }
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.enableKeepalive = static_cast<bool>(val);
+        VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: "
+                << static_cast<bool>(val);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
