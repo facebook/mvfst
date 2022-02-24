@@ -42,8 +42,6 @@ void startHappyEyeballs(
     folly::AsyncUDPSocket::ReadCallback* readCallback,
     const folly::SocketOptionMap& options);
 
-void resetHappyEyeballs(QuicClientConnectionState& connection);
-
 void happyEyeballsSetUpSocket(
     folly::AsyncUDPSocket& socket,
     folly::Optional<folly::SocketAddress> localAddress,
