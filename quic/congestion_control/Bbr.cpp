@@ -37,6 +37,24 @@ BbrCongestionController::BbrCongestionController(QuicConnectionStateBase& conn)
       pacingGainCycles_(kPacingGainCycles.begin(), kPacingGainCycles.end()),
       maxAckHeightFilter_(bandwidthWindowLength(kNumOfCycles), 0, 0) {}
 
+BbrCongestionController::BbrCongestionController(
+    QuicConnectionStateBase& conn,
+    uint64_t cwndBytes,
+    std::chrono::microseconds minRtt)
+    : conn_(conn),
+      cwnd_(cwndBytes),
+      initialCwnd_(
+          conn.udpSendPacketLen * conn.transportSettings.initCwndInMss),
+      recoveryWindow_(
+          conn.udpSendPacketLen * conn.transportSettings.maxCwndInMss),
+      pacingWindow_(cwndBytes),
+      pacingGainCycles_(kPacingGainCycles.begin(), kPacingGainCycles.end()),
+      maxAckHeightFilter_(bandwidthWindowLength(kNumOfCycles), 0, 0) {
+  if (conn_.pacer) {
+    conn_.pacer->refreshPacingRate(pacingWindow_, minRtt);
+  }
+}
+
 CongestionControlType BbrCongestionController::type() const noexcept {
   return CongestionControlType::BBR;
 }

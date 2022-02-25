@@ -99,6 +99,10 @@ class BbrCongestionController : public CongestionController {
   };
 
   explicit BbrCongestionController(QuicConnectionStateBase& conn);
+  explicit BbrCongestionController(
+      QuicConnectionStateBase& conn,
+      uint64_t cwndBytes,
+      std::chrono::microseconds minRtt);
 
   // TODO: these should probably come in as part of a builder. but I'm not sure
   // if the sampler interface is here to stay atm, so bear with me

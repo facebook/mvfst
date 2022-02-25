@@ -33,6 +33,23 @@ TEST_F(BbrTest, InitStates) {
   EXPECT_EQ(bbr.getWritableBytes(), bbr.getCongestionWindow());
 }
 
+TEST_F(BbrTest, InitWithCwndAndRtt) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  auto mockPacer = std::make_unique<MockPacer>();
+  MockPacer* rawPacer = mockPacer.get();
+  conn.pacer = std::move(mockPacer);
+
+  auto cwnd = 123456;
+  std::chrono::microseconds minRtt = 100ms;
+  EXPECT_CALL(*rawPacer, refreshPacingRate(cwnd, minRtt, _));
+
+  BbrCongestionController bbr(conn, cwnd, minRtt);
+
+  EXPECT_EQ(CongestionControlType::BBR, bbr.type());
+  EXPECT_EQ(bbr.getCongestionWindow(), cwnd);
+  EXPECT_EQ(bbr.getWritableBytes(), bbr.getCongestionWindow());
+}
+
 TEST_F(BbrTest, Recovery) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
