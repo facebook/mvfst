@@ -175,6 +175,7 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     EXPECT_CALL(*quicStats_, onQuicStreamClosed()).Times(1);
     EXPECT_CALL(*quicStats_, onRead(_)).Times(AtLeast(1));
     EXPECT_CALL(*quicStats_, onWrite(_)).Times(AtLeast(1));
+    EXPECT_CALL(*quicStats_, onConnectionClose(_)).Times(1);
     client->setTransportStatsCallback(quicStats_);
   }
 

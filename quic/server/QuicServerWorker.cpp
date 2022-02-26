@@ -1231,10 +1231,6 @@ void QuicServerWorker::onConnectionUnbound(
   transport->setRoutingCallback(nullptr);
   boundServerTransports_.erase(transport);
 
-  if (connectionIdData.size()) {
-    QUIC_STATS(statsCallback_, onConnectionClose, folly::none);
-  }
-
   for (auto& connId : connectionIdData) {
     VLOG(4) << fmt::format(
         "Removing CID from connectionIdMap_, routingInfo={}",
@@ -1311,7 +1307,6 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
       t->setHandshakeFinishedCallback(nullptr);
       t->closeNow(
           QuicError(QuicErrorCode(error), std::string("shutting down")));
-      QUIC_STATS(statsCallback_, onConnectionClose, QuicErrorCode(error));
     }
   }
   sourceAddressMap_.clear();

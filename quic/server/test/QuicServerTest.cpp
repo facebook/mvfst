@@ -959,7 +959,6 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       folly::none);
   eventbase_.loop();
 
-  EXPECT_CALL(*quicStats_, onConnectionClose(_)).Times(1);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
       transport_.get(),
@@ -1075,7 +1074,6 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       folly::none);
   eventbase_.loop();
 
-  EXPECT_CALL(*quicStats_, onConnectionClose(_)).Times(2);
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   worker_->onConnectionUnbound(
       transport_.get(),
@@ -1344,7 +1342,6 @@ TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
-  EXPECT_CALL(*quicStats_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, close(_)).WillRepeatedly(Invoke([this](auto) {
@@ -1384,7 +1381,6 @@ TEST_F(QuicServerWorkerTest, DestroyQuicServer) {
   const auto& connIdMap = worker_->getConnectionIdMap();
   EXPECT_EQ(connIdMap.count(getTestConnectionId(hostId_)), 1);
 
-  EXPECT_CALL(*quicStats_, onConnectionClose(_));
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr)).Times(2);
   EXPECT_CALL(*transport_, setHandshakeFinishedCallback(nullptr)).Times(2);

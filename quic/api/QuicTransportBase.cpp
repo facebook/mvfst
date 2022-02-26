@@ -481,6 +481,7 @@ void QuicTransportBase::processConnectionCallbacks(
     return;
   }
 
+  QUIC_STATS(conn_->statsCallback, onConnectionClose, cancelCode.code);
   if (useConnectionEndWithErrorCallback_) {
     connCallback_->onConnectionEnd(cancelCode);
     return;
