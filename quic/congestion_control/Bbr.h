@@ -139,6 +139,8 @@ class BbrCongestionController : public CongestionController {
   void setAppIdle(bool idle, TimePoint eventTime) noexcept override;
   void setAppLimited() override;
 
+  void setExperimental(bool experimental) override;
+
   /**
    * Sets a factor of the measured bottleneck BW that the congestion controller
    * should make use of. Can be used to leave headroom for other flows and to
@@ -240,6 +242,7 @@ class BbrCongestionController : public CongestionController {
   void updateCwnd(uint64_t ackedBytes, uint64_t excessiveBytes) noexcept;
   std::chrono::microseconds minRtt() const noexcept;
 
+  bool isExperimental_{false};
   // Number of round trips the connection has witnessed
   uint64_t roundTripCounter_{0};
   // When a packet with send time later than endOfRoundTrip_ is acked, the
