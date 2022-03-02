@@ -188,4 +188,17 @@ class MockHandshakeFinishedCallback
 #endif
 };
 
+class MockQuicServerTransport : public QuicServerTransport {
+ public:
+  MockQuicServerTransport(
+      folly::EventBase* evb,
+      std::unique_ptr<folly::AsyncUDPSocket> socket)
+      : QuicServerTransport(evb, std::move(socket), nullptr, nullptr, nullptr) {
+  }
+  MOCK_CONST_METHOD0(getOneRttCipherInfo, CipherInfo());
+  MOCK_CONST_METHOD0(getServerConnectionId, folly::Optional<ConnectionId>());
+  MOCK_CONST_METHOD0(getClientConnectionId, folly::Optional<ConnectionId>());
+  MOCK_CONST_METHOD0(getPeerAddress, folly::SocketAddress&());
+};
+
 } // namespace quic
