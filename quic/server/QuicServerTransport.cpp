@@ -878,4 +878,11 @@ QuicConnectionStats QuicServerTransport::getConnectionsStats() const {
   return connStats;
 }
 
+CipherInfo QuicServerTransport::getOneRttCipherInfo() const {
+  return {
+      *conn_->oneRttWriteCipher->getKey(),
+      *serverConn_->serverHandshakeLayer->getState().cipher(),
+      conn_->oneRttWriteHeaderCipher->getKey()->clone()};
+}
+
 } // namespace quic

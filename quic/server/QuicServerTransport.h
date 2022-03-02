@@ -19,7 +19,15 @@
 
 #include <folly/io/async/AsyncTransportCertificate.h>
 
+#include <fizz/record/Types.h>
+
 namespace quic {
+
+struct CipherInfo {
+  TrafficKey trafficKey;
+  fizz::CipherSuite cipherSuite;
+  Buf packetProtectionKey;
+};
 
 class QuicServerTransport
     : public QuicTransportBase,
@@ -147,6 +155,8 @@ class QuicServerTransport
 
   const std::shared_ptr<const folly::AsyncTransportCertificate>
   getPeerCertificate() const override;
+
+  virtual CipherInfo getOneRttCipherInfo() const;
 
  protected:
   // From ServerHandshake::HandshakeCallback
