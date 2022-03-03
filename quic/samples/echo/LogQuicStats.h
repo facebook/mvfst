@@ -41,6 +41,10 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
     VLOG(2) << prefix_ << "onPacketSent";
   }
 
+  void onDSRPacketSent(size_t pktSize) override {
+    VLOG(2) << prefix_ << "onDSRPacketSent size=" << pktSize;
+  }
+
   void onPacketRetransmission() override {
     VLOG(2) << prefix_ << "onPacketRetransmission";
   }

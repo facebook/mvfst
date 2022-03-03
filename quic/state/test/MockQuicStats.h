@@ -69,6 +69,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD0(onTokenDecryptFailure, void());
   MOCK_METHOD1(onShortHeaderPadding, void(size_t));
   MOCK_METHOD0(onPacerTimerLagged, void());
+  MOCK_METHOD1(onDSRPacketSent, void(size_t));
 };
 
 class MockQuicStatsFactory : public QuicTransportStatsCallbackFactory {

@@ -876,6 +876,7 @@ void updateConnection(
   pkt.isDSRPacket = isDSRPacket;
   if (isDSRPacket) {
     ++conn.outstandings.dsrCount;
+    QUIC_STATS(conn.statsCallback, onDSRPacketSent, encodedSize);
   }
 
   if (conn.congestionController) {
