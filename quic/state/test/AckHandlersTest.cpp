@@ -5235,7 +5235,7 @@ TEST_F(AckEventForAppDataTest, AckEventRetransMultipleDupack) {
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     AckHandlersTests,
     AckHandlersTest,
     Values(

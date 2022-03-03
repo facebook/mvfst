@@ -63,9 +63,9 @@ namespace test {
 
 class MockLossTimeout {
  public:
-  MOCK_METHOD(void, cancelLossTimeout, ());
-  MOCK_METHOD(void, scheduleLossTimeout, (std::chrono::milliseconds));
-  MOCK_METHOD(bool, isLossTimeoutScheduled, ());
+  MOCK_METHOD0(cancelLossTimeout, void());
+  MOCK_METHOD1(scheduleLossTimeout, void(std::chrono::milliseconds));
+  MOCK_METHOD0(isLossTimeoutScheduled, bool());
 };
 
 enum class PacketType {
@@ -2547,7 +2547,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicLossFunctionsTests,
     QuicLossFunctionsTest,
     Values(

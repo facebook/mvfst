@@ -82,7 +82,7 @@ TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveOld) {
       currentLargestReceived);
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     UpdateLargestReceivedPacketNumTests,
     UpdateLargestReceivedPacketNumTest,
     Values(
@@ -506,7 +506,7 @@ TEST_P(
   EXPECT_FALSE(verifyToScheduleAckTimeout(conn));
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     UpdateAckStateTests,
     UpdateAckStateTest,
     Values(
@@ -874,7 +874,7 @@ TEST_P(QuicStateFunctionsTest, CloseTranportStateChange) {
   EXPECT_TRUE(conn.pendingEvents.closeTransport);
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicStateFunctionsTests,
     QuicStateFunctionsTest,
     Values(

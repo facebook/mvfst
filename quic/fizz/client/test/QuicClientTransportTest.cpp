@@ -901,7 +901,7 @@ TEST_P(QuicClientTransportIntegrationTest, D6DEnabledTest) {
   eventbase_.loopForever();
 }
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientTransportIntegrationTests,
     QuicClientTransportIntegrationTest,
     ::testing::Values(
@@ -1065,21 +1065,22 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
       onTransportReadyMock();
     }
 
-    MOCK_METHOD(void, onFlowControlUpdate, (StreamId), (noexcept));
-    MOCK_METHOD(void, onNewBidirectionalStream, (StreamId), (noexcept));
-    MOCK_METHOD(void, onNewUnidirectionalStream, (StreamId), (noexcept));
-    MOCK_METHOD(
-        void,
+    GMOCK_METHOD1_(, noexcept, , onFlowControlUpdate, void(StreamId));
+    GMOCK_METHOD1_(, noexcept, , onNewBidirectionalStream, void(StreamId));
+    GMOCK_METHOD1_(, noexcept, , onNewUnidirectionalStream, void(StreamId));
+    GMOCK_METHOD2_(
+        ,
+        noexcept,
+        ,
         onStopSending,
-        (StreamId, ApplicationErrorCode),
-        (noexcept));
-    MOCK_METHOD(void, onTransportReadyMock, (), (noexcept));
-    MOCK_METHOD(void, onReplaySafe, (), (noexcept));
-    MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
+        void(StreamId, ApplicationErrorCode));
+    GMOCK_METHOD0_(, noexcept, , onTransportReadyMock, void());
+    GMOCK_METHOD0_(, noexcept, , onReplaySafe, void());
+    GMOCK_METHOD0_(, noexcept, , onConnectionEnd, void());
     void onConnectionSetupError(QuicError error) noexcept override {
       onConnectionError(std::move(error));
     }
-    MOCK_METHOD(void, onConnectionError, (QuicError), (noexcept));
+    GMOCK_METHOD1_(, noexcept, , onConnectionError, void(QuicError));
 
    private:
     std::shared_ptr<QuicSocket> socket_;
@@ -1962,7 +1963,7 @@ class QuicClientTransportHappyEyeballsTest
   SocketAddress serverAddrV6{"::1", 443};
 };
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientTransportHappyEyeballsTests,
     QuicClientTransportHappyEyeballsTest,
     ::testing::Values(
@@ -2137,7 +2138,7 @@ class QuicClientTransportAfterStartTest
     : public QuicClientTransportAfterStartTestBase,
       public testing::WithParamInterface<uint8_t> {};
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientZeroLenConnIds,
     QuicClientTransportAfterStartTest,
     ::Values(0, 8));
@@ -3009,7 +3010,7 @@ class QuicClientTransportAfterStartTestClose
     : public QuicClientTransportAfterStartTestBase,
       public testing::WithParamInterface<bool> {};
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientTransportAfterStartTestCloseWithError,
     QuicClientTransportAfterStartTestClose,
     Values(true, false));
@@ -3215,7 +3216,7 @@ class QuicClientTransportAfterStartTestTimeout
     : public QuicClientTransportAfterStartTestBase,
       public testing::WithParamInterface<QuicVersion> {};
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientTransportAfterStartTestTimeouts,
     QuicClientTransportAfterStartTestTimeout,
     Values(QuicVersion::MVFST, QuicVersion::QUIC_V1, QuicVersion::QUIC_DRAFT));
@@ -5352,7 +5353,7 @@ class QuicProcessDataTest : public QuicClientTransportAfterStartTestBase,
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(
+INSTANTIATE_TEST_CASE_P(
     QuicClientZeroLenConnIds,
     QuicProcessDataTest,
     ::Values(0, 8));

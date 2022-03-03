@@ -16,62 +16,59 @@ namespace test {
 class MockCongestionController : public CongestionController {
  public:
   ~MockCongestionController() override {}
-  MOCK_METHOD(void, onRemoveBytesFromInflight, (uint64_t));
-  MOCK_METHOD(void, onPacketSent, (const OutstandingPacket&));
-  MOCK_METHOD(
-      void,
+  MOCK_METHOD1(onRemoveBytesFromInflight, void(uint64_t));
+  MOCK_METHOD1(onPacketSent, void(const OutstandingPacket&));
+  MOCK_METHOD2(
       onPacketAckOrLoss,
-      (const AckEvent* FOLLY_NULLABLE, const LossEvent* FOLLY_NULLABLE));
-  MOCK_METHOD(uint64_t, getWritableBytes, (), (const));
-  MOCK_METHOD(uint64_t, getCongestionWindow, (), (const));
-  MOCK_METHOD(void, onSpuriousLoss, ());
-  MOCK_METHOD(CongestionControlType, type, (), (const));
-  MOCK_METHOD(void, setAppIdle, (bool, TimePoint));
-  MOCK_METHOD(void, setAppLimited, ());
-  MOCK_METHOD(void, setBandwidthUtilizationFactor, (float), (noexcept));
-  MOCK_METHOD(bool, isInBackgroundMode, (), (const));
-  MOCK_METHOD(bool, isAppLimited, (), (const));
-  MOCK_METHOD(void, getStats, (CongestionControllerStats&), (const));
-  MOCK_METHOD(void, setExperimental, (bool));
+      void(const AckEvent* FOLLY_NULLABLE, const LossEvent* FOLLY_NULLABLE));
+  MOCK_CONST_METHOD0(getWritableBytes, uint64_t());
+  MOCK_CONST_METHOD0(getCongestionWindow, uint64_t());
+  MOCK_METHOD0(onSpuriousLoss, void());
+  MOCK_CONST_METHOD0(type, CongestionControlType());
+  GMOCK_METHOD2_(, , , setAppIdle, void(bool, TimePoint));
+  MOCK_METHOD0(setAppLimited, void());
+  GMOCK_METHOD1_(, noexcept, , setBandwidthUtilizationFactor, void(float));
+  MOCK_CONST_METHOD0(isInBackgroundMode, bool());
+  MOCK_CONST_METHOD0(isAppLimited, bool());
+  MOCK_CONST_METHOD1(getStats, void(CongestionControllerStats&));
+  MOCK_METHOD1(setExperimental, void(bool));
 };
 
 class MockPacer : public Pacer {
  public:
-  MOCK_METHOD(
-      void,
+  MOCK_METHOD3(
       refreshPacingRate,
-      (uint64_t, std::chrono::microseconds, TimePoint currentTime));
-  MOCK_METHOD(void, setPacingRate, (uint64_t));
-  MOCK_METHOD(void, setMaxPacingRate, (uint64_t));
-  MOCK_METHOD(void, reset, ());
-  MOCK_METHOD(void, setRttFactor, (uint8_t, uint8_t));
-  MOCK_METHOD(
-      std::chrono::microseconds,
+      void(uint64_t, std::chrono::microseconds, TimePoint currentTime));
+  MOCK_METHOD1(setPacingRate, void(uint64_t));
+  MOCK_METHOD1(setMaxPacingRate, void(uint64_t));
+  MOCK_METHOD0(reset, void());
+  MOCK_METHOD2(setRttFactor, void(uint8_t, uint8_t));
+  MOCK_CONST_METHOD1(
       getTimeUntilNextWrite,
-      (TimePoint),
-      (const));
-  MOCK_METHOD(uint64_t, updateAndGetWriteBatchSize, (TimePoint));
-  MOCK_METHOD(uint64_t, getCachedWriteBatchSize, (), (const));
-  MOCK_METHOD(void, setAppLimited, (bool));
-  MOCK_METHOD(void, onPacketSent, ());
-  MOCK_METHOD(void, onPacketsLoss, ());
-  MOCK_METHOD(void, setExperimental, (bool));
+      std::chrono::microseconds(TimePoint));
+  MOCK_METHOD1(updateAndGetWriteBatchSize, uint64_t(TimePoint));
+  MOCK_CONST_METHOD0(getCachedWriteBatchSize, uint64_t());
+  MOCK_METHOD1(setAppLimited, void(bool));
+  MOCK_METHOD0(onPacketSent, void());
+  MOCK_METHOD0(onPacketsLoss, void());
+  MOCK_METHOD1(setExperimental, void(bool));
 };
 
 class MockPendingPathRateLimiter : public PendingPathRateLimiter {
  public:
   MockPendingPathRateLimiter() : PendingPathRateLimiter(0) {}
-  MOCK_METHOD(void, onPacketSent, (uint64_t));
-  MOCK_METHOD(
-      uint64_t,
+  MOCK_METHOD1(onPacketSent, void(uint64_t));
+  GMOCK_METHOD2_(
+      ,
+      noexcept,
+      ,
       currentCredit,
-      (TimePoint, std::chrono::microseconds),
-      (noexcept));
+      uint64_t(TimePoint, std::chrono::microseconds));
 };
 
 class MockQuicStreamPrioritiesObserver : public QuicStreamPrioritiesObserver {
  public:
-  MOCK_METHOD(void, onStreamPrioritiesChange, ());
+  MOCK_METHOD0(onStreamPrioritiesChange, void());
 };
 } // namespace test
 } // namespace quic
