@@ -627,7 +627,7 @@ TEST_P(QuicBatchWriterTest, InplaceWriterBufResidueCheck) {
   EXPECT_EQ(0, rawBuf->headroom());
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicBatchWriterTest,
     QuicBatchWriterTest,
     ::testing::Values(false, true));

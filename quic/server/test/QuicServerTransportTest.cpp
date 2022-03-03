@@ -1734,7 +1734,7 @@ class QuicServerTransportAllowMigrationTest
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportMigrationTests,
     QuicServerTransportAllowMigrationTest,
     Values(
@@ -3683,7 +3683,7 @@ class QuicServerTransportPendingDataTest
   }
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportPendingDataTests,
     QuicServerTransportPendingDataTest,
     Values(
@@ -3942,7 +3942,7 @@ class QuicServerTransportHandshakeTest
   std::vector<folly::IPAddress> expectedSourceToken_;
 };
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicServerTransportHandshakeTests,
     QuicServerTransportHandshakeTest,
     Values(

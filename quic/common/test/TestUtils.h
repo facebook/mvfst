@@ -329,9 +329,11 @@ class FizzCryptoTestFactory : public FizzCryptoFactory {
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       fizz::CipherSuite) const override;
 
-  MOCK_CONST_METHOD1(
+  MOCK_METHOD(
+      std::unique_ptr<PacketNumberCipher>,
       _makePacketNumberCipher,
-      std::unique_ptr<PacketNumberCipher>(folly::ByteRange));
+      (folly::ByteRange),
+      (const));
 
   std::unique_ptr<PacketNumberCipher> makePacketNumberCipher(
       folly::ByteRange secret) const override;
@@ -397,7 +399,7 @@ class FakeServerHandshake : public FizzServerHandshake {
 
   void accept(std::shared_ptr<ServerTransportParametersExtension>) override {}
 
-  MOCK_METHOD1(writeNewSessionTicket, void(const AppToken&));
+  MOCK_METHOD(void, writeNewSessionTicket, (const AppToken&));
 
   void doHandshake(std::unique_ptr<folly::IOBuf> data, EncryptionLevel)
       override {

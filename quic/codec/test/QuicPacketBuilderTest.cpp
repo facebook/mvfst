@@ -785,7 +785,7 @@ TEST_P(QuicPacketBuilderTest, TestCipherOverhead) {
       kDefaultUDPSendPacketLen - cipherOverhead);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicPacketBuilderTests,
     QuicPacketBuilderTest,
     Values(TestFlavor::Regular, TestFlavor::Inplace));

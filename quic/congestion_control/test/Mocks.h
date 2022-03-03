@@ -15,30 +15,30 @@ class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
  public:
   ~MockMinRttSampler() override = default;
 
-  MOCK_CONST_METHOD0(minRtt, std::chrono::microseconds());
-  MOCK_CONST_METHOD0(minRttExpired, bool());
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
+  MOCK_METHOD(std::chrono::microseconds, minRtt, (), (const));
+  MOCK_METHOD(bool, minRttExpired, (), (const));
+  MOCK_METHOD(
+      bool,
       newRttSample,
-      bool(std::chrono::microseconds, TimePoint));
-  GMOCK_METHOD1_(, noexcept, , timestampMinRtt, void(TimePoint));
+      (std::chrono::microseconds, TimePoint),
+      (noexcept));
+  MOCK_METHOD(void, timestampMinRtt, (TimePoint), (noexcept));
 };
 
 class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
  public:
   ~MockBandwidthSampler() override = default;
 
-  MOCK_CONST_METHOD0(getBandwidth, Bandwidth());
-  MOCK_CONST_METHOD0(getLatestSample, Bandwidth());
-  MOCK_CONST_METHOD0(isAppLimited, bool());
+  MOCK_METHOD(Bandwidth, getBandwidth, (), (const));
+  MOCK_METHOD(Bandwidth, getLatestSample, (), (const));
+  MOCK_METHOD(bool, isAppLimited, (), (const));
 
-  MOCK_METHOD2(
+  MOCK_METHOD(
+      void,
       onPacketAcked,
-      void(const CongestionController::AckEvent&, uint64_t));
-  MOCK_METHOD0(onAppLimited, void());
-  GMOCK_METHOD1_(, noexcept, , setWindowLength, void(const uint64_t));
+      (const CongestionController::AckEvent&, uint64_t));
+  MOCK_METHOD(void, onAppLimited, ());
+  MOCK_METHOD(void, setWindowLength, (const uint64_t), (noexcept));
 };
 
 } // namespace test

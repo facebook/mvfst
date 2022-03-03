@@ -17,8 +17,8 @@
 namespace quic {
 class MockQuicPskCache : public QuicPskCache {
  public:
-  MOCK_METHOD1(getPsk, folly::Optional<QuicCachedPsk>(const std::string&));
-  MOCK_METHOD2(putPsk, void(const std::string&, QuicCachedPsk));
-  MOCK_METHOD1(removePsk, void(const std::string&));
+  MOCK_METHOD(folly::Optional<QuicCachedPsk>, getPsk, (const std::string&));
+  MOCK_METHOD(void, putPsk, (const std::string&, QuicCachedPsk));
+  MOCK_METHOD(void, removePsk, (const std::string&));
 };
 } // namespace quic

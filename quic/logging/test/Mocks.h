@@ -16,52 +16,57 @@ class MockQLogger : public QLogger {
   MockQLogger() = delete;
   MockQLogger(VantagePoint vp) : QLogger(vp, kHTTP3ProtocolType) {}
   ~MockQLogger() override = default;
-  MOCK_METHOD2(addPacket, void(const RegularQuicPacket&, uint64_t));
-  MOCK_METHOD3(
+  MOCK_METHOD(void, addPacket, (const RegularQuicPacket&, uint64_t));
+  MOCK_METHOD(
+      void,
       addPacket,
-      void(const VersionNegotiationPacket&, uint64_t, bool));
-  MOCK_METHOD3(addPacket, void(const RetryPacket&, uint64_t, bool));
-  MOCK_METHOD2(addPacket, void(const RegularQuicWritePacket&, uint64_t));
-  MOCK_METHOD4(addConnectionClose, void(std::string, std::string, bool, bool));
-  MOCK_METHOD1(addTransportSummary, void(const TransportSummaryArgs&));
-  MOCK_METHOD5(
+      (const VersionNegotiationPacket&, uint64_t, bool));
+  MOCK_METHOD(void, addPacket, (const RetryPacket&, uint64_t, bool));
+  MOCK_METHOD(void, addPacket, (const RegularQuicWritePacket&, uint64_t));
+  MOCK_METHOD(void, addConnectionClose, (std::string, std::string, bool, bool));
+  MOCK_METHOD(void, addTransportSummary, (const TransportSummaryArgs&));
+  MOCK_METHOD(
+      void,
       addCongestionMetricUpdate,
-      void(uint64_t, uint64_t, std::string, std::string, std::string));
-  MOCK_METHOD2(
+      (uint64_t, uint64_t, std::string, std::string, std::string));
+  MOCK_METHOD(
+      void,
       addPacingMetricUpdate,
-      void(uint64_t, std::chrono::microseconds));
-  MOCK_METHOD3(
+      (uint64_t, std::chrono::microseconds));
+  MOCK_METHOD(
+      void,
       addPacingObservation,
-      void(std::string, std::string, std::string));
-  MOCK_METHOD2(addAppIdleUpdate, void(std::string, bool));
-  MOCK_METHOD2(addPacketDrop, void(size_t, std::string));
-  MOCK_METHOD1(addDatagramReceived, void(uint64_t));
-  MOCK_METHOD4(addLossAlarm, void(PacketNum, uint64_t, uint64_t, std::string));
-  MOCK_METHOD3(addPacketsLost, void(PacketNum, uint64_t, uint64_t));
-  MOCK_METHOD1(addTransportStateUpdate, void(std::string));
-  MOCK_METHOD2(addPacketBuffered, void(ProtectionType, uint64_t));
-  MOCK_METHOD4(
+      (std::string, std::string, std::string));
+  MOCK_METHOD(void, addAppIdleUpdate, (std::string, bool));
+  MOCK_METHOD(void, addPacketDrop, (size_t, std::string));
+  MOCK_METHOD(void, addDatagramReceived, (uint64_t));
+  MOCK_METHOD(void, addLossAlarm, (PacketNum, uint64_t, uint64_t, std::string));
+  MOCK_METHOD(void, addPacketsLost, (PacketNum, uint64_t, uint64_t));
+  MOCK_METHOD(void, addTransportStateUpdate, (std::string));
+  MOCK_METHOD(void, addPacketBuffered, (ProtectionType, uint64_t));
+  MOCK_METHOD(
+      void,
       addMetricUpdate,
-      void(
-          std::chrono::microseconds,
-          std::chrono::microseconds,
-          std::chrono::microseconds,
-          std::chrono::microseconds));
-  MOCK_METHOD3(
+      (std::chrono::microseconds,
+       std::chrono::microseconds,
+       std::chrono::microseconds,
+       std::chrono::microseconds));
+  MOCK_METHOD(
+      void,
       addStreamStateUpdate,
-      void(
-          quic::StreamId,
-          std::string,
-          folly::Optional<std::chrono::milliseconds>));
-  MOCK_METHOD2(
+      (quic::StreamId,
+       std::string,
+       folly::Optional<std::chrono::milliseconds>));
+  MOCK_METHOD(
+      void,
       addBandwidthEstUpdate,
-      void(uint64_t, std::chrono::microseconds));
-  MOCK_METHOD0(addAppLimitedUpdate, void());
-  MOCK_METHOD0(addAppUnlimitedUpdate, void());
-  MOCK_METHOD1(addConnectionMigrationUpdate, void(bool));
-  MOCK_METHOD1(addPathValidationEvent, void(bool));
-  MOCK_METHOD1(setDcid, void(folly::Optional<ConnectionId>));
-  MOCK_METHOD1(setScid, void(folly::Optional<ConnectionId>));
-  MOCK_METHOD3(addPriorityUpdate, void(quic::StreamId, uint8_t, bool));
+      (uint64_t, std::chrono::microseconds));
+  MOCK_METHOD(void, addAppLimitedUpdate, ());
+  MOCK_METHOD(void, addAppUnlimitedUpdate, ());
+  MOCK_METHOD(void, addConnectionMigrationUpdate, (bool));
+  MOCK_METHOD(void, addPathValidationEvent, (bool));
+  MOCK_METHOD(void, setDcid, (folly::Optional<ConnectionId>));
+  MOCK_METHOD(void, setScid, (folly::Optional<ConnectionId>));
+  MOCK_METHOD(void, addPriorityUpdate, (quic::StreamId, uint8_t, bool));
 };
 } // namespace quic::test

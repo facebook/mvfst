@@ -125,7 +125,7 @@ TEST_F(QuicIntegerEncodeTest, ForceWrongBytes) {
   EXPECT_DEATH(encodeQuicInteger(15293, appendOp, 1), "");
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicIntegerTests,
     QuicIntegerDecodeTest,
     Values(
@@ -138,7 +138,7 @@ INSTANTIATE_TEST_CASE_P(
         (IntegerParams){37, "C000000000000025", false, 8},
         (IntegerParams){37, "40", true}));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicIntegerEncodeTests,
     QuicIntegerEncodeTest,
     Values(

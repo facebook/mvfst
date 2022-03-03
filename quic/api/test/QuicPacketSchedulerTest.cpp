@@ -2209,7 +2209,7 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   EXPECT_EQ(packetLength, conn.udpSendPacketLen);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicPacketSchedulerTests,
     QuicPacketSchedulerTest,
     Values(PacketBuilderType::Regular, PacketBuilderType::Inplace));

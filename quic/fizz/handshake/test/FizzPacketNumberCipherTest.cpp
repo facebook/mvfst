@@ -89,7 +89,7 @@ TEST_P(LongPacketNumberCipherTest, TestEncryptDecrypt) {
       GetParam().decryptedPacketNumberBytes);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     LongPacketNumberCipherTests,
     LongPacketNumberCipherTest,
     ::testing::Values(

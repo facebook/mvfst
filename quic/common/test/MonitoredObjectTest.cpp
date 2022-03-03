@@ -17,7 +17,7 @@ using namespace ::testing;
 
 class MockObserver {
  public:
-  MOCK_METHOD1(accessed, void(const string&));
+  MOCK_METHOD(void, accessed, (const string&));
 };
 
 TEST(MonitoredObjectTest, TestObserverCalled) {
