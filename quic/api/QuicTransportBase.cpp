@@ -3221,7 +3221,10 @@ bool QuicTransportBase::isKnobSupported() const {
   // support and incorporate it into the check, such that if the QUIC version
   // increases/changes, this method will still continue to work, based on the
   // transport parameter setting.
-  return (conn_->version && (*(conn_->version) == QuicVersion::MVFST));
+  return (
+      conn_->version &&
+      (*(conn_->version) == QuicVersion::MVFST ||
+       *(conn_->version) == QuicVersion::MVFST_EXPERIMENTAL));
 }
 
 const TransportSettings& QuicTransportBase::getTransportSettings() const {
