@@ -45,13 +45,13 @@ class TestingQuicClientTransport : public QuicClientTransport {
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       std::shared_ptr<ClientHandshakeFactory> handshakeFactory,
       size_t connIdSize = kDefaultConnectionIdSize,
-      bool useSplitConnectionCallbacks = false)
+      bool useConnectionEndWithErrorCallback = false)
       : QuicClientTransport(
             evb,
             std::move(socket),
             std::move(handshakeFactory),
             connIdSize,
-            useSplitConnectionCallbacks) {}
+            useConnectionEndWithErrorCallback) {}
 
   ~TestingQuicClientTransport() override {
     if (destructionCallback_) {
