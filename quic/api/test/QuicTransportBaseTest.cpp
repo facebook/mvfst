@@ -542,7 +542,7 @@ class QuicTransportImplTest : public Test {
 class QuicTransportImplTestClose : public QuicTransportImplTest,
                                    public testing::WithParamInterface<bool> {};
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicTransportImplTest,
     QuicTransportImplTestClose,
     Values(true, false));
@@ -2858,7 +2858,7 @@ quic::StreamId createStream(
   }
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicTransportImplTest,
     QuicTransportImplTestUniBidi,
     Values(true, false));
