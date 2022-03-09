@@ -241,18 +241,12 @@ class MockQuicSocket : public QuicSocket {
       (StreamId, const BufferMeta&, bool, ByteEventCallback*));
   MOCK_METHOD(
       WriteResult,
-      setDSRPacketizationRequestSenderRef,
-      (StreamId, const std::unique_ptr<DSRPacketizationRequestSender>&));
-  WriteResult setDSRPacketizationRequestSender(
-      StreamId streamId,
-      std::unique_ptr<DSRPacketizationRequestSender> sender) override {
-    return setDSRPacketizationRequestSenderRef(streamId, sender);
-  }
+      setDSRPacketizationRequestSender,
+      (StreamId, std::unique_ptr<DSRPacketizationRequestSender>));
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
       registerDeliveryCallback,
       (StreamId, uint64_t, ByteEventCallback*));
-
   MOCK_METHOD(folly::Optional<LocalErrorCode>, shutdownWrite, (StreamId));
   MOCK_METHOD(
       (folly::Expected<folly::Unit, LocalErrorCode>),
