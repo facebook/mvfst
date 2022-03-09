@@ -63,7 +63,7 @@ TEST_P(Packet32DecodeTest, Decode) {
   EXPECT_EQ(GetParam().expected, decoded) << std::hex << decoded;
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Packet8DecodeTests,
     Packet8DecodeTest,
     Values(
@@ -72,7 +72,7 @@ INSTANTIATE_TEST_CASE_P(
         (Packet8DecodeData){0xaa82ffff, 0x01, 0xaa830001},
         (Packet8DecodeData){0xaa82fffe, 0x01, 0xaa830001}));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Packet16DecodeTests,
     Packet16DecodeTest,
     Values(
@@ -90,7 +90,7 @@ INSTANTIATE_TEST_CASE_P(
         (Packet16DecodeData){0xaa82f30e, 0x9b3, 0xaa8309b3},
         (Packet16DecodeData){0xa82f30ea, 0x9b32, 0xa82f9b32}));
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Packet32DecodeTests,
     Packet32DecodeTest,
     Values(

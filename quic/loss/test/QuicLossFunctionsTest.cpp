@@ -2547,7 +2547,7 @@ TEST_F(QuicLossFunctionsTest, LossVisitorDSRTest) {
   EXPECT_FALSE(conn->streamManager->writableDSRStreams().empty());
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     QuicLossFunctionsTests,
     QuicLossFunctionsTest,
     Values(

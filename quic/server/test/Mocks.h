@@ -25,12 +25,11 @@ class MockServerConnectionIdRejector : public ServerConnectionIdRejector {
       (const ConnectionId),
       (noexcept));
 #else
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
+  MOCK_METHOD(
+      (bool),
       rejectConnectionIdNonConst,
-      bool(const ConnectionId));
+      (const ConnectionId),
+      (noexcept));
 #endif
 
   bool rejectConnectionId(const ConnectionId& id) const noexcept override {
@@ -64,16 +63,14 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
        std::shared_ptr<const fizz::server::FizzServerContext>),
       (noexcept));
 #else
-  GMOCK_METHOD4_(
-      ,
-      noexcept,
-      ,
+  MOCK_METHOD(
+      (QuicServerTransport::Ptr),
       _make,
-      QuicServerTransport::Ptr(
-          folly::EventBase* evb,
-          std::unique_ptr<folly::AsyncUDPSocket>& sock,
-          const folly::SocketAddress&,
-          std::shared_ptr<const fizz::server::FizzServerContext>));
+      (folly::EventBase * evb,
+       std::unique_ptr<folly::AsyncUDPSocket>& sock,
+       const folly::SocketAddress&,
+       std::shared_ptr<const fizz::server::FizzServerContext>),
+      (noexcept));
 #endif
 };
 
@@ -150,27 +147,23 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
        const std::vector<ConnectionIdData>&),
       (noexcept));
 #else
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
+  MOCK_METHOD(
+      (void),
       onConnectionIdAvailable,
-      void(QuicServerTransport::Ptr, ConnectionId));
-  GMOCK_METHOD1_(
-      ,
-      noexcept,
-      ,
+      (QuicServerTransport::Ptr, ConnectionId),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
       onConnectionIdBound,
-      void(QuicServerTransport::Ptr));
-  GMOCK_METHOD3_(
-      ,
-      noexcept,
-      ,
+      (QuicServerTransport::Ptr),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
       onConnectionUnbound,
-      void(
-          QuicServerTransport*,
-          const QuicServerTransport::SourceIdentity&,
-          const std::vector<ConnectionIdData>& connIdData));
+      (QuicServerTransport*,
+       const QuicServerTransport::SourceIdentity&,
+       const std::vector<ConnectionIdData>& connIdData),
+      (noexcept));
 #endif
 };
 
@@ -183,8 +176,8 @@ class MockHandshakeFinishedCallback
   MOCK_METHOD((void), onHandshakeFinished, (), (noexcept));
   MOCK_METHOD((void), onHandshakeUnfinished, (), (noexcept));
 #else
-  GMOCK_METHOD0_(, noexcept, , onHandshakeFinished, void());
-  GMOCK_METHOD0_(, noexcept, , onHandshakeUnfinished, void());
+  MOCK_METHOD((void), onHandshakeFinished, (), (noexcept));
+  MOCK_METHOD((void), onHandshakeUnfinished, (), (noexcept));
 #endif
 };
 

@@ -14,7 +14,7 @@ namespace quic::test {
 
 class MockDSRPacketBuilder : public DSRPacketBuilderBase {
  public:
-  GMOCK_METHOD0_(, noexcept, , remainingSpaceNonConst, size_t());
+  MOCK_METHOD((size_t), remainingSpaceNonConst, (), (noexcept));
 
   size_t remainingSpace() const noexcept override {
     return const_cast<MockDSRPacketBuilder&>(*this).remainingSpaceNonConst();

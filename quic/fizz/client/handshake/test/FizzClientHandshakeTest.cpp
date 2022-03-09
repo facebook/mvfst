@@ -34,7 +34,6 @@
 #include <quic/state/StateData.h>
 
 using namespace std;
-using namespace folly;
 using namespace testing;
 
 namespace quic {
@@ -366,7 +365,7 @@ TEST_F(ClientHandshakeTest, TestAppBytesInterpretedAsHandshake) {
   clientServerRound();
 
   fizz::AppWrite w;
-  w.data = IOBuf::copyBuffer("hey");
+  w.data = folly::IOBuf::copyBuffer("hey");
   fizzServer->appWrite(std::move(w));
   evb.loop();
 

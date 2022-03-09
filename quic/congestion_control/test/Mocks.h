@@ -17,13 +17,12 @@ class MockMinRttSampler : public BbrCongestionController::MinRttSampler {
 
   MOCK_CONST_METHOD0(minRtt, std::chrono::microseconds());
   MOCK_CONST_METHOD0(minRttExpired, bool());
-  GMOCK_METHOD2_(
-      ,
-      noexcept,
-      ,
+  MOCK_METHOD(
+      (bool),
       newRttSample,
-      bool(std::chrono::microseconds, TimePoint));
-  GMOCK_METHOD1_(, noexcept, , timestampMinRtt, void(TimePoint));
+      (std::chrono::microseconds, TimePoint),
+      (noexcept));
+  MOCK_METHOD((void), timestampMinRtt, (TimePoint), (noexcept));
 };
 
 class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
@@ -38,7 +37,7 @@ class MockBandwidthSampler : public BbrCongestionController::BandwidthSampler {
       onPacketAcked,
       void(const CongestionController::AckEvent&, uint64_t));
   MOCK_METHOD0(onAppLimited, void());
-  GMOCK_METHOD1_(, noexcept, , setWindowLength, void(const uint64_t));
+  MOCK_METHOD((void), setWindowLength, (const uint64_t), (noexcept));
 };
 
 } // namespace test

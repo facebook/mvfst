@@ -36,10 +36,9 @@
 #include <quic/state/StateData.h>
 
 using namespace std;
-using namespace folly;
 using namespace testing;
 
-static constexpr StringPiece kTestHostname = "www.facebook.com";
+static constexpr folly::StringPiece kTestHostname = "www.facebook.com";
 
 namespace quic {
 namespace test {
@@ -47,7 +46,7 @@ class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
  public:
   ~MockServerHandshakeCallback() override = default;
 
-  GMOCK_METHOD0_(, noexcept, , onCryptoEventAvailable, void());
+  MOCK_METHOD((void), onCryptoEventAvailable, (), (noexcept));
 };
 
 struct TestingServerConnectionState : public QuicServerConnectionState {
@@ -427,14 +426,14 @@ class AsyncRejectingTicketCipher : public fizz::server::TicketCipher {
       std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
   encrypt(fizz::server::ResumptionState) const override {
     if (!encryptAsync_) {
-      return std::make_pair(IOBuf::create(0), 2s);
+      return std::make_pair(folly::IOBuf::create(0), 2s);
     } else {
       encryptAsync_ = false;
       return std::move(encryptFuture_).deferValue([](auto&&) {
         VLOG(1) << "got ticket async";
         return folly::makeSemiFuture<folly::Optional<
             std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>(
-            std::make_pair(IOBuf::create(0), 2s));
+            std::make_pair(folly::IOBuf::create(0), 2s));
       });
     }
   }
@@ -761,7 +760,7 @@ class ServerHandshakeZeroRttDefaultAppTokenValidatorTest
         std::pair<std::unique_ptr<folly::IOBuf>, std::chrono::seconds>>>
     encrypt(fizz::server::ResumptionState) const override {
       // Fake handshake, no need todo anything here.
-      return std::make_pair(IOBuf::create(0), 2s);
+      return std::make_pair(folly::IOBuf::create(0), 2s);
     }
 
     void setPsk(fizz::client::CachedPsk psk) {
