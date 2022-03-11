@@ -81,6 +81,7 @@ class MockConnectionSetupCallback : public QuicSocket::ConnectionSetupCallback {
   MOCK_METHOD((void), onReplaySafe, (), (noexcept));
   MOCK_METHOD((void), onTransportReady, (), (noexcept));
   MOCK_METHOD((void), onFirstPeerPacketProcessed, (), (noexcept));
+  MOCK_METHOD((void), onFullHandshakeDone, (), (noexcept));
 };
 
 class MockConnectionCallback : public QuicSocket::ConnectionCallback {

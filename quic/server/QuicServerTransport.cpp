@@ -544,10 +544,15 @@ void QuicServerTransport::maybeNotifyConnectionIdBound() {
 }
 
 void QuicServerTransport::maybeNotifyHandshakeFinished() {
-  if (handshakeFinishedCb_ &&
-      serverConn_->serverHandshakeLayer->isHandshakeDone()) {
-    handshakeFinishedCb_->onHandshakeFinished();
-    handshakeFinishedCb_ = nullptr;
+  if (serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    if (handshakeFinishedCb_) {
+      handshakeFinishedCb_->onHandshakeFinished();
+      handshakeFinishedCb_ = nullptr;
+    }
+    if (connSetupCallback_ && !handshakeDoneNotified_) {
+      connSetupCallback_->onFullHandshakeDone();
+      handshakeDoneNotified_ = true;
+    }
   }
 }
 

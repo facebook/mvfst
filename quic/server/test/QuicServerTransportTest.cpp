@@ -3922,8 +3922,11 @@ class QuicServerTransportHandshakeTest
     // is processed
     if (GetParam().acceptZeroRtt) {
       EXPECT_CALL(connSetupCallback, onTransportReady());
+      EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(0);
     }
     recvClientHello();
+
+    EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(1);
 
     // If 0-rtt is disabled, one rtt write cipher will be available after CFIN
     // is processed

@@ -921,6 +921,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   std::map<StreamId, WriteCallback*> pendingWriteCallbacks_;
   CloseState closeState_{CloseState::OPEN};
   bool transportReadyNotified_{false};
+  bool handshakeDoneNotified_{false};
   bool d6dProbingStarted_{false};
 
   LossTimeout lossTimeout_;

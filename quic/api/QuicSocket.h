@@ -63,6 +63,13 @@ class QuicSocket {
      * onTransportReady(), signifies full crypto handshake finished.
      */
     virtual void onReplaySafe() noexcept {}
+
+    /**
+     * Essentially Server only as clients have onReplaySafe.
+     * Called after onTransportReady() and in case of 0-RTT, unlike
+     * onTransportReady(), signifies full crypto handshake finished.
+     */
+    virtual void onFullHandshakeDone() noexcept {}
   };
 
   /**

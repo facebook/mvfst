@@ -395,6 +395,7 @@ class QuicServerTransportTestBase : public virtual testing::Test {
 
     EXPECT_TRUE(server->getConn().pendingEvents.frames.empty());
     EXPECT_EQ(server->getConn().nextSelfConnectionIdSequence, 1);
+    EXPECT_CALL(connSetupCallback, onFullHandshakeDone()).Times(1);
     recvClientFinished();
 
     // We need an extra pump here for some reason.
