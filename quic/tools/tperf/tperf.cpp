@@ -727,7 +727,8 @@ class TPerfClient : public quic::QuicSocket::ConnectionSetupCallback,
     settings.shouldUseRecvmmsgForBatchRecv = true;
     settings.maxRecvBatchSize = 32;
     settings.defaultCongestionController = congestionControlType_;
-    if (congestionControlType_ == quic::CongestionControlType::BBR) {
+    if (congestionControlType_ == quic::CongestionControlType::BBR ||
+        congestionControlType_ == CongestionControlType::BBRTesting) {
       settings.pacingEnabled = true;
       settings.pacingTimerTickInterval = 200us;
     }

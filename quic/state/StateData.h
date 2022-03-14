@@ -244,6 +244,7 @@ struct CongestionController {
   // Helper struct to group multiple lost packets into one event
   struct LossEvent {
     folly::Optional<PacketNum> largestLostPacketNum;
+    std::vector<PacketNum> lostPacketNumbers;
     uint64_t lostBytes;
     uint32_t lostPackets;
     const TimePoint lossTime;
@@ -272,6 +273,7 @@ struct CongestionController {
       PacketNum packetNum = packet.packet.header.getPacketSequenceNum();
       largestLostPacketNum =
           std::max(packetNum, largestLostPacketNum.value_or(packetNum));
+      lostPacketNumbers.push_back(packetNum);
       lostBytes += packet.metadata.encodedSize;
       lostPackets++;
       largestLostSentTime = std::max(

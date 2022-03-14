@@ -10,7 +10,6 @@
 #include <quic/congestion_control/Bbr.h>
 #include <quic/congestion_control/BbrBandwidthSampler.h>
 #include <quic/congestion_control/BbrRttSampler.h>
-#include <quic/congestion_control/BbrTesting.h>
 #include <quic/congestion_control/Copa.h>
 #include <quic/congestion_control/Copa2.h>
 #include <quic/congestion_control/NewReno.h>
@@ -45,14 +44,11 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::Copa2:
       congestionController = std::make_unique<Copa2>(conn);
       break;
+    case CongestionControlType::BBRTesting:
+      LOG(ERROR)
+          << "Default CC Factory cannot make BbrTesting. Falling back to BBR.";
     case CongestionControlType::BBR: {
       auto bbr = std::make_unique<BbrCongestionController>(conn);
-      setupBBR(bbr.get());
-      congestionController = std::move(bbr);
-      break;
-    }
-    case CongestionControlType::BBRTesting: {
-      auto bbr = std::make_unique<BbrTestingCongestionController>(conn);
       setupBBR(bbr.get());
       congestionController = std::move(bbr);
       break;

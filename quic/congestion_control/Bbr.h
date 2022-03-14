@@ -178,6 +178,8 @@ class BbrCongestionController : public CongestionController {
 
   float cwndGain_{kStartupGain};
   float pacingGain_{kStartupGain};
+  // Whether we have found the bottleneck link bandwidth
+  bool btlbwFound_{false};
 
   QuicConnectionStateBase& conn_;
   BbrState state_{BbrState::Startup};
@@ -265,8 +267,6 @@ class BbrCongestionController : public CongestionController {
   std::vector<float> pacingGainCycles_;
   float bandwidthUtilizationFactor_{1.0};
 
-  // Whether we have found the bottleneck link bandwidth
-  bool btlbwFound_{false};
   uint64_t sendQuantum_{0};
 
   Bandwidth previousStartupBandwidth_;

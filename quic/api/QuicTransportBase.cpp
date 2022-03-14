@@ -3153,7 +3153,9 @@ void QuicTransportBase::setTransportSettings(
     if (writeLooper_->hasPacingTimer()) {
       bool usingBbr =
           (conn_->transportSettings.defaultCongestionController ==
-           CongestionControlType::BBR);
+               CongestionControlType::BBR ||
+           conn_->transportSettings.defaultCongestionController ==
+               CongestionControlType::BBRTesting);
       auto minCwnd = usingBbr ? kMinCwndInMssForBbr
                               : conn_->transportSettings.minCwndInMss;
       conn_->pacer = std::make_unique<TokenlessPacer>(*conn_, minCwnd);
