@@ -1009,6 +1009,12 @@ void QuicClientTransport::startCryptoHandshake() {
       conn_->clientConnectionId.value(),
       customTransportParameters_);
   conn_->transportParametersEncoded = true;
+  if (!conn_->transportSettings.flowPriming.empty() &&
+      conn_->peerAddress.isInitialized()) {
+    socket_->write(
+        conn_->peerAddress,
+        folly::IOBuf::copyBuffer(conn_->transportSettings.flowPriming));
+  }
   handshakeLayer->connect(hostname_, std::move(paramsExtension));
 
   writeSocketData();

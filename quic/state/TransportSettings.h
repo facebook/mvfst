@@ -290,6 +290,7 @@ struct TransportSettings {
   // before an idle timeout. To work effectively this means the idle timer
   // has to be set to something >> the RTT of the connection.
   bool enableKeepalive{false};
+  std::string flowPriming = "";
 };
 
 } // namespace quic
