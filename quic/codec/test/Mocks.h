@@ -44,29 +44,32 @@ class MockQuicPacketBuilder : public PacketBuilderInterface {
   void insert(std::unique_ptr<folly::IOBuf> buf, size_t limit) override {
     _insert(buf, limit);
   }
-  MOCK_METHOD1(appendFrame, void(QuicWriteFrame));
-  MOCK_METHOD1(_insert, void(std::unique_ptr<folly::IOBuf>&));
-  MOCK_METHOD2(_insert, void(std::unique_ptr<folly::IOBuf>&, size_t));
-  MOCK_METHOD2(insert, void(const BufQueue&, size_t));
-  MOCK_METHOD2(push, void(const uint8_t*, size_t));
-  MOCK_METHOD1(write, void(const QuicInteger&));
+  MOCK_METHOD(void, appendFrame, (QuicWriteFrame));
+  MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&));
+  MOCK_METHOD(void, _insert, (std::unique_ptr<folly::IOBuf>&, size_t));
+  MOCK_METHOD(void, insert, (const BufQueue&, size_t));
+  MOCK_METHOD(void, push, (const uint8_t*, size_t));
+  MOCK_METHOD(void, write, (const QuicInteger&));
 
-  MOCK_METHOD((uint32_t), remainingSpaceInPkt, (), (const));
-  MOCK_METHOD((const PacketHeader&), getPacketHeader, (), (const));
+  MOCK_METHOD(uint32_t, remainingSpaceInPkt, (), (const));
+  MOCK_METHOD(const PacketHeader&, getPacketHeader, (), (const));
 
-  MOCK_METHOD1(writeBEUint8, void(uint8_t));
-  MOCK_METHOD1(writeBEUint16, void(uint16_t));
-  MOCK_METHOD1(writeBEUint64, void(uint16_t));
+  MOCK_METHOD(void, writeBEUint8, (uint8_t));
+  MOCK_METHOD(void, writeBEUint16, (uint16_t));
+  MOCK_METHOD(void, writeBEUint64, (uint16_t));
 
-  MOCK_METHOD2(appendBytes, void(PacketNum, uint8_t));
-  MOCK_METHOD3(appendBytesWithAppender, void(BufAppender&, PacketNum, uint8_t));
-  MOCK_METHOD3(appendBytesWithBufWriter, void(BufWriter&, PacketNum, uint8_t));
-  MOCK_METHOD((void), accountForCipherOverhead, (uint8_t), (noexcept));
-  MOCK_METHOD((bool), canBuildPacketNonConst, (), (noexcept));
-  MOCK_METHOD((uint32_t), getHeaderBytes, (), (const));
-  MOCK_METHOD((bool), hasFramesPending, (), (const));
-  MOCK_METHOD0(releaseOutputBufferMock, void());
-  MOCK_METHOD0(encodePacketHeader, void());
+  MOCK_METHOD(void, appendBytes, (PacketNum, uint8_t));
+  MOCK_METHOD(
+      void,
+      appendBytesWithAppender,
+      (BufAppender&, PacketNum, uint8_t));
+  MOCK_METHOD(void, appendBytesWithBufWriter, (BufWriter&, PacketNum, uint8_t));
+  MOCK_METHOD(void, accountForCipherOverhead, (uint8_t), (noexcept));
+  MOCK_METHOD(bool, canBuildPacketNonConst, (), (noexcept));
+  MOCK_METHOD(uint32_t, getHeaderBytes, (), (const));
+  MOCK_METHOD(bool, hasFramesPending, (), (const));
+  MOCK_METHOD(void, releaseOutputBufferMock, ());
+  MOCK_METHOD(void, encodePacketHeader, ());
 
   void releaseOutputBuffer() && override {
     releaseOutputBufferMock();

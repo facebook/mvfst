@@ -18,9 +18,9 @@ namespace quic::test {
 
 class MockDSRPacketizationRequestSender : public DSRPacketizationRequestSender {
  public:
-  MOCK_METHOD1(addSendInstruction, bool(const SendInstruction&));
-  MOCK_METHOD0(flush, bool());
-  MOCK_METHOD0(release, void());
+  MOCK_METHOD(bool, addSendInstruction, (const SendInstruction&));
+  MOCK_METHOD(bool, flush, ());
+  MOCK_METHOD(void, release, ());
 };
 
 } // namespace quic::test

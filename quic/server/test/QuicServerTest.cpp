@@ -1413,10 +1413,10 @@ TEST_F(QuicServerWorkerTest, AssignBufAccessor) {
 
 class MockAcceptObserver : public AcceptObserver {
  public:
-  MOCK_METHOD((void), accept, (QuicTransportBase* const), (noexcept));
-  MOCK_METHOD((void), acceptorDestroy, (QuicServerWorker*), (noexcept));
-  MOCK_METHOD((void), observerAttach, (QuicServerWorker*), (noexcept));
-  MOCK_METHOD((void), observerDetach, (QuicServerWorker*), (noexcept));
+  MOCK_METHOD(void, accept, (QuicTransportBase* const), (noexcept));
+  MOCK_METHOD(void, acceptorDestroy, (QuicServerWorker*), (noexcept));
+  MOCK_METHOD(void, observerAttach, (QuicServerWorker*), (noexcept));
+  MOCK_METHOD(void, observerDetach, (QuicServerWorker*), (noexcept));
 };
 
 TEST_F(QuicServerWorkerTest, AcceptObserver) {

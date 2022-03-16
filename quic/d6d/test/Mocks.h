@@ -18,10 +18,11 @@ class MockProbeSizeRaiser : public ProbeSizeRaiser {
  public:
   ~MockProbeSizeRaiser() override {}
 
-  MOCK_METHOD1(onProbeLost, void(uint16_t lastProbeSize));
-  MOCK_METHOD1(
+  MOCK_METHOD(void, onProbeLost, (uint16_t lastProbeSize));
+  MOCK_METHOD(
+      folly::Optional<uint16_t>,
       raiseProbeSize,
-      folly::Optional<uint16_t>(uint16_t lastProbeSize));
+      (uint16_t lastProbeSize));
 };
 
 } // namespace test

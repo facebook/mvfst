@@ -1065,21 +1065,21 @@ TEST_F(QuicClientTransportTest, SocketClosedDuringOnTransportReady) {
       onTransportReadyMock();
     }
 
-    MOCK_METHOD((void), onFlowControlUpdate, (StreamId), (noexcept));
-    MOCK_METHOD((void), onNewBidirectionalStream, (StreamId), (noexcept));
-    MOCK_METHOD((void), onNewUnidirectionalStream, (StreamId), (noexcept));
+    MOCK_METHOD(void, onFlowControlUpdate, (StreamId), (noexcept));
+    MOCK_METHOD(void, onNewBidirectionalStream, (StreamId), (noexcept));
+    MOCK_METHOD(void, onNewUnidirectionalStream, (StreamId), (noexcept));
     MOCK_METHOD(
-        (void),
+        void,
         onStopSending,
         (StreamId, ApplicationErrorCode),
         (noexcept));
-    MOCK_METHOD((void), onTransportReadyMock, (), (noexcept));
-    MOCK_METHOD((void), onReplaySafe, (), (noexcept));
-    MOCK_METHOD((void), onConnectionEnd, (), (noexcept));
+    MOCK_METHOD(void, onTransportReadyMock, (), (noexcept));
+    MOCK_METHOD(void, onReplaySafe, (), (noexcept));
+    MOCK_METHOD(void, onConnectionEnd, (), (noexcept));
     void onConnectionSetupError(QuicError error) noexcept override {
       onConnectionError(std::move(error));
     }
-    MOCK_METHOD((void), onConnectionError, (QuicError), (noexcept));
+    MOCK_METHOD(void, onConnectionError, (QuicError), (noexcept));
 
    private:
     std::shared_ptr<QuicSocket> socket_;

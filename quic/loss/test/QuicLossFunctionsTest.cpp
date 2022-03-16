@@ -63,9 +63,9 @@ namespace test {
 
 class MockLossTimeout {
  public:
-  MOCK_METHOD0(cancelLossTimeout, void());
-  MOCK_METHOD1(scheduleLossTimeout, void(std::chrono::milliseconds));
-  MOCK_METHOD0(isLossTimeoutScheduled, bool());
+  MOCK_METHOD(void, cancelLossTimeout, ());
+  MOCK_METHOD(void, scheduleLossTimeout, (std::chrono::milliseconds));
+  MOCK_METHOD(bool, isLossTimeoutScheduled, ());
 };
 
 enum class PacketType {

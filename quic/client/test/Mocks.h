@@ -21,9 +21,10 @@ namespace test {
 
 class MockClientHandshakeFactory : public ClientHandshakeFactory {
  public:
-  MOCK_METHOD1(
+  MOCK_METHOD(
+      std::unique_ptr<ClientHandshake>,
       _makeClientHandshake,
-      std::unique_ptr<ClientHandshake>(QuicClientConnectionState*));
+      (QuicClientConnectionState*));
 
   std::unique_ptr<ClientHandshake>
       makeClientHandshake(QuicClientConnectionState* conn) && override {
@@ -44,40 +45,43 @@ class MockClientHandshake : public ClientHandshake {
       EncryptionLevel encryptionLevel) override {
     doHandshakeImpl(data.get(), encryptionLevel);
   }
-  MOCK_METHOD2(doHandshakeImpl, void(folly::IOBuf*, EncryptionLevel));
-  MOCK_METHOD2(
+  MOCK_METHOD(void, doHandshakeImpl, (folly::IOBuf*, EncryptionLevel));
+  MOCK_METHOD(
+      bool,
       verifyRetryIntegrityTag,
-      bool(const ConnectionId&, const RetryPacket&));
-  MOCK_METHOD1(removePsk, void(const folly::Optional<std::string>&));
-  MOCK_CONST_METHOD0(getCryptoFactory, const CryptoFactory&());
-  MOCK_CONST_METHOD0(isTLSResumed, bool());
-  MOCK_METHOD0(getZeroRttRejected, folly::Optional<bool>());
-  MOCK_METHOD0(
+      (const ConnectionId&, const RetryPacket&));
+  MOCK_METHOD(void, removePsk, (const folly::Optional<std::string>&));
+  MOCK_METHOD(const CryptoFactory&, getCryptoFactory, (), (const));
+  MOCK_METHOD(bool, isTLSResumed, (), (const));
+  MOCK_METHOD(folly::Optional<bool>, getZeroRttRejected, ());
+  MOCK_METHOD(
+      folly::Optional<ServerTransportParameters>,
       getServerTransportParams,
-      folly::Optional<ServerTransportParameters>());
-  MOCK_METHOD0(destroy, void());
+      ());
+  MOCK_METHOD(void, destroy, ());
 
-  MOCK_METHOD1(
+  MOCK_METHOD(
+      folly::Optional<CachedServerTransportParameters>,
       connectImpl,
-      folly::Optional<CachedServerTransportParameters>(
-          folly::Optional<std::string>));
-  MOCK_METHOD0(getReadRecordLayerEncryptionLevel, EncryptionLevel());
-  MOCK_METHOD1(processSocketData, void(folly::IOBufQueue& queue));
-  MOCK_METHOD0(matchEarlyParameters, bool());
-  MOCK_METHOD2(
+      (folly::Optional<std::string>));
+  MOCK_METHOD(EncryptionLevel, getReadRecordLayerEncryptionLevel, ());
+  MOCK_METHOD(void, processSocketData, (folly::IOBufQueue & queue));
+  MOCK_METHOD(bool, matchEarlyParameters, ());
+  MOCK_METHOD(
+      (std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>),
       buildCiphers,
-      std::pair<std::unique_ptr<Aead>, std::unique_ptr<PacketNumberCipher>>(
-          ClientHandshake::CipherKind kind,
-          folly::ByteRange secret));
-  MOCK_CONST_METHOD0(
+      (ClientHandshake::CipherKind kind, folly::ByteRange secret));
+  MOCK_METHOD(
+      const folly::Optional<std::string>&,
       getApplicationProtocol,
-      const folly::Optional<std::string>&());
+      (),
+      (const));
 };
 
 class MockQuicConnectorCallback : public quic::QuicConnector::Callback {
  public:
-  MOCK_METHOD1(onConnectError, void(QuicError));
-  MOCK_METHOD0(onConnectSuccess, void());
+  MOCK_METHOD(void, onConnectError, (QuicError));
+  MOCK_METHOD(void, onConnectSuccess, ());
 };
 
 class MockQuicClientTransport : public quic::QuicClientTransport {

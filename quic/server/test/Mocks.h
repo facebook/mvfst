@@ -18,19 +18,11 @@ namespace quic {
 
 class MockServerConnectionIdRejector : public ServerConnectionIdRejector {
  public:
-#if defined(MOCK_METHOD)
   MOCK_METHOD(
       (bool),
       rejectConnectionIdNonConst,
       (const ConnectionId),
       (noexcept));
-#else
-  MOCK_METHOD(
-      (bool),
-      rejectConnectionIdNonConst,
-      (const ConnectionId),
-      (noexcept));
-#endif
 
   bool rejectConnectionId(const ConnectionId& id) const noexcept override {
     return const_cast<MockServerConnectionIdRejector&>(*this)
@@ -53,7 +45,6 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
     return _make(evb, socket, addr, ctx);
   }
 
-#if defined(MOCK_METHOD)
   MOCK_METHOD(
       (QuicServerTransport::Ptr),
       _make,
@@ -62,40 +53,30 @@ class MockQuicServerTransportFactory : public QuicServerTransportFactory {
        const folly::SocketAddress&,
        std::shared_ptr<const fizz::server::FizzServerContext>),
       (noexcept));
-#else
-  MOCK_METHOD(
-      (QuicServerTransport::Ptr),
-      _make,
-      (folly::EventBase * evb,
-       std::unique_ptr<folly::AsyncUDPSocket>& sock,
-       const folly::SocketAddress&,
-       std::shared_ptr<const fizz::server::FizzServerContext>),
-      (noexcept));
-#endif
 };
 
 class MockWorkerCallback : public QuicServerWorker::WorkerCallback {
  public:
   ~MockWorkerCallback() = default;
-  MOCK_METHOD1(handleWorkerError, void(LocalErrorCode));
+  MOCK_METHOD(void, handleWorkerError, (LocalErrorCode));
 
-  MOCK_METHOD5(
+  MOCK_METHOD(
+      void,
       routeDataToWorkerLong,
-      void(
-          const folly::SocketAddress&,
-          std::unique_ptr<RoutingData>&,
-          std::unique_ptr<NetworkData>&,
-          folly::Optional<QuicVersion>,
-          bool isForwardedData));
+      (const folly::SocketAddress&,
+       std::unique_ptr<RoutingData>&,
+       std::unique_ptr<NetworkData>&,
+       folly::Optional<QuicVersion>,
+       bool isForwardedData));
 
-  MOCK_METHOD5(
+  MOCK_METHOD(
+      void,
       routeDataToWorkerShort,
-      void(
-          const folly::SocketAddress&,
-          std::unique_ptr<RoutingData>&,
-          std::unique_ptr<NetworkData>&,
-          folly::Optional<QuicVersion>,
-          bool isForwardedData));
+      (const folly::SocketAddress&,
+       std::unique_ptr<RoutingData>&,
+       std::unique_ptr<NetworkData>&,
+       folly::Optional<QuicVersion>,
+       bool isForwardedData));
 
   void routeDataToWorker(
       const folly::SocketAddress& client,
@@ -121,14 +102,13 @@ class MockQuicUDPSocketFactory : public QuicUDPSocketFactory {
   std::unique_ptr<folly::AsyncUDPSocket> make(folly::EventBase* evb, int fd) {
     return std::unique_ptr<folly::AsyncUDPSocket>(_make(evb, fd));
   }
-  MOCK_METHOD2(_make, folly::AsyncUDPSocket*(folly::EventBase*, int));
+  MOCK_METHOD(folly::AsyncUDPSocket*, _make, (folly::EventBase*, int));
 };
 
 class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
  public:
   ~MockRoutingCallback() override = default;
 
-#if defined(MOCK_METHOD)
   MOCK_METHOD(
       (void),
       onConnectionIdAvailable,
@@ -146,25 +126,6 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
        const QuicServerTransport::SourceIdentity&,
        const std::vector<ConnectionIdData>&),
       (noexcept));
-#else
-  MOCK_METHOD(
-      (void),
-      onConnectionIdAvailable,
-      (QuicServerTransport::Ptr, ConnectionId),
-      (noexcept));
-  MOCK_METHOD(
-      (void),
-      onConnectionIdBound,
-      (QuicServerTransport::Ptr),
-      (noexcept));
-  MOCK_METHOD(
-      (void),
-      onConnectionUnbound,
-      (QuicServerTransport*,
-       const QuicServerTransport::SourceIdentity&,
-       const std::vector<ConnectionIdData>& connIdData),
-      (noexcept));
-#endif
 };
 
 class MockHandshakeFinishedCallback
@@ -172,13 +133,8 @@ class MockHandshakeFinishedCallback
  public:
   ~MockHandshakeFinishedCallback() override = default;
 
-#if defined(MOCK_METHOD)
   MOCK_METHOD((void), onHandshakeFinished, (), (noexcept));
   MOCK_METHOD((void), onHandshakeUnfinished, (), (noexcept));
-#else
-  MOCK_METHOD((void), onHandshakeFinished, (), (noexcept));
-  MOCK_METHOD((void), onHandshakeUnfinished, (), (noexcept));
-#endif
 };
 
 class MockQuicServerTransport : public QuicServerTransport {

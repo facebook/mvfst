@@ -46,7 +46,7 @@ class MockServerHandshakeCallback : public ServerHandshake::HandshakeCallback {
  public:
   ~MockServerHandshakeCallback() override = default;
 
-  MOCK_METHOD((void), onCryptoEventAvailable, (), (noexcept));
+  MOCK_METHOD(void, onCryptoEventAvailable, (), (noexcept));
 };
 
 struct TestingServerConnectionState : public QuicServerConnectionState {
