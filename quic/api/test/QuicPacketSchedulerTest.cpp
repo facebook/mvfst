@@ -726,6 +726,94 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeData) {
   EXPECT_TRUE(cloningScheduler.hasData());
 }
 
+/**
+ * This test case covers the following scenario:
+   1) conn sent out a handshake packet that did not get acked yet
+   2) conn received some handshake data that needs to be acked
+   3) imitate that we're emitting a PTO packet (that is generated via cloning
+      scheduler)
+   4) emitted cloned packet MUST have both cloned crypto data AND ack
+      frame(s)
+
+    There was a bug that would result in mvfst emit a "empty" PTO packet with
+    acks; this is the test case to cover that scenario.
+ */
+TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
+
+  FrameScheduler noopScheduler = std::move(FrameScheduler::Builder(
+                                               conn,
+                                               EncryptionLevel::Handshake,
+                                               PacketNumberSpace::Handshake,
+                                               "testScheduler")
+                                               .ackFrames())
+                                     .build();
+  addHandshakeOutstandingPacket(conn);
+
+  // Add some crypto data for the outstanding packet to make it look legit.
+  // This is so cloning scheduler can actually copy something.
+  getCryptoStream(*conn.cryptoState, EncryptionLevel::Handshake)
+      ->retransmissionBuffer.emplace(
+          0,
+          std::make_unique<StreamBuffer>(
+              folly::IOBuf::copyBuffer("test"), 0, false));
+  conn.outstandings.packets.back().packet.frames.push_back(
+      WriteCryptoFrame(0, 4));
+
+  // Make it look like we received some acks from the peer.
+  conn.ackStates.handshakeAckState.acks.insert(10);
+  conn.ackStates.handshakeAckState.largestRecvdPacketTime = Clock::now();
+
+  // Create cloning scheduler.
+  CloningScheduler cloningScheduler(noopScheduler, conn, "CopyCat", 0);
+  EXPECT_TRUE(cloningScheduler.hasData());
+
+  // Get the packet builder going for the clone packet.
+  PacketNum nextPacketNum =
+      getNextPacketNum(conn, PacketNumberSpace::Handshake);
+  std::vector<uint8_t> zeroConnIdData(quic::kDefaultConnectionIdSize, 0);
+  ConnectionId srcConnId(zeroConnIdData);
+  LongHeader header(
+      LongHeader::Types::Handshake,
+      srcConnId,
+      conn.clientConnectionId.value_or(quic::test::getTestConnectionId()),
+      nextPacketNum,
+      QuicVersion::QUIC_DRAFT);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(header),
+      conn.ackStates.appDataAckState.largestAckedByPeer.value_or(0));
+
+  // Clone the packet.
+  auto result = cloningScheduler.scheduleFramesForPacket(
+      std::move(builder), kDefaultUDPSendPacketLen);
+  EXPECT_TRUE(result.packetEvent.has_value());
+  EXPECT_TRUE(result.packet.has_value());
+
+  // Cloned packet has to have at least one ack frame AND the crypto data.
+  bool hasAckFrame = false;
+  bool hasCryptoFrame = false;
+  for (auto iter = result.packet->packet.frames.cbegin();
+       iter != result.packet->packet.frames.cend();
+       iter++) {
+    const QuicWriteFrame& frame = *iter;
+    switch (frame.type()) {
+      case QuicWriteFrame::Type::WriteAckFrame:
+        hasAckFrame = true;
+        break;
+      case QuicWriteFrame::Type::WriteCryptoFrame:
+        hasCryptoFrame = true;
+        break;
+      default:
+        break;
+    }
+  }
+  EXPECT_TRUE(hasAckFrame);
+  EXPECT_TRUE(hasCryptoFrame);
+}
+
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasInitialData) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -779,13 +867,16 @@ TEST_F(QuicPacketSchedulerTest, DoNotCloneHandshake) {
 TEST_F(QuicPacketSchedulerTest, CloneSchedulerUseNormalSchedulerFirst) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
+  conn.version = QuicVersion::MVFST_EXPERIMENTAL2;
   NiceMock<MockFrameScheduler> mockScheduler(&conn);
   CloningScheduler cloningScheduler(mockScheduler, conn, "Mocker", 0);
   ShortHeader header(
       ProtectionType::KeyPhaseOne,
       conn.clientConnectionId.value_or(getTestConnectionId()),
       getNextPacketNum(conn, PacketNumberSpace::AppData));
-  EXPECT_CALL(mockScheduler, hasData()).Times(1).WillOnce(Return(true));
+  EXPECT_CALL(mockScheduler, hasImmediateData())
+      .Times(1)
+      .WillOnce(Return(true));
 
   EXPECT_CALL(mockScheduler, _scheduleFramesForPacket(_, _))
       .Times(1)

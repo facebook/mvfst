@@ -285,6 +285,7 @@ enum class QuicVersion : uint32_t {
   MVFST_EXPERIMENTAL = 0xfaceb00e, // Experimental alias for MVFST
   MVFST_ALIAS = 0xfaceb010,
   MVFST_INVALID = 0xfaceb00f,
+  MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;

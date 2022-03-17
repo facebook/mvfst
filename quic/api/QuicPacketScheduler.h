@@ -292,10 +292,16 @@ class FrameScheduler : public QuicPacketScheduler {
   // If any scheduler, including AckScheduler, has pending data to send
   FOLLY_NODISCARD bool hasData() const override;
 
+  // If AckScheduler has any pending acks to write.
+  FOLLY_NODISCARD bool hasPendingAcks() const;
+
   // If any of the non-Ack scheduler has pending data to send
   FOLLY_NODISCARD virtual bool hasImmediateData() const;
 
   FOLLY_NODISCARD folly::StringPiece name() const override;
+
+  // Writes outstanding acks.
+  void writeNextAcks(PacketBuilderInterface& builder);
 
  private:
   folly::Optional<StreamFrameScheduler> streamFrameScheduler_;
@@ -313,11 +319,11 @@ class FrameScheduler : public QuicPacketScheduler {
 
 /**
  * A packet scheduler wrapping a normal FrameScheduler with the ability to clone
- * exiting packets that are still outstanding. A CloningScheduler first trie to
- * write new farmes with new data into a packet. If that fails due to the lack
+ * exiting packets that are still outstanding. A CloningScheduler first tries to
+ * write new frames with new data into a packet. If that fails due to the lack
  * of new data, it falls back to cloning one inflight packet from a connection's
  * oustanding packets if there is at least one outstanding packet that's smaller
- * than the writableBytes limit, and isn't a Handshake packet.
+ * than the writableBytes limit.
  */
 class CloningScheduler : public QuicPacketScheduler {
  public:

@@ -35,6 +35,7 @@ class MockFrameScheduler : public FrameScheduler {
   }
 
   MOCK_METHOD((bool), hasData, (), (const));
+  MOCK_METHOD((bool), hasImmediateData, (), (const));
   MOCK_METHOD(
       SchedulingResult,
       _scheduleFramesForPacket,

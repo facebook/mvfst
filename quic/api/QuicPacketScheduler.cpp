@@ -312,9 +312,17 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
   return SchedulingResult(folly::none, std::move(builder).buildPacket());
 }
 
+void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
+  ackScheduler_->writeNextAcks(builder);
+}
+
 bool FrameScheduler::hasData() const {
   return (ackScheduler_ && ackScheduler_->hasPendingAcks()) ||
       hasImmediateData();
+}
+
+bool FrameScheduler::hasPendingAcks() const {
+  return ackScheduler_ && ackScheduler_->hasPendingAcks();
 }
 
 bool FrameScheduler::hasImmediateData() const {
@@ -794,7 +802,12 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   // The writableBytes in this function shouldn't be limited by cwnd, since
   // we only use CloningScheduler for the cases that we want to bypass cwnd for
   // now.
-  if (frameScheduler_.hasData()) {
+  bool hasData = frameScheduler_.hasData();
+  if (conn_.version.has_value() &&
+      conn_.version.value() == QuicVersion::MVFST_EXPERIMENTAL2) {
+    hasData = frameScheduler_.hasImmediateData();
+  }
+  if (hasData) {
     // Note that there is a possibility that we end up writing nothing here. But
     // if frameScheduler_ hasData() to write, we shouldn't invoke the cloning
     // path if the write fails.
@@ -874,6 +887,14 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // Rebuilder will write the rest of frames
     auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
     if (rebuildResult) {
+      if (conn_.version.has_value() &&
+          conn_.version.value() == QuicVersion::MVFST_EXPERIMENTAL2) {
+        // Check if we have any acks pending and write those into the cloned
+        // packet as well.
+        if (frameScheduler_.hasPendingAcks()) {
+          frameScheduler_.writeNextAcks(*internalBuilder);
+        }
+      }
       return SchedulingResult(
           std::move(rebuildResult), std::move(*internalBuilder).buildPacket());
     } else if (
