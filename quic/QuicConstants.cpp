@@ -23,10 +23,12 @@ folly::StringPiece congestionControlTypeToString(CongestionControlType type) {
       return kCongestionControlCopa2Str;
     case CongestionControlType::NewReno:
       return kCongestionControlNewRenoStr;
-    case CongestionControlType::None:
-      return kCongestionControlNoneStr;
     case CongestionControlType::CCP:
       return kCongestionControlCcpStr;
+    case CongestionControlType::StaticCwnd:
+      return kCongestionControlStaticCwndStr;
+    case CongestionControlType::None:
+      return kCongestionControlNoneStr;
     case CongestionControlType::MAX:
       return "MAX";
     default:
@@ -48,10 +50,12 @@ folly::Optional<CongestionControlType> congestionControlStrToType(
     return quic::CongestionControlType::Copa2;
   } else if (str == kCongestionControlNewRenoStr) {
     return quic::CongestionControlType::NewReno;
-  } else if (str == kCongestionControlNoneStr) {
-    return quic::CongestionControlType::None;
   } else if (str == kCongestionControlCcpStr) {
     return quic::CongestionControlType::CCP;
+  } else if (str == kCongestionControlStaticCwndStr) {
+    return quic::CongestionControlType::StaticCwnd;
+  } else if (str == kCongestionControlNoneStr) {
+    return quic::CongestionControlType::None;
   }
   return folly::none;
 }

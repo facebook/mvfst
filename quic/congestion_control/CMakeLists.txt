@@ -18,6 +18,7 @@ add_library(
   QuicCubic.cpp
   QuicCCP.cpp
   ServerCongestionControllerFactory.cpp
+  StaticCwndCongestionController.cpp
   TokenlessPacer.cpp
 )
 

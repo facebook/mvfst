@@ -16,6 +16,7 @@
 #include <quic/congestion_control/NewReno.h>
 #include <quic/congestion_control/QuicCCP.h>
 #include <quic/congestion_control/QuicCubic.h>
+#include <quic/congestion_control/StaticCwndCongestionController.h>
 
 #include <memory>
 
@@ -62,6 +63,12 @@ ServerCongestionControllerFactory::makeCongestionController(
       setupBBR(bbr.get());
       congestionController = std::move(bbr);
       break;
+    }
+    case CongestionControlType::StaticCwnd: {
+      throw QuicInternalException(
+          "StaticCwnd Congestion Controller cannot be "
+          "constructed via CongestionControllerFactory.",
+          LocalErrorCode::INTERNAL_ERROR);
     }
     case CongestionControlType::None:
       break;

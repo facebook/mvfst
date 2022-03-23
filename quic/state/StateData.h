@@ -300,13 +300,14 @@ struct CongestionController {
    * Return the number of bytes that the congestion controller
    * will allow you to write.
    */
-  virtual uint64_t getWritableBytes() const = 0;
+  FOLLY_NODISCARD virtual uint64_t getWritableBytes() const = 0;
 
   /**
    * Return the number of bytes of cwnd of the congestion
    * controller.
    */
-  virtual uint64_t getCongestionWindow() const = 0;
+  FOLLY_NODISCARD virtual uint64_t getCongestionWindow() const = 0;
+
   /**
    * Notify congestion controller that the connection has become idle or active
    * in the sense that there are active non-control streams.
@@ -319,10 +320,10 @@ struct CongestionController {
   /**
    * Notify congestion controller that the connection has become app-limited or
    * not app-limited.
-   *
    */
   virtual void setAppLimited() = 0;
-  virtual CongestionControlType type() const = 0;
+
+  FOLLY_NODISCARD virtual CongestionControlType type() const = 0;
 
   /**
    * Set the congestion controller to use only a fraction of the available
@@ -339,13 +340,13 @@ struct CongestionController {
    * Whether the congestion controller is making use of all of the available
    * bandwidth. Returns true if bandwidthUtilizationFactor < 1.0.
    */
-  virtual bool isInBackgroundMode() const = 0;
+  FOLLY_NODISCARD virtual bool isInBackgroundMode() const = 0;
 
   /**
    * Whether the congestion controller thinks it's currently in app-limited
    * state.
    */
-  virtual bool isAppLimited() const = 0;
+  FOLLY_NODISCARD virtual bool isAppLimited() const = 0;
 
   virtual void getStats(CongestionControllerStats& stats) const = 0;
 

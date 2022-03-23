@@ -359,8 +359,9 @@ constexpr folly::StringPiece kCongestionControlBbrTestingStr = "bbr_testing";
 constexpr folly::StringPiece kCongestionControlCopaStr = "copa";
 constexpr folly::StringPiece kCongestionControlCopa2Str = "copa2";
 constexpr folly::StringPiece kCongestionControlNewRenoStr = "newreno";
-constexpr folly::StringPiece kCongestionControlNoneStr = "none";
 constexpr folly::StringPiece kCongestionControlCcpStr = "ccp";
+constexpr folly::StringPiece kCongestionControlStaticCwndStr = "staticcwnd";
+constexpr folly::StringPiece kCongestionControlNoneStr = "none";
 
 constexpr DurationRep kPersistentCongestionThreshold = 3;
 enum class CongestionControlType : uint8_t {
@@ -371,6 +372,7 @@ enum class CongestionControlType : uint8_t {
   BBR,
   BBRTesting,
   CCP,
+  StaticCwnd,
   None,
   // NOTE: MAX should always be at the end
   MAX
