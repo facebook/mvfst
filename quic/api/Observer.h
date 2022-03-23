@@ -108,11 +108,15 @@ class Observer {
     // Monotonically increasing number assigned to each write operation.
     const uint64_t writeCount;
 
+    // Timestamp when packet was last written
+    const folly::Optional<TimePoint> maybeLastPacketSentTime;
+
     struct BuilderFields {
       folly::Optional<
           std::reference_wrapper<const std::deque<OutstandingPacket>>>
           maybeOutstandingPacketsRef;
       folly::Optional<uint64_t> maybeWriteCount;
+      folly::Optional<TimePoint> maybeLastPacketSentTime;
       explicit BuilderFields() = default;
     };
 
@@ -120,6 +124,9 @@ class Observer {
       Builder&& setOutstandingPackets(
           const std::deque<OutstandingPacket>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
+      Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
+      Builder&& setLastPacketSentTime(
+          const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn);
       WriteEvent build() &&;
       explicit Builder() = default;
     };
@@ -139,6 +146,9 @@ class Observer {
       Builder&& setOutstandingPackets(
           const std::deque<OutstandingPacket>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
+      Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
+      Builder&& setLastPacketSentTime(
+          const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn);
       AppLimitedEvent build() &&;
       explicit Builder() = default;
     };
@@ -155,9 +165,13 @@ class Observer {
     // These packets will appear in outstandingPackets.
     const uint64_t numAckElicitingPacketsWritten;
 
+    // Number of bytes written.
+    const uint64_t numBytesWritten;
+
     struct BuilderFields : public WriteEvent::BuilderFields {
       folly::Optional<uint64_t> maybeNumPacketsWritten;
       folly::Optional<uint64_t> maybeNumAckElicitingPacketsWritten;
+      folly::Optional<uint64_t> maybeNumBytesWritten;
       explicit BuilderFields() = default;
     };
 
@@ -165,9 +179,13 @@ class Observer {
       Builder&& setOutstandingPackets(
           const std::deque<OutstandingPacket>& outstandingPacketsIn);
       Builder&& setWriteCount(const uint64_t writeCountIn);
+      Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
+      Builder&& setLastPacketSentTime(
+          const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn);
       Builder&& setNumPacketsWritten(const uint64_t numPacketsWrittenIn);
       Builder&& setNumAckElicitingPacketsWritten(
           const uint64_t numAckElicitingPacketsWrittenIn);
+      Builder&& setNumBytesWritten(const uint64_t numBytesWrittenIn);
       PacketsWrittenEvent build() &&;
       explicit Builder() = default;
     };

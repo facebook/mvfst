@@ -853,6 +853,201 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   transport_ = nullptr;
 }
 
+TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
+  InSequence s;
+
+  Observer::Config config = {};
+  config.packetsWrittenEvents = true;
+  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  const auto invokeForAllObservers =
+      [&cb1, &cb2, &cb3](const std::function<void(MockObserver&)>& fn) {
+        fn(*cb1);
+        fn(*cb2);
+        fn(*cb3);
+      };
+  const auto invokeForEachObserverWithTestEvents =
+      [&cb1, &cb2](const std::function<void(MockObserver&)>& fn) {
+        fn(*cb1);
+        fn(*cb2);
+      };
+
+  // install observers
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, observerAttach(transport_.get()));
+    transport_->addObserver(&observer);
+  }));
+  EXPECT_THAT(
+      transport_->getObservers(),
+      UnorderedElementsAre(cb1.get(), cb2.get(), cb3.get()));
+
+  auto& conn = transport_->getConnectionState();
+  uint64_t writeNum = 1;
+
+  // write of 4000 stream bytes
+  {
+    // matcher
+    const auto matcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(4)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(4)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(4)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(4000)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
+             MockObserver& observer) {
+          EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
+              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+                EXPECT_EQ(
+                    socket->getTransportInfo().bytesSent - oldTInfo.bytesSent,
+                    event.numBytesWritten);
+              }));
+        }));
+
+    auto stream = transport_->createBidirectionalStream().value();
+    transport_->writeChain(stream, buildRandomInputData(4000), false, nullptr);
+    transport_->updateWriteLooper(true);
+    loopForWrites();
+    loopForWrites();
+  }
+
+  // another write of 1000 stream bytes
+  {
+    writeNum++;
+
+    // matcher
+    const auto matcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(1000)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
+             MockObserver& observer) {
+          EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
+              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+                EXPECT_EQ(
+                    socket->getTransportInfo().bytesSent - oldTInfo.bytesSent,
+                    event.numBytesWritten);
+              }));
+        }));
+
+    auto stream = transport_->createBidirectionalStream().value();
+    transport_->writeChain(stream, buildRandomInputData(1000), false, nullptr);
+    transport_->updateWriteLooper(true);
+    loopForWrites();
+  }
+
+  // send an ACK
+  {
+    writeNum++;
+
+    // matcher
+    const auto matcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(0)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numBytesWritten, testing::Gt(0)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
+             MockObserver& observer) {
+          EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
+              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+                EXPECT_EQ(
+                    socket->getTransportInfo().bytesSent - oldTInfo.bytesSent,
+                    event.numBytesWritten);
+              }));
+        }));
+
+    PacketNum start = 20;
+    PacketNum end = 25;
+    addAckStatesWithCurrentTimestamps(
+        conn.ackStates.appDataAckState, start, end);
+    conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+    conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+    transport_->updateWriteLooper(true);
+    loopForWrites();
+  }
+
+  // another write of 1000 stream bytes AND some ACKs in same packet
+  {
+    writeNum++;
+
+    // matcher
+    const auto matcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(6)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(1000)));
+
+    invokeForEachObserverWithTestEvents(
+        ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
+             MockObserver& observer) {
+          EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
+              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+                EXPECT_EQ(
+                    socket->getTransportInfo().bytesSent - oldTInfo.bytesSent,
+                    event.numBytesWritten);
+              }));
+        }));
+
+    PacketNum start = 30;
+    PacketNum end = 35;
+    addAckStatesWithCurrentTimestamps(
+        conn.ackStates.appDataAckState, start, end);
+    conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+    conn.ackStates.appDataAckState.numNonRxPacketsRecvd = 3;
+    auto stream = transport_->createBidirectionalStream().value();
+    transport_->writeChain(stream, buildRandomInputData(1000), false, nullptr);
+
+    transport_->updateWriteLooper(true);
+    loopForWrites();
+  }
+
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, close(transport_.get(), _));
+  }));
+  invokeForAllObservers(([this](MockObserver& observer) {
+    EXPECT_CALL(observer, destroy(transport_.get()));
+  }));
+  transport_->close(folly::none);
+  transport_ = nullptr;
+}
+
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
   Observer::Config configWithStreamEvents = {};
   configWithStreamEvents.streamEvents = true;

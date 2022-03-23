@@ -143,8 +143,10 @@ class TestQuicTransport
 
   void invokeNotifyPacketsWritten(
       const uint64_t numPacketsWritten,
-      const uint64_t numAckElicitingPacketsWritten) {
-    notifyPacketsWritten(numPacketsWritten, numAckElicitingPacketsWritten);
+      const uint64_t numAckElicitingPacketsWritten,
+      const uint64_t numBytesWritten) {
+    notifyPacketsWritten(
+        numPacketsWritten, numAckElicitingPacketsWritten, numBytesWritten);
   }
 
   void invokeNotifyAppRateLimited() {

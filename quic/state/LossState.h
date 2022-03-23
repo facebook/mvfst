@@ -38,6 +38,8 @@ struct LossState {
   // The time when last retranmittable packet is sent for every packet number
   // space
   TimePoint lastRetransmittablePacketSentTime;
+  // The time when the last packet was sent.
+  folly::Optional<TimePoint> maybeLastPacketSentTime;
   // Total number of bytes sent on this connection. This is after encoding.
   uint64_t totalBytesSent{0};
   // Total number of bytes received on this connection. This is before decoding.

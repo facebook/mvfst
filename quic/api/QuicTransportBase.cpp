@@ -2986,6 +2986,7 @@ void QuicTransportBase::writeSocketData() {
     ++(conn_->writeCount); // incremented on each write (or write attempt)
 
     // record current number of sent packets to detect delta
+    const auto beforeTotalBytesSent = conn_->lossState.totalBytesSent;
     const auto beforeTotalPacketsSent = conn_->lossState.totalPacketsSent;
     const auto beforeTotalAckElicitingPacketsSent =
         conn_->lossState.totalAckElicitingPacketsSent;
@@ -3007,6 +3008,7 @@ void QuicTransportBase::writeSocketData() {
       setLossDetectionAlarm(*conn_, *this);
 
       // check for change in number of packets
+      const auto afterTotalBytesSent = conn_->lossState.totalBytesSent;
       const auto afterTotalPacketsSent = conn_->lossState.totalPacketsSent;
       const auto afterTotalAckElicitingPacketsSent =
           conn_->lossState.totalAckElicitingPacketsSent;
@@ -3033,7 +3035,8 @@ void QuicTransportBase::writeSocketData() {
             /* numPacketsWritten */,
             afterTotalAckElicitingPacketsSent -
                 beforeTotalAckElicitingPacketsSent
-            /* numAckElicitingPacketsWritten */);
+            /* numAckElicitingPacketsWritten */,
+            afterTotalBytesSent - beforeTotalBytesSent /* numBytesWritten */);
       }
       if (conn_->loopDetectorCallback && newOutstandingPackets) {
         conn_->writeDebugState.currentEmptyLoopCount = 0;
@@ -3539,10 +3542,12 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
 }
 
 void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
-  const auto event = Observer::AppLimitedEvent::Builder()
-                         .setOutstandingPackets(conn_->outstandings.packets)
-                         .setWriteCount(conn_->writeCount)
-                         .build();
+  const auto event =
+      Observer::AppLimitedEvent::Builder()
+          .setOutstandingPackets(conn_->outstandings.packets)
+          .setWriteCount(conn_->writeCount)
+          .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
+          .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().appRateLimitedEvents) {
       cb->startWritingFromAppLimited(this, event);
@@ -3552,13 +3557,16 @@ void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
 
 void QuicTransportBase::notifyPacketsWritten(
     uint64_t numPacketsWritten,
-    uint64_t numAckElicitingPacketsWritten) {
+    uint64_t numAckElicitingPacketsWritten,
+    uint64_t numBytesWritten) {
   const auto event =
       Observer::PacketsWrittenEvent::Builder()
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
+          .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
           .setNumPacketsWritten(numPacketsWritten)
           .setNumAckElicitingPacketsWritten(numAckElicitingPacketsWritten)
+          .setNumBytesWritten(numBytesWritten)
           .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().packetsWrittenEvents) {
@@ -3568,10 +3576,12 @@ void QuicTransportBase::notifyPacketsWritten(
 }
 
 void QuicTransportBase::notifyAppRateLimited() {
-  const auto event = Observer::AppLimitedEvent::Builder()
-                         .setOutstandingPackets(conn_->outstandings.packets)
-                         .setWriteCount(conn_->writeCount)
-                         .build();
+  const auto event =
+      Observer::AppLimitedEvent::Builder()
+          .setOutstandingPackets(conn_->outstandings.packets)
+          .setWriteCount(conn_->writeCount)
+          .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
+          .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().appRateLimitedEvents) {
       cb->appRateLimited(this, event);

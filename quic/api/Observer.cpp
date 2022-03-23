@@ -24,6 +24,20 @@ Observer::WriteEvent::Builder&& Observer::WriteEvent::Builder::setWriteCount(
   return std::move(*this);
 }
 
+Observer::WriteEvent::Builder&&
+Observer::WriteEvent::Builder::setLastPacketSentTime(
+    const TimePoint& lastPacketSentTimeIn) {
+  maybeLastPacketSentTime = lastPacketSentTimeIn;
+  return std::move(*this);
+}
+
+Observer::WriteEvent::Builder&&
+Observer::WriteEvent::Builder::setLastPacketSentTime(
+    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+  maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
+  return std::move(*this);
+}
+
 Observer::WriteEvent Observer::WriteEvent::Builder::build() && {
   return WriteEvent(*this);
 }
@@ -31,7 +45,8 @@ Observer::WriteEvent Observer::WriteEvent::Builder::build() && {
 Observer::WriteEvent::WriteEvent(const WriteEvent::BuilderFields& builderFields)
     : outstandingPackets(*CHECK_NOTNULL(
           builderFields.maybeOutstandingPacketsRef.get_pointer())),
-      writeCount(*CHECK_NOTNULL(builderFields.maybeWriteCount.get_pointer())) {}
+      writeCount(*CHECK_NOTNULL(builderFields.maybeWriteCount.get_pointer())),
+      maybeLastPacketSentTime(builderFields.maybeLastPacketSentTime) {}
 
 Observer::AppLimitedEvent::Builder&&
 Observer::AppLimitedEvent::Builder::setOutstandingPackets(
@@ -46,6 +61,20 @@ Observer::AppLimitedEvent::Builder::setWriteCount(const uint64_t writeCountIn) {
   return std::move(*this);
 }
 
+Observer::AppLimitedEvent::Builder&&
+Observer::AppLimitedEvent::Builder::setLastPacketSentTime(
+    const TimePoint& lastPacketSentTimeIn) {
+  maybeLastPacketSentTime = lastPacketSentTimeIn;
+  return std::move(*this);
+}
+
+Observer::AppLimitedEvent::Builder&&
+Observer::AppLimitedEvent::Builder::setLastPacketSentTime(
+    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+  maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
+  return std::move(*this);
+}
+
 Observer::AppLimitedEvent Observer::AppLimitedEvent::Builder::build() && {
   return AppLimitedEvent(std::move(*this));
 }
@@ -53,6 +82,34 @@ Observer::AppLimitedEvent Observer::AppLimitedEvent::Builder::build() && {
 Observer::AppLimitedEvent::AppLimitedEvent(
     Observer::AppLimitedEvent::BuilderFields&& builderFields)
     : WriteEvent(builderFields) {}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setOutstandingPackets(
+    const std::deque<OutstandingPacket>& outstandingPacketsIn) {
+  maybeOutstandingPacketsRef = outstandingPacketsIn;
+  return std::move(*this);
+}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setWriteCount(
+    const uint64_t writeCountIn) {
+  maybeWriteCount = writeCountIn;
+  return std::move(*this);
+}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setLastPacketSentTime(
+    const TimePoint& lastPacketSentTimeIn) {
+  maybeLastPacketSentTime = lastPacketSentTimeIn;
+  return std::move(*this);
+}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setLastPacketSentTime(
+    const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
+  maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
+  return std::move(*this);
+}
 
 Observer::PacketsWrittenEvent::Builder&&
 Observer::PacketsWrittenEvent::Builder::setNumPacketsWritten(
@@ -69,16 +126,9 @@ Observer::PacketsWrittenEvent::Builder::setNumAckElicitingPacketsWritten(
 }
 
 Observer::PacketsWrittenEvent::Builder&&
-Observer::PacketsWrittenEvent::Builder::setOutstandingPackets(
-    const std::deque<OutstandingPacket>& outstandingPacketsIn) {
-  maybeOutstandingPacketsRef = outstandingPacketsIn;
-  return std::move(*this);
-}
-
-Observer::PacketsWrittenEvent::Builder&&
-Observer::PacketsWrittenEvent::Builder::setWriteCount(
-    const uint64_t writeCountIn) {
-  maybeWriteCount = writeCountIn;
+Observer::PacketsWrittenEvent::Builder::setNumBytesWritten(
+    const uint64_t numBytesWrittenIn) {
+  maybeNumBytesWritten = numBytesWrittenIn;
   return std::move(*this);
 }
 
@@ -93,7 +143,9 @@ Observer::PacketsWrittenEvent::PacketsWrittenEvent(
       numPacketsWritten(
           *CHECK_NOTNULL(builderFields.maybeNumPacketsWritten.get_pointer())),
       numAckElicitingPacketsWritten(*CHECK_NOTNULL(
-          builderFields.maybeNumAckElicitingPacketsWritten.get_pointer())) {}
+          builderFields.maybeNumAckElicitingPacketsWritten.get_pointer())),
+      numBytesWritten(
+          *CHECK_NOTNULL(builderFields.maybeNumBytesWritten.get_pointer())) {}
 
 Observer::AcksProcessedEvent::Builder&&
 Observer::AcksProcessedEvent::Builder::setAckEvents(

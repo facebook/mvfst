@@ -834,7 +834,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void notifyStartWritingFromAppRateLimited();
   void notifyPacketsWritten(
       const uint64_t numPacketsWritten,
-      const uint64_t numAckElicitingPacketsWritten);
+      const uint64_t numAckElicitingPacketsWritten,
+      const uint64_t numBytesWritten);
   void notifyAppRateLimited();
 
   /**

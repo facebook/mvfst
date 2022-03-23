@@ -812,6 +812,7 @@ void updateConnection(
   if (!conn.pendingEvents.setLossDetectionAlarm) {
     conn.pendingEvents.setLossDetectionAlarm = retransmittable;
   }
+  conn.lossState.maybeLastPacketSentTime = sentTime;
   conn.lossState.totalBytesSent += encodedSize;
   conn.lossState.totalBodyBytesSent += encodedBodySize;
   conn.lossState.totalPacketsSent++;
