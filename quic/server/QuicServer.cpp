@@ -9,6 +9,7 @@
 
 #include <folly/Random.h>
 #include <folly/io/async/EventBaseManager.h>
+#include <folly/portability/GFlags.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/QuicHeaderCodec.h>
 #include <iterator>
