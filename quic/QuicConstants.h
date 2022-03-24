@@ -652,4 +652,6 @@ enum class DataPathType : uint8_t {
 using PriorityLevel = uint8_t;
 constexpr uint8_t kDefaultMaxPriority = 7;
 
+constexpr size_t kShortHeaderPaddingModulo = 32;
+
 } // namespace quic

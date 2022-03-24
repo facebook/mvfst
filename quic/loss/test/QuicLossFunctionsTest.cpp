@@ -304,6 +304,17 @@ PacketNum QuicLossFunctionsTest::sendPacket(
   return conn.lossState.largestSent.value();
 }
 
+RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
+  SmallVec<QuicWriteFrame, 4, uint16_t> trimmedFrames{};
+  for (auto frame : packet.frames) {
+    if (!frame.asPaddingFrame()) {
+      trimmedFrames.push_back(frame);
+    }
+  }
+  packet.frames = trimmedFrames;
+  return packet;
+}
+
 TEST_F(QuicLossFunctionsTest, AllPacketsProcessed) {
   auto conn = createConn();
   EXPECT_CALL(*quicStats_, onPTO()).Times(0);
@@ -1592,9 +1603,9 @@ TEST_F(QuicLossFunctionsTest, TestMarkPacketLossProcessedPacket) {
   ASSERT_TRUE(conn->outstandings.packetEvents.empty());
   uint32_t streamDataCounter = 0, streamWindowUpdateCounter = 0,
            connWindowUpdateCounter = 0;
-  for (const auto& frame :
-       getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)
-           ->packet.frames) {
+  auto strippedPacket = stripPaddingFrames(
+      getLastOutstandingPacket(*conn, PacketNumberSpace::AppData)->packet);
+  for (const auto& frame : strippedPacket.frames) {
     switch (frame.type()) {
       case QuicWriteFrame::Type::WriteStreamFrame:
         streamDataCounter++;

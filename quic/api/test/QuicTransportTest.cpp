@@ -11,6 +11,7 @@
 #include <folly/Random.h>
 #include <folly/io/Cursor.h>
 #include <folly/io/async/test/MockAsyncUDPSocket.h>
+#include <quic/QuicConstants.h>
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/Mocks.h>
@@ -121,6 +122,17 @@ class QuicTransportTest : public Test {
   std::unique_ptr<PacketNumberCipher> headerCipher_;
   std::shared_ptr<TestQuicTransport> transport_;
 };
+
+RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
+  SmallVec<QuicWriteFrame, 4, uint16_t> trimmedFrames{};
+  for (auto frame : packet.frames) {
+    if (!frame.asPaddingFrame()) {
+      trimmedFrames.push_back(frame);
+    }
+  }
+  packet.frames = trimmedFrames;
+  return packet;
+}
 
 size_t bufLength(
     const SocketAddress&,
@@ -1704,7 +1716,7 @@ TEST_F(QuicTransportTest, StopSending) {
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
-  EXPECT_EQ(1, packet.frames.size());
+  EXPECT_EQ(1, stripPaddingFrames(packet).frames.size());
   bool foundStopSending = false;
   for (auto& frame : packet.frames) {
     const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
@@ -1734,7 +1746,7 @@ TEST_F(QuicTransportTest, StopSendingReadCallbackDefault) {
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
-  EXPECT_EQ(1, packet.frames.size());
+  EXPECT_EQ(1, stripPaddingFrames(packet).frames.size());
   bool foundStopSending = false;
   for (auto& frame : packet.frames) {
     const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
@@ -1765,7 +1777,7 @@ TEST_F(QuicTransportTest, StopSendingReadCallback) {
       getLastOutstandingPacket(
           transport_->getConnectionState(), PacketNumberSpace::AppData)
           ->packet;
-  EXPECT_EQ(1, packet.frames.size());
+  EXPECT_EQ(1, stripPaddingFrames(packet).frames.size());
   bool foundStopSending = false;
   for (auto& frame : packet.frames) {
     const QuicSimpleFrame* simpleFrame = frame.asQuicSimpleFrame();
@@ -3760,9 +3772,11 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(1, conn.outstandings.packets.size());
-  auto& packet2 = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
-  EXPECT_EQ(1, packet2.packet.frames.size());
-  auto& frame2 = packet2.packet.frames.front();
+  auto& outstandingPacket2 =
+      *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  auto packet2 = stripPaddingFrames(outstandingPacket2.packet);
+  EXPECT_EQ(1, packet2.frames.size());
+  auto& frame2 = packet2.frames.front();
   const WriteStreamFrame* streamFrame2 = frame2.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame2);
   EXPECT_EQ(streamFrame2->streamId, s2);
@@ -3782,10 +3796,12 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
       transport_->getVersion(),
       conn.transportSettings.writeConnectionDataPacketsLimit);
   EXPECT_EQ(1, conn.outstandings.packets.size());
-  auto& packet3 = *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
-  EXPECT_EQ(2, packet3.packet.frames.size());
-  auto& frame3 = packet3.packet.frames.front();
-  auto& frame4 = packet3.packet.frames.back();
+  auto& outstandingPacket3 =
+      *getFirstOutstandingPacket(conn, PacketNumberSpace::AppData);
+  auto packet3 = stripPaddingFrames(outstandingPacket3.packet);
+  EXPECT_EQ(2, packet3.frames.size());
+  auto& frame3 = packet3.frames.front();
+  auto& frame4 = packet3.frames.back();
   const WriteStreamFrame* streamFrame3 = frame3.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame3);
   EXPECT_EQ(streamFrame3->streamId, s2);

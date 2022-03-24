@@ -87,6 +87,17 @@ void writeCryptoDataProbesToSocketForTest(
       version);
 }
 
+RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
+  SmallVec<QuicWriteFrame, 4, uint16_t> trimmedFrames{};
+  for (auto frame : packet.frames) {
+    if (!frame.asPaddingFrame()) {
+      trimmedFrames.push_back(frame);
+    }
+  }
+  packet.frames = trimmedFrames;
+  return packet;
+}
+
 auto buildEmptyPacket(
     QuicServerConnectionState& conn,
     PacketNumberSpace pnSpace,
@@ -4018,7 +4029,8 @@ TEST_F(QuicTransportFunctionsTest, ProbeWriteNewFunctionalFrames) {
       getVersion(*conn),
       1 /* limit to 1 packet */);
   EXPECT_EQ(2, conn->outstandings.packets.size());
-  EXPECT_EQ(1, conn->outstandings.packets[1].packet.frames.size());
+  auto packet = stripPaddingFrames(conn->outstandings.packets[1].packet);
+  EXPECT_EQ(1, packet.frames.size());
   EXPECT_EQ(
       QuicWriteFrame::Type::MaxDataFrame,
       conn->outstandings.packets[1].packet.frames[0].type());
