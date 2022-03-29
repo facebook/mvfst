@@ -1736,6 +1736,124 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
+    WriteEventsOutstandingPacketSentNoCongestionController) {
+  InSequence s;
+
+  // ACK outstanding packets so that we can switch out the congestion control
+  this->ackAllOutstandingPackets();
+  EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+
+  // determine the starting writeCount
+  auto writeCount = this->getConn().writeCount;
+
+  // remove congestion controller
+  this->getNonConstConn().congestionController = nullptr;
+
+  MockObserver::Config configWithEventsEnabled;
+  configWithEventsEnabled.appRateLimitedEvents = true;
+  configWithEventsEnabled.packetsWrittenEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithEvents1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+  auto observerWithEvents2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+
+  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
+  transport->addObserver(observerWithNoEvents.get());
+  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
+  transport->addObserver(observerWithEvents1.get());
+  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
+  transport->addObserver(observerWithEvents2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoEvents.get(),
+          observerWithEvents1.get(),
+          observerWithEvents2.get()));
+
+  // string to write
+  const std::string str1 = "hello";
+  const auto strLength = str1.length();
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // setup matchers
+  {
+    writeCount++; // write count will be incremented
+
+    // no congestion controller == no startWritingFromAppLimited events
+    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
+        .Times(0);
+    EXPECT_CALL(*observerWithEvents1, startWritingFromAppLimited(_, _))
+        .Times(0);
+    EXPECT_CALL(*observerWithEvents2, startWritingFromAppLimited(_, _))
+        .Times(0);
+
+    // matcher for event from packetsWritten
+    const auto packetsWrittenMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(folly::none))),
+        testing::Field(
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(folly::none))),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field( // precise check in WillOnce()
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(strLength)));
+    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+
+    // no congestion controller == no appRateLimited events
+    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*observerWithEvents1, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*observerWithEvents2, appRateLimited(_, _)).Times(0);
+  }
+
+  // open a stream and write str1
+  {
+    this->getTransport()->writeChain(streamId, IOBuf::copyBuffer(str1), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+  }
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAcked) {
   MockObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;

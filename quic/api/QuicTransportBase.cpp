@@ -3029,7 +3029,7 @@ void QuicTransportBase::writeSocketData() {
            beforeTotalAckElicitingPacketsSent);
 
       // if packets sent, notify observers
-      if (newPackets && conn_->congestionController) {
+      if (newPackets) {
         notifyPacketsWritten(
             afterTotalPacketsSent - beforeTotalPacketsSent
             /* numPacketsWritten */,
