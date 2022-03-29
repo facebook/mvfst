@@ -458,6 +458,7 @@ AckEvent processAckFrame(
       }
     }
     conn.congestionController->onPacketAckOrLoss(&ack, lossEvent.get_pointer());
+    ack.ccState = conn.congestionController->getState();
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
   if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {

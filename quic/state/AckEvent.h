@@ -10,6 +10,7 @@
 #include <folly/Optional.h>
 #include <folly/container/F14Map.h>
 #include <quic/codec/Types.h>
+#include <quic/congestion_control/CongestionController.h>
 #include <quic/state/OutstandingPacket.h>
 
 namespace quic {
@@ -143,6 +144,11 @@ struct AckEvent {
   //
   // not available if largestAckedPacket already acked or declared lost
   folly::Optional<std::chrono::microseconds> rttSampleNoAckDelay;
+
+  // Congestion controller state after processing of AckEvent.
+  //
+  // Optional to handle cases where congestion controller not used.
+  folly::Optional<CongestionController::State> ccState;
 
   /**
    * Booleans grouped together to avoid padding.

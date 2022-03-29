@@ -8,11 +8,12 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
-#include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
 #include <quic/state/PacketEvent.h>
 
 namespace quic {
+
+struct AckEvent;
 
 struct BbrStats {
   uint8_t state;
