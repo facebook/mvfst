@@ -14,6 +14,7 @@
 #include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/TimeUtil.h>
+#include <quic/congestion_control/CongestionController.h>
 #include <quic/d6d/QuicD6DStateFunctions.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/logging/QLoggerConstants.h>

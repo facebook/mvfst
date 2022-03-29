@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <quic/state/StateData.h>
+#include <quic/congestion_control/CongestionController.h>
 #include <quic/state/TransportSettings.h>
 
 namespace quic {

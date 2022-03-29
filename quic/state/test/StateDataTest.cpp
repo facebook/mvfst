@@ -11,6 +11,7 @@
 #include <quic/common/test/TestUtils.h>
 #include <quic/state/LossState.h>
 #include <quic/state/StateData.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace quic;
 using namespace testing;
@@ -21,6 +22,33 @@ namespace quic {
 namespace test {
 
 class StateDataTest : public Test {};
+
+TEST_F(StateDataTest, CongestionControllerState) {
+  auto mockCongestionController =
+      std::make_unique<NiceMock<MockCongestionController>>();
+
+  EXPECT_CALL(*mockCongestionController, getCongestionWindow())
+      .WillOnce(Return(1000));
+  EXPECT_CALL(*mockCongestionController, getWritableBytes())
+      .WillOnce(Return(2000));
+  EXPECT_THAT(
+      mockCongestionController->getState(),
+      testing::AllOf(
+          testing::Field(
+              &CongestionController::State::congestionWindowBytes, 1000),
+          testing::Field(&CongestionController::State::writableBytes, 2000)));
+
+  EXPECT_CALL(*mockCongestionController, getCongestionWindow())
+      .WillOnce(Return(3000));
+  EXPECT_CALL(*mockCongestionController, getWritableBytes())
+      .WillOnce(Return(4000));
+  EXPECT_THAT(
+      mockCongestionController->getState(),
+      testing::AllOf(
+          testing::Field(
+              &CongestionController::State::congestionWindowBytes, 3000),
+          testing::Field(&CongestionController::State::writableBytes, 4000)));
+}
 
 TEST_F(StateDataTest, EmptyLossEvent) {
   CongestionController::LossEvent loss;

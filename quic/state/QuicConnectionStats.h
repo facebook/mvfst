@@ -12,28 +12,9 @@
 
 #include <folly/SocketAddress.h>
 #include <quic/QuicConstants.h>
+#include <quic/congestion_control/CongestionController.h>
 
 namespace quic {
-
-struct BbrStats {
-  uint8_t state;
-};
-
-struct CopaStats {
-  double deltaParam;
-  bool useRttStanding;
-};
-
-struct CubicStats {
-  uint8_t state;
-  uint64_t ssthresh;
-};
-
-union CongestionControllerStats {
-  struct BbrStats bbrStats;
-  struct CopaStats copaStats;
-  struct CubicStats cubicStats;
-};
 
 struct QuicConnectionStats {
   uint8_t workerID{0};

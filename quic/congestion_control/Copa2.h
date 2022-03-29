@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <quic/congestion_control/CongestionController.h>
 #include <quic/congestion_control/third_party/windowed_filter.h>
 #include <quic/state/StateData.h>
 
