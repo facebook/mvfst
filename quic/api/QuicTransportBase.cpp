@@ -581,9 +581,12 @@ QuicSocket::TransportInfo QuicTransportBase::getTransportInfo() const {
   transportInfo.srtt = conn_->lossState.srtt;
   transportInfo.rttvar = conn_->lossState.rttvar;
   transportInfo.lrtt = conn_->lossState.lrtt;
+  transportInfo.maybeLrtt = conn_->lossState.maybeLrtt;
+  transportInfo.maybeLrttAckDelay = conn_->lossState.maybeLrttAckDelay;
   if (conn_->lossState.mrtt != kDefaultMinRtt) {
     transportInfo.maybeMinRtt = conn_->lossState.mrtt;
   }
+  transportInfo.maybeMinRttNoAckDelay = conn_->lossState.maybeMrttNoAckDelay;
   transportInfo.mss = conn_->udpSendPacketLen;
   transportInfo.congestionControlType = congestionControlType;
   transportInfo.writableBytes = writableBytes;

@@ -30,8 +30,8 @@ void updateAckSendStateOnSentPacketWithAcks(
 
 void updateRtt(
     QuicConnectionStateBase& conn,
-    std::chrono::microseconds rttSample,
-    std::chrono::microseconds ackDelay);
+    const std::chrono::microseconds rttSample,
+    const std::chrono::microseconds ackDelay);
 
 bool isConnectionPaced(const QuicConnectionStateBase& conn) noexcept;
 

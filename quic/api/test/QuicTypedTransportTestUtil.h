@@ -282,7 +282,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    */
   quic::Buf buildAckPacketForSentPackets(
       quic::PacketNumberSpace pnSpace,
-      quic::AckBlocks acks) {
+      quic::AckBlocks acks,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::PacketNum peerPacketNum{0};
     switch (pnSpace) {
       case quic::PacketNumberSpace::Initial:
@@ -300,7 +301,12 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     }
 
     auto buf = quic::test::packetToBuf(quic::test::createAckPacket(
-        getNonConstConn(), peerPacketNum, acks, pnSpace));
+        getNonConstConn(),
+        peerPacketNum,
+        acks,
+        pnSpace,
+        nullptr /* aead */,
+        ackDelay));
     buf->coalesce();
     return buf;
   }
@@ -311,56 +317,66 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   quic::Buf buildAckPacketForSentPackets(
       quic::PacketNumberSpace pnSpace,
       quic::PacketNum intervalStart,
-      quic::PacketNum intervalEnd) {
+      quic::PacketNum intervalEnd,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks = {{intervalStart, intervalEnd}};
-    return buildAckPacketForSentPackets(pnSpace, acks);
+    return buildAckPacketForSentPackets(pnSpace, acks, ackDelay);
   }
 
   /**
    * Build a packet from peer with ACK frame for previously sent AppData pkts.
    */
-  quic::Buf buildAckPacketForSentAppDataPackets(quic::AckBlocks acks) {
-    return buildAckPacketForSentPackets(quic::PacketNumberSpace::AppData, acks);
+  quic::Buf buildAckPacketForSentAppDataPackets(
+      quic::AckBlocks acks,
+      std::chrono::microseconds ackDelay = 0us) {
+    return buildAckPacketForSentPackets(
+        quic::PacketNumberSpace::AppData, acks, ackDelay);
   }
 
   /**
    * Build a packet with ACK frame for previously sent AppData packet.
    */
-  quic::Buf buildAckPacketForSentAppDataPacket(quic::PacketNum packetNum) {
+  quic::Buf buildAckPacketForSentAppDataPacket(
+      quic::PacketNum packetNum,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks = {{packetNum, packetNum}};
-    return buildAckPacketForSentAppDataPackets(acks);
+    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      NewOutstandingPacketInterval writeInterval) {
+      NewOutstandingPacketInterval writeInterval,
+      std::chrono::microseconds ackDelay = 0us) {
     const quic::PacketNum firstPacketNum = writeInterval.start;
     const quic::PacketNum lastPacketNum = writeInterval.end;
     quic::AckBlocks acks = {{firstPacketNum, lastPacketNum}};
-    return buildAckPacketForSentAppDataPackets(acks);
+    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      folly::Optional<NewOutstandingPacketInterval> maybeWriteInterval) {
+      folly::Optional<NewOutstandingPacketInterval> maybeWriteInterval,
+      std::chrono::microseconds ackDelay = 0us) {
     CHECK(maybeWriteInterval.has_value());
-    return buildAckPacketForSentAppDataPackets(maybeWriteInterval.value());
+    return buildAckPacketForSentAppDataPackets(
+        maybeWriteInterval.value(), ackDelay);
   }
 
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      std::vector<NewOutstandingPacketInterval> writeIntervals) {
+      std::vector<NewOutstandingPacketInterval> writeIntervals,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks;
     for (const auto& writeInterval : writeIntervals) {
       acks.insert(writeInterval.start, writeInterval.end);
     }
-    return buildAckPacketForSentAppDataPackets(acks);
+    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
   /**
@@ -368,13 +384,14 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
       std::vector<folly::Optional<NewOutstandingPacketInterval>>
-          maybeWriteIntervals) {
+          maybeWriteIntervals,
+      std::chrono::microseconds ackDelay = 0us) {
     std::vector<NewOutstandingPacketInterval> writeIntervals;
     for (const auto& maybeWriteInterval : maybeWriteIntervals) {
       CHECK(maybeWriteInterval.has_value());
       writeIntervals.emplace_back(maybeWriteInterval.value());
     }
-    return buildAckPacketForSentAppDataPackets(writeIntervals);
+    return buildAckPacketForSentAppDataPackets(writeIntervals, ackDelay);
   }
 
   /**
@@ -382,31 +399,36 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
       quic::PacketNum intervalStart,
-      quic::PacketNum intervalEnd) {
+      quic::PacketNum intervalEnd,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks = {{intervalStart, intervalEnd}};
-    return buildAckPacketForSentAppDataPackets(acks);
+    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
   /**
    * Build a packet with ACK frame for previously sent AppData packets.
    */
   quic::Buf buildAckPacketForSentAppDataPackets(
-      std::vector<quic::PacketNum> packetNums) {
+      const std::vector<quic::PacketNum>& packetNums,
+      std::chrono::microseconds ackDelay = 0us) {
     quic::AckBlocks acks;
     for (const auto& packetNum : packetNums) {
       acks.insert(packetNum, packetNum);
     }
-    return buildAckPacketForSentAppDataPackets(acks);
+    return buildAckPacketForSentAppDataPackets(acks, ackDelay);
   }
 
   /**
    * Build a packet from peer with ACK frame for previously AppData packets.
    */
   template <class T0, class... Ts>
-  quic::Buf buildAckPacketForSentAppDataPackets(T0&& first, Ts&&... args) {
+  quic::Buf buildAckPacketForSentAppDataPackets(
+      T0&& first,
+      Ts&&... args,
+      std::chrono::microseconds ackDelay = 0us) {
     std::vector<quic::PacketNum> packetNums{
         std::forward<T0>(first), std::forward<Ts>(args)...};
-    return buildAckPacketForSentAppDataPackets(packetNums);
+    return buildAckPacketForSentAppDataPackets(packetNums, ackDelay);
   }
 
   /**

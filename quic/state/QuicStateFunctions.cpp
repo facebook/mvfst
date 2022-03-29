@@ -39,18 +39,34 @@ namespace quic {
 
 void updateRtt(
     QuicConnectionStateBase& conn,
-    std::chrono::microseconds rttSample,
-    std::chrono::microseconds ackDelay) {
+    const std::chrono::microseconds rttSample,
+    const std::chrono::microseconds ackDelay) {
   // update mrtt
   //
   // mrtt ignores ack delay. This is the same in the current recovery draft
   // section A.6.
   conn.lossState.mrtt = timeMin(conn.lossState.mrtt, rttSample);
 
+  // update mrttNoAckDelay
+  //
+  // keep a version of mrtt formed from rtt samples with ACK delay removed
+  if (rttSample >= ackDelay) {
+    const auto rttSampleNoAckDelay =
+        std::chrono::ceil<std::chrono::microseconds>(rttSample - ackDelay);
+    conn.lossState.maybeMrttNoAckDelay = (conn.lossState.maybeMrttNoAckDelay)
+        ? std::min(*conn.lossState.maybeMrttNoAckDelay, rttSampleNoAckDelay)
+        : rttSampleNoAckDelay;
+  }
+
+  // update lrtt and lrttAckDelay
+  conn.lossState.lrtt = rttSample;
+  conn.lossState.maybeLrtt = rttSample;
+  conn.lossState.maybeLrttAckDelay = ackDelay;
+
   // update maxAckDelay
   conn.lossState.maxAckDelay = timeMax(conn.lossState.maxAckDelay, ackDelay);
 
-  // determine the RTT sample we will use for srtt and related calculations
+  // determine the adjusted RTT sample we will use for srtt calculations
   //
   // do NOT subtract the acknowledgment delay from the RTT sample if the
   // resulting value is smaller than the min_rtt; this limits underestimation
@@ -58,21 +74,21 @@ void updateRtt(
   //
   // if this is the first RTT sample, then it is also the minRTT and ACK delay
   // will not be subtracted
-  const auto srttSample =
+  const auto adjustedRtt =
       ((rttSample > ackDelay) && (rttSample > conn.lossState.mrtt + ackDelay))
       ? rttSample - ackDelay
       : rttSample;
-  conn.lossState.lrtt = srttSample;
   if (conn.lossState.srtt == 0us) {
-    conn.lossState.srtt = srttSample;
-    conn.lossState.rttvar = srttSample / 2;
+    conn.lossState.srtt = adjustedRtt;
+    conn.lossState.rttvar = adjustedRtt / 2;
   } else {
     conn.lossState.rttvar = conn.lossState.rttvar * (kRttBeta - 1) / kRttBeta +
-        (conn.lossState.srtt > srttSample ? conn.lossState.srtt - srttSample
-                                          : srttSample - conn.lossState.srtt) /
+        (conn.lossState.srtt > adjustedRtt
+             ? conn.lossState.srtt - adjustedRtt
+             : adjustedRtt - conn.lossState.srtt) /
             kRttBeta;
     conn.lossState.srtt = conn.lossState.srtt * (kRttAlpha - 1) / kRttAlpha +
-        srttSample / kRttAlpha;
+        adjustedRtt / kRttAlpha;
   }
 
   // inform qlog

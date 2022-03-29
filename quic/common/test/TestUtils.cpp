@@ -96,7 +96,8 @@ RegularQuicPacketBuilder::Packet createAckPacket(
     PacketNum pn,
     AckBlocks& acks,
     PacketNumberSpace pnSpace,
-    const Aead* aead) {
+    const Aead* aead,
+    std::chrono::microseconds ackDelay) {
   // This function sends ACK to dstConn
   auto srcConnId =
       (dstConn.nodeType == QuicNodeType::Client ? *dstConn.serverConnectionId
@@ -132,7 +133,7 @@ RegularQuicPacketBuilder::Packet createAckPacket(
   }
   DCHECK(builder.canBuildPacket());
   AckFrameMetaData ackData(
-      acks, 0us, dstConn.transportSettings.ackDelayExponent);
+      acks, ackDelay, dstConn.transportSettings.ackDelayExponent);
   writeAckFrame(ackData, builder);
   return std::move(builder).buildPacket();
 }

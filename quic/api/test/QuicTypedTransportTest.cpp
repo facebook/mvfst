@@ -62,127 +62,414 @@ TYPED_TEST_SUITE(
     ::TransportTypeNames);
 
 /**
- * Verify minRTT is not populated until first RTT sample and is correct.
+ * Verify that RTT signals are properly passed through to TransportInfo.
+ *
+ * Currently tests mrtt, mrttNoAckDelay, lrttRaw, lrttRawAckDelay
  */
-TYPED_TEST(QuicTypedTransportTest, TransportInfoMinRtt) {
-  // expected value of minRTT, updated throughout test
-  folly::Optional<std::chrono::microseconds> expectedMinRtt;
+TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
+  // lambda to send and ACK a packet
+  const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
 
-  // lambda to update expected value of minRTT (expectedMinRtt)
-  const auto updateExpectedMinRtt =
-      [](const auto& rttIn,
-         folly::Optional<std::chrono::microseconds>& expectedMinRttIn) {
-        const auto rttUs =
-            std::chrono::duration_cast<std::chrono::microseconds>(rttIn);
-        expectedMinRttIn = std::min(rttUs, expectedMinRttIn.value_or(rttUs));
-      };
+    // get the packet's send time
+    const auto packetSentTime =
+        CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
-  // minRTT should not be available
+    // deliver an ACK for the outstanding packet rttIn ms later
+    const auto packetAckTime = packetSentTime + rttIn;
+    this->deliverPacket(
+        this->buildAckPacketForSentAppDataPackets(
+            maybeWriteInterval, ackDelayIn),
+        packetAckTime);
+  };
+
+  // minRTT should not be available in any form
   EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
   EXPECT_EQ(
-      expectedMinRtt, this->getTransport()->getTransportInfo().maybeMinRtt);
+      folly::none,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
   this->getNonConstConn().outstandings.packets.clear();
   this->getNonConstConn().outstandings.packetCount = {};
   this->getNonConstConn().outstandings.clonedPacketCount = {};
 
-  // open a stream and write some bytes, should trigger single packet TX
-  // then send an ACK
-  auto streamId = this->getTransport()->createBidirectionalStream().value();
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
-  const auto maybeWriteInterval1 = this->loopForWrites();
-  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval1));
+  //                                     ||   [ Value Expected ]   |
+  //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
+  //  -----|-------------|---------------||------- |----------------|----------
+  //    1  | 31ms (5 ms) |     26ms      ||   31   |       26       | (both)
+  //    2  | 30ms (3 ms) |     27ms      ||   30   |       26       | (1)
+  //    3  | 30ms (8 ms) |     22ms      ||   30   |       22       | (2)
+  //    4  | 37ms (8 ms) |     29ms      ||   30   |       22       | (none)
+  //    5  | 25ms (0 ms) |     29ms      ||   25   |       22       | (1)
+  //    6  | 25ms (4 ms) |     29ms      ||   25   |       21       | (2)
+  //    7  | 20ms (0 ms) |     29ms      ||   20   |       20       | (both)
+
+  // case 1 [31ms (5 ms)]
   {
+    const auto rtt = 31ms;
+    const auto ackDelay = 5ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 31ms;
+    const auto expectedMinRttNoAckDelay = 26ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 2 [30ms (3 ms)]
+  {
+    const auto rtt = 30ms;
+    const auto ackDelay = 3ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 30ms;
+    const auto expectedMinRttNoAckDelay = 26ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 3 [30ms (8 ms)]
+  {
+    const auto rtt = 30ms;
+    const auto ackDelay = 8ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 30ms;
+    const auto expectedMinRttNoAckDelay = 22ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 4 [37ms (8 ms)]
+  {
+    const auto rtt = 37ms;
+    const auto ackDelay = 8ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 30ms;
+    const auto expectedMinRttNoAckDelay = 22ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 5 [25ms (0 ms)]
+  {
+    const auto rtt = 25ms;
+    const auto ackDelay = 0ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 25ms;
+    const auto expectedMinRttNoAckDelay = 22ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 6 [25ms (4 ms)]
+  {
+    const auto rtt = 25ms;
+    const auto ackDelay = 4ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 25ms;
+    const auto expectedMinRttNoAckDelay = 21ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  // case 7 [20ms (0 ms)]
+  {
+    const auto rtt = 20ms;
+    const auto ackDelay = 0ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 20ms;
+    const auto expectedMinRttNoAckDelay = 20ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  this->destroyTransport();
+}
+
+/**
+ * Test case where the ACK delay is equal to the RTT sample.
+ */
+TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
+  // lambda to send and ACK a packet
+  const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+
     // get the packet's send time
     const auto packetSentTime =
         CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
-    // deliver an ACK for the outstanding packet 31 ms later
-    const auto packetAckTime = packetSentTime + 31ms;
+    // deliver an ACK for the outstanding packet rttIn ms later
+    const auto packetAckTime = packetSentTime + rttIn;
     this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWriteInterval1),
+        this->buildAckPacketForSentAppDataPackets(
+            maybeWriteInterval, ackDelayIn),
         packetAckTime);
-    updateExpectedMinRtt(packetAckTime - packetSentTime, expectedMinRtt);
-    EXPECT_EQ(packetAckTime - packetSentTime, expectedMinRtt); // sanity
-  }
+  };
 
-  // minRTT should now be available
-  // for tests where we have control of arrival time, check actual RTT value
-  EXPECT_NE(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
-  if constexpr (std::is_same_v<
-                    TypeParam,
-                    QuicClientTransportAfterStartTestBase>) {
-    // do nothing, explicit to ensure we handle all types of T
-  } else if constexpr (std::is_same_v<TypeParam, QuicServerTransportTestBase>) {
-    EXPECT_EQ(
-        expectedMinRtt, this->getTransport()->getTransportInfo().maybeMinRtt);
-  } else {
-    FAIL(); // unhandled typed test
-  }
+  // minRTT should not be available in any form
+  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(
+      folly::none,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
-  // write some more, then send an ACK with higher RTT
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
-  const auto maybeWriteInterval2 = this->loopForWrites();
-  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval2));
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.packets.clear();
+  this->getNonConstConn().outstandings.packetCount = {};
+  this->getNonConstConn().outstandings.clonedPacketCount = {};
+
+  //                                     ||   [ Value Expected ]   |
+  //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
+  //  -----|-------------|---------------||------- |----------------|----------
+  //    1  | 25ms (25 ms)|     25ms      ||   25   |       0        | (both)
   {
+    const auto rtt = 25ms;
+    const auto ackDelay = 25ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 25ms;
+    const auto expectedMinRttNoAckDelay = 0ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(expectedMinRttNoAckDelay, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  this->destroyTransport();
+}
+
+/**
+ * Test case where the ACK delay is greater than the RTT sample.
+ */
+TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
+  // lambda to send and ACK a packet
+  const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+
     // get the packet's send time
     const auto packetSentTime =
         CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
-    // deliver an ACK for the outstanding packet 42 ms later
-    const auto packetAckTime = packetSentTime + 42ms;
+    // deliver an ACK for the outstanding packet rttIn ms later
+    const auto packetAckTime = packetSentTime + rttIn;
     this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWriteInterval2),
+        this->buildAckPacketForSentAppDataPackets(
+            maybeWriteInterval, ackDelayIn),
         packetAckTime);
-    const auto oldExpectedMinRtt = expectedMinRtt;
-    updateExpectedMinRtt(packetAckTime - packetSentTime, expectedMinRtt);
-    EXPECT_EQ(oldExpectedMinRtt, expectedMinRtt); // sanity, should not change
-  }
+  };
 
-  // for tests where we have control of arrival time, check actual RTT value
-  EXPECT_NE(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
-  if constexpr (std::is_same_v<
-                    TypeParam,
-                    QuicClientTransportAfterStartTestBase>) {
-    // do nothing, explicit to ensure we handle all types of T
-  } else if constexpr (std::is_same_v<TypeParam, QuicServerTransportTestBase>) {
-    EXPECT_EQ(
-        expectedMinRtt, this->getTransport()->getTransportInfo().maybeMinRtt);
-  } else {
-    FAIL(); // unhandled typed test
-  }
+  // minRTT should not be available in any form
+  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(
+      folly::none,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
-  // write some more, then send an ACK with lower RTT, new min
-  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
-  const auto maybeWriteInterval3 = this->loopForWrites();
-  EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval3));
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.packets.clear();
+  this->getNonConstConn().outstandings.packetCount = {};
+  this->getNonConstConn().outstandings.clonedPacketCount = {};
+
+  //                                     ||   [ Value Expected ]   |
+  //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
+  //  -----|-------------|---------------||------- |----------------|----------
+  //    1  | 25ms (26 ms)|     25ms      ||   25   |  folly::none   | (1)
   {
+    const auto rtt = 25ms;
+    const auto ackDelay = 26ms;
+    sendAndAckPacket(rtt, ackDelay);
+
+    const auto expectedMinRtt = 25ms;
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_EQ(rtt, tInfo.maybeLrtt);
+      EXPECT_EQ(ackDelay, tInfo.maybeLrttAckDelay);
+      EXPECT_EQ(expectedMinRtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(folly::none, tInfo.maybeMinRttNoAckDelay); // unavailable
+    } else {
+      FAIL(); // unhandled typed test
+    }
+  }
+
+  this->destroyTransport();
+}
+
+/**
+ * Test case where the RTT sample has zero time based on socket RX timestamp.
+ *
+ * In this case, we should fallback to using system clock timestamp, and thus
+ * should end up with a non-zero RTT.
+ */
+TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
+  // lambda to send and ACK a packet
+  const auto sendAndAckPacket = [&](const auto& rttIn, const auto& ackDelayIn) {
+    auto streamId = this->getTransport()->createBidirectionalStream().value();
+    this->getTransport()->writeChain(
+        streamId, IOBuf::copyBuffer("hello"), false);
+    const auto maybeWriteInterval = this->loopForWrites();
+    EXPECT_EQ(1, this->getNumPacketsWritten(maybeWriteInterval));
+
     // get the packet's send time
     const auto packetSentTime =
         CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
-    // deliver an ACK for the outstanding packet 19 ms later
-    const auto packetAckTime = packetSentTime + 19ms;
+    // deliver an ACK for the outstanding packet rttIn ms later
+    const auto packetAckTime = packetSentTime + rttIn;
     this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWriteInterval3),
+        this->buildAckPacketForSentAppDataPackets(
+            maybeWriteInterval, ackDelayIn),
         packetAckTime);
-    const auto oldExpectedMinRtt = expectedMinRtt;
-    updateExpectedMinRtt(packetAckTime - packetSentTime, expectedMinRtt);
-    EXPECT_NE(oldExpectedMinRtt, expectedMinRtt); // sanity, should change
-  }
+  };
 
-  // for tests where we have control of arrival time, check actual RTT value
-  EXPECT_NE(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
-  if constexpr (std::is_same_v<
-                    TypeParam,
-                    QuicClientTransportAfterStartTestBase>) {
-    // do nothing, explicit to ensure we handle all types of T
-  } else if constexpr (std::is_same_v<TypeParam, QuicServerTransportTestBase>) {
-    EXPECT_EQ(
-        expectedMinRtt, this->getTransport()->getTransportInfo().maybeMinRtt);
-  } else {
-    FAIL(); // unhandled typed test
+  // minRTT should not be available in any form
+  EXPECT_EQ(folly::none, this->getTransport()->getTransportInfo().maybeMinRtt);
+  EXPECT_EQ(
+      folly::none,
+      this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
+
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.packets.clear();
+  this->getNonConstConn().outstandings.packetCount = {};
+  this->getNonConstConn().outstandings.clonedPacketCount = {};
+
+  //                                     ||   [ Value Expected ]   |
+  //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
+  //  -----|-------------|---------------||------- |----------------|----------
+  //    1  | 0ms (0 ms)  |     0ms       ||   >0   |      >0        | (both)
+  {
+    const auto rtt = 0ms;
+    const auto ackDelay = 0ms;
+    sendAndAckPacket(rtt, ackDelay);
+    if constexpr (std::is_same_v<
+                      TypeParam,
+                      QuicClientTransportAfterStartTestBase>) {
+    } else if constexpr (std::is_same_v<
+                             TypeParam,
+                             QuicServerTransportTestBase>) {
+      const auto tInfo = this->getTransport()->getTransportInfo();
+      EXPECT_LE(0ms, tInfo.maybeLrtt.value());
+      EXPECT_GE(500ms, tInfo.maybeLrtt.value());
+      EXPECT_EQ(0ms, tInfo.maybeLrttAckDelay.value());
+      EXPECT_EQ(tInfo.maybeLrtt, tInfo.maybeMinRtt);
+      EXPECT_EQ(tInfo.maybeMinRtt, tInfo.maybeMinRttNoAckDelay);
+    } else {
+      FAIL(); // unhandled typed test
+    }
   }
 
   this->destroyTransport();

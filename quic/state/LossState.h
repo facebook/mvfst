@@ -19,23 +19,29 @@ struct LossState {
   folly::Optional<PacketNum> largestSent;
   // Timer for time reordering detection or early retransmit alarm.
   EnumArray<PacketNumberSpace, folly::Optional<TimePoint>> lossTimes;
-  // Max ack delay received from peer
+  // Max ack delay received from peer.
   std::chrono::microseconds maxAckDelay{0us};
   // minimum rtt. AckDelay isn't excluded from this.
   std::chrono::microseconds mrtt{kDefaultMinRtt};
-  // Smooth rtt
+  // minimum rtt measured from samples with AckDelay excluded.
+  folly::Optional<std::chrono::microseconds> maybeMrttNoAckDelay;
+  // Last raw RTT value; unlike lrtt, this will always contain any ACK delay.
+  folly::Optional<std::chrono::microseconds> maybeLrtt;
+  // Last raw ACK delay value.
+  folly::Optional<std::chrono::microseconds> maybeLrttAckDelay;
+  // Smooth rtt.
   std::chrono::microseconds srtt{0us};
-  // Latest rtt
+  // Latest rtt.
   std::chrono::microseconds lrtt{0us};
-  // Rtt var
+  // Rtt var.
   std::chrono::microseconds rttvar{0us};
-  // The sent time of the latest acked packet
+  // The sent time of the latest acked packet.
   folly::Optional<TimePoint> lastAckedPacketSentTime;
-  // The latest time a packet is acked
+  // The latest time a packet is acked.
   folly::Optional<TimePoint> lastAckedTime;
-  // The latest time a packet is acked, minus ack delay
+  // The latest time a packet is acked, minus ack delay.
   folly::Optional<TimePoint> adjustedLastAckedTime;
-  // The time when last retranmittable packet is sent for every packet number
+  // The time when last retranmittable packet is sent for every packet number.
   // space
   TimePoint lastRetransmittablePacketSentTime;
   // The time when the last packet was sent.

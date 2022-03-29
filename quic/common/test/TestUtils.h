@@ -61,7 +61,8 @@ RegularQuicPacketBuilder::Packet createAckPacket(
     PacketNum pn,
     AckBlocks& acks,
     PacketNumberSpace pnSpace,
-    const Aead* aead = nullptr);
+    const Aead* aead = nullptr,
+    std::chrono::microseconds ackDelay = 0us);
 
 PacketNum rstStreamAndSendPacket(
     QuicServerConnectionState& conn,
