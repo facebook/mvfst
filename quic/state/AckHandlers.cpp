@@ -198,7 +198,7 @@ AckEvent processAckFrame(
             ackReceiveTimeOrNow - rPacketIt->metadata.time);
         if (rttSample != rttSample.zero()) {
           // notify observers
-          Observer::PacketRTT packetRTT(
+          const Observer::PacketRTT packetRTT(
               ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
           for (const auto& observer : *(conn.observers)) {
             conn.pendingCallbacks.emplace_back(

@@ -219,7 +219,7 @@ struct OutstandingPacket {
             encodedSizeIn,
             encodedBodySizeIn,
             isHandshakeIn,
-            false,
+            false /* isD6DProbeIn */,
             totalBytesSentIn,
             totalBodyBytesSentIn,
             inflightBytesIn,
