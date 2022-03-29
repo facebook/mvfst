@@ -36,6 +36,7 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::CCP:
       LOG(ERROR)
           << "Default CC Factory cannot make CCP. Falling back to cubic.";
+      FOLLY_FALLTHROUGH;
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
       break;
@@ -48,6 +49,7 @@ DefaultCongestionControllerFactory::makeCongestionController(
     case CongestionControlType::BBRTesting:
       LOG(ERROR)
           << "Default CC Factory cannot make BbrTesting. Falling back to BBR.";
+      FOLLY_FALLTHROUGH;
     case CongestionControlType::BBR: {
       auto bbr = std::make_unique<BbrCongestionController>(conn);
       setupBBR(bbr.get());

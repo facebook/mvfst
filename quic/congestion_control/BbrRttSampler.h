@@ -15,7 +15,7 @@ namespace quic {
 class BbrRttSampler : public BbrCongestionController::MinRttSampler {
  public:
   explicit BbrRttSampler(std::chrono::seconds expiration);
-  ~BbrRttSampler() = default;
+  ~BbrRttSampler() override = default;
 
   std::chrono::microseconds minRtt() const noexcept override;
   bool minRttExpired() const noexcept override;

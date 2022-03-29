@@ -89,7 +89,7 @@ class ClientHandshake : public Handshake {
    */
   virtual folly::Optional<ServerTransportParameters> getServerTransportParams();
 
-  virtual ~ClientHandshake() = default;
+  ~ClientHandshake() override = default;
 
  protected:
   enum class CipherKind {

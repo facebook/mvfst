@@ -39,7 +39,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
     return std::shared_ptr<QuicServer>(new QuicServer());
   }
 
-  virtual ~QuicServer();
+  ~QuicServer() override;
 
   // Initialize and start the quic server where the quic server manages
   // the eventbases for workers

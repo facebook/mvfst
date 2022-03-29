@@ -182,7 +182,7 @@ class ServerHandshake : public Handshake {
    */
   const folly::Optional<std::string>& getApplicationProtocol() const override;
 
-  virtual ~ServerHandshake() = default;
+  ~ServerHandshake() override = default;
 
   void onError(std::pair<std::string, TransportErrorCode> error);
 

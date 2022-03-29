@@ -42,6 +42,7 @@ ServerCongestionControllerFactory::makeCongestionController(
 #else
       LOG(ERROR)
           << "Server CC Factory cannot make CCP (unless recompiled with -DCCP_ENABLED). Falling back to cubic.";
+      FOLLY_FALLTHROUGH;
 #endif
     case CongestionControlType::Cubic:
       congestionController = std::make_unique<Cubic>(conn);
