@@ -35,6 +35,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacket) {
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(0)
                       .build();
   ackEvent.ackedBytes = 5000;
   ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(
@@ -53,6 +54,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacketFallback) {
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(0)
                       .build();
   ackEvent.ackedBytes = 5000;
   ackEvent.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(
@@ -70,6 +72,7 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculation) {
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(4)
                       .build();
   ackEvent.ackedBytes = 5000;
   conn_.lossState.totalBytesAcked = 5000;
@@ -101,6 +104,7 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculationWithAdjustedAckTime) {
                       .setAdjustedAckTime(ackTime - 100us)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(4)
                       .build();
   ackEvent.ackedBytes = 5000;
   conn_.lossState.totalBytesAcked = 5000;
@@ -127,18 +131,19 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculationWithAdjustedAckTime) {
 
 TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   BbrBandwidthSampler sampler(conn_);
+  PacketNum pn = 1;
   auto ackTime = Clock::now();
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(pn)
                       .build();
   conn_.lossState.totalBytesAcked = 1000;
   ackEvent.ackedBytes = 1000;
   auto lastAckedPacketSentTime = ackTime - 200us;
   auto lastAckedPacketAckTime = ackTime - 100us;
-  PacketNum pn = 1;
   auto packet = makeTestingWritePacket(pn, 1000, 2000);
   packet.lastAckedPacketInfo.emplace(
       lastAckedPacketSentTime,
@@ -162,6 +167,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
                        .setAdjustedAckTime(ackTime2)
                        .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                       .setLargestAckedPacket(pn)
                        .build();
   packet2.metadata.time = ackTime + 110us;
   ackEvent2.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet2));
@@ -180,6 +186,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
                        .setAdjustedAckTime(ackTime3)
                        .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                       .setLargestAckedPacket(pn)
                        .build();
   packet3.metadata.time = ackTime + 210us;
   ackEvent3.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet3));
@@ -197,6 +204,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
                        .setAdjustedAckTime(ackTime4)
                        .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                       .setLargestAckedPacket(pn)
                        .build();
   packet4.metadata.time = ackTime + 310us;
   ackEvent4.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet4));
@@ -211,6 +219,9 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   conn.qLogger = qLogger;
 
+  conn.lossState.largestSent = conn.lossState.largestSent.value_or(0);
+  const auto pn = ++conn.lossState.largestSent.value();
+
   BbrBandwidthSampler sampler(conn);
   EXPECT_FALSE(sampler.isAppLimited());
   sampler.onAppLimited();
@@ -221,11 +232,10 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(pn)
                       .build();
-  conn.lossState.largestSent = conn.lossState.largestSent.value_or(0);
-  ackEvent.largestNewlyAckedPacket = ++conn.lossState.largestSent.value();
-  auto packet =
-      makeTestingWritePacket(*ackEvent.largestNewlyAckedPacket, 1000, 1000);
+  auto packet = makeTestingWritePacket(pn, 1000, 1000);
+  ackEvent.largestNewlyAckedPacket = pn;
   ackEvent.largestNewlyAckedPacketSentTime = packet.metadata.time;
   ackEvent.ackedPackets.push_back(
       makeAckPacketFromOutstandingPacket(std::move(packet)));
@@ -247,17 +257,18 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
 TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   QuicConnectionStateBase conn(QuicNodeType::Client);
   BbrBandwidthSampler sampler(conn);
+  PacketNum pn = 0;
   auto ackTime1 = Clock::now();
   auto ackEvent1 = AckEvent::Builder()
                        .setAckTime(ackTime1)
                        .setAdjustedAckTime(ackTime1)
                        .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                       .setLargestAckedPacket(pn)
                        .build();
   ackEvent1.ackedBytes = 1000;
   auto lastAckedPacketSentTime = ackTime1 - 200us;
   auto lastAckedPacketAckTime = ackTime1 - 100us;
-  PacketNum pn = 0;
   auto packet = makeTestingWritePacket(pn, 1000, 1000 + 1000 * pn);
   packet.isAppLimited = true;
   packet.lastAckedPacketInfo.emplace(
@@ -285,6 +296,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
                        .setAdjustedAckTime(ackTime2)
                        .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
+                       .setLargestAckedPacket(pn)
                        .build();
   ackEvent2.ackedBytes = 1000;
   ackEvent2.ackedPackets.push_back(makeAckPacketFromOutstandingPacket(packet1));

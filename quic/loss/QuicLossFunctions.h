@@ -435,7 +435,6 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       conn.outstandings.numOutstanding() > 0;
   VLOG(10) << __func__ << " largestAckedInPacket="
            << ack.largestNewlyAckedPacket.value_or(0)
-
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.numOutstanding()

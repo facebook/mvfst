@@ -5,10 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-// #include <folly/portability/GMock.h>
-// #include <folly/portability/GTest.h>
-
 #include <quic/api/QuicTransportBase.h>
+#include <quic/common/test/TestPacketBuilders.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/state/QuicStateFunctions.h>
 #include <quic/state/StateData.h>
@@ -199,7 +197,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
-        ++peerNextAppDataPacketNum,
+        ++peerPacketNumStore.nextAppDataPacketNum,
         streamId,
         *data /* stream data */,
         0 /* cipherOverhead */,
@@ -222,7 +220,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     auto buf = quic::test::packetToBuf(createStreamPacket(
         getSrcConnectionId(),
         getDstConnectionId(),
-        ++peerNextAppDataPacketNum,
+        ++peerPacketNumStore.nextAppDataPacketNum,
         streamId,
         *data /* stream data */,
         0 /* cipherOverhead */,
@@ -241,7 +239,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     ShortHeader header(
         ProtectionType::KeyPhaseZero,
         getDstConnectionId(),
-        peerNextAppDataPacketNum++);
+        peerPacketNumStore.nextAppDataPacketNum++);
     RegularQuicPacketBuilder builder(
         getConn().udpSendPacketLen, std::move(header), 0 /* largestAcked */);
     builder.encodePacketHeader();
@@ -265,7 +263,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     ShortHeader header(
         ProtectionType::KeyPhaseZero,
         getDstConnectionId(),
-        peerNextAppDataPacketNum++);
+        peerPacketNumStore.nextAppDataPacketNum++);
     RegularQuicPacketBuilder builder(
         getConn().udpSendPacketLen, std::move(header), 0 /* largestAcked */);
     builder.encodePacketHeader();
@@ -287,29 +285,14 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
       quic::PacketNumberSpace pnSpace,
       quic::AckBlocks acks,
       std::chrono::microseconds ackDelay = 0us) {
-    quic::PacketNum peerPacketNum{0};
-    switch (pnSpace) {
-      case quic::PacketNumberSpace::Initial:
-        peerPacketNum = peerNextInitialPacketNum;
-        peerNextInitialPacketNum++;
-        break;
-      case quic::PacketNumberSpace::Handshake:
-        peerPacketNum = peerNextHandshakePacketNum;
-        peerNextHandshakePacketNum++;
-        break;
-      case quic::PacketNumberSpace::AppData:
-        peerPacketNum = peerNextAppDataPacketNum;
-        peerNextAppDataPacketNum++;
-        break;
-    }
-
-    auto buf = quic::test::packetToBuf(quic::test::createAckPacket(
-        getNonConstConn(),
-        peerPacketNum,
-        acks,
-        pnSpace,
-        nullptr /* aead */,
-        ackDelay));
+    auto buf =
+        quic::test::packetToBuf(AckPacketBuilder()
+                                    .setDstConn(&getNonConstConn())
+                                    .setPacketNumberSpace(pnSpace)
+                                    .setAckPacketNumStore(&peerPacketNumStore)
+                                    .setAckBlocks(acks)
+                                    .setAckDelay(ackDelay)
+                                    .build());
     buf->coalesce();
     return buf;
   }
@@ -716,9 +699,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     return getPacketNumsFromIntervals(writeIntervals);
   }
 
-  quic::PacketNum peerNextInitialPacketNum{0};
-  quic::PacketNum peerNextHandshakePacketNum{0};
-  quic::PacketNum peerNextAppDataPacketNum{0};
+  PacketNumStore peerPacketNumStore;
 };
 
 } // namespace quic::test

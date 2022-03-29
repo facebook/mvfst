@@ -30,6 +30,11 @@ namespace test {
 
 class AckHandlersTest : public TestWithParam<PacketNumberSpace> {};
 
+template <typename T>
+uint64_t ul(T val) {
+  return static_cast<uint64_t>(val);
+}
+
 auto testLossHandler(std::vector<PacketNum>& lostPackets) -> decltype(auto) {
   return [&lostPackets](QuicConnectionStateBase&, auto& packet, bool) {
     auto packetNum = packet.header.getPacketSequenceNum();
@@ -70,6 +75,23 @@ auto emplacePackets(
     conn.outstandings.packets.emplace_back(sentPacket);
     packetNum++;
   }
+}
+
+auto getAckPacketMatcher(
+    PacketNum packetNum,
+    uint64_t writeCount,
+    TimePoint sentTime) {
+  return testing::AllOf(
+      testing::Field(&AckEvent::AckPacket::packetNum, packetNum),
+      testing::Field(
+          &AckEvent::AckPacket::outstandingPacketMetadata,
+          testing::AllOf(
+              testing::Field(&OutstandingPacketMetadata::time, sentTime),
+              testing::Field(
+                  &OutstandingPacketMetadata::totalBytesSent,
+                  1 * (packetNum + 1)),
+              testing::Field(
+                  &OutstandingPacketMetadata::writeCount, writeCount))));
 }
 
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
@@ -121,7 +143,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .WillRepeatedly(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(101, *ack->largestNewlyAckedPacket);
+          EXPECT_EQ(ul(101), ack->largestAckedPacket);
+          EXPECT_EQ(ul(101), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -206,7 +229,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       .Times(3)
       .WillOnce(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(101, *ack->largestNewlyAckedPacket);
+          EXPECT_EQ(ul(101), ack->largestAckedPacket);
+          EXPECT_EQ(ul(101), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -354,7 +378,8 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .WillRepeatedly(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(45, *ack->largestNewlyAckedPacket);
+          EXPECT_EQ(ul(45), ack->largestAckedPacket);
+          EXPECT_EQ(ul(45), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -488,7 +513,8 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(26, *ackEvent->largestNewlyAckedPacket);
+        EXPECT_EQ(ul(26), ackEvent->largestAckedPacket);
+        EXPECT_EQ(ul(26), ackEvent->largestNewlyAckedPacket);
         EXPECT_EQ(expectedAckedBytes, ackEvent->ackedBytes);
         EXPECT_EQ(expectedAckedPackets, ackEvent->ackedPackets.size());
       }));
@@ -1292,10 +1318,17 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
 
-  TimePoint startTime = Clock::now();
-  TimePoint largestSentTime = startTime;
+  const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
   StreamId streamid = 0;
+
+  auto getWriteCount = [](PacketNum packetNum) {
+    return (packetNum <= 4) ? 1 : 2;
+  };
+  auto getSentTime = [&startTime](PacketNum packetNum) {
+    return startTime +
+        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
+  };
 
   // write 10 packets, with half in write #1, the other half in write #2
   // packets in each write have the same timestamp and writeCount
@@ -1304,16 +1337,11 @@ TEST_P(AckHandlersTest, AckEventCreation) {
     WriteStreamFrame frame(streamid++, 0, 0, true);
     regularPacket.frames.emplace_back(std::move(frame));
 
-    const auto writeCount = ((packetNum <= 4) ? 1 : 2);
-    const auto sentTime = startTime +
-        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
-    largestSentTime = sentTime;
-
     conn.outstandings
         .packetCount[regularPacket.header.getPacketNumberSpace()]++;
     OutstandingPacket sentPacket(
         std::move(regularPacket),
-        sentTime,
+        getSentTime(packetNum),
         1 /* encodedSizeIn */,
         0 /* encodedBodySizeIn */,
         false /* handshake */,
@@ -1322,71 +1350,52 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         0 /* inflightBytesIn */,
         0 /* packetsInflightIn */,
         LossState(),
-        writeCount /* writeCountIn */,
+        getWriteCount(packetNum) /* writeCountIn */,
         OutstandingPacketMetadata::DetailsPerStream());
     sentPacket.isAppLimited = (packetNum % 2);
     conn.outstandings.packets.emplace_back(sentPacket);
     packetNum++;
   }
 
-  auto getAckPacketMatcher = [&startTime](const auto& packetNum) {
-    const auto writeCount = ((packetNum <= 4) ? 1 : 2);
-    const auto sentTime = startTime +
-        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
-
-    return testing::AllOf(
-        testing::Field(&AckEvent::AckPacket::packetNum, packetNum),
-        testing::Field(
-            &AckEvent::AckPacket::outstandingPacketMetadata,
-            testing::AllOf(
-                testing::Field(&OutstandingPacketMetadata::time, sentTime),
-                testing::Field(
-                    &OutstandingPacketMetadata::totalBytesSent,
-                    1 * (packetNum + 1)),
-                testing::Field(
-                    &OutstandingPacketMetadata::writeCount, writeCount))));
-  };
-
   ReadAckFrame ackFrame;
   ackFrame.largestAcked = 9;
   ackFrame.ackBlocks.emplace_back(0, 9);
   ackFrame.ackDelay = 5ms;
-  auto ackTime = largestSentTime + 10ms;
+  const auto ackTime = getSentTime(9) + 10ms;
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
-        EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
+        EXPECT_EQ(ul(9), ack->largestAckedPacket);
+        EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
+        EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestNewlyAckedPacketAppLimited);
         EXPECT_EQ(GetParam(), ack->packetNumberSpace);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
-                ackTime - largestSentTime),
+                ackTime - getSentTime(9)),
             ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
-                ackTime - largestSentTime - ackFrame.ackDelay),
+                ackTime - getSentTime(9) - ackFrame.ackDelay),
             ack->rttSampleNoAckDelay);
         EXPECT_THAT(ack->ackedPackets, SizeIs(10));
         EXPECT_THAT(
             ack->ackedPackets,
-            // packets are inserted in reverse order (today), so don't require
-            // specific ordering in the test
-            UnorderedElementsAre(
-                getAckPacketMatcher(0),
-                getAckPacketMatcher(1),
-                getAckPacketMatcher(2),
-                getAckPacketMatcher(3),
-                getAckPacketMatcher(4),
-                getAckPacketMatcher(5),
-                getAckPacketMatcher(6),
-                getAckPacketMatcher(7),
-                getAckPacketMatcher(8),
-                getAckPacketMatcher(9)));
+            ElementsAre(
+                getAckPacketMatcher(0, getWriteCount(0), getSentTime(0)),
+                getAckPacketMatcher(1, getWriteCount(1), getSentTime(1)),
+                getAckPacketMatcher(2, getWriteCount(2), getSentTime(2)),
+                getAckPacketMatcher(3, getWriteCount(3), getSentTime(3)),
+                getAckPacketMatcher(4, getWriteCount(4), getSentTime(4)),
+                getAckPacketMatcher(5, getWriteCount(5), getSentTime(5)),
+                getAckPacketMatcher(6, getWriteCount(6), getSentTime(6)),
+                getAckPacketMatcher(7, getWriteCount(7), getSentTime(7)),
+                getAckPacketMatcher(8, getWriteCount(8), getSentTime(8)),
+                getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
       }));
 
   processAckFrame(
@@ -1454,7 +1463,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(ul(9), ack->largestAckedPacket);
+        EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
@@ -1531,7 +1541,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(ul(9), ack->largestAckedPacket);
+        EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
@@ -1548,6 +1559,304 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       [](const auto&, const auto&, const auto&) {},
       [](auto&, auto&, bool) {},
       ackTime);
+}
+
+TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController =
+      std::make_unique<StrictMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // prevent packets from being marked as lost
+  // must initialize srtt and lrtt in parallel
+  conn.lossState.srtt = 1ms;
+  conn.lossState.lrtt = 1ms;
+  conn.lossState.reorderingThreshold = 10;
+  conn.transportSettings.timeReorderingThreshDividend = 1000;
+  conn.transportSettings.timeReorderingThreshDivisor = 1;
+
+  const TimePoint startTime = Clock::now();
+  PacketNum packetNum = 0;
+  StreamId streamid = 0;
+
+  auto getWriteCount = [](PacketNum packetNum) {
+    return (packetNum <= 4) ? 1 : 2;
+  };
+  auto getSentTime = [&startTime](PacketNum packetNum) {
+    return startTime +
+        std::chrono::milliseconds(10ms * ((packetNum <= 4) ? 1 : 2));
+  };
+
+  // write 10 packets, with half in write #1, the other half in write #2
+  // packets in each write have the same timestamp and writeCount
+  while (packetNum < 10) {
+    auto regularPacket = createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(frame);
+
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    OutstandingPacket sentPacket(
+        std::move(regularPacket),
+        getSentTime(packetNum),
+        1 /* encodedSizeIn */,
+        0 /* encodedBodySizeIn */,
+        false /* handshake */,
+        1 * (packetNum + 1) /* totalBytesSentIn */,
+        0 /* totalBodyBytesSentIn */,
+        0 /* inflightBytesIn */,
+        0 /* packetsInflightIn */,
+        LossState(),
+        getWriteCount(packetNum) /* writeCountIn */,
+        OutstandingPacketMetadata::DetailsPerStream());
+    sentPacket.isAppLimited = (packetNum % 2);
+    conn.outstandings.packets.emplace_back(sentPacket);
+    packetNum++;
+  }
+
+  // propagation delay used for this test
+  const auto propDelay = 10ms;
+
+  // AckFrame acking packets (0 -> 3, 7 -> 9)
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 9;
+    ackFrame.ackBlocks.emplace_back(7, 9);
+    ackFrame.ackBlocks.emplace_back(0, 3);
+    ackFrame.ackDelay = 10ms;
+    const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay;
+    EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](auto ack, auto /* loss */) {
+          EXPECT_EQ(ackTime, ack->ackTime);
+          EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
+          EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
+          EXPECT_EQ(ul(9), ack->largestAckedPacket);
+          EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
+          EXPECT_EQ(getSentTime(9), ack->largestNewlyAckedPacketSentTime);
+          EXPECT_EQ(propDelay + ackFrame.ackDelay, ack->rttSample);
+          EXPECT_EQ(
+              std::chrono::ceil<std::chrono::microseconds>(
+                  ackTime - getSentTime(9)),
+              ack->rttSample);
+          EXPECT_EQ(propDelay, ack->rttSampleNoAckDelay);
+          EXPECT_THAT(ack->ackedPackets, SizeIs(7));
+          EXPECT_THAT(
+              ack->ackedPackets,
+              ElementsAre(
+                  getAckPacketMatcher(0, getWriteCount(0), getSentTime(0)),
+                  getAckPacketMatcher(1, getWriteCount(1), getSentTime(1)),
+                  getAckPacketMatcher(2, getWriteCount(2), getSentTime(2)),
+                  getAckPacketMatcher(3, getWriteCount(3), getSentTime(3)),
+                  getAckPacketMatcher(7, getWriteCount(7), getSentTime(7)),
+                  getAckPacketMatcher(8, getWriteCount(8), getSentTime(8)),
+                  getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
+        }));
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackTime);
+  }
+
+  // AckFrame acking packets (0 -> 4, 7 -> 9)
+  // (e.g., packet 4 arrived later)
+  //
+  // no RTT sample as packet 9 acked (removed from OutstandingPackets) earlier
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 9;
+    ackFrame.ackBlocks.emplace_back(7, 9);
+    ackFrame.ackBlocks.emplace_back(0, 4);
+    ackFrame.ackDelay = 0ms;
+    const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay + 1ms;
+    EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](auto ack, auto /* loss */) {
+          EXPECT_EQ(ackTime, ack->ackTime);
+          EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
+          EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
+          EXPECT_EQ(ul(9), ack->largestAckedPacket);
+          EXPECT_EQ(ul(4), ack->largestNewlyAckedPacket); // 4 = newly acked
+          EXPECT_EQ(getSentTime(4), ack->largestNewlyAckedPacketSentTime);
+          EXPECT_EQ(folly::none, ack->rttSample); // no RTT sample
+          EXPECT_EQ(folly::none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_THAT(ack->ackedPackets, SizeIs(1));
+          EXPECT_THAT(
+              ack->ackedPackets,
+              ElementsAre(
+                  getAckPacketMatcher(4, getWriteCount(4), getSentTime(4))));
+        }));
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackTime);
+  }
+
+  // AckFrame acking packets (0 -> 9)
+  // (e.g., packet 5, 6 arrived later)
+  //
+  // no RTT sample as packet 9 acked (removed from OutstandingPackets) earlier
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 9;
+    ackFrame.ackBlocks.emplace_back(0, 9);
+    ackFrame.ackDelay = 5ms;
+    const auto ackTime = getSentTime(9) + propDelay + ackFrame.ackDelay + 2ms;
+    EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](auto ack, auto /* loss */) {
+          EXPECT_EQ(ackTime, ack->ackTime);
+          EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
+          EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
+          EXPECT_EQ(ul(9), ack->largestAckedPacket);
+          EXPECT_EQ(ul(6), ack->largestNewlyAckedPacket); // 6 = newly acked
+          EXPECT_EQ(getSentTime(6), ack->largestNewlyAckedPacketSentTime);
+          EXPECT_EQ(folly::none, ack->rttSample); // no RTT sample
+          EXPECT_EQ(folly::none, ack->rttSampleNoAckDelay); // no RTT sample
+          EXPECT_THAT(ack->ackedPackets, SizeIs(2));
+          EXPECT_THAT(
+              ack->ackedPackets,
+              ElementsAre(
+                  getAckPacketMatcher(5, getWriteCount(5), getSentTime(5)),
+                  getAckPacketMatcher(6, getWriteCount(6), getSentTime(6))));
+        }));
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackTime);
+  }
+}
+
+TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController =
+      std::make_unique<StrictMock<MockCongestionController>>();
+  auto rawCongestionController = mockCongestionController.get();
+  conn.congestionController = std::move(mockCongestionController);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+
+  const TimePoint startTime = Clock::now();
+  PacketNum packetNum = 0;
+  StreamId streamid = 0;
+
+  auto getSentTime = [&startTime](PacketNum packetNum) {
+    return startTime + std::chrono::milliseconds(10ms * packetNum);
+  };
+
+  // write 4 packets
+  while (packetNum < 4) {
+    auto regularPacket = createNewPacket(packetNum, GetParam());
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(frame);
+
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    OutstandingPacket sentPacket(
+        std::move(regularPacket),
+        getSentTime(packetNum),
+        1 /* encodedSizeIn */,
+        0 /* encodedBodySizeIn */,
+        false /* handshake */,
+        1 * (packetNum + 1) /* totalBytesSentIn */,
+        0 /* totalBodyBytesSentIn */,
+        0 /* inflightBytesIn */,
+        0 /* packetsInflightIn */,
+        LossState(),
+        1 /* writeCountIn */,
+        OutstandingPacketMetadata::DetailsPerStream());
+    sentPacket.isAppLimited = false;
+    conn.outstandings.packets.emplace_back(sentPacket);
+    packetNum++;
+  }
+  EXPECT_EQ(4, conn.outstandings.numOutstanding());
+
+  // propagation delay used for this test
+  const auto propDelay = 10ms;
+
+  // AckFrame acking packets (0, 2, 3)
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 3;
+    ackFrame.ackBlocks.emplace_back(2, 3);
+    ackFrame.ackBlocks.emplace_back(0, 0);
+    ackFrame.ackDelay = 10ms;
+    const auto ackTime = getSentTime(3) + propDelay + ackFrame.ackDelay;
+    EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](auto ack, auto loss) {
+          EXPECT_EQ(ackTime, ack->ackTime);
+          EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
+          EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
+          EXPECT_EQ(ul(3), ack->largestAckedPacket);
+          EXPECT_EQ(ul(3), ack->largestNewlyAckedPacket);
+          EXPECT_EQ(getSentTime(3), ack->largestNewlyAckedPacketSentTime);
+          EXPECT_EQ(propDelay + ackFrame.ackDelay, ack->rttSample);
+          EXPECT_EQ(
+              std::chrono::ceil<std::chrono::microseconds>(
+                  ackTime - getSentTime(3)),
+              ack->rttSample);
+          EXPECT_EQ(propDelay, ack->rttSampleNoAckDelay);
+          EXPECT_THAT(ack->ackedPackets, SizeIs(3));
+          EXPECT_THAT(
+              ack->ackedPackets,
+              ElementsAre(
+                  getAckPacketMatcher(0, 1 /* writeCount */, getSentTime(0)),
+                  getAckPacketMatcher(2, 1 /* writeCount */, getSentTime(2)),
+                  getAckPacketMatcher(3, 1 /* writeCount */, getSentTime(3))));
+
+          // should have a loss as well
+          EXPECT_THAT(loss, Not(IsNull()));
+        }));
+
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackTime);
+  }
+
+  // should have zero outstanding at this point
+  EXPECT_EQ(0, conn.outstandings.numOutstanding());
+
+  // AckFrame acking packets (0 -> 3)
+  // (e.g., packet 1 arrived later)
+  //
+  // because packet 1 was already declared lost, no event
+  {
+    ReadAckFrame ackFrame;
+    ackFrame.largestAcked = 3;
+    ackFrame.ackBlocks.emplace_back(2, 3);
+    ackFrame.ackBlocks.emplace_back(0, 0);
+    ackFrame.ackDelay = 10ms;
+    const auto ackTime = getSentTime(3) + propDelay + ackFrame.ackDelay + 5ms;
+    EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _)).Times(0);
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackTime);
+  }
 }
 
 TEST_P(AckHandlersTest, ImplictAckEventCreation) {
@@ -1596,7 +1905,8 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
         EXPECT_EQ(ackTime, ack->ackTime);
-        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(ul(9), ack->largestAckedPacket);
+        EXPECT_EQ(ul(9), ack->largestNewlyAckedPacket);
         EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestNewlyAckedPacketAppLimited);

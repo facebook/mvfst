@@ -98,44 +98,16 @@ RegularQuicPacketBuilder::Packet createAckPacket(
     PacketNumberSpace pnSpace,
     const Aead* aead,
     std::chrono::microseconds ackDelay) {
-  // This function sends ACK to dstConn
-  auto srcConnId =
-      (dstConn.nodeType == QuicNodeType::Client ? *dstConn.serverConnectionId
-                                                : *dstConn.clientConnectionId);
-  auto dstConnId =
-      (dstConn.nodeType == QuicNodeType::Client ? *dstConn.clientConnectionId
-                                                : *dstConn.serverConnectionId);
-  folly::Optional<PacketHeader> header;
-  if (pnSpace == PacketNumberSpace::Initial) {
-    header = LongHeader(
-        LongHeader::Types::Initial,
-        srcConnId,
-        dstConnId,
-        pn,
-        QuicVersion::MVFST);
-  } else if (pnSpace == PacketNumberSpace::Handshake) {
-    header = LongHeader(
-        LongHeader::Types::Handshake,
-        srcConnId,
-        dstConnId,
-        pn,
-        QuicVersion::MVFST);
-  } else {
-    header = ShortHeader(ProtectionType::KeyPhaseZero, dstConnId, pn);
-  }
-  RegularQuicPacketBuilder builder(
-      dstConn.udpSendPacketLen,
-      std::move(*header),
-      getAckState(dstConn, pnSpace).largestAckScheduled.value_or(0));
-  builder.encodePacketHeader();
+  auto builder = AckPacketBuilder()
+                     .setDstConn(&dstConn)
+                     .setPacketNumberSpace(pnSpace)
+                     .setAckPacketNum(pn)
+                     .setAckBlocks(acks)
+                     .setAckDelay(ackDelay);
   if (aead) {
-    builder.accountForCipherOverhead(aead->getCipherOverhead());
+    builder.setAead(aead);
   }
-  DCHECK(builder.canBuildPacket());
-  AckFrameMetaData ackData(
-      acks, ackDelay, dstConn.transportSettings.ackDelayExponent);
-  writeAckFrame(ackData, builder);
-  return std::move(builder).buildPacket();
+  return std::move(builder).build();
 }
 
 std::shared_ptr<fizz::SelfCert> readCert() {
@@ -571,6 +543,7 @@ CongestionController::AckEvent makeAck(
                  .setAdjustedAckTime(ackedTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(seq)
                  .build();
 
   ack.ackedBytes = ackedSize;

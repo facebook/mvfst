@@ -62,6 +62,7 @@ AckEvent processAckFrame(
                  .setAdjustedAckTime(ackReceiveTime - frame.ackDelay)
                  .setAckDelay(frame.ackDelay)
                  .setPacketNumberSpace(pnSpace)
+                 .setLargestAckedPacket(frame.largestAcked)
                  .setIsImplicitAck(frame.implicit)
                  .build();
 

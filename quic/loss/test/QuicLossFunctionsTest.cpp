@@ -1053,6 +1053,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
                       .setAdjustedAckTime(ackTime)
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
+                      .setLargestAckedPacket(1000)
                       .build();
   ackEvent.largestNewlyAckedPacket = 1000;
   handleAckForLoss(
@@ -1877,6 +1878,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
                  .setAdjustedAckTime(ackTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(1)
                  .build();
 
   EXPECT_TRUE(isPersistentCongestion(
@@ -1921,6 +1923,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
                  .setAdjustedAckTime(now)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(1)
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
@@ -1956,6 +1959,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
                  .setAdjustedAckTime(now)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(1)
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()
@@ -1990,6 +1994,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
                  .setAdjustedAckTime(now)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(1)
                  .build();
   ack.ackedPackets.push_back(
       CongestionController::AckEvent::AckPacket::Builder()

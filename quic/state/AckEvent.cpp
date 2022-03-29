@@ -134,6 +134,12 @@ AckEvent::Builder&& AckEvent::Builder::setPacketNumberSpace(
   return std::move(*this);
 }
 
+AckEvent::Builder&& AckEvent::Builder::setLargestAckedPacket(
+    PacketNum largestAckedPacketIn) {
+  maybeLargestAckedPacket = largestAckedPacketIn;
+  return std::move(*this);
+}
+
 AckEvent::Builder&& AckEvent::Builder::setIsImplicitAck(bool isImplicitAckIn) {
   isImplicitAck = isImplicitAckIn;
   return std::move(*this);
@@ -150,6 +156,8 @@ AckEvent::AckEvent(AckEvent::BuilderFields&& builderFields)
       ackDelay(*CHECK_NOTNULL(builderFields.maybeAckDelay.get_pointer())),
       packetNumberSpace(
           *CHECK_NOTNULL(builderFields.maybePacketNumberSpace.get_pointer())),
+      largestAckedPacket(
+          *CHECK_NOTNULL(builderFields.maybeLargestAckedPacket.get_pointer())),
       implicit(builderFields.isImplicitAck) {}
 
 } // namespace quic

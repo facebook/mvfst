@@ -80,6 +80,7 @@ class CopaTest : public Test {
                    .setAdjustedAckTime(ackTime)
                    .setAckDelay(0us)
                    .setPacketNumberSpace(PacketNumberSpace::AppData)
+                   .setLargestAckedPacket(largestAcked)
                    .build();
     ack.largestNewlyAckedPacket = largestAcked;
     ack.ackedBytes = ackedSize;
@@ -552,6 +553,7 @@ TEST_F(CopaTest, NoLargestAckedPacketNoCrash) {
                  .setAdjustedAckTime(now)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(1)
                  .build();
   copa.onPacketAckOrLoss(ack, loss);
 

@@ -637,122 +637,185 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
     QuicTypedTransportTest<T>::SetUp();
   }
 
-  auto getAcksProcessedEventMatcher(
-      const std::vector<typename QuicTypedTransportTest<
-          T>::NewOutstandingPacketInterval>& expectedAckedIntervals,
-      const uint64_t expectedNumAckedPackets,
-      const quic::TimePoint ackTime,
-      const std::chrono::microseconds ackDelay,
-      const folly::Optional<std::chrono::microseconds>& rtt = folly::none) {
-    CHECK_LT(0, expectedAckedIntervals.size());
-
-    // sanity check expectedNumAckedPackets and expectedAckedIntervals
-    // reduces potential of error in test design
-    {
-      uint64_t expectedNumAckedPacketsFromIntervals = 0;
+  struct AckEventMatcherBuilder {
+    using Builder = AckEventMatcherBuilder;
+    Builder&& setExpectedAckedIntervals(
+        std::vector<
+            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
+            expectedAckedIntervals) {
+      maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
+      return std::move(*this);
+    }
+    Builder&& setExpectedAckedIntervals(
+        std::vector<folly::Optional<
+            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
+            expectedAckedIntervalsOpt) {
       std::vector<
           typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
-          processedExpectedAckedIntervals;
-
-      for (const auto& interval : expectedAckedIntervals) {
-        CHECK_LE(interval.start, interval.end);
-        CHECK_LE(0, interval.end);
-        expectedNumAckedPacketsFromIntervals +=
-            interval.end - interval.start + 1;
-
-        // should not overlap with existing intervals
-        for (const auto& processedInterval : processedExpectedAckedIntervals) {
-          CHECK(
-              processedInterval.end < interval.start ||
-              processedInterval.start < interval.end);
-        }
-
-        processedExpectedAckedIntervals.push_back(interval);
+          expectedAckedIntervals;
+      for (const auto& maybeInterval : expectedAckedIntervalsOpt) {
+        CHECK(maybeInterval.has_value());
+        expectedAckedIntervals.push_back(maybeInterval.value());
       }
-      CHECK_EQ(expectedNumAckedPacketsFromIntervals, expectedNumAckedPackets);
+      maybeExpectedAckedIntervals = std::move(expectedAckedIntervals);
+      return std::move(*this);
     }
+    Builder&& setExpectedNumAckedPackets(
+        const uint64_t expectedNumAckedPackets) {
+      maybeExpectedNumAckedPackets = expectedNumAckedPackets;
+      return std::move(*this);
+    }
+    Builder&& setAckTime(TimePoint ackTime) {
+      maybeAckTime = ackTime;
+      return std::move(*this);
+    }
+    Builder&& setAckDelay(std::chrono::microseconds ackDelay) {
+      maybeAckDelay = ackDelay;
+      return std::move(*this);
+    }
+    Builder&& setLargestAckedPacket(quic::PacketNum largestAckedPacketIn) {
+      maybeLargestAckedPacket = largestAckedPacketIn;
+      return std::move(*this);
+    }
+    Builder&& setLargestNewlyAckedPacket(
+        quic::PacketNum largestNewlyAckedPacketIn) {
+      maybeLargestNewlyAckedPacket = largestNewlyAckedPacketIn;
+      return std::move(*this);
+    }
+    Builder&& setRtt(const folly::Optional<std::chrono::microseconds>& rttIn) {
+      maybeRtt = rttIn;
+      CHECK(!noRtt);
+      return std::move(*this);
+    }
+    Builder&& setRttNoAckDelay(
+        const folly::Optional<std::chrono::microseconds>& rttNoAckDelayIn) {
+      maybeRttNoAckDelay = rttNoAckDelayIn;
+      CHECK(!noRtt);
+      CHECK(!noRttWithNoAckDelay);
+      return std::move(*this);
+    }
+    Builder&& setNoRtt() {
+      noRtt = true;
+      CHECK(!maybeRtt);
+      CHECK(!maybeRttNoAckDelay);
+      return std::move(*this);
+    }
+    Builder&& setNoRttWithNoAckDelay() {
+      noRttWithNoAckDelay = true;
+      CHECK(!maybeRttNoAckDelay);
+      return std::move(*this);
+    }
+    auto build() && {
+      CHECK(
+          noRtt ||
+          (maybeRtt.has_value() &&
+           (noRttWithNoAckDelay || maybeRttNoAckDelay.has_value())));
 
-    // get last packet ACKed
-    const quic::PacketNum largestAckedPacketNum = [&expectedAckedIntervals]() {
+      CHECK(maybeExpectedAckedIntervals.has_value());
+      const auto& expectedAckedIntervals = *maybeExpectedAckedIntervals;
       CHECK_LT(0, expectedAckedIntervals.size());
-      quic::PacketNum packetNum = 0;
-      for (const auto& interval : expectedAckedIntervals) {
-        CHECK_LE(interval.start, interval.end);
-        CHECK_LE(0, interval.end);
-        packetNum = std::max(packetNum, interval.end);
+
+      CHECK(maybeExpectedNumAckedPackets.has_value());
+      const auto& expectedNumAckedPackets = *maybeExpectedNumAckedPackets;
+
+      CHECK(maybeAckTime.has_value());
+      const auto& ackTime = *maybeAckTime;
+
+      CHECK(maybeAckDelay.has_value());
+      const auto& ackDelay = *maybeAckDelay;
+
+      CHECK(maybeLargestAckedPacket.has_value());
+      const auto& largestAckedPacket = *maybeLargestAckedPacket;
+
+      CHECK(maybeLargestNewlyAckedPacket.has_value());
+      const auto& largestNewlyAckedPacket = *maybeLargestNewlyAckedPacket;
+
+      // sanity check expectedNumAckedPackets and expectedAckedIntervals
+      // reduces potential of error in test design
+      {
+        uint64_t expectedNumAckedPacketsFromIntervals = 0;
+        std::vector<
+            typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
+            processedExpectedAckedIntervals;
+
+        for (const auto& interval : expectedAckedIntervals) {
+          CHECK_LE(interval.start, interval.end);
+          CHECK_LE(0, interval.end);
+          expectedNumAckedPacketsFromIntervals +=
+              interval.end - interval.start + 1;
+
+          // should not overlap with existing intervals
+          for (const auto& processedInterval :
+               processedExpectedAckedIntervals) {
+            CHECK(
+                processedInterval.end < interval.start ||
+                processedInterval.start < interval.end);
+          }
+
+          processedExpectedAckedIntervals.push_back(interval);
+        }
+        CHECK_EQ(expectedNumAckedPacketsFromIntervals, expectedNumAckedPackets);
       }
 
-      return packetNum;
-    }();
-
-    // only check adjustedAckTime and RTT for server, as we don't support
-    // passing the RX time for client transport right now
-    if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
-      return testing::Property(
-          &quic::Observer::AcksProcessedEvent::getAckEvents,
-          testing::ElementsAre(testing::AllOf(
-              testing::Field(
-                  &quic::AckEvent::largestNewlyAckedPacket,
-                  testing::Eq(largestAckedPacketNum)),
-              testing::Field(
-                  &quic::AckEvent::ackedPackets,
-                  testing::SizeIs(expectedNumAckedPackets)),
-              testing::Field(
-                  &quic::AckEvent::ackDelay, testing::Eq(ackDelay)))));
-    } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
-      const auto matcher = testing::AllOf(
-          testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
-          testing::Field(
-              &quic::AckEvent::adjustedAckTime,
-              testing::Eq(ackTime - ackDelay)),
-          testing::Field(
-              &quic::AckEvent::largestNewlyAckedPacket,
-              testing::Eq(largestAckedPacketNum)),
-          testing::Field(
-              &quic::AckEvent::ackedPackets,
-              testing::SizeIs(expectedNumAckedPackets)),
-          testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
-          testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)));
-      if (rtt.has_value()) {
+      if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
         return testing::Property(
             &quic::Observer::AcksProcessedEvent::getAckEvents,
             testing::ElementsAre(testing::AllOf(
-                matcher,
-                testing::Field(&quic::AckEvent::rttSample, testing::Eq(rtt)),
+                // ack time, adjusted ack time, RTT not supported for client now
                 testing::Field(
-                    &quic::AckEvent::rttSampleNoAckDelay,
-                    testing::Eq(rtt.value() - ackDelay)))));
-      } else {
+                    &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+                testing::Field(
+                    &quic::AckEvent::largestAckedPacket,
+                    testing::Eq(largestAckedPacket)),
+                testing::Field(
+                    &quic::AckEvent::largestNewlyAckedPacket,
+                    testing::Eq(largestNewlyAckedPacket)),
+                testing::Field(
+                    &quic::AckEvent::ackedPackets,
+                    testing::SizeIs(expectedNumAckedPackets)))));
+      } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
         return testing::Property(
             &quic::Observer::AcksProcessedEvent::getAckEvents,
-            testing::ElementsAre(matcher));
+            testing::ElementsAre(testing::AllOf(
+                testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
+                testing::Field(
+                    &quic::AckEvent::adjustedAckTime,
+                    testing::Eq(ackTime - ackDelay)),
+                testing::Field(
+                    &quic::AckEvent::ackDelay, testing::Eq(ackDelay)),
+                testing::Field(
+                    &quic::AckEvent::largestAckedPacket,
+                    testing::Eq(largestAckedPacket)),
+                testing::Field(
+                    &quic::AckEvent::largestNewlyAckedPacket,
+                    testing::Eq(largestNewlyAckedPacket)),
+                testing::Field(
+                    &quic::AckEvent::ackedPackets,
+                    testing::SizeIs(expectedNumAckedPackets)),
+                testing::Field(
+                    &quic::AckEvent::rttSample, testing::Eq(maybeRtt)),
+                testing::Field(
+                    &quic::AckEvent::rttSampleNoAckDelay,
+                    testing::Eq(maybeRttNoAckDelay)))));
+      } else {
+        FAIL(); // unhandled typed test
       }
-    } else {
-      FAIL(); // unhandled typed test
     }
-  }
+    explicit AckEventMatcherBuilder() = default;
 
-  auto getAcksProcessedEventMatcherOpt(
-      const std::vector<folly::Optional<typename QuicTypedTransportTest<
-          T>::NewOutstandingPacketInterval>>& expectedAckedIntervalsOptionals,
-      const uint64_t expectedNumAckedPackets,
-      const quic::TimePoint ackTime,
-      const std::chrono::microseconds ackDelay,
-      const folly::Optional<std::chrono::microseconds>& rtt = folly::none) {
-    std::vector<
-        typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
-        expectedAckedIntervals;
-    for (const auto& maybeInterval : expectedAckedIntervalsOptionals) {
-      CHECK(maybeInterval.has_value());
-      expectedAckedIntervals.push_back(maybeInterval.value());
-    }
-    return getAcksProcessedEventMatcher(
-        expectedAckedIntervals,
-        expectedNumAckedPackets,
-        ackTime,
-        ackDelay,
-        rtt);
-  }
+    folly::Optional<std::vector<
+        typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>>
+        maybeExpectedAckedIntervals;
+    folly::Optional<uint64_t> maybeExpectedNumAckedPackets;
+    folly::Optional<TimePoint> maybeAckTime;
+    folly::Optional<std::chrono::microseconds> maybeAckDelay;
+    folly::Optional<quic::PacketNum> maybeLargestAckedPacket;
+    folly::Optional<quic::PacketNum> maybeLargestNewlyAckedPacket;
+    folly::Optional<std::chrono::microseconds> maybeRtt;
+    folly::Optional<std::chrono::microseconds> maybeRttNoAckDelay;
+    bool noRtt{false};
+    bool noRttWithNoAckDelay{false};
+  };
 
   auto getStreamEventMatcherOpt(
       const StreamId streamId,
@@ -2161,7 +2224,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    AckEventsOutstandingPacketSentThenAcked) {
+    AckEventsOutstandingPacketSentThenAckedNoAckDelay) {
   MockObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
@@ -2197,23 +2260,44 @@ TYPED_TEST(
   EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
 
   // deliver an ACK for all of the outstanding packets
-  auto ackRecvTime =
-      std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-  const auto matcher = this->getAcksProcessedEventMatcherOpt(
-      {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
+  const auto sentTime = maybeWrittenPackets->sentTime;
+  const auto ackRecvTime = sentTime + 27ms;
+  const auto ackDelay = 0us;
+  const auto matcher =
+      typename TestFixture::AckEventMatcherBuilder()
+          .setExpectedAckedIntervals({maybeWrittenPackets})
+          .setExpectedNumAckedPackets(1)
+          .setAckTime(ackRecvTime)
+          .setAckDelay(ackDelay)
+          .setLargestAckedPacket(maybeWrittenPackets->end)
+          .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+              ackRecvTime - sentTime))
+          .setRttNoAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime - ackDelay))
+          .build();
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-  this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
-      ackRecvTime);
 
+  const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
+  auto buf = quic::test::packetToBuf(
+      AckPacketBuilder()
+          .setDstConn(&this->getNonConstConn())
+          .setPacketNumberSpace(PacketNumberSpace::AppData)
+          .setAckPacketNumStore(&this->peerPacketNumStore)
+          .setAckBlocks(ackBlocks)
+          .setAckDelay(ackDelay)
+          .build());
+  buf->coalesce();
+  this->deliverPacket(std::move(buf), ackRecvTime);
   this->destroyTransport();
 }
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    AckEventsOutstandingPacketSentThenAckedWithAckDelayRtt) {
+    AckEventsOutstandingPacketSentThenAckedWithAckDelay) {
   MockObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
@@ -2252,21 +2336,223 @@ TYPED_TEST(
   const auto sentTime = maybeWrittenPackets->sentTime;
   const auto ackRecvTime = sentTime + 50ms;
   const auto ackDelay = 5ms;
-  const auto matcher = this->getAcksProcessedEventMatcherOpt(
-      {maybeWrittenPackets},
-      1,
-      ackRecvTime,
-      ackDelay,
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          ackRecvTime - sentTime) /* rtt */);
+  const auto matcher =
+      typename TestFixture::AckEventMatcherBuilder()
+          .setExpectedAckedIntervals({maybeWrittenPackets})
+          .setExpectedNumAckedPackets(1)
+          .setAckTime(ackRecvTime)
+          .setAckDelay(ackDelay)
+          .setLargestAckedPacket(maybeWrittenPackets->end)
+          .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+              ackRecvTime - sentTime))
+          .setRttNoAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime - ackDelay))
+          .build();
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-  this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(
-          firstPacketNum, lastPacketNum, ackDelay),
-      ackRecvTime);
 
+  const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
+  auto buf = quic::test::packetToBuf(
+      AckPacketBuilder()
+          .setDstConn(&this->getNonConstConn())
+          .setPacketNumberSpace(PacketNumberSpace::AppData)
+          .setAckPacketNumStore(&this->peerPacketNumStore)
+          .setAckBlocks(ackBlocks)
+          .setAckDelay(ackDelay)
+          .build());
+  buf->coalesce();
+  this->deliverPacket(std::move(buf), ackRecvTime);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    AckEventsOutstandingPacketSentThenAckedWithAckDelayEqRtt) {
+  MockObserver::Config configWithAcksEnabled;
+  configWithAcksEnabled.acksProcessedEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithAcks1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+  auto observerWithAcks2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+
+  EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
+  transport->addObserver(observerWithNoAcks.get());
+  EXPECT_CALL(*observerWithAcks1, observerAttach(transport));
+  transport->addObserver(observerWithAcks1.get());
+  EXPECT_CALL(*observerWithAcks2, observerAttach(transport));
+  transport->addObserver(observerWithAcks2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoAcks.get(),
+          observerWithAcks1.get(),
+          observerWithAcks2.get()));
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+  const quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+  const quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+  // deliver an ACK for all of the outstanding packets
+  const auto sentTime = maybeWrittenPackets->sentTime;
+  const auto ackRecvTime = sentTime + 50ms;
+  const auto ackDelay = ackRecvTime - sentTime; // ack delay == RTT!
+  const auto matcher =
+      typename TestFixture::AckEventMatcherBuilder()
+          .setExpectedAckedIntervals({maybeWrittenPackets})
+          .setExpectedNumAckedPackets(1)
+          .setAckTime(ackRecvTime)
+          .setAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
+          .setLargestAckedPacket(maybeWrittenPackets->end)
+          .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+              ackRecvTime - sentTime))
+          .setRttNoAckDelay(0us)
+          .build();
+  EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
+  EXPECT_CALL(
+      *observerWithAcks1,
+      acksProcessed(
+          transport,
+          testing::AllOf(
+              matcher,
+              testing::Property(
+                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  testing::ElementsAre(testing::AllOf(testing::Field(
+                      &quic::AckEvent::rttSampleNoAckDelay,
+                      testing::AnyOf(
+                          testing::Eq(0ms), testing::Eq(folly::none)))))))));
+  EXPECT_CALL(
+      *observerWithAcks2,
+      acksProcessed(
+          transport,
+          testing::AllOf(
+              matcher,
+              testing::Property(
+                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  testing::ElementsAre(testing::AllOf(testing::Field(
+                      &quic::AckEvent::rttSampleNoAckDelay,
+                      testing::AnyOf(
+                          testing::Eq(0ms), testing::Eq(folly::none)))))))));
+
+  const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
+  auto buf = quic::test::packetToBuf(
+      AckPacketBuilder()
+          .setDstConn(&this->getNonConstConn())
+          .setPacketNumberSpace(PacketNumberSpace::AppData)
+          .setAckPacketNumStore(&this->peerPacketNumStore)
+          .setAckBlocks(ackBlocks)
+          .setAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
+          .build());
+  buf->coalesce();
+  this->deliverPacket(std::move(buf), ackRecvTime);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    AckEventsOutstandingPacketSentThenAckedWithTooLargeAckDelay) {
+  MockObserver::Config configWithAcksEnabled;
+  configWithAcksEnabled.acksProcessedEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithAcks1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+  auto observerWithAcks2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+
+  EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
+  transport->addObserver(observerWithNoAcks.get());
+  EXPECT_CALL(*observerWithAcks1, observerAttach(transport));
+  transport->addObserver(observerWithAcks1.get());
+  EXPECT_CALL(*observerWithAcks2, observerAttach(transport));
+  transport->addObserver(observerWithAcks2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoAcks.get(),
+          observerWithAcks1.get(),
+          observerWithAcks2.get()));
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+  const quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+  const quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+  // deliver an ACK for all of the outstanding packets
+  const auto sentTime = maybeWrittenPackets->sentTime;
+  const auto ackRecvTime = sentTime + 50ms;
+  const auto ackDelay = ackRecvTime + 1ms - sentTime; // ack delay >> RTT!
+  const auto matcher =
+      typename TestFixture::AckEventMatcherBuilder()
+          .setExpectedAckedIntervals({maybeWrittenPackets})
+          .setExpectedNumAckedPackets(1)
+          .setAckTime(ackRecvTime)
+          .setAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
+          .setLargestAckedPacket(maybeWrittenPackets->end)
+          .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+              ackRecvTime - sentTime))
+          .setNoRttWithNoAckDelay()
+          .build();
+  EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
+  EXPECT_CALL(
+      *observerWithAcks1,
+      acksProcessed(
+          transport,
+          testing::AllOf(
+              matcher,
+              testing::Property(
+                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  testing::ElementsAre(testing::AllOf(testing::Field(
+                      &quic::AckEvent::rttSampleNoAckDelay,
+                      testing::Eq(folly::none))))))));
+  EXPECT_CALL(
+      *observerWithAcks2,
+      acksProcessed(
+          transport,
+          testing::AllOf(
+              matcher,
+              testing::Property(
+                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  testing::ElementsAre(testing::AllOf(testing::Field(
+                      &quic::AckEvent::rttSampleNoAckDelay,
+                      testing::Eq(folly::none))))))));
+
+  const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
+  auto buf = quic::test::packetToBuf(
+      AckPacketBuilder()
+          .setDstConn(&this->getNonConstConn())
+          .setPacketNumberSpace(PacketNumberSpace::AppData)
+          .setAckPacketNumStore(&this->peerPacketNumStore)
+          .setAckBlocks(ackBlocks)
+          .setAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(ackDelay))
+          .build());
+  buf->coalesce();
+  this->deliverPacket(std::move(buf), ackRecvTime);
   this->destroyTransport();
 }
 
@@ -2318,20 +2604,41 @@ TYPED_TEST(
   EXPECT_EQ(3, lastPacketNum - firstPacketNum + 1);
 
   // deliver an ACK for all of the outstanding packets
-  auto ackRecvTime =
-      std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-  const auto matcher = this->getAcksProcessedEventMatcherOpt(
-      {maybeWrittenPackets1, maybeWrittenPackets2, maybeWrittenPackets3},
-      3,
-      ackRecvTime,
-      0us /* ackDelay */);
+  const auto sentTime = maybeWrittenPackets3->sentTime;
+  const auto ackRecvTime = sentTime + 27ms;
+  const auto ackDelay = 5ms;
+  const auto matcher =
+      typename TestFixture::AckEventMatcherBuilder()
+          .setExpectedAckedIntervals(
+              {maybeWrittenPackets1,
+               maybeWrittenPackets2,
+               maybeWrittenPackets3})
+          .setExpectedNumAckedPackets(3)
+          .setAckTime(ackRecvTime)
+          .setAckDelay(ackDelay)
+          .setLargestAckedPacket(maybeWrittenPackets3->end)
+          .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
+          .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+              ackRecvTime - sentTime))
+          .setRttNoAckDelay(
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  ackRecvTime - sentTime - ackDelay))
+          .build();
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-  this->deliverPacket(
-      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
-      ackRecvTime);
 
+  const quic::AckBlocks ackBlocks = {{firstPacketNum, lastPacketNum}};
+  auto buf = quic::test::packetToBuf(
+      AckPacketBuilder()
+          .setDstConn(&this->getNonConstConn())
+          .setPacketNumberSpace(PacketNumberSpace::AppData)
+          .setAckPacketNumStore(&this->peerPacketNumStore)
+          .setAckBlocks(ackBlocks)
+          .setAckDelay(ackDelay)
+          .build());
+  buf->coalesce();
+  this->deliverPacket(std::move(buf), ackRecvTime);
   this->destroyTransport();
 }
 
@@ -2367,17 +2674,40 @@ TYPED_TEST(
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
+
+    const auto sentTime = maybeWrittenPackets->sentTime;
+    const auto ackRecvTime = sentTime + 27ms;
+    const auto ackDelay = 5ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets->start, maybeWrittenPackets->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets->start, maybeWrittenPackets->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // write some more bytes into the same stream, send packet, deliver ACK
@@ -2385,17 +2715,39 @@ TYPED_TEST(
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets->sentTime;
+    const auto ackRecvTime = sentTime + 443ms;
+    const auto ackDelay = 7ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets->start, maybeWrittenPackets->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets->start, maybeWrittenPackets->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // third and final write, this time with EOF, send packet, deliver ACK
@@ -2403,17 +2755,40 @@ TYPED_TEST(
   {
     const auto maybeWrittenPackets = this->loopForWrites();
     ASSERT_TRUE(maybeWrittenPackets.has_value());
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(7);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {*maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
+
+    const auto sentTime = maybeWrittenPackets->sentTime;
+    const auto ackRecvTime = sentTime + 62ms;
+    const auto ackDelay = 3ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets->start, maybeWrittenPackets->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets->start, maybeWrittenPackets->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   this->destroyTransport();
@@ -2468,47 +2843,113 @@ TYPED_TEST(
 
   // deliver an ACK for packet 1
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets1}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets1->sentTime;
+    const auto ackRecvTime = sentTime + 122ms;
+    const auto ackDelay = 3ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets1->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets1->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets1->start, maybeWrittenPackets1->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets1->start, maybeWrittenPackets1->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // deliver an ACK for packet 2
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets2->sentTime;
+    const auto ackRecvTime = sentTime + 62ms;
+    const auto ackDelay = 1ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets2})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets2->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets2->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets2->start, maybeWrittenPackets2->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets2->start, maybeWrittenPackets2->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // deliver an ACK for packet 3
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets3}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets3->sentTime;
+    const auto ackRecvTime = sentTime + 82ms;
+    const auto ackDelay = 20ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets3})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets3->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets3->start, maybeWrittenPackets3->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets3->start, maybeWrittenPackets3->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   this->destroyTransport();
@@ -2570,44 +3011,110 @@ TYPED_TEST(
 
   // deliver an ACK for packet 1
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets1}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets1->sentTime;
+    const auto ackRecvTime = sentTime + 20ms;
+    const auto ackDelay = 5ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets1->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets1->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets1->start, maybeWrittenPackets1->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // deliver an ACK for packet 3
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets3}, 1, ackRecvTime, 0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets3->sentTime;
+    const auto ackRecvTime = sentTime + 11ms;
+    const auto ackDelay = 4ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets3->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets3),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets3->start, maybeWrittenPackets3->end},
+        {maybeWrittenPackets1->start, maybeWrittenPackets1->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // deliver an ACK for packet 2
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
+    // base ACK receive time off of (3) as sent packet was reordered
+    const auto ackRecvTime = maybeWrittenPackets3->sentTime + 11ms;
+    const auto ackDelay = 2ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets3->end) // still 3
+            .setLargestNewlyAckedPacket(maybeWrittenPackets2->end) // 2
+            .setNoRtt() // no RTT because largest ACKed (3) acked earlier
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets1->start, maybeWrittenPackets3->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   this->destroyTransport();
@@ -2662,42 +3169,81 @@ TYPED_TEST(
   ASSERT_TRUE(maybeWrittenPackets1.has_value());
   ASSERT_TRUE(maybeWrittenPackets2.has_value());
   ASSERT_TRUE(maybeWrittenPackets3.has_value());
-  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
-  quic::PacketNum lastPacketNum = maybeWrittenPackets3->end;
-  EXPECT_EQ(3, lastPacketNum - firstPacketNum + 1);
+  EXPECT_EQ(
+      3,
+      this->getNumPacketsWritten(
+          {maybeWrittenPackets1, maybeWrittenPackets2, maybeWrittenPackets3}));
 
   // deliver an ACK for packet 1 and 3
   {
-    quic::AckBlocks ackBlocks;
-    ackBlocks.insert(maybeWrittenPackets1->start, maybeWrittenPackets1->end);
-    ackBlocks.insert(maybeWrittenPackets3->start, maybeWrittenPackets3->end);
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets1, maybeWrittenPackets3},
-        2,
-        ackRecvTime,
-        0us /* ackDelay */);
+    const auto sentTime = maybeWrittenPackets3->sentTime; // 3 is latest sent
+    const auto ackRecvTime = sentTime + 20ms;
+    const auto ackDelay = 5ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals(
+                {maybeWrittenPackets1, maybeWrittenPackets3})
+            .setExpectedNumAckedPackets(2)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets3->end)
+            .setLargestNewlyAckedPacket(maybeWrittenPackets3->end)
+            .setRtt(std::chrono::duration_cast<std::chrono::microseconds>(
+                ackRecvTime - sentTime))
+            .setRttNoAckDelay(
+                std::chrono::duration_cast<std::chrono::microseconds>(
+                    ackRecvTime - sentTime - ackDelay))
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(ackBlocks), ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets3->start, maybeWrittenPackets3->end},
+        {maybeWrittenPackets1->start, maybeWrittenPackets1->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   // deliver an ACK for packet 2
   {
-    auto ackRecvTime =
-        std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
-    const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
+    // base ACK receive time off of (3) as sent packet was reordered
+    const auto ackRecvTime = maybeWrittenPackets3->sentTime + 11ms;
+    const auto ackDelay = 2ms;
+    const auto matcher =
+        typename TestFixture::AckEventMatcherBuilder()
+            .setExpectedAckedIntervals({maybeWrittenPackets1})
+            .setExpectedNumAckedPackets(1)
+            .setAckTime(ackRecvTime)
+            .setAckDelay(ackDelay)
+            .setLargestAckedPacket(maybeWrittenPackets3->end) // still 3
+            .setLargestNewlyAckedPacket(maybeWrittenPackets2->end) // 2
+            .setNoRtt() // no RTT because largest ACKed (3) acked earlier
+            .build();
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
-    this->deliverPacket(
-        this->buildAckPacketForSentAppDataPackets(
-            maybeWrittenPackets2->start, maybeWrittenPackets2->end),
-        ackRecvTime);
+
+    const quic::AckBlocks ackBlocks = {
+        {maybeWrittenPackets1->start, maybeWrittenPackets3->end}};
+    auto buf = quic::test::packetToBuf(
+        AckPacketBuilder()
+            .setDstConn(&this->getNonConstConn())
+            .setPacketNumberSpace(PacketNumberSpace::AppData)
+            .setAckPacketNumStore(&this->peerPacketNumStore)
+            .setAckBlocks(ackBlocks)
+            .setAckDelay(ackDelay)
+            .build());
+    buf->coalesce();
+    this->deliverPacket(std::move(buf), ackRecvTime);
   }
 
   this->destroyTransport();

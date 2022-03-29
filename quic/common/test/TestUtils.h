@@ -11,6 +11,7 @@
 #include <quic/codec/QuicPacketBuilder.h>
 #include <quic/codec/Types.h>
 #include <quic/common/BufUtil.h>
+#include <quic/common/test/TestPacketBuilders.h>
 #include <quic/fizz/client/handshake/QuicPskCache.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
 #include <quic/fizz/server/handshake/FizzServerHandshake.h>

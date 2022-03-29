@@ -18,14 +18,30 @@ struct AckEvent {
   // ack receive time
   const TimePoint ackTime;
 
-  // ack receive time minus ack delay
+  // ack receive time minus ack delay.
   const TimePoint adjustedAckTime;
 
-  // ack delay (equal to ackTime - adjustedAckTime)
+  // ack delay
+  //
+  // the ack delay is the amount of time between the remote receiving
+  // largestAckedPacket and the remote generating the AckFrame associated with
+  // this AckEvent.
+  //
+  // different AckFrame can have the same largestAckedPacket with different ack
+  // blocks (ranges) in the case of reordering; under such circumstances, you
+  // cannot use the ack delay if the largestAckedPacket was already acknowledged
+  // by a previous AckFrame.
   const std::chrono::microseconds ackDelay;
 
-  // packet number space that (newly) acked packets are in
+  // packet number space that acked packets are in.
   const PacketNumberSpace packetNumberSpace;
+
+  // the largest acked packet included in the AckFrame received from sender.
+  //
+  // this may not be the same as largestNewlyAckedPacket (below) if the
+  // OutstandingPacket with this packet number had already been removed from the
+  // list of OutstandingPackets, either due to being marked lost or acked.
+  const PacketNum largestAckedPacket;
 
   // for all packets (newly) acked during this event, sum of encoded sizes
   // encoded size includes header and body
@@ -35,11 +51,11 @@ struct AckEvent {
   // determine information about stream bytes.
   uint64_t ackedBytes{0};
 
-  // the highest packet number newly acked by this event.
+  // the highest packet number newly acked during processing of this event.
   //
-  // this may not be the same as the largestAckedPacket in the ackFrame if the
-  // corresponding outstanding packet had already been acked or removed from the
-  // list of outstanding packets because we concluded that it was lost.
+  // this may not be the same as the largestAckedPacket if the OutstandingPacket
+  // with that packet number had already been acked or removed from the list of
+  // list of OutstandingPackets, either due to being marked lost or acked.
   //
   // the reason that this is an optional type is that we construct an
   // AckEvent first, then go through the acked packets that are still
@@ -49,11 +65,14 @@ struct AckEvent {
   // when largestNewlyAckedPacket was sent
   TimePoint largestNewlyAckedPacketSentTime;
 
-  // RTT sample, not available if largestAckedPacket was already acked
+  // RTT sample with ack delay included.
+  //
+  // not available if largestAckedPacket already acked or declared lost
   folly::Optional<std::chrono::microseconds> rttSample;
 
-  // RTT sample with ack delay removed,
-  // not available if largestAckedPacket was already acked
+  // RTT sample with ack delay removed.
+  //
+  // not available if largestAckedPacket already acked or declared lost
   folly::Optional<std::chrono::microseconds> rttSampleNoAckDelay;
 
   /**
@@ -228,6 +247,7 @@ struct AckEvent {
     folly::Optional<TimePoint> maybeAdjustedAckTime;
     folly::Optional<std::chrono::microseconds> maybeAckDelay;
     folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
+    folly::Optional<PacketNum> maybeLargestAckedPacket;
     bool isImplicitAck{false};
     explicit BuilderFields() = default;
   };
@@ -237,6 +257,7 @@ struct AckEvent {
     Builder&& setAdjustedAckTime(TimePoint adjustedAckTimeIn);
     Builder&& setAckDelay(std::chrono::microseconds ackDelay);
     Builder&& setPacketNumberSpace(PacketNumberSpace packetNumberSpaceIn);
+    Builder&& setLargestAckedPacket(PacketNum largestAckedPacketIn);
     Builder&& setIsImplicitAck(bool isImplicitAckIn);
     AckEvent build() &&;
     explicit Builder() = default;

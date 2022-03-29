@@ -211,7 +211,6 @@ void BbrCongestionController::onPacketAcked(
 
   bool newRoundTrip =
       updateRoundTripCounter(ack.largestNewlyAckedPacketSentTime);
-
   bool lastAckedPacketAppLimited =
       ack.ackedPackets.empty() ? false : ack.largestNewlyAckedPacketAppLimited;
   if (bandwidthSampler_) {

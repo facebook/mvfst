@@ -48,6 +48,7 @@ class Copa2Test : public Test {
                         .setAckDelay(0us)
                         .setImplicit(false)
                         .setPacketNumberSpace(PacketNumberSpace::AppData)
+                        .setLargestAckedPacket(largestAcked)
                         .build();
     ack.largestNewlyAckedPacket = largestAcked;
     ack.ackedBytes = ackedSize;

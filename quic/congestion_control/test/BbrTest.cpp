@@ -413,12 +413,14 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
   BbrCongestionController bbr(conn);
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
+  const auto pn = 0;
   auto ackTime = Clock::now();
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::Initial)
+                 .setLargestAckedPacket(pn)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);
 }
@@ -428,12 +430,14 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
   BbrCongestionController bbr(conn);
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
+  const auto pn = 0;
   auto ackTime = Clock::now();
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::Handshake)
+                 .setLargestAckedPacket(pn)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);
 }
@@ -443,12 +447,65 @@ TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
   BbrCongestionController bbr(conn);
   CongestionController::LossEvent loss;
   loss.largestLostPacketNum = 0;
+  const auto pn = 0;
   auto ackTime = Clock::now();
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(pn)
+                 .build();
+  bbr.onPacketAckOrLoss(ack, loss);
+}
+
+TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrashPn1) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  CongestionController::LossEvent loss;
+  loss.largestLostPacketNum = 0;
+  const auto pn = 1;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
+                 .setPacketNumberSpace(PacketNumberSpace::Initial)
+                 .setLargestAckedPacket(pn)
+                 .build();
+  bbr.onPacketAckOrLoss(ack, loss);
+}
+
+TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrashPn1) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  CongestionController::LossEvent loss;
+  loss.largestLostPacketNum = 0;
+  const auto pn = 1;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
+                 .setPacketNumberSpace(PacketNumberSpace::Handshake)
+                 .setLargestAckedPacket(pn)
+                 .build();
+  bbr.onPacketAckOrLoss(ack, loss);
+}
+
+TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrashPn1) {
+  QuicConnectionStateBase conn(QuicNodeType::Client);
+  BbrCongestionController bbr(conn);
+  CongestionController::LossEvent loss;
+  loss.largestLostPacketNum = 0;
+  const auto pn = 1;
+  auto ackTime = Clock::now();
+  auto ack = CongestionController::AckEvent::Builder()
+                 .setAckTime(ackTime)
+                 .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
+                 .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(pn)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);
 }

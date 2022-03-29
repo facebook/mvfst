@@ -56,6 +56,7 @@ CongestionController::AckEvent createAckEvent(
                  .setAdjustedAckTime(ackTime)
                  .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
+                 .setLargestAckedPacket(largestAcked)
                  .build();
   ack.largestNewlyAckedPacket = largestAcked;
   ack.ackedBytes = ackedSize;
