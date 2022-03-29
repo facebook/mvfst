@@ -223,10 +223,10 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   conn.lossState.largestSent = conn.lossState.largestSent.value_or(0);
-  ackEvent.largestAckedPacket = ++conn.lossState.largestSent.value();
+  ackEvent.largestNewlyAckedPacket = ++conn.lossState.largestSent.value();
   auto packet =
-      makeTestingWritePacket(*ackEvent.largestAckedPacket, 1000, 1000);
-  ackEvent.largestAckedPacketSentTime = packet.metadata.time;
+      makeTestingWritePacket(*ackEvent.largestNewlyAckedPacket, 1000, 1000);
+  ackEvent.largestNewlyAckedPacketSentTime = packet.metadata.time;
   ackEvent.ackedPackets.push_back(
       makeAckPacketFromOutstandingPacket(std::move(packet)));
   sampler.onPacketAcked(ackEvent, 0);

@@ -53,7 +53,7 @@ void NewReno::onPacketSent(const OutstandingPacket& packet) {
 }
 
 void NewReno::onAckEvent(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.has_value() && !ack.ackedPackets.empty());
+  DCHECK(ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
   subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_
@@ -102,7 +102,7 @@ void NewReno::onPacketAckOrLoss(
     // When we start to support pacing in NewReno, we need to call onPacketsLoss
     // on the pacer when there is loss.
   }
-  if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
+  if (ackEvent && ackEvent->largestNewlyAckedPacket.has_value()) {
     onAckEvent(*ackEvent);
   }
   // TODO: Pacing isn't supported with NewReno

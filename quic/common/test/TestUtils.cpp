@@ -574,7 +574,7 @@ CongestionController::AckEvent makeAck(
                  .build();
 
   ack.ackedBytes = ackedSize;
-  ack.largestAckedPacket = seq;
+  ack.largestNewlyAckedPacket = seq;
   ack.ackedPackets.emplace_back(
       CongestionController::AckEvent::AckPacket::Builder()
           .setPacketNum(seq)
@@ -593,7 +593,7 @@ CongestionController::AckEvent makeAck(
               OutstandingPacketMetadata::DetailsPerStream()))
           .setDetailsPerStream(AckEvent::AckPacket::DetailsPerStream())
           .build());
-  ack.largestAckedPacketSentTime = sentTime;
+  ack.largestNewlyAckedPacketSentTime = sentTime;
   return ack;
 }
 

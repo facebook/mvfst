@@ -692,7 +692,7 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
           &quic::Observer::AcksProcessedEvent::getAckEvents,
           testing::ElementsAre(testing::AllOf(
               testing::Field(
-                  &quic::AckEvent::largestAckedPacket,
+                  &quic::AckEvent::largestNewlyAckedPacket,
                   testing::Eq(largestAckedPacketNum)),
               testing::Field(
                   &quic::AckEvent::ackedPackets,
@@ -706,7 +706,7 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
               &quic::AckEvent::adjustedAckTime,
               testing::Eq(ackTime - ackDelay)),
           testing::Field(
-              &quic::AckEvent::largestAckedPacket,
+              &quic::AckEvent::largestNewlyAckedPacket,
               testing::Eq(largestAckedPacketNum)),
           testing::Field(
               &quic::AckEvent::ackedPackets,

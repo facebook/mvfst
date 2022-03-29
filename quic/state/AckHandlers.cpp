@@ -238,11 +238,11 @@ AckEvent processAckFrame(
       if (rPacketIt->associatedEvent) {
         conn.outstandings.packetEvents.erase(*rPacketIt->associatedEvent);
       }
-      if (!ack.largestAckedPacket ||
-          *ack.largestAckedPacket < currentPacketNum) {
-        ack.largestAckedPacket = currentPacketNum;
-        ack.largestAckedPacketSentTime = rPacketIt->metadata.time;
-        ack.largestAckedPacketAppLimited = rPacketIt->isAppLimited;
+      if (!ack.largestNewlyAckedPacket ||
+          *ack.largestNewlyAckedPacket < currentPacketNum) {
+        ack.largestNewlyAckedPacket = currentPacketNum;
+        ack.largestNewlyAckedPacketSentTime = rPacketIt->metadata.time;
+        ack.largestNewlyAckedPacketAppLimited = rPacketIt->isAppLimited;
       }
       if (!ack.implicit) {
         conn.lossState.totalBytesAcked += rPacketIt->metadata.encodedSize;
@@ -438,7 +438,7 @@ AckEvent processAckFrame(
   CHECK_GE(updatedOustandingPacketsCount, conn.outstandings.numClonedPackets());
   auto lossEvent = handleAckForLoss(conn, lossVisitor, ack, pnSpace);
   if (conn.congestionController &&
-      (ack.largestAckedPacket.has_value() || lossEvent)) {
+      (ack.largestNewlyAckedPacket.has_value() || lossEvent)) {
     if (lossEvent) {
       CHECK(lossEvent->largestLostSentTime && lossEvent->smallestLostSentTime);
       // TODO it's not clear that we should be using the smallest and largest

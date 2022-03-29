@@ -175,7 +175,7 @@ void BbrCongestionController::onPacketAckOrLoss(
       conn_.pacer->onPacketsLoss();
     }
   }
-  if (ackEvent && ackEvent->largestAckedPacket.has_value()) {
+  if (ackEvent && ackEvent->largestNewlyAckedPacket.has_value()) {
     CHECK(!ackEvent->ackedPackets.empty());
     onPacketAcked(*ackEvent, prevInflightBytes, lossEvent != nullptr);
   }
@@ -209,9 +209,11 @@ void BbrCongestionController::onPacketAcked(
     }
   }
 
-  bool newRoundTrip = updateRoundTripCounter(ack.largestAckedPacketSentTime);
+  bool newRoundTrip =
+      updateRoundTripCounter(ack.largestNewlyAckedPacketSentTime);
+
   bool lastAckedPacketAppLimited =
-      ack.ackedPackets.empty() ? false : ack.largestAckedPacketAppLimited;
+      ack.ackedPackets.empty() ? false : ack.largestNewlyAckedPacketAppLimited;
   if (bandwidthSampler_) {
     bandwidthSampler_->onPacketAcked(ack, roundTripCounter_);
   }
@@ -221,7 +223,7 @@ void BbrCongestionController::onPacketAcked(
         recoveryState_ != BbrCongestionController::RecoveryState::GROWTH) {
       recoveryState_ = BbrCongestionController::RecoveryState::GROWTH;
     }
-    if (ack.largestAckedPacketSentTime > *endOfRecovery_) {
+    if (ack.largestNewlyAckedPacketSentTime > *endOfRecovery_) {
       recoveryState_ = BbrCongestionController::RecoveryState::NOT_RECOVERY;
     } else {
       updateRecoveryWindowWithAck(ack.ackedBytes);

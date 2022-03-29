@@ -121,7 +121,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .WillRepeatedly(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(101, *ack->largestAckedPacket);
+          EXPECT_EQ(101, *ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -206,7 +206,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
       .Times(3)
       .WillOnce(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(101, *ack->largestAckedPacket);
+          EXPECT_EQ(101, *ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -354,7 +354,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .WillRepeatedly(Invoke([&](auto ack, auto loss) {
         if (ack) {
-          EXPECT_EQ(45, *ack->largestAckedPacket);
+          EXPECT_EQ(45, *ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
@@ -488,7 +488,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
-        EXPECT_EQ(26, *ackEvent->largestAckedPacket);
+        EXPECT_EQ(26, *ackEvent->largestNewlyAckedPacket);
         EXPECT_EQ(expectedAckedBytes, ackEvent->ackedBytes);
         EXPECT_EQ(expectedAckedPackets, ackEvent->ackedPackets.size());
       }));
@@ -1182,7 +1182,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
           [&](const CongestionController::AckEvent* FOLLY_NULLABLE ackEvent,
               const CongestionController::LossEvent* FOLLY_NULLABLE lossEvent) {
             EXPECT_FALSE(
-                CHECK_NOTNULL(ackEvent)->largestAckedPacket.has_value());
+                CHECK_NOTNULL(ackEvent)->largestNewlyAckedPacket.has_value());
             EXPECT_TRUE(
                 CHECK_NOTNULL(lossEvent)->largestLostPacketNum.has_value());
           }));
@@ -1358,10 +1358,10 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestAckedPacket.value());
-        EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
+        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(10, ack->ackedBytes);
-        EXPECT_TRUE(ack->largestAckedPacketAppLimited);
+        EXPECT_TRUE(ack->largestNewlyAckedPacketAppLimited);
         EXPECT_EQ(GetParam(), ack->packetNumberSpace);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
@@ -1454,8 +1454,8 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestAckedPacket.value());
-        EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
+        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
@@ -1531,8 +1531,8 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         EXPECT_EQ(ackTime, ack->ackTime);
         EXPECT_EQ(ackTime - ackFrame.ackDelay, ack->adjustedAckTime);
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
-        EXPECT_EQ(9, ack->largestAckedPacket.value());
-        EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
+        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
@@ -1596,10 +1596,10 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .Times(1)
       .WillOnce(Invoke([&](auto ack, auto /* loss */) {
         EXPECT_EQ(ackTime, ack->ackTime);
-        EXPECT_EQ(9, ack->largestAckedPacket.value());
-        EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
+        EXPECT_EQ(9, ack->largestNewlyAckedPacket.value());
+        EXPECT_EQ(largestSentTime, ack->largestNewlyAckedPacketSentTime);
         EXPECT_EQ(10, ack->ackedBytes);
-        EXPECT_TRUE(ack->largestAckedPacketAppLimited);
+        EXPECT_TRUE(ack->largestNewlyAckedPacketAppLimited);
         EXPECT_TRUE(ack->implicit);
         EXPECT_FALSE(ack->rttSample.has_value());
         EXPECT_EQ(srttBefore, conn.lossState.srtt);

@@ -31,7 +31,7 @@ void BbrBandwidthSampler::onPacketAcked(
     const CongestionController::AckEvent& ackEvent,
     uint64_t rttCounter) {
   if (appLimited_) {
-    if (appLimitedExitTarget_ < ackEvent.largestAckedPacketSentTime) {
+    if (appLimitedExitTarget_ < ackEvent.largestNewlyAckedPacketSentTime) {
       appLimited_ = false;
       if (conn_.qLogger) {
         conn_.qLogger->addAppUnlimitedUpdate();

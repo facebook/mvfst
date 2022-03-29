@@ -1054,7 +1054,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
                       .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
-  ackEvent.largestAckedPacket = 1000;
+  ackEvent.largestNewlyAckedPacket = 1000;
   handleAckForLoss(
       *conn, testLossMarkFunc, ackEvent, PacketNumberSpace::Handshake);
 

@@ -139,13 +139,13 @@ void Copa::onPacketAckOrLoss(
       conn_.pacer->onPacketsLoss();
     }
   }
-  if (ack && ack->largestAckedPacket.has_value()) {
+  if (ack && ack->largestNewlyAckedPacket.has_value()) {
     onPacketAcked(*ack);
   }
 }
 
 void Copa::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.has_value());
+  DCHECK(ack.largestNewlyAckedPacket.has_value());
   subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,

@@ -419,11 +419,11 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
     CongestionController::AckEvent& ack,
     PacketNumberSpace pnSpace) {
   auto& largestAcked = getAckState(conn, pnSpace).largestAckedByPeer;
-  if (ack.largestAckedPacket.hasValue()) {
+  if (ack.largestNewlyAckedPacket.has_value()) {
     conn.lossState.ptoCount = 0;
     largestAcked = std::max<PacketNum>(
-        largestAcked.value_or(*ack.largestAckedPacket),
-        *ack.largestAckedPacket);
+        largestAcked.value_or(*ack.largestNewlyAckedPacket),
+        *ack.largestNewlyAckedPacket);
   }
   auto lossEvent = detectLossPackets(
       conn,
@@ -433,8 +433,9 @@ folly::Optional<CongestionController::LossEvent> handleAckForLoss(
       pnSpace);
   conn.pendingEvents.setLossDetectionAlarm =
       conn.outstandings.numOutstanding() > 0;
-  VLOG(10) << __func__
-           << " largestAckedInPacket=" << ack.largestAckedPacket.value_or(0)
+  VLOG(10) << __func__ << " largestAckedInPacket="
+           << ack.largestNewlyAckedPacket.value_or(0)
+
            << " setLossDetectionAlarm="
            << conn.pendingEvents.setLossDetectionAlarm
            << " outstanding=" << conn.outstandings.numOutstanding()

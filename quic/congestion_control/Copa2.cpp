@@ -61,9 +61,9 @@ void Copa2::onPacketAckOrLoss(
       conn_.pacer->onPacketsLoss();
     }
   }
-  if (ack && ack->largestAckedPacket.has_value()) {
+  if (ack && ack->largestNewlyAckedPacket.has_value()) {
     if (appLimited_) {
-      if (appLimitedExitTarget_ < ack->largestAckedPacketSentTime) {
+      if (appLimitedExitTarget_ < ack->largestNewlyAckedPacketSentTime) {
         appLimited_ = false;
         if (conn_.qLogger) {
           conn_.qLogger->addAppUnlimitedUpdate();
@@ -140,7 +140,7 @@ void Copa2::onPacketLoss(const LossEvent& loss) {
 }
 
 void Copa2::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.has_value());
+  DCHECK(ack.largestNewlyAckedPacket.has_value());
   subtractAndCheckUnderflow(conn_.lossState.inflightBytes, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
@@ -153,7 +153,7 @@ void Copa2::onPacketAcked(const AckEvent& ack) {
   auto rttMin = minRTTFilter_.GetBest();
 
   numAckedInLossCycle_ += ack.ackedPackets.size();
-  manageLossyMode(ack.largestAckedPacketSentTime);
+  manageLossyMode(ack.largestNewlyAckedPacketSentTime);
 
   auto dParam = rttMin;
   if (lossyMode_) {

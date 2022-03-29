@@ -102,7 +102,7 @@ void CCP::onPacketSent(const OutstandingPacket& packet) {
 }
 
 void CCP::onAckEvent(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.hasValue() && !ack.ackedPackets.empty());
+  DCHECK(ack.largestNewlyAckedPacket.has_value() && !ack.ackedPackets.empty());
 
   // Fallback algorithm takes care of bytes acked since it shares the same conn_
   if (!inFallback_) {
@@ -167,7 +167,7 @@ void CCP::onPacketAckOrLoss(
     }
   }
 
-  if (ackEvent && ackEvent->largestAckedPacket.hasValue()) {
+  if (ackEvent && ackEvent->largestNewlyAckedPacket.hasValue()) {
     onAckEvent(*ackEvent);
   }
 
