@@ -209,10 +209,10 @@ AckEvent processAckFrame(
           }
 
           // update AckEvent RTTs, which are used by CCA and other processing
-          CHECK(!ack.mrttSample.has_value());
-          CHECK(!ack.mrttSampleNoAckDelay.has_value());
-          ack.mrttSample = rttSample;
-          ack.mrttSampleNoAckDelay = (rttSample >= frame.ackDelay)
+          CHECK(!ack.rttSample.has_value());
+          CHECK(!ack.rttSampleNoAckDelay.has_value());
+          ack.rttSample = rttSample;
+          ack.rttSampleNoAckDelay = (rttSample >= frame.ackDelay)
               ? folly::make_optional(
                     std::chrono::ceil<std::chrono::microseconds>(
                         rttSample - frame.ackDelay))

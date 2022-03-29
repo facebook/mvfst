@@ -718,9 +718,9 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
             &quic::Observer::AcksProcessedEvent::getAckEvents,
             testing::ElementsAre(testing::AllOf(
                 matcher,
-                testing::Field(&quic::AckEvent::mrttSample, testing::Eq(rtt)),
+                testing::Field(&quic::AckEvent::rttSample, testing::Eq(rtt)),
                 testing::Field(
-                    &quic::AckEvent::mrttSampleNoAckDelay,
+                    &quic::AckEvent::rttSampleNoAckDelay,
                     testing::Eq(rtt.value() - ackDelay)))));
       } else {
         return testing::Property(

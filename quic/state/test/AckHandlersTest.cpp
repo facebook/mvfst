@@ -1366,11 +1366,11 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),
-            ack->mrttSample);
+            ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime - ackFrame.ackDelay),
-            ack->mrttSampleNoAckDelay);
+            ack->rttSampleNoAckDelay);
         EXPECT_THAT(ack->ackedPackets, SizeIs(10));
         EXPECT_THAT(
             ack->ackedPackets,
@@ -1456,14 +1456,14 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
         EXPECT_EQ(9, ack->largestAckedPacket.value());
         EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
-        EXPECT_EQ(rtt, ack->mrttSample);
+        EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),
-            ack->mrttSample);
+            ack->rttSample);
         EXPECT_EQ(
             folly::none, // ack delay > RTT, so not set
-            ack->mrttSampleNoAckDelay);
+            ack->rttSampleNoAckDelay);
       }));
 
   processAckFrame(
@@ -1533,12 +1533,12 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
         EXPECT_EQ(ackFrame.ackDelay, ack->ackDelay);
         EXPECT_EQ(9, ack->largestAckedPacket.value());
         EXPECT_EQ(largestSentTime, ack->largestAckedPacketSentTime);
-        EXPECT_EQ(rtt, ack->mrttSample);
+        EXPECT_EQ(rtt, ack->rttSample);
         EXPECT_EQ(
             std::chrono::ceil<std::chrono::microseconds>(
                 ackTime - largestSentTime),
-            ack->mrttSample);
-        EXPECT_EQ(0ms, ack->mrttSampleNoAckDelay);
+            ack->rttSample);
+        EXPECT_EQ(0ms, ack->rttSampleNoAckDelay);
       }));
 
   processAckFrame(
@@ -1601,7 +1601,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
         EXPECT_EQ(10, ack->ackedBytes);
         EXPECT_TRUE(ack->largestAckedPacketAppLimited);
         EXPECT_TRUE(ack->implicit);
-        EXPECT_FALSE(ack->mrttSample.has_value());
+        EXPECT_FALSE(ack->rttSample.has_value());
         EXPECT_EQ(srttBefore, conn.lossState.srtt);
       }));
 
@@ -2150,7 +2150,7 @@ class AckEventForAppDataTest : public Test {
 };
 
 /**
- * Check AckEvent::ackTime, adjustedAckTime, and mrttSample.
+ * Check AckEvent::ackTime, adjustedAckTime, and rttSample.
  *
  * Two packets sent, ACKed in single ACK.
  */
@@ -2199,7 +2199,7 @@ TEST_F(AckEventForAppDataTest, AckEventAckTimeAndMrttSample) {
   EXPECT_EQ(ackArrivalTime - ackDelay, ackEvent.adjustedAckTime);
 
   // check mrtt sample (includes ack delay)
-  EXPECT_EQ(ackArrivalTime - packet2SendTime, ackEvent.mrttSample);
+  EXPECT_EQ(ackArrivalTime - packet2SendTime, ackEvent.rttSample);
 }
 
 /**

@@ -201,9 +201,9 @@ void BbrCongestionController::onPacketAcked(
     updateCwnd(ack.ackedBytes, 0);
     return;
   }
-  if (ack.mrttSample && minRttSampler_) {
+  if (ack.rttSample && minRttSampler_) {
     bool updated =
-        minRttSampler_->newRttSample(ack.mrttSample.value(), ack.ackTime);
+        minRttSampler_->newRttSample(ack.rttSample.value(), ack.ackTime);
     if (updated) {
       appLimitedSinceProbeRtt_ = false;
     }

@@ -45,11 +45,11 @@ struct AckEvent {
   // when largestAckedPacket was sent
   TimePoint largestAckedPacketSentTime;
 
-  // minimal RTT sample among (newly) acked packets; includes ack delay
-  folly::Optional<std::chrono::microseconds> mrttSample;
+  // RTT sample
+  folly::Optional<std::chrono::microseconds> rttSample;
 
-  // minimal RTT sample among (newly) acked packets; ack delay removed
-  folly::Optional<std::chrono::microseconds> mrttSampleNoAckDelay;
+  // RTT sample with ack delay removed
+  folly::Optional<std::chrono::microseconds> rttSampleNoAckDelay;
 
   /**
    * Booleans grouped together to avoid padding.
