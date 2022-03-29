@@ -41,31 +41,41 @@ void updateRtt(
     QuicConnectionStateBase& conn,
     std::chrono::microseconds rttSample,
     std::chrono::microseconds ackDelay) {
-  std::chrono::microseconds minRtt = timeMin(conn.lossState.mrtt, rttSample);
-  conn.lossState.maxAckDelay = timeMax(conn.lossState.maxAckDelay, ackDelay);
-  bool shouldUseAckDelay = (rttSample > ackDelay) &&
-      (rttSample > minRtt + ackDelay || conn.lossState.mrtt == kDefaultMinRtt);
-  if (shouldUseAckDelay) {
-    rttSample -= ackDelay;
-  }
+  // update mrtt
+  //
   // mrtt ignores ack delay. This is the same in the current recovery draft
   // section A.6.
-  conn.lossState.mrtt = minRtt;
-  // We use the original minRtt without the ack delay included here
-  // explicitly. We might want to change this by including ackDelay
-  // as well.
-  conn.lossState.lrtt = rttSample;
+  conn.lossState.mrtt = timeMin(conn.lossState.mrtt, rttSample);
+
+  // update maxAckDelay
+  conn.lossState.maxAckDelay = timeMax(conn.lossState.maxAckDelay, ackDelay);
+
+  // determine the RTT sample we will use for srtt and related calculations
+  //
+  // do NOT subtract the acknowledgment delay from the RTT sample if the
+  // resulting value is smaller than the min_rtt; this limits underestimation
+  // of the smoothed_rtt due to a misreporting peer.
+  //
+  // if this is the first RTT sample, then it is also the minRTT and ACK delay
+  // will not be subtracted
+  const auto srttSample =
+      ((rttSample > ackDelay) && (rttSample > conn.lossState.mrtt + ackDelay))
+      ? rttSample - ackDelay
+      : rttSample;
+  conn.lossState.lrtt = srttSample;
   if (conn.lossState.srtt == 0us) {
-    conn.lossState.srtt = rttSample;
-    conn.lossState.rttvar = rttSample / 2;
+    conn.lossState.srtt = srttSample;
+    conn.lossState.rttvar = srttSample / 2;
   } else {
     conn.lossState.rttvar = conn.lossState.rttvar * (kRttBeta - 1) / kRttBeta +
-        (conn.lossState.srtt > rttSample ? conn.lossState.srtt - rttSample
-                                         : rttSample - conn.lossState.srtt) /
+        (conn.lossState.srtt > srttSample ? conn.lossState.srtt - srttSample
+                                          : srttSample - conn.lossState.srtt) /
             kRttBeta;
     conn.lossState.srtt = conn.lossState.srtt * (kRttAlpha - 1) / kRttAlpha +
-        rttSample / kRttAlpha;
+        srttSample / kRttAlpha;
   }
+
+  // inform qlog
   if (conn.qLogger) {
     conn.qLogger->addMetricUpdate(
         rttSample, conn.lossState.mrtt, conn.lossState.srtt, ackDelay);

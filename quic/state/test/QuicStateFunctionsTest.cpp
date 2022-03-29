@@ -516,52 +516,189 @@ INSTANTIATE_TEST_SUITE_P(
 
 class QuicStateFunctionsTest : public TestWithParam<PacketNumberSpace> {};
 
-TEST_F(QuicStateFunctionsTest, RttCalculationNoAckDelay) {
+TEST_F(QuicStateFunctionsTest, RttCalculationZeroAckDelayFirstRtt) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  auto rttSample = 1100us;
-  updateRtt(conn, rttSample, 0us);
+  const auto rttSample = 1100us;
+  const auto ackDelay = 0us;
+  updateRtt(conn, rttSample, ackDelay);
   EXPECT_EQ(1100, conn.lossState.srtt.count());
+  EXPECT_EQ(1100, conn.lossState.lrtt.count());
   EXPECT_EQ(1100 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(1100, conn.lossState.mrtt.count());
   EXPECT_EQ(0us, conn.lossState.maxAckDelay);
 }
 
-TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelay) {
+TEST_F(QuicStateFunctionsTest, RttCalculationWithAckDelayFirstRtt) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
-  auto rttSample = 1000us;
-  updateRtt(conn, rttSample, 300us);
-  EXPECT_EQ(700, conn.lossState.srtt.count());
-  EXPECT_EQ(700, conn.lossState.lrtt.count());
+  const auto rttSample = 1000us;
+  const auto ackDelay = 300us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(1000, conn.lossState.srtt.count());
+  EXPECT_EQ(1000, conn.lossState.lrtt.count());
   EXPECT_EQ(1000, conn.lossState.mrtt.count());
-  EXPECT_EQ(350, conn.lossState.rttvar.count());
+  EXPECT_EQ(1000 / 2, conn.lossState.rttvar.count());
   EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 
-TEST_F(QuicStateFunctionsTest, RttCalculationWithMrttAckDelay) {
+TEST_F(QuicStateFunctionsTest, RttCalculationWithExistingMrttNewLower) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.mrtt = 100us;
-  auto rttSample = 1000us;
-  updateRtt(conn, rttSample, 300us);
-  EXPECT_EQ(700, conn.lossState.srtt.count());
-  EXPECT_EQ(700, conn.lossState.lrtt.count());
+  const auto rttSample = 50us;
+  const auto ackDelay = 100us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(50, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationWithExistingMrttStaysSame) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 25us;
+  const auto rttSample = 50us;
+  const auto ackDelay = 100us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(25, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationWithExistingMrttZeroAckDelay) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 500us;
+  const auto rttSample = 1100us;
+  const auto ackDelay = 0us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(1100, conn.lossState.srtt.count());
+  EXPECT_EQ(1100, conn.lossState.lrtt.count());
   EXPECT_EQ(100, conn.lossState.mrtt.count());
-  EXPECT_EQ(350, conn.lossState.rttvar.count());
+  EXPECT_EQ(1100 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(500us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationWithExistingMrttSubtractAckDelay) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  const auto rttSample = 1000us;
+  const auto ackDelay = 300us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(700, conn.lossState.srtt.count()); // 700 as ack delay subtracted
+  EXPECT_EQ(700, conn.lossState.lrtt.count()); // 700 as ack delay subtracted
+  EXPECT_EQ(100, conn.lossState.mrtt.count());
+  EXPECT_EQ(
+      700 / 2, conn.lossState.rttvar.count()); // 700 as ack delay subtracted
   EXPECT_EQ(300us, conn.lossState.maxAckDelay);
 }
 
-TEST_F(QuicStateFunctionsTest, RttCalculationIgnoreAckDelay) {
+TEST_F(QuicStateFunctionsTest, RttCalculationWithExistingMrttIgnoreAckDelay) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   conn.lossState.mrtt = 700us;
-  auto rttSample = 900us;
-  updateRtt(conn, rttSample, 300us);
+  const auto rttSample = 900us;
+  const auto ackDelay = 300us;
+  updateRtt(conn, rttSample, ackDelay);
   EXPECT_EQ(900, conn.lossState.srtt.count());
   EXPECT_EQ(900, conn.lossState.lrtt.count());
   EXPECT_EQ(700, conn.lossState.mrtt.count());
   EXPECT_EQ(450, conn.lossState.rttvar.count());
   EXPECT_EQ(300us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationWithNewLowerMrttZeroAckDelay) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 500us;
+  const auto rttSample = 50us;
+  const auto ackDelay = 0us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(50, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(500us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationWithNewLowerMrttIgnoreAckDelay) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  const auto rttSample = 50us;
+  const auto ackDelay = 25us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(50, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(25us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationMaxAckDelayIncreases) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 50us;
+  const auto rttSample = 500us;
+  const auto ackDelay = 100us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(400, conn.lossState.srtt.count()); // 400 as ack delay subtracted
+  EXPECT_EQ(400, conn.lossState.lrtt.count()); // 400 as ack delay subtracted
+  EXPECT_EQ(100, conn.lossState.mrtt.count());
+  EXPECT_EQ(400 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(100us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationMaxAckDelayStaysSame) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 5000us;
+  const auto rttSample = 500us;
+  const auto ackDelay = 100us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(400, conn.lossState.srtt.count()); // 400 as ack delay subtracted
+  EXPECT_EQ(400, conn.lossState.lrtt.count()); // 400 as ack delay subtracted
+  EXPECT_EQ(100, conn.lossState.mrtt.count());
+  EXPECT_EQ(400 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(5000us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationNewLowerMrttMaxAckDelayIncreases) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 50us;
+  const auto rttSample = 50us;
+  const auto ackDelay = 100us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(50, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(100us, conn.lossState.maxAckDelay);
+}
+
+TEST_F(QuicStateFunctionsTest, RttCalculationNewLowerMrttMaxAckDelayStaysSame) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  conn.lossState.mrtt = 100us;
+  conn.lossState.maxAckDelay = 5000us;
+  const auto rttSample = 50us;
+  const auto ackDelay = 10us;
+  updateRtt(conn, rttSample, ackDelay);
+  EXPECT_EQ(50, conn.lossState.srtt.count());
+  EXPECT_EQ(50, conn.lossState.lrtt.count());
+  EXPECT_EQ(50, conn.lossState.mrtt.count());
+  EXPECT_EQ(50 / 2, conn.lossState.rttvar.count());
+  EXPECT_EQ(5000us, conn.lossState.maxAckDelay);
 }
 
 TEST_F(QuicStateFunctionsTest, RttCalculationAckDelayLarger) {
