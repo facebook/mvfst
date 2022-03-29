@@ -33,6 +33,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacket) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   ackEvent.ackedBytes = 5000;
@@ -50,6 +51,7 @@ TEST_F(BbrBandwidthSamplerTest, NoPreviousAckedPacketFallback) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   ackEvent.ackedBytes = 5000;
@@ -66,6 +68,7 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculation) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   ackEvent.ackedBytes = 5000;
@@ -96,6 +99,7 @@ TEST_F(BbrBandwidthSamplerTest, RateCalculationWithAdjustedAckTime) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime - 100us)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   ackEvent.ackedBytes = 5000;
@@ -127,6 +131,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   conn_.lossState.totalBytesAcked = 1000;
@@ -155,6 +160,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   auto ackEvent2 = AckEvent::Builder()
                        .setAckTime(ackTime2)
                        .setAdjustedAckTime(ackTime2)
+                       .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
                        .build();
   packet2.metadata.time = ackTime + 110us;
@@ -172,6 +178,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   auto ackEvent3 = AckEvent::Builder()
                        .setAckTime(ackTime3)
                        .setAdjustedAckTime(ackTime3)
+                       .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
                        .build();
   packet3.metadata.time = ackTime + 210us;
@@ -188,6 +195,7 @@ TEST_F(BbrBandwidthSamplerTest, SampleExpiration) {
   auto ackEvent4 = AckEvent::Builder()
                        .setAckTime(ackTime4)
                        .setAdjustedAckTime(ackTime4)
+                       .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
                        .build();
   packet4.metadata.time = ackTime + 310us;
@@ -211,6 +219,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimited) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   conn.lossState.largestSent = conn.lossState.largestSent.value_or(0);
@@ -242,6 +251,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   auto ackEvent1 = AckEvent::Builder()
                        .setAckTime(ackTime1)
                        .setAdjustedAckTime(ackTime1)
+                       .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
                        .build();
   ackEvent1.ackedBytes = 1000;
@@ -273,6 +283,7 @@ TEST_F(BbrBandwidthSamplerTest, AppLimitedOutstandingPacket) {
   auto ackEvent2 = AckEvent::Builder()
                        .setAckTime(ackTime2)
                        .setAdjustedAckTime(ackTime2)
+                       .setAckDelay(0us)
                        .setPacketNumberSpace(PacketNumberSpace::AppData)
                        .build();
   ackEvent2.ackedBytes = 1000;

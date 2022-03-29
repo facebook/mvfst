@@ -569,6 +569,7 @@ CongestionController::AckEvent makeAck(
   auto ack = AckEvent::Builder()
                  .setAckTime(ackedTime)
                  .setAdjustedAckTime(ackedTime)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
 

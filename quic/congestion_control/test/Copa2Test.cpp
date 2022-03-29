@@ -45,6 +45,7 @@ class Copa2Test : public Test {
     auto ackEvent = AckEvent::Builder()
                         .setAckTime(ackTime)
                         .setAdjustedAckTime(ackTime)
+                        .setAckDelay(0us)
                         .setImplicit(false)
                         .setPacketNumberSpace(PacketNumberSpace::AppData)
                         .build();

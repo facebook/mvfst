@@ -42,8 +42,9 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Contains interval of OutstandingPackets that were just written.
    */
   struct NewOutstandingPacketInterval {
-    PacketNum start;
-    PacketNum end;
+    const PacketNum start;
+    const PacketNum end;
+    const TimePoint sentTime;
   };
 
   /**
@@ -71,7 +72,9 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
       return folly::none;
     }
     const auto& packet = it->packet;
+    const auto& metadata = it->metadata;
     const auto lastAppDataPacketNum = packet.header.getPacketSequenceNum();
+    const auto sendTime = metadata.time;
 
     // if packet number of last AppData packet < nextAppDataPacketNum, then
     // we sent nothing new and we have nothing to do...
@@ -81,7 +84,7 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
 
     // we sent new AppData packets
     return NewOutstandingPacketInterval{
-        preSendNextAppDataPacketNum, lastAppDataPacketNum};
+        preSendNextAppDataPacketNum, lastAppDataPacketNum, sendTime};
   }
 
   /**

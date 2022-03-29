@@ -21,6 +21,9 @@ struct AckEvent {
   // ack receive time minus ack delay
   const TimePoint adjustedAckTime;
 
+  // ack delay (equal to ackTime - adjustedAckTime)
+  const std::chrono::microseconds ackDelay;
+
   // packet number space that (newly) acked packets are in
   const PacketNumberSpace packetNumberSpace;
 
@@ -42,8 +45,11 @@ struct AckEvent {
   // when largestAckedPacket was sent
   TimePoint largestAckedPacketSentTime;
 
-  // minimal RTT sample among packets newly acked; includes ack delay
+  // minimal RTT sample among (newly) acked packets; includes ack delay
   folly::Optional<std::chrono::microseconds> mrttSample;
+
+  // minimal RTT sample among (newly) acked packets; ack delay removed
+  folly::Optional<std::chrono::microseconds> mrttSampleNoAckDelay;
 
   /**
    * Booleans grouped together to avoid padding.
@@ -215,6 +221,7 @@ struct AckEvent {
   struct BuilderFields {
     folly::Optional<TimePoint> maybeAckTime;
     folly::Optional<TimePoint> maybeAdjustedAckTime;
+    folly::Optional<std::chrono::microseconds> maybeAckDelay;
     folly::Optional<PacketNumberSpace> maybePacketNumberSpace;
     bool isImplicitAck{false};
     explicit BuilderFields() = default;
@@ -223,6 +230,7 @@ struct AckEvent {
   struct Builder : public BuilderFields {
     Builder&& setAckTime(TimePoint ackTimeIn);
     Builder&& setAdjustedAckTime(TimePoint adjustedAckTimeIn);
+    Builder&& setAckDelay(std::chrono::microseconds ackDelay);
     Builder&& setPacketNumberSpace(PacketNumberSpace packetNumberSpaceIn);
     Builder&& setIsImplicitAck(bool isImplicitAckIn);
     AckEvent build() &&;

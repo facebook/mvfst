@@ -642,7 +642,8 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
           T>::NewOutstandingPacketInterval>& expectedAckedIntervals,
       const uint64_t expectedNumAckedPackets,
       const quic::TimePoint ackTime,
-      const quic::TimePoint adjustedAckTime) {
+      const std::chrono::microseconds ackDelay,
+      const folly::Optional<std::chrono::microseconds>& rtt = folly::none) {
     CHECK_LT(0, expectedAckedIntervals.size());
 
     // sanity check expectedNumAckedPackets and expectedAckedIntervals
@@ -684,7 +685,8 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
       return packetNum;
     }();
 
-    // only check ack timing for server; we don't support passing for client
+    // only check adjustedAckTime and RTT for server, as we don't support
+    // passing the RX time for client transport right now
     if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
       return testing::Property(
           &quic::Observer::AcksProcessedEvent::getAckEvents,
@@ -694,21 +696,37 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
                   testing::Eq(largestAckedPacketNum)),
               testing::Field(
                   &quic::AckEvent::ackedPackets,
-                  testing::SizeIs(expectedNumAckedPackets)))));
-    } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
-      return testing::Property(
-          &quic::Observer::AcksProcessedEvent::getAckEvents,
-          testing::ElementsAre(testing::AllOf(
-              testing::Field(
-                  &quic::AckEvent::largestAckedPacket,
-                  testing::Eq(largestAckedPacketNum)),
-              testing::Field(
-                  &quic::AckEvent::ackedPackets,
                   testing::SizeIs(expectedNumAckedPackets)),
-              testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
               testing::Field(
-                  &quic::AckEvent::adjustedAckTime,
-                  testing::Eq(adjustedAckTime)))));
+                  &quic::AckEvent::ackDelay, testing::Eq(ackDelay)))));
+    } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
+      const auto matcher = testing::AllOf(
+          testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
+          testing::Field(
+              &quic::AckEvent::adjustedAckTime,
+              testing::Eq(ackTime - ackDelay)),
+          testing::Field(
+              &quic::AckEvent::largestAckedPacket,
+              testing::Eq(largestAckedPacketNum)),
+          testing::Field(
+              &quic::AckEvent::ackedPackets,
+              testing::SizeIs(expectedNumAckedPackets)),
+          testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
+          testing::Field(&quic::AckEvent::ackDelay, testing::Eq(ackDelay)));
+      if (rtt.has_value()) {
+        return testing::Property(
+            &quic::Observer::AcksProcessedEvent::getAckEvents,
+            testing::ElementsAre(testing::AllOf(
+                matcher,
+                testing::Field(&quic::AckEvent::mrttSample, testing::Eq(rtt)),
+                testing::Field(
+                    &quic::AckEvent::mrttSampleNoAckDelay,
+                    testing::Eq(rtt.value() - ackDelay)))));
+      } else {
+        return testing::Property(
+            &quic::Observer::AcksProcessedEvent::getAckEvents,
+            testing::ElementsAre(matcher));
+      }
     } else {
       FAIL(); // unhandled typed test
     }
@@ -719,7 +737,8 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
           T>::NewOutstandingPacketInterval>>& expectedAckedIntervalsOptionals,
       const uint64_t expectedNumAckedPackets,
       const quic::TimePoint ackTime,
-      const quic::TimePoint adjustedAckTime) {
+      const std::chrono::microseconds ackDelay,
+      const folly::Optional<std::chrono::microseconds>& rtt = folly::none) {
     std::vector<
         typename QuicTypedTransportTest<T>::NewOutstandingPacketInterval>
         expectedAckedIntervals;
@@ -731,7 +750,8 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
         expectedAckedIntervals,
         expectedNumAckedPackets,
         ackTime,
-        adjustedAckTime);
+        ackDelay,
+        rtt);
   }
 
   auto getStreamEventMatcherOpt(
@@ -2180,12 +2200,71 @@ TYPED_TEST(
   auto ackRecvTime =
       std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
   const auto matcher = this->getAcksProcessedEventMatcherOpt(
-      {maybeWrittenPackets}, 1, ackRecvTime, ackRecvTime);
+      {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      ackRecvTime);
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    AckEventsOutstandingPacketSentThenAckedWithAckDelayRtt) {
+  MockObserver::Config configWithAcksEnabled;
+  configWithAcksEnabled.acksProcessedEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithAcks1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+  auto observerWithAcks2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+
+  EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
+  transport->addObserver(observerWithNoAcks.get());
+  EXPECT_CALL(*observerWithAcks1, observerAttach(transport));
+  transport->addObserver(observerWithAcks1.get());
+  EXPECT_CALL(*observerWithAcks2, observerAttach(transport));
+  transport->addObserver(observerWithAcks2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoAcks.get(),
+          observerWithAcks1.get(),
+          observerWithAcks2.get()));
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+  const quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+  const quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+  // deliver an ACK for all of the outstanding packets
+  const auto sentTime = maybeWrittenPackets->sentTime;
+  const auto ackRecvTime = sentTime + 50ms;
+  const auto ackDelay = 5ms;
+  const auto matcher = this->getAcksProcessedEventMatcherOpt(
+      {maybeWrittenPackets},
+      1,
+      ackRecvTime,
+      ackDelay,
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          ackRecvTime - sentTime) /* rtt */);
+  EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
+  EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
+  EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(
+          firstPacketNum, lastPacketNum, ackDelay),
       ackRecvTime);
 
   this->destroyTransport();
@@ -2245,7 +2324,7 @@ TYPED_TEST(
       {maybeWrittenPackets1, maybeWrittenPackets2, maybeWrittenPackets3},
       3,
       ackRecvTime,
-      ackRecvTime);
+      0us /* ackDelay */);
   EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
   EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
   EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2291,7 +2370,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2309,7 +2388,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2327,7 +2406,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(7);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {*maybeWrittenPackets}, 1, ackRecvTime, ackRecvTime);
+        {*maybeWrittenPackets}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2392,7 +2471,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets1}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets1}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2407,7 +2486,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2422,7 +2501,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets3}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets3}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2494,7 +2573,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(5);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets1}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets1}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2508,7 +2587,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets3}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets3}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2522,7 +2601,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2598,7 +2677,7 @@ TYPED_TEST(
         {maybeWrittenPackets1, maybeWrittenPackets3},
         2,
         ackRecvTime,
-        ackRecvTime);
+        0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));
@@ -2611,7 +2690,7 @@ TYPED_TEST(
     auto ackRecvTime =
         std::chrono::steady_clock::time_point() + std::chrono::minutes(6);
     const auto matcher = this->getAcksProcessedEventMatcherOpt(
-        {maybeWrittenPackets2}, 1, ackRecvTime, ackRecvTime);
+        {maybeWrittenPackets2}, 1, ackRecvTime, 0us /* ackDelay */);
     EXPECT_CALL(*observerWithNoAcks, acksProcessed(_, _)).Times(0);
     EXPECT_CALL(*observerWithAcks1, acksProcessed(transport, matcher));
     EXPECT_CALL(*observerWithAcks2, acksProcessed(transport, matcher));

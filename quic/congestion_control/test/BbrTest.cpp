@@ -417,6 +417,7 @@ TEST_F(BbrTest, NoLargestAckedPacketInitialNoCrash) {
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::Initial)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);
@@ -431,6 +432,7 @@ TEST_F(BbrTest, NoLargestAckedPacketHandshakeNoCrash) {
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::Handshake)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);
@@ -445,6 +447,7 @@ TEST_F(BbrTest, NoLargestAckedPacketAppDataNoCrash) {
   auto ack = CongestionController::AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
   bbr.onPacketAckOrLoss(ack, loss);

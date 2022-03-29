@@ -60,6 +60,7 @@ AckEvent processAckFrame(
   auto ack = AckEvent::Builder()
                  .setAckTime(ackReceiveTime)
                  .setAdjustedAckTime(ackReceiveTime - frame.ackDelay)
+                 .setAckDelay(frame.ackDelay)
                  .setPacketNumberSpace(pnSpace)
                  .setIsImplicitAck(frame.implicit)
                  .build();
@@ -207,9 +208,15 @@ AckEvent processAckFrame(
                 });
           }
 
-          // update AckEvent RTTs, which are used by CCA and other procesisng
-          ack.mrttSample =
-              std::min(ack.mrttSample.value_or(rttSample), rttSample);
+          // update AckEvent RTTs, which are used by CCA and other processing
+          CHECK(!ack.mrttSample.has_value());
+          CHECK(!ack.mrttSampleNoAckDelay.has_value());
+          ack.mrttSample = rttSample;
+          ack.mrttSampleNoAckDelay = (rttSample >= frame.ackDelay)
+              ? folly::make_optional(
+                    std::chrono::ceil<std::chrono::microseconds>(
+                        rttSample - frame.ackDelay))
+              : folly::none;
 
           // update transport RTT
           updateRtt(conn, rttSample, frame.ackDelay);

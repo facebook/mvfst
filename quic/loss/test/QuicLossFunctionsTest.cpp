@@ -1051,6 +1051,7 @@ TEST_F(QuicLossFunctionsTest, TestHandleAckForLoss) {
   auto ackEvent = AckEvent::Builder()
                       .setAckTime(ackTime)
                       .setAdjustedAckTime(ackTime)
+                      .setAckDelay(0us)
                       .setPacketNumberSpace(PacketNumberSpace::AppData)
                       .build();
   ackEvent.largestAckedPacket = 1000;
@@ -1874,6 +1875,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestion) {
   auto ack = AckEvent::Builder()
                  .setAckTime(ackTime)
                  .setAdjustedAckTime(ackTime)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
 
@@ -1917,6 +1919,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckOutsideWindow) {
   auto ack = AckEvent::Builder()
                  .setAckTime(now)
                  .setAdjustedAckTime(now)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
   ack.ackedPackets.push_back(
@@ -1951,6 +1954,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionAckInsideWindow) {
   auto ack = AckEvent::Builder()
                  .setAckTime(now)
                  .setAdjustedAckTime(now)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
   ack.ackedPackets.push_back(
@@ -1984,6 +1988,7 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
   auto ack = AckEvent::Builder()
                  .setAckTime(now)
                  .setAdjustedAckTime(now)
+                 .setAckDelay(0us)
                  .setPacketNumberSpace(PacketNumberSpace::AppData)
                  .build();
   ack.ackedPackets.push_back(
