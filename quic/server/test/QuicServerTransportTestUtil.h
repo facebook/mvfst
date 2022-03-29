@@ -181,7 +181,10 @@ class QuicServerTransportTestBase : public virtual testing::Test {
     EXPECT_EQ(
         *server->getConn().clientConnectionId,
         server->getConn().peerConnectionIds[0].connId);
+    SetUpChild();
   }
+
+  virtual void SetUpChild() {}
 
   void destroyTransport() {
     server = nullptr;

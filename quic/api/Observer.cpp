@@ -38,6 +38,18 @@ Observer::WriteEvent::Builder::setLastPacketSentTime(
   return std::move(*this);
 }
 
+Observer::WriteEvent::Builder&& Observer::WriteEvent::Builder::setCwndInBytes(
+    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+  maybeCwndInBytes = maybeCwndInBytesIn;
+  return std::move(*this);
+}
+
+Observer::WriteEvent::Builder&& Observer::WriteEvent::Builder::setWritableBytes(
+    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+  maybeWritableBytes = maybeWritableBytesIn;
+  return std::move(*this);
+}
+
 Observer::WriteEvent Observer::WriteEvent::Builder::build() && {
   return WriteEvent(*this);
 }
@@ -46,7 +58,9 @@ Observer::WriteEvent::WriteEvent(const WriteEvent::BuilderFields& builderFields)
     : outstandingPackets(*CHECK_NOTNULL(
           builderFields.maybeOutstandingPacketsRef.get_pointer())),
       writeCount(*CHECK_NOTNULL(builderFields.maybeWriteCount.get_pointer())),
-      maybeLastPacketSentTime(builderFields.maybeLastPacketSentTime) {}
+      maybeLastPacketSentTime(builderFields.maybeLastPacketSentTime),
+      maybeCwndInBytes(builderFields.maybeCwndInBytes),
+      maybeWritableBytes(builderFields.maybeWritableBytes) {}
 
 Observer::AppLimitedEvent::Builder&&
 Observer::AppLimitedEvent::Builder::setOutstandingPackets(
@@ -72,6 +86,20 @@ Observer::AppLimitedEvent::Builder&&
 Observer::AppLimitedEvent::Builder::setLastPacketSentTime(
     const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
   maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
+  return std::move(*this);
+}
+
+Observer::AppLimitedEvent::Builder&&
+Observer::AppLimitedEvent::Builder::setCwndInBytes(
+    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+  maybeCwndInBytes = maybeCwndInBytesIn;
+  return std::move(*this);
+}
+
+Observer::AppLimitedEvent::Builder&&
+Observer::AppLimitedEvent::Builder::setWritableBytes(
+    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+  maybeWritableBytes = maybeWritableBytesIn;
   return std::move(*this);
 }
 
@@ -108,6 +136,20 @@ Observer::PacketsWrittenEvent::Builder&&
 Observer::PacketsWrittenEvent::Builder::setLastPacketSentTime(
     const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn) {
   maybeLastPacketSentTime = maybeLastPacketSentTimeIn;
+  return std::move(*this);
+}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setCwndInBytes(
+    const folly::Optional<uint64_t>& maybeCwndInBytesIn) {
+  maybeCwndInBytes = maybeCwndInBytesIn;
+  return std::move(*this);
+}
+
+Observer::PacketsWrittenEvent::Builder&&
+Observer::PacketsWrittenEvent::Builder::setWritableBytes(
+    const folly::Optional<uint64_t>& maybeWritableBytesIn) {
+  maybeWritableBytes = maybeWritableBytesIn;
   return std::move(*this);
 }
 

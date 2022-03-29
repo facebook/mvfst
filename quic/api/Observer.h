@@ -111,12 +111,24 @@ class Observer {
     // Timestamp when packet was last written
     const folly::Optional<TimePoint> maybeLastPacketSentTime;
 
+    // CWND in bytes.
+    //
+    // Optional to handle cases where congestion controller not used.
+    const folly::Optional<uint64_t> maybeCwndInBytes;
+
+    // Writable bytes.
+    //
+    // Optional to handle cases where congestion controller not used.
+    const folly::Optional<uint64_t> maybeWritableBytes;
+
     struct BuilderFields {
       folly::Optional<
           std::reference_wrapper<const std::deque<OutstandingPacket>>>
           maybeOutstandingPacketsRef;
       folly::Optional<uint64_t> maybeWriteCount;
       folly::Optional<TimePoint> maybeLastPacketSentTime;
+      folly::Optional<uint64_t> maybeCwndInBytes;
+      folly::Optional<uint64_t> maybeWritableBytes;
       explicit BuilderFields() = default;
     };
 
@@ -127,6 +139,10 @@ class Observer {
       Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
       Builder&& setLastPacketSentTime(
           const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn);
+      Builder&& setCwndInBytes(
+          const folly::Optional<uint64_t>& maybeCwndInBytesIn);
+      Builder&& setWritableBytes(
+          const folly::Optional<uint64_t>& maybeWritableBytesIn);
       WriteEvent build() &&;
       explicit Builder() = default;
     };
@@ -149,6 +165,10 @@ class Observer {
       Builder&& setLastPacketSentTime(const TimePoint& lastPacketSentTimeIn);
       Builder&& setLastPacketSentTime(
           const folly::Optional<TimePoint>& maybeLastPacketSentTimeIn);
+      Builder&& setCwndInBytes(
+          const folly::Optional<uint64_t>& maybeCwndInBytesIn);
+      Builder&& setWritableBytes(
+          const folly::Optional<uint64_t>& maybeWritableBytesIn);
       AppLimitedEvent build() &&;
       explicit Builder() = default;
     };
@@ -186,6 +206,10 @@ class Observer {
       Builder&& setNumAckElicitingPacketsWritten(
           const uint64_t numAckElicitingPacketsWrittenIn);
       Builder&& setNumBytesWritten(const uint64_t numBytesWrittenIn);
+      Builder&& setCwndInBytes(
+          const folly::Optional<uint64_t>& maybeCwndInBytesIn);
+      Builder&& setWritableBytes(
+          const folly::Optional<uint64_t>& maybeWritableBytesIn);
       PacketsWrittenEvent build() &&;
       explicit Builder() = default;
     };

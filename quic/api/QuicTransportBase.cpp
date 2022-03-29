@@ -3547,6 +3547,16 @@ void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
+          .setCwndInBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getCongestionWindow())
+                  : folly::none)
+          .setWritableBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getWritableBytes())
+                  : folly::none)
           .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().appRateLimitedEvents) {
@@ -3564,6 +3574,16 @@ void QuicTransportBase::notifyPacketsWritten(
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
+          .setCwndInBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getCongestionWindow())
+                  : folly::none)
+          .setWritableBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getWritableBytes())
+                  : folly::none)
           .setNumPacketsWritten(numPacketsWritten)
           .setNumAckElicitingPacketsWritten(numAckElicitingPacketsWritten)
           .setNumBytesWritten(numBytesWritten)
@@ -3581,6 +3601,16 @@ void QuicTransportBase::notifyAppRateLimited() {
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
+          .setCwndInBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getCongestionWindow())
+                  : folly::none)
+          .setWritableBytes(
+              conn_->congestionController
+                  ? folly::Optional<uint64_t>(
+                        conn_->congestionController->getWritableBytes())
+                  : folly::none)
           .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().appRateLimitedEvents) {

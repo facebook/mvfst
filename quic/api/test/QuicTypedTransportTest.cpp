@@ -7,11 +7,13 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <chrono>
 
 #include <quic/api/test/Mocks.h>
 #include <quic/api/test/QuicTypedTransportTestUtil.h>
 #include <quic/codec/Types.h>
+#include <quic/congestion_control/StaticCwndCongestionController.h>
 #include <quic/fizz/client/test/QuicClientTransportTestUtil.h>
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 #include <quic/state/AckEvent.h>
@@ -94,7 +96,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoMinRtt) {
   {
     // get the packet's send time
     const auto packetSentTime =
-        CHECK_NOTNULL(this->getLastAppDataPacketWritten())->metadata.time;
+        CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
     // deliver an ACK for the outstanding packet 31 ms later
     const auto packetAckTime = packetSentTime + 31ms;
@@ -126,7 +128,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoMinRtt) {
   {
     // get the packet's send time
     const auto packetSentTime =
-        CHECK_NOTNULL(this->getLastAppDataPacketWritten())->metadata.time;
+        CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
     // deliver an ACK for the outstanding packet 42 ms later
     const auto packetAckTime = packetSentTime + 42ms;
@@ -158,7 +160,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoMinRtt) {
   {
     // get the packet's send time
     const auto packetSentTime =
-        CHECK_NOTNULL(this->getLastAppDataPacketWritten())->metadata.time;
+        CHECK_NOTNULL(this->getNewestAppDataOutstandingPacket())->metadata.time;
 
     // deliver an ACK for the outstanding packet 19 ms later
     const auto packetAckTime = packetSentTime + 19ms;
@@ -1166,6 +1168,568 @@ TYPED_TEST(
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPacket(maybeRstPacketNum.value()));
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    WriteEventsOutstandingPacketSent) {
+  InSequence s;
+
+  // ACK outstanding packets so that we can switch out the congestion control
+  this->ackAllOutstandingPackets();
+  EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+
+  // determine the starting writeCount
+  auto writeCount = this->getConn().writeCount;
+
+  // install StaticCwndCongestionController
+  const auto cwndInBytes = 10000;
+  this->getNonConstConn().congestionController =
+      std::make_unique<StaticCwndCongestionController>(
+          StaticCwndCongestionController::CwndInBytes(cwndInBytes));
+
+  MockObserver::Config configWithEventsEnabled;
+  configWithEventsEnabled.appRateLimitedEvents = true;
+  configWithEventsEnabled.packetsWrittenEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithEvents1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+  auto observerWithEvents2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+
+  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
+  transport->addObserver(observerWithNoEvents.get());
+  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
+  transport->addObserver(observerWithEvents1.get());
+  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
+  transport->addObserver(observerWithEvents2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoEvents.get(),
+          observerWithEvents1.get(),
+          observerWithEvents2.get()));
+
+  // string to write
+  const std::string str1 = "hello";
+  const auto strLength = str1.length();
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // setup matchers
+  {
+    writeCount++; // write count will be incremented
+
+    // matcher for event from startWritingFromAppLimited
+    const auto startWritingFromAppLimitedMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field(
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
+        .Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+    EXPECT_CALL(
+        *observerWithEvents2,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+
+    // matcher for event from packetsWritten
+    const auto packetsWrittenMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check in WillOnce()
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field( // precise check in WillOnce()
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(strLength)));
+    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+
+    // matcher for event from appRateLimited
+    const auto appRateLimitedMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check below
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))));
+
+    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, appRateLimited(transport, appRateLimitedMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, appRateLimited(transport, appRateLimitedMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+        });
+  }
+
+  // open a stream and write string
+  {
+    this->getTransport()->writeChain(streamId, IOBuf::copyBuffer(str1), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+  }
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    WriteEventsOutstandingPacketSentWroteMoreThanCwnd) {
+  InSequence s;
+
+  // ACK outstanding packets so that we can switch out the congestion control
+  this->ackAllOutstandingPackets();
+  EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+
+  // determine the starting writeCount
+  auto writeCount = this->getConn().writeCount;
+
+  // install StaticCwndCongestionController with a CWND < MSS
+  const auto cwndInBytes = 800;
+  this->getNonConstConn().congestionController =
+      std::make_unique<StaticCwndCongestionController>(
+          StaticCwndCongestionController::CwndInBytes(cwndInBytes));
+
+  MockObserver::Config configWithEventsEnabled;
+  configWithEventsEnabled.appRateLimitedEvents = true;
+  configWithEventsEnabled.packetsWrittenEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithEvents1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+  auto observerWithEvents2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+
+  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
+  transport->addObserver(observerWithNoEvents.get());
+  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
+  transport->addObserver(observerWithEvents1.get());
+  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
+  transport->addObserver(observerWithEvents2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoEvents.get(),
+          observerWithEvents1.get(),
+          observerWithEvents2.get()));
+
+  // we're going to write 1000 bytes with a smaller CWND
+  // because MSS > CWND, we're going to overshoot
+  const auto bufLength = 1000;
+  auto buf = buildRandomInputData(bufLength);
+  EXPECT_GT(bufLength, cwndInBytes);
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // setup matchers
+  {
+    writeCount++; // write count will be incremented
+
+    // matcher for event from startWritingFromAppLimited
+    const auto startWritingFromAppLimitedMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field(
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
+        .Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+    EXPECT_CALL(
+        *observerWithEvents2,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+
+    // matcher for event from packetsWritten
+    const auto packetsWrittenMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check in WillOnce()
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(0))),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field( // precise check in WillOnce(), expect overshoot CWND
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::AllOf(testing::Gt(bufLength), testing::Gt(cwndInBytes))));
+    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+  }
+
+  // open a stream and write string
+  {
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // should have sent one packet
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+  }
+
+  // TODO(bschlinker): Check for appRateLimited on ACK so that we get an
+  // appRateLimited signal when the outstanding packet is ACKed.
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    WriteEventsOutstandingPacketsSentCwndLimited) {
+  InSequence s;
+
+  // ACK outstanding packets so that we can switch out the congestion control
+  this->ackAllOutstandingPackets();
+  EXPECT_THAT(this->getConn().outstandings.packets, IsEmpty());
+
+  // determine the starting writeCount
+  auto writeCount = this->getConn().writeCount;
+
+  // install StaticCwndCongestionController
+  const auto cwndInBytes = 7000;
+  this->getNonConstConn().congestionController =
+      std::make_unique<StaticCwndCongestionController>(
+          StaticCwndCongestionController::CwndInBytes(cwndInBytes));
+
+  MockObserver::Config configWithEventsEnabled;
+  configWithEventsEnabled.appRateLimitedEvents = true;
+  configWithEventsEnabled.packetsWrittenEvents = true;
+
+  auto transport = this->getTransport();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithEvents1 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+  auto observerWithEvents2 =
+      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+
+  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
+  transport->addObserver(observerWithNoEvents.get());
+  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
+  transport->addObserver(observerWithEvents1.get());
+  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
+  transport->addObserver(observerWithEvents2.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(
+          observerWithNoEvents.get(),
+          observerWithEvents1.get(),
+          observerWithEvents2.get()));
+
+  // open stream that we will write to
+  const auto streamId =
+      this->getTransport()->createBidirectionalStream().value();
+
+  // we're going to write 10000 bytes with a CWND of 7000
+  const auto bufLength = 10000;
+  auto buf = buildRandomInputData(bufLength);
+  EXPECT_EQ(7000, cwndInBytes);
+
+  // setup matchers for first write, write the entire buffer, trigger loop
+  // we will NOT become app limited after this write, as CWND limited
+  {
+    writeCount++; // write count will be incremented
+    const auto packetsExpectedWritten = 5;
+
+    // matcher for event from startWritingFromAppLimited
+    const auto startWritingFromAppLimitedMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field(
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
+    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
+        .Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+    EXPECT_CALL(
+        *observerWithEvents2,
+        startWritingFromAppLimited(
+            transport, startWritingFromAppLimitedMatcher));
+
+    // matcher for event from packetsWritten
+    const auto packetsWrittenMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(packetsExpectedWritten)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check in WillOnce()
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Eq(folly::Optional<uint64_t>(0))), // CWND exhausted
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(packetsExpectedWritten)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(packetsExpectedWritten)),
+        testing::Field( // precise check in WillOnce()
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Ge(cwndInBytes))); // full CWND written
+    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+
+    this->getTransport()->writeChain(streamId, std::move(buf), false);
+    const auto maybeWrittenPackets = this->loopForWrites();
+
+    // make sure we wrote
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(packetsExpectedWritten, lastPacketNum - firstPacketNum + 1);
+  }
+
+  // ACK all outstanding packets
+  this->ackAllOutstandingPackets();
+
+  // setup matchers for second write, then trigger loop
+  // we will become app limited after this write
+  {
+    writeCount++; // write count will be incremented
+    const auto packetsExpectedWritten = 2;
+
+    // matcher for event from packetsWritten
+    const auto packetsWrittenMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(packetsExpectedWritten)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check in WillOnce()
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Lt(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(packetsExpectedWritten)),
+        testing::Field(
+            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            testing::Eq(packetsExpectedWritten)),
+        testing::Field( // precise check in WillOnce()
+            &Observer::PacketsWrittenEvent::numBytesWritten,
+            testing::Lt(cwndInBytes)));
+    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+          EXPECT_EQ(bytesWritten, event.numBytesWritten);
+        });
+
+    // matcher for event from appRateLimited
+    const auto appRateLimitedMatcher = AllOf(
+        testing::Property(
+            &Observer::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(packetsExpectedWritten)),
+        testing::Field(
+            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+        testing::Field(
+            &Observer::WriteEvent::maybeCwndInBytes,
+            testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
+        testing::Field( // precise check in WillOnce()
+            &Observer::WriteEvent::maybeWritableBytes,
+            testing::Lt(folly::Optional<uint64_t>(cwndInBytes))));
+    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(
+        *observerWithEvents1, appRateLimited(transport, appRateLimitedMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+        });
+    EXPECT_CALL(
+        *observerWithEvents2, appRateLimited(transport, appRateLimitedMatcher))
+        .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
+                      const auto& socket, const auto& event) {
+          const auto bytesWritten =
+              socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
+          EXPECT_EQ(
+              folly::Optional<uint64_t>(std::max(
+                  int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
+              event.maybeWritableBytes);
+        });
+
+    const auto maybeWrittenPackets = this->loopForWrites();
+    ASSERT_TRUE(maybeWrittenPackets.has_value());
+    quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+    quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+    EXPECT_EQ(packetsExpectedWritten, lastPacketNum - firstPacketNum + 1);
+  }
 
   this->destroyTransport();
 }

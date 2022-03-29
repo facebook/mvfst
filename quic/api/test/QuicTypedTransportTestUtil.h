@@ -85,18 +85,40 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
-   * Returns the last outstanding packet written of the specified type.
+   * Returns the first outstanding packet written of the specified type.
+   *
+   * If no outstanding packets of the specified type, returns nullptr.
    *
    * Since this is a reference to a packet in the outstanding packets deque, it
    * should not be stored.
    */
   const OutstandingPacket* FOLLY_NULLABLE
-  getLastPacketWritten(const quic::PacketNumberSpace packetNumberSpace) {
+  getOldestOutstandingPacket(const quic::PacketNumberSpace packetNumberSpace) {
+    const auto outstandingPacketIt =
+        getFirstOutstandingPacket(this->getNonConstConn(), packetNumberSpace);
+    if (outstandingPacketIt ==
+        this->getNonConstConn().outstandings.packets.end()) {
+      return nullptr;
+    }
+    return &*outstandingPacketIt;
+  }
+
+  /**
+   * Returns the last outstanding packet written of the specified type.
+   *
+   * If no outstanding packets of the specified type, returns nullptr.
+   *
+   * Since this is a reference to a packet in the outstanding packets deque, it
+   * should not be stored.
+   */
+  const OutstandingPacket* FOLLY_NULLABLE
+  getNewestOutstandingPacket(const quic::PacketNumberSpace packetNumberSpace) {
     const auto outstandingPacketIt =
         getLastOutstandingPacket(this->getNonConstConn(), packetNumberSpace);
-    CHECK(
-        outstandingPacketIt !=
-        this->getNonConstConn().outstandings.packets.rend());
+    if (outstandingPacketIt ==
+        this->getNonConstConn().outstandings.packets.rend()) {
+      return nullptr;
+    }
     return &*outstandingPacketIt;
   }
 
@@ -108,8 +130,41 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
    * Since this is a reference to a packet in the outstanding packets deque, it
    * should not be stored.
    */
-  const OutstandingPacket* FOLLY_NULLABLE getLastAppDataPacketWritten() {
-    return getLastPacketWritten(PacketNumberSpace::AppData);
+  const OutstandingPacket* FOLLY_NULLABLE getNewestAppDataOutstandingPacket() {
+    return getNewestOutstandingPacket(PacketNumberSpace::AppData);
+  }
+
+  /**
+   * Acks all outstanding packets for the specified packet number space.
+   */
+  void ackAllOutstandingPackets(
+      quic::PacketNumberSpace pnSpace,
+      quic::TimePoint recvTime = TimePoint::clock::now()) {
+    auto oldestOutstandingPkt = getOldestOutstandingPacket(pnSpace);
+    auto newestOutstandingPkt = getNewestOutstandingPacket(pnSpace);
+    CHECK_EQ(oldestOutstandingPkt == nullptr, newestOutstandingPkt == nullptr);
+    if (!oldestOutstandingPkt) {
+      return;
+    }
+
+    QuicTransportTestClass::deliverData(
+        NetworkData(
+            buildAckPacketForSentPackets(
+                pnSpace,
+                oldestOutstandingPkt->packet.header.getPacketSequenceNum(),
+                newestOutstandingPkt->packet.header.getPacketSequenceNum()),
+            recvTime),
+        false /* loopForWrites */);
+  }
+
+  /**
+   * Acks all outstanding packets for all packet number spaces.
+   */
+  void ackAllOutstandingPackets(
+      quic::TimePoint recvTime = TimePoint::clock::now()) {
+    ackAllOutstandingPackets(quic::PacketNumberSpace::Initial, recvTime);
+    ackAllOutstandingPackets(quic::PacketNumberSpace::Handshake, recvTime);
+    ackAllOutstandingPackets(quic::PacketNumberSpace::AppData, recvTime);
   }
 
   /**
@@ -223,24 +278,57 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Build a packet from peer with ACK frame for previously sent packets.
+   */
+  quic::Buf buildAckPacketForSentPackets(
+      quic::PacketNumberSpace pnSpace,
+      quic::AckBlocks acks) {
+    quic::PacketNum peerPacketNum{0};
+    switch (pnSpace) {
+      case quic::PacketNumberSpace::Initial:
+        peerPacketNum = peerNextInitialPacketNum;
+        peerNextInitialPacketNum++;
+        break;
+      case quic::PacketNumberSpace::Handshake:
+        peerPacketNum = peerNextHandshakePacketNum;
+        peerNextHandshakePacketNum++;
+        break;
+      case quic::PacketNumberSpace::AppData:
+        peerPacketNum = peerNextAppDataPacketNum;
+        peerNextAppDataPacketNum++;
+        break;
+    }
+
+    auto buf = quic::test::packetToBuf(quic::test::createAckPacket(
+        getNonConstConn(), peerPacketNum, acks, pnSpace));
+    buf->coalesce();
+    return buf;
+  }
+
+  /**
+   * Build a packet from peer with ACK frame for previously sent packets.
+   */
+  quic::Buf buildAckPacketForSentPackets(
+      quic::PacketNumberSpace pnSpace,
+      quic::PacketNum intervalStart,
+      quic::PacketNum intervalEnd) {
+    quic::AckBlocks acks = {{intervalStart, intervalEnd}};
+    return buildAckPacketForSentPackets(pnSpace, acks);
+  }
+
+  /**
+   * Build a packet from peer with ACK frame for previously sent AppData pkts.
+   */
+  quic::Buf buildAckPacketForSentAppDataPackets(quic::AckBlocks acks) {
+    return buildAckPacketForSentPackets(quic::PacketNumberSpace::AppData, acks);
+  }
+
+  /**
    * Build a packet with ACK frame for previously sent AppData packet.
    */
   quic::Buf buildAckPacketForSentAppDataPacket(quic::PacketNum packetNum) {
     quic::AckBlocks acks = {{packetNum, packetNum}};
     return buildAckPacketForSentAppDataPackets(acks);
-  }
-
-  /**
-   * Build a packet from peer with ACK frame for previously AppData packets.
-   */
-  quic::Buf buildAckPacketForSentAppDataPackets(quic::AckBlocks acks) {
-    auto buf = quic::test::packetToBuf(quic::test::createAckPacket(
-        getNonConstConn(),
-        ++peerNextAppDataPacketNum,
-        acks,
-        quic::PacketNumberSpace::AppData));
-    buf->coalesce();
-    return buf;
   }
 
   /**
@@ -603,6 +691,8 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
     return getPacketNumsFromIntervals(writeIntervals);
   }
 
+  quic::PacketNum peerNextInitialPacketNum{0};
+  quic::PacketNum peerNextHandshakePacketNum{0};
   quic::PacketNum peerNextAppDataPacketNum{0};
 };
 
