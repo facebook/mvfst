@@ -7,14 +7,18 @@
 
 #pragma once
 
+#include <folly/Random.h>
 #include <folly/container/EvictingCacheMap.h>
 #include <folly/container/F14Map.h>
 #include <folly/container/F14Set.h>
 #include <folly/io/SocketOptionMap.h>
 #include <folly/io/async/AsyncUDPSocket.h>
 #include <folly/small_vector.h>
+#include <cstdint>
+#include <type_traits>
 
 #include <quic/codec/ConnectionIdAlgo.h>
+#include <quic/codec/QuicConnectionId.h>
 #include <quic/common/BufAccessor.h>
 #include <quic/common/Timers.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
@@ -24,6 +28,7 @@
 #include <quic/server/QuicUDPSocketFactory.h>
 #include <quic/server/RateLimiter.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
+#include <quic/server/third-party/siphash.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
@@ -389,11 +394,34 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   using ConnIdToTransportMap = folly::
       F14FastMap<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;
 
+  struct SourceIdentityKey {
+    struct sockaddr_storage storage {};
+    std::array<uint8_t, kMaxConnectionIdSize> connidData{};
+    uint16_t port;
+    std::array<uint8_t, 2> padding{};
+    SourceIdentityKey(const QuicServerTransport::SourceIdentity& sid)
+        : port(sid.first.getPort()) {
+      memcpy(connidData.data(), sid.second.data(), sid.second.size());
+      sid.first.getAddress(&storage);
+    }
+  };
+
+  template <class T>
+  using has_no_padding = std::conjunction<
+      std::is_standard_layout<std::decay_t<T>>,
+      std::has_unique_object_representations<std::decay_t<T>>>;
+
+  static_assert(
+      has_no_padding<SourceIdentityKey>::value,
+      "SourceIdentityKey must have no padding");
+
   struct SourceIdentityHash {
     size_t operator()(const QuicServerTransport::SourceIdentity& sid) const {
-      return folly::hash::hash_combine(
-          folly::hash::fnv32_buf(sid.second.data(), sid.second.size()),
-          sid.first.hash());
+      static const ::siphash::Key hashKey(
+          folly::Random::secureRandom<std::uint64_t>(),
+          folly::Random::secureRandom<std::uint64_t>());
+      SourceIdentityKey key(sid);
+      return siphash::siphash24(&key, sizeof(key), &hashKey);
     }
   };
   using SrcToTransportMap = folly::F14FastMap<
