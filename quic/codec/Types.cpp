@@ -453,6 +453,8 @@ std::string toString(QuicVersion version) {
       return "MVFST_INVALID";
     case QuicVersion::MVFST_EXPERIMENTAL2:
       return "MVFST_EXPERIMENTAL2";
+    case QuicVersion::MVFST_ALIAS2:
+      return "MVFST_ALIAS2";
   }
   LOG(WARNING) << "toString has unhandled version type";
   return "UNKNOWN";
