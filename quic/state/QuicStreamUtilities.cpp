@@ -25,6 +25,14 @@ bool isBidirectionalStream(StreamId stream) {
   return !isUnidirectionalStream(stream);
 }
 
+bool isClientBidirectionalStream(StreamId streamId) {
+  return isClientStream(streamId) && isBidirectionalStream(streamId);
+}
+
+bool isServerUnidirectionalStream(StreamId streamId) {
+  return isServerStream(streamId) && isUnidirectionalStream(streamId);
+}
+
 StreamDirectionality getStreamDirectionality(StreamId stream) {
   return isUnidirectionalStream(stream) ? StreamDirectionality::Unidirectional
                                         : StreamDirectionality::Bidirectional;

@@ -37,6 +37,16 @@ bool isUnidirectionalStream(StreamId stream);
 bool isBidirectionalStream(StreamId stream);
 
 /**
+ * Returns whether the given StreamId identifies a client bidirectional stream.
+ */
+bool isClientBidirectionalStream(StreamId stream);
+
+/**
+ * Returns whether the given StreamId identifies a server unidirectional stream.
+ */
+bool isServerUnidirectionalStream(StreamId stream);
+
+/**
  * Returns directionality (unidirectional or bidirectional) of a stream by ID.
  */
 StreamDirectionality getStreamDirectionality(StreamId stream);

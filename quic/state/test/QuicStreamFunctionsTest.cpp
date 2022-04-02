@@ -1103,6 +1103,32 @@ TEST_F(QuicStreamFunctionsTest, IsBidirectionalStream) {
   EXPECT_FALSE(isBidirectionalStream(0xff));
 }
 
+TEST_F(QuicStreamFunctionsTest, IsServerUnidirectionalStream) {
+  EXPECT_TRUE(isServerUnidirectionalStream(0x03));
+  EXPECT_TRUE(isServerUnidirectionalStream(0x07));
+  EXPECT_TRUE(isServerUnidirectionalStream(0x0f));
+  EXPECT_TRUE(isServerUnidirectionalStream(0xf3));
+  EXPECT_TRUE(isServerUnidirectionalStream(0xff));
+  EXPECT_FALSE(isServerUnidirectionalStream(0x01));
+  EXPECT_FALSE(isServerUnidirectionalStream(0x02));
+  EXPECT_FALSE(isServerUnidirectionalStream(0x0e));
+  EXPECT_FALSE(isServerUnidirectionalStream(0xf1));
+  EXPECT_FALSE(isServerUnidirectionalStream(0xfd));
+}
+
+TEST_F(QuicStreamFunctionsTest, IsClientBidirectionalStream) {
+  EXPECT_TRUE(isClientBidirectionalStream(0x00));
+  EXPECT_TRUE(isClientBidirectionalStream(0x04));
+  EXPECT_TRUE(isClientBidirectionalStream(0x08));
+  EXPECT_TRUE(isClientBidirectionalStream(0xf0));
+  EXPECT_TRUE(isClientBidirectionalStream(0xfc));
+  EXPECT_FALSE(isClientBidirectionalStream(0x01));
+  EXPECT_FALSE(isClientBidirectionalStream(0x02));
+  EXPECT_FALSE(isClientBidirectionalStream(0x03));
+  EXPECT_FALSE(isClientBidirectionalStream(0xf1));
+  EXPECT_FALSE(isClientBidirectionalStream(0xff));
+}
+
 TEST_F(QuicStreamFunctionsTest, GetStreamDirectionality) {
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0x01));
   EXPECT_EQ(StreamDirectionality::Bidirectional, getStreamDirectionality(0xf0));
