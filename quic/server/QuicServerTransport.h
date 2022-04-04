@@ -125,6 +125,8 @@ class QuicServerTransport
 
   void setClientChosenDestConnectionId(const ConnectionId& serverCid);
 
+  void verifiedClientAddress();
+
   // From QuicTransportBase
   void onReadData(
       const folly::SocketAddress& peer,

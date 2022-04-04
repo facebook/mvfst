@@ -696,6 +696,9 @@ void QuicServerWorker::dispatchPacketData(
           trans->setHandshakeFinishedCallback(this);
           trans->setSupportedVersions(supportedVersions_);
           trans->setOriginalPeerAddress(client);
+          if (isValidNewToken) {
+            trans->verifiedClientAddress();
+          }
 #ifdef CCP_ENABLED
           trans->setCcpDatapath(getCcpReader()->getDatapath());
 #endif

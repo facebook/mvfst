@@ -2970,6 +2970,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingNewData) {
   auto currentPacketSeqNum = conn->ackStates.appDataAckState.nextPacketNum;
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
+  EXPECT_CALL(*mockCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(2000));
   auto rawCongestionController = mockCongestionController.get();
   conn->congestionController = std::move(mockCongestionController);
   EventBase evb;
@@ -3059,6 +3061,8 @@ TEST_F(QuicTransportFunctionsTest, WriteProbingCryptoData) {
   // Replace real congestionController with MockCongestionController:
   auto mockCongestionController =
       std::make_unique<NiceMock<MockCongestionController>>();
+  EXPECT_CALL(*mockCongestionController, getWritableBytes())
+      .WillRepeatedly(Return(2000));
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
   EventBase evb;

@@ -3261,6 +3261,212 @@ TEST_F(QuicUnencryptedServerTransportTest, TestNoAckOnlyCryptoInitial) {
   }
 }
 
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    TestHandshakeNotWritableBytesLimited) {
+  /**
+   * Set the WritableBytes limit to 5x (~ 5 * 1200 = 6,000). This will be enough
+   * for the handshake to fit (1200 initial + 3000 handshake = 4,200 < 6,000).
+   */
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.limitedCwndInMss = 5;
+  server->setTransportSettings(transportSettings);
+  server->getNonConstConn().enableWritableBytesLimit = true;
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
+
+  recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
+
+  EXPECT_GE(serverWrites.size(), 3);
+
+  AckStates ackStates;
+
+  auto clientCodec = makeClientEncryptedCodec(true);
+  bool hasCryptoInitialFrame = false;
+  bool hasCryptoHandshakeFrame = false;
+  bool hasAckFrame = false;
+
+  /**
+   * Verify that we've written some cypto frames (initial, handshake packet
+   * spaces) and some acks.
+   */
+  for (auto& write : serverWrites) {
+    auto packetQueue = bufToQueue(write->clone());
+    auto result = clientCodec->parsePacket(packetQueue, ackStates);
+    auto& regularPacket = *result.regularPacket();
+    // EXPECT_TRUE(regularPacket);
+    ProtectionType protectionType = regularPacket.header.getProtectionType();
+    EXPECT_GE(regularPacket.frames.size(), 1);
+    bool hasCryptoFrame = false;
+    for (auto& frame : regularPacket.frames) {
+      hasCryptoFrame |= frame.asReadCryptoFrame() != nullptr;
+      hasAckFrame |= frame.asReadAckFrame() != nullptr;
+    }
+
+    hasCryptoInitialFrame |=
+        (protectionType == ProtectionType::Initial && hasCryptoFrame);
+    hasCryptoHandshakeFrame |=
+        (protectionType == ProtectionType::Handshake && hasCryptoFrame);
+  }
+
+  EXPECT_TRUE(hasCryptoInitialFrame);
+  EXPECT_TRUE(hasCryptoHandshakeFrame);
+  // skipping ack-only initial should not kick in here since we also have crypto
+  // data to write.
+  EXPECT_TRUE(hasAckFrame);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    TestHandshakeWritableBytesLimitedWithCFin) {
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited())
+      .Times(AtLeast(1));
+  /**
+   * Set the WritableBytes limit to 3x (~ 3 * 1200 = 3,600). This will not be
+   * enough for the handshake to fit (1200 initial + 4000 handshake = 5,200 >
+   * 3,600). We expect to be WritableBytes limited. After receiving an ack/cfin
+   * from the client, the limit should increase and we're now unblocked.
+   */
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.limitedCwndInMss = 3;
+  server->setTransportSettings(transportSettings);
+  server->getNonConstConn().enableWritableBytesLimit = true;
+
+  recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
+
+  // basically the maximum we can write is three packets before we hit the limit
+  EXPECT_EQ(serverWrites.size(), 3);
+
+  AckStates ackStates;
+
+  auto clientCodec = makeClientEncryptedCodec(true);
+  bool hasCryptoInitialFrame, hasCryptoHandshakeFrame, hasAckFrame;
+  hasCryptoInitialFrame = hasCryptoHandshakeFrame = hasAckFrame = false;
+
+  for (auto& write : serverWrites) {
+    auto packetQueue = bufToQueue(write->clone());
+    auto result = clientCodec->parsePacket(packetQueue, ackStates);
+    auto& regularPacket = *result.regularPacket();
+    // EXPECT_TRUE(regularPacket);
+    ProtectionType protectionType = regularPacket.header.getProtectionType();
+    EXPECT_GE(regularPacket.frames.size(), 1);
+    bool hasCryptoFrame = false;
+    for (auto& frame : regularPacket.frames) {
+      hasCryptoFrame |= frame.asReadCryptoFrame() != nullptr;
+      hasAckFrame |= frame.asReadAckFrame() != nullptr;
+    }
+
+    hasCryptoInitialFrame |=
+        (protectionType == ProtectionType::Initial && hasCryptoFrame);
+    hasCryptoHandshakeFrame |=
+        (protectionType == ProtectionType::Handshake && hasCryptoFrame);
+  }
+
+  EXPECT_TRUE(hasCryptoInitialFrame);
+  EXPECT_TRUE(hasCryptoHandshakeFrame);
+  EXPECT_TRUE(hasAckFrame);
+  /**
+   * Let's now send an ack/cfin to the server which will unblock and let us
+   * finish the handshake. The packets written by the server at this point are
+   * expected to have crypto data and acks only in the handshake pn space, not
+   * initial.
+   */
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
+  serverWrites.clear();
+  recvClientFinished();
+  EXPECT_TRUE(server->getConn().isClientAddrVerified);
+  EXPECT_FALSE(server->getConn().writableBytesLimit);
+  EXPECT_GT(serverWrites.size(), 0);
+
+  hasCryptoInitialFrame = hasCryptoHandshakeFrame = hasAckFrame = false;
+
+  for (auto& write : serverWrites) {
+    auto packetQueue = bufToQueue(write->clone());
+    auto result = clientCodec->parsePacket(packetQueue, ackStates);
+    auto& regularPacket = *result.regularPacket();
+    ProtectionType protectionType = regularPacket.header.getProtectionType();
+    EXPECT_GE(regularPacket.frames.size(), 1);
+    bool hasCryptoFrame = false;
+    for (auto& frame : regularPacket.frames) {
+      hasCryptoFrame |= frame.asReadCryptoFrame() != nullptr;
+      hasAckFrame |= frame.asReadAckFrame() != nullptr;
+    }
+
+    hasCryptoHandshakeFrame |=
+        (protectionType == ProtectionType::Handshake && hasCryptoFrame);
+  }
+
+  // We don't expect crypto frame in initial pnspace since we're done
+  EXPECT_FALSE(hasCryptoInitialFrame);
+  EXPECT_TRUE(hasCryptoHandshakeFrame);
+  EXPECT_TRUE(hasAckFrame);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    TestHandshakeWritableBytesLimitedPartialAck) {
+  /**
+   * Set the WritableBytes limit to 3x (~ 3 * 1200 = 3,600). This will not be
+   * enough for the handshake to fit (1200 initial + 4000 handshake = 5,200 >
+   * 3,600). We expect to be WritableBytes limited. After receiving an ack
+   * from the client acking only the initial crypto data, the pto should fire
+   * immediately to resend the handshake crypto data.
+   */
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.limitedCwndInMss = 3;
+  server->setTransportSettings(transportSettings);
+  server->getNonConstConn().enableWritableBytesLimit = true;
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited())
+      .Times(AtLeast(1));
+
+  recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
+
+  // basically the maximum we can write is three packets before we hit the limit
+  EXPECT_EQ(serverWrites.size(), 3);
+
+  AckStates ackStates;
+
+  auto clientCodec = makeClientEncryptedCodec(true);
+
+  for (auto& write : serverWrites) {
+    auto packetQueue = bufToQueue(write->clone());
+    auto result = clientCodec->parsePacket(packetQueue, ackStates);
+    EXPECT_TRUE(result.regularPacket());
+  }
+
+  /**
+   * Let's now send an partial ack to the server, acking only the initial pn
+   * space, which will unblock and let us finish the handshake. Since we've
+   * already sent the handshake data, we expect a pto to fire immediately and
+   */
+
+  serverWrites.clear();
+  auto nextPacketNum = clientNextInitialPacketNum++;
+  auto aead = getInitialCipher();
+  auto headerCipher = getInitialHeaderCipher();
+  AckBlocks acks;
+  auto start = getFirstOutstandingPacket(
+                   server->getNonConstConn(), PacketNumberSpace::Initial)
+                   ->packet.header.getPacketSequenceNum();
+  auto end = getLastOutstandingPacket(
+                 server->getNonConstConn(), PacketNumberSpace::Initial)
+                 ->packet.header.getPacketSequenceNum();
+  acks.insert(start, end);
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
+  deliverData(packetToBufCleartext(
+      createAckPacket(
+          server->getNonConstConn(),
+          nextPacketNum,
+          acks,
+          PacketNumberSpace::Initial,
+          aead.get()),
+      *aead,
+      *headerCipher,
+      nextPacketNum));
+
+  // The server is unblocked and should now be able to finish the handshake
+  EXPECT_GE(serverWrites.size(), 1);
+}
+
 TEST_F(QuicUnencryptedServerTransportTest, TestCorruptedDstCidInitialTest) {
   auto chlo = folly::IOBuf::copyBuffer("CHLO");
   auto nextPacketNum = clientNextInitialPacketNum++;
@@ -3387,6 +3593,7 @@ TEST_F(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDone) {
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
   EXPECT_CALL(handshakeFinishedCallback, onHandshakeFinished());
   getFakeHandshakeLayer()->allowZeroRttKeys();
   setupClientReadCodec();
@@ -3430,6 +3637,7 @@ std::pair<int, std::vector<const NewTokenFrame*>> getNewTokenFrame(
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
   std::array<uint8_t, kRetryTokenSecretLength> secret;
   folly::Random::secureRandom(secret.data(), secret.size());
   server->getNonConstConn().transportSettings.retryTokenSecret = secret;

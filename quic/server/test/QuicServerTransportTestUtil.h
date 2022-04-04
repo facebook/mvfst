@@ -353,6 +353,9 @@ class QuicServerTransportTestBase : public virtual testing::Test {
   virtual void setupConnection() {
     EXPECT_EQ(server->getConn().readCodec, nullptr);
     EXPECT_EQ(server->getConn().statsCallback, quicStats_.get());
+    // None of these connections should cause the server to get WritableBytes
+    // limited.
+    EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
     // Not all connections are successful, in which case we don't call
     // onConnectionClose. The best we can test here is that onConnectionClose
     // doesn't get invoked more than once

@@ -287,6 +287,7 @@ enum class QuicVersion : uint32_t {
   MVFST_INVALID = 0xfaceb00f,
   MVFST_EXPERIMENTAL2 = 0xfaceb011, // Experimental alias for MVFST
   MVFST_ALIAS2 = 0xfaceb012,
+  MVFST_EXPERIMENTAL3 = 0xfaceb013, // Experimental alias for MVFST
 };
 
 using QuicVersionType = std::underlying_type<QuicVersion>::type;
@@ -395,10 +396,10 @@ constexpr uint64_t kDefaultMaxCwndInMss = 2000;
 // Max cwnd limit for perf test purpose
 constexpr uint64_t kLargeMaxCwndInMss = 860000;
 
-// When server receives early data attempt without valid source address token,
+// When server receives initial data without valid source address token,
 // server will limit bytes in flight to avoid amplification attack until CFIN
 // is received which proves sender owns the address.
-constexpr uint64_t kLimitedCwndInMss = 3;
+constexpr uint64_t kLimitedCwndInMss = 5;
 
 /* Hybrid slow start: */
 // The first kAckSampling Acks within a RTT round will be used to sample delays

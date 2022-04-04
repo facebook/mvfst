@@ -915,6 +915,7 @@ uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn) {
         conn.lossState.srtt == 0us ? kDefaultInitialRtt : conn.lossState.srtt);
   } else if (conn.writableBytesLimit) {
     if (*conn.writableBytesLimit <= conn.lossState.totalBytesSent) {
+      QUIC_STATS(conn.statsCallback, onConnectionWritableBytesLimited);
       return 0;
     }
     writableBytes = *conn.writableBytesLimit - conn.lossState.totalBytesSent;
@@ -1468,7 +1469,7 @@ uint64_t writeProbingDataToSocket(
                      builder,
                      pnSpace,
                      cloningScheduler,
-                     unlimitedWritableBytes,
+                     congestionControlWritableBytes,
                      probesToSend,
                      aead,
                      headerCipher,
@@ -1492,7 +1493,7 @@ uint64_t writeProbingDataToSocket(
                    builder,
                    pnSpace,
                    pingScheduler,
-                   unlimitedWritableBytes,
+                   congestionControlWritableBytes,
                    probesToSend - written,
                    aead,
                    headerCipher,

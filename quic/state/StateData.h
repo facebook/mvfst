@@ -333,7 +333,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // When server receives early data attempt without valid source address token,
   // server will limit bytes in flight to avoid amplification attack.
   // This limit should be cleared and set back to max after CFIN is received.
-  folly::Optional<uint32_t> writableBytesLimit;
+  folly::Optional<uint64_t> writableBytesLimit;
 
   std::unique_ptr<PendingPathRateLimiter> pathValidationLimiter;
 
