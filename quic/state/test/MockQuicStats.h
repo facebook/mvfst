@@ -33,6 +33,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onForwardedPacketProcessed, ());
   MOCK_METHOD(void, onClientInitialReceived, (QuicVersion));
   MOCK_METHOD(void, onConnectionRateLimited, ());
+  MOCK_METHOD(void, onConnectionWritableBytesLimited, ());
   MOCK_METHOD(void, onNewConnection, ());
   MOCK_METHOD(void, onConnectionClose, (folly::Optional<QuicErrorCode>));
   MOCK_METHOD(void, onConnectionCloseZeroBytesWritten, ());

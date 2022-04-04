@@ -95,6 +95,8 @@ class QuicTransportStatsCallback {
 
   virtual void onConnectionRateLimited() = 0;
 
+  virtual void onConnectionWritableBytesLimited() = 0;
+
   virtual void onNewTokenReceived() = 0;
 
   virtual void onNewTokenIssued() = 0;
