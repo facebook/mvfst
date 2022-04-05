@@ -891,6 +891,9 @@ void QuicClientTransport::writeData() {
         (conn_->ackStates.initialAckState.needsToSendAckImmediately &&
          hasAcksToSchedule(conn_->ackStates.initialAckState))) {
       CHECK(conn_->initialHeaderCipher);
+      std::string& token = clientConn_->retryToken.empty()
+          ? clientConn_->newToken
+          : clientConn_->retryToken;
       packetLimit -= writeCryptoAndAckDataToSocket(
                          *socket_,
                          *conn_,
@@ -901,7 +904,7 @@ void QuicClientTransport::writeData() {
                          *conn_->initialHeaderCipher,
                          version,
                          packetLimit,
-                         clientConn_->retryToken)
+                         token)
                          .packetsWritten;
     }
     if (!packetLimit && !conn_->pendingEvents.anyProbePackets()) {

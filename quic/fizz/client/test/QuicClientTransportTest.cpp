@@ -124,10 +124,10 @@ class QuicClientTransportIntegrationTest : public TestWithParam<TestingParams> {
     }));
     transportSettings.zeroRttSourceTokenMatchingPolicy =
         ZeroRttSourceTokenMatchingPolicy::LIMIT_IF_NO_EXACT_MATCH;
+    std::array<uint8_t, kRetryTokenSecretLength> secret;
+    folly::Random::secureRandom(secret.data(), secret.size());
+    transportSettings.retryTokenSecret = secret;
     if (withRetryPacket) {
-      std::array<uint8_t, kRetryTokenSecretLength> secret;
-      folly::Random::secureRandom(secret.data(), secret.size());
-      transportSettings.retryTokenSecret = secret;
       server->setRateLimit([]() { return 0u; }, 1s);
     }
     server->setTransportStatsCallbackFactory(std::move(statsFactory));
@@ -604,6 +604,82 @@ TEST_P(QuicClientTransportIntegrationTest, ZeroRttRetryPacketTest) {
 
   EXPECT_FALSE(client->getConn().zeroRttWriteCipher);
   EXPECT_TRUE(client->getConn().statelessResetToken.has_value());
+}
+
+TEST_P(QuicClientTransportIntegrationTest, NewTokenReceived) {
+  std::string newToken;
+  client->setNewTokenCallback(
+      [&](std::string token) { newToken = std::move(token); });
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  EXPECT_FALSE(newToken.empty());
+}
+
+TEST_P(QuicClientTransportIntegrationTest, UseNewTokenThenReceiveRetryToken) {
+  std::string newToken;
+  client->setNewTokenCallback(
+      [&](std::string token) { newToken = std::move(token); });
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  auto streamId = client->createBidirectionalStream().value();
+  auto data = IOBuf::copyBuffer("hello");
+  auto expected = std::shared_ptr<IOBuf>(IOBuf::copyBuffer("echo "));
+  expected->prependChain(data->clone());
+  sendRequestAndResponseAndWait(*expected, data->clone(), streamId, &readCb);
+
+  EXPECT_FALSE(newToken.empty());
+
+  /**
+   * At this point we have a valid new token, so we're going to do the
+   * following:
+   * 1. create a new client and set the new token to the one received above
+
+   * 2. create a new server with a rate limit of zero, forcing retry packet (the
+   *    new token will get rejected since the token secrets aren't the same, but
+   *    this doesn't really affect anything for this test)
+   *
+   * 3. connect to the new server, verify that the tokens are non-empty and not
+   *    equal.
+   */
+  client = createClient();
+  client->setNewToken(newToken);
+
+  auto retryServer = createServer(ProcessId::ONE, true);
+  client->getNonConstConn().peerAddress = retryServer->getAddress();
+
+  SCOPE_EXIT {
+    retryServer->shutdown();
+    retryServer = nullptr;
+  };
+
+  client->start(&clientConnSetupCallback, &clientConnCallback);
+
+  EXPECT_CALL(clientConnSetupCallback, onTransportReady()).WillOnce(Invoke([&] {
+    CHECK(client->getConn().oneRttWriteCipher);
+    eventbase_.terminateLoopSoon();
+  }));
+  eventbase_.loopForever();
+
+  EXPECT_FALSE(client->getConn().retryToken.empty());
+  EXPECT_NE(newToken, client->getConn().retryToken);
 }
 
 TEST_P(QuicClientTransportIntegrationTest, TestZeroRttRejection) {

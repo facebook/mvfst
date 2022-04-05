@@ -170,7 +170,7 @@ class QuicClientTransport
    * attempting to connect.
    */
   void setNewToken(std::string token) noexcept {
-    clientConn_->retryToken = std::move(token);
+    clientConn_->newToken = std::move(token);
   }
 
   class HappyEyeballsConnAttemptDelayTimeout

@@ -44,6 +44,10 @@ struct QuicClientConnectionState : public QuicConnectionStateBase {
   // The retry token sent by the server.
   std::string retryToken;
 
+  // The new token that potentially verifies the address of the
+  // client.
+  std::string newToken;
+
   // This is the destination connection id that will be sent in the outgoing
   // client initial packet. It is modified in the event of a retry.
   folly::Optional<ConnectionId> initialDestinationConnectionId;
