@@ -410,10 +410,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       std::is_standard_layout<std::decay_t<T>>,
       std::has_unique_object_representations<std::decay_t<T>>>;
 
-  static_assert(
-      has_no_padding<SourceIdentityKey>::value,
-      "SourceIdentityKey must have no padding");
-
   struct SourceIdentityHash {
     size_t operator()(const QuicServerTransport::SourceIdentity& sid) const;
   };
