@@ -30,6 +30,7 @@
 #include <quic/server/QuicServerWorker.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 #include <quic/server/handshake/TokenGenerator.h>
+#include <quic/server/third-party/siphash.h>
 #include <quic/state/QuicConnectionStats.h>
 
 namespace quic {
@@ -1424,6 +1425,15 @@ void QuicServerWorker::getAllConnectionsStats(
     connStats.numConnIDs = connEntry.second;
     stats.emplace_back(connStats);
   }
+}
+
+size_t QuicServerWorker::SourceIdentityHash::operator()(
+    const QuicServerTransport::SourceIdentity& sid) const {
+  static const ::siphash::Key hashKey(
+      folly::Random::secureRandom<std::uint64_t>(),
+      folly::Random::secureRandom<std::uint64_t>());
+  SourceIdentityKey key(sid);
+  return siphash::siphash24(&key, sizeof(key), &hashKey);
 }
 
 } // namespace quic

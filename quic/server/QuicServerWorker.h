@@ -28,7 +28,6 @@
 #include <quic/server/QuicUDPSocketFactory.h>
 #include <quic/server/RateLimiter.h>
 #include <quic/server/state/ServerConnectionIdRejector.h>
-#include <quic/server/third-party/siphash.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicTransportStatsCallback.h>
 
@@ -416,13 +415,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       "SourceIdentityKey must have no padding");
 
   struct SourceIdentityHash {
-    size_t operator()(const QuicServerTransport::SourceIdentity& sid) const {
-      static const ::siphash::Key hashKey(
-          folly::Random::secureRandom<std::uint64_t>(),
-          folly::Random::secureRandom<std::uint64_t>());
-      SourceIdentityKey key(sid);
-      return siphash::siphash24(&key, sizeof(key), &hashKey);
-    }
+    size_t operator()(const QuicServerTransport::SourceIdentity& sid) const;
   };
   using SrcToTransportMap = folly::F14FastMap<
       QuicServerTransport::SourceIdentity,
