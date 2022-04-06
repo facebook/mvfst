@@ -1432,8 +1432,30 @@ size_t QuicServerWorker::SourceIdentityHash::operator()(
   static const ::siphash::Key hashKey(
       folly::Random::secureRandom<std::uint64_t>(),
       folly::Random::secureRandom<std::uint64_t>());
-  SourceIdentityKey key(sid);
-  return siphash::siphash24(&key, sizeof(key), &hashKey);
+
+  // We opt to manually lay out the key in order to ensure that our key
+  // has a unique object representation. (i.e. no padding).
+  //
+  // (sockaddr, quic connection id, port)
+  constexpr size_t kKeySize =
+      sizeof(struct sockaddr_storage) + kMaxConnectionIdSize + sizeof(uint16_t);
+
+  // Zero initialization is intentional here.
+  std::array<unsigned char, kKeySize> key{};
+
+  struct sockaddr_storage* storage =
+      reinterpret_cast<struct sockaddr_storage*>(key.data());
+  const auto& sockaddr = sid.first;
+  sockaddr.getAddress(storage);
+
+  unsigned char* connid = key.data() + sizeof(struct sockaddr_storage);
+  memcpy(connid, sid.second.data(), sid.second.size());
+
+  uint16_t* port = reinterpret_cast<uint16_t*>(
+      key.data() + sizeof(struct sockaddr_storage) + kMaxConnectionIdSize);
+  *port = sid.first.getPort();
+
+  return siphash::siphash24(key.data(), key.size(), &hashKey);
 }
 
 } // namespace quic

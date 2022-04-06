@@ -393,23 +393,6 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   using ConnIdToTransportMap = folly::
       F14FastMap<ConnectionId, QuicServerTransport::Ptr, ConnectionIdHash>;
 
-  struct SourceIdentityKey {
-    struct sockaddr_storage storage {};
-    std::array<uint8_t, kMaxConnectionIdSize> connidData{};
-    uint16_t port;
-    std::array<uint8_t, 2> padding{};
-    SourceIdentityKey(const QuicServerTransport::SourceIdentity& sid)
-        : port(sid.first.getPort()) {
-      memcpy(connidData.data(), sid.second.data(), sid.second.size());
-      sid.first.getAddress(&storage);
-    }
-  };
-
-  template <class T>
-  using has_no_padding = std::conjunction<
-      std::is_standard_layout<std::decay_t<T>>,
-      std::has_unique_object_representations<std::decay_t<T>>>;
-
   struct SourceIdentityHash {
     size_t operator()(const QuicServerTransport::SourceIdentity& sid) const;
   };
