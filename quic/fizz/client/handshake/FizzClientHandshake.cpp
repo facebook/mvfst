@@ -286,6 +286,8 @@ class FizzClientHandshake::ActionMoveVisitor {
                 CipherKind::HandshakeRead,
                 folly::range(secretAvailable.secret.secret));
             break;
+          case fizz::HandshakeSecrets::ECHAcceptConfirmation:
+            break;
         }
         break;
       case fizz::SecretType::Type::AppTrafficSecrets_E:
