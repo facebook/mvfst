@@ -792,7 +792,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
   EXPECT_TRUE(result.packetEvent.has_value());
   EXPECT_TRUE(result.packet.has_value());
 
-  // Cloned packet has to have at least one ack frame AND the crypto data.
+  // Cloned packet has to have crypto data and no acks.
   bool hasAckFrame = false;
   bool hasCryptoFrame = false;
   for (auto iter = result.packet->packet.frames.cbegin();
@@ -810,7 +810,7 @@ TEST_F(QuicPacketSchedulerTest, CloneSchedulerHasHandshakeDataAndAcks) {
         break;
     }
   }
-  EXPECT_TRUE(hasAckFrame);
+  EXPECT_FALSE(hasAckFrame);
   EXPECT_TRUE(hasCryptoFrame);
 }
 

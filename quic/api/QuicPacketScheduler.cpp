@@ -887,14 +887,6 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
     // Rebuilder will write the rest of frames
     auto rebuildResult = rebuilder.rebuildFromPacket(outstandingPacket);
     if (rebuildResult) {
-      if (conn_.version.has_value() &&
-          conn_.version.value() == QuicVersion::MVFST_EXPERIMENTAL2) {
-        // Check if we have any acks pending and write those into the cloned
-        // packet as well.
-        if (frameScheduler_.hasPendingAcks()) {
-          frameScheduler_.writeNextAcks(*internalBuilder);
-        }
-      }
       return SchedulingResult(
           std::move(rebuildResult), std::move(*internalBuilder).buildPacket());
     } else if (
