@@ -88,7 +88,7 @@ constexpr uint64_t kDefaultD6DBlackholeDetectionThreshold = 8;
 // 1 means GRO is not enabled
 // 64 is the max possible value
 constexpr uint16_t kMinNumGROBuffers = 1;
-constexpr uint16_t kMaxNumGROBuffers = 16;
+constexpr uint16_t kMaxNumGROBuffers = 64;
 constexpr uint16_t kDefaultNumGROBuffers = kMinNumGROBuffers;
 
 constexpr uint16_t kMaxNumCoalescedPackets = 5;
