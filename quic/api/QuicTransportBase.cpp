@@ -165,7 +165,7 @@ QuicTransportBase::~QuicTransportBase() {
 }
 
 bool QuicTransportBase::good() const {
-  return hasWriteCipher() && !error();
+  return closeState_ == CloseState::OPEN && hasWriteCipher() && !error();
 }
 
 bool QuicTransportBase::replaySafe() const {
