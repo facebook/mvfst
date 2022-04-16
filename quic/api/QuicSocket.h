@@ -918,7 +918,7 @@ class QuicSocket {
    */
   class DeliveryCallback : public ByteEventCallback {
    public:
-    virtual ~DeliveryCallback() = default;
+    ~DeliveryCallback() override = default;
 
     /**
      * Invoked when the peer has acknowledged the receipt of the specified
