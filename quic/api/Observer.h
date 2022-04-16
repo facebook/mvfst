@@ -88,7 +88,7 @@ class Observer : public SocketObserverInterface {
   explicit Observer(const Config& observerConfig)
       : observerConfig_(observerConfig) {}
 
-  virtual ~Observer() = default;
+  ~Observer() override = default;
 
   /**
    * Returns observers configuration.
