@@ -839,7 +839,72 @@ TYPED_TEST_SUITE(
     ::TransportTypes,
     ::TransportTypeNames);
 
-TYPED_TEST(QuicTypedTransportTestForObservers, Attach) {
+TYPED_TEST(QuicTypedTransportTestForObservers, AttachThenDetach) {
+  auto transport = this->getTransport();
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_EQ(0, transport->numObservers());
+  EXPECT_THAT(transport->findObservers(), IsEmpty());
+
+  EXPECT_CALL(*observer, attached(transport));
+  transport->addObserver(observer.get());
+  EXPECT_EQ(1, transport->numObservers());
+  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+
+  EXPECT_CALL(*observer, detached(transport));
+  EXPECT_TRUE(transport->removeObserver(observer.get()));
+  Mock::VerifyAndClearExpectations(observer.get());
+  EXPECT_EQ(0, transport->numObservers());
+  EXPECT_THAT(transport->findObservers(), IsEmpty());
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    CloseNoErrorThenDestroyTransport) {
+  auto transport = this->getTransport();
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_CALL(*observer, attached(transport));
+  transport->addObserver(observer.get());
+  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+
+  const QuicError defaultError = QuicError(
+      GenericApplicationErrorCode::NO_ERROR,
+      toString(GenericApplicationErrorCode::NO_ERROR));
+  EXPECT_CALL(
+      *observer, close(transport, folly::Optional<QuicError>(defaultError)));
+  transport->close(folly::none);
+  Mock::VerifyAndClearExpectations(observer.get());
+  InSequence s;
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
+  this->destroyTransport();
+  Mock::VerifyAndClearExpectations(observer.get());
+}
+
+TYPED_TEST(
+    QuicTypedTransportTestForObservers,
+    CloseWithErrorThenDestroyTransport) {
+  auto transport = this->getTransport();
+  auto observer = std::make_unique<StrictMock<MockObserver>>();
+
+  EXPECT_CALL(*observer, attached(transport));
+  transport->addObserver(observer.get());
+  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+
+  const auto testError = QuicError(
+      QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
+      std::string("testError"));
+  EXPECT_CALL(
+      *observer, close(transport, folly::Optional<QuicError>(testError)));
+  transport->close(testError);
+  Mock::VerifyAndClearExpectations(observer.get());
+  InSequence s;
+  EXPECT_CALL(*observer, destroyed(transport, IsNull()));
+  this->destroyTransport();
+  Mock::VerifyAndClearExpectations(observer.get());
+}
+
+TYPED_TEST(QuicTypedTransportTestForObservers, LegacyAttachThenDetach) {
   auto transport = this->getTransport();
   auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 
@@ -854,7 +919,7 @@ TYPED_TEST(QuicTypedTransportTestForObservers, Attach) {
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    CloseNoErrorThenDestroyTransport) {
+    LegacyCloseNoErrorThenDestroyTransport) {
   auto transport = this->getTransport();
   auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 
@@ -877,7 +942,7 @@ TYPED_TEST(
 
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
-    CloseWithErrorThenDestroyTransport) {
+    LegacyCloseWithErrorThenDestroyTransport) {
   auto transport = this->getTransport();
   auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 

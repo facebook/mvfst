@@ -191,6 +191,11 @@ class QuicClientTransport
   };
 
  protected:
+  // From QuicSocket
+  SocketObserverContainer* getSocketObserverContainer() const override {
+    return observerContainer_.get();
+  }
+
   // From AsyncUDPSocket::ReadCallback
   void getReadBuffer(void** buf, size_t* len) noexcept override;
   void onDataAvailable(
@@ -269,5 +274,13 @@ class QuicClientTransport
   bool transportKnobsSent_{false};
   // Callback function to invoke when the client receives a new token
   std::function<void(std::string)> newTokenCallback_;
+
+  // Container of observers for the socket / transport.
+  //
+  // This member MUST be last in the list of members to ensure it is destroyed
+  // first, before any other members are destroyed. This ensures that observers
+  // can inspect any socket / transport state available through public methods
+  // when destruction of the transport begins.
+  const std::shared_ptr<SocketObserverContainer> observerContainer_;
 };
 } // namespace quic

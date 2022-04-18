@@ -161,6 +161,11 @@ class QuicServerTransport
   virtual CipherInfo getOneRttCipherInfo() const;
 
  protected:
+  // From QuicSocket
+  SocketObserverContainer* getSocketObserverContainer() const override {
+    return observerContainer_.get();
+  }
+
   // From ServerHandshake::HandshakeCallback
   virtual void onCryptoEventAvailable() noexcept override;
 
@@ -197,5 +202,13 @@ class QuicServerTransport
       uint64_t,
       std::function<void(QuicServerTransport*, uint64_t)>>
       transportKnobParamHandlers_;
+
+  // Container of observers for the socket / transport.
+  //
+  // This member MUST be last in the list of members to ensure it is destroyed
+  // first, before any other members are destroyed. This ensures that observers
+  // can inspect any socket / transport state available through public methods
+  // when destruction of the transport begins.
+  const std::shared_ptr<SocketObserverContainer> observerContainer_;
 };
 } // namespace quic

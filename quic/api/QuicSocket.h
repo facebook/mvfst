@@ -15,6 +15,7 @@
 #include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
+#include <quic/observer/SocketObserverContainer.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamUtilities.h>
@@ -1208,6 +1209,63 @@ class QuicSocket {
    */
   FOLLY_NODISCARD virtual const ObserverVec& getObservers() const = 0;
 
+  using Observer = SocketObserverContainer::Observer;
+  using ManagedObserver = SocketObserverContainer::ManagedObserver;
+
+  /**
+   * Adds an observer.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(Observer* observer) {
+    if (auto list = getSocketObserverContainer()) {
+      list->addObserver(observer);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(Observer* observer) {
+    if (auto list = getSocketObserverContainer()) {
+      return list->removeObserver(observer);
+    }
+    return false;
+  }
+
+  /**
+   * Get number of observers.
+   *
+   * @return             Number of observers.
+   */
+  [[nodiscard]] size_t numObservers() const {
+    if (auto list = getSocketObserverContainer()) {
+      return list->numObservers();
+    }
+    return 0;
+  }
+
+  /**
+   * Returns list of attached observers that are of type T.
+   *
+   * @return             Attached observers of type T.
+   */
+  template <typename T = Observer>
+  std::vector<T*> findObservers() {
+    if (auto list = getSocketObserverContainer()) {
+      return list->findObservers<T>();
+    }
+    return {};
+  }
+
   /**
    * Returns varios stats of the connection.
    */
@@ -1262,5 +1320,24 @@ class QuicSocket {
    */
   virtual folly::Expected<std::vector<Buf>, LocalErrorCode> readDatagramBufs(
       size_t atMost = 0) = 0;
+
+ protected:
+  /**
+   * Returns the SocketObserverList or nullptr if not available.
+   *
+   * QuicSocket implementations that support observers should override this
+   * function and return the socket observer list that they hold in memory.
+   *
+   * We have a default implementation to ensure that there is no risk of a
+   * pure-virtual function being called during constructon or destruction of
+   * the socket. If this was to occur the derived class which implements this
+   * function may be unavailable leading to undefined behavior. While this is
+   * true for any pure-virtual function, the potential for this issue is
+   * greater for observers.
+   */
+  [[nodiscard]] virtual SocketObserverContainer* getSocketObserverContainer()
+      const {
+    return nullptr;
+  }
 };
 } // namespace quic

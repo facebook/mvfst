@@ -258,6 +258,23 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD(void, onSuspiciousReadLoops, (uint64_t, NoReadReason));
 };
 
+class MockObserver : public QuicSocket::ManagedObserver {
+ public:
+  using QuicSocket::ManagedObserver::ManagedObserver;
+  MOCK_METHOD((void), attached, (QuicSocket*), (noexcept));
+  MOCK_METHOD((void), detached, (QuicSocket*), (noexcept));
+  MOCK_METHOD(
+      (void),
+      destroyed,
+      (QuicSocket*, QuicSocket::Observer::DestroyContext* ctx),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
+      close,
+      (QuicSocket*, const folly::Optional<QuicError>&),
+      (noexcept));
+};
+
 class MockLegacyObserver : public LegacyObserver {
  public:
   MockLegacyObserver() : LegacyObserver(LegacyObserver::Config()) {}

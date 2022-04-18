@@ -641,6 +641,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
+  using QuicSocket::addObserver;
+  using QuicSocket::removeObserver;
+
   /**
    * Adds an observer.
    *

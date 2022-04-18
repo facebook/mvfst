@@ -50,7 +50,8 @@ QuicServerTransport::QuicServerTransport(
           evb,
           std::move(sock),
           useConnectionEndWithErrorCallback),
-      ctx_(std::move(ctx)) {
+      ctx_(std::move(ctx)),
+      observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
   auto tempConn = std::make_unique<QuicServerConnectionState>(
       FizzServerQuicHandshakeContext::Builder()
           .setFizzServerContext(ctx_)

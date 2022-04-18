@@ -249,8 +249,17 @@ void QuicTransportBase::closeImpl(
     return;
   }
 
+  // legacy observer support
   for (const auto& cb : *observers_) {
     cb->close(this, errorCode);
+  }
+
+  // new observer support
+  if (auto list = getSocketObserverContainer()) {
+    list->invokeInterfaceMethodAllObservers(
+        [errorCode](auto observer, auto observed) {
+          observer->close(observed, errorCode);
+        });
   }
 
   drainConnection = drainConnection & conn_->transportSettings.shouldDrain;

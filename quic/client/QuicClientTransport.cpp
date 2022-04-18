@@ -59,7 +59,8 @@ QuicClientTransport::QuicClientTransport(
           evb,
           std::move(socket),
           useConnectionEndWithErrorCallback),
-      happyEyeballsConnAttemptDelayTimeout_(this) {
+      happyEyeballsConnAttemptDelayTimeout_(this),
+      observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
   DCHECK(handshakeFactory);
   auto tempConn =
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
