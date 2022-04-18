@@ -3482,9 +3482,9 @@ TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
   auto conn = transport->transportConn;
 
   // attach an observer to the socket
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.knobFrameEvents = true;
-  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>(config);
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   Mock::VerifyAndClearExpectations(cb.get());
@@ -3547,7 +3547,7 @@ TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverAttachRemove) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3558,13 +3558,13 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemove) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultiple) {
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
   Mock::VerifyAndClearExpectations(cb1.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
 
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb2, observerAttach(transport.get()));
   transport->addObserver(cb2.get());
   Mock::VerifyAndClearExpectations(cb2.get());
@@ -3583,13 +3583,13 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultiple) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultipleReverse) {
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
   Mock::VerifyAndClearExpectations(cb1.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
 
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb2, observerAttach(transport.get()));
   transport->addObserver(cb2.get());
   Mock::VerifyAndClearExpectations(cb2.get());
@@ -3608,13 +3608,13 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultipleReverse) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverRemoveMissing) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_FALSE(transport->removeObserver(cb.get()));
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
 TEST_F(QuicTransportImplTest, ObserverDestroyTransport) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3626,7 +3626,7 @@ TEST_F(QuicTransportImplTest, ObserverDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3645,7 +3645,7 @@ TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3664,7 +3664,7 @@ TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverDetachObserverImmediately) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3676,7 +3676,7 @@ TEST_F(QuicTransportImplTest, ObserverDetachObserverImmediately) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverDetachObserverAfterTransportClose) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3694,7 +3694,7 @@ TEST_F(QuicTransportImplTest, ObserverDetachObserverAfterTransportClose) {
 TEST_F(
     QuicTransportImplTest,
     ObserverDetachObserverOnCloseDuringTransportDestroy) {
-  auto cb = std::make_unique<StrictMock<MockObserver>>();
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb.get()));
@@ -3710,12 +3710,12 @@ TEST_F(
 }
 
 TEST_F(QuicTransportImplTest, ObserverMultipleAttachRemove) {
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
 
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb2, observerAttach(transport.get()));
   transport->addObserver(cb2.get());
   EXPECT_THAT(
@@ -3737,12 +3737,12 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachRemove) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
   EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(cb1.get()));
 
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>();
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb2, observerAttach(transport.get()));
   transport->addObserver(cb2.get());
   EXPECT_THAT(
@@ -3759,9 +3759,9 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverDetachAndAttachEvb) {
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.evbEvents = true;
-  auto cb = std::make_unique<StrictMock<MockObserver>>(config);
+  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>(config);
   folly::EventBase evb2;
 
   EXPECT_CALL(*cb, observerAttach(transport.get()));

@@ -26,7 +26,7 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
 
   QUIC_STATS(conn.statsCallback, onConnectionPMTUUpperBoundDetected);
   if (conn.observers->size() > 0) {
-    Observer::PMTUUpperBoundEvent upperBoundEvent(
+    SocketObserverInterface::PMTUUpperBoundEvent upperBoundEvent(
         now,
         std::chrono::duration_cast<std::chrono::microseconds>(
             now - d6d.meta.timeLastNonSearchState),
@@ -58,7 +58,7 @@ static TimePoint reportBlackhole(
   auto& d6d = conn.d6d;
   const auto now = Clock::now();
   if (conn.observers->size() > 0) {
-    Observer::PMTUBlackholeEvent blackholeEvent(
+    SocketObserverInterface::PMTUBlackholeEvent blackholeEvent(
         now,
         std::chrono::duration_cast<std::chrono::microseconds>(
             now - d6d.meta.timeLastNonSearchState),

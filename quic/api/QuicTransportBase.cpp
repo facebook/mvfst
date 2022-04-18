@@ -1487,7 +1487,9 @@ void QuicTransportBase::handleKnobCallbacks() {
       for (const auto& cb : *observers_) {
         if (cb->getConfig().knobFrameEvents) {
           cb->knobFrameReceived(
-              this, quic::Observer::KnobFrameEvent(Clock::now(), knobFrame));
+              this,
+              quic::SocketObserverInterface::KnobFrameEvent(
+                  Clock::now(), knobFrame));
         }
       }
 
@@ -1507,9 +1509,10 @@ void QuicTransportBase::handleAckEventCallbacks() {
     return; // nothing to do
   }
 
-  const auto event = quic::Observer::AcksProcessedEvent::Builder()
-                         .setAckEvents(lastProcessedAckEvents)
-                         .build();
+  const auto event =
+      quic::SocketObserverInterface::AcksProcessedEvent::Builder()
+          .setAckEvents(lastProcessedAckEvents)
+          .build();
   for (const auto& cb : *observers_) {
     if (cb->getConfig().acksProcessedEvents) {
       cb->acksProcessed(this, event);
@@ -1541,7 +1544,7 @@ void QuicTransportBase::handleNewStreamCallbacks(
     } else {
       connCallback_->onNewUnidirectionalStream(streamId);
     }
-    const Observer::StreamOpenEvent streamEvent(
+    const SocketObserverInterface::StreamOpenEvent streamEvent(
         streamId,
         getStreamInitiator(streamId),
         getStreamDirectionality(streamId));
@@ -1883,7 +1886,7 @@ QuicTransportBase::createStreamInternal(bool bidirectional) {
   }
   if (streamResult) {
     const StreamId streamId = streamResult.value()->id;
-    const Observer::StreamOpenEvent streamEvent(
+    const SocketObserverInterface::StreamOpenEvent streamEvent(
         streamId,
         getStreamInitiator(streamId),
         getStreamDirectionality(streamId));
@@ -2391,7 +2394,7 @@ void QuicTransportBase::checkForClosedStream() {
   auto itr = conn_->streamManager->closedStreams().begin();
   while (itr != conn_->streamManager->closedStreams().end()) {
     const auto& streamId = *itr;
-    const Observer::StreamCloseEvent streamEvent(
+    const SocketObserverInterface::StreamCloseEvent streamEvent(
         streamId,
         getStreamInitiator(streamId),
         getStreamDirectionality(streamId));
@@ -2826,7 +2829,7 @@ void QuicTransportBase::resetNonControlStreams(
   }
 }
 
-void QuicTransportBase::addObserver(Observer* observer) {
+void QuicTransportBase::addObserver(LegacyObserver* observer) {
   // adding the same observer multiple times is not allowed
   CHECK(
       std::find(observers_->begin(), observers_->end(), observer) ==
@@ -2836,7 +2839,7 @@ void QuicTransportBase::addObserver(Observer* observer) {
   observer->observerAttach(this);
 }
 
-bool QuicTransportBase::removeObserver(Observer* observer) {
+bool QuicTransportBase::removeObserver(LegacyObserver* observer) {
   auto it = std::find(observers_->begin(), observers_->end(), observer);
   if (it == observers_->end()) {
     return false;
@@ -3546,7 +3549,7 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
 
 void QuicTransportBase::notifyStartWritingFromAppRateLimited() {
   const auto event =
-      Observer::AppLimitedEvent::Builder()
+      SocketObserverInterface::AppLimitedEvent::Builder()
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
@@ -3573,7 +3576,7 @@ void QuicTransportBase::notifyPacketsWritten(
     uint64_t numAckElicitingPacketsWritten,
     uint64_t numBytesWritten) {
   const auto event =
-      Observer::PacketsWrittenEvent::Builder()
+      SocketObserverInterface::PacketsWrittenEvent::Builder()
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)
@@ -3600,7 +3603,7 @@ void QuicTransportBase::notifyPacketsWritten(
 
 void QuicTransportBase::notifyAppRateLimited() {
   const auto event =
-      Observer::AppLimitedEvent::Builder()
+      SocketObserverInterface::AppLimitedEvent::Builder()
           .setOutstandingPackets(conn_->outstandings.packets)
           .setWriteCount(conn_->writeCount)
           .setLastPacketSentTime(conn_->lossState.maybeLastPacketSentTime)

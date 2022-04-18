@@ -73,7 +73,7 @@ AckEvent processAckFrame(
   uint64_t dsrPacketsAcked = 0;
   folly::Optional<decltype(conn.lossState.lastAckedPacketSentTime)>
       lastAckedPacketSentTime;
-  folly::Optional<Observer::SpuriousLossEvent> spuriousLossEvent;
+  folly::Optional<LegacyObserver::SpuriousLossEvent> spuriousLossEvent;
   // Used for debug only.
   const auto originalPacketCount = conn.outstandings.packetCount;
   if (conn.observers->size() > 0) {
@@ -198,7 +198,7 @@ AckEvent processAckFrame(
             ackReceiveTimeOrNow - rPacketIt->metadata.time);
         if (rttSample != rttSample.zero()) {
           // notify observers
-          const Observer::PacketRTT packetRTT(
+          const SocketObserverInterface::PacketRTT packetRTT(
               ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
           for (const auto& observer : *(conn.observers)) {
             conn.pendingCallbacks.emplace_back(

@@ -139,12 +139,14 @@ ProbeSizeRaiserType parseRaiserType(uint32_t type) {
   }
 }
 
-class TPerfObserver : public Observer {
+class TPerfObserver : public LegacyObserver {
  public:
-  TPerfObserver(const Observer::Config& config) : Observer(config) {}
+  explicit TPerfObserver(const LegacyObserver::Config& config)
+      : LegacyObserver(config) {}
   void appRateLimited(
       QuicSocket* /* socket */,
-      const quic::Observer::AppLimitedEvent& /* appLimitedEvent */) override {
+      const quic::SocketObserverInterface::
+          AppLimitedEvent& /* appLimitedEvent */) override {
     if (FLAGS_log_app_rate_limited) {
       LOG(INFO) << "appRateLimited detected";
     }
@@ -200,7 +202,7 @@ class TPerfAcceptObserver : public AcceptObserver {
   TPerfAcceptObserver() {
     // Create an observer config, only enabling events we are interested in
     // receiving.
-    Observer::Config config = {};
+    LegacyObserver::Config config = {};
     config.appRateLimitedEvents = true;
     config.pmtuEvents = true;
     config.rttSamples = true;

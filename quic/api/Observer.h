@@ -29,7 +29,7 @@ class QuicSocket;
 /**
  * Observer of socket events.
  */
-class Observer : public SocketObserverInterface {
+class LegacyObserver : public SocketObserverInterface {
  public:
   /**
    * Observer configuration.
@@ -78,17 +78,17 @@ class Observer : public SocketObserverInterface {
   /**
    * Constructor for observer, uses default config (all callbacks disabled).
    */
-  Observer() : Observer(Config()) {}
+  LegacyObserver() : LegacyObserver(Config()) {}
 
   /**
    * Constructor for observer.
    *
    * @param config      Config, defaults to auxilary instrumentaton disabled.
    */
-  explicit Observer(const Config& observerConfig)
+  explicit LegacyObserver(const Config& observerConfig)
       : observerConfig_(observerConfig) {}
 
-  ~Observer() override = default;
+  ~LegacyObserver() override = default;
 
   /**
    * Returns observers configuration.
@@ -130,6 +130,6 @@ class Observer : public SocketObserverInterface {
 
 // Container for instrumentation observers.
 // Avoids heap allocation for up to 2 observers being installed.
-using ObserverVec = SmallVec<Observer*, 2>;
+using ObserverVec = SmallVec<LegacyObserver*, 2>;
 
 } // namespace quic

@@ -2322,9 +2322,9 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   conn.congestionController = std::move(mockCongestionController);
 
   // Register 1 observer
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.rttSamples = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
 
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(&ib);
@@ -2420,11 +2420,16 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
         rttSampleGenerated(
             nullptr,
             AllOf(
-                Field(&Observer::PacketRTT::rcvTime, ackData.ackTime),
-                Field(&Observer::PacketRTT::rttSample, rttSample),
-                Field(&Observer::PacketRTT::ackDelay, ackData.ackDelay),
                 Field(
-                    &Observer::PacketRTT::metadata,
+                    &SocketObserverInterface::PacketRTT::rcvTime,
+                    ackData.ackTime),
+                Field(
+                    &SocketObserverInterface::PacketRTT::rttSample, rttSample),
+                Field(
+                    &SocketObserverInterface::PacketRTT::ackDelay,
+                    ackData.ackDelay),
+                Field(
+                    &SocketObserverInterface::PacketRTT::metadata,
                     Field(
                         &quic::OutstandingPacketMetadata::inflightBytes,
                         ackData.endSeq + 1)))));
@@ -2442,10 +2447,10 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
   conn.congestionController = std::move(mockCongestionController);
 
   // Register 1 observer
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.spuriousLossEvents = true;
   config.lossEvents = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
 
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(&ib);
@@ -2480,11 +2485,11 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
       packetLossDetected(
           nullptr,
           Field(
-              &Observer::LossEvent::lostPackets,
+              &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
-                  MockObserver::getLossPacketMatcher(0, true, false),
-                  MockObserver::getLossPacketMatcher(1, true, false),
-                  MockObserver::getLossPacketMatcher(2, true, false)))))
+                  MockLegacyObserver::getLossPacketMatcher(0, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(1, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
       .Times(1);
 
   // Here we receive the spurious loss packets in a late ack
@@ -2510,11 +2515,11 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
       spuriousLossDetected(
           nullptr,
           Field(
-              &Observer::SpuriousLossEvent::spuriousPackets,
+              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
               UnorderedElementsAre(
-                  MockObserver::getLossPacketMatcher(0, true, false),
-                  MockObserver::getLossPacketMatcher(1, true, false),
-                  MockObserver::getLossPacketMatcher(2, true, false)))))
+                  MockLegacyObserver::getLossPacketMatcher(0, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(1, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
       .Times(1);
 
   for (auto& callback : conn.pendingCallbacks) {
@@ -2529,10 +2534,10 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
   conn.congestionController = std::move(mockCongestionController);
 
   // Register 1 observer
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.spuriousLossEvents = true;
   config.lossEvents = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
 
   auto observers = std::make_shared<ObserverVec>();
   observers->emplace_back(&ib);
@@ -2567,13 +2572,13 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
       packetLossDetected(
           nullptr,
           Field(
-              &Observer::LossEvent::lostPackets,
+              &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
-                  MockObserver::getLossPacketMatcher(5, false, true),
-                  MockObserver::getLossPacketMatcher(6, false, true),
-                  MockObserver::getLossPacketMatcher(7, false, true),
-                  MockObserver::getLossPacketMatcher(8, false, true),
-                  MockObserver::getLossPacketMatcher(9, false, true)))))
+                  MockLegacyObserver::getLossPacketMatcher(5, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(6, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(7, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(8, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
       .Times(1);
 
   // Here we receive the spurious loss packets in a late ack
@@ -2599,13 +2604,13 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
       spuriousLossDetected(
           nullptr,
           Field(
-              &Observer::SpuriousLossEvent::spuriousPackets,
+              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
               UnorderedElementsAre(
-                  MockObserver::getLossPacketMatcher(5, false, true),
-                  MockObserver::getLossPacketMatcher(6, false, true),
-                  MockObserver::getLossPacketMatcher(7, false, true),
-                  MockObserver::getLossPacketMatcher(8, false, true),
-                  MockObserver::getLossPacketMatcher(9, false, true)))))
+                  MockLegacyObserver::getLossPacketMatcher(5, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(6, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(7, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(8, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
       .Times(1);
 
   for (auto& callback : conn.pendingCallbacks) {

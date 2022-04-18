@@ -258,11 +258,11 @@ class MockLoopDetectorCallback : public LoopDetectorCallback {
   MOCK_METHOD(void, onSuspiciousReadLoops, (uint64_t, NoReadReason));
 };
 
-class MockObserver : public Observer {
+class MockLegacyObserver : public LegacyObserver {
  public:
-  MockObserver() : Observer(Observer::Config()) {}
-  MockObserver(const Observer::Config& observerConfig)
-      : Observer(observerConfig) {}
+  MockLegacyObserver() : LegacyObserver(LegacyObserver::Config()) {}
+  explicit MockLegacyObserver(const LegacyObserver::Config& observerConfig)
+      : LegacyObserver(observerConfig) {}
   MOCK_METHOD((void), observerAttach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), observerDetach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), destroy, (QuicSocket*), (noexcept));
@@ -349,12 +349,14 @@ class MockObserver : public Observer {
       bool timeoutLoss) {
     return AllOf(
         testing::Field(
-            &Observer::LostPacket::lostByReorderThreshold,
+            &SocketObserverInterface::LostPacket::lostByReorderThreshold,
             testing::Eq(reorderLoss)),
         testing::Field(
-            &Observer::LostPacket::lostByTimeout, testing::Eq(timeoutLoss)),
+            &SocketObserverInterface::LostPacket::lostByTimeout,
+            testing::Eq(timeoutLoss)),
         testing::Field(
-            &Observer::LostPacket::packet, getLossPacketNum(packetNum)));
+            &SocketObserverInterface::LostPacket::packet,
+            getLossPacketNum(packetNum)));
   }
 
   static auto getStreamEventMatcher(

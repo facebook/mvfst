@@ -376,12 +376,13 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
         return 0;
       }));
 
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
 
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -421,12 +422,13 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(5000));
 
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
 
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -458,12 +460,13 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
 }
 
 TEST_F(QuicTransportTest, ObserverAppLimited) {
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
   EXPECT_CALL(*cb3, observerAttach(transport_.get()));
@@ -506,26 +509,27 @@ TEST_F(QuicTransportTest, ObserverAppLimited) {
 TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   InSequence s;
 
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   const auto invokeForAllObservers =
-      [&cb1, &cb2, &cb3](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
         fn(*cb3);
       };
   const auto invokeForEachObserverWithTestEvents =
-      [&cb1, &cb2](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
       };
 
   // install observers
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, observerAttach(transport_.get()));
     transport_->addObserver(&observer);
   }));
@@ -547,25 +551,29 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   {
     const auto writeEventMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(0)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(0)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)));
     const auto packetsWrittenEventMatcher = AllOf(
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(0)));
 
     invokeForEachObserverWithTestEvents(
-        ([this, &writeEventMatcher](MockObserver& observer) {
+        ([this, &writeEventMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               startWritingFromAppLimited(transport_.get(), writeEventMatcher));
         }));
     invokeForEachObserverWithTestEvents(
         ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               packetsWritten(
@@ -573,7 +581,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
                   AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
         }));
     invokeForEachObserverWithTestEvents(
-        ([this, &writeEventMatcher](MockObserver& observer) {
+        ([this, &writeEventMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer, appRateLimited(transport_.get(), writeEventMatcher));
         }));
@@ -610,12 +618,14 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     {
       const auto writeEventMatcher = AllOf(
           testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(0)),
+              &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+              testing::SizeIs(0)),
           testing::Field(
-              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+              &SocketObserverInterface::WriteEvent::writeCount,
+              testing::Eq(writeNum)));
 
       invokeForEachObserverWithTestEvents(([this, &writeEventMatcher](
-                                               MockObserver& observer) {
+                                               MockLegacyObserver& observer) {
         EXPECT_CALL(
             observer,
             startWritingFromAppLimited(transport_.get(), writeEventMatcher));
@@ -626,20 +636,23 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     {
       const auto writeEventMatcher = AllOf(
           testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+              &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+              testing::SizeIs(5)),
           testing::Field(
-              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+              &SocketObserverInterface::WriteEvent::writeCount,
+              testing::Eq(writeNum)));
       const auto packetsWrittenEventMatcher = AllOf(
           testing::Field(
-              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
               testing::Eq(5)),
           testing::Field(
-              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::
+                  numAckElicitingPacketsWritten,
               testing::Eq(5)));
 
       invokeForEachObserverWithTestEvents(
           ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
-               MockObserver& observer) {
+               MockLegacyObserver& observer) {
             EXPECT_CALL(
                 observer,
                 packetsWritten(
@@ -654,20 +667,23 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     {
       const auto writeEventMatcher = AllOf(
           testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(7)),
+              &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+              testing::SizeIs(7)),
           testing::Field(
-              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+              &SocketObserverInterface::WriteEvent::writeCount,
+              testing::Eq(writeNum)));
       const auto packetsWrittenEventMatcher = AllOf(
           testing::Field(
-              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
               testing::Eq(2)),
           testing::Field(
-              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::
+                  numAckElicitingPacketsWritten,
               testing::Eq(2)));
 
       invokeForEachObserverWithTestEvents(
           ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
-               MockObserver& observer) {
+               MockLegacyObserver& observer) {
             EXPECT_CALL(
                 observer,
                 packetsWritten(
@@ -675,7 +691,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
                     AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
           }));
       invokeForEachObserverWithTestEvents(
-          ([this, &writeEventMatcher](MockObserver& observer) {
+          ([this, &writeEventMatcher](MockLegacyObserver& observer) {
             EXPECT_CALL(
                 observer, appRateLimited(transport_.get(), writeEventMatcher));
           }));
@@ -710,12 +726,14 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     {
       const auto writeEventMatcher = AllOf(
           testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(7)),
+              &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+              testing::SizeIs(7)),
           testing::Field(
-              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+              &SocketObserverInterface::WriteEvent::writeCount,
+              testing::Eq(writeNum)));
 
       invokeForEachObserverWithTestEvents(([this, &writeEventMatcher](
-                                               MockObserver& observer) {
+                                               MockLegacyObserver& observer) {
         EXPECT_CALL(
             observer,
             startWritingFromAppLimited(transport_.get(), writeEventMatcher));
@@ -727,9 +745,9 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
     {
       // older versions of gtest do not seem to accept lambdas for ResultOf
       // matcher, so define an std::function
-      std::function<uint64_t(const Observer::WriteEvent&)>
+      std::function<uint64_t(const SocketObserverInterface::WriteEvent&)>
           countPacketsWithAckFrames =
-              [](const Observer::WriteEvent& event) -> uint64_t {
+              [](const SocketObserverInterface::WriteEvent& event) -> uint64_t {
         uint64_t packetsWithAckFrames = 0;
         for (auto& outstandingPacket : event.outstandingPackets) {
           bool hasAckFrame = false;
@@ -749,20 +767,23 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
       const auto writeEventMatcher = AllOf(
           testing::ResultOf(countPacketsWithAckFrames, 1),
           testing::Property(
-              &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(9)),
+              &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+              testing::SizeIs(9)),
           testing::Field(
-              &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+              &SocketObserverInterface::WriteEvent::writeCount,
+              testing::Eq(writeNum)));
       const auto packetsWrittenEventMatcher = AllOf(
           testing::Field(
-              &Observer::PacketsWrittenEvent::numPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
               testing::Eq(2)),
           testing::Field(
-              &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+              &SocketObserverInterface::PacketsWrittenEvent::
+                  numAckElicitingPacketsWritten,
               testing::Eq(2)));
 
       invokeForEachObserverWithTestEvents(
           ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
-               MockObserver& observer) {
+               MockLegacyObserver& observer) {
             EXPECT_CALL(
                 observer,
                 packetsWritten(
@@ -770,7 +791,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
                     AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
           }));
       invokeForEachObserverWithTestEvents(
-          ([this, &writeEventMatcher](MockObserver& observer) {
+          ([this, &writeEventMatcher](MockLegacyObserver& observer) {
             EXPECT_CALL(
                 observer, appRateLimited(transport_.get(), writeEventMatcher));
           }));
@@ -810,25 +831,29 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
 
     const auto writeEventMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(9)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(9)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)));
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)));
     const auto packetsWrittenEventMatcher = AllOf(
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(0)));
 
     invokeForEachObserverWithTestEvents(
-        ([this, &writeEventMatcher](MockObserver& observer) {
+        ([this, &writeEventMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               startWritingFromAppLimited(transport_.get(), writeEventMatcher));
         }));
     invokeForEachObserverWithTestEvents(
         ([this, &writeEventMatcher, &packetsWrittenEventMatcher](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               packetsWritten(
@@ -836,7 +861,7 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
                   AllOf(writeEventMatcher, packetsWrittenEventMatcher)));
         }));
     invokeForEachObserverWithTestEvents(
-        ([this, &writeEventMatcher](MockObserver& observer) {
+        ([this, &writeEventMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer, appRateLimited(transport_.get(), writeEventMatcher));
         }));
@@ -856,10 +881,10 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   transport_->updateWriteLooper(true);
   loopForWrites();
 
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, close(transport_.get(), _));
   }));
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
   transport_->close(folly::none);
@@ -869,25 +894,26 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
 TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
   InSequence s;
 
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   const auto invokeForAllObservers =
-      [&cb1, &cb2, &cb3](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
         fn(*cb3);
       };
   const auto invokeForEachObserverWithTestEvents =
-      [&cb1, &cb2](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
       };
 
   // install observers
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, observerAttach(transport_.get()));
     transport_->addObserver(&observer);
   }));
@@ -903,21 +929,25 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
     // matcher
     const auto matcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(4)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(4)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(4)),
-        testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(4)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
+            testing::Eq(4)),
+        testing::Field(
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(4000)));
 
     invokeForEachObserverWithTestEvents(
         ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
               .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
                 EXPECT_EQ(
@@ -940,21 +970,25 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
     // matcher
     const auto matcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(5)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
-        testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field(
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(1000)));
 
     invokeForEachObserverWithTestEvents(
         ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
               .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
                 EXPECT_EQ(
@@ -976,20 +1010,25 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
     // matcher
     const auto matcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(5)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(0)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten, testing::Gt(0)));
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
+            testing::Gt(0)));
 
     invokeForEachObserverWithTestEvents(
         ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
               .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
                 EXPECT_EQ(
@@ -1015,21 +1054,25 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
     // matcher
     const auto matcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(6)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(6)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
-        testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field(
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(1000)));
 
     invokeForEachObserverWithTestEvents(
         ([this, &matcher, oldTInfo = transport_->getTransportInfo()](
-             MockObserver& observer) {
+             MockLegacyObserver& observer) {
           EXPECT_CALL(observer, packetsWritten(transport_.get(), matcher))
               .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
                 EXPECT_EQ(
@@ -1051,10 +1094,10 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
     loopForWrites();
   }
 
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, close(transport_.get(), _));
   }));
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
   transport_->close(folly::none);
@@ -1064,26 +1107,27 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
 TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
   InSequence s;
 
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.packetsWrittenEvents = true;
   config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   const auto invokeForAllObservers =
-      [&cb1, &cb2, &cb3](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
         fn(*cb3);
       };
   const auto invokeForEachObserverWithTestEvents =
-      [&cb1, &cb2](const std::function<void(MockObserver&)>& fn) {
+      [&cb1, &cb2](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
         fn(*cb2);
       };
 
   // install observers
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, observerAttach(transport_.get()));
     transport_->addObserver(&observer);
   }));
@@ -1109,54 +1153,63 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
     // matcher for event from startWritingFromAppLimited
     const auto startWritingFromAppLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::IsEmpty()),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
 
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(4)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(4)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(4)),
-        testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(4)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
+            testing::Eq(4)),
+        testing::Field(
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(bytesToWrite)));
 
     // matcher for event from appRateLimited
     const auto appRateLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(4)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(4)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))));
 
     invokeForEachObserverWithTestEvents(
-        ([this, &startWritingFromAppLimitedMatcher](MockObserver& observer) {
+        ([this,
+          &startWritingFromAppLimitedMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               startWritingFromAppLimited(
@@ -1167,7 +1220,8 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
         ([this,
           &packetsWrittenMatcher,
           cwndInBytes,
-          oldTInfo = transport_->getTransportInfo()](MockObserver& observer) {
+          oldTInfo =
+              transport_->getTransportInfo()](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer, packetsWritten(transport_.get(), packetsWrittenMatcher))
               .WillOnce(([cwndInBytes, oldTInfo](
@@ -1183,7 +1237,8 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
         ([this,
           &appRateLimitedMatcher,
           cwndInBytes,
-          oldTInfo = transport_->getTransportInfo()](MockObserver& observer) {
+          oldTInfo =
+              transport_->getTransportInfo()](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer, appRateLimited(transport_.get(), appRateLimitedMatcher))
               .WillOnce(([cwndInBytes, oldTInfo](
@@ -1214,90 +1269,99 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
     // matcher for event from startWritingFromAppLimited
     const auto startWritingFromAppLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(4)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(4)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(
                 folly::Optional<uint64_t>(upperBoundCurrentBytesWritable))));
 
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(5)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
-        testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
+            testing::Eq(1)),
+        testing::Field(
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(bytesToWrite)));
 
     // matcher for event from appRateLimited
     const auto appRateLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(5)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(5)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeNum)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeNum)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(
                 upperBoundCurrentBytesWritable - bytesToWrite))));
 
     invokeForEachObserverWithTestEvents(
-        ([this, &startWritingFromAppLimitedMatcher](MockObserver& observer) {
+        ([this,
+          &startWritingFromAppLimitedMatcher](MockLegacyObserver& observer) {
           EXPECT_CALL(
               observer,
               startWritingFromAppLimited(
                   transport_.get(), startWritingFromAppLimitedMatcher));
         }));
 
-    invokeForEachObserverWithTestEvents(
-        ([this,
-          &packetsWrittenMatcher,
-          oldTInfo = transport_->getTransportInfo()](MockObserver& observer) {
-          EXPECT_CALL(
-              observer, packetsWritten(transport_.get(), packetsWrittenMatcher))
-              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
-                EXPECT_EQ(
-                    oldTInfo.writableBytes -
-                        (socket->getTransportInfo().bytesSent -
-                         oldTInfo.bytesSent),
-                    event.maybeWritableBytes);
-              }));
-        }));
+    invokeForEachObserverWithTestEvents(([this,
+                                          &packetsWrittenMatcher,
+                                          oldTInfo =
+                                              transport_->getTransportInfo()](
+                                             MockLegacyObserver& observer) {
+      EXPECT_CALL(
+          observer, packetsWritten(transport_.get(), packetsWrittenMatcher))
+          .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+            EXPECT_EQ(
+                oldTInfo.writableBytes -
+                    (socket->getTransportInfo().bytesSent - oldTInfo.bytesSent),
+                event.maybeWritableBytes);
+          }));
+    }));
 
-    invokeForEachObserverWithTestEvents(
-        ([this,
-          &appRateLimitedMatcher,
-          oldTInfo = transport_->getTransportInfo()](MockObserver& observer) {
-          EXPECT_CALL(
-              observer, appRateLimited(transport_.get(), appRateLimitedMatcher))
-              .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
-                EXPECT_EQ(
-                    oldTInfo.writableBytes -
-                        (socket->getTransportInfo().bytesSent -
-                         oldTInfo.bytesSent),
-                    event.maybeWritableBytes);
-              }));
-        }));
+    invokeForEachObserverWithTestEvents(([this,
+                                          &appRateLimitedMatcher,
+                                          oldTInfo =
+                                              transport_->getTransportInfo()](
+                                             MockLegacyObserver& observer) {
+      EXPECT_CALL(
+          observer, appRateLimited(transport_.get(), appRateLimitedMatcher))
+          .WillOnce(([oldTInfo](const auto& socket, const auto& event) {
+            EXPECT_EQ(
+                oldTInfo.writableBytes -
+                    (socket->getTransportInfo().bytesSent - oldTInfo.bytesSent),
+                event.maybeWritableBytes);
+          }));
+    }));
 
     auto stream = transport_->createBidirectionalStream().value();
     transport_->writeChain(
@@ -1311,10 +1375,10 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
     writeNum++;
   }
 
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, close(transport_.get(), _));
   }));
-  invokeForAllObservers(([this](MockObserver& observer) {
+  invokeForAllObservers(([this](MockLegacyObserver& observer) {
     EXPECT_CALL(observer, destroy(transport_.get()));
   }));
   transport_->close(folly::none);
@@ -1322,10 +1386,12 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
-  Observer::Config configWithStreamEvents = {};
+  LegacyObserver::Config configWithStreamEvents = {};
   configWithStreamEvents.streamEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 =
+      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1334,7 +1400,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
       transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   const auto id = 0x01;
-  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+  const auto streamEventMatcher = MockLegacyObserver::getStreamEventMatcher(
       id, StreamInitiator::Local, StreamDirectionality::Bidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
@@ -1363,10 +1429,12 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
-  Observer::Config configWithStreamEvents = {};
+  LegacyObserver::Config configWithStreamEvents = {};
   configWithStreamEvents.streamEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 =
+      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1375,7 +1443,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
       transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   const auto id = 0x00;
-  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+  const auto streamEventMatcher = MockLegacyObserver::getStreamEventMatcher(
       id, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
@@ -1404,10 +1472,12 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
-  Observer::Config configWithStreamEvents = {};
+  LegacyObserver::Config configWithStreamEvents = {};
   configWithStreamEvents.streamEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 =
+      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1416,7 +1486,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
       transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   const auto id = 0x03;
-  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+  const auto streamEventMatcher = MockLegacyObserver::getStreamEventMatcher(
       id, StreamInitiator::Local, StreamDirectionality::Unidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));
@@ -1445,10 +1515,12 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
-  Observer::Config configWithStreamEvents = {};
+  LegacyObserver::Config configWithStreamEvents = {};
   configWithStreamEvents.streamEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockObserver>>(Observer::Config());
+  auto cb1 =
+      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
+      LegacyObserver::Config());
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1457,7 +1529,7 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
       transport_->getObservers(), UnorderedElementsAre(cb1.get(), cb2.get()));
 
   const auto id = 0x02;
-  const auto streamEventMatcher = MockObserver::getStreamEventMatcher(
+  const auto streamEventMatcher = MockLegacyObserver::getStreamEventMatcher(
       id, StreamInitiator::Remote, StreamDirectionality::Unidirectional);
 
   EXPECT_CALL(*cb1, streamOpened(transport_.get(), streamEventMatcher));

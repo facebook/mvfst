@@ -1191,7 +1191,7 @@ class QuicSocket {
    *
    * @param observer     Observer to add (implements Observer).
    */
-  virtual void addObserver(Observer* observer) = 0;
+  virtual void addObserver(LegacyObserver* observer) = 0;
 
   /**
    * Removes an observer.
@@ -1199,7 +1199,7 @@ class QuicSocket {
    * @param observer     Observer to remove.
    * @return             Whether observer found and removed from list.
    */
-  virtual bool removeObserver(Observer* observer) = 0;
+  virtual bool removeObserver(LegacyObserver* observer) = 0;
 
   /**
    * Returns installed observers.

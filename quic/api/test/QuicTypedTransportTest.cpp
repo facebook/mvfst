@@ -759,7 +759,7 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
 
       if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
         return testing::Property(
-            &quic::Observer::AcksProcessedEvent::getAckEvents,
+            &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
             testing::ElementsAre(testing::AllOf(
                 // ack time, adjusted ack time, RTT not supported for client now
                 testing::Field(
@@ -775,7 +775,7 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
                     testing::SizeIs(expectedNumAckedPackets)))));
       } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
         return testing::Property(
-            &quic::Observer::AcksProcessedEvent::getAckEvents,
+            &quic::SocketObserverInterface::AcksProcessedEvent::getAckEvents,
             testing::ElementsAre(testing::AllOf(
                 testing::Field(&quic::AckEvent::ackTime, testing::Eq(ackTime)),
                 testing::Field(
@@ -823,12 +823,13 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
       const StreamDirectionality streamDirectionality) {
     return testing::AllOf(
         testing::Field(
-            &quic::Observer::StreamEvent::streamId, testing::Eq(streamId)),
+            &quic::SocketObserverInterface::StreamEvent::streamId,
+            testing::Eq(streamId)),
         testing::Field(
-            &quic::Observer::StreamEvent::streamInitiator,
+            &quic::SocketObserverInterface::StreamEvent::streamInitiator,
             testing::Eq(streamInitiator)),
         testing::Field(
-            &quic::Observer::StreamEvent::streamDirectionality,
+            &quic::SocketObserverInterface::StreamEvent::streamDirectionality,
             testing::Eq(streamDirectionality)));
   }
 };
@@ -840,7 +841,7 @@ TYPED_TEST_SUITE(
 
 TYPED_TEST(QuicTypedTransportTestForObservers, Attach) {
   auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockObserver>>();
+  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 
   EXPECT_CALL(*observer, observerAttach(transport));
   transport->addObserver(observer.get());
@@ -855,7 +856,7 @@ TYPED_TEST(
     QuicTypedTransportTestForObservers,
     CloseNoErrorThenDestroyTransport) {
   auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockObserver>>();
+  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 
   EXPECT_CALL(*observer, observerAttach(transport));
   transport->addObserver(observer.get());
@@ -878,7 +879,7 @@ TYPED_TEST(
     QuicTypedTransportTestForObservers,
     CloseWithErrorThenDestroyTransport) {
   auto transport = this->getTransport();
-  auto observer = std::make_unique<StrictMock<MockObserver>>();
+  auto observer = std::make_unique<StrictMock<MockLegacyObserver>>();
 
   EXPECT_CALL(*observer, observerAttach(transport));
   transport->addObserver(observer.get());
@@ -898,15 +899,18 @@ TYPED_TEST(
 }
 
 TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -974,15 +978,18 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocal) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1042,15 +1049,18 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocalRemote) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1105,15 +1115,18 @@ TYPED_TEST(
 }
 
 TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1175,15 +1188,18 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofRemote) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1241,15 +1257,18 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofLocalRemote) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1301,15 +1320,18 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRst) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1385,15 +1407,18 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRstBytesInFlight) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1467,15 +1492,18 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEorStopSendingTriggersRstBytesInFlight) {
-  MockObserver::Config configWithStreamEventsEnabled;
+  MockLegacyObserver::Config configWithStreamEventsEnabled;
   configWithStreamEventsEnabled.streamEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoStreamEvents =
+      std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
   auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithStreamEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(
+          configWithStreamEventsEnabled);
 
   EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
   transport->addObserver(observerWithNoStreamEvents.get());
@@ -1560,16 +1588,16 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockObserver::Config configWithEventsEnabled;
+  MockLegacyObserver::Config configWithEventsEnabled;
   configWithEventsEnabled.appRateLimitedEvents = true;
   configWithEventsEnabled.packetsWrittenEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
   auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
 
   EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
   transport->addObserver(observerWithNoEvents.get());
@@ -1599,14 +1627,16 @@ TYPED_TEST(
     // matcher for event from startWritingFromAppLimited
     const auto startWritingFromAppLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::IsEmpty()),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
         .Times(0);
@@ -1622,22 +1652,26 @@ TYPED_TEST(
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(1)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(1)),
         testing::Field( // precise check in WillOnce()
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(strLength)));
     EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(
@@ -1668,14 +1702,16 @@ TYPED_TEST(
     // matcher for event from appRateLimited
     const auto appRateLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(1)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check below
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))));
 
     EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
@@ -1736,16 +1772,16 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockObserver::Config configWithEventsEnabled;
+  MockLegacyObserver::Config configWithEventsEnabled;
   configWithEventsEnabled.appRateLimitedEvents = true;
   configWithEventsEnabled.packetsWrittenEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
   auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
 
   EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
   transport->addObserver(observerWithNoEvents.get());
@@ -1777,14 +1813,16 @@ TYPED_TEST(
     // matcher for event from startWritingFromAppLimited
     const auto startWritingFromAppLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::IsEmpty()),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
         .Times(0);
@@ -1800,22 +1838,26 @@ TYPED_TEST(
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(1)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(0))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(1)),
         testing::Field( // precise check in WillOnce(), expect overshoot CWND
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::AllOf(testing::Gt(bufLength), testing::Gt(cwndInBytes))));
     EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(
@@ -1880,16 +1922,16 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockObserver::Config configWithEventsEnabled;
+  MockLegacyObserver::Config configWithEventsEnabled;
   configWithEventsEnabled.appRateLimitedEvents = true;
   configWithEventsEnabled.packetsWrittenEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
   auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
 
   EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
   transport->addObserver(observerWithNoEvents.get());
@@ -1922,14 +1964,16 @@ TYPED_TEST(
     // matcher for event from startWritingFromAppLimited
     const auto startWritingFromAppLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::IsEmpty()),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::IsEmpty()),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
         .Times(0);
@@ -1945,24 +1989,26 @@ TYPED_TEST(
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets,
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
             testing::SizeIs(packetsExpectedWritten)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(0))), // CWND exhausted
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
         testing::Field( // precise check in WillOnce()
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Ge(cwndInBytes))); // full CWND written
     EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(
@@ -2012,24 +2058,26 @@ TYPED_TEST(
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets,
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
             testing::SizeIs(packetsExpectedWritten)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(packetsExpectedWritten)),
         testing::Field( // precise check in WillOnce()
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Lt(cwndInBytes)));
     EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(
@@ -2060,15 +2108,16 @@ TYPED_TEST(
     // matcher for event from appRateLimited
     const auto appRateLimitedMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets,
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
             testing::SizeIs(packetsExpectedWritten)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))),
         testing::Field( // precise check in WillOnce()
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes))));
     EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
     EXPECT_CALL(
@@ -2119,16 +2168,16 @@ TYPED_TEST(
   // remove congestion controller
   this->getNonConstConn().congestionController = nullptr;
 
-  MockObserver::Config configWithEventsEnabled;
+  MockLegacyObserver::Config configWithEventsEnabled;
   configWithEventsEnabled.appRateLimitedEvents = true;
   configWithEventsEnabled.packetsWrittenEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
   auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithEventsEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
 
   EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
   transport->addObserver(observerWithNoEvents.get());
@@ -2166,22 +2215,26 @@ TYPED_TEST(
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
         testing::Property(
-            &Observer::WriteEvent::getOutstandingPackets, testing::SizeIs(1)),
+            &SocketObserverInterface::WriteEvent::getOutstandingPackets,
+            testing::SizeIs(1)),
         testing::Field(
-            &Observer::WriteEvent::writeCount, testing::Eq(writeCount)),
+            &SocketObserverInterface::WriteEvent::writeCount,
+            testing::Eq(writeCount)),
         testing::Field(
-            &Observer::WriteEvent::maybeCwndInBytes,
+            &SocketObserverInterface::WriteEvent::maybeCwndInBytes,
             testing::Eq(folly::Optional<uint64_t>(folly::none))),
         testing::Field(
-            &Observer::WriteEvent::maybeWritableBytes,
+            &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(folly::none))),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numPacketsWritten, testing::Eq(1)),
+            &SocketObserverInterface::PacketsWrittenEvent::numPacketsWritten,
+            testing::Eq(1)),
         testing::Field(
-            &Observer::PacketsWrittenEvent::numAckElicitingPacketsWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::
+                numAckElicitingPacketsWritten,
             testing::Eq(1)),
         testing::Field( // precise check in WillOnce()
-            &Observer::PacketsWrittenEvent::numBytesWritten,
+            &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(strLength)));
     EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
     EXPECT_CALL(
@@ -2225,15 +2278,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedNoAckDelay) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2298,15 +2351,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelay) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2371,15 +2424,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelayEqRtt) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2430,7 +2483,8 @@ TYPED_TEST(
           testing::AllOf(
               matcher,
               testing::Property(
-                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  &quic::SocketObserverInterface::AcksProcessedEvent::
+                      getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
@@ -2442,7 +2496,8 @@ TYPED_TEST(
           testing::AllOf(
               matcher,
               testing::Property(
-                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  &quic::SocketObserverInterface::AcksProcessedEvent::
+                      getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::AnyOf(
@@ -2466,15 +2521,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithTooLargeAckDelay) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2525,7 +2580,8 @@ TYPED_TEST(
           testing::AllOf(
               matcher,
               testing::Property(
-                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  &quic::SocketObserverInterface::AcksProcessedEvent::
+                      getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::Eq(folly::none))))))));
@@ -2536,7 +2592,8 @@ TYPED_TEST(
           testing::AllOf(
               matcher,
               testing::Property(
-                  &quic::Observer::AcksProcessedEvent::getAckEvents,
+                  &quic::SocketObserverInterface::AcksProcessedEvent::
+                      getAckEvents,
                   testing::ElementsAre(testing::AllOf(testing::Field(
                       &quic::AckEvent::rttSampleNoAckDelay,
                       testing::Eq(folly::none))))))));
@@ -2559,15 +2616,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAllAckedAtOnce) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2645,15 +2702,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentAndAckedSequentially) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2797,15 +2854,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAckedSequentially) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2958,7 +3015,7 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedSequentiallyThenSecondAcked) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   // prevent packets from being marked as lost
@@ -2968,11 +3025,11 @@ TYPED_TEST(
   this->getNonConstConn().transportSettings.timeReorderingThreshDivisor = 1;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -3123,7 +3180,7 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedAtOnceThenSecondAcked) {
-  MockObserver::Config configWithAcksEnabled;
+  MockLegacyObserver::Config configWithAcksEnabled;
   configWithAcksEnabled.acksProcessedEvents = true;
 
   // prevent packets from being marked as lost
@@ -3133,11 +3190,11 @@ TYPED_TEST(
   this->getNonConstConn().transportSettings.timeReorderingThreshDivisor = 1;
 
   auto transport = this->getTransport();
-  auto observerWithNoAcks = std::make_unique<NiceMock<MockObserver>>();
+  auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());

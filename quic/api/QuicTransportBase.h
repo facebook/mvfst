@@ -652,7 +652,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    *
    * @param observer     Observer to add (implements Observer).
    */
-  void addObserver(Observer* observer) override;
+  void addObserver(LegacyObserver* observer) override;
 
   /**
    * Removes an observer.
@@ -660,7 +660,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    * @param observer     Observer to remove.
    * @return             Whether observer found and removed from list.
    */
-  bool removeObserver(Observer* observer) override;
+  bool removeObserver(LegacyObserver* observer) override;
 
   /**
    * Returns installed observers.

@@ -165,7 +165,7 @@ class QuicLossFunctionsTest : public TestWithParam<PacketNumberSpace> {
       PacketNum packetNum,
       bool lossByReorder,
       bool lossByTimeout) {
-    return MockObserver::getLossPacketMatcher(
+    return MockLegacyObserver::getLossPacketMatcher(
         packetNum, lossByReorder, lossByTimeout);
   }
 };
@@ -2021,9 +2021,9 @@ TEST_F(QuicLossFunctionsTest, PersistentCongestionNoPTO) {
 
 TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.lossEvents = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
   auto conn = createConn();
   // Register 1 observer
   observers->emplace_back(&ib);
@@ -2074,7 +2074,7 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &Observer::LossEvent::lostPackets,
+              &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(1, true, false),
                   getLossPacketMatcher(2, true, false),
@@ -2088,9 +2088,9 @@ TEST_F(QuicLossFunctionsTest, TestReorderLossObserverCallback) {
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.lossEvents = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
   auto conn = createConn();
   // Register 1 observer
   observers->emplace_back(&ib);
@@ -2142,7 +2142,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &Observer::LossEvent::lostPackets,
+              &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(1, false, true),
                   getLossPacketMatcher(2, false, true),
@@ -2160,9 +2160,9 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutLossObserverCallback) {
 
 TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
   auto observers = std::make_shared<ObserverVec>();
-  Observer::Config config = {};
+  LegacyObserver::Config config = {};
   config.lossEvents = true;
-  auto ib = MockObserver(config);
+  auto ib = MockLegacyObserver(config);
   auto conn = createConn();
   // Register 1 observer
   observers->emplace_back(&ib);
@@ -2216,7 +2216,7 @@ TEST_F(QuicLossFunctionsTest, TestTimeoutAndReorderLossObserverCallback) {
       packetLossDetected(
           nullptr,
           Field(
-              &Observer::LossEvent::lostPackets,
+              &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
                   getLossPacketMatcher(1, true, true),
                   getLossPacketMatcher(2, true, true),

@@ -213,7 +213,7 @@ folly::Optional<CongestionController::LossEvent> detectLossPackets(
            << " delayUntilLost=" << delayUntilLost.count() << "us"
            << " " << conn;
   CongestionController::LossEvent lossEvent(lossTime);
-  folly::Optional<Observer::LossEvent> observerLossEvent;
+  folly::Optional<SocketObserverInterface::LossEvent> observerLossEvent;
   if (!conn.observers->empty()) {
     observerLossEvent.emplace(lossTime);
   }

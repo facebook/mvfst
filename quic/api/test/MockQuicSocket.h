@@ -308,8 +308,8 @@ class MockQuicSocket : public QuicSocket {
       earlyDataAppParamsValidator_;
   folly::Function<Buf()> earlyDataAppParamsGetter_;
 
-  MOCK_METHOD(void, addObserver, (Observer*));
-  MOCK_METHOD(bool, removeObserver, (Observer*));
+  MOCK_METHOD(void, addObserver, (LegacyObserver*));
+  MOCK_METHOD(bool, removeObserver, (LegacyObserver*));
   MOCK_METHOD(const ObserverVec&, getObservers, (), (const));
   MOCK_METHOD(
       void,
