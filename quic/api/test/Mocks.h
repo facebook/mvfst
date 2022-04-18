@@ -277,9 +277,7 @@ class MockObserver : public QuicSocket::ManagedObserver {
 
 class MockLegacyObserver : public LegacyObserver {
  public:
-  MockLegacyObserver() : LegacyObserver(LegacyObserver::Config()) {}
-  explicit MockLegacyObserver(const LegacyObserver::Config& observerConfig)
-      : LegacyObserver(observerConfig) {}
+  using LegacyObserver::LegacyObserver;
   MOCK_METHOD((void), observerAttach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), observerDetach, (QuicSocket*), (noexcept));
   MOCK_METHOD((void), destroy, (QuicSocket*), (noexcept));

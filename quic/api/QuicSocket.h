@@ -1181,34 +1181,6 @@ class QuicSocket {
    */
   virtual void setCongestionControl(CongestionControlType type) = 0;
 
-  /**
-   * Adds an observer.
-   *
-   * Observers can tie their lifetime to aspects of this socket's  /
-   * lifetime and perform inspection at various states.
-   *
-   * This enables instrumentation to be added without changing / interfering
-   * with how the application uses the socket.
-   *
-   * @param observer     Observer to add (implements Observer).
-   */
-  virtual void addObserver(LegacyObserver* observer) = 0;
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether observer found and removed from list.
-   */
-  virtual bool removeObserver(LegacyObserver* observer) = 0;
-
-  /**
-   * Returns installed observers.
-   *
-   * @return             Reference to const vector with installed observers.
-   */
-  FOLLY_NODISCARD virtual const ObserverVec& getObservers() const = 0;
-
   using Observer = SocketObserverContainer::Observer;
   using ManagedObserver = SocketObserverContainer::ManagedObserver;
 
@@ -1251,6 +1223,18 @@ class QuicSocket {
       return list->numObservers();
     }
     return 0;
+  }
+
+  /**
+   * Returns list of attached observers.
+   *
+   * @return             List of observers.
+   */
+  std::vector<Observer*> getObservers() {
+    if (auto list = getSocketObserverContainer()) {
+      return list->getObservers();
+    }
+    return {};
   }
 
   /**

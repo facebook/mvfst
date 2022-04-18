@@ -76,7 +76,9 @@ AckEvent processAckFrame(
   folly::Optional<LegacyObserver::SpuriousLossEvent> spuriousLossEvent;
   // Used for debug only.
   const auto originalPacketCount = conn.outstandings.packetCount;
-  if (conn.observers->size() > 0) {
+  if (conn.observerContainer &&
+      conn.observerContainer->hasObserversForEvent<
+          SocketObserverInterface::Events::spuriousLossEvents>()) {
     spuriousLossEvent.emplace(ackReceiveTime);
   }
   auto ackBlockIt = frame.ackBlocks.cbegin();
@@ -198,14 +200,17 @@ AckEvent processAckFrame(
             ackReceiveTimeOrNow - rPacketIt->metadata.time);
         if (rttSample != rttSample.zero()) {
           // notify observers
-          const SocketObserverInterface::PacketRTT packetRTT(
-              ackReceiveTimeOrNow, rttSample, frame.ackDelay, *rPacketIt);
-          for (const auto& observer : *(conn.observers)) {
-            conn.pendingCallbacks.emplace_back(
-                [observer, packetRTT](QuicSocket* qSocket) {
-                  if (observer->getConfig().rttSamples) {
-                    observer->rttSampleGenerated(qSocket, packetRTT);
-                  }
+          if (conn.observerContainer &&
+              conn.observerContainer->hasObserversForEvent<
+                  SocketObserverInterface::Events::rttSamples>()) {
+            conn.observerContainer->invokeInterfaceMethod<
+                SocketObserverInterface::Events::rttSamples>(
+                [event = SocketObserverInterface::PacketRTT(
+                     ackReceiveTimeOrNow,
+                     rttSample,
+                     frame.ackDelay,
+                     *rPacketIt)](auto observer, auto observed) {
+                  observer->rttSampleGenerated(observed, event);
                 });
           }
 
@@ -461,16 +466,17 @@ AckEvent processAckFrame(
     ack.ccState = conn.congestionController->getState();
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);
-  if (spuriousLossEvent && spuriousLossEvent->hasPackets()) {
-    for (const auto& observer : *(conn.observers)) {
-      conn.pendingCallbacks.emplace_back(
-          [observer, spuriousLossEvent](QuicSocket* qSocket) {
-            if (observer->getConfig().spuriousLossEvents) {
-              observer->spuriousLossDetected(qSocket, *spuriousLossEvent);
-            }
-          });
-    }
+
+  if (spuriousLossEvent && conn.observerContainer &&
+      conn.observerContainer->hasObserversForEvent<
+          SocketObserverInterface::Events::spuriousLossEvents>()) {
+    conn.observerContainer->invokeInterfaceMethod<
+        SocketObserverInterface::Events::spuriousLossEvents>(
+        [spuriousLossEvent](auto observer, auto observed) {
+          observer->spuriousLossDetected(observed, *spuriousLossEvent);
+        });
   }
+
   return ack;
 }
 

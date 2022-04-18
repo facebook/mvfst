@@ -376,13 +376,13 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithNoWritableBytes) {
         return 0;
       }));
 
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::packetsWrittenEvents,
+      SocketObserverInterface::Events::appRateLimitedEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
 
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -422,13 +422,13 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
   EXPECT_CALL(*rawCongestionController, getWritableBytes())
       .WillRepeatedly(Return(5000));
 
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::packetsWrittenEvents,
+      SocketObserverInterface::Events::appRateLimitedEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
 
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -460,13 +460,14 @@ TEST_F(QuicTransportTest, ObserverNotAppLimitedWithLargeBuffer) {
 }
 
 TEST_F(QuicTransportTest, ObserverAppLimited) {
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::packetsWrittenEvents,
+      SocketObserverInterface::Events::appRateLimitedEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
+
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
   EXPECT_CALL(*cb3, observerAttach(transport_.get()));
@@ -508,14 +509,14 @@ TEST_F(QuicTransportTest, ObserverAppLimited) {
 
 TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
   InSequence s;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::packetsWrittenEvents,
+      SocketObserverInterface::Events::appRateLimitedEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
 
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
   const auto invokeForAllObservers =
       [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
@@ -893,13 +894,12 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCycleCheckDetails) {
 
 TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
   InSequence s;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::packetsWrittenEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
 
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
   const auto invokeForAllObservers =
       [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
@@ -1106,14 +1106,14 @@ TEST_F(QuicTransportTest, ObserverPacketsWrittenCheckBytesSent) {
 
 TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
   InSequence s;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::packetsWrittenEvents,
+      SocketObserverInterface::Events::appRateLimitedEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>();
 
-  LegacyObserver::Config config = {};
-  config.packetsWrittenEvents = true;
-  config.appRateLimitedEvents = true;
-  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  auto cb3 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
   const auto invokeForAllObservers =
       [&cb1, &cb2, &cb3](const std::function<void(MockLegacyObserver&)>& fn) {
         fn(*cb1);
@@ -1386,12 +1386,11 @@ TEST_F(QuicTransportTest, ObserverWriteEventsCheckCwndPacketsWritable) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
-  LegacyObserver::Config configWithStreamEvents = {};
-  configWithStreamEvents.streamEvents = true;
-  auto cb1 =
-      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
+
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1429,12 +1428,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalLocalOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
-  LegacyObserver::Config configWithStreamEvents = {};
-  configWithStreamEvents.streamEvents = true;
-  auto cb1 =
-      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
+
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1472,12 +1470,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventBidirectionalRemoteOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
-  LegacyObserver::Config configWithStreamEvents = {};
-  configWithStreamEvents.streamEvents = true;
-  auto cb1 =
-      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
+
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));
@@ -1515,12 +1512,11 @@ TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalLocalOpenClose) {
 }
 
 TEST_F(QuicTransportTest, ObserverStreamEventUnidirectionalRemoteOpenClose) {
-  LegacyObserver::Config configWithStreamEvents = {};
-  configWithStreamEvents.streamEvents = true;
-  auto cb1 =
-      std::make_unique<StrictMock<MockLegacyObserver>>(configWithStreamEvents);
-  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>(
-      LegacyObserver::Config());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
+  auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>(eventSet);
+  auto cb2 = std::make_unique<StrictMock<MockLegacyObserver>>();
+
   EXPECT_CALL(*cb1, observerAttach(transport_.get()));
   transport_->addObserver(cb1.get());
   EXPECT_CALL(*cb2, observerAttach(transport_.get()));

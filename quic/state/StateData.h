@@ -307,9 +307,7 @@ struct ReadDatagram {
 struct QuicConnectionStateBase : public folly::DelayedDestruction {
   virtual ~QuicConnectionStateBase() override = default;
 
-  explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {
-    observers = std::make_shared<ObserverVec>();
-  }
+  explicit QuicConnectionStateBase(QuicNodeType type) : nodeType(type) {}
 
   // Accessor to output buffer for continuous memory GSO writes
   BufAccessor* bufAccessor{nullptr};
@@ -666,11 +664,15 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
    */
   bool retireAndSwitchPeerConnectionIds();
 
-  // queue of functions to be called in processCallbacksAfterNetworkData
-  std::vector<std::function<void(QuicSocket*)>> pendingCallbacks;
+  // SocketObserverContainer
+  std::shared_ptr<SocketObserverContainer> observerContainer;
 
-  // Vector of Observers that are attached to this socket.
-  std::shared_ptr<const ObserverVec> observers;
+  /**
+   * Returns the SocketObserverContainer or nullptr if not available.
+   */
+  SocketObserverContainer* getSocketObserverContainer() const {
+    return observerContainer.get();
+  }
 
   // Recent ACK events, for use in processCallbacksAfterNetworkData.
   // Holds the ACK events generated during the last round of ACK processing.

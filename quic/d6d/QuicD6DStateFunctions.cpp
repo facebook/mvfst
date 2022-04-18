@@ -6,6 +6,7 @@
  */
 
 #include <quic/d6d/QuicD6DStateFunctions.h>
+#include <quic/observer/SocketObserverContainer.h>
 
 namespace quic {
 
@@ -23,26 +24,24 @@ static TimePoint reportUpperBound(QuicConnectionStateBase& conn) {
   auto& d6d = conn.d6d;
   const auto lastProbeSize = d6d.lastProbe->packetSize;
   const auto now = Clock::now();
-
   QUIC_STATS(conn.statsCallback, onConnectionPMTUUpperBoundDetected);
-  if (conn.observers->size() > 0) {
-    SocketObserverInterface::PMTUUpperBoundEvent upperBoundEvent(
-        now,
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            now - d6d.meta.timeLastNonSearchState),
-        d6d.meta.lastNonSearchState,
-        lastProbeSize,
-        d6d.meta.totalTxedProbes,
-        conn.transportSettings.d6dConfig.raiserType);
-    // enqueue a function for every observer to invoke callback
-    for (const auto& observer : *(conn.observers)) {
-      conn.pendingCallbacks.emplace_back(
-          [observer, upperBoundEvent](QuicSocket* qSocket) {
-            if (observer->getConfig().pmtuEvents) {
-              observer->pmtuUpperBoundDetected(qSocket, upperBoundEvent);
-            }
-          });
-    }
+  if (conn.getSocketObserverContainer() &&
+      conn.getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::pmtuEvents>()) {
+    conn.getSocketObserverContainer()
+        ->invokeInterfaceMethod<SocketObserverInterface::Events::pmtuEvents>(
+            [event = SocketObserverInterface::PMTUUpperBoundEvent(
+                 now,
+                 std::chrono::duration_cast<std::chrono::microseconds>(
+                     now - d6d.meta.timeLastNonSearchState),
+                 d6d.meta.lastNonSearchState,
+                 lastProbeSize,
+                 d6d.meta.totalTxedProbes,
+                 conn.transportSettings.d6dConfig.raiserType)](
+                auto observer, auto observed) {
+              observer->pmtuUpperBoundDetected(observed, event);
+            });
   }
   return now;
 }
@@ -57,28 +56,24 @@ static TimePoint reportBlackhole(
   QUIC_STATS(conn.statsCallback, onConnectionPMTUBlackholeDetected);
   auto& d6d = conn.d6d;
   const auto now = Clock::now();
-  if (conn.observers->size() > 0) {
-    SocketObserverInterface::PMTUBlackholeEvent blackholeEvent(
-        now,
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            now - d6d.meta.timeLastNonSearchState),
-        d6d.meta.lastNonSearchState,
-        d6d.state,
-        conn.udpSendPacketLen,
-        d6d.lastProbe->packetSize,
-        d6d.thresholdCounter->getWindow(),
-        d6d.thresholdCounter->getThreshold(),
-        packet);
-
-    // If there are observers, enqueue a function to invoke callback
-    for (const auto& observer : *(conn.observers)) {
-      conn.pendingCallbacks.emplace_back(
-          [observer, blackholeEvent](QuicSocket* qSocket) {
-            if (observer->getConfig().pmtuEvents) {
-              observer->pmtuBlackholeDetected(qSocket, blackholeEvent);
-            }
-          });
-    }
+  if (conn.observerContainer &&
+      conn.observerContainer->hasObserversForEvent<
+          SocketObserverInterface::Events::pmtuEvents>()) {
+    conn.observerContainer
+        ->invokeInterfaceMethod<SocketObserverInterface::Events::pmtuEvents>(
+            [event = SocketObserverInterface::PMTUBlackholeEvent(
+                 now,
+                 std::chrono::duration_cast<std::chrono::microseconds>(
+                     now - d6d.meta.timeLastNonSearchState),
+                 d6d.meta.lastNonSearchState,
+                 d6d.state,
+                 conn.udpSendPacketLen,
+                 d6d.lastProbe->packetSize,
+                 d6d.thresholdCounter->getWindow(),
+                 d6d.thresholdCounter->getThreshold(),
+                 packet)](auto observer, auto observed) {
+              observer->pmtuBlackholeDetected(observed, event);
+            });
   }
   return now;
 }

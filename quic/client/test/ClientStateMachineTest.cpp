@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/api/test/MockQuicSocket.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
 #include <quic/client/state/ClientStateMachine.h>
@@ -102,6 +103,34 @@ TEST_F(ClientStateMachineTest, PreserveHappyeyabllsDuringUndo) {
   auto newConn = undoAllClientStateForRetry(std::move(client_));
   EXPECT_TRUE(newConn->happyEyeballsState.finished);
   EXPECT_NE(nullptr, newConn->happyEyeballsState.secondSocket);
+}
+
+TEST_F(ClientStateMachineTest, PreserveObserverContainer) {
+  auto socket = std::make_shared<MockQuicSocket>();
+  const auto observerContainer =
+      std::make_shared<SocketObserverContainer>(socket.get());
+  SocketObserverContainer::ManagedObserver obs;
+  observerContainer->addObserver(&obs);
+
+  client_->clientConnectionId = ConnectionId::createRandom(8);
+  client_->observerContainer = observerContainer;
+  EXPECT_EQ(1, client_->observerContainer->numObservers());
+  EXPECT_THAT(
+      client_->observerContainer->findObservers(), UnorderedElementsAre(&obs));
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+  EXPECT_EQ(newConn->observerContainer, observerContainer);
+  EXPECT_EQ(1, newConn->observerContainer->numObservers());
+  EXPECT_THAT(
+      newConn->observerContainer->findObservers(), UnorderedElementsAre(&obs));
+}
+
+TEST_F(ClientStateMachineTest, PreserveObserverContainerNullptr) {
+  client_->clientConnectionId = ConnectionId::createRandom(8);
+  client_->observerContainer = nullptr;
+
+  auto newConn = undoAllClientStateForRetry(std::move(client_));
+  EXPECT_THAT(newConn->observerContainer, IsNull());
 }
 
 TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeBelowMin) {

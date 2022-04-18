@@ -4189,20 +4189,31 @@ TEST_P(
 }
 
 TEST_P(QuicServerTransportHandshakeTest, TestD6DStartCallback) {
-  LegacyObserver::Config config = {};
-  config.pmtuEvents = true;
-  auto observer = std::make_unique<MockLegacyObserver>(config);
-  server->addObserver(observer.get());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::pmtuEvents);
+
+  auto obs1 = std::make_unique<MockLegacyObserver>();
+  auto obs2 = std::make_unique<MockLegacyObserver>(eventSet);
+  auto obs3 = std::make_unique<MockLegacyObserver>(eventSet);
+  server->addObserver(obs1.get());
+  server->addObserver(obs2.get());
+  server->addObserver(obs3.get());
+
   // Set oneRttReader so that maybeStartD6DPriobing passes its check
   auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
   codec->setOneRttReadCipher(createNoOpAead());
   server->getNonConstConn().readCodec = std::move(codec);
   // And the state too
   server->getNonConstConn().d6d.state = D6DMachineState::BASE;
-  EXPECT_CALL(*observer, pmtuProbingStarted(_)).Times(1);
+  EXPECT_CALL(*obs1, pmtuProbingStarted(_)).Times(0); // not enabled
+  EXPECT_CALL(*obs2, pmtuProbingStarted(_)).Times(1);
+  EXPECT_CALL(*obs3, pmtuProbingStarted(_)).Times(1);
   // CHLO should be enough to trigger probing
   recvClientHello();
-  server->removeObserver(observer.get());
+
+  server->removeObserver(obs1.get());
+  server->removeObserver(obs2.get());
+  server->removeObserver(obs3.get());
 }
 
 TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {

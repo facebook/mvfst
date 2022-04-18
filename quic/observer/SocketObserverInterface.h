@@ -22,39 +22,25 @@ class EventBase;
 
 namespace quic {
 class QuicSocket;
-
-/**
- * A temporary interface for use during transition to folly::ObserverContainer.
- *
- * At the moment, the new observer only supports events in this interface.
- */
-class SocketObserverInterfaceTransitional {
- public:
-  enum class Events {};
-  SocketObserverInterfaceTransitional() = default;
-  virtual ~SocketObserverInterfaceTransitional() = default;
-
-  /**
-   * close() will be invoked when the socket is being closed.
-   *
-   * If the callback handler does not unsubscribe itself upon being called,
-   * then it may be called multiple times (e.g., by a call to close() by
-   * the application, and then again when closeNow() is called on
-   * destruction).
-   *
-   * @param socket      Socket being closed.
-   * @param errorOpt    Error information, if connection closed due to error.
-   */
-  virtual void close(
-      QuicSocket* /* socket */,
-      const folly::Optional<QuicError>& /* errorOpt */) noexcept {}
-};
+class QuicTransportBase;
 
 /**
  * Observer of socket events.
  */
-class SocketObserverInterface : public SocketObserverInterfaceTransitional {
+class SocketObserverInterface {
  public:
+  enum class Events {
+    evbEvents = 1,
+    packetsWrittenEvents = 2,
+    appRateLimitedEvents = 3,
+    rttSamples = 4,
+    lossEvents = 5,
+    spuriousLossEvents = 6,
+    pmtuEvents = 7,
+    knobFrameEvents = 8,
+    streamEvents = 9,
+    acksProcessedEvents = 10,
+  };
   virtual ~SocketObserverInterface() = default;
 
   struct WriteEvent {
@@ -109,13 +95,17 @@ class SocketObserverInterface : public SocketObserverInterfaceTransitional {
     };
 
     // Do not support copy or move given that outstanding packets is a ref.
-    WriteEvent(const WriteEvent&) = delete;
     WriteEvent(WriteEvent&&) = delete;
     WriteEvent& operator=(const WriteEvent&) = delete;
     WriteEvent& operator=(WriteEvent&& rhs) = delete;
 
     // Use builder to construct.
     explicit WriteEvent(const BuilderFields& builderFields);
+
+   protected:
+    // Allow QuicTransportBase to use the copy constructor for enqueuing
+    friend class QuicTransportBase;
+    WriteEvent(const WriteEvent&) = default;
   };
 
   struct AppLimitedEvent : public WriteEvent {
@@ -350,6 +340,21 @@ class SocketObserverInterface : public SocketObserverInterfaceTransitional {
 
   using StreamOpenEvent = StreamEvent;
   using StreamCloseEvent = StreamEvent;
+
+  /**
+   * close() will be invoked when the socket is being closed.
+   *
+   * If the callback handler does not unsubscribe itself upon being called,
+   * then it may be called multiple times (e.g., by a call to close() by
+   * the application, and then again when closeNow() is called on
+   * destruction).
+   *
+   * @param socket      Socket being closed.
+   * @param errorOpt    Error information, if connection closed due to error.
+   */
+  virtual void close(
+      QuicSocket* /* socket */,
+      const folly::Optional<QuicError>& /* errorOpt */) noexcept {}
 
   /**
    * evbAttach() will be invoked when a new event base is attached to this

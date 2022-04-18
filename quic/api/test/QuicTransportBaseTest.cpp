@@ -200,13 +200,15 @@ class TestQuicTransport
       std::unique_ptr<folly::AsyncUDPSocket> socket,
       ConnectionSetupCallback* connSetupCb,
       ConnectionCallback* connCb)
-      : QuicTransportBase(evb, std::move(socket)) {
+      : QuicTransportBase(evb, std::move(socket)),
+        observerContainer_(std::make_shared<SocketObserverContainer>(this)) {
     setConnectionSetupCallback(connSetupCb);
     setConnectionCallback(connCb);
     auto conn = std::make_unique<QuicServerConnectionState>(
         FizzServerQuicHandshakeContext::Builder().build());
     conn->clientConnectionId = ConnectionId({10, 9, 8, 7});
     conn->version = QuicVersion::MVFST;
+    conn->observerContainer = observerContainer_;
     transportConn = conn.get();
     conn_.reset(conn.release());
     aead = test::createNoOpAead();
@@ -490,12 +492,24 @@ class TestQuicTransport
     conn_->datagramState.maxReadBufferSize = 10;
   }
 
+  SocketObserverContainer* getSocketObserverContainer() const override {
+    return observerContainer_.get();
+  }
+
   QuicServerConnectionState* transportConn;
   std::unique_ptr<Aead> aead;
   std::unique_ptr<PacketNumberCipher> headerCipher;
   std::unique_ptr<ConnectionIdAlgo> connIdAlgo_;
   bool transportClosed{false};
   PacketNum packetNum_{0};
+
+  // Container of observers for the socket / transport.
+  //
+  // This member MUST be last in the list of members to ensure it is destroyed
+  // first, before any other members are destroyed. This ensures that observers
+  // can inspect any socket / transport state available through public methods
+  // when destruction of the transport begins.
+  const std::shared_ptr<SocketObserverContainer> observerContainer_;
 };
 
 class QuicTransportImplTest : public Test {
@@ -3481,13 +3495,15 @@ TEST_F(QuicTransportImplTest, FailedPing) {
 TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
   auto conn = transport->transportConn;
 
-  // attach an observer to the socket
-  LegacyObserver::Config config = {};
-  config.knobFrameEvents = true;
-  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>(config);
-  EXPECT_CALL(*cb, observerAttach(transport.get()));
-  transport->addObserver(cb.get());
-  Mock::VerifyAndClearExpectations(cb.get());
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::knobFrameEvents);
+
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  transport->addObserver(obs1.get());
+  transport->addObserver(obs2.get());
+  transport->addObserver(obs3.get());
 
   // set test knob frame
   uint64_t knobSpace = 0xfaceb00c;
@@ -3501,15 +3517,17 @@ TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
 
   EXPECT_CALL(connCallback, onKnobMock(knobSpace, knobId, _))
       .WillOnce(Invoke([](Unused, Unused, Unused) { /* do nothing */ }));
-  EXPECT_CALL(*cb, knobFrameReceived(transport.get(), _)).Times(1);
+  EXPECT_CALL(*obs1, knobFrameReceived(transport.get(), _)).Times(0);
+  EXPECT_CALL(*obs2, knobFrameReceived(transport.get(), _)).Times(1);
+  EXPECT_CALL(*obs3, knobFrameReceived(transport.get(), _)).Times(1);
   transport->invokeHandleKnobCallbacks();
   evb->loopOnce();
   EXPECT_EQ(conn->pendingEvents.knobs.size(), 0);
 
   // detach the observer from the socket
-  EXPECT_CALL(*cb, observerDetach(transport.get()));
-  EXPECT_TRUE(transport->removeObserver(cb.get()));
-  Mock::VerifyAndClearExpectations(cb.get());
+  EXPECT_TRUE(transport->removeObserver(obs1.get()));
+  EXPECT_TRUE(transport->removeObserver(obs2.get()));
+  EXPECT_TRUE(transport->removeObserver(obs3.get()));
 }
 
 TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
@@ -3759,78 +3777,51 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
 }
 
 TEST_F(QuicTransportImplTest, ObserverDetachAndAttachEvb) {
-  LegacyObserver::Config config = {};
-  config.evbEvents = true;
-  auto cb = std::make_unique<StrictMock<MockLegacyObserver>>(config);
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::evbEvents);
+
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  transport->addObserver(obs1.get());
+  transport->addObserver(obs2.get());
+  transport->addObserver(obs3.get());
+
+  // check the current event base and create a new one
+  EXPECT_EQ(evb.get(), transport->getEventBase());
   folly::EventBase evb2;
 
-  EXPECT_CALL(*cb, observerAttach(transport.get()));
-  transport->addObserver(cb.get());
-  Mock::VerifyAndClearExpectations(cb.get());
-
-  // Detach the event base evb and attach a new event base evb2
-  EXPECT_CALL(*cb, evbDetach(transport.get(), evb.get()));
+  // Detach the event base evb
+  EXPECT_CALL(*obs1, evbDetach(transport.get(), evb.get())).Times(0);
+  EXPECT_CALL(*obs2, evbDetach(transport.get(), evb.get())).Times(1);
+  EXPECT_CALL(*obs3, evbDetach(transport.get(), evb.get())).Times(1);
   transport->detachEventBase();
   EXPECT_EQ(nullptr, transport->getEventBase());
-  Mock::VerifyAndClearExpectations(cb.get());
 
-  EXPECT_CALL(*cb, evbAttach(transport.get(), &evb2));
+  // Attach a new event base evb2
+  EXPECT_CALL(*obs1, evbAttach(transport.get(), &evb2)).Times(0);
+  EXPECT_CALL(*obs2, evbAttach(transport.get(), &evb2)).Times(1);
+  EXPECT_CALL(*obs3, evbAttach(transport.get(), &evb2)).Times(1);
   transport->attachEventBase(&evb2);
   EXPECT_EQ(&evb2, transport->getEventBase());
-  Mock::VerifyAndClearExpectations(cb.get());
 
-  // Detach the event base evb and re-attach the old event base evb
-  EXPECT_CALL(*cb, evbDetach(transport.get(), &evb2));
+  // Detach the event base evb2
+  EXPECT_CALL(*obs1, evbDetach(transport.get(), &evb2)).Times(0);
+  EXPECT_CALL(*obs2, evbDetach(transport.get(), &evb2)).Times(1);
+  EXPECT_CALL(*obs3, evbDetach(transport.get(), &evb2)).Times(1);
   transport->detachEventBase();
   EXPECT_EQ(nullptr, transport->getEventBase());
-  Mock::VerifyAndClearExpectations(cb.get());
 
-  EXPECT_CALL(*cb, evbAttach(transport.get(), evb.get()));
+  // Attach the original event base evb
+  EXPECT_CALL(*obs1, evbAttach(transport.get(), evb.get())).Times(0);
+  EXPECT_CALL(*obs2, evbAttach(transport.get(), evb.get())).Times(1);
+  EXPECT_CALL(*obs3, evbAttach(transport.get(), evb.get())).Times(1);
   transport->attachEventBase(evb.get());
   EXPECT_EQ(evb.get(), transport->getEventBase());
-  Mock::VerifyAndClearExpectations(cb.get());
 
-  EXPECT_CALL(*cb, observerDetach(transport.get()));
-  EXPECT_TRUE(transport->removeObserver(cb.get()));
-  Mock::VerifyAndClearExpectations(cb.get());
-}
-
-TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksDeleted) {
-  auto noopCallback = [](QuicSocket*) {};
-  transport->transportConn->pendingCallbacks.emplace_back(noopCallback);
-  EXPECT_EQ(1, size(transport->transportConn->pendingCallbacks));
-  transport->invokeProcessCallbacksAfterNetworkData();
-  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
-}
-
-TEST_F(QuicTransportImplTest, ImplementationObserverCallbacksInvoked) {
-  uint32_t callbacksInvoked = 0;
-  auto countingCallback = [&](QuicSocket*) { callbacksInvoked++; };
-
-  for (int i = 0; i < 2; i++) {
-    transport->transportConn->pendingCallbacks.emplace_back(countingCallback);
-  }
-  EXPECT_EQ(2, size(transport->transportConn->pendingCallbacks));
-  transport->invokeProcessCallbacksAfterNetworkData();
-
-  EXPECT_EQ(2, callbacksInvoked);
-  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
-}
-
-TEST_F(
-    QuicTransportImplTest,
-    ImplementationObserverCallbacksCorrectQuicSocket) {
-  QuicSocket* returnedSocket = nullptr;
-  auto func = [&](QuicSocket* qSocket) { returnedSocket = qSocket; };
-
-  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
-  transport->transportConn->pendingCallbacks.emplace_back(func);
-  EXPECT_EQ(1, size(transport->transportConn->pendingCallbacks));
-
-  transport->invokeProcessCallbacksAfterNetworkData();
-  EXPECT_EQ(0, size(transport->transportConn->pendingCallbacks));
-
-  EXPECT_EQ(transport.get(), returnedSocket);
+  EXPECT_TRUE(transport->removeObserver(obs1.get()));
+  EXPECT_TRUE(transport->removeObserver(obs2.get()));
+  EXPECT_TRUE(transport->removeObserver(obs3.get()));
 }
 
 TEST_F(QuicTransportImplTest, GetConnectionStatsSmoke) {

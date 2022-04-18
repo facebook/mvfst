@@ -844,18 +844,18 @@ TYPED_TEST(QuicTypedTransportTestForObservers, AttachThenDetach) {
   auto observer = std::make_unique<StrictMock<MockObserver>>();
 
   EXPECT_EQ(0, transport->numObservers());
-  EXPECT_THAT(transport->findObservers(), IsEmpty());
+  EXPECT_THAT(transport->getObservers(), IsEmpty());
 
   EXPECT_CALL(*observer, attached(transport));
   transport->addObserver(observer.get());
   EXPECT_EQ(1, transport->numObservers());
-  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
   EXPECT_CALL(*observer, detached(transport));
   EXPECT_TRUE(transport->removeObserver(observer.get()));
   Mock::VerifyAndClearExpectations(observer.get());
   EXPECT_EQ(0, transport->numObservers());
-  EXPECT_THAT(transport->findObservers(), IsEmpty());
+  EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
 TYPED_TEST(
@@ -866,7 +866,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*observer, attached(transport));
   transport->addObserver(observer.get());
-  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
   const QuicError defaultError = QuicError(
       GenericApplicationErrorCode::NO_ERROR,
@@ -889,7 +889,7 @@ TYPED_TEST(
 
   EXPECT_CALL(*observer, attached(transport));
   transport->addObserver(observer.get());
-  EXPECT_THAT(transport->findObservers(), UnorderedElementsAre(observer.get()));
+  EXPECT_THAT(transport->getObservers(), UnorderedElementsAre(observer.get()));
 
   const auto testError = QuicError(
       QuicErrorCode(LocalErrorCode::CONNECTION_RESET),
@@ -964,31 +964,22 @@ TYPED_TEST(
 }
 
 TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
-
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // create a new stream locally
   const auto expectedStreamId = this->getNextLocalBidirectionalStreamId();
@@ -997,9 +988,9 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
         expectedStreamId,
         StreamInitiator::Local,
         StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   const auto streamId = this->createBidirectionalStream();
   EXPECT_EQ(expectedStreamId, streamId);
@@ -1030,9 +1021,9 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Local, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("goodbye2")));
@@ -1043,31 +1034,23 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsLocalOpenedStream) {
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocal) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // create a new stream locally
   const auto expectedStreamId = this->getNextLocalBidirectionalStreamId();
@@ -1076,9 +1059,9 @@ TYPED_TEST(
         expectedStreamId,
         StreamInitiator::Local,
         StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   const auto streamId = this->createBidirectionalStream();
   EXPECT_EQ(expectedStreamId, streamId);
@@ -1101,9 +1084,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Local, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("goodbye")));
@@ -1114,31 +1097,23 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsLocalOpenedStreamImmediateEofLocalRemote) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // create a new stream locally
   const auto expectedStreamId = this->getNextLocalBidirectionalStreamId();
@@ -1147,9 +1122,9 @@ TYPED_TEST(
         expectedStreamId,
         StreamInitiator::Local,
         StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   const auto streamId = this->createBidirectionalStream();
   EXPECT_EQ(expectedStreamId, streamId);
@@ -1169,9 +1144,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Local, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("hello2")));
@@ -1180,31 +1155,23 @@ TYPED_TEST(
 }
 
 TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1213,9 +1180,9 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamData(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1240,9 +1207,9 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2));
@@ -1253,31 +1220,23 @@ TYPED_TEST(QuicTypedTransportTestForObservers, StreamEventsPeerOpenedStream) {
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofRemote) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1286,9 +1245,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1309,9 +1268,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets2));
@@ -1322,31 +1281,23 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEofLocalRemote) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1355,9 +1306,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1372,9 +1323,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPackets(maybeWrittenPackets1));
@@ -1385,31 +1336,23 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRst) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1418,9 +1361,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamData(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1459,9 +1402,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPacket(maybeRstPacketNum.value()));
@@ -1472,31 +1415,23 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamStopSendingPlusRstTriggersRstBytesInFlight) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1505,9 +1440,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamData(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1544,9 +1479,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPacket(maybeRstPacketNum.value()));
@@ -1557,31 +1492,23 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     StreamEventsPeerOpenedStreamImmediateEorStopSendingTriggersRstBytesInFlight) {
-  MockLegacyObserver::Config configWithStreamEventsEnabled;
-  configWithStreamEventsEnabled.streamEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::streamEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoStreamEvents =
-      std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithStreamEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
-  auto observerWithStreamEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(
-          configWithStreamEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoStreamEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoStreamEvents.get());
-  EXPECT_CALL(*observerWithStreamEvents1, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents1.get());
-  EXPECT_CALL(*observerWithStreamEvents2, observerAttach(transport));
-  transport->addObserver(observerWithStreamEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoStreamEvents.get(),
-          observerWithStreamEvents1.get(),
-          observerWithStreamEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // get stream ID for peer
   const auto streamId = this->getNextPeerBidirectionalStreamId();
@@ -1590,9 +1517,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamOpened(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamOpened(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs1, streamOpened(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamOpened(transport, matcher));
+    EXPECT_CALL(*obs3, streamOpened(transport, matcher));
   }
   this->deliverPacket(this->buildPeerPacketWithStreamDataAndEof(
       streamId, IOBuf::copyBuffer("hello1")));
@@ -1625,9 +1552,9 @@ TYPED_TEST(
   {
     const auto matcher = this->getStreamEventMatcherOpt(
         streamId, StreamInitiator::Remote, StreamDirectionality::Bidirectional);
-    EXPECT_CALL(*observerWithNoStreamEvents, streamClosed(_, _)).Times(0);
-    EXPECT_CALL(*observerWithStreamEvents1, streamClosed(transport, matcher));
-    EXPECT_CALL(*observerWithStreamEvents2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs1, streamClosed(_, _)).Times(0);
+    EXPECT_CALL(*obs2, streamClosed(transport, matcher));
+    EXPECT_CALL(*obs3, streamClosed(transport, matcher));
   }
   this->deliverPacket(
       this->buildAckPacketForSentAppDataPacket(maybeRstPacketNum.value()));
@@ -1653,29 +1580,25 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockLegacyObserver::Config configWithEventsEnabled;
-  configWithEventsEnabled.appRateLimitedEvents = true;
-  configWithEventsEnabled.packetsWrittenEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::appRateLimitedEvents,
+      SocketObserverInterface::Events::packetsWrittenEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
-  auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoEvents.get());
-  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
-  transport->addObserver(observerWithEvents1.get());
-  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
-  transport->addObserver(observerWithEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoEvents.get(),
-          observerWithEvents1.get(),
-          observerWithEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // string to write
   const std::string str1 = "hello";
@@ -1703,14 +1626,13 @@ TYPED_TEST(
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
-    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
-        .Times(0);
+    EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
-        *observerWithEvents1,
+        *obs2,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
     EXPECT_CALL(
-        *observerWithEvents2,
+        *obs3,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
 
@@ -1738,9 +1660,8 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(strLength)));
-    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1751,8 +1672,7 @@ TYPED_TEST(
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1779,9 +1699,8 @@ TYPED_TEST(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes - strLength))));
 
-    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, appRateLimited(transport, appRateLimitedMatcher))
+    EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1791,8 +1710,7 @@ TYPED_TEST(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, appRateLimited(transport, appRateLimitedMatcher))
+    EXPECT_CALL(*obs3, appRateLimited(transport, appRateLimitedMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1837,29 +1755,25 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockLegacyObserver::Config configWithEventsEnabled;
-  configWithEventsEnabled.appRateLimitedEvents = true;
-  configWithEventsEnabled.packetsWrittenEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::appRateLimitedEvents,
+      SocketObserverInterface::Events::packetsWrittenEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
-  auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoEvents.get());
-  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
-  transport->addObserver(observerWithEvents1.get());
-  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
-  transport->addObserver(observerWithEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoEvents.get(),
-          observerWithEvents1.get(),
-          observerWithEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // we're going to write 1000 bytes with a smaller CWND
   // because MSS > CWND, we're going to overshoot
@@ -1889,14 +1803,13 @@ TYPED_TEST(
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
-    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
-        .Times(0);
+    EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
-        *observerWithEvents1,
+        *obs2,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
     EXPECT_CALL(
-        *observerWithEvents2,
+        *obs3,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
 
@@ -1924,9 +1837,8 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce(), expect overshoot CWND
             &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::AllOf(testing::Gt(bufLength), testing::Gt(cwndInBytes))));
-    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1937,8 +1849,7 @@ TYPED_TEST(
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -1987,29 +1898,25 @@ TYPED_TEST(
       std::make_unique<StaticCwndCongestionController>(
           StaticCwndCongestionController::CwndInBytes(cwndInBytes));
 
-  MockLegacyObserver::Config configWithEventsEnabled;
-  configWithEventsEnabled.appRateLimitedEvents = true;
-  configWithEventsEnabled.packetsWrittenEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::appRateLimitedEvents,
+      SocketObserverInterface::Events::packetsWrittenEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
-  auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoEvents.get());
-  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
-  transport->addObserver(observerWithEvents1.get());
-  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
-  transport->addObserver(observerWithEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoEvents.get(),
-          observerWithEvents1.get(),
-          observerWithEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // open stream that we will write to
   const auto streamId =
@@ -2040,14 +1947,13 @@ TYPED_TEST(
         testing::Field(
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Eq(folly::Optional<uint64_t>(cwndInBytes))));
-    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
-        .Times(0);
+    EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
     EXPECT_CALL(
-        *observerWithEvents1,
+        *obs2,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
     EXPECT_CALL(
-        *observerWithEvents2,
+        *obs3,
         startWritingFromAppLimited(
             transport, startWritingFromAppLimitedMatcher));
 
@@ -2075,9 +1981,8 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Ge(cwndInBytes))); // full CWND written
-    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2088,8 +1993,7 @@ TYPED_TEST(
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2144,9 +2048,8 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Lt(cwndInBytes)));
-    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2157,8 +2060,7 @@ TYPED_TEST(
               event.maybeWritableBytes);
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2184,9 +2086,8 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::WriteEvent::maybeWritableBytes,
             testing::Lt(folly::Optional<uint64_t>(cwndInBytes))));
-    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, appRateLimited(transport, appRateLimitedMatcher))
+    EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs2, appRateLimited(transport, appRateLimitedMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2196,8 +2097,7 @@ TYPED_TEST(
                   int64_t(cwndInBytes) - int64_t(bytesWritten), int64_t(0))),
               event.maybeWritableBytes);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, appRateLimited(transport, appRateLimitedMatcher))
+    EXPECT_CALL(*obs3, appRateLimited(transport, appRateLimitedMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2233,29 +2133,25 @@ TYPED_TEST(
   // remove congestion controller
   this->getNonConstConn().congestionController = nullptr;
 
-  MockLegacyObserver::Config configWithEventsEnabled;
-  configWithEventsEnabled.appRateLimitedEvents = true;
-  configWithEventsEnabled.packetsWrittenEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::appRateLimitedEvents,
+      SocketObserverInterface::Events::packetsWrittenEvents);
 
   auto transport = this->getTransport();
-  auto observerWithNoEvents = std::make_unique<NiceMock<MockLegacyObserver>>();
-  auto observerWithEvents1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
-  auto observerWithEvents2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithEventsEnabled);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
-  EXPECT_CALL(*observerWithNoEvents, observerAttach(transport));
-  transport->addObserver(observerWithNoEvents.get());
-  EXPECT_CALL(*observerWithEvents1, observerAttach(transport));
-  transport->addObserver(observerWithEvents1.get());
-  EXPECT_CALL(*observerWithEvents2, observerAttach(transport));
-  transport->addObserver(observerWithEvents2.get());
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
   EXPECT_THAT(
       transport->getObservers(),
-      UnorderedElementsAre(
-          observerWithNoEvents.get(),
-          observerWithEvents1.get(),
-          observerWithEvents2.get()));
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
 
   // string to write
   const std::string str1 = "hello";
@@ -2270,12 +2166,9 @@ TYPED_TEST(
     writeCount++; // write count will be incremented
 
     // no congestion controller == no startWritingFromAppLimited events
-    EXPECT_CALL(*observerWithNoEvents, startWritingFromAppLimited(_, _))
-        .Times(0);
-    EXPECT_CALL(*observerWithEvents1, startWritingFromAppLimited(_, _))
-        .Times(0);
-    EXPECT_CALL(*observerWithEvents2, startWritingFromAppLimited(_, _))
-        .Times(0);
+    EXPECT_CALL(*obs1, startWritingFromAppLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs2, startWritingFromAppLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs3, startWritingFromAppLimited(_, _)).Times(0);
 
     // matcher for event from packetsWritten
     const auto packetsWrittenMatcher = AllOf(
@@ -2301,17 +2194,15 @@ TYPED_TEST(
         testing::Field( // precise check in WillOnce()
             &SocketObserverInterface::PacketsWrittenEvent::numBytesWritten,
             testing::Gt(strLength)));
-    EXPECT_CALL(*observerWithNoEvents, packetsWritten(_, _)).Times(0);
-    EXPECT_CALL(
-        *observerWithEvents1, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs1, packetsWritten(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
               socket->getTransportInfo().bytesSent - oldTInfo.bytesSent;
           EXPECT_EQ(bytesWritten, event.numBytesWritten);
         });
-    EXPECT_CALL(
-        *observerWithEvents2, packetsWritten(transport, packetsWrittenMatcher))
+    EXPECT_CALL(*obs3, packetsWritten(transport, packetsWrittenMatcher))
         .WillOnce([oldTInfo = this->getTransport()->getTransportInfo()](
                       const auto& socket, const auto& event) {
           const auto bytesWritten =
@@ -2320,9 +2211,9 @@ TYPED_TEST(
         });
 
     // no congestion controller == no appRateLimited events
-    EXPECT_CALL(*observerWithNoEvents, appRateLimited(_, _)).Times(0);
-    EXPECT_CALL(*observerWithEvents1, appRateLimited(_, _)).Times(0);
-    EXPECT_CALL(*observerWithEvents2, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs1, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs2, appRateLimited(_, _)).Times(0);
+    EXPECT_CALL(*obs3, appRateLimited(_, _)).Times(0);
   }
 
   // open a stream and write str1
@@ -2343,15 +2234,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedNoAckDelay) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2416,15 +2307,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelay) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2489,15 +2380,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithAckDelayEqRtt) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2586,15 +2477,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsOutstandingPacketSentThenAckedWithTooLargeAckDelay) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2681,15 +2572,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAllAckedAtOnce) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2767,15 +2658,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentAndAckedSequentially) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -2919,15 +2810,15 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenAckedSequentially) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -3080,8 +2971,8 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedSequentiallyThenSecondAcked) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   // prevent packets from being marked as lost
   this->getNonConstConn().lossState.reorderingThreshold = 10;
@@ -3092,9 +2983,9 @@ TYPED_TEST(
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());
@@ -3245,8 +3136,8 @@ TYPED_TEST(
 TYPED_TEST(
     QuicTypedTransportTestForObservers,
     AckEventsThreeOutstandingPacketsSentThenFirstLastAckedAtOnceThenSecondAcked) {
-  MockLegacyObserver::Config configWithAcksEnabled;
-  configWithAcksEnabled.acksProcessedEvents = true;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::acksProcessedEvents);
 
   // prevent packets from being marked as lost
   this->getNonConstConn().lossState.reorderingThreshold = 10;
@@ -3257,9 +3148,9 @@ TYPED_TEST(
   auto transport = this->getTransport();
   auto observerWithNoAcks = std::make_unique<NiceMock<MockLegacyObserver>>();
   auto observerWithAcks1 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
   auto observerWithAcks2 =
-      std::make_unique<NiceMock<MockLegacyObserver>>(configWithAcksEnabled);
+      std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
 
   EXPECT_CALL(*observerWithNoAcks, observerAttach(transport));
   transport->addObserver(observerWithNoAcks.get());

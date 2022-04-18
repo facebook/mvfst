@@ -141,8 +141,8 @@ ProbeSizeRaiserType parseRaiserType(uint32_t type) {
 
 class TPerfObserver : public LegacyObserver {
  public:
-  explicit TPerfObserver(const LegacyObserver::Config& config)
-      : LegacyObserver(config) {}
+  using LegacyObserver::LegacyObserver;
+
   void appRateLimited(
       QuicSocket* /* socket */,
       const quic::SocketObserverInterface::
@@ -202,12 +202,13 @@ class TPerfAcceptObserver : public AcceptObserver {
   TPerfAcceptObserver() {
     // Create an observer config, only enabling events we are interested in
     // receiving.
-    LegacyObserver::Config config = {};
-    config.appRateLimitedEvents = true;
-    config.pmtuEvents = true;
-    config.rttSamples = true;
-    config.lossEvents = true;
-    tperfObserver_ = std::make_unique<TPerfObserver>(config);
+    LegacyObserver::EventSet eventSet;
+    eventSet.enable(
+        SocketObserverInterface::Events::appRateLimitedEvents,
+        SocketObserverInterface::Events::pmtuEvents,
+        SocketObserverInterface::Events::rttSamples,
+        SocketObserverInterface::Events::lossEvents);
+    tperfObserver_ = std::make_unique<TPerfObserver>(eventSet);
   }
 
   void accept(QuicTransportBase* transport) noexcept override {

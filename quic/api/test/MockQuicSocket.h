@@ -17,6 +17,8 @@ class MockQuicSocket : public QuicSocket {
  public:
   using SharedBuf = std::shared_ptr<folly::IOBuf>;
 
+  MockQuicSocket() = default;
+
   MockQuicSocket(
       folly::EventBase* /*eventBase*/,
       ConnectionSetupCallback* setupCb,
@@ -301,16 +303,13 @@ class MockQuicSocket : public QuicSocket {
 
   MOCK_METHOD(void, setCongestionControl, (CongestionControlType));
 
-  ConnectionSetupCallback* setupCb_;
-  ConnectionCallback* connCb_;
+  ConnectionSetupCallback* setupCb_{nullptr};
+  ConnectionCallback* connCb_{nullptr};
 
   folly::Function<bool(const folly::Optional<std::string>&, const Buf&)>
       earlyDataAppParamsValidator_;
   folly::Function<Buf()> earlyDataAppParamsGetter_;
 
-  MOCK_METHOD(void, addObserver, (LegacyObserver*));
-  MOCK_METHOD(bool, removeObserver, (LegacyObserver*));
-  MOCK_METHOD(const ObserverVec&, getObservers, (), (const));
   MOCK_METHOD(
       void,
       resetNonControlStreams,
@@ -335,5 +334,10 @@ class MockQuicSocket : public QuicSocket {
       (folly::Expected<std::vector<Buf>, LocalErrorCode>),
       readDatagramBufs,
       (size_t));
+  MOCK_METHOD(
+      SocketObserverContainer*,
+      getSocketObserverContainer,
+      (),
+      (const));
 };
 } // namespace quic

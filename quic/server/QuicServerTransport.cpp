@@ -60,7 +60,7 @@ QuicServerTransport::QuicServerTransport(
   tempConn->serverAddr = socket_->address();
   serverConn_ = tempConn.get();
   conn_.reset(tempConn.release());
-  conn_->observers = observers_;
+  conn_->observerContainer = observerContainer_;
 
   setConnectionSetupCallback(connSetupCb);
   setConnectionCallback(connStreamsCb);
@@ -626,10 +626,16 @@ void QuicServerTransport::maybeStartD6DProbing() {
     // valuable
     conn_->pendingEvents.d6d.sendProbeDelay = kDefaultD6DKickStartDelay;
     QUIC_STATS(conn_->statsCallback, onConnectionD6DStarted);
-    for (const auto& cb : *(conn_->observers)) {
-      if (cb->getConfig().pmtuEvents) {
-        cb->pmtuProbingStarted(this);
-      }
+
+    if (getSocketObserverContainer() &&
+        getSocketObserverContainer()
+            ->hasObserversForEvent<
+                SocketObserverInterface::Events::pmtuEvents>()) {
+      getSocketObserverContainer()
+          ->invokeInterfaceMethod<SocketObserverInterface::Events::pmtuEvents>(
+              [](auto observer, auto observed) {
+                observer->pmtuProbingStarted(observed);
+              });
     }
   }
 }

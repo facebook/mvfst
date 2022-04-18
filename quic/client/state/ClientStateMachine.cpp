@@ -28,6 +28,7 @@ std::unique_ptr<QuicClientConnectionState> undoAllClientStateForRetry(
   // across stateless retry.
   auto newConn = std::make_unique<QuicClientConnectionState>(
       std::move(conn->handshakeFactory));
+  newConn->observerContainer = conn->observerContainer;
   newConn->qLogger = conn->qLogger;
   newConn->clientConnectionId = conn->clientConnectionId;
   newConn->initialDestinationConnectionId =

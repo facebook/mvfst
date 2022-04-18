@@ -66,7 +66,7 @@ QuicClientTransport::QuicClientTransport(
       std::make_unique<QuicClientConnectionState>(std::move(handshakeFactory));
   clientConn_ = tempConn.get();
   conn_.reset(tempConn.release());
-  conn_->observers = observers_;
+  conn_->observerContainer = observerContainer_;
 
   auto srcConnId = connectionIdSize > 0
       ? ConnectionId::createRandom(connectionIdSize)

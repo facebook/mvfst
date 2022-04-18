@@ -641,37 +641,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
 
   virtual void cancelAllAppCallbacks(const QuicError& error) noexcept;
 
-  using QuicSocket::addObserver;
-  using QuicSocket::removeObserver;
-
-  /**
-   * Adds an observer.
-   *
-   * Observers can tie their lifetime to aspects of this socket's lifecycle /
-   * lifetime and perform inspection at various states.
-   *
-   * This enables instrumentation to be added without changing / interfering
-   * with how the application uses the socket.
-   *
-   * @param observer     Observer to add (implements Observer).
-   */
-  void addObserver(LegacyObserver* observer) override;
-
-  /**
-   * Removes an observer.
-   *
-   * @param observer     Observer to remove.
-   * @return             Whether observer found and removed from list.
-   */
-  bool removeObserver(LegacyObserver* observer) override;
-
-  /**
-   * Returns installed observers.
-   *
-   * @return             Reference to const vector with installed observers.
-   */
-  FOLLY_NODISCARD const ObserverVec& getObservers() const override;
-
   FOLLY_NODISCARD QuicConnectionStats getConnectionsStats() const override;
 
   /**
@@ -947,10 +916,6 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   folly::SocketAddress localFallbackAddress;
 
   folly::Optional<std::string> exceptionCloseWhat_;
-
-  // Observers
-
-  std::shared_ptr<ObserverVec> observers_{std::make_shared<ObserverVec>()};
 
   uint64_t qlogRefcnt_{0};
 

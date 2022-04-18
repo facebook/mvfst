@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <quic/QuicConstants.h>
+#include <quic/api/test/MockQuicSocket.h>
 #include <quic/api/test/Mocks.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
@@ -2315,21 +2316,23 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       ackTime);
 }
 
-TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
+TEST_P(AckHandlersTest, ObserverRttSample) {
+  auto socket = std::make_shared<MockQuicSocket>();
+  const auto observerContainer =
+      std::make_shared<SocketObserverContainer>(socket.get());
+
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
+  conn.observerContainer = observerContainer;
 
-  // Register 1 observer
-  LegacyObserver::Config config = {};
-  config.rttSamples = true;
-  auto ib = MockLegacyObserver(config);
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::rttSamples);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  observerContainer->addObserver(obs1.get());
 
-  auto observers = std::make_shared<ObserverVec>();
-  observers->emplace_back(&ib);
-  conn.observers = observers;
-
+  // send packet numbers 0 -> 29
   PacketNum packetNum = 0;
   StreamId streamid = 0;
   TimePoint sentTime;
@@ -2360,13 +2363,13 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
     packetNum++;
   }
 
-  struct ackPacketData {
+  struct AckFrameWithTestData {
     PacketNum startSeq, endSeq;
     std::chrono::milliseconds ackDelay;
     TimePoint ackTime;
     ReadAckFrame ackFrame;
 
-    explicit ackPacketData(
+    explicit AckFrameWithTestData(
         PacketNum startSeqIn,
         PacketNum endSeqIn,
         std::chrono::milliseconds ackDelayIn)
@@ -2381,44 +2384,24 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
   };
 
   // See each emplace as the ACK Block [X, Y] with size (Y-X+1)
-  std::vector<ackPacketData> ackVec;
+  std::vector<AckFrameWithTestData> ackVec;
   // Sequential test
-  ackVec.emplace_back(0, 5, 4ms); // +1 callback
-  ackVec.emplace_back(6, 10, 5ms); // +1
-  ackVec.emplace_back(11, 15, 6ms); // +1
+  ackVec.emplace_back(0, 5, 4ms);
+  ackVec.emplace_back(6, 10, 5ms);
+  ackVec.emplace_back(11, 15, 6ms);
   // Out-of-order test
-  //
-  // Its important to check the if
-  // largestAcked - currentPacketNum > reorderingThreshold (currently 3)
-  // else it can trigger Observer::packetLossDetected
-  // and increase the number of callbacks
-  ackVec.emplace_back(18, 18, 0ms); // +1
-  ackVec.emplace_back(16, 17, 2ms); // +1
-  ackVec.emplace_back(19, 29, 12ms); // +1 = 6 callbacks
+  ackVec.emplace_back(18, 18, 0ms);
+  ackVec.emplace_back(16, 17, 2ms);
+  ackVec.emplace_back(19, 29, 12ms);
 
-  // 0 pending callbacks
-  EXPECT_EQ(0, size(conn.pendingCallbacks));
-
-  for (const auto& ackData : ackVec) {
-    processAckFrame(
-        conn,
-        GetParam(),
-        ackData.ackFrame,
-        [](const auto&, const auto&, const auto&) {},
-        [](auto&, auto&, bool) {},
-        ackData.ackTime);
-  }
-
-  // see above
-  EXPECT_EQ(6, size(conn.pendingCallbacks));
-
+  // Setup expectations, then process the actual ACKs
   for (const auto& ackData : ackVec) {
     auto rttSample = std::chrono::ceil<std::chrono::microseconds>(
         ackData.ackTime - packetRcvTime[ackData.endSeq]);
     EXPECT_CALL(
-        ib,
+        *obs1,
         rttSampleGenerated(
-            nullptr,
+            socket.get(),
             AllOf(
                 Field(
                     &SocketObserverInterface::PacketRTT::rcvTime,
@@ -2434,29 +2417,38 @@ TEST_P(AckHandlersTest, TestRTTPacketObserverCallback) {
                         &quic::OutstandingPacketMetadata::inflightBytes,
                         ackData.endSeq + 1)))));
   }
-
-  for (auto& callback : conn.pendingCallbacks) {
-    callback(nullptr);
+  for (const auto& ackData : ackVec) {
+    processAckFrame(
+        conn,
+        GetParam(),
+        ackData.ackFrame,
+        [](const auto&, const auto&, const auto&) {},
+        [](auto&, auto&, bool) {},
+        ackData.ackTime);
   }
+
+  observerContainer->removeObserver(obs1.get());
 }
 
-TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
+TEST_P(AckHandlersTest, ObserverSpuriousLostEventReorderThreshold) {
+  auto socket = std::make_shared<MockQuicSocket>();
+  const auto observerContainer =
+      std::make_shared<SocketObserverContainer>(socket.get());
+
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
+  conn.observerContainer = observerContainer;
 
-  // Register 1 observer
-  LegacyObserver::Config config = {};
-  config.spuriousLossEvents = true;
-  config.lossEvents = true;
-  auto ib = MockLegacyObserver(config);
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::lossEvents,
+      SocketObserverInterface::Events::spuriousLossEvents);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  observerContainer->addObserver(obs1.get());
 
-  auto observers = std::make_shared<ObserverVec>();
-  observers->emplace_back(&ib);
-  conn.observers = observers;
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
-
+  // send 10 packets
   TimePoint startTime = Clock::now();
   emplacePackets(conn, 10, startTime, GetParam());
 
@@ -2475,15 +2467,11 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 20ms;
 
-  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
-
-  // expecting 1 callback to be stacked
-  EXPECT_EQ(1, size(conn.pendingCallbacks));
-
+  // expect packets to be marked lost on call to detectLostPackets
   EXPECT_CALL(
-      ib,
+      *obs1,
       packetLossDetected(
-          nullptr,
+          socket.get(),
           Field(
               &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
@@ -2491,8 +2479,21 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
                   MockLegacyObserver::getLossPacketMatcher(1, true, false),
                   MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
       .Times(1);
+  detectLossPackets(
+      conn, 4, [](auto&, auto&, bool) {}, checkTime, GetParam());
 
-  // Here we receive the spurious loss packets in a late ack
+  // now we get acks for packets marked lost, triggering spuriousLossDetected
+  EXPECT_CALL(
+      *obs1,
+      spuriousLossDetected(
+          socket.get(),
+          Field(
+              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
+              UnorderedElementsAre(
+                  MockLegacyObserver::getLossPacketMatcher(0, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(1, true, false),
+                  MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
+      .Times(1);
   {
     ReadAckFrame ackFrame;
     ackFrame.largestAcked = 2;
@@ -2507,43 +2508,28 @@ TEST_P(AckHandlersTest, TestSpuriousObserverReorder) {
         startTime + 30ms);
   }
 
-  // Spurious loss observer call added
-  EXPECT_EQ(2, size(conn.pendingCallbacks));
-
-  EXPECT_CALL(
-      ib,
-      spuriousLossDetected(
-          nullptr,
-          Field(
-              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
-              UnorderedElementsAre(
-                  MockLegacyObserver::getLossPacketMatcher(0, true, false),
-                  MockLegacyObserver::getLossPacketMatcher(1, true, false),
-                  MockLegacyObserver::getLossPacketMatcher(2, true, false)))))
-      .Times(1);
-
-  for (auto& callback : conn.pendingCallbacks) {
-    callback(nullptr);
-  }
+  observerContainer->removeObserver(obs1.get());
 }
 
-TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
+TEST_P(AckHandlersTest, ObserverSpuriousLostEventTimeout) {
+  auto socket = std::make_shared<MockQuicSocket>();
+  const auto observerContainer =
+      std::make_shared<SocketObserverContainer>(socket.get());
+
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   conn.congestionController = std::move(mockCongestionController);
+  conn.observerContainer = observerContainer;
 
-  // Register 1 observer
-  LegacyObserver::Config config = {};
-  config.spuriousLossEvents = true;
-  config.lossEvents = true;
-  auto ib = MockLegacyObserver(config);
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(
+      SocketObserverInterface::Events::lossEvents,
+      SocketObserverInterface::Events::spuriousLossEvents);
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  observerContainer->addObserver(obs1.get());
 
-  auto observers = std::make_shared<ObserverVec>();
-  observers->emplace_back(&ib);
-  conn.observers = observers;
-  auto noopLossVisitor = [](auto&, auto&, bool) {};
-
+  // send 10 packets
   TimePoint startTime = Clock::now();
   emplacePackets(conn, 10, startTime, GetParam());
 
@@ -2562,15 +2548,11 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
   conn.transportSettings.timeReorderingThreshDivisor = 1.0;
   TimePoint checkTime = startTime + 500ms;
 
-  detectLossPackets(conn, 10, noopLossVisitor, checkTime, GetParam());
-
-  // expecting 1 callback to be stacked
-  EXPECT_EQ(1, size(conn.pendingCallbacks));
-
+  // expect packets to be marked lost on call to detectLostPackets
   EXPECT_CALL(
-      ib,
+      *obs1,
       packetLossDetected(
-          nullptr,
+          socket.get(),
           Field(
               &SocketObserverInterface::LossEvent::lostPackets,
               UnorderedElementsAre(
@@ -2580,8 +2562,23 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
                   MockLegacyObserver::getLossPacketMatcher(8, false, true),
                   MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
       .Times(1);
+  detectLossPackets(
+      conn, 10, [](auto&, auto&, bool) {}, checkTime, GetParam());
 
-  // Here we receive the spurious loss packets in a late ack
+  // now we get acks for packets marked lost, triggering spuriousLossDetected
+  EXPECT_CALL(
+      *obs1,
+      spuriousLossDetected(
+          socket.get(),
+          Field(
+              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
+              UnorderedElementsAre(
+                  MockLegacyObserver::getLossPacketMatcher(5, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(6, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(7, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(8, false, true),
+                  MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
+      .Times(1);
   {
     ReadAckFrame ackFrame;
     ackFrame.largestAcked = 9;
@@ -2596,26 +2593,7 @@ TEST_P(AckHandlersTest, TestSpuriousObserverTimeout) {
         startTime + 510ms);
   }
 
-  // Spurious loss observer call added
-  EXPECT_EQ(2, size(conn.pendingCallbacks));
-
-  EXPECT_CALL(
-      ib,
-      spuriousLossDetected(
-          nullptr,
-          Field(
-              &SocketObserverInterface::SpuriousLossEvent::spuriousPackets,
-              UnorderedElementsAre(
-                  MockLegacyObserver::getLossPacketMatcher(5, false, true),
-                  MockLegacyObserver::getLossPacketMatcher(6, false, true),
-                  MockLegacyObserver::getLossPacketMatcher(7, false, true),
-                  MockLegacyObserver::getLossPacketMatcher(8, false, true),
-                  MockLegacyObserver::getLossPacketMatcher(9, false, true)))))
-      .Times(1);
-
-  for (auto& callback : conn.pendingCallbacks) {
-    callback(nullptr);
-  }
+  observerContainer->removeObserver(obs1.get());
 }
 
 TEST_P(AckHandlersTest, SubMicrosecondRTT) {
