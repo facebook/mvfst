@@ -146,6 +146,9 @@ void QuicServerTransport::onReadData(
   readData.peer = peer;
   readData.networkData = std::move(networkData);
   bool waitingForFirstPacket = !hasReceivedPackets(*conn_);
+  uint64_t prevWritableBytes = serverConn_->writableBytesLimit
+      ? *serverConn_->writableBytesLimit
+      : std::numeric_limits<uint64_t>::max();
   onServerReadData(*serverConn_, readData);
   processPendingData(true);
 
@@ -163,6 +166,20 @@ void QuicServerTransport::onReadData(
       hasReceivedPackets(*conn_)) {
     connSetupCallback_->onFirstPeerPacketProcessed();
   }
+
+  uint64_t curWritableBytes = serverConn_->writableBytesLimit
+      ? *serverConn_->writableBytesLimit
+      : std::numeric_limits<uint64_t>::max();
+
+  // If we've increased our writable bytes limit after processing incoming data
+  // and we were previously blocked from writing probes, fire the PTO alarm
+  if (serverConn_->transportSettings.enableWritableBytesLimit &&
+      serverConn_->numProbesWritableBytesLimited &&
+      prevWritableBytes < curWritableBytes) {
+    onPTOAlarm(*serverConn_);
+    serverConn_->numProbesWritableBytesLimited = 0;
+  }
+
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
   maybeNotifyHandshakeFinished();

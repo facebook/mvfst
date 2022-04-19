@@ -101,7 +101,7 @@ void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
       conn.pacer->setExperimental(true);
     }
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
-    conn.enableWritableBytesLimit = true;
+    conn.transportSettings.enableWritableBytesLimit = true;
   }
 }
 } // namespace
@@ -444,6 +444,7 @@ bool validateAndUpdateSourceToken(
       // of vector to increase its favorability.
       sourceAddresses.erase(sourceAddresses.begin() + ii);
       sourceAddresses.push_back(conn.peerAddress.getIPAddress());
+      conn.isClientAddrVerified = true;
     }
   }
   conn.sourceTokenMatching = foundMatch;
@@ -483,7 +484,9 @@ void updateWritableByteLimitOnRecvPacket(QuicServerConnectionState& conn) {
   if (conn.writableBytesLimit) {
     conn.writableBytesLimit = *conn.writableBytesLimit +
         conn.transportSettings.limitedCwndInMss * conn.udpSendPacketLen;
-  } else if (!conn.isClientAddrVerified && conn.enableWritableBytesLimit) {
+  } else if (
+      !conn.isClientAddrVerified &&
+      conn.transportSettings.enableWritableBytesLimit) {
     conn.writableBytesLimit =
         conn.transportSettings.limitedCwndInMss * conn.udpSendPacketLen;
   }

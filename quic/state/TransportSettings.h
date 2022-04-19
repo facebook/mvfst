@@ -291,6 +291,8 @@ struct TransportSettings {
   // has to be set to something >> the RTT of the connection.
   bool enableKeepalive{false};
   std::string flowPriming = "";
+  // Whether or not to enable WritableBytes limit (server only)
+  bool enableWritableBytesLimit{false};
 };
 
 } // namespace quic

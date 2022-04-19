@@ -138,9 +138,6 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // NewToken).
   bool isClientAddrVerified{false};
 
-  // Whether or not to enable WritableBytes limit
-  bool enableWritableBytesLimit{false};
-
 #ifdef CCP_ENABLED
   // Pointer to struct that maintains state needed for interacting with libccp.
   // Once instance of this struct is created for each instance of

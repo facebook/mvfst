@@ -3270,8 +3270,8 @@ TEST_F(
    */
   auto transportSettings = server->getTransportSettings();
   transportSettings.limitedCwndInMss = 5;
+  transportSettings.enableWritableBytesLimit = true;
   server->setTransportSettings(transportSettings);
-  server->getNonConstConn().enableWritableBytesLimit = true;
   EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited()).Times(0);
 
   recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
@@ -3328,8 +3328,8 @@ TEST_F(
    */
   auto transportSettings = server->getTransportSettings();
   transportSettings.limitedCwndInMss = 3;
+  transportSettings.enableWritableBytesLimit = true;
   server->setTransportSettings(transportSettings);
-  server->getNonConstConn().enableWritableBytesLimit = true;
 
   recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
 
@@ -3413,8 +3413,8 @@ TEST_F(
    */
   auto transportSettings = server->getTransportSettings();
   transportSettings.limitedCwndInMss = 3;
+  transportSettings.enableWritableBytesLimit = true;
   server->setTransportSettings(transportSettings);
-  server->getNonConstConn().enableWritableBytesLimit = true;
   EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited())
       .Times(AtLeast(1));
 

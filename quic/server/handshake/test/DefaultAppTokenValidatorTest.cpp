@@ -390,6 +390,7 @@ TEST_F(LimitIfNoMatchPolicyTest, EmptySourceToken) {
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenNoAddrMatch) {
@@ -403,6 +404,7 @@ TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenNoAddrMatch) {
       conn_.tokenSourceAddresses,
       ElementsAre(
           folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
@@ -413,6 +415,7 @@ TEST_F(LimitIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
@@ -431,6 +434,7 @@ TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
           folly::IPAddress("1.2.3.6"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
@@ -447,6 +451,7 @@ TEST_F(LimitIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
           folly::IPAddress("1.2.3.5"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 class RejectIfNoMatchPolicyTest : public SourceAddressTokenTest {
@@ -476,6 +481,7 @@ TEST_F(RejectIfNoMatchPolicyTest, OneSourceTokenNoAddrMatch) {
       conn_.tokenSourceAddresses,
       ElementsAre(
           folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(RejectIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
@@ -486,6 +492,7 @@ TEST_F(RejectIfNoMatchPolicyTest, OneSourceTokenAddrMatch) {
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
@@ -502,6 +509,7 @@ TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenNoAddrMatch) {
           folly::IPAddress("1.2.3.6"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
@@ -519,6 +527,7 @@ TEST_F(RejectIfNoMatchPolicyTest, MaxNumSourceTokenAddrMatch) {
           folly::IPAddress("1.2.3.5"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 class AlwaysRejectPolicyTest : public SourceAddressTokenTest {
@@ -537,6 +546,7 @@ TEST_F(AlwaysRejectPolicyTest, EmptySourceToken) {
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(AlwaysRejectPolicyTest, OneSourceTokenNoAddrMatch) {
@@ -548,6 +558,7 @@ TEST_F(AlwaysRejectPolicyTest, OneSourceTokenNoAddrMatch) {
       conn_.tokenSourceAddresses,
       ElementsAre(
           folly::IPAddress("1.2.3.5"), conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(AlwaysRejectPolicyTest, OneSourceTokenAddrMatch) {
@@ -558,6 +569,7 @@ TEST_F(AlwaysRejectPolicyTest, OneSourceTokenAddrMatch) {
   ASSERT_THAT(
       conn_.tokenSourceAddresses,
       ElementsAre(conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenNoAddrMatch) {
@@ -574,6 +586,7 @@ TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenNoAddrMatch) {
           folly::IPAddress("1.2.3.6"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_FALSE(conn_.isClientAddrVerified);
 }
 
 TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenAddrMatch) {
@@ -591,6 +604,7 @@ TEST_F(AlwaysRejectPolicyTest, MaxNumSourceTokenAddrMatch) {
           folly::IPAddress("1.2.3.5"),
           folly::IPAddress("1.2.3.7"),
           conn_.peerAddress.getIPAddress()));
+  EXPECT_TRUE(conn_.isClientAddrVerified);
 }
 
 } // namespace test

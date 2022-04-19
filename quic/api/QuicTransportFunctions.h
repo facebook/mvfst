@@ -75,7 +75,7 @@ using HeaderBuilder = std::function<PacketHeader(
     const std::string& token)>;
 
 using WritableBytesFunc =
-    std::function<uint64_t(const QuicConnectionStateBase& conn)>;
+    std::function<uint64_t(QuicConnectionStateBase& conn)>;
 
 // Encapsulating the return value for the write functions.
 // Useful because probes can go over the packet limit.
@@ -150,7 +150,7 @@ uint64_t writeZeroRttDataToSocket(
  * Whether we should and can write data.
  *
  */
-WriteDataReason shouldWriteData(const QuicConnectionStateBase& conn);
+WriteDataReason shouldWriteData(QuicConnectionStateBase& conn);
 bool hasAckDataToWrite(const QuicConnectionStateBase& conn);
 WriteDataReason hasNonAckDataToWrite(const QuicConnectionStateBase& conn);
 
@@ -208,12 +208,20 @@ void updateConnection(
     bool isDSRPacket);
 
 /**
+ * Returns the number of writable bytes available for constructing a PTO packet.
+ * This will either return std::numeric_limits<uint64_t>::max() or the number
+ * of bytes until the writableBytesLimit is reached – depending on whether the
+ * client's address has been validated.
+ */
+uint64_t probePacketWritableBytes(QuicConnectionStateBase& conn);
+
+/**
  * Returns the minimum available bytes window out of path validation rate
  * limiting, 0-rtt total bytes sent limiting, and the congestion controller.
  */
-uint64_t congestionControlWritableBytes(const QuicConnectionStateBase& conn);
+uint64_t congestionControlWritableBytes(QuicConnectionStateBase& conn);
 
-uint64_t unlimitedWritableBytes(const QuicConnectionStateBase&);
+uint64_t unlimitedWritableBytes(QuicConnectionStateBase&);
 
 void writeCloseCommon(
     folly::AsyncUDPSocket& sock,
