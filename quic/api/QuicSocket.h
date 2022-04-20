@@ -12,10 +12,10 @@
 #include <folly/io/IOBuf.h>
 #include <folly/io/async/AsyncTransportCertificate.h>
 #include <quic/QuicConstants.h>
-#include <quic/api/Observer.h>
 #include <quic/codec/Types.h>
 #include <quic/common/SmallVec.h>
 #include <quic/observer/SocketObserverContainer.h>
+#include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/QuicConnectionStats.h>
 #include <quic/state/QuicPriorityQueue.h>
 #include <quic/state/QuicStreamUtilities.h>

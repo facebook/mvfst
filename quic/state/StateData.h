@@ -8,7 +8,6 @@
 #pragma once
 
 #include <quic/QuicConstants.h>
-#include <quic/api/Observer.h>
 #include <quic/codec/ConnectionIdAlgo.h>
 #include <quic/codec/QuicReadCodec.h>
 #include <quic/codec/QuicWriteCodec.h>
@@ -19,6 +18,7 @@
 #include <quic/d6d/ProbeSizeRaiser.h>
 #include <quic/handshake/HandshakeLayer.h>
 #include <quic/logging/QLogger.h>
+#include <quic/observer/SocketObserverTypes.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/AckStates.h>
 #include <quic/state/LossState.h>
