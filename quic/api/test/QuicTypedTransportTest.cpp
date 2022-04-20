@@ -817,6 +817,51 @@ class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
     bool noRttWithNoAckDelay{false};
   };
 
+  struct ReceivedPacketMatcherBuilder {
+    using Builder = ReceivedPacketMatcherBuilder;
+    using Obj =
+        quic::SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket;
+    Builder&& setExpectedPacketReceiveTime(
+        const TimePoint expectedPacketReceiveTime) {
+      maybeExpectedPacketReceiveTime = expectedPacketReceiveTime;
+      return std::move(*this);
+    }
+    Builder&& setExpectedPacketNumBytes(const uint64_t expectedPacketNumBytes) {
+      maybeExpectedPacketNumBytes = expectedPacketNumBytes;
+      return std::move(*this);
+    }
+    auto build() && {
+      CHECK(maybeExpectedPacketReceiveTime.has_value());
+      const auto& packetReceiveTime = *maybeExpectedPacketReceiveTime;
+
+      CHECK(maybeExpectedPacketNumBytes.has_value());
+      const auto& packetNumBytes = *maybeExpectedPacketNumBytes;
+
+      if constexpr (std::is_same_v<T, QuicClientTransportAfterStartTestBase>) {
+        return testing::AllOf(
+            // client does not currently support socket RX timestamps, so we
+            // expect ts >= now() at time of matcher build
+            testing::Field(
+                &Obj::packetReceiveTime,
+                testing::AnyOf(
+                    testing::Eq(packetReceiveTime),
+                    testing::Ge(TimePoint::clock::now()))),
+            testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+      } else if constexpr (std::is_same_v<T, QuicServerTransportTestBase>) {
+        return testing::AllOf(
+            testing::Field(
+                &Obj::packetReceiveTime, testing::Eq(packetReceiveTime)),
+            testing::Field(&Obj::packetNumBytes, testing::Eq(packetNumBytes)));
+      } else {
+        FAIL(); // unhandled typed test
+      }
+    }
+    explicit ReceivedPacketMatcherBuilder() = default;
+
+    folly::Optional<TimePoint> maybeExpectedPacketReceiveTime;
+    folly::Optional<uint64_t> maybeExpectedPacketNumBytes;
+  };
+
   auto getStreamEventMatcherOpt(
       const StreamId streamId,
       const StreamInitiator streamInitiator,
@@ -3258,6 +3303,204 @@ TYPED_TEST(
     buf->coalesce();
     this->deliverPacket(std::move(buf), ackRecvTime);
   }
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsSingle) {
+  using Event = quic::SocketObserverInterface::PacketsReceivedEvent;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::packetsReceivedEvents);
+
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
+
+  // get stream ID for peer
+  const auto streamId = this->getNextPeerBidirectionalStreamId();
+
+  // deliver pkt1 with stream data from the remote
+  auto pkt1 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(100));
+  const auto pkt1RecvTime = TimePoint::clock::now();
+  const auto pkt1NumBytes = pkt1->computeChainDataLength();
+  {
+    const auto matcher = testing::AllOf(
+        testing::Field(
+            &Event::receiveLoopTime, testing::Ge(TimePoint::clock::now())),
+        testing::Field(&Event::numPacketsReceived, testing::Eq(1)),
+        testing::Field(&Event::numBytesReceived, testing::Eq(pkt1NumBytes)),
+        testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Event::receivedPackets,
+            testing::ElementsAre(
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pkt1RecvTime)
+                    .setExpectedPacketNumBytes(pkt1NumBytes)
+                    .build())));
+
+    EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
+    EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
+  }
+  this->deliverPacket(std::move(pkt1), pkt1RecvTime);
+
+  // deliver pkt2 with stream data from the remote
+  auto pkt2 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(500));
+  const auto pkt2RecvTime = pkt1RecvTime + 50ms;
+  const auto pkt2NumBytes = pkt2->computeChainDataLength();
+  EXPECT_NE(pkt2NumBytes, pkt1NumBytes);
+  {
+    const auto matcher = testing::AllOf(
+        testing::Field(
+            &Event::receiveLoopTime, testing::Ge(TimePoint::clock::now())),
+        testing::Field(&Event::numPacketsReceived, testing::Eq(1)),
+        testing::Field(&Event::numBytesReceived, testing::Eq(pkt2NumBytes)),
+        testing::Field(&Event::receivedPackets, testing::SizeIs(1)),
+        testing::Field(
+            &Event::receivedPackets,
+            testing::ElementsAre(
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pkt2RecvTime)
+                    .setExpectedPacketNumBytes(pkt2NumBytes)
+                    .build())));
+
+    EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
+    EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
+  }
+  this->deliverPacket(std::move(pkt2), pkt2RecvTime);
+
+  this->destroyTransport();
+}
+
+TYPED_TEST(QuicTypedTransportTestForObservers, PacketsReceivedEventsMulti) {
+  // skip for client transport tests for now as supporting test foundation
+  // does not properly support batch delivery
+  if constexpr (std::is_same_v<
+                    TypeParam,
+                    QuicClientTransportAfterStartTestBase>) {
+    return;
+  }
+
+  using Event = quic::SocketObserverInterface::PacketsReceivedEvent;
+  LegacyObserver::EventSet eventSet;
+  eventSet.enable(SocketObserverInterface::Events::packetsReceivedEvents);
+
+  auto transport = this->getTransport();
+  auto obs1 = std::make_unique<NiceMock<MockLegacyObserver>>();
+  auto obs2 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+  auto obs3 = std::make_unique<NiceMock<MockLegacyObserver>>(eventSet);
+
+  EXPECT_CALL(*obs1, observerAttach(transport));
+  transport->addObserver(obs1.get());
+  EXPECT_CALL(*obs2, observerAttach(transport));
+  transport->addObserver(obs2.get());
+  EXPECT_CALL(*obs3, observerAttach(transport));
+  transport->addObserver(obs3.get());
+  EXPECT_THAT(
+      transport->getObservers(),
+      UnorderedElementsAre(obs1.get(), obs2.get(), obs3.get()));
+
+  // get stream ID for peer
+  const auto streamId = this->getNextPeerBidirectionalStreamId();
+
+  // deliver pkt1 and pkt2 at same time with stream data from the remote
+  auto pkt1 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(100));
+  auto pkt2 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(500));
+  const auto pkt1NumBytes = pkt1->computeChainDataLength();
+  const auto pkt2NumBytes = pkt2->computeChainDataLength();
+  EXPECT_NE(pkt1NumBytes, pkt2NumBytes);
+
+  std::vector<std::unique_ptr<folly::IOBuf>> pktBatch1;
+  pktBatch1.emplace_back(std::move(pkt1));
+  pktBatch1.emplace_back(std::move(pkt2));
+  const auto pktBatch1RecvTime = TimePoint::clock::now();
+  const auto pktBatch1NumBytes = pkt1NumBytes + pkt2NumBytes;
+  {
+    const auto matcher = testing::AllOf(
+        testing::Field(
+            &Event::receiveLoopTime, testing::Ge(TimePoint::clock::now())),
+        testing::Field(&Event::numPacketsReceived, testing::Eq(2)),
+        testing::Field(
+            &Event::numBytesReceived, testing::Eq(pktBatch1NumBytes)),
+        testing::Field(&Event::receivedPackets, testing::SizeIs(2)),
+        testing::Field(
+            &Event::receivedPackets,
+            testing::ElementsAre(
+                // pkt1
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pktBatch1RecvTime)
+                    .setExpectedPacketNumBytes(pkt1NumBytes)
+                    .build(),
+                // pkt2
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pktBatch1RecvTime)
+                    .setExpectedPacketNumBytes(pkt2NumBytes)
+                    .build())));
+
+    EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
+    EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
+  }
+  this->deliverPackets(std::move(pktBatch1), pktBatch1RecvTime);
+
+  // deliver pkt3 and pkt4 at same time with stream data from the remote
+  auto pkt3 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(200));
+  auto pkt4 =
+      this->buildPeerPacketWithStreamData(streamId, buildRandomInputData(800));
+  const auto pkt3NumBytes = pkt3->computeChainDataLength();
+  const auto pkt4NumBytes = pkt4->computeChainDataLength();
+  EXPECT_NE(pkt3NumBytes, pkt4NumBytes);
+
+  std::vector<std::unique_ptr<folly::IOBuf>> pktBatch2;
+  pktBatch2.emplace_back(std::move(pkt3));
+  pktBatch2.emplace_back(std::move(pkt4));
+  const auto pktBatch2RecvTime = pktBatch1RecvTime + 50ms;
+  const auto pktBatch2NumBytes = pkt3NumBytes + pkt4NumBytes;
+  EXPECT_NE(pktBatch1NumBytes, pktBatch2NumBytes);
+  {
+    const auto matcher = testing::AllOf(
+        testing::Field(
+            &Event::receiveLoopTime, testing::Ge(TimePoint::clock::now())),
+        testing::Field(&Event::numPacketsReceived, testing::Eq(2)),
+        testing::Field(
+            &Event::numBytesReceived, testing::Eq(pktBatch2NumBytes)),
+        testing::Field(&Event::receivedPackets, testing::SizeIs(2)),
+        testing::Field(
+            &Event::receivedPackets,
+            testing::ElementsAre(
+                // pkt1
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pktBatch2RecvTime)
+                    .setExpectedPacketNumBytes(pkt3NumBytes)
+                    .build(),
+                // pkt2
+                typename TestFixture::ReceivedPacketMatcherBuilder()
+                    .setExpectedPacketReceiveTime(pktBatch2RecvTime)
+                    .setExpectedPacketNumBytes(pkt4NumBytes)
+                    .build())));
+
+    EXPECT_CALL(*obs1, packetsReceived(_, _)).Times(0);
+    EXPECT_CALL(*obs2, packetsReceived(transport, matcher));
+    EXPECT_CALL(*obs3, packetsReceived(transport, matcher));
+  }
+  this->deliverPackets(std::move(pktBatch2), pktBatch2RecvTime);
 
   this->destroyTransport();
 }

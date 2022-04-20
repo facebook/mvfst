@@ -189,6 +189,26 @@ class QuicTypedTransportTestBase : protected QuicTransportTestClass {
   }
 
   /**
+   * Deliver multiple packets from the remote.
+   */
+  void deliverPackets(
+      std::vector<Buf>&& bufs,
+      quic::TimePoint recvTime = TimePoint::clock::now(),
+      bool loopForWrites = true) {
+    QuicTransportTestClass::deliverData(
+        NetworkData(std::move(bufs), recvTime), loopForWrites);
+  }
+
+  /**
+   * Deliver multiple packets from the remote, do not loop for writes.
+   */
+  void deliverPacketsNoWrites(
+      std::vector<Buf>&& bufs,
+      quic::TimePoint recvTime = TimePoint::clock::now()) {
+    deliverPackets(std::move(bufs), recvTime, false /* loopForWrites */);
+  }
+
+  /**
    * Build a packet with stream data from peer.
    */
   quic::Buf buildPeerPacketWithStreamData(

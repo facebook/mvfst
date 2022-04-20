@@ -1781,11 +1781,40 @@ void QuicTransportBase::onNetworkData(
     conn_->lastProcessedAckEvents.clear();
     conn_->lossState.totalBytesRecvd += networkData.totalData;
     auto originalAckVersion = currentAckStateVersion(*conn_);
+
+    // handle PacketsReceivedEvent if requested by observers
+    if (getSocketObserverContainer() &&
+        getSocketObserverContainer()
+            ->hasObserversForEvent<
+                SocketObserverInterface::Events::packetsReceivedEvents>()) {
+      auto builder = SocketObserverInterface::PacketsReceivedEvent::Builder()
+                         .setReceiveLoopTime(TimePoint::clock::now())
+                         .setNumPacketsReceived(networkData.packets.size())
+                         .setNumBytesReceived(networkData.totalData);
+      for (auto& packet : networkData.packets) {
+        builder.addReceivedPacket(
+            SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
+                Builder()
+                    .setPacketReceiveTime(networkData.receiveTimePoint)
+                    .setPacketNumBytes(packet->computeChainDataLength())
+                    .build());
+      }
+
+      getSocketObserverContainer()
+          ->invokeInterfaceMethod<
+              SocketObserverInterface::Events::packetsReceivedEvents>(
+              [event = std::move(builder).build()](
+                  auto observer, auto observed) {
+                observer->packetsReceived(observed, event);
+              });
+    }
+
     for (auto& packet : networkData.packets) {
       onReadData(
           peer,
           NetworkDataSingle(std::move(packet), networkData.receiveTimePoint));
     }
+
     processCallbacksAfterNetworkData();
     if (closeState_ != CloseState::CLOSED) {
       if (currentAckStateVersion(*conn_) != originalAckVersion) {

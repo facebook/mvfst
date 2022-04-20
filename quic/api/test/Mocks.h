@@ -305,6 +305,11 @@ class MockLegacyObserver : public LegacyObserver {
       (noexcept));
   MOCK_METHOD(
       (void),
+      packetsReceived,
+      (QuicSocket*, const PacketsReceivedEvent&),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
       acksProcessed,
       (QuicSocket*, const AcksProcessedEvent&),
       (noexcept));

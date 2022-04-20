@@ -40,6 +40,7 @@ class SocketObserverInterface {
     knobFrameEvents = 8,
     streamEvents = 9,
     acksProcessedEvents = 10,
+    packetsReceivedEvents = 11,
   };
   virtual ~SocketObserverInterface() = default;
 
@@ -55,7 +56,7 @@ class SocketObserverInterface {
     // Monotonically increasing number assigned to each write operation.
     const uint64_t writeCount;
 
-    // Timestamp when packet was last written
+    // Timestamp when packet was last written.
     const folly::Optional<TimePoint> maybeLastPacketSentTime;
 
     // CWND in bytes.
@@ -167,6 +168,71 @@ class SocketObserverInterface {
 
     // Use builder to construct.
     explicit PacketsWrittenEvent(BuilderFields&& builderFields);
+  };
+
+  struct PacketsReceivedEvent {
+    /**
+     * Packet received.
+     */
+    struct ReceivedPacket {
+      // Packet receive timestamp.
+      //
+      // If socket receive (RX) timestamps are used this will be the timestamp
+      // provided by the kernel mapped to the steady_clock timespace and made
+      // later than or equal to previous timestamps.
+      const TimePoint packetReceiveTime;
+
+      // Number of bytes in the received packet.
+      const uint64_t packetNumBytes;
+
+      struct BuilderFields {
+        folly::Optional<TimePoint> maybePacketReceiveTime;
+        folly::Optional<uint64_t> maybePacketNumBytes;
+        explicit BuilderFields() = default;
+      };
+
+      struct Builder : public BuilderFields {
+        Builder&& setPacketReceiveTime(const TimePoint packetReceiveTimeIn);
+        Builder&& setPacketNumBytes(const uint64_t packetNumBytesIn);
+        ReceivedPacket build() &&;
+        explicit Builder() = default;
+      };
+
+      // Use builder to construct.
+      explicit ReceivedPacket(BuilderFields&& builderFields);
+    };
+
+    // Receive loop timestamp.
+    const TimePoint receiveLoopTime;
+
+    // Number of packets received.
+    const uint64_t numPacketsReceived;
+
+    // Number of bytes received.
+    const uint64_t numBytesReceived;
+
+    // Details for each received packet.
+    std::vector<ReceivedPacket> receivedPackets;
+
+    struct BuilderFields {
+      folly::Optional<TimePoint> maybeReceiveLoopTime;
+      folly::Optional<uint64_t> maybeNumPacketsReceived;
+      folly::Optional<uint64_t> maybeNumBytesReceived;
+      std::vector<ReceivedPacket> receivedPackets;
+      explicit BuilderFields() = default;
+    };
+
+    struct Builder : public BuilderFields {
+      Builder&& setReceiveLoopTime(const TimePoint receiveLoopTimeIn);
+      Builder&& setNumPacketsReceived(const uint64_t numPacketsReceivedIn);
+      Builder&& setNumBytesReceived(const uint64_t numBytesReceivedIn);
+      Builder&& addReceivedPacket(ReceivedPacket&& packetIn);
+      PacketsReceivedEvent build() &&;
+      explicit Builder() = default;
+    };
+
+    // Use builder to construct.
+    explicit PacketsReceivedEvent(BuilderFields&& builderFields);
   };
 
   struct AcksProcessedEvent {
@@ -390,9 +456,9 @@ class SocketObserverInterface {
       const AppLimitedEvent& /* event */) {}
 
   /**
-   * packetsWritten() is invoked when the socket writes packets to the wire.
+   * packetsWritten() is invoked when packets are written to the UDP socket.
    *
-   * @param socket   Socket for which packets were written to the wire.
+   * @param socket   Socket for which packets were written.
    * @param event    PacketsWrittenEvent with details.
    */
   virtual void packetsWritten(
@@ -408,6 +474,16 @@ class SocketObserverInterface {
   virtual void appRateLimited(
       QuicSocket* /* socket */,
       const AppLimitedEvent& /* event */) {}
+
+  /**
+   * packetsReceived() is invoked when raw packets are received from UDP socket.
+   *
+   * @param socket   Socket for which packets were received.
+   * @param event    PacketsReceivedEvent with details.
+   */
+  virtual void packetsReceived(
+      QuicSocket* /* socket */,
+      const PacketsReceivedEvent& /* event */) {}
 
   /**
    * acksProcessed() is invoked when ACKs from remote are processed.

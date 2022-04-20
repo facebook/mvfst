@@ -197,6 +197,80 @@ SocketObserverInterface::PacketsWrittenEvent::PacketsWrittenEvent(
       numBytesWritten(
           *CHECK_NOTNULL(builderFields.maybeNumBytesWritten.get_pointer())) {}
 
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+    setPacketReceiveTime(const TimePoint packetReceiveTimeIn) {
+  maybePacketReceiveTime = packetReceiveTimeIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+    setPacketNumBytes(const uint64_t packetNumBytesIn) {
+  maybePacketNumBytes = packetNumBytesIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::Builder::
+    build() && {
+  return ReceivedPacket(std::move(*this));
+}
+
+SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::ReceivedPacket(
+    SocketObserverInterface::PacketsReceivedEvent::ReceivedPacket::
+        BuilderFields&& builderFields)
+    : packetReceiveTime(
+          *CHECK_NOTNULL(builderFields.maybePacketReceiveTime.get_pointer())),
+      packetNumBytes(
+          *CHECK_NOTNULL(builderFields.maybePacketNumBytes.get_pointer())) {}
+
+SocketObserverInterface::PacketsReceivedEvent::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::Builder::setReceiveLoopTime(
+    const TimePoint receiveLoopTimeIn) {
+  maybeReceiveLoopTime = receiveLoopTimeIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::Builder::setNumPacketsReceived(
+    const uint64_t numPacketsReceivedIn) {
+  maybeNumPacketsReceived = numPacketsReceivedIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::Builder::setNumBytesReceived(
+    const uint64_t numBytesReceivedIn) {
+  maybeNumBytesReceived = numBytesReceivedIn;
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent::Builder&&
+SocketObserverInterface::PacketsReceivedEvent::Builder::addReceivedPacket(
+    ReceivedPacket&& packetIn) {
+  receivedPackets.emplace_back(packetIn);
+  return std::move(*this);
+}
+
+SocketObserverInterface::PacketsReceivedEvent
+SocketObserverInterface::PacketsReceivedEvent::Builder::build() && {
+  return PacketsReceivedEvent(std::move(*this));
+}
+
+SocketObserverInterface::PacketsReceivedEvent::PacketsReceivedEvent(
+    SocketObserverInterface::PacketsReceivedEvent::BuilderFields&&
+        builderFields)
+    : receiveLoopTime(
+          *CHECK_NOTNULL(builderFields.maybeReceiveLoopTime.get_pointer())),
+      numPacketsReceived(
+          *CHECK_NOTNULL(builderFields.maybeNumPacketsReceived.get_pointer())),
+      numBytesReceived(
+          *CHECK_NOTNULL(builderFields.maybeNumBytesReceived.get_pointer())),
+      receivedPackets(std::move(builderFields.receivedPackets)) {
+  CHECK_EQ(numPacketsReceived, receivedPackets.size());
+}
+
 SocketObserverInterface::AcksProcessedEvent::Builder&&
 SocketObserverInterface::AcksProcessedEvent::Builder::setAckEvents(
     const std::vector<AckEvent>& ackEventsIn) {
