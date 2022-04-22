@@ -506,20 +506,20 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
 
     if (!hystartState_.lastSampledRtt.has_value() ||
         (*hystartState_.lastSampledRtt >=
-         std::chrono::microseconds::max() - delayIncreaseLowerBound)) {
+         std::chrono::microseconds::max() - kDelayIncreaseLowerBound)) {
       return;
     }
     auto eta = std::min(
-        delayIncreaseUpperBound,
+        kDelayIncreaseUpperBound,
         std::max(
-            delayIncreaseLowerBound,
+            kDelayIncreaseLowerBound,
             std::chrono::microseconds(
                 hystartState_.lastSampledRtt.value().count() >> 4)));
     // lastSampledRtt + eta may overflow:
     if (*hystartState_.lastSampledRtt >
         std::chrono::microseconds::max() - eta) {
       // No way currSampledRtt can top this either, return
-      // TODO: so our rtt is within 8us (kDelayIncreaseUpperBound) of the
+      // TODO: so our rtt is within 16ms (kDelayIncreaseUpperBound) of the
       // microseconds::max(), should we just shut down the connection?
       return;
     }
@@ -661,16 +661,6 @@ void Cubic::onPacketAckedInRecovery(const AckEvent& ack) {
 void Cubic::getStats(CongestionControllerStats& stats) const {
   stats.cubicStats.state = static_cast<uint8_t>(state_);
   stats.cubicStats.ssthresh = ssthresh_;
-}
-
-void Cubic::setExperimental(bool experimental) {
-  if (experimental) {
-    delayIncreaseLowerBound = kDelayIncreaseLowerBoundExperimental;
-    delayIncreaseUpperBound = kDelayIncreaseUpperBoundExperimental;
-  } else {
-    delayIncreaseLowerBound = kDelayIncreaseLowerBound;
-    delayIncreaseUpperBound = kDelayIncreaseUpperBound;
-  }
 }
 
 folly::StringPiece cubicStateToString(CubicStates state) {

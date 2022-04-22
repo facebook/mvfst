@@ -119,7 +119,7 @@ TEST_F(CubicHystartTest, NoAckTrainNoDelayIncrease) {
 
   // Packet 0 is acked:
   // make sure AckTrain won't find it
-  conn.lossState.srtt = 2us;
+  conn.lossState.srtt = 10ms;
   auto realNow = quic::Clock::now();
   // One onPacketAcked will not trigger DelayIncrease
   auto packet = makeTestingWritePacket(0, 1000, 1000, realNow);
@@ -165,12 +165,12 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   conn.lossState.largestSent = secondPacketNum;
   cubic.onPacketSent(packet1);
 
-  conn.lossState.srtt = 100us;
+  conn.lossState.srtt = 10ms;
 
-  // First onPacketAcked will set up lastSampledRtt = 200us for next round. It
+  // First onPacketAcked will set up lastSampledRtt = 20ms for next round. It
   // will also set up rttRoundEndTarget = 1 since largestSent = 1.
   auto ackTime = packetsSentTime + 1us;
-  auto ackTimeIncrease = 2us;
+  auto ackTimeIncrease = 2ms;
   ackTime += ackTimeIncrease;
   cubic.onPacketAckOrLoss(
       makeAck(firstPacketNum, 1000, ackTime, packet0.metadata.time),
@@ -194,7 +194,7 @@ TEST_F(CubicHystartTest, DelayIncrease) {
   auto cwndEndRound = cubic.getWritableBytes();
 
   // New RTT round, give currSampledRtt a value larger than previous RTT:
-  conn.lossState.srtt = 200us;
+  conn.lossState.srtt = 20ms;
   // onPacketAcked kAckSampling - 1 times:
   std::vector<CongestionController::AckEvent> moreAcks;
   for (size_t i = 0; i < kAckSampling - 1; i++) {

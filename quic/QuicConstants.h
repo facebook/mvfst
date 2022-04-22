@@ -409,13 +409,9 @@ constexpr uint64_t kLowSsthreshInMss = 16;
 // ACKs within kAckCountingGap are considered closely spaced, i.e., AckTrain
 constexpr std::chrono::microseconds kAckCountingGap(2);
 // Hystart's upper bound for DelayIncrease
-constexpr std::chrono::microseconds kDelayIncreaseUpperBound(8);
+constexpr std::chrono::microseconds kDelayIncreaseUpperBound(16ms);
 // Hystart's lower bound for DelayIncrease
-constexpr std::chrono::microseconds kDelayIncreaseLowerBound(2);
-// Hystart's upper bound for DelayIncrease (Experimental)
-constexpr std::chrono::microseconds kDelayIncreaseUpperBoundExperimental(16ms);
-// Hystart's lower bound for DelayIncrease (Experimental)
-constexpr std::chrono::microseconds kDelayIncreaseLowerBoundExperimental(4ms);
+constexpr std::chrono::microseconds kDelayIncreaseLowerBound(4ms);
 
 /* Cubic */
 // Default cwnd reduction factor:
