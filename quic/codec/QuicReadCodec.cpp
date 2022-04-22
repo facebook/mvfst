@@ -50,6 +50,9 @@ QuicReadCodec::tryParsingVersionNegotiation(BufQueue& queue) {
 folly::Expected<ParsedLongHeader, TransportErrorCode> tryParseLongHeader(
     folly::io::Cursor& cursor,
     QuicNodeType nodeType) {
+  if (cursor.isAtEnd() || !cursor.canAdvance(sizeof(uint8_t))) {
+    return folly::makeUnexpected(TransportErrorCode::PROTOCOL_VIOLATION);
+  }
   auto initialByte = cursor.readBE<uint8_t>();
   auto longHeaderInvariant = parseLongHeaderInvariant(initialByte, cursor);
   if (!longHeaderInvariant) {
