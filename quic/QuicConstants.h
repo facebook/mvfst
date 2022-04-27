@@ -120,6 +120,8 @@ BETTER_ENUM(
     uint64_t,
     // Any value not in the list below
     UNKNOWN = 0x0,
+    // No-op
+    NOOP = 0x1,
     // Disabling pmtu blackhole detection
     ZERO_PMTU_BLACKHOLE_DETECTION = 0x8830,
     // Force udp payload size to be equal to max
