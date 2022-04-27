@@ -120,7 +120,7 @@ struct QuicStreamLike {
 
   // Tracks intervals which we have received ACKs for. E.g. in the case of all
   // data being acked this would contain one internval from 0 -> the largest
-  // offseet ACKed. This allows us to track which delivery callbacks can be
+  // offset ACKed. This allows us to track which delivery callbacks can be
   // called.
   template <class T>
   using IntervalSetVec = SmallVec<T, 32, uint16_t>;
