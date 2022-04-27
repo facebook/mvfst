@@ -29,10 +29,11 @@ namespace samples {
 class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                    public quic::QuicSocket::ConnectionCallback,
                    public quic::QuicSocket::ReadCallback,
-                   public quic::QuicSocket::WriteCallback {
+                   public quic::QuicSocket::WriteCallback,
+                   public quic::QuicSocket::DatagramCallback {
  public:
-  EchoClient(const std::string& host, uint16_t port)
-      : host_(host), port_(port) {}
+  EchoClient(const std::string& host, uint16_t port, bool useDatagrams)
+      : host_(host), port_(port), useDatagrams_(useDatagrams) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -105,6 +106,23 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                << " error=" << toString(error);
   }
 
+  void onDatagramsAvailable() noexcept override {
+    auto res = quicClient_->readDatagrams();
+    if (res.hasError()) {
+      LOG(ERROR) << "EchoClient failed reading datagrams; error="
+                 << res.error();
+      return;
+    }
+    for (const auto& datagram : *res) {
+      LOG(INFO) << "Client received datagram ="
+                << datagram.bufQueue()
+                       .front()
+                       ->cloneCoalesced()
+                       ->moveToFbString()
+                       .toStdString();
+    }
+  }
+
   void start(std::string token) {
     folly::ScopedEventBaseThread networkThread("EchoClientThread");
     auto evb = networkThread.getEventBase();
@@ -123,8 +141,13 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
       if (!token.empty()) {
         quicClient_->setNewToken(token);
       }
+      if (useDatagrams_) {
+        auto res = quicClient_->setDatagramCallback(this);
+        CHECK(res.hasValue()) << res.error();
+      }
 
       TransportSettings settings;
+      settings.datagramConfig.enabled = useDatagrams_;
       quicClient_->setTransportSettings(settings);
 
       quicClient_->setTransportStatsCallback(
@@ -159,7 +182,9 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
  private:
   void sendMessage(quic::StreamId id, BufQueue& data) {
     auto message = data.move();
-    auto res = quicClient_->writeChain(id, message->clone(), true);
+    auto res = useDatagrams_
+        ? quicClient_->writeDatagram(message->clone())
+        : quicClient_->writeChain(id, message->clone(), true);
     if (res.hasError()) {
       LOG(ERROR) << "EchoClient writeChain error=" << uint32_t(res.error());
     } else {
@@ -173,6 +198,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
   std::string host_;
   uint16_t port_;
+  bool useDatagrams_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;

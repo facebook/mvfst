@@ -17,14 +17,20 @@ namespace samples {
 class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
                     public quic::QuicSocket::ConnectionCallback,
                     public quic::QuicSocket::ReadCallback,
-                    public quic::QuicSocket::WriteCallback {
+                    public quic::QuicSocket::WriteCallback,
+                    public quic::QuicSocket::DatagramCallback {
  public:
   using StreamData = std::pair<BufQueue, bool>;
 
-  explicit EchoHandler(folly::EventBase* evbIn) : evb(evbIn) {}
+  explicit EchoHandler(folly::EventBase* evbIn, bool useDatagrams = false)
+      : evb(evbIn), useDatagrams_(useDatagrams) {}
 
   void setQuicSocket(std::shared_ptr<quic::QuicSocket> socket) {
     sock = socket;
+    if (useDatagrams_) {
+      auto res = sock->setDatagramCallback(this);
+      CHECK(res.hasValue()) << res.error();
+    }
   }
 
   void onNewBidirectionalStream(quic::StreamId id) noexcept override {
@@ -90,20 +96,14 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
     // resetStream
   }
 
-  void echo(quic::StreamId id, StreamData& data) {
-    if (!data.second) {
-      // only echo when eof is present
+  void onDatagramsAvailable() noexcept override {
+    auto res = sock->readDatagrams();
+    if (res.hasError()) {
+      LOG(ERROR) << "readDatagrams() error: " << res.error();
       return;
     }
-    auto echoedData = folly::IOBuf::copyBuffer("echo ");
-    echoedData->prependChain(data.first.move());
-    auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
-    if (res.hasError()) {
-      LOG(ERROR) << "write error=" << toString(res.error());
-    } else {
-      // echo is done, clear EOF
-      data.second = false;
-    }
+    LOG(INFO) << "received " << res->size() << " datagrams";
+    echoDg(std::move(res.value()));
   }
 
   void onStreamWriteReady(quic::StreamId id, uint64_t maxToSend) noexcept
@@ -126,6 +126,35 @@ class EchoHandler : public quic::QuicSocket::ConnectionSetupCallback,
   std::shared_ptr<quic::QuicSocket> sock;
 
  private:
+  void echo(quic::StreamId id, StreamData& data) {
+    if (!data.second) {
+      // only echo when eof is present
+      return;
+    }
+    auto echoedData = folly::IOBuf::copyBuffer("echo ");
+    echoedData->prependChain(data.first.move());
+    auto res = sock->writeChain(id, std::move(echoedData), true, nullptr);
+    if (res.hasError()) {
+      LOG(ERROR) << "write error=" << toString(res.error());
+    } else {
+      // echo is done, clear EOF
+      data.second = false;
+    }
+  }
+
+  void echoDg(std::vector<quic::ReadDatagram> datagrams) {
+    CHECK_GT(datagrams.size(), 0);
+    for (const auto& datagram : datagrams) {
+      auto echoedData = folly::IOBuf::copyBuffer("echo ");
+      echoedData->prependChain(datagram.bufQueue().front()->cloneCoalesced());
+      auto res = sock->writeDatagram(std::move(echoedData));
+      if (res.hasError()) {
+        LOG(ERROR) << "writeDatagram error=" << toString(res.error());
+      }
+    }
+  }
+
+  bool useDatagrams_;
   std::map<quic::StreamId, StreamData> input_;
 };
 } // namespace samples

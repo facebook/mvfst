@@ -34,7 +34,8 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     }
   }
 
-  EchoServerTransportFactory() = default;
+  explicit EchoServerTransportFactory(bool useDatagrams = false)
+      : useDatagrams_(useDatagrams) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb,
@@ -44,7 +45,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
       std::shared_ptr<const fizz::server::FizzServerContext> ctx) noexcept
       override {
     CHECK_EQ(evb, sock->getEventBase());
-    auto echoHandler = std::make_unique<EchoHandler>(evb);
+    auto echoHandler = std::make_unique<EchoHandler>(evb, useDatagrams_);
     auto transport = quic::QuicServerTransport::make(
         evb, std::move(sock), echoHandler.get(), echoHandler.get(), ctx);
     echoHandler->setQuicSocket(transport);
@@ -52,6 +53,7 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
     return transport;
   }
 
+  bool useDatagrams_;
   std::vector<std::unique_ptr<EchoHandler>> echoHandlers_;
 
  private:
@@ -59,15 +61,23 @@ class EchoServerTransportFactory : public quic::QuicServerTransportFactory {
 
 class EchoServer {
  public:
-  explicit EchoServer(const std::string& host = "::1", uint16_t port = 6666)
+  explicit EchoServer(
+      const std::string& host = "::1",
+      uint16_t port = 6666,
+      bool useDatagrams = false)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
-        std::make_unique<EchoServerTransportFactory>());
+        std::make_unique<EchoServerTransportFactory>(useDatagrams));
     server_->setTransportStatsCallbackFactory(
         std::make_unique<LogQuicStatsFactory>());
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
+    if (useDatagrams) {
+      auto settingsCopy = server_->getTransportSettings();
+      settingsCopy.datagramConfig.enabled = true;
+      server_->setTransportSettings(std::move(settingsCopy));
+    }
   }
 
   void start() {

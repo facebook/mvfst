@@ -21,6 +21,7 @@ DEFINE_string(
     token,
     "",
     "Client new token string to attach to connection initiation");
+DEFINE_bool(use_datagrams, false, "Use QUIC datagrams to communicate");
 
 using namespace quic::samples;
 
@@ -35,14 +36,14 @@ int main(int argc, char* argv[]) {
   fizz::CryptoUtils::init();
 
   if (FLAGS_mode == "server") {
-    EchoServer server(FLAGS_host, FLAGS_port);
+    EchoServer server(FLAGS_host, FLAGS_port, FLAGS_use_datagrams);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {
       LOG(ERROR) << "EchoClient expected --host and --port";
       return -2;
     }
-    EchoClient client(FLAGS_host, FLAGS_port);
+    EchoClient client(FLAGS_host, FLAGS_port, FLAGS_use_datagrams);
     client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;
