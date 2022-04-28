@@ -22,6 +22,13 @@
 #include <chrono>
 #include <memory>
 
+// This hook is invoked by mvfst for every UDP socket it creates.
+#if FOLLY_HAVE_WEAK_SYMBOLS
+extern "C" FOLLY_ATTR_WEAK void mvfst_hook_on_socket_create(int fd);
+#else
+static void (*mvfst_hook_on_socket_create)(int fd) = nullptr;
+#endif
+
 namespace fsp = folly::portability::sockets;
 
 namespace quic {
@@ -154,6 +161,10 @@ void happyEyeballsSetUpSocket(
         {{nopipeKey, 1}}, folly::SocketOptionKey::ApplyPos::POST_BIND);
   }
 #endif
+
+  if (mvfst_hook_on_socket_create) {
+    mvfst_hook_on_socket_create(socket.getNetworkSocket().toFd());
+  }
 
   // never fragment, always turn off PMTU
   socket.setDFAndTurnOffPMTU();

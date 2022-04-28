@@ -33,6 +33,13 @@
 #include <quic/server/third-party/siphash.h>
 #include <quic/state/QuicConnectionStats.h>
 
+// This hook is invoked by mvfst for every UDP socket it creates.
+#if FOLLY_HAVE_WEAK_SYMBOLS
+extern "C" FOLLY_ATTR_WEAK void mvfst_hook_on_socket_create(int fd);
+#else
+static void (*mvfst_hook_on_socket_create)(int fd) = nullptr;
+#endif
+
 namespace quic {
 
 std::atomic_int globalUnfinishedHandshakes{0};
@@ -1161,13 +1168,21 @@ void QuicServerWorker::setHealthCheckToken(
 std::unique_ptr<folly::AsyncUDPSocket> QuicServerWorker::makeSocket(
     folly::EventBase* evb) const {
   CHECK(socket_);
-  return socketFactory_->make(evb, socket_->getNetworkSocket().toFd());
+  auto sock = socketFactory_->make(evb, socket_->getNetworkSocket().toFd());
+  if (sock && mvfst_hook_on_socket_create) {
+    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
+  }
+  return sock;
 }
 
 std::unique_ptr<folly::AsyncUDPSocket> QuicServerWorker::makeSocket(
     folly::EventBase* evb,
     int fd) const {
-  return socketFactory_->make(evb, fd);
+  auto sock = socketFactory_->make(evb, fd);
+  if (sock && mvfst_hook_on_socket_create) {
+    mvfst_hook_on_socket_create(sock->getNetworkSocket().toFd());
+  }
+  return sock;
 }
 
 const QuicServerWorker::ConnIdToTransportMap&
