@@ -150,7 +150,9 @@ BETTER_ENUM(
     // Set short header padding modulo size
     SHORT_HEADER_PADDING_KNOB = 0x6666,
     // Keepalive timer enabled
-    KEEPALIVE_ENABLED = 0x7777)
+    KEEPALIVE_ENABLED = 0x7777,
+    // Remove from loss buffer on spurious loss
+    REMOVE_FROM_LOSS_BUFFER = 0x8888)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,

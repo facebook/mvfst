@@ -137,7 +137,6 @@ AckEvent processAckFrame(
                << conn;
       // If we hit a packet which has been lost we need to count the spurious
       // loss and ignore all other processing.
-      // TODO also remove any stream data from the loss buffer.
       if (rPacketIt->declaredLost) {
         CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.lossState.totalPacketsSpuriouslyMarkedLost++;
@@ -153,6 +152,21 @@ AckEvent processAckFrame(
                   conn.transportSettings.timeReorderingThreshDividend) {
             conn.transportSettings.timeReorderingThreshDividend =
                 rPacketIt->lossTimeoutDividend.value();
+          }
+        }
+        if (conn.transportSettings.removeFromLossBufferOnSpurious) {
+          for (auto& f : rPacketIt->packet.frames) {
+            auto streamFrame = f.asWriteStreamFrame();
+            if (streamFrame) {
+              auto stream =
+                  conn.streamManager->findStream(streamFrame->streamId);
+              if (stream) {
+                stream->removeFromLossBuffer(
+                    streamFrame->offset, streamFrame->len, streamFrame->fin);
+                conn.streamManager->updateLossStreams(*stream);
+                conn.streamManager->updateWritableStreams(*stream);
+              }
+            }
           }
         }
         QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);

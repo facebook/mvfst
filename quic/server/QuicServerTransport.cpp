@@ -904,6 +904,16 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: "
                 << static_cast<bool>(val);
       });
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(TransportKnobParamId::REMOVE_FROM_LOSS_BUFFER),
+      [](QuicServerTransport* serverTransport, uint64_t val) {
+        CHECK(serverTransport);
+        auto server_conn = serverTransport->serverConn_;
+        server_conn->transportSettings.removeFromLossBufferOnSpurious =
+            static_cast<bool>(val);
+        VLOG(3) << "REMOVE_FROM_LOSS_BUFFER KnobParam received: "
+                << static_cast<bool>(val);
+      });
 }
 
 QuicConnectionStats QuicServerTransport::getConnectionsStats() const {

@@ -186,6 +186,53 @@ struct QuicStreamLike {
       lossBuffer.insert(lossItr, std::move(*buf));
     }
   }
+
+  void removeFromLossBuffer(uint64_t offset, size_t len, bool eof) {
+    if (lossBuffer.empty() || len == 0) {
+      // Nothing to do.
+      return;
+    }
+    auto lossItr = lossBuffer.begin();
+    for (; lossItr != lossBuffer.end(); lossItr++) {
+      uint64_t lossStartOffset = lossItr->offset;
+      uint64_t lossEndOffset = lossItr->offset + lossItr->data.chainLength();
+      uint64_t removedStartOffset = offset;
+      uint64_t removedEndOffset = offset + len;
+      if (lossStartOffset > removedEndOffset) {
+        return;
+      }
+      // There's two cases. If the removed offset lies within the existing
+      // StreamBuffer then we need to potentially split it and remove that
+      // section. The other case is that the existing StreamBuffer is completely
+      // accounted for by the removed section, in which case it will be removed.
+      // Note that this split/trim logic relies on the fact that insertion into
+      // the loss buffer will merge contiguous elements, thus allowing us to
+      // make these assumptions.
+      if ((removedStartOffset >= lossStartOffset &&
+           removedEndOffset <= lossEndOffset) ||
+          (lossStartOffset >= removedStartOffset &&
+           lossEndOffset <= removedEndOffset)) {
+        size_t amountToSplit = removedStartOffset > lossStartOffset
+            ? removedStartOffset - lossStartOffset
+            : 0;
+        Buf splitBuf = nullptr;
+        if (amountToSplit > 0) {
+          splitBuf = lossItr->data.splitAtMost(amountToSplit);
+          CHECK(splitBuf);
+          lossItr->offset += amountToSplit;
+        }
+        lossItr->offset += lossItr->data.trimStartAtMost(len);
+        if (lossItr->data.empty() && lossItr->eof == eof) {
+          lossBuffer.erase(lossItr);
+        }
+        if (splitBuf) {
+          insertIntoLossBuffer(std::make_unique<StreamBuffer>(
+              std::move(splitBuf), lossStartOffset, false));
+        }
+        return;
+      }
+    }
+  }
 };
 
 struct QuicConnectionStateBase;

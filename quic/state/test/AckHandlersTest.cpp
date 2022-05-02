@@ -181,6 +181,290 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   EXPECT_EQ(conn.outstandings.packets.size(), numDeclaredLost + 5);
 }
 
+TEST_P(AckHandlersTest, TestSpuriousLossFullRemoval) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  conn.transportSettings.removeFromLossBufferOnSpurious = true;
+
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  StreamId streamId = 1;
+  auto streamState = conn.streamManager->createStream(streamId).value();
+  BufQueue data{};
+  auto iob = folly::IOBuf::createChain(200, 200);
+  iob->append(200);
+  data.append(std::move(iob));
+  ASSERT_EQ(data.chainLength(), 200);
+  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  streamState->insertIntoLossBuffer(std::move(streamBuffer));
+
+  TimePoint startTime = Clock::now();
+  auto regularPacket = createNewPacket(0, GetParam());
+  WriteStreamFrame frame(streamId, 0, 200, false);
+  regularPacket.frames.emplace_back(frame);
+  conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
+  OutstandingPacket sentPacket(
+      std::move(regularPacket),
+      startTime,
+      1,
+      0,
+      false /* handshake */,
+      0,
+      0,
+      1,
+      1,
+      quic::LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.emplace_back(sentPacket);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 20ms;
+
+  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
+
+  // Here we receive the spurious loss packets in a late ack
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 2;
+  ackFrame.ackBlocks.emplace_back(0, 2);
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 30ms);
+
+  EXPECT_TRUE(streamState->lossBuffer.empty());
+}
+
+TEST_P(AckHandlersTest, TestSpuriousLossSplitMiddleRemoval) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  conn.transportSettings.removeFromLossBufferOnSpurious = true;
+
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  StreamId streamId = 1;
+  auto streamState = conn.streamManager->createStream(streamId).value();
+  BufQueue data{};
+  auto iob = folly::IOBuf::createChain(200, 200);
+  iob->append(200);
+  data.append(std::move(iob));
+  ASSERT_EQ(data.chainLength(), 200);
+  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  streamState->insertIntoLossBuffer(std::move(streamBuffer));
+
+  TimePoint startTime = Clock::now();
+  auto regularPacket = createNewPacket(0, GetParam());
+  WriteStreamFrame frame(streamId, 50, 50, false);
+  regularPacket.frames.emplace_back(frame);
+  conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
+  OutstandingPacket sentPacket(
+      std::move(regularPacket),
+      startTime,
+      1,
+      0,
+      false /* handshake */,
+      0,
+      0,
+      1,
+      1,
+      quic::LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.emplace_back(sentPacket);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 20ms;
+
+  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
+
+  // Here we receive the spurious loss packets in a late ack
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 2;
+  ackFrame.ackBlocks.emplace_back(0, 2);
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 30ms);
+
+  ASSERT_EQ(streamState->lossBuffer.size(), 2);
+  EXPECT_EQ(streamState->lossBuffer[0].offset, 0);
+  EXPECT_EQ(streamState->lossBuffer[0].data.chainLength(), 50);
+  EXPECT_EQ(streamState->lossBuffer[0].eof, false);
+  EXPECT_EQ(streamState->lossBuffer[1].offset, 100);
+  EXPECT_EQ(streamState->lossBuffer[1].data.chainLength(), 100);
+  EXPECT_EQ(streamState->lossBuffer[1].eof, false);
+}
+
+TEST_P(AckHandlersTest, TestSpuriousLossTrimFrontRemoval) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  conn.transportSettings.removeFromLossBufferOnSpurious = true;
+
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  StreamId streamId = 1;
+  auto streamState = conn.streamManager->createStream(streamId).value();
+  BufQueue data{};
+  auto iob = folly::IOBuf::createChain(200, 200);
+  iob->append(200);
+  data.append(std::move(iob));
+  ASSERT_EQ(data.chainLength(), 200);
+  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  streamState->insertIntoLossBuffer(std::move(streamBuffer));
+
+  TimePoint startTime = Clock::now();
+  auto regularPacket = createNewPacket(0, GetParam());
+  WriteStreamFrame frame(streamId, 0, 50, false);
+  regularPacket.frames.emplace_back(frame);
+  conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
+  OutstandingPacket sentPacket(
+      std::move(regularPacket),
+      startTime,
+      1,
+      0,
+      false /* handshake */,
+      0,
+      0,
+      1,
+      1,
+      quic::LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.emplace_back(sentPacket);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 20ms;
+
+  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
+
+  // Here we receive the spurious loss packets in a late ack
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 2;
+  ackFrame.ackBlocks.emplace_back(0, 2);
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 30ms);
+
+  ASSERT_EQ(streamState->lossBuffer.size(), 1);
+  EXPECT_EQ(streamState->lossBuffer[0].offset, 50);
+  EXPECT_EQ(streamState->lossBuffer[0].data.chainLength(), 150);
+  EXPECT_EQ(streamState->lossBuffer[0].eof, false);
+}
+
+TEST_P(AckHandlersTest, TestSpuriousLossSplitFrontRemoval) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+  conn.streamManager->setMaxLocalBidirectionalStreams(100);
+  conn.transportSettings.removeFromLossBufferOnSpurious = true;
+
+  auto noopLossVisitor = [](auto&, auto&, bool) {};
+
+  StreamId streamId = 1;
+  auto streamState = conn.streamManager->createStream(streamId).value();
+  BufQueue data{};
+  auto iob = folly::IOBuf::createChain(200, 200);
+  iob->append(200);
+  data.append(std::move(iob));
+  ASSERT_EQ(data.chainLength(), 200);
+  auto streamBuffer = std::make_unique<StreamBuffer>(data.move(), 0, false);
+  streamState->insertIntoLossBuffer(std::move(streamBuffer));
+
+  TimePoint startTime = Clock::now();
+  auto regularPacket = createNewPacket(0, GetParam());
+  WriteStreamFrame frame(streamId, 50, 150, false);
+  regularPacket.frames.emplace_back(frame);
+  conn.outstandings.packetCount[regularPacket.header.getPacketNumberSpace()]++;
+  OutstandingPacket sentPacket(
+      std::move(regularPacket),
+      startTime,
+      1,
+      0,
+      false /* handshake */,
+      0,
+      0,
+      1,
+      1,
+      quic::LossState(),
+      0,
+      OutstandingPacketMetadata::DetailsPerStream());
+  conn.outstandings.packets.emplace_back(sentPacket);
+
+  // setting a very low reordering threshold to force loss by reorder
+  conn.lossState.reorderingThreshold = 1;
+  // setting time out parameters higher than the time at which detectLossPackets
+  // is called to make sure there are no losses by timeout
+  conn.lossState.srtt = 400ms;
+  conn.lossState.lrtt = 350ms;
+  conn.transportSettings.timeReorderingThreshDividend = 1.0;
+  conn.transportSettings.timeReorderingThreshDivisor = 1.0;
+  TimePoint checkTime = startTime + 20ms;
+
+  detectLossPackets(conn, 4, noopLossVisitor, checkTime, GetParam());
+
+  // Here we receive the spurious loss packets in a late ack
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 2;
+  ackFrame.ackBlocks.emplace_back(0, 2);
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [](const auto&, const auto&, const auto&) {},
+      [](auto&, auto&, bool) {},
+      startTime + 30ms);
+
+  ASSERT_EQ(streamState->lossBuffer.size(), 1);
+  EXPECT_EQ(streamState->lossBuffer[0].offset, 0);
+  EXPECT_EQ(streamState->lossBuffer[0].data.chainLength(), 50);
+  EXPECT_EQ(streamState->lossBuffer[0].eof, false);
+}
+
 TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());

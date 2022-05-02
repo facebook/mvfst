@@ -293,6 +293,8 @@ struct TransportSettings {
   std::string flowPriming = "";
   // Whether or not to enable WritableBytes limit (server only)
   bool enableWritableBytesLimit{false};
+  // Whether or not to remove data from the loss buffer on spurious loss.
+  bool removeFromLossBufferOnSpurious{false};
 };
 
 } // namespace quic
