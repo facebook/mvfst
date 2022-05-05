@@ -22,8 +22,8 @@ namespace {
  */
 struct OutstandingPacketWithHandlerContext {
   explicit OutstandingPacketWithHandlerContext(
-      OutstandingPacket&& outstandingPacketIn)
-      : outstandingPacket(outstandingPacketIn) {}
+      OutstandingPacket outstandingPacketIn)
+      : outstandingPacket(std::move(outstandingPacketIn)) {}
 
   OutstandingPacket outstandingPacket;
   bool processAllFrames{false};
