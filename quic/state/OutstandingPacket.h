@@ -46,7 +46,7 @@ struct OutstandingPacketMetadata {
 
   struct StreamDetails {
     template <class T>
-    using IntervalSetVec = SmallVec<T, 2 /* stack size */, uint16_t>;
+    using IntervalSetVec = SmallVec<T, 4 /* stack size */, uint16_t>;
     using StreamIntervals = IntervalSet<uint64_t, 1, IntervalSetVec>;
     StreamIntervals streamIntervals;
 
