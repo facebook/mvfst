@@ -426,10 +426,8 @@ class QuicServerTransportTestBase : public virtual testing::Test {
         }
       }
     }
-    uint64_t connIdsToIssue = std::min(
-                                  server->getConn().peerActiveConnectionIdLimit,
-                                  kDefaultActiveConnectionIdLimit) -
-        1;
+    uint64_t connIdsToIssue =
+        maximumConnectionIdsToIssue(server->getConn()) - 1;
 
     if (server->getConn().transportSettings.disableMigration ||
         (connIdsToIssue == 0)) {

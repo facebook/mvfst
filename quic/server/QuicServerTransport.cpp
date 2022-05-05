@@ -583,8 +583,7 @@ void QuicServerTransport::maybeIssueConnectionIds() {
     // If the peer specifies that they have a limit of 1,000,000 connection
     // ids then only issue a small number at first, since the server still
     // needs to be able to search through all issued ids for routing.
-    const uint64_t maximumIdsToIssue = std::min(
-        conn_->peerActiveConnectionIdLimit, kDefaultActiveConnectionIdLimit);
+    const uint64_t maximumIdsToIssue = maximumConnectionIdsToIssue(*conn_);
 
     // Make sure size of selfConnectionIds is not larger than maximumIdsToIssue
     for (size_t i = conn_->selfConnectionIds.size(); i < maximumIdsToIssue;

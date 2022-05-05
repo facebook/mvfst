@@ -539,7 +539,11 @@ constexpr uint64_t kMaxRetryTokenValidMs = 1000 * 60 * 5;
 // Set to 24h
 constexpr uint64_t kMaxNewTokenValidMs = 1000 * 24 * 60 * 60;
 
+// Default limit on active connection ids that a peer generates.
 constexpr uint64_t kDefaultActiveConnectionIdLimit = 2;
+
+// Maximum number of active connection ids to generate for the peer.
+constexpr uint64_t kMaxActiveConnectionIdLimit = 100;
 
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
 

@@ -117,4 +117,6 @@ std::pair<folly::Optional<TimePoint>, PacketNumberSpace> earliestTimeAndSpace(
     const EnumArray<PacketNumberSpace, folly::Optional<TimePoint>>& times,
     bool considerAppData) noexcept;
 
+uint64_t maximumConnectionIdsToIssue(const QuicConnectionStateBase& conn);
+
 } // namespace quic
