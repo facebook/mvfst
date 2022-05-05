@@ -22,6 +22,11 @@ DEFINE_string(
     "",
     "Client new token string to attach to connection initiation");
 DEFINE_bool(use_datagrams, false, "Use QUIC datagrams to communicate");
+DEFINE_int64(
+    active_conn_id_limit,
+    10,
+    "Maximum number of active connection IDs a peer supports");
+DEFINE_bool(enable_migration, true, "Enable/disable migration");
 
 using namespace quic::samples;
 
@@ -36,14 +41,24 @@ int main(int argc, char* argv[]) {
   fizz::CryptoUtils::init();
 
   if (FLAGS_mode == "server") {
-    EchoServer server(FLAGS_host, FLAGS_port, FLAGS_use_datagrams);
+    EchoServer server(
+        FLAGS_host,
+        FLAGS_port,
+        FLAGS_use_datagrams,
+        FLAGS_active_conn_id_limit,
+        FLAGS_enable_migration);
     server.start();
   } else if (FLAGS_mode == "client") {
     if (FLAGS_host.empty() || FLAGS_port == 0) {
       LOG(ERROR) << "EchoClient expected --host and --port";
       return -2;
     }
-    EchoClient client(FLAGS_host, FLAGS_port, FLAGS_use_datagrams);
+    EchoClient client(
+        FLAGS_host,
+        FLAGS_port,
+        FLAGS_use_datagrams,
+        FLAGS_active_conn_id_limit,
+        FLAGS_enable_migration);
     client.start(FLAGS_token);
   } else {
     LOG(ERROR) << "Unknown mode specified: " << FLAGS_mode;

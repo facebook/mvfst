@@ -32,8 +32,17 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
                    public quic::QuicSocket::WriteCallback,
                    public quic::QuicSocket::DatagramCallback {
  public:
-  EchoClient(const std::string& host, uint16_t port, bool useDatagrams)
-      : host_(host), port_(port), useDatagrams_(useDatagrams) {}
+  EchoClient(
+      const std::string& host,
+      uint16_t port,
+      bool useDatagrams,
+      uint64_t activeConnIdLimit,
+      bool enableMigration)
+      : host_(host),
+        port_(port),
+        useDatagrams_(useDatagrams),
+        activeConnIdLimit_(activeConnIdLimit),
+        enableMigration_(enableMigration) {}
 
   void readAvailable(quic::StreamId streamId) noexcept override {
     auto readData = quicClient_->read(streamId, 0);
@@ -148,6 +157,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
 
       TransportSettings settings;
       settings.datagramConfig.enabled = useDatagrams_;
+      settings.selfActiveConnectionIdLimit = activeConnIdLimit_;
+      settings.disableMigration = !enableMigration_;
       quicClient_->setTransportSettings(settings);
 
       quicClient_->setTransportStatsCallback(
@@ -199,6 +210,8 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
   std::string host_;
   uint16_t port_;
   bool useDatagrams_;
+  uint64_t activeConnIdLimit_;
+  bool enableMigration_;
   std::shared_ptr<quic::QuicClientTransport> quicClient_;
   std::map<quic::StreamId, BufQueue> pendingOutput_;
   std::map<quic::StreamId, uint64_t> recvOffsets_;

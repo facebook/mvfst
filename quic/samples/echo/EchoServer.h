@@ -64,7 +64,9 @@ class EchoServer {
   explicit EchoServer(
       const std::string& host = "::1",
       uint16_t port = 6666,
-      bool useDatagrams = false)
+      bool useDatagrams = false,
+      uint64_t activeConnIdLimit = 10,
+      bool enableMigration = true)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(useDatagrams));
@@ -73,11 +75,12 @@ class EchoServer {
     auto serverCtx = quic::test::createServerCtx();
     serverCtx->setClock(std::make_shared<fizz::SystemClock>());
     server_->setFizzContext(serverCtx);
-    if (useDatagrams) {
-      auto settingsCopy = server_->getTransportSettings();
-      settingsCopy.datagramConfig.enabled = true;
-      server_->setTransportSettings(std::move(settingsCopy));
-    }
+
+    auto settingsCopy = server_->getTransportSettings();
+    settingsCopy.datagramConfig.enabled = useDatagrams;
+    settingsCopy.selfActiveConnectionIdLimit = activeConnIdLimit;
+    settingsCopy.disableMigration = !enableMigration;
+    server_->setTransportSettings(std::move(settingsCopy));
   }
 
   void start() {
