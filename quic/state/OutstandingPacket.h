@@ -56,7 +56,7 @@ struct OutstandingPacketMetadata {
     folly::Optional<uint64_t> maybeFirstNewStreamByteOffset;
   };
 
-  class DetailsPerStream : private folly::F14FastMap<StreamId, StreamDetails> {
+  class DetailsPerStream : private folly::F14ValueMap<StreamId, StreamDetails> {
    public:
     void addFrame(const WriteStreamFrame& frame, const bool newData) {
       auto ret = emplace(
@@ -86,7 +86,7 @@ struct OutstandingPacketMetadata {
     }
 
     [[nodiscard]] auto at(StreamId id) const {
-      return folly::F14FastMap<StreamId, StreamDetails>::at(id);
+      return folly::F14ValueMap<StreamId, StreamDetails>::at(id);
     }
 
     [[nodiscard]] auto begin() const {
@@ -97,14 +97,14 @@ struct OutstandingPacketMetadata {
       return cend();
     }
 
-    using folly::F14FastMap<StreamId, StreamDetails>::cbegin;
-    using folly::F14FastMap<StreamId, StreamDetails>::cend;
-    using folly::F14FastMap<StreamId, StreamDetails>::const_iterator;
-    using folly::F14FastMap<StreamId, StreamDetails>::empty;
-    using folly::F14FastMap<StreamId, StreamDetails>::find;
-    using folly::F14FastMap<StreamId, StreamDetails>::mapped_type;
-    using folly::F14FastMap<StreamId, StreamDetails>::size;
-    using folly::F14FastMap<StreamId, StreamDetails>::value_type;
+    using folly::F14ValueMap<StreamId, StreamDetails>::cbegin;
+    using folly::F14ValueMap<StreamId, StreamDetails>::cend;
+    using folly::F14ValueMap<StreamId, StreamDetails>::const_iterator;
+    using folly::F14ValueMap<StreamId, StreamDetails>::empty;
+    using folly::F14ValueMap<StreamId, StreamDetails>::find;
+    using folly::F14ValueMap<StreamId, StreamDetails>::mapped_type;
+    using folly::F14ValueMap<StreamId, StreamDetails>::size;
+    using folly::F14ValueMap<StreamId, StreamDetails>::value_type;
   };
 
   // Details about each stream with frames in this packet
