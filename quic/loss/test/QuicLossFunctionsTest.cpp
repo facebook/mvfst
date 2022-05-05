@@ -309,7 +309,7 @@ PacketNum QuicLossFunctionsTest::sendPacket(
 }
 
 RegularQuicWritePacket stripPaddingFrames(RegularQuicWritePacket packet) {
-  SmallVec<QuicWriteFrame, 4, uint16_t> trimmedFrames{};
+  RegularQuicWritePacket::Vec trimmedFrames{};
   for (auto frame : packet.frames) {
     if (!frame.asPaddingFrame()) {
       trimmedFrames.push_back(frame);

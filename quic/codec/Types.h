@@ -1062,11 +1062,13 @@ struct RegularQuicPacket : public RegularPacket {
  * A representation of a regular packet that is written to the network.
  */
 struct RegularQuicWritePacket : public RegularPacket {
-  using Vec = SmallVec<QuicWriteFrame, 4, uint16_t>;
+  using Vec = std::vector<QuicWriteFrame>;
   Vec frames;
 
   explicit RegularQuicWritePacket(PacketHeader&& headerIn)
-      : RegularPacket(std::move(headerIn)) {}
+      : RegularPacket(std::move(headerIn)) {
+    frames.reserve(8);
+  }
 };
 
 /**
