@@ -137,7 +137,7 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
                 utilizationPercent;
             knobParams.push_back(
                 {paramId, folly::to<uint64_t>(combinedKnobVal)});
-          } else if (paramId == TransportKnobParamId::NOOP) {
+          } else if (paramId == TransportKnobParamId::NO_OP) {
             // No further processing needed. Ignore this knob parameter.
             VLOG(4) << "Skipping over noop transport knob";
             continue;
