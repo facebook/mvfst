@@ -1507,7 +1507,7 @@ void QuicTransportBase::handleKnobCallbacks() {
 }
 
 void QuicTransportBase::handleAckEventCallbacks() {
-  const auto& lastProcessedAckEvents = conn_->lastProcessedAckEvents;
+  auto& lastProcessedAckEvents = conn_->lastProcessedAckEvents;
   if (lastProcessedAckEvents.empty()) {
     return; // nothing to do
   }
@@ -1526,6 +1526,7 @@ void QuicTransportBase::handleAckEventCallbacks() {
               observer->acksProcessed(observed, event);
             });
   }
+  lastProcessedAckEvents.clear();
 }
 
 void QuicTransportBase::handleCancelByteEventCallbacks() {
@@ -1778,7 +1779,6 @@ void QuicTransportBase::onNetworkData(
     updateWriteLooper(true);
   };
   try {
-    conn_->lastProcessedAckEvents.clear();
     conn_->lossState.totalBytesRecvd += networkData.totalData;
     auto originalAckVersion = currentAckStateVersion(*conn_);
 
