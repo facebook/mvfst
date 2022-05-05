@@ -67,7 +67,8 @@ AckEvent processAckFrame(
                  .build();
 
   // temporary storage to enable packets to be processed in sent order
-  std::deque<OutstandingPacketWithHandlerContext> packetsWithHandlerContext;
+  SmallVec<OutstandingPacketWithHandlerContext, 50, uint16_t>
+      packetsWithHandlerContext;
 
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
   uint64_t dsrPacketsAcked = 0;
@@ -278,16 +279,16 @@ AckEvent processAckFrame(
         conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
       }
 
-      // temporarily store the packet to facilitate in-order ACK processing
       {
         auto tmpIt = packetsWithHandlerContext.emplace(
             std::find_if(
-                packetsWithHandlerContext.begin(),
-                packetsWithHandlerContext.end(),
+                packetsWithHandlerContext.rbegin(),
+                packetsWithHandlerContext.rend(),
                 [&currentPacketNum](const auto& packetWithHandlerContext) {
                   return packetWithHandlerContext.outstandingPacket.packet
                              .header.getPacketSequenceNum() > currentPacketNum;
-                }),
+                })
+                .base(),
             std::move(*rPacketIt));
         tmpIt->processAllFrames = needsProcess;
       }
@@ -312,9 +313,11 @@ AckEvent processAckFrame(
   // frame types only if the packet doesn't have an associated PacketEvent;
   // or the PacketEvent is in conn.outstandings.packetEvents
   ack.ackedPackets.reserve(packetsWithHandlerContext.size());
-  for (auto& packetWithHandlerContext : packetsWithHandlerContext) {
-    auto& outstandingPacket = packetWithHandlerContext.outstandingPacket;
-    const auto processAllFrames = packetWithHandlerContext.processAllFrames;
+  for (auto packetWithHandlerContextItr = packetsWithHandlerContext.rbegin();
+       packetWithHandlerContextItr != packetsWithHandlerContext.rend();
+       packetWithHandlerContextItr++) {
+    auto& outstandingPacket = packetWithHandlerContextItr->outstandingPacket;
+    const auto processAllFrames = packetWithHandlerContextItr->processAllFrames;
     AckEvent::AckPacket::DetailsPerStream detailsPerStream;
     for (auto& packetFrame : outstandingPacket.packet.frames) {
       if (!processAllFrames &&
