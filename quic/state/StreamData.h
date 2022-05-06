@@ -111,10 +111,6 @@ struct QuicStreamLike {
   // are currently un-acked. Each one represents one StreamFrame that was
   // written. We need to buffer these because these might be retransmitted in
   // the future. These are associated with the starting offset of the buffer.
-  // Note: the offset in the StreamBuffer itself can be >= the offset on which
-  // it is keyed due to partial reliability - when data is skipped the offset
-  // in the StreamBuffer may be incremented, but the keyed offset must remain
-  // the same so it can be removed from the buffer on ACK.
   folly::F14FastMap<uint64_t, std::unique_ptr<StreamBuffer>>
       retransmissionBuffer;
 
@@ -141,7 +137,6 @@ struct QuicStreamLike {
   uint64_t currentWriteOffset{0};
 
   // the minimum offset requires retransmit
-  // N.B. used in QUIC partial reliability
   uint64_t minimumRetransmittableOffset{0};
 
   // Offset of the next expected bytes that we need to read from
@@ -149,7 +144,6 @@ struct QuicStreamLike {
   uint64_t currentReadOffset{0};
 
   // the smallest data offset that we expect the peer to send.
-  // N.B. used in QUIC partial reliability
   uint64_t currentReceiveOffset{0};
 
   // Maximum byte offset observed on the stream.
