@@ -94,9 +94,7 @@ TYPED_TEST(QuicTypedTransportTest, TransportInfoRttSignals) {
       this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
@@ -311,9 +309,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayEqual) {
       this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
@@ -376,9 +372,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleAckDelayGreater) {
       this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
@@ -443,9 +437,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
       this->getTransport()->getTransportInfo().maybeMinRttNoAckDelay);
 
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   //                                     ||   [ Value Expected ]   |
   //  Case | RTT (delay) | RTT w/o delay ||  mRTT  |  w/o ACK delay | Updated
@@ -480,9 +472,7 @@ TYPED_TEST(QuicTypedTransportTest, RttSampleZeroTime) {
  */
 TYPED_TEST(QuicTypedTransportTest, AckEventsNoAllocatedSpaceWhenNoOutstanding) {
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -515,9 +505,7 @@ TYPED_TEST(
     QuicTypedTransportTest,
     AckEventsNoAllocatedSpaceWhenNoOutstandingTwoInFlight) {
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();
@@ -580,9 +568,7 @@ TYPED_TEST(
   this->getNonConstConn().transportSettings.timeReorderingThreshDivisor = 1;
 
   // clear any outstanding packets
-  this->getNonConstConn().outstandings.packets.clear();
-  this->getNonConstConn().outstandings.packetCount = {};
-  this->getNonConstConn().outstandings.clonedPacketCount = {};
+  this->getNonConstConn().outstandings.reset();
 
   // open a stream and write some bytes
   auto streamId = this->getTransport()->createBidirectionalStream().value();

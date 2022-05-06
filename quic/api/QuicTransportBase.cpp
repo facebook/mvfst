@@ -407,9 +407,7 @@ void QuicTransportBase::closeImpl(
   resetConnectionCallbacks();
 
   // Don't need outstanding packets.
-  conn_->outstandings.packets.clear();
-  conn_->outstandings.packetCount = {};
-  conn_->outstandings.clonedPacketCount = {};
+  conn_->outstandings.reset();
 
   // We don't need no congestion control.
   conn_->congestionController = nullptr;

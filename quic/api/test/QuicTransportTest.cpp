@@ -166,7 +166,7 @@ void dropPackets(QuicServerConnectionState& conn) {
       conn.streamManager->updateLossStreams(*stream);
     }
   }
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
 }
 
 // Helper function to verify the data of buffer is written to outstanding
@@ -1669,7 +1669,7 @@ TEST_F(QuicTransportTest, WriteMultipleTimes) {
       conn.streamManager->findStream(stream)->currentWriteOffset;
   verifyCorrectness(conn, 0, stream, *buf);
 
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   conn.streamManager->findStream(stream)->retransmissionBuffer.clear();
   buf = buildRandomInputData(50);
   EXPECT_CALL(*socket_, write(_, _)).WillOnce(Invoke(bufLength));
@@ -1752,7 +1752,7 @@ TEST_F(QuicTransportTest, WriteFlowControl) {
   }
   EXPECT_TRUE(blockedFound);
   EXPECT_FALSE(dataBlockedFound);
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
 
   // Stream flow control
   auto buf1 = buf->clone();
@@ -2253,8 +2253,7 @@ TEST_F(QuicTransportTest, SendPathValidationWhileThereIsOutstandingOne) {
 TEST_F(QuicTransportTest, ClonePathChallenge) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -2287,8 +2286,7 @@ TEST_F(QuicTransportTest, ClonePathChallenge) {
 TEST_F(QuicTransportTest, OnlyClonePathValidationIfOutstanding) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -2429,8 +2427,7 @@ TEST_F(QuicTransportTest, CloneAfterRecvReset) {
 TEST_F(QuicTransportTest, ClonePathResponse) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -2512,9 +2509,7 @@ TEST_F(QuicTransportTest, SendNewConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneNewConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Initial] = 0;
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -2652,9 +2647,7 @@ TEST_F(QuicTransportTest, SendRetireConnectionIdFrame) {
 TEST_F(QuicTransportTest, CloneRetireConnectionIdFrame) {
   auto& conn = transport_->getConnectionState();
   // knock every handshake outstanding packets out
-  conn.outstandings.packetCount[PacketNumberSpace::Initial] = 0;
-  conn.outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
   for (auto& t : conn.lossState.lossTimes) {
     t.reset();
   }
@@ -2950,7 +2943,7 @@ TEST_F(QuicTransportTest, WriteWindowUpdate) {
   EXPECT_TRUE(connWindowFound);
 
   EXPECT_EQ(conn.flowControlState.advertisedMaxOffset, 100);
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
 
   auto stream = transport_->createBidirectionalStream().value();
   auto streamState = conn.streamManager->getStream(stream);
@@ -4084,7 +4077,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   const WriteStreamFrame* streamFrame = frame.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame);
   EXPECT_EQ(streamFrame->streamId, s1);
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
 
   // Start from stream2 instead of stream1
   conn.streamManager->writableStreams().setNextScheduledStream(s2);
@@ -4109,7 +4102,7 @@ TEST_F(QuicTransportTest, WriteStreamFromMiddleOfMap) {
   const WriteStreamFrame* streamFrame2 = frame2.asWriteStreamFrame();
   EXPECT_TRUE(streamFrame2);
   EXPECT_EQ(streamFrame2->streamId, s2);
-  conn.outstandings.packets.clear();
+  conn.outstandings.reset();
 
   // Test wrap around
   conn.streamManager->writableStreams().setNextScheduledStream(s2);

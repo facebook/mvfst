@@ -212,9 +212,8 @@ TEST_F(QuicServerTransportTest, IdleTimerNotResetOnDuplicatePacket) {
 TEST_F(QuicServerTransportTest, IdleTimerNotResetWhenDataOutstanding) {
   // Clear the receivedNewPacketBeforeWrite flag, since we may reveice from
   // client during the SetUp of the test case.
-  server->getNonConstConn().outstandings.packets.clear();
+  server->getNonConstConn().outstandings.reset();
   server->getNonConstConn().receivedNewPacketBeforeWrite = false;
-  server->getNonConstConn().outstandings.packets.clear();
   StreamId streamId = server->createBidirectionalStream().value();
 
   server->idleTimeout().cancelTimeout();
@@ -599,8 +598,7 @@ TEST_F(QuicServerTransportTest, TestOpenAckStreamFrame) {
   auto data = IOBuf::copyBuffer("Aloha");
 
   // Remove any packets that might have been queued.
-  server->getNonConstConn().outstandings.packets.clear();
-  server->getNonConstConn().outstandings.packetCount = {};
+  server->getNonConstConn().outstandings.reset();
   server->writeChain(streamId, data->clone(), false);
   loopForWrites();
   server->writeChain(streamId, data->clone(), false);
@@ -1194,8 +1192,7 @@ TEST_F(QuicServerTransportTest, TestCloneStopSending) {
   server->getNonConstConn().qLogger = qLogger;
   server->getNonConstConn().streamManager->getStream(streamId);
   // knock every handshake outstanding packets out
-  server->getNonConstConn().outstandings.packetCount = {};
-  server->getNonConstConn().outstandings.packets.clear();
+  server->getNonConstConn().outstandings.reset();
   for (auto& t : server->getNonConstConn().lossState.lossTimes) {
     t.reset();
   }
@@ -3685,8 +3682,7 @@ TEST_F(QuicUnencryptedServerTransportTest, TestSendHandshakeDoneNewTokenFrame) {
    */
 
   // Remove any packets that might have been queued.
-  server->getNonConstConn().outstandings.packets.clear();
-  server->getNonConstConn().outstandings.packetCount = {};
+  server->getNonConstConn().outstandings.reset();
 
   StreamId streamId = server->createBidirectionalStream().value();
   auto data = IOBuf::copyBuffer("data");
@@ -4332,7 +4328,7 @@ TEST_F(QuicServerTransportTest, WriteDSR) {
   // Rinse anything pending
   server->writeData();
   loopForWrites();
-  server->getNonConstConn().outstandings.packets.clear();
+  server->getNonConstConn().outstandings.reset();
   getFakeHandshakeLayer()->setCipherSuite(
       fizz::CipherSuite::TLS_AES_128_GCM_SHA256);
   auto streamId = server->createBidirectionalStream().value();

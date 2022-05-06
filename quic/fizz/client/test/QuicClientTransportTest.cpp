@@ -3459,9 +3459,7 @@ TEST_F(QuicClientTransportAfterStartTest, IdleTimerResetNoOutstandingPackets) {
 
   // Clear out all the outstanding packets to simulate quiescent state.
   client->getNonConstConn().receivedNewPacketBeforeWrite = false;
-  client->getNonConstConn().outstandings.packets.clear();
-  client->getNonConstConn().outstandings.packetCount = {};
-  client->getNonConstConn().outstandings.clonedPacketCount = {};
+  client->getNonConstConn().outstandings.reset();
   client->idleTimeout().cancelTimeout();
   auto streamId = client->createBidirectionalStream().value();
   auto expected = folly::IOBuf::copyBuffer("hello");

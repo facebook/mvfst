@@ -151,6 +151,15 @@ struct OutstandingsInfo {
         clonedPacketCount[PacketNumberSpace::Handshake] +
         clonedPacketCount[PacketNumberSpace::AppData];
   }
+
+  void reset() {
+    packets.clear();
+    packetEvents.clear();
+    packetCount = {};
+    clonedPacketCount = {};
+    declaredLostCount = 0;
+    dsrCount = 0;
+  }
 };
 
 struct Pacer {

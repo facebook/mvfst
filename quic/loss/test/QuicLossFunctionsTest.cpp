@@ -1862,8 +1862,7 @@ TEST_F(QuicLossFunctionsTest, OutstandingHandshakeCounting) {
 
 TEST_P(QuicLossFunctionsTest, CappedShiftNoCrash) {
   auto conn = createConn();
-  conn->outstandings.packetCount[PacketNumberSpace::Handshake] = 0;
-  conn->outstandings.packets.clear();
+  conn->outstandings.reset();
   conn->lossState.ptoCount =
       std::numeric_limits<decltype(conn->lossState.ptoCount)>::max();
   sendPacket(*conn, Clock::now(), folly::none, PacketType::OneRtt);
