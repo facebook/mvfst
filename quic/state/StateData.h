@@ -142,6 +142,7 @@ struct OutstandingsInfo {
 
   // Number of packets outstanding and not declared lost.
   uint64_t numOutstanding() {
+    CHECK_GE(packets.size(), declaredLostCount);
     return packets.size() - declaredLostCount;
   }
 

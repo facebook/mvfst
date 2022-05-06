@@ -173,6 +173,7 @@ AckEvent processAckFrame(
         QUIC_STATS(conn.statsCallback, onPacketSpuriousLoss);
         // Decrement the counter, trust that we will erase this as part of
         // the bulk erase.
+        CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.outstandings.declaredLostCount--;
         if (spuriousLossEvent) {
           spuriousLossEvent->addSpuriousPacket(*rPacketIt);
@@ -524,6 +525,7 @@ void clearOldOutstandingPackets(
       auto timeSinceSent = time - opItr->metadata.time;
       if (opItr->declaredLost && timeSinceSent > threshold) {
         opItr++;
+        CHECK_GT(conn.outstandings.declaredLostCount, 0);
         conn.outstandings.declaredLostCount--;
       } else {
         break;
