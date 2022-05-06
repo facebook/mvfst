@@ -402,8 +402,7 @@ class QuicServer : public QuicServerWorker::WorkerCallback,
        QuicVersion::MVFST_EXPERIMENTAL3,
        QuicVersion::MVFST_ALIAS,
        QuicVersion::QUIC_V1,
-       QuicVersion::QUIC_DRAFT,
-       QuicVersion::MVFST_ALIAS2}};
+       QuicVersion::QUIC_DRAFT}};
 
   bool isUsingCCP();
 

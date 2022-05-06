@@ -165,8 +165,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
          QuicVersion::MVFST_EXPERIMENTAL3,
          QuicVersion::MVFST_ALIAS,
          QuicVersion::QUIC_V1,
-         QuicVersion::QUIC_DRAFT,
-         QuicVersion::MVFST_ALIAS2}};
+         QuicVersion::QUIC_DRAFT}};
     originalVersion = QuicVersion::MVFST;
     DCHECK(handshakeFactory);
     auto tmpServerHandshake =
