@@ -104,12 +104,6 @@ class QuicReadCodec {
       const AckStates& ackStates,
       size_t dstConnIdSize = kDefaultConnectionIdSize);
 
-  CodecResult tryParseShortHeaderPacket(
-      Buf data,
-      const AckStates& ackStates,
-      size_t dstConnIdSize,
-      folly::io::Cursor& cursor);
-
   /**
    * Tries to parse the packet and returns whether or not
    * it is a version negotiation packet.
@@ -164,6 +158,11 @@ class QuicReadCodec {
   folly::Optional<TimePoint> getHandshakeDoneTime();
 
  private:
+  CodecResult tryParseShortHeaderPacket(
+      Buf data,
+      const AckStates& ackStates,
+      size_t dstConnIdSize,
+      folly::io::Cursor& cursor);
   CodecResult parseLongHeaderPacket(
       BufQueue& queue,
       const AckStates& ackStates);
