@@ -1108,7 +1108,7 @@ void QuicClientTransport::getReadBuffer(void** buf, size_t* len) noexcept {
   DCHECK(conn_) << "trying to receive packets without a connection";
   auto readBufferSize =
       conn_->transportSettings.maxRecvPacketSize * numGROBuffers_;
-  readBuffer_ = folly::IOBuf::create(readBufferSize);
+  readBuffer_ = folly::IOBuf::createCombined(readBufferSize);
   *buf = readBuffer_->writableData();
   *len = readBufferSize;
 }
@@ -1208,7 +1208,7 @@ void QuicClientTransport::recvMsg(
     // We create 1 buffer per packet so that it is not shared, this enables
     // us to decrypt in place. If the fizz decrypt api could decrypt in-place
     // even if shared, then we could allocate one giant IOBuf here.
-    Buf readBuffer = folly::IOBuf::create(readBufferSize);
+    Buf readBuffer = folly::IOBuf::createCombined(readBufferSize);
     struct iovec vec {};
     vec.iov_base = readBuffer->writableData();
     vec.iov_len = readBufferSize;
@@ -1354,7 +1354,7 @@ void QuicClientTransport::recvMmsg(
   for (int i = 0; i < numPackets; ++i) {
     Buf readBuffer;
     if (freeBufs.empty()) {
-      readBuffer = folly::IOBuf::create(readBufferSize);
+      readBuffer = folly::IOBuf::createCombined(readBufferSize);
     } else {
       readBuffer = std::move(freeBufs.back());
       DCHECK(readBuffer != nullptr);

@@ -64,8 +64,8 @@ bool writeSingleQuicPacket(
   packet.header->coalesce();
   auto headerLen = packet.header->length();
   auto bodyLen = packet.body->computeChainDataLength();
-  auto unencrypted =
-      folly::IOBuf::create(headerLen + bodyLen + aead.getCipherOverhead());
+  auto unencrypted = folly::IOBuf::createCombined(
+      headerLen + bodyLen + aead.getCipherOverhead());
   auto bodyCursor = folly::io::Cursor(packet.body.get());
   bodyCursor.pull(unencrypted->writableData() + headerLen, bodyLen);
   unencrypted->advance(headerLen);

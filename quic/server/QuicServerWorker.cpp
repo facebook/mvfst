@@ -188,7 +188,7 @@ const folly::SocketAddress& QuicServerWorker::getAddress() const {
 }
 
 void QuicServerWorker::getReadBuffer(void** buf, size_t* len) noexcept {
-  readBuffer_ = folly::IOBuf::create(
+  readBuffer_ = folly::IOBuf::createCombined(
       transportSettings_.maxRecvPacketSize * numGROBuffers_);
   *buf = readBuffer_->writableData();
   *len = transportSettings_.maxRecvPacketSize * numGROBuffers_;

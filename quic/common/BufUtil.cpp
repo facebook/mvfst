@@ -133,7 +133,7 @@ BufAppender::BufAppender(folly::IOBuf* data, size_t appendLen)
 
 void BufAppender::push(const uint8_t* data, size_t len) {
   if (crtBuf_->tailroom() < len || lastBufShared_) {
-    auto newBuf = folly::IOBuf::create(std::max(appendLen_, len));
+    auto newBuf = folly::IOBuf::createCombined(std::max(appendLen_, len));
     folly::IOBuf* newBufPtr = newBuf.get();
     head_->prependChain(std::move(newBuf));
     crtBuf_ = newBufPtr;
