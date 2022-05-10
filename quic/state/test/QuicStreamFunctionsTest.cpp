@@ -1998,11 +1998,27 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAcked) {
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
+TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedDSR) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  stream.finalWriteOffset = 1;
+  stream.writeBufMeta.offset = 2;
+  EXPECT_TRUE(allBytesTillFinAcked(stream));
+}
+
 TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnly) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 0;
   stream.currentWriteOffset = 1;
+  EXPECT_TRUE(allBytesTillFinAcked(stream));
+}
+
+TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedFinOnlyDSR) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  stream.finalWriteOffset = 0;
+  stream.writeBufMeta.offset = 1;
   EXPECT_TRUE(allBytesTillFinAcked(stream));
 }
 
@@ -2021,12 +2037,37 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLost) {
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
+TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillLostDSR) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  stream.finalWriteOffset = 20;
+  stream.writeBufMeta.offset = 21;
+  WriteBufferMeta::Builder b;
+  b.setLength(10);
+  b.setOffset(10);
+  b.setEOF(false);
+  stream.lossBufMetas.emplace_back(b.build());
+  EXPECT_FALSE(allBytesTillFinAcked(stream));
+}
+
 TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmitting) {
   StreamId id = 3;
   QuicStreamState stream(id, conn);
   stream.finalWriteOffset = 12;
   stream.retransmissionBuffer.emplace(
       0, std::make_unique<StreamBuffer>(IOBuf::create(10), 10, false));
+  EXPECT_FALSE(allBytesTillFinAcked(stream));
+}
+
+TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillRetransmittingDSR) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  stream.finalWriteOffset = 12;
+  WriteBufferMeta::Builder b;
+  b.setLength(10);
+  b.setOffset(10);
+  b.setEOF(false);
+  stream.retransmissionBufMetas.emplace(0, b.build());
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 
@@ -2037,6 +2078,14 @@ TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillWriting) {
   auto buf = IOBuf::create(10);
   buf->append(10);
   stream.writeBuffer.append(std::move(buf));
+  EXPECT_FALSE(allBytesTillFinAcked(stream));
+}
+
+TEST_F(QuicStreamFunctionsTest, AllBytesTillFinAckedStillWritingDSR) {
+  StreamId id = 3;
+  QuicStreamState stream(id, conn);
+  stream.finalWriteOffset = 10;
+  stream.writeBufMeta.length = 10;
   EXPECT_FALSE(allBytesTillFinAcked(stream));
 }
 

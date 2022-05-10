@@ -386,10 +386,10 @@ bool allBytesTillFinAcked(const QuicStreamState& stream) {
    * 4. We have no bytes left to write
    * 5. We have no bytes that are detected as lost.
    */
-  return stream.finalWriteOffset &&
-      stream.currentWriteOffset > *stream.finalWriteOffset &&
-      stream.retransmissionBuffer.empty() && stream.writeBuffer.empty() &&
-      stream.lossBuffer.empty();
+  return stream.hasSentFIN() && stream.retransmissionBuffer.empty() &&
+      stream.retransmissionBufMetas.empty() && stream.writeBuffer.empty() &&
+      !stream.hasWritableBufMeta() && stream.lossBuffer.empty() &&
+      stream.lossBufMetas.empty();
 }
 
 void appendPendingStreamReset(

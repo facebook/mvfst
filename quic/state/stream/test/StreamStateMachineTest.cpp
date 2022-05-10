@@ -854,6 +854,45 @@ TEST_F(QuicOpenStateTest, DSRStreamAcked) {
   frame.fromBufMeta = true;
   sendAckSMHandler(*stream, frame);
   EXPECT_TRUE(stream->retransmissionBufMetas.empty());
+  EXPECT_EQ(stream->sendState, StreamSendState::Open);
+}
+
+TEST_F(QuicOpenStateTest, DSRFullStreamAcked) {
+  auto conn = createConn();
+  conn->clientConnectionId = getTestConnectionId(0);
+  conn->serverConnectionId = getTestConnectionId(1);
+  auto stream = conn->streamManager->createNextBidirectionalStream().value();
+  auto buf = folly::IOBuf::copyBuffer("Big ship stucks in small water");
+  size_t len = buf->computeChainDataLength();
+  writeDataToQuicStream(*stream, std::move(buf), false);
+  handleStreamWritten(
+      *conn, *stream, 0, len, false, 1, PacketNumberSpace::AppData);
+  ASSERT_EQ(stream->retransmissionBuffer.size(), 1);
+  writeBufMetaToQuicStream(*stream, BufferMeta(1000), true);
+  auto bufMetaStartingOffset = stream->writeBufMeta.offset;
+  handleStreamBufMetaWritten(
+      *conn,
+      *stream,
+      bufMetaStartingOffset,
+      1000,
+      true,
+      1,
+      PacketNumberSpace::AppData);
+  ASSERT_EQ(stream->writeBuffer.chainLength(), 0);
+  ASSERT_NE(
+      stream->retransmissionBufMetas.end(),
+      stream->retransmissionBufMetas.find(bufMetaStartingOffset));
+  WriteStreamFrame frame(stream->id, bufMetaStartingOffset, 1000, true);
+  frame.fromBufMeta = true;
+  sendAckSMHandler(*stream, frame);
+  frame.offset = 0;
+  frame.len = len;
+  frame.fin = false;
+  frame.fromBufMeta = false;
+  sendAckSMHandler(*stream, frame);
+  EXPECT_TRUE(stream->retransmissionBuffer.empty());
+  EXPECT_TRUE(stream->retransmissionBufMetas.empty());
+  EXPECT_EQ(stream->sendState, StreamSendState::Closed);
 }
 
 } // namespace test
