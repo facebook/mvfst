@@ -499,7 +499,7 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   LossState lossState;
 
   // This contains the ack and packet number related states for all three
-  // packet number space.
+  // packet number spaces.
   AckStates ackStates;
 
   struct ConnectionFlowControlState {
