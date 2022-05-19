@@ -32,16 +32,28 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
     const std::string& serializedParams) {
   TransportKnobParams knobParams;
   try {
-    folly::dynamic params = folly::parseJson(serializedParams);
+    // leave numbers as strings so that we can use uint64_t number space
+    // (JSON only supports int64; numbers larger than this will trigger throw)
+    folly::json::serialization_opts opts;
+    opts.parse_numbers_as_strings = true;
+    folly::dynamic params = folly::parseJson(serializedParams, opts);
     for (const auto& id : params.keys()) {
       auto paramId = folly::to<uint64_t>(id.asInt());
       auto val = params[id];
       switch (val.type()) {
         case folly::dynamic::Type::BOOL:
-        case folly::dynamic::Type::INT64:
           knobParams.push_back({paramId, folly::to<uint64_t>(val.asInt())});
           continue;
         case folly::dynamic::Type::STRING: {
+          /*
+           * try to parse as an integer first
+           * we parse manually to enable us to support uint64_t
+           */
+          if (const auto expectAsInt = folly::tryTo<uint64_t>(val.asString())) {
+            knobParams.push_back({paramId, expectAsInt.value()});
+            continue;
+          }
+
           /*
            * set cc algorithm
            * expected format: string, all lower case, name of cc algorithm

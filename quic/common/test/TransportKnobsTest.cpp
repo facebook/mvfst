@@ -25,6 +25,7 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
   if (fixture.expectError) {
     EXPECT_FALSE(result.hasValue());
   } else {
+    ASSERT_TRUE(result.hasValue());
     EXPECT_EQ(result->size(), fixture.expectParams.size());
     for (size_t i = 0; i < result->size(); i++) {
       auto& actualKnob = (*result)[i];
@@ -279,6 +280,14 @@ TEST(QuicKnobsParsingTest, DoubleKey) {
 
 TEST(QuicKnobsParsingTest, DoubleValue) {
   QuicKnobsParsingTestFixture fixture = {"{  \"10\" : 0.1 }", true, {}};
+  run(fixture);
+}
+
+TEST(QuicKnobsParsingTest, UInt64Max) {
+  const uint64_t id = 10;
+  const uint64_t val = std::numeric_limits<uint64_t>::max();
+  std::string str = fmt::format("{{\"{}\" : {}}}", id, val);
+  QuicKnobsParsingTestFixture fixture = {str, false, {{.id = id, .val = val}}};
   run(fixture);
 }
 
