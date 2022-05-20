@@ -46,12 +46,23 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
           continue;
         case folly::dynamic::Type::STRING: {
           /*
-           * try to parse as an integer first
+           * try to parse as an integer first, unless known to be string knob
            * we parse manually to enable us to support uint64_t
            */
-          if (const auto expectAsInt = folly::tryTo<uint64_t>(val.asString())) {
-            knobParams.push_back({paramId, expectAsInt.value()});
-            continue;
+          switch (paramId) {
+            case TransportKnobParamId::AUTO_BACKGROUND_MODE:
+            case TransportKnobParamId::CC_ALGORITHM_KNOB:
+            case TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB:
+            case TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB:
+            case TransportKnobParamId::NO_OP:
+              break;
+            default:
+              if (const auto expectAsInt =
+                      folly::tryTo<uint64_t>(val.asString())) {
+                knobParams.push_back({paramId, expectAsInt.value()});
+                continue; // triggers next loop iteration
+              }
+              return folly::none; // error parsing integer parameter
           }
 
           /*

@@ -39,12 +39,12 @@ void run(const QuicKnobsParsingTestFixture& fixture) {
 TEST(QuicKnobsParsingTest, Simple) {
   QuicKnobsParsingTestFixture fixture = {
       "{ \"0\": 1,"
-      "  \"1\": 5,"
+      "  \"11\": 5,"
       "  \"19\": 6,"
       "  \"2\": 3"
       "  }",
       false,
-      {{0, 1}, {1, 5}, {2, 3}, {19, 6}}};
+      {{0, 1}, {2, 3}, {11, 5}, {19, 6}}};
   run(fixture);
 }
 
@@ -79,7 +79,7 @@ TEST(QuicKnobsParsingTest, Characters) {
 }
 
 TEST(QuicKnobsParsingTest, NegativeNumbers) {
-  QuicKnobsParsingTestFixture fixture = {"{ \"1\" : -1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {"{ \"10\" : -1 }", true, {}};
   run(fixture);
 }
 
@@ -192,12 +192,13 @@ TEST(QuicKnobsParsingTest, ValidNotSentBufferSize) {
   run(fixture);
 }
 
-TEST(QuicKnobsParsingTest, InvalidNotSentBufferSizeAsString) {
+TEST(QuicKnobsParsingTest, ValidNotSentBufferSizeAsString) {
   auto key =
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB);
   uint64_t val = 111;
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
   run(fixture);
 }
 
@@ -210,11 +211,12 @@ TEST(QuicKnobsParsingTest, ValidMaxPacingRate) {
   run(fixture);
 }
 
-TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsString) {
+TEST(QuicKnobsParsingTest, ValidMaxPacingRateAsString) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
   uint64_t val = 111;
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = val}}};
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
   run(fixture);
 }
 
@@ -223,7 +225,7 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   // Decimal is UINT64_MAX + 1
   std::string args =
       fmt::format(R"({{"{}" : {}}})", key, "18446744073709551616");
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 1}}};
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
 
@@ -239,37 +241,38 @@ TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeBadFormat) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7/25");
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundModeExtraValues) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7,25,25");
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundPriorityOutOfBounds) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "8,50");
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 }
 
 TEST(QuicKnobsParsingTest, InvalidAutoBackgroundUtilizationPercentOutOfBounds) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "0,101");
-  QuicKnobsParsingTestFixture fixture = {args, true, {{.id = key, .val = 0}}};
+  QuicKnobsParsingTestFixture fixture = {args, true, {}};
   run(fixture);
 
   std::string args2 = fmt::format(R"({{"{}" : "{}"}})", key, "0,24");
-  QuicKnobsParsingTestFixture fixture2 = {args2, true, {{.id = key, .val = 0}}};
+  QuicKnobsParsingTestFixture fixture2 = {args2, true, {}};
   run(fixture2);
 }
 
 TEST(QuicKnobsParsingTest, NonStringKey) {
-  QuicKnobsParsingTestFixture fixture = {"{ 1 : 1 }", true, {}};
+  QuicKnobsParsingTestFixture fixture = {
+      "{ 10 : 1 }", false, {{.id = 10, .val = 1}}};
   run(fixture);
 }
 
