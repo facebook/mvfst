@@ -295,6 +295,9 @@ struct TransportSettings {
   bool enableWritableBytesLimit{false};
   // Whether or not to remove data from the loss buffer on spurious loss.
   bool removeFromLossBufferOnSpurious{false};
+  // If set to true, the users won't get new stream notification until an
+  // actual stream frame with the new stream id arrives.
+  bool notifyOnNewStreamsExplicitly{false};
 };
 
 } // namespace quic

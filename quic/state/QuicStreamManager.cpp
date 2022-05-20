@@ -67,7 +67,7 @@ static LocalErrorCode openPeerStreamIfNotClosed(
     folly::F14FastSet<StreamId>& openStreams,
     StreamId& nextAcceptableStreamId,
     StreamId maxStreamId,
-    std::vector<StreamId>& newStreams) {
+    std::vector<StreamId>* newStreams) {
   if (streamId < nextAcceptableStreamId) {
     return LocalErrorCode::CREATING_EXISTING_STREAM;
   }
@@ -78,10 +78,14 @@ static LocalErrorCode openPeerStreamIfNotClosed(
   StreamId start = nextAcceptableStreamId;
   auto numNewStreams = (streamId - start) / detail::kStreamIncrement;
   openStreams.reserve(openStreams.size() + numNewStreams);
-  newStreams.reserve(newStreams.size() + numNewStreams);
+  if (newStreams) {
+    newStreams->reserve(newStreams->size() + numNewStreams);
+  }
   while (start <= streamId) {
     openStreams.emplace(start);
-    newStreams.push_back(start);
+    if (newStreams) {
+      newStreams->push_back(start);
+    }
     start += detail::kStreamIncrement;
   }
 
@@ -331,6 +335,20 @@ QuicStreamManager::createNextUnidirectionalStream() {
 }
 
 QuicStreamState* FOLLY_NULLABLE
+QuicStreamManager::instantiatePeerStream(StreamId streamId) {
+  if (transportSettings_->notifyOnNewStreamsExplicitly) {
+    newPeerStreams_.push_back(streamId);
+  }
+  auto it = streams_.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(streamId),
+      std::forward_as_tuple(streamId, conn_));
+  addToStreamPriorityMap(it.first->second);
+  QUIC_STATS(conn_.statsCallback, onNewQuicStream);
+  return &it.first->second;
+}
+
+QuicStreamState* FOLLY_NULLABLE
 QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
   // This function maintains 3 invariants:
   // 1. Streams below nextAcceptableStreamId are streams that have been
@@ -365,13 +383,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       : openBidirectionalPeerStreams_;
   if (openPeerStreams.count(streamId)) {
     // Stream was already open, create the state for it lazily.
-    auto it = streams_.emplace(
-        std::piecewise_construct,
-        std::forward_as_tuple(streamId),
-        std::forward_as_tuple(streamId, conn_));
-    addToStreamPriorityMap(it.first->second);
-    QUIC_STATS(conn_.statsCallback, onNewQuicStream);
-    return &it.first->second;
+    return instantiatePeerStream(streamId);
   }
 
   auto& nextAcceptableStreamId = isUnidirectionalStream(streamId)
@@ -385,7 +397,9 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
       openPeerStreams,
       nextAcceptableStreamId,
       maxStreamId,
-      newPeerStreams_);
+      (transportSettings_->notifyOnNewStreamsExplicitly ? nullptr
+                                                        : &newPeerStreams_));
+
   if (openedResult == LocalErrorCode::CREATING_EXISTING_STREAM) {
     // Stream could be closed here.
     return nullptr;
@@ -394,13 +408,7 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
         "Exceeded stream limit.", TransportErrorCode::STREAM_LIMIT_ERROR);
   }
 
-  auto it = streams_.emplace(
-      std::piecewise_construct,
-      std::forward_as_tuple(streamId),
-      std::forward_as_tuple(streamId, conn_));
-  addToStreamPriorityMap(it.first->second);
-  QUIC_STATS(conn_.statsCallback, onNewQuicStream);
-  return &it.first->second;
+  return instantiatePeerStream(streamId);
 }
 
 folly::Expected<QuicStreamState*, LocalErrorCode>

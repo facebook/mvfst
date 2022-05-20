@@ -940,6 +940,9 @@ class QuicStreamManager {
   void addToStreamPriorityMap(const QuicStreamState& streamState);
   void notifyStreamPriorityChanges();
 
+  // helper to create a new peer stream.
+  QuicStreamState* FOLLY_NULLABLE instantiatePeerStream(StreamId streamId);
+
   QuicConnectionStateBase& conn_;
   QuicNodeType nodeType_;
 

@@ -534,7 +534,10 @@ class QuicTransportImplTest : public Test {
         kDefaultMaxStreamsBidirectional);
     conn.streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
+    maybeSetNotifyOnNewStreamsExplicitly();
   }
+
+  virtual void maybeSetNotifyOnNewStreamsExplicitly() {}
 
   auto getTxMatcher(StreamId id, uint64_t offset) {
     return MockByteEventCallback::getTxMatcher(id, offset);
@@ -561,18 +564,40 @@ INSTANTIATE_TEST_SUITE_P(
     QuicTransportImplTestClose,
     Values(true, false));
 
-TEST_F(QuicTransportImplTest, AckTimeoutExpiredWillResetTimeoutFlag) {
+struct DelayedStreamNotifsTestParam {
+  bool notifyOnNewStreamsExplicitly;
+};
+
+class QuicTransportImplTestBase
+    : public QuicTransportImplTest,
+      public WithParamInterface<DelayedStreamNotifsTestParam> {
+  void maybeSetNotifyOnNewStreamsExplicitly() override {
+    auto transportSettings = transport->getTransportSettings();
+    transportSettings.notifyOnNewStreamsExplicitly =
+        GetParam().notifyOnNewStreamsExplicitly;
+    transport->setTransportSettings(transportSettings);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicTransportImplTestBase,
+    QuicTransportImplTestBase,
+    ::testing::Values(
+        DelayedStreamNotifsTestParam{.notifyOnNewStreamsExplicitly = false},
+        DelayedStreamNotifsTestParam{.notifyOnNewStreamsExplicitly = true}));
+
+TEST_P(QuicTransportImplTestBase, AckTimeoutExpiredWillResetTimeoutFlag) {
   transport->invokeAckTimeout();
   EXPECT_FALSE(transport->transportConn->pendingEvents.scheduleAckTimeout);
 }
 
-TEST_F(QuicTransportImplTest, IdleTimeoutExpiredDestroysTransport) {
+TEST_P(QuicTransportImplTestBase, IdleTimeoutExpiredDestroysTransport) {
   EXPECT_CALL(connSetupCallback, onConnectionSetupError(_))
       .WillOnce(Invoke([&](auto) { transport = nullptr; }));
   transport->invokeIdleTimeout();
 }
 
-TEST_F(QuicTransportImplTest, IdleTimeoutStreamMaessage) {
+TEST_P(QuicTransportImplTestBase, IdleTimeoutStreamMaessage) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   auto stream3 = transport->createUnidirectionalStream().value();
@@ -597,7 +622,7 @@ TEST_F(QuicTransportImplTest, IdleTimeoutStreamMaessage) {
   transport->invokeIdleTimeout();
 }
 
-TEST_F(QuicTransportImplTest, WriteAckPacketUnsetsLooper) {
+TEST_P(QuicTransportImplTestBase, WriteAckPacketUnsetsLooper) {
   // start looper in running state first
   transport->writeLooper()->run(true);
 
@@ -621,7 +646,7 @@ TEST_F(QuicTransportImplTest, WriteAckPacketUnsetsLooper) {
   EXPECT_FALSE(transport->writeLooper()->isLoopCallbackScheduled());
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackDataAvailable) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailable) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StreamId stream3 = 0x6;
@@ -668,7 +693,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailable) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableNoReap) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableNoReap) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StreamId stream3 = 0x6;
@@ -714,7 +739,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableNoReap) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableOrdered) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackDataAvailableOrdered) {
   auto transportSettings = transport->getTransportSettings();
   transportSettings.orderedReadCallbacks = true;
   transport->setTransportSettings(transportSettings);
@@ -766,7 +791,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackDataAvailableOrdered) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackChangeReadCallback) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackChangeReadCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   NiceMock<MockReadCallback> readCb1;
@@ -798,7 +823,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackChangeReadCallback) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackUnsetAll) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -839,7 +864,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackUnsetAll) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackPauseResume) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackPauseResume) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb1;
@@ -873,7 +898,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackPauseResume) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackNoCallbackSet) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackNoCallbackSet) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   transport->addDataToStream(
@@ -886,14 +911,14 @@ TEST_F(QuicTransportImplTest, ReadCallbackNoCallbackSet) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackInvalidStream) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackInvalidStream) {
   NiceMock<MockReadCallback> readCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(transport->setReadCallback(invalidStream, &readCb1).hasError());
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadData) {
+TEST_P(QuicTransportImplTestBase, ReadData) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   NiceMock<MockReadCallback> readCb1;
@@ -927,7 +952,7 @@ TEST_F(QuicTransportImplTest, ReadData) {
 
 // TODO The finest copypasta around. We need a better story for parameterizing
 // unidirectional vs. bidirectional.
-TEST_F(QuicTransportImplTest, UnidirectionalReadData) {
+TEST_P(QuicTransportImplTestBase, UnidirectionalReadData) {
   auto stream1 = 0x6;
 
   NiceMock<MockReadCallback> readCb1;
@@ -958,7 +983,7 @@ TEST_F(QuicTransportImplTest, UnidirectionalReadData) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadDataUnsetReadCallbackInCallback) {
+TEST_P(QuicTransportImplTestBase, ReadDataUnsetReadCallbackInCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
@@ -976,7 +1001,7 @@ TEST_F(QuicTransportImplTest, ReadDataUnsetReadCallbackInCallback) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadDataNoCallback) {
+TEST_P(QuicTransportImplTestBase, ReadDataNoCallback) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
@@ -990,7 +1015,10 @@ TEST_F(QuicTransportImplTest, ReadDataNoCallback) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackForClientOutOfOrderStream) {
+  auto const notifyOnNewStreamsExplicitly =
+      transport->getTransportSettings().notifyOnNewStreamsExplicitly;
+
   InSequence dummy;
   StreamId clientOutOfOrderStream = 96;
   StreamId clientOutOfOrderStream2 = 76;
@@ -999,11 +1027,18 @@ TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
 
   NiceMock<MockReadCallback> streamRead;
 
-  for (StreamId start = 0x00; start <= clientOutOfOrderStream;
-       start += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
+  if (notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(clientOutOfOrderStream))
         .WillOnce(Invoke(
             [&](StreamId id) { transport->setReadCallback(id, &streamRead); }));
+  } else {
+    for (StreamId start = 0x00; start <= clientOutOfOrderStream;
+         start += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
+          .WillOnce(Invoke([&](StreamId id) {
+            transport->setReadCallback(id, &streamRead);
+          }));
+    }
   }
 
   EXPECT_CALL(streamRead, readAvailable(clientOutOfOrderStream))
@@ -1020,6 +1055,11 @@ TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
 
   transport->driveReadCallbacks();
 
+  if (notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(clientOutOfOrderStream2))
+        .WillOnce(Invoke(
+            [&](StreamId id) { transport->setReadCallback(id, &streamRead); }));
+  }
   transport->addDataToStream(
       clientOutOfOrderStream2, StreamBuffer(readData->clone(), 0, true));
 
@@ -1035,7 +1075,7 @@ TEST_F(QuicTransportImplTest, ReadCallbackForClientOutOfOrderStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadDataInvalidStream) {
+TEST_P(QuicTransportImplTestBase, ReadDataInvalidStream) {
   StreamId invalidStream = 10;
   EXPECT_THROW(
       transport->read(invalidStream, 100).thenOrThrow([&](auto) {}),
@@ -1043,7 +1083,7 @@ TEST_F(QuicTransportImplTest, ReadDataInvalidStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadError) {
+TEST_P(QuicTransportImplTestBase, ReadError) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   NiceMock<MockReadCallback> readCb1;
@@ -1058,7 +1098,7 @@ TEST_F(QuicTransportImplTest, ReadError) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ReadCallbackDeleteTransport) {
+TEST_P(QuicTransportImplTestBase, ReadCallbackDeleteTransport) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -1081,7 +1121,10 @@ TEST_F(QuicTransportImplTest, ReadCallbackDeleteTransport) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, onNewBidirectionalStreamCallback) {
+TEST_P(QuicTransportImplTestBase, onNewBidirectionalStreamCallback) {
+  auto const notifyOnNewStreamsExplicitly =
+      transport->getTransportSettings().notifyOnNewStreamsExplicitly;
+
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
 
   StreamId stream2 = 0x00;
@@ -1093,18 +1136,20 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamCallback) {
   transport->addDataToStream(stream3, StreamBuffer(readData->clone(), 0, true));
 
   StreamId uniStream3 = 0xa;
-  EXPECT_CALL(
-      connCallback,
-      onNewUnidirectionalStream(uniStream3 - 2 * kStreamIncrement));
-  EXPECT_CALL(
-      connCallback, onNewUnidirectionalStream(uniStream3 - kStreamIncrement));
+  if (!notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(
+        connCallback,
+        onNewUnidirectionalStream(uniStream3 - 2 * kStreamIncrement));
+    EXPECT_CALL(
+        connCallback, onNewUnidirectionalStream(uniStream3 - kStreamIncrement));
+  }
   EXPECT_CALL(connCallback, onNewUnidirectionalStream(uniStream3));
   transport->addDataToStream(
       uniStream3, StreamBuffer(readData->clone(), 0, true));
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, onNewStreamCallbackDoesNotRemove) {
+TEST_P(QuicTransportImplTestBase, onNewStreamCallbackDoesNotRemove) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   StreamId uniStream1 = 2;
   StreamId uniStream2 = uniStream1 + kStreamIncrement;
@@ -1123,16 +1168,25 @@ TEST_F(QuicTransportImplTest, onNewStreamCallbackDoesNotRemove) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, onNewBidirectionalStreamStreamOutOfOrder) {
+TEST_P(QuicTransportImplTestBase, onNewBidirectionalStreamStreamOutOfOrder) {
   InSequence dummy;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   StreamId biStream1 = 28;
   StreamId uniStream1 = 30;
-  for (StreamId id = 0x00; id <= biStream1; id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
-  }
-  for (StreamId id = 0x02; id <= uniStream1; id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewUnidirectionalStream(id));
+
+  auto const notifyOnNewStreamsExplicitly =
+      transport->getTransportSettings().notifyOnNewStreamsExplicitly;
+
+  if (notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(biStream1));
+    EXPECT_CALL(connCallback, onNewUnidirectionalStream(uniStream1));
+  } else {
+    for (StreamId id = 0x00; id <= biStream1; id += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
+    }
+    for (StreamId id = 0x02; id <= uniStream1; id += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewUnidirectionalStream(id));
+    }
   }
   transport->addDataToStream(
       biStream1, StreamBuffer(readData->clone(), 0, true));
@@ -1141,14 +1195,21 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamStreamOutOfOrder) {
 
   StreamId biStream2 = 56;
   StreamId uniStream2 = 38;
-  for (StreamId id = biStream1 + kStreamIncrement; id <= biStream2;
-       id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
+
+  if (notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(biStream2));
+    EXPECT_CALL(connCallback, onNewUnidirectionalStream(uniStream2));
+  } else {
+    for (StreamId id = biStream1 + kStreamIncrement; id <= biStream2;
+         id += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewBidirectionalStream(id));
+    }
+    for (StreamId id = uniStream1 + kStreamIncrement; id <= uniStream2;
+         id += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewUnidirectionalStream(id));
+    }
   }
-  for (StreamId id = uniStream1 + kStreamIncrement; id <= uniStream2;
-       id += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewUnidirectionalStream(id));
-  }
+
   transport->addDataToStream(
       biStream2, StreamBuffer(readData->clone(), 0, true));
   transport->addDataToStream(
@@ -1156,7 +1217,10 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamStreamOutOfOrder) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
+TEST_P(QuicTransportImplTestBase, onNewBidirectionalStreamSetReadCallback) {
+  auto const notifyOnNewStreamsExplicitly =
+      transport->getTransportSettings().notifyOnNewStreamsExplicitly;
+
   InSequence dummy;
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   transport->addCryptoData(StreamBuffer(readData->clone(), 0, true));
@@ -1170,18 +1234,25 @@ TEST_F(QuicTransportImplTest, onNewBidirectionalStreamSetReadCallback) {
 
   StreamId stream3 = 0x10;
   NiceMock<MockReadCallback> streamRead;
-  for (StreamId start = stream2 + kStreamIncrement; start <= stream3;
-       start += kStreamIncrement) {
-    EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
+  if (notifyOnNewStreamsExplicitly) {
+    EXPECT_CALL(connCallback, onNewBidirectionalStream(stream3))
         .WillOnce(Invoke(
             [&](StreamId id) { transport->setReadCallback(id, &streamRead); }));
+  } else {
+    for (StreamId start = stream2 + kStreamIncrement; start <= stream3;
+         start += kStreamIncrement) {
+      EXPECT_CALL(connCallback, onNewBidirectionalStream(start))
+          .WillOnce(Invoke([&](StreamId id) {
+            transport->setReadCallback(id, &streamRead);
+          }));
+    }
   }
   transport->addDataToStream(stream3, StreamBuffer(readData->clone(), 0, true));
   evb->loopOnce();
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, OnInvalidServerStream) {
+TEST_P(QuicTransportImplTestBase, OnInvalidServerStream) {
   EXPECT_CALL(
       connSetupCallback,
       onConnectionSetupError(IsError(TransportErrorCode::STREAM_STATE_ERROR)));
@@ -1195,7 +1266,7 @@ TEST_F(QuicTransportImplTest, OnInvalidServerStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateStream) {
+TEST_P(QuicTransportImplTestBase, CreateStream) {
   auto streamId = transport->createBidirectionalStream().value();
   auto streamId2 = transport->createBidirectionalStream().value();
   auto streamId3 = transport->createBidirectionalStream().value();
@@ -1207,7 +1278,7 @@ TEST_F(QuicTransportImplTest, CreateStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateUnidirectionalStream) {
+TEST_P(QuicTransportImplTestBase, CreateUnidirectionalStream) {
   auto streamId = transport->createUnidirectionalStream().value();
   auto streamId2 = transport->createUnidirectionalStream().value();
   auto streamId3 = transport->createUnidirectionalStream().value();
@@ -1219,7 +1290,7 @@ TEST_F(QuicTransportImplTest, CreateUnidirectionalStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateBothStream) {
+TEST_P(QuicTransportImplTestBase, CreateBothStream) {
   auto uniStreamId = transport->createUnidirectionalStream().value();
   auto biStreamId = transport->createBidirectionalStream().value();
   auto uniStreamId2 = transport->createUnidirectionalStream().value();
@@ -1238,7 +1309,7 @@ TEST_F(QuicTransportImplTest, CreateBothStream) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateStreamLimitsBidirectionalZero) {
+TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalZero) {
   transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
       0, true);
   EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 0);
@@ -1250,7 +1321,7 @@ TEST_F(QuicTransportImplTest, CreateStreamLimitsBidirectionalZero) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateStreamLimitsUnidirectionalZero) {
+TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalZero) {
   transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
       0, true);
   EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 0);
@@ -1262,7 +1333,7 @@ TEST_F(QuicTransportImplTest, CreateStreamLimitsUnidirectionalZero) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateStreamLimitsBidirectionalFew) {
+TEST_P(QuicTransportImplTestBase, CreateStreamLimitsBidirectionalFew) {
   transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
       10, true);
   EXPECT_EQ(transport->getNumOpenableBidirectionalStreams(), 10);
@@ -1277,7 +1348,7 @@ TEST_F(QuicTransportImplTest, CreateStreamLimitsBidirectionalFew) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CreateStreamLimitsUnidirectionalFew) {
+TEST_P(QuicTransportImplTestBase, CreateStreamLimitsUnidirectionalFew) {
   transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
       10, true);
   EXPECT_EQ(transport->getNumOpenableUnidirectionalStreams(), 10);
@@ -1292,7 +1363,7 @@ TEST_F(QuicTransportImplTest, CreateStreamLimitsUnidirectionalFew) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallback) {
+TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallback) {
   transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
       0, /*force=*/true);
 
@@ -1307,7 +1378,7 @@ TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallback) {
   transport->addMaxStreamsFrame(MaxStreamsFrame(1, /*isBidirectionalIn=*/true));
 }
 
-TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallbackAfterExausted) {
+TEST_P(QuicTransportImplTestBase, onBidiStreamsAvailableCallbackAfterExausted) {
   transport->transportConn->streamManager->setMaxLocalBidirectionalStreams(
       0, /*force=*/true);
 
@@ -1326,7 +1397,7 @@ TEST_F(QuicTransportImplTest, onBidiStreamsAvailableCallbackAfterExausted) {
       /*isBidirectionalIn=*/true));
 }
 
-TEST_F(QuicTransportImplTest, oneUniStreamsAvailableCallback) {
+TEST_P(QuicTransportImplTestBase, oneUniStreamsAvailableCallback) {
   transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
       0, /*force=*/true);
 
@@ -1343,7 +1414,7 @@ TEST_F(QuicTransportImplTest, oneUniStreamsAvailableCallback) {
       MaxStreamsFrame(1, /*isBidirectionalIn=*/false));
 }
 
-TEST_F(QuicTransportImplTest, onUniStreamsAvailableCallbackAfterExausted) {
+TEST_P(QuicTransportImplTestBase, onUniStreamsAvailableCallbackAfterExausted) {
   transport->transportConn->streamManager->setMaxLocalUnidirectionalStreams(
       0, /*force=*/true);
 
@@ -1360,7 +1431,7 @@ TEST_F(QuicTransportImplTest, onUniStreamsAvailableCallbackAfterExausted) {
       MaxStreamsFrame(2, /*isBidirectionalIn=*/false));
 }
 
-TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
+TEST_P(QuicTransportImplTestBase, ReadDataAlsoChecksLossAlarm) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   transport->writeChain(stream, folly::IOBuf::copyBuffer("Hey"), true);
@@ -1375,7 +1446,7 @@ TEST_F(QuicTransportImplTest, ReadDataAlsoChecksLossAlarm) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
+TEST_P(QuicTransportImplTestBase, ConnectionErrorOnWrite) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(*socketPtr, write(_, _))
@@ -1391,7 +1462,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorOnWrite) {
       QuicErrorCode(LocalErrorCode::CONNECTION_ABANDONED));
 }
 
-TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
+TEST_P(QuicTransportImplTestBase, ReadErrorUnsanitizedErrorMsg) {
   transport->setServerConnectionId();
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
@@ -1417,7 +1488,7 @@ TEST_F(QuicTransportImplTest, ReadErrorUnsanitizedErrorMsg) {
   EXPECT_TRUE(transport->isClosed());
 }
 
-TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
+TEST_P(QuicTransportImplTestBase, ConnectionErrorUnhandledException) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_CALL(
@@ -1440,7 +1511,7 @@ TEST_F(QuicTransportImplTest, ConnectionErrorUnhandledException) {
       QuicErrorCode(TransportErrorCode::INTERNAL_ERROR));
 }
 
-TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
+TEST_P(QuicTransportImplTestBase, LossTimeoutNoLessThanTickInterval) {
   auto tickInterval = evb->timer().getTickInterval();
   transport->scheduleLossTimeout(tickInterval - 1ms);
   EXPECT_NEAR(
@@ -1449,7 +1520,7 @@ TEST_F(QuicTransportImplTest, LossTimeoutNoLessThanTickInterval) {
       2);
 }
 
-TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
+TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadError) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   transport->transportConn->qLogger = qLogger;
   auto stream1 = transport->createBidirectionalStream().value();
@@ -1474,7 +1545,7 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadError) {
   EXPECT_EQ(event->update, getClosingStream("1"));
 }
 
-TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
+TEST_P(QuicTransportImplTestBase, CloseStreamAfterReadFin) {
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockReadCallback> readCb2;
   transport->setReadCallback(stream2, &readCb2);
@@ -1493,7 +1564,7 @@ TEST_F(QuicTransportImplTest, CloseStreamAfterReadFin) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {
+TEST_P(QuicTransportImplTestBase, CloseTransportCleansupOutstandingCounters) {
   transport->transportConn->outstandings
       .packetCount[PacketNumberSpace::Handshake] = 200;
   transport->closeNow(folly::none);
@@ -1503,7 +1574,7 @@ TEST_F(QuicTransportImplTest, CloseTransportCleansupOutstandingCounters) {
           .packetCount[PacketNumberSpace::Handshake]);
 }
 
-TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetAll) {
+TEST_P(QuicTransportImplTestBase, DeliveryCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockDeliveryCallback> dcb1;
@@ -1523,7 +1594,7 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetAll) {
   transport->close(folly::none);
 }
 
-TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
+TEST_P(QuicTransportImplTestBase, DeliveryCallbackUnsetOne) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   NiceMock<MockDeliveryCallback> dcb1;
@@ -1543,7 +1614,7 @@ TEST_F(QuicTransportImplTest, DeliveryCallbackUnsetOne) {
   transport->close(folly::none);
 }
 
-TEST_F(QuicTransportImplTest, ByteEventCallbacksManagementSingleStream) {
+TEST_P(QuicTransportImplTestBase, ByteEventCallbacksManagementSingleStream) {
   auto stream = transport->createBidirectionalStream().value();
   uint64_t offset1 = 10, offset2 = 20;
 
@@ -1629,7 +1700,9 @@ TEST_F(QuicTransportImplTest, ByteEventCallbacksManagementSingleStream) {
               ackEvent2, TestByteEventCallback::Status::RECEIVED)));
 }
 
-TEST_F(QuicTransportImplTest, ByteEventCallbacksManagementDifferentStreams) {
+TEST_P(
+    QuicTransportImplTestBase,
+    ByteEventCallbacksManagementDifferentStreams) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -1703,7 +1776,7 @@ TEST_F(QuicTransportImplTest, ByteEventCallbacksManagementDifferentStreams) {
               ackEvent2, TestByteEventCallback::Status::CANCELLED)));
 }
 
-TEST_F(QuicTransportImplTest, RegisterTxDeliveryCallbackLowerThanExpected) {
+TEST_P(QuicTransportImplTestBase, RegisterTxDeliveryCallbackLowerThanExpected) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -1767,7 +1840,9 @@ TEST_F(
   Mock::VerifyAndClearExpectations(&dcb);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackMultipleRegistrationsTx) {
+TEST_P(
+    QuicTransportImplTestBase,
+    RegisterDeliveryCallbackMultipleRegistrationsTx) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -1839,7 +1914,9 @@ TEST_F(
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackMultipleRecipientsTx) {
+TEST_P(
+    QuicTransportImplTestBase,
+    RegisterDeliveryCallbackMultipleRecipientsTx) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -1875,7 +1952,9 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackMultipleRecipientsTx) {
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackMultipleRecipientsAck) {
+TEST_P(
+    QuicTransportImplTestBase,
+    RegisterDeliveryCallbackMultipleRecipientsAck) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -1911,7 +1990,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackMultipleRecipientsAck) {
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackAsyncDeliveryTx) {
+TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryTx) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -1956,7 +2035,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackAsyncDeliveryTx) {
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
-TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackAsyncDeliveryAck) {
+TEST_P(QuicTransportImplTestBase, RegisterDeliveryCallbackAsyncDeliveryAck) {
   auto stream = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
   StrictMock<MockByteEventCallback> txcb2;
@@ -2002,7 +2081,7 @@ TEST_F(QuicTransportImplTest, RegisterDeliveryCallbackAsyncDeliveryAck) {
   Mock::VerifyAndClearExpectations(&txcb2);
 }
 
-TEST_F(QuicTransportImplTest, CancelAllByteEventCallbacks) {
+TEST_P(QuicTransportImplTestBase, CancelAllByteEventCallbacks) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -2079,7 +2158,7 @@ TEST_F(QuicTransportImplTest, CancelAllByteEventCallbacks) {
   Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStream) {
+TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksForStream) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
@@ -2155,7 +2234,7 @@ TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStream) {
   Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStreamWithOffset) {
+TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksForStreamWithOffset) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
@@ -2333,7 +2412,7 @@ TEST_F(QuicTransportImplTest, CancelByteEventCallbacksForStreamWithOffset) {
           ByteEvent::Type::ACK, stream2));
 }
 
-TEST_F(QuicTransportImplTest, CancelByteEventCallbacksTx) {
+TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksTx) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
@@ -2415,7 +2494,7 @@ TEST_F(QuicTransportImplTest, CancelByteEventCallbacksTx) {
   Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, CancelByteEventCallbacksDelivery) {
+TEST_P(QuicTransportImplTestBase, CancelByteEventCallbacksDelivery) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
   StrictMock<MockByteEventCallback> txcb1;
@@ -2497,7 +2576,9 @@ TEST_F(QuicTransportImplTest, CancelByteEventCallbacksDelivery) {
   Mock::VerifyAndClearExpectations(&dcb2);
 }
 
-TEST_F(QuicTransportImplTest, TestNotifyPendingConnWriteOnCloseWithoutError) {
+TEST_P(
+    QuicTransportImplTestBase,
+    TestNotifyPendingConnWriteOnCloseWithoutError) {
   NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(
       wcb,
@@ -2524,7 +2605,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingConnWriteOnCloseWithError) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, TestNotifyPendingWriteWithActiveCallback) {
+TEST_P(QuicTransportImplTestBase, TestNotifyPendingWriteWithActiveCallback) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(wcb, onStreamWriteReady(stream, _));
@@ -2535,7 +2616,7 @@ TEST_F(QuicTransportImplTest, TestNotifyPendingWriteWithActiveCallback) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, TestNotifyPendingWriteOnCloseWithoutError) {
+TEST_P(QuicTransportImplTestBase, TestNotifyPendingWriteOnCloseWithoutError) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(
@@ -2565,7 +2646,7 @@ TEST_P(QuicTransportImplTestClose, TestNotifyPendingWriteOnCloseWithError) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, TestTransportCloseWithMaxPacketNumber) {
+TEST_P(QuicTransportImplTestBase, TestTransportCloseWithMaxPacketNumber) {
   transport->setServerConnectionId();
   transport->transportConn->pendingEvents.closeTransport = false;
   EXPECT_NO_THROW(transport->invokeWriteSocketData());
@@ -2574,7 +2655,7 @@ TEST_F(QuicTransportImplTest, TestTransportCloseWithMaxPacketNumber) {
   EXPECT_THROW(transport->invokeWriteSocketData(), QuicTransportException);
 }
 
-TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
+TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithActiveStream) {
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
 
@@ -2633,7 +2714,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithActiveStream) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
+TEST_P(QuicTransportImplTestBase, TestGracefulCloseWithNoActiveStream) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   NiceMock<MockWriteCallback> wcbConn;
@@ -2683,7 +2764,7 @@ TEST_F(QuicTransportImplTest, TestGracefulCloseWithNoActiveStream) {
           .hasError());
 }
 
-TEST_F(QuicTransportImplTest, TestImmediateClose) {
+TEST_P(QuicTransportImplTestBase, TestImmediateClose) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   NiceMock<MockWriteCallback> wcbConn;
@@ -2744,7 +2825,7 @@ TEST_F(QuicTransportImplTest, TestImmediateClose) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, ResetStreamUnsetWriteCallback) {
+TEST_P(QuicTransportImplTestBase, ResetStreamUnsetWriteCallback) {
   auto stream = transport->createBidirectionalStream().value();
   NiceMock<MockWriteCallback> wcb;
   EXPECT_CALL(wcb, onStreamWriteError(stream, _)).Times(0);
@@ -2755,7 +2836,7 @@ TEST_F(QuicTransportImplTest, ResetStreamUnsetWriteCallback) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, ResetAllNonControlStreams) {
+TEST_P(QuicTransportImplTestBase, ResetAllNonControlStreams) {
   auto stream1 = transport->createBidirectionalStream().value();
   ASSERT_FALSE(transport->setControlStream(stream1));
   NiceMock<MockWriteCallback> wcb1;
@@ -2796,20 +2877,20 @@ TEST_F(QuicTransportImplTest, ResetAllNonControlStreams) {
   transport->unsetAllReadCallbacks();
 }
 
-TEST_F(QuicTransportImplTest, DestroyWithoutClosing) {
+TEST_P(QuicTransportImplTestBase, DestroyWithoutClosing) {
   EXPECT_CALL(connCallback, onConnectionError(_)).Times(0);
   EXPECT_CALL(connCallback, onConnectionEnd()).Times(0);
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, UncleanShutdownEventBase) {
+TEST_P(QuicTransportImplTestBase, UncleanShutdownEventBase) {
   // if abruptly shutting down the eventbase we should avoid scheduling
   // any new timer.
   transport->setIdleTimeout();
   evb.reset();
 }
 
-TEST_F(QuicTransportImplTest, GetLocalAddressBoundSocket) {
+TEST_P(QuicTransportImplTestBase, GetLocalAddressBoundSocket) {
   SocketAddress addr("127.0.0.1", 443);
   EXPECT_CALL(*socketPtr, isBound()).WillOnce(Return(true));
   EXPECT_CALL(*socketPtr, address()).WillRepeatedly(ReturnRef(addr));
@@ -2817,13 +2898,13 @@ TEST_F(QuicTransportImplTest, GetLocalAddressBoundSocket) {
   EXPECT_TRUE(localAddr == addr);
 }
 
-TEST_F(QuicTransportImplTest, GetLocalAddressUnboundSocket) {
+TEST_P(QuicTransportImplTestBase, GetLocalAddressUnboundSocket) {
   EXPECT_CALL(*socketPtr, isBound()).WillOnce(Return(false));
   SocketAddress localAddr = transport->getLocalAddress();
   EXPECT_FALSE(localAddr.isInitialized());
 }
 
-TEST_F(QuicTransportImplTest, GetLocalAddressBadSocket) {
+TEST_P(QuicTransportImplTestBase, GetLocalAddressBadSocket) {
   auto badTransport = std::make_shared<TestQuicTransport>(
       evb.get(), nullptr, &connSetupCallback, &connCallback);
   badTransport->closeWithoutWrite();
@@ -2831,7 +2912,7 @@ TEST_F(QuicTransportImplTest, GetLocalAddressBadSocket) {
   EXPECT_FALSE(localAddr.isInitialized());
 }
 
-TEST_F(QuicTransportImplTest, AsyncStreamFlowControlWrite) {
+TEST_P(QuicTransportImplTestBase, AsyncStreamFlowControlWrite) {
   transport->transportConn->oneRttWriteCipher = test::createNoOpAead();
   auto stream = transport->createBidirectionalStream().value();
   auto streamState = transport->transportConn->streamManager->getStream(stream);
@@ -2846,7 +2927,7 @@ TEST_F(QuicTransportImplTest, AsyncStreamFlowControlWrite) {
   EXPECT_EQ(4000, streamState->flowControlState.advertisedMaxOffset);
 }
 
-TEST_F(QuicTransportImplTest, ExceptionInWriteLooperDoesNotCrash) {
+TEST_P(QuicTransportImplTestBase, ExceptionInWriteLooperDoesNotCrash) {
   auto stream = transport->createBidirectionalStream().value();
   transport->setReadCallback(stream, nullptr);
   transport->writeChain(stream, IOBuf::copyBuffer("hello"), true, nullptr);
@@ -2933,7 +3014,7 @@ TEST_P(QuicTransportImplTestUniBidi, AppIdleTestOnlyControlStreams) {
   transport->closeStream(ctrlStream2);
 }
 
-TEST_F(QuicTransportImplTest, UnidirectionalInvalidReadFuncs) {
+TEST_P(QuicTransportImplTestBase, UnidirectionalInvalidReadFuncs) {
   auto stream = transport->createUnidirectionalStream().value();
   EXPECT_THROW(
       transport->read(stream, 100).thenOrThrow([&](auto) {}),
@@ -2953,7 +3034,7 @@ TEST_F(QuicTransportImplTest, UnidirectionalInvalidReadFuncs) {
       folly::BadExpectedAccess<LocalErrorCode>);
 }
 
-TEST_F(QuicTransportImplTest, UnidirectionalInvalidWriteFuncs) {
+TEST_P(QuicTransportImplTestBase, UnidirectionalInvalidWriteFuncs) {
   auto readData = folly::IOBuf::copyBuffer("actual stream data");
   StreamId stream = 0x6;
   transport->addDataToStream(stream, StreamBuffer(readData->clone(), 0, true));
@@ -3005,31 +3086,31 @@ TEST_P(QuicTransportImplTestUniBidi, IsClientStream) {
   EXPECT_FALSE(transport->isClientStream(stream));
 }
 
-TEST_F(QuicTransportImplTest, IsUnidirectionalStream) {
+TEST_P(QuicTransportImplTestBase, IsUnidirectionalStream) {
   auto stream = transport->createUnidirectionalStream().value();
   EXPECT_TRUE(transport->isUnidirectionalStream(stream));
 }
 
-TEST_F(QuicTransportImplTest, IsBidirectionalStream) {
+TEST_P(QuicTransportImplTestBase, IsBidirectionalStream) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_TRUE(transport->isBidirectionalStream(stream));
 }
 
-TEST_F(QuicTransportImplTest, GetStreamDirectionalityUnidirectional) {
+TEST_P(QuicTransportImplTestBase, GetStreamDirectionalityUnidirectional) {
   auto stream = transport->createUnidirectionalStream().value();
   EXPECT_EQ(
       StreamDirectionality::Unidirectional,
       transport->getStreamDirectionality(stream));
 }
 
-TEST_F(QuicTransportImplTest, GetStreamDirectionalityBidirectional) {
+TEST_P(QuicTransportImplTestBase, GetStreamDirectionalityBidirectional) {
   auto stream = transport->createBidirectionalStream().value();
   EXPECT_EQ(
       StreamDirectionality::Bidirectional,
       transport->getStreamDirectionality(stream));
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackDataAvailable) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -3072,7 +3153,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackDataAvailable) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekError) {
+TEST_P(QuicTransportImplTestBase, PeekError) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   NiceMock<MockPeekCallback> peekCb1;
@@ -3092,7 +3173,7 @@ TEST_F(QuicTransportImplTest, PeekError) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackUnsetAll) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackUnsetAll) {
   auto stream1 = transport->createBidirectionalStream().value();
   auto stream2 = transport->createBidirectionalStream().value();
 
@@ -3131,7 +3212,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackUnsetAll) {
   transport->driveReadCallbacks();
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackChangePeekCallback) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackChangePeekCallback) {
   InSequence enforceOrder;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -3156,7 +3237,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackChangePeekCallback) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackPauseResume) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackPauseResume) {
   InSequence enforceOrder;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -3184,7 +3265,7 @@ TEST_F(QuicTransportImplTest, PeekCallbackPauseResume) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackNoCallbackSet) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackNoCallbackSet) {
   auto stream1 = transport->createBidirectionalStream().value();
 
   transport->addDataToStream(
@@ -3197,14 +3278,14 @@ TEST_F(QuicTransportImplTest, PeekCallbackNoCallbackSet) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekCallbackInvalidStream) {
+TEST_P(QuicTransportImplTestBase, PeekCallbackInvalidStream) {
   NiceMock<MockPeekCallback> peekCb1;
   StreamId invalidStream = 10;
   EXPECT_TRUE(transport->setPeekCallback(invalidStream, &peekCb1).hasError());
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekData) {
+TEST_P(QuicTransportImplTestBase, PeekData) {
   InSequence enforceOrder;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -3233,7 +3314,7 @@ TEST_F(QuicTransportImplTest, PeekData) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekDataWithError) {
+TEST_P(QuicTransportImplTestBase, PeekDataWithError) {
   InSequence enforceOrder;
 
   auto streamId = transport->createBidirectionalStream().value();
@@ -3263,7 +3344,7 @@ TEST_F(QuicTransportImplTest, PeekDataWithError) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, ConsumeDataWithError) {
+TEST_P(QuicTransportImplTestBase, ConsumeDataWithError) {
   InSequence enforceOrder;
 
   auto streamId = transport->createBidirectionalStream().value();
@@ -3286,7 +3367,7 @@ TEST_F(QuicTransportImplTest, ConsumeDataWithError) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
+TEST_P(QuicTransportImplTestBase, PeekConsumeReadTest) {
   InSequence enforceOrder;
 
   auto stream1 = transport->createBidirectionalStream().value();
@@ -3392,7 +3473,7 @@ TEST_F(QuicTransportImplTest, PeekConsumeReadTest) {
   transport.reset();
 }
 
-TEST_F(QuicTransportImplTest, UpdatePeekableListNoDataTest) {
+TEST_P(QuicTransportImplTestBase, UpdatePeekableListNoDataTest) {
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
@@ -3405,7 +3486,7 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListNoDataTest) {
   EXPECT_EQ(0, conn->streamManager->peekableStreams().count(streamId));
 }
 
-TEST_F(QuicTransportImplTest, UpdatePeekableListWithDataTest) {
+TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithDataTest) {
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
@@ -3424,7 +3505,7 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListWithDataTest) {
   EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
 }
 
-TEST_F(QuicTransportImplTest, UpdatePeekableListEmptyListTest) {
+TEST_P(QuicTransportImplTestBase, UpdatePeekableListEmptyListTest) {
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   auto stream = transport->getStream(streamId);
@@ -3445,7 +3526,7 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListEmptyListTest) {
   EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
 }
 
-TEST_F(QuicTransportImplTest, UpdatePeekableListWithStreamErrorTest) {
+TEST_P(QuicTransportImplTestBase, UpdatePeekableListWithStreamErrorTest) {
   auto streamId = transport->createBidirectionalStream().value();
   const auto& conn = transport->transportConn;
   // Add some data to the stream.
@@ -3463,7 +3544,7 @@ TEST_F(QuicTransportImplTest, UpdatePeekableListWithStreamErrorTest) {
   EXPECT_EQ(1, conn->streamManager->peekableStreams().count(streamId));
 }
 
-TEST_F(QuicTransportImplTest, SuccessfulPing) {
+TEST_P(QuicTransportImplTestBase, SuccessfulPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
   TestPingCallback pingCallback;
@@ -3478,7 +3559,7 @@ TEST_F(QuicTransportImplTest, SuccessfulPing) {
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
 
-TEST_F(QuicTransportImplTest, FailedPing) {
+TEST_P(QuicTransportImplTestBase, FailedPing) {
   auto conn = transport->transportConn;
   std::chrono::milliseconds interval(10);
   TestPingCallback pingCallback;
@@ -3492,7 +3573,7 @@ TEST_F(QuicTransportImplTest, FailedPing) {
   EXPECT_EQ(conn->pendingEvents.cancelPingTimeout, false);
 }
 
-TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
+TEST_P(QuicTransportImplTestBase, HandleKnobCallbacks) {
   auto conn = transport->transportConn;
 
   LegacyObserver::EventSet eventSet;
@@ -3530,7 +3611,7 @@ TEST_F(QuicTransportImplTest, HandleKnobCallbacks) {
   EXPECT_TRUE(transport->removeObserver(obs3.get()));
 }
 
-TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
+TEST_P(QuicTransportImplTestBase, StreamWriteCallbackUnregister) {
   auto stream = transport->createBidirectionalStream().value();
   // Unset before set
   EXPECT_FALSE(transport->unregisterStreamWriteCallback(stream));
@@ -3564,7 +3645,7 @@ TEST_F(QuicTransportImplTest, StreamWriteCallbackUnregister) {
   evb->loopOnce();
 }
 
-TEST_F(QuicTransportImplTest, ObserverAttachRemove) {
+TEST_P(QuicTransportImplTestBase, ObserverAttachRemove) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3575,7 +3656,7 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemove) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultiple) {
+TEST_P(QuicTransportImplTestBase, ObserverAttachRemoveMultiple) {
   auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
@@ -3600,7 +3681,7 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultiple) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultipleReverse) {
+TEST_P(QuicTransportImplTestBase, ObserverAttachRemoveMultipleReverse) {
   auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
@@ -3625,13 +3706,13 @@ TEST_F(QuicTransportImplTest, ObserverAttachRemoveMultipleReverse) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverRemoveMissing) {
+TEST_P(QuicTransportImplTestBase, ObserverRemoveMissing) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_FALSE(transport->removeObserver(cb.get()));
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverDestroyTransport) {
+TEST_P(QuicTransportImplTestBase, ObserverDestroyTransport) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3643,7 +3724,7 @@ TEST_F(QuicTransportImplTest, ObserverDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
+TEST_P(QuicTransportImplTestBase, ObserverCloseNoErrorThenDestroyTransport) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3662,7 +3743,7 @@ TEST_F(QuicTransportImplTest, ObserverCloseNoErrorThenDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
+TEST_P(QuicTransportImplTestBase, ObserverCloseWithErrorThenDestroyTransport) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3681,7 +3762,7 @@ TEST_F(QuicTransportImplTest, ObserverCloseWithErrorThenDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportImplTest, ObserverDetachObserverImmediately) {
+TEST_P(QuicTransportImplTestBase, ObserverDetachObserverImmediately) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3693,7 +3774,7 @@ TEST_F(QuicTransportImplTest, ObserverDetachObserverImmediately) {
   EXPECT_THAT(transport->getObservers(), IsEmpty());
 }
 
-TEST_F(QuicTransportImplTest, ObserverDetachObserverAfterTransportClose) {
+TEST_P(QuicTransportImplTestBase, ObserverDetachObserverAfterTransportClose) {
   auto cb = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb, observerAttach(transport.get()));
   transport->addObserver(cb.get());
@@ -3727,7 +3808,7 @@ TEST_F(
   Mock::VerifyAndClearExpectations(cb.get());
 }
 
-TEST_F(QuicTransportImplTest, ObserverMultipleAttachRemove) {
+TEST_P(QuicTransportImplTestBase, ObserverMultipleAttachRemove) {
   auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
@@ -3754,7 +3835,7 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachRemove) {
   transport = nullptr;
 }
 
-TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
+TEST_P(QuicTransportImplTestBase, ObserverMultipleAttachDestroyTransport) {
   auto cb1 = std::make_unique<StrictMock<MockLegacyObserver>>();
   EXPECT_CALL(*cb1, observerAttach(transport.get()));
   transport->addObserver(cb1.get());
@@ -3776,7 +3857,7 @@ TEST_F(QuicTransportImplTest, ObserverMultipleAttachDestroyTransport) {
   Mock::VerifyAndClearExpectations(cb2.get());
 }
 
-TEST_F(QuicTransportImplTest, ObserverDetachAndAttachEvb) {
+TEST_P(QuicTransportImplTestBase, ObserverDetachAndAttachEvb) {
   LegacyObserver::EventSet eventSet;
   eventSet.enable(SocketObserverInterface::Events::evbEvents);
 
@@ -3824,13 +3905,13 @@ TEST_F(QuicTransportImplTest, ObserverDetachAndAttachEvb) {
   EXPECT_TRUE(transport->removeObserver(obs3.get()));
 }
 
-TEST_F(QuicTransportImplTest, GetConnectionStatsSmoke) {
+TEST_P(QuicTransportImplTestBase, GetConnectionStatsSmoke) {
   auto stats = transport->getConnectionsStats();
   EXPECT_EQ(stats.congestionController, CongestionControlType::Cubic);
   EXPECT_EQ(stats.clientConnectionId, "0a090807");
 }
 
-TEST_F(QuicTransportImplTest, DatagramCallbackDatagramAvailable) {
+TEST_P(QuicTransportImplTestBase, DatagramCallbackDatagramAvailable) {
   NiceMock<MockDatagramCallback> datagramCb;
   transport->enableDatagram();
   transport->setDatagramCallback(&datagramCb);
@@ -3839,7 +3920,7 @@ TEST_F(QuicTransportImplTest, DatagramCallbackDatagramAvailable) {
   transport->driveReadCallbacks();
 }
 
-TEST_F(QuicTransportImplTest, ZeroLengthDatagram) {
+TEST_P(QuicTransportImplTestBase, ZeroLengthDatagram) {
   NiceMock<MockDatagramCallback> datagramCb;
   transport->enableDatagram();
   transport->setDatagramCallback(&datagramCb);
@@ -3853,7 +3934,7 @@ TEST_F(QuicTransportImplTest, ZeroLengthDatagram) {
   EXPECT_EQ(datagrams->front()->computeChainDataLength(), 0);
 }
 
-TEST_F(QuicTransportImplTest, ZeroLengthDatagramBufs) {
+TEST_P(QuicTransportImplTestBase, ZeroLengthDatagramBufs) {
   NiceMock<MockDatagramCallback> datagramCb;
   transport->enableDatagram();
   transport->setDatagramCallback(&datagramCb);
@@ -3869,7 +3950,7 @@ TEST_F(QuicTransportImplTest, ZeroLengthDatagramBufs) {
   EXPECT_EQ(datagrams->front().bufQueue().front()->computeChainDataLength(), 0);
 }
 
-TEST_F(QuicTransportImplTest, Cmsgs) {
+TEST_P(QuicTransportImplTestBase, Cmsgs) {
   transport->setServerConnectionId();
   folly::SocketOptionMap cmsgs;
   cmsgs[{IPPROTO_IP, IP_TOS}] = 123;
@@ -3880,7 +3961,7 @@ TEST_F(QuicTransportImplTest, Cmsgs) {
   transport->appendCmsgs(cmsgs);
 }
 
-TEST_F(QuicTransportImplTest, BackgroundModeChangeWithStreamChanges) {
+TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
   // Verify that background mode is correctly turned on and off
   // based upon stream creation, priority changes, stream removal.
   // For different steps try local (uni/bi)directional streams and remote

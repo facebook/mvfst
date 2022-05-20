@@ -20,7 +20,13 @@ using namespace testing;
 namespace quic {
 namespace test {
 
-class QuicStreamManagerTest : public Test {
+struct StreamManagerTestParam {
+  bool notifyOnNewStreamsExplicitly;
+};
+
+class QuicStreamManagerTest
+    : public Test,
+      public WithParamInterface<StreamManagerTestParam> {
  public:
   QuicStreamManagerTest()
       : conn(FizzServerQuicHandshakeContext::Builder().build()) {}
@@ -41,13 +47,17 @@ class QuicStreamManagerTest : public Test {
         std::make_unique<NiceMock<MockCongestionController>>();
     mockController = congestionController.get();
     conn.congestionController = std::move(congestionController);
+
+    conn.transportSettings.notifyOnNewStreamsExplicitly =
+        GetParam().notifyOnNewStreamsExplicitly;
+    conn.streamManager->refreshTransportSettings(conn.transportSettings);
   }
 
   QuicServerConnectionState conn;
   MockCongestionController* mockController;
 };
 
-TEST_F(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
+TEST_P(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
   auto& manager = *conn.streamManager;
   auto stream = manager.createNextBidirectionalStream();
   auto streamId = stream.value()->id;
@@ -62,7 +72,7 @@ TEST_F(QuicStreamManagerTest, SkipRedundantPriorityUpdate) {
       !currentPriority.incremental));
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
 
@@ -81,7 +91,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCreateBidiStream) {
   EXPECT_EQ(manager.getStream(id), nullptr);
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleCreateUnidiStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleCreateUnidiStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
@@ -96,7 +106,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCreateUnidiStream) {
   EXPECT_TRUE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleExistingLocalStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleExistingLocalStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
@@ -112,7 +122,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleExistingLocalStream) {
   EXPECT_TRUE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleStreamAsControl) {
+TEST_P(QuicStreamManagerTest, TestAppIdleStreamAsControl) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
 
@@ -128,7 +138,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleStreamAsControl) {
   EXPECT_FALSE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleCreatePeerStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleCreatePeerStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   StreamId id = 0;
@@ -145,7 +155,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCreatePeerStream) {
   EXPECT_FALSE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleExistingPeerStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleExistingPeerStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
@@ -162,7 +172,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleExistingPeerStream) {
   EXPECT_TRUE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   StreamId id = 0;
@@ -178,7 +188,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleClosePeerStream) {
   EXPECT_EQ(manager.getStream(id), nullptr);
 }
 
-TEST_F(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
+TEST_P(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   auto& manager = *conn.streamManager;
   EXPECT_FALSE(manager.isAppIdle());
   EXPECT_CALL(*mockController, setAppIdle(false, _)).Times(0);
@@ -198,7 +208,7 @@ TEST_F(QuicStreamManagerTest, TestAppIdleCloseControlStream) {
   EXPECT_TRUE(manager.isAppIdle());
 }
 
-TEST_F(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
+TEST_P(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
   conn.transportSettings.advertisedInitialMaxStreamsUni = 100;
@@ -229,7 +239,7 @@ TEST_F(QuicStreamManagerTest, StreamLimitWindowedUpdate) {
   EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
 }
 
-TEST_F(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
+TEST_P(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
   manager.refreshTransportSettings(conn.transportSettings);
@@ -247,7 +257,7 @@ TEST_F(QuicStreamManagerTest, StreamLimitNoWindowedUpdate) {
   EXPECT_FALSE(update);
 }
 
-TEST_F(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
+TEST_P(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsBidi = 100;
   manager.refreshTransportSettings(conn.transportSettings);
@@ -268,7 +278,7 @@ TEST_F(QuicStreamManagerTest, StreamLimitManyWindowedUpdate) {
   EXPECT_FALSE(manager.remoteUnidirectionalStreamLimitUpdate());
 }
 
-TEST_F(QuicStreamManagerTest, StreamLimitIncrementBidi) {
+TEST_P(QuicStreamManagerTest, StreamLimitIncrementBidi) {
   auto& manager = *conn.streamManager;
   manager.setMaxLocalBidirectionalStreams(100, true);
   manager.refreshTransportSettings(conn.transportSettings);
@@ -283,7 +293,7 @@ TEST_F(QuicStreamManagerTest, StreamLimitIncrementBidi) {
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
-TEST_F(QuicStreamManagerTest, ConsumeStopSending) {
+TEST_P(QuicStreamManagerTest, ConsumeStopSending) {
   auto& manager = *conn.streamManager;
   manager.addStopSending(0, GenericApplicationErrorCode::NO_ERROR);
   EXPECT_EQ(manager.stopSendingStreams().size(), 1);
@@ -294,7 +304,7 @@ TEST_F(QuicStreamManagerTest, ConsumeStopSending) {
   EXPECT_TRUE(manager.stopSendingStreams().empty());
 }
 
-TEST_F(QuicStreamManagerTest, StreamLimitIncrementUni) {
+TEST_P(QuicStreamManagerTest, StreamLimitIncrementUni) {
   auto& manager = *conn.streamManager;
   manager.setMaxLocalUnidirectionalStreams(100, true);
   manager.refreshTransportSettings(conn.transportSettings);
@@ -309,7 +319,7 @@ TEST_F(QuicStreamManagerTest, StreamLimitIncrementUni) {
   EXPECT_EQ(s.value()->id, max + detail::kStreamIncrement);
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamId) {
+TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamId) {
   auto& manager = *conn.streamManager;
 
   // local is server
@@ -344,7 +354,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamId) {
       serverStreamId3, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamId) {
+TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamId) {
   auto& manager = *conn.streamManager;
 
   // local is server
@@ -378,7 +388,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamId) {
       serverStreamId3, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
+TEST_P(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   manager.setMaxLocalUnidirectionalStreams(2, true);
 
@@ -410,7 +420,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptableLocalUnidirectionalStreamIdLimit) {
   EXPECT_EQ(folly::none, manager.nextAcceptableLocalUnidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
+TEST_P(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   manager.setMaxLocalBidirectionalStreams(2, true);
 
@@ -441,7 +451,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptableLocalBidirectionalStreamIdLimit) {
   EXPECT_EQ(folly::none, manager.nextAcceptableLocalBidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
+TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
   auto& manager = *conn.streamManager;
 
   // local is server, so remote/peer is client
@@ -476,7 +486,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamId) {
       clientStreamId3, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamId) {
+TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamId) {
   auto& manager = *conn.streamManager;
 
   // local is server, so remote/peer is client
@@ -504,7 +514,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamId) {
   EXPECT_EQ(clientStreamId3, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
+TEST_P(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsUni = 2;
   manager.refreshTransportSettings(conn.transportSettings);
@@ -537,7 +547,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptablePeerUnidirectionalStreamIdLimit) {
   EXPECT_EQ(folly::none, manager.nextAcceptablePeerUnidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
+TEST_P(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
   auto& manager = *conn.streamManager;
   conn.transportSettings.advertisedInitialMaxStreamsBidi = 2;
   manager.refreshTransportSettings(conn.transportSettings);
@@ -565,7 +575,7 @@ TEST_F(QuicStreamManagerTest, NextAcceptablePeerBidirectionalStreamIdLimit) {
   EXPECT_EQ(folly::none, manager.nextAcceptablePeerBidirectionalStreamId());
 }
 
-TEST_F(QuicStreamManagerTest, TestClearActionable) {
+TEST_P(QuicStreamManagerTest, TestClearActionable) {
   auto& manager = *conn.streamManager;
 
   StreamId id = 1;
@@ -586,7 +596,7 @@ TEST_F(QuicStreamManagerTest, TestClearActionable) {
   EXPECT_TRUE(manager.peekableStreams().empty());
 }
 
-TEST_F(QuicStreamManagerTest, WriteBufferMeta) {
+TEST_P(QuicStreamManagerTest, WriteBufferMeta) {
   auto& manager = *conn.streamManager;
   auto stream = manager.createNextUnidirectionalStream().value();
   // Add some real data into write buffer
@@ -606,7 +616,7 @@ TEST_F(QuicStreamManagerTest, WriteBufferMeta) {
   EXPECT_TRUE(manager.writableDSRStreams().empty());
 }
 
-TEST_F(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
+TEST_P(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
   // Verify that the StreamPriorityChanges callback function is called
   // upon stream creation, priority changes, stream removal.
   // For different steps try local (uni/bi)directional streams and remote
@@ -672,7 +682,7 @@ TEST_F(QuicStreamManagerTest, NotifyOnStreamPriorityChanges) {
   manager.removeClosedStream(stream2Id);
 }
 
-TEST_F(QuicStreamManagerTest, StreamPriorityExcludesControl) {
+TEST_P(QuicStreamManagerTest, StreamPriorityExcludesControl) {
   MockQuicStreamPrioritiesObserver mObserver;
 
   auto& manager = *conn.streamManager;
@@ -691,6 +701,13 @@ TEST_F(QuicStreamManagerTest, StreamPriorityExcludesControl) {
   stream->recvState = StreamRecvState::Closed;
   manager.removeClosedStream(stream->id);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicStreamManagerTest,
+    QuicStreamManagerTest,
+    ::testing::Values(
+        StreamManagerTestParam{.notifyOnNewStreamsExplicitly = false},
+        StreamManagerTestParam{.notifyOnNewStreamsExplicitly = true}));
 
 } // namespace test
 } // namespace quic
