@@ -1788,4 +1788,34 @@ bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn) {
       conn.readCodec->getHandshakeReadCipher();
 }
 
+bool setCustomTransportParameter(
+    std::unique_ptr<CustomTransportParameter> customParam,
+    std::vector<TransportParameter>& customTransportParameters) {
+  // Check that the parameter id is in the "private parameter" range, as
+  // described by the spec.
+  if (static_cast<uint16_t>(customParam->getParameterId()) <
+      kCustomTransportParameterThreshold) {
+    LOG(ERROR) << "invalid parameter id";
+    return false;
+  }
+
+  // check to see that we haven't already added in a parameter with the
+  // specified parameter id
+  auto it = std::find_if(
+      customTransportParameters.begin(),
+      customTransportParameters.end(),
+      [&customParam](const TransportParameter& param) {
+        return param.parameter == customParam->getParameterId();
+      });
+
+  // if a match has been found, we return failure
+  if (it != customTransportParameters.end()) {
+    LOG(ERROR) << "transport parameter already present";
+    return false;
+  }
+
+  customTransportParameters.push_back(customParam->encode());
+  return true;
+}
+
 } // namespace quic

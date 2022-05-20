@@ -1640,35 +1640,6 @@ void QuicClientTransport::setSelfOwning() {
   selfOwning_ = shared_from_this();
 }
 
-bool QuicClientTransport::setCustomTransportParameter(
-    std::unique_ptr<CustomTransportParameter> customParam) {
-  // check that the parameter id is in the "private parameter" range, as
-  // described by the spec.
-  if (static_cast<uint16_t>(customParam->getParameterId()) <
-      kCustomTransportParameterThreshold) {
-    LOG(ERROR) << "invalid parameter id";
-    return false;
-  }
-
-  // check to see that we haven't already added in a parameter with the
-  // specified parameter id
-  auto it = std::find_if(
-      customTransportParameters_.begin(),
-      customTransportParameters_.end(),
-      [&customParam](const TransportParameter& param) {
-        return param.parameter == customParam->getParameterId();
-      });
-
-  // if a match has been found, we return failure
-  if (it != customTransportParameters_.end()) {
-    LOG(ERROR) << "transport parameter already present";
-    return false;
-  }
-
-  customTransportParameters_.push_back(customParam->encode());
-  return true;
-}
-
 void QuicClientTransport::setD6DBasePMTUTransportParameter() {
   if (!conn_->transportSettings.d6dConfig.enabled) {
     return;
@@ -1687,7 +1658,8 @@ void QuicClientTransport::setD6DBasePMTUTransportParameter() {
   auto basePMTUCustomParam = std::make_unique<CustomIntegralTransportParameter>(
       kD6DBasePMTUParameterId, basePMTUSetting);
 
-  if (!setCustomTransportParameter(std::move(basePMTUCustomParam))) {
+  if (!setCustomTransportParameter(
+          std::move(basePMTUCustomParam), customTransportParameters_)) {
     LOG(ERROR) << "failed to set D6D base PMTU transport parameter";
   }
 }
@@ -1710,7 +1682,8 @@ void QuicClientTransport::setD6DRaiseTimeoutTransportParameter() {
       std::make_unique<CustomIntegralTransportParameter>(
           kD6DRaiseTimeoutParameterId, raiseTimeoutSetting.count());
 
-  if (!setCustomTransportParameter(std::move(raiseTimeoutCustomParam))) {
+  if (!setCustomTransportParameter(
+          std::move(raiseTimeoutCustomParam), customTransportParameters_)) {
     LOG(ERROR) << "failed to set D6D raise timeout transport parameter";
   }
 }
@@ -1733,7 +1706,8 @@ void QuicClientTransport::setD6DProbeTimeoutTransportParameter() {
       std::make_unique<CustomIntegralTransportParameter>(
           kD6DProbeTimeoutParameterId, probeTimeoutSetting.count());
 
-  if (!setCustomTransportParameter(std::move(probeTimeoutCustomParam))) {
+  if (!setCustomTransportParameter(
+          std::move(probeTimeoutCustomParam), customTransportParameters_)) {
     LOG(ERROR) << "failed to set D6D probe timeout transport parameter";
   }
 }

@@ -14,6 +14,7 @@
 #include <quic/api/IoBufQuicBatch.h>
 #include <quic/api/QuicPacketScheduler.h>
 #include <quic/api/QuicSocket.h>
+#include <quic/handshake/TransportParameters.h>
 #include <quic/state/StateData.h>
 
 // Function to schedule writing data to socket. Return number of packets
@@ -332,5 +333,15 @@ bool hasInitialOrHandshakeCiphers(QuicConnectionStateBase& conn);
 bool writeLoopTimeLimit(
     TimePoint loopBeginTime,
     const QuicConnectionStateBase& connection);
+
+/**
+ * Sets private transport parameters that are not in the TransportParameterId
+ * enum. See kCustomTransportParameterThreshold in QuicConstants.h
+ * - checks that the custom param id complies to the spec
+ * - checks that the param is not in the provided vector already
+ */
+bool setCustomTransportParameter(
+    std::unique_ptr<CustomTransportParameter> customParam,
+    std::vector<TransportParameter>& customTransportParameters);
 
 } // namespace quic

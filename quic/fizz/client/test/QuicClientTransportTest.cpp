@@ -1053,13 +1053,6 @@ TEST_F(QuicClientTransportTest, FirstPacketProcessedCallback) {
   client->closeNow(folly::none);
 }
 
-TEST_F(QuicClientTransportTest, CustomTransportParam) {
-  EXPECT_TRUE(client->setCustomTransportParameter(
-      std::make_unique<CustomIntegralTransportParameter>(
-          kCustomTransportParameterThreshold, 0)));
-  client->closeNow(folly::none);
-}
-
 TEST_F(QuicClientTransportTest, CloseSocketOnWriteError) {
   client->addNewPeerAddress(serverAddr);
   EXPECT_CALL(*sock, write(_, _)).WillOnce(SetErrnoAndReturn(EBADF, -1));

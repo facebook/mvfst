@@ -138,14 +138,6 @@ class QuicClientTransport
    */
   void setSelfOwning();
 
-  /**
-   * Used to set private transport parameters that are not in the
-   * TransportParameterId enum.
-   * See kCustomTransportParameterThreshold in QuicConstants.h
-   */
-  bool setCustomTransportParameter(
-      std::unique_ptr<CustomTransportParameter> customParam);
-
   void onNetworkSwitch(std::unique_ptr<folly::AsyncUDPSocket> newSock) override;
 
   /**
