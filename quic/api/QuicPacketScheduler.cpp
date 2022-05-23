@@ -804,7 +804,7 @@ SchedulingResult CloningScheduler::scheduleFramesForPacket(
   // now.
   bool hasData = frameScheduler_.hasData();
   if (conn_.version.has_value() &&
-      conn_.version.value() == QuicVersion::MVFST_EXPERIMENTAL2) {
+      conn_.version.value() != QuicVersion::QUIC_V1) {
     hasData = frameScheduler_.hasImmediateData();
   }
   if (hasData) {
