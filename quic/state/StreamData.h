@@ -390,6 +390,7 @@ struct QuicStreamState : public QuicStreamLike {
       return false;
     }
     if (writeBufMeta.length > 0) {
+      CHECK_GE(flowControlState.peerAdvertisedMaxOffset, writeBufMeta.offset);
       return flowControlState.peerAdvertisedMaxOffset - writeBufMeta.offset > 0;
     }
     if (finalWriteOffset) {
