@@ -60,13 +60,16 @@ class DSRCommonTestFixture : public testing::Test {
         kDefaultMaxStreamsUnidirectional);
   }
 
-  StreamId prepareOneStream(size_t bufMetaLength = 1000) {
+  StreamId prepareOneStream(
+      size_t bufMetaLength = 1000,
+      uint64_t peeMaxOffsetSimulated = std::numeric_limits<uint64_t>::max()) {
     conn_.streamManager->setMaxLocalBidirectionalStreams(
         kDefaultMaxStreamsBidirectional);
     conn_.streamManager->setMaxLocalUnidirectionalStreams(
         kDefaultMaxStreamsUnidirectional);
     auto id = conn_.streamManager->createNextBidirectionalStream().value()->id;
     auto stream = conn_.streamManager->findStream(id);
+    stream->flowControlState.peerAdvertisedMaxOffset = peeMaxOffsetSimulated;
 
     auto sender = std::make_unique<MockDSRPacketizationRequestSender>();
     ON_CALL(*sender, addSendInstruction(testing::_))

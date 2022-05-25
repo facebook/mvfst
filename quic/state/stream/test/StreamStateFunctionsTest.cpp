@@ -190,6 +190,8 @@ TEST_F(StreamStateFunctionsTests, SendResetDSRStream) {
   writeDataToQuicStream(stream, folly::IOBuf::copyBuffer("aloha"), false);
   auto mockDSRSender = std::make_unique<MockDSRPacketizationRequestSender>();
   EXPECT_CALL(*mockDSRSender, release()).Times(1);
+  stream.flowControlState.peerAdvertisedMaxOffset =
+      std::numeric_limits<uint64_t>::max();
   stream.dsrSender = std::move(mockDSRSender);
   BufferMeta bufMeta(2000);
   writeBufMetaToQuicStream(stream, bufMeta, true);
