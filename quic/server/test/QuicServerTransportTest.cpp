@@ -3314,6 +3314,37 @@ TEST_F(
 
 TEST_F(
     QuicUnencryptedServerTransportTest,
+    TestHandshakeWritableBytesLimitedWithCFinNewToken) {
+  /**
+   * Exact same test case as above, but let's make the transport assume that the
+   * address was verified (we received a valid new token). This should bypass
+   * the writableBytesLimit and proceed as usual.
+   */
+  EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited())
+      .Times(AtLeast(0));
+  /**
+   * Set the WritableBytes limit to 3x (~ 3 * 1200 = 3,600). This will not be
+   * enough for the handshake to fit (1200 initial + 4000 handshake = 5,200 >
+   * 3,600), however the valid new token should bypass the limit and not be
+   * blocked.
+   */
+  auto transportSettings = server->getTransportSettings();
+  transportSettings.limitedCwndInMss = 3;
+  transportSettings.enableWritableBytesLimit = true;
+  server->setTransportSettings(transportSettings);
+
+  // make the server think we've received a valid new token
+  server->verifiedClientAddress();
+
+  recvClientHello(true, QuicVersion::MVFST, "CHLO_CERT");
+
+  EXPECT_GE(serverWrites.size(), 3);
+
+  AckStates ackStates;
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
     TestHandshakeWritableBytesLimitedWithCFin) {
   EXPECT_CALL(*quicStats_, onConnectionWritableBytesLimited())
       .Times(AtLeast(1));
