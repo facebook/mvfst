@@ -366,6 +366,7 @@ struct QuicStreamState : public QuicStreamLike {
   // needs to have writeBuffer, or it has EOF to send.
   bool hasWritableData() const {
     if (!writeBuffer.empty()) {
+      CHECK_GE(flowControlState.peerAdvertisedMaxOffset, currentWriteOffset);
       return flowControlState.peerAdvertisedMaxOffset - currentWriteOffset > 0;
     }
     if (finalWriteOffset) {
