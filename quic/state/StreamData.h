@@ -456,8 +456,8 @@ struct QuicStreamState : public QuicStreamLike {
         lossBufMetas.begin(),
         lossBufMetas.end(),
         bufMeta.offset,
-        [](auto offset, const auto& bufMeta) {
-          return offset < bufMeta.offset;
+        [](auto offset, const auto& wBufMeta) {
+          return offset < wBufMeta.offset;
         });
     if (!lossBufMetas.empty() && lossItr != lossBufMetas.begin() &&
         std::prev(lossItr)->offset + std::prev(lossItr)->length ==
