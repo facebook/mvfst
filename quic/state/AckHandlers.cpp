@@ -67,7 +67,7 @@ AckEvent processAckFrame(
                  .build();
 
   // temporary storage to enable packets to be processed in sent order
-  SmallVec<OutstandingPacketWithHandlerContext, 50, uint16_t>
+  SmallVec<OutstandingPacketWithHandlerContext, 50, uint64_t>
       packetsWithHandlerContext;
 
   auto currentPacketIt = getLastOutstandingPacketIncludingLost(conn, pnSpace);
