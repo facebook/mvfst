@@ -117,7 +117,10 @@ struct SendInstruction {
           clientAddr(conn.peerAddress),
           streamId(idIn),
           trafficKey(*conn.oneRttWriteCipher->getKey()),
-          cipherSuite(*conn.serverHandshakeLayer->getState().cipher()),
+          // TODO the value_or here is a test hack because it's very difficult
+          // to plumb it down properly at the moment.
+          cipherSuite(conn.serverHandshakeLayer->getState().cipher().value_or(
+              fizz::CipherSuite::TLS_AES_128_GCM_SHA256)),
           packetProtectionKey(conn.oneRttWriteHeaderCipher->getKey()) {}
 
     SendInstruction build() {

@@ -10,6 +10,7 @@
 #include <quic/api/QuicTransportBase.h>
 #include <quic/api/QuicTransportFunctions.h>
 #include <quic/common/test/TestUtils.h>
+#include <quic/dsr/frontend/WriteFunctions.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 
 namespace quic {
@@ -83,6 +84,14 @@ class TestQuicTransport
         (isConnectionPaced(*conn_)
              ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
              : conn_->transportSettings.writeConnectionDataPacketsLimit));
+    writePacketizationRequest(
+        *dynamic_cast<QuicServerConnectionState*>(conn_.get()),
+        *conn_->clientConnectionId,
+        (isConnectionPaced(*conn_)
+             ? conn_->pacer->updateAndGetWriteBatchSize(Clock::now())
+             : conn_->transportSettings.writeConnectionDataPacketsLimit),
+        *aead,
+        Clock::now());
   }
 
   void closeTransport() override {

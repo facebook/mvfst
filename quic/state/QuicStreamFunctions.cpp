@@ -422,18 +422,21 @@ void appendPendingStreamReset(
 }
 
 uint64_t getLargestWriteOffsetSeen(const QuicStreamState& stream) {
-  return stream.finalWriteOffset.value_or(
-      stream.currentWriteOffset + stream.writeBuffer.chainLength());
+  return stream.finalWriteOffset.value_or(std::max<uint64_t>(
+      stream.currentWriteOffset + stream.writeBuffer.chainLength(),
+      stream.writeBufMeta.offset + stream.writeBufMeta.length));
 }
 
 folly::Optional<uint64_t> getLargestWriteOffsetTxed(
     const QuicStreamState& stream) {
   // currentWriteOffset is really nextWriteOffset
   // when 0, it indicates nothing has been written yet
-  if (stream.currentWriteOffset == 0) {
+  if (stream.currentWriteOffset == 0 && stream.writeBufMeta.offset == 0) {
     return folly::none;
   }
-  return stream.currentWriteOffset - 1;
+  uint64_t currentWriteOffset =
+      std::max<uint64_t>(stream.currentWriteOffset, stream.writeBufMeta.offset);
+  return currentWriteOffset - 1;
 }
 
 folly::Optional<uint64_t> getLargestDeliverableOffset(

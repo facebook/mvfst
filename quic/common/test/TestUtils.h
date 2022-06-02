@@ -136,6 +136,8 @@ std::shared_ptr<fizz::server::FizzServerContext> createServerCtx();
 
 void setupCtxWithTestCert(fizz::server::FizzServerContext& ctx);
 
+TrafficKey getQuicTestKey();
+
 void setupZeroRttOnServerCtx(
     fizz::server::FizzServerContext& serverCtx,
     const QuicCachedPsk& cachedPsk);
@@ -164,6 +166,9 @@ std::unique_ptr<T> createNoOpAeadImpl() {
       .WillByDefault(
           testing::Invoke([&](auto& buf, auto, auto) { return buf->clone(); }));
   ON_CALL(*aead, getCipherOverhead()).WillByDefault(testing::Return(0));
+  ON_CALL(*aead, getKey()).WillByDefault(testing::Invoke([]() {
+    return getQuicTestKey();
+  }));
   return aead;
 }
 
@@ -378,7 +383,6 @@ class TestPacketBatchWriter : public IOBufBatchWriter {
   size_t bufSize_{0};
 };
 
-TrafficKey getQuicTestKey();
 std::unique_ptr<folly::IOBuf> getProtectionKey();
 
 class FakeServerHandshake : public FizzServerHandshake {

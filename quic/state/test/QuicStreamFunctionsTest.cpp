@@ -2138,10 +2138,28 @@ TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenNoFIN) {
   EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
 }
 
+TEST_F(QuicStreamFunctionsTest, LargestWriteOffsetSeenDSRNoFIN) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 10;
+  stream.writeBufMeta.offset = 100;
+  stream.writeBufMeta.length = 20;
+  EXPECT_EQ(120, getLargestWriteOffsetSeen(stream));
+}
+
 TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedNothingTxed) {
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 0;
+  stream.writeBufMeta.offset = 0;
   EXPECT_EQ(folly::none, getLargestWriteOffsetTxed(stream));
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    StreamLargestWriteOffsetTxedNothingTxedDSRTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 0;
+  stream.writeBufMeta.offset = 55;
+  EXPECT_EQ(54, getLargestWriteOffsetTxed(stream).value());
 }
 
 TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteTxed) {
@@ -2149,6 +2167,14 @@ TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteTxed) {
   stream.currentWriteOffset = 1;
   ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
   EXPECT_EQ(0, getLargestWriteOffsetTxed(stream).value());
+}
+
+TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedOneByteDSRTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 1;
+  stream.writeBufMeta.offset = 2;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(1, getLargestWriteOffsetTxed(stream).value());
 }
 
 TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedHundredBytesTxed) {
@@ -2160,11 +2186,34 @@ TEST_F(QuicStreamFunctionsTest, StreamLargestWriteOffsetTxedHundredBytesTxed) {
 
 TEST_F(
     QuicStreamFunctionsTest,
+    StreamLargestWriteOffsetTxedHundredBytesDSRTxed) {
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 10;
+  stream.writeBufMeta.offset = 100;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(99, getLargestWriteOffsetTxed(stream).value());
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
     StreamLargestWriteOffsetTxedIgnoreFinalWriteOffset) {
   // finalWriteOffset is set when writeChain is called with EoR, but we should
   // always use currentWriteOffset to determine how many bytes have been TXed
   QuicStreamState stream(3, conn);
   stream.currentWriteOffset = 10;
+  stream.finalWriteOffset = 100;
+  ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
+  EXPECT_EQ(9, getLargestWriteOffsetTxed(stream).value());
+}
+
+TEST_F(
+    QuicStreamFunctionsTest,
+    StreamLargestWriteOffsetTxedDSRIgnoreFinalWriteOffset) {
+  // finalWriteOffset is set when writeChain is called with EoR, but we should
+  // always use currentWriteOffset to determine how many bytes have been TXed
+  QuicStreamState stream(3, conn);
+  stream.currentWriteOffset = 1;
+  stream.writeBufMeta.offset = 10;
   stream.finalWriteOffset = 100;
   ASSERT_TRUE(getLargestWriteOffsetTxed(stream).has_value());
   EXPECT_EQ(9, getLargestWriteOffsetTxed(stream).value());
