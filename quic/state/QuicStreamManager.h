@@ -345,7 +345,7 @@ class QuicStreamManager {
   }
 
   void updateLossStreams(const QuicStreamState& stream) {
-    if (stream.lossBuffer.empty()) {
+    if (!stream.hasLoss()) {
       removeLoss(stream.id);
     } else {
       addLoss(stream.id);

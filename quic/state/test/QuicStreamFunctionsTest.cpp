@@ -2206,6 +2206,31 @@ TEST_F(QuicStreamFunctionsTest, LossBufferHasData) {
   EXPECT_TRUE(conn.streamManager->hasLoss());
 }
 
+TEST_F(QuicStreamFunctionsTest, LossBufferMetaHasData) {
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+  WriteBufferMeta::Builder b;
+  b.setLength(10);
+  b.setOffset(10);
+  b.setEOF(false);
+  stream.lossBufMetas.emplace_back(b.build());
+  conn.streamManager->updateLossStreams(stream);
+  EXPECT_TRUE(conn.streamManager->hasLoss());
+}
+
+TEST_F(QuicStreamFunctionsTest, LossBufferMetaStillHasData) {
+  StreamId id = 4;
+  QuicStreamState stream(id, conn);
+  conn.streamManager->addLoss(id);
+  WriteBufferMeta::Builder b;
+  b.setLength(10);
+  b.setOffset(10);
+  b.setEOF(false);
+  stream.lossBufMetas.emplace_back(b.build());
+  conn.streamManager->updateLossStreams(stream);
+  EXPECT_TRUE(conn.streamManager->hasLoss());
+}
+
 TEST_F(QuicStreamFunctionsTest, LossBufferStillHasData) {
   StreamId id = 4;
   QuicStreamState stream(id, conn);

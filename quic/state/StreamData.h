@@ -407,6 +407,10 @@ struct QuicStreamState : public QuicStreamLike {
         writeBufMeta.offset > *finalWriteOffset;
   }
 
+  FOLLY_NODISCARD bool hasLoss() const {
+    return !lossBuffer.empty() || !lossBufMetas.empty();
+  }
+
   FOLLY_NODISCARD uint64_t nextOffsetToWrite() const {
     // The stream has never had WriteBufferMetas. Then currentWriteOffset
     // always points to the next offset we send. This of course relies on the
