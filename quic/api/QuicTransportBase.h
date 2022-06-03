@@ -746,7 +746,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       StreamId id,
       PeekCallback* cb) noexcept;
   folly::Expected<StreamId, LocalErrorCode> createStreamInternal(
-      bool bidirectional);
+      bool bidirectional,
+      const folly::Optional<StreamGroupId>& streamGroupId = folly::none);
 
   /**
    * Helper function - if given error is not set, returns a generic app error.

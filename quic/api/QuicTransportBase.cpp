@@ -1910,15 +1910,19 @@ uint64_t QuicTransportBase::getNumOpenableUnidirectionalStreams() const {
 }
 
 folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createStreamInternal(bool bidirectional) {
+QuicTransportBase::createStreamInternal(
+    bool bidirectional,
+    const folly::Optional<StreamGroupId>& streamGroupId) {
   if (closeState_ != CloseState::OPEN) {
     return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
   }
   folly::Expected<QuicStreamState*, LocalErrorCode> streamResult;
   if (bidirectional) {
-    streamResult = conn_->streamManager->createNextBidirectionalStream();
+    streamResult =
+        conn_->streamManager->createNextBidirectionalStream(streamGroupId);
   } else {
-    streamResult = conn_->streamManager->createNextUnidirectionalStream();
+    streamResult =
+        conn_->streamManager->createNextUnidirectionalStream(streamGroupId);
   }
   if (streamResult) {
     const StreamId streamId = streamResult.value()->id;
@@ -1957,24 +1961,28 @@ QuicTransportBase::createUnidirectionalStream(bool /*replaySafe*/) {
 
 folly::Expected<StreamGroupId, LocalErrorCode>
 QuicTransportBase::createBidirectionalStreamGroup() {
-  return 0;
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  return conn_->streamManager->createNextBidirectionalStreamGroup();
 }
 
 folly::Expected<StreamGroupId, LocalErrorCode>
 QuicTransportBase::createUnidirectionalStreamGroup() {
-  return 0;
+  if (closeState_ != CloseState::OPEN) {
+    return folly::makeUnexpected(LocalErrorCode::CONNECTION_CLOSED);
+  }
+  return conn_->streamManager->createNextUnidirectionalStreamGroup();
 }
 
 folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createBidirectionalStreamInGroup(
-    StreamGroupId /* groupId */) {
-  return 0;
+QuicTransportBase::createBidirectionalStreamInGroup(StreamGroupId groupId) {
+  return createStreamInternal(true, groupId);
 }
 
 folly::Expected<StreamId, LocalErrorCode>
-QuicTransportBase::createUnidirectionalStreamInGroup(
-    StreamGroupId /* groupId */) {
-  return 0;
+QuicTransportBase::createUnidirectionalStreamInGroup(StreamGroupId groupId) {
+  return createStreamInternal(false, groupId);
 }
 
 bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
