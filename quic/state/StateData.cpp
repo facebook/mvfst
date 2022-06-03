@@ -40,6 +40,14 @@ QuicStreamState::QuicStreamState(StreamId idIn, QuicConnectionStateBase& connIn)
   }
 }
 
+QuicStreamState::QuicStreamState(
+    StreamId idIn,
+    const folly::Optional<StreamGroupId>& groupIdIn,
+    QuicConnectionStateBase& connIn)
+    : QuicStreamState(idIn, connIn) {
+  groupId = groupIdIn;
+}
+
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st) {
   if (st.clientConnectionId) {
     os << "client CID=" << *st.clientConnectionId;

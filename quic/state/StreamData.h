@@ -266,6 +266,11 @@ struct QuicStreamState : public QuicStreamLike {
 
   QuicStreamState(StreamId id, QuicConnectionStateBase& conn);
 
+  QuicStreamState(
+      StreamId idIn,
+      const folly::Optional<StreamGroupId>& groupIdIn,
+      QuicConnectionStateBase& connIn);
+
   QuicStreamState(QuicStreamState&&) = default;
 
   /**
@@ -273,7 +278,10 @@ struct QuicStreamState : public QuicStreamLike {
    * QuicConnectionStateBase.
    */
   QuicStreamState(QuicConnectionStateBase& connIn, QuicStreamState&& other)
-      : QuicStreamLike(std::move(other)), conn(connIn), id(other.id) {
+      : QuicStreamLike(std::move(other)),
+        conn(connIn),
+        id(other.id),
+        groupId(other.groupId) {
     // QuicStreamState fields
     finalWriteOffset = other.finalWriteOffset;
     flowControlState = other.flowControlState;
@@ -297,6 +305,9 @@ struct QuicStreamState : public QuicStreamLike {
 
   // Stream id of the connection.
   StreamId id;
+
+  // ID of the group the stream belongs to.
+  folly::Optional<StreamGroupId> groupId;
 
   // Write side eof offset. This represents only the final FIN offset.
   folly::Optional<uint64_t> finalWriteOffset;
