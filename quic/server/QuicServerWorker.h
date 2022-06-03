@@ -547,7 +547,7 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
   folly::SocketOptionMap* socketOptions_{nullptr};
   std::shared_ptr<WorkerCallback> callback_;
   bool setEventCallback_{false};
-  folly::EventBase* evb_{nullptr};
+  folly::Executor::KeepAlive<folly::EventBase> evb_;
 
   // factories are owned by quic server
   QuicUDPSocketFactory* socketFactory_;

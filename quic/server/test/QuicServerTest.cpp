@@ -60,8 +60,8 @@ MATCHER_P(NetworkDataMatches, networkData, "") {
  */
 class SimpleQuicServerWorkerTest : public Test {
  protected:
-  std::unique_ptr<QuicServerWorker> worker_;
   folly::EventBase eventbase_;
+  std::unique_ptr<QuicServerWorker> worker_;
   std::shared_ptr<MockWorkerCallback> workerCb_;
   folly::test::MockAsyncUDPSocket* rawSocket_{nullptr};
 };
@@ -235,8 +235,8 @@ class QuicServerWorkerTest : public Test {
 
  protected:
   folly::SocketAddress fakeAddress_;
-  std::unique_ptr<QuicServerWorker> worker_;
   folly::EventBase eventbase_;
+  std::unique_ptr<QuicServerWorker> worker_;
   MockQuicTransport::Ptr transport_;
   std::shared_ptr<MockWorkerCallback> workerCb_;
   std::unique_ptr<MockQuicServerTransportFactory> factory_;
@@ -304,7 +304,7 @@ void QuicServerWorkerTest::createQuicConnectionDuringShedding(
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(0, addrMap.count(std::make_pair(addr, connId)));
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 void QuicServerWorkerTest::createQuicConnection(
@@ -331,7 +331,7 @@ void QuicServerWorkerTest::createQuicConnection(
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(addr, connId)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 void QuicServerWorkerTest::testSendReset(
@@ -379,7 +379,7 @@ void QuicServerWorkerTest::testSendReset(
       std::move(routingData),
       NetworkData(packet->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 /**
@@ -449,7 +449,7 @@ std::string QuicServerWorkerTest::testSendRetry(
       std::move(routingData),
       NetworkData(data->clone(), Clock::now()),
       QuicVersion::MVFST);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   return encryptedRetryToken;
 }
@@ -474,7 +474,7 @@ std::string QuicServerWorkerTest::testSendRetryUnfinished(
       std::move(routingData),
       NetworkData(data->clone(), Clock::now()),
       QuicVersion::MVFST);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   return encryptedRetryToken;
 }
@@ -580,7 +580,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
   NiceMock<MockConnectionSetupCallback> connSetupCb2;
@@ -615,7 +615,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
@@ -635,7 +635,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
   EXPECT_EQ(addrMap.size(), 2);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
@@ -675,7 +675,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
 
   const auto& addrMap = worker_->getSrcToTransportMap();
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId1)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   auto caddr2 = folly::SocketAddress("2.3.4.5", 1234);
   NiceMock<MockConnectionSetupCallback> connSetupCb2;
@@ -709,7 +709,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr2, connId2)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
@@ -728,7 +728,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr3, connId3)), 0);
   EXPECT_EQ(addrMap.size(), 2);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   // Finish a handshake.
   worker_->onHandshakeFinished();
@@ -764,7 +764,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       version);
 
   EXPECT_EQ(addrMap.count(std::make_pair(caddr4, connId4)), 1);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 // Validate that when the worker receives a valid NewToken, it invokes
@@ -939,7 +939,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       std::move(routingData2),
       NetworkData(data->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   auto connId2 = connId;
   connId2.data()[7] ^= 0x1;
@@ -957,7 +957,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
       std::move(routingData3),
       NetworkData(data->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
   worker_->onConnectionUnbound(
@@ -999,7 +999,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       std::move(routingData),
       NetworkData(data->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   EXPECT_CALL(*quicStats_, onNewConnection());
   ConnectionId newConnId = getTestConnectionId(hostId_);
@@ -1033,7 +1033,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       std::move(routingData2),
       NetworkData(data->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   // routing by address after transport_'s connid available, but before
   // transport2's connid available.
@@ -1072,7 +1072,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
       std::move(routingData3),
       NetworkData(data->clone(), Clock::now()),
       folly::none);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   EXPECT_CALL(*transport_, setRoutingCallback(nullptr)).Times(2);
   worker_->onConnectionUnbound(
@@ -1119,7 +1119,7 @@ TEST_F(QuicServerWorkerTest, InitialPacketTooSmall) {
       std::move(routingData),
       NetworkData(data->clone(), Clock::now()),
       version);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, QuicShedTest) {
@@ -1147,7 +1147,7 @@ TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(blockedSrcPort, std::move(packet), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
@@ -1166,7 +1166,7 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
@@ -1184,7 +1184,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacket), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   // Initial with any packet number should also increate the counting
   PacketNum bignum = 200;
@@ -1199,7 +1199,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
       .Times(1);
   worker_->handleNetworkData(
       kClientAddr, std::move(initialPacketBigNum), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 
   LongHeader handshakeHeader(
       LongHeader::Types::Handshake, srcConnId, destConnId, num, version);
@@ -1210,7 +1210,7 @@ TEST_F(QuicServerWorkerTest, ClientInitialCounting) {
   EXPECT_CALL(*quicStats_, onClientInitialReceived(_)).Times(0);
   worker_->handleNetworkData(
       kClientAddr, std::move(handshakePacket), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
@@ -1232,7 +1232,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   }
   auto packet = packetToBuf(std::move(builder).buildPacket());
   worker_->handleNetworkData(kClientAddr, std::move(packet), Clock::now());
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
@@ -1274,7 +1274,7 @@ TEST_F(QuicServerWorkerTest, FailToParseConnectionId) {
   EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
@@ -1302,7 +1302,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
@@ -1330,7 +1330,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
   NetworkData networkData(std::move(packet), Clock::now());
   worker_->dispatchPacketData(
       kClientAddr, std::move(routingData), std::move(networkData), version);
-  eventbase_.loop();
+  eventbase_.loopIgnoreKeepAlive();
 }
 
 TEST_F(QuicServerWorkerTest, ShutdownQuicServer) {
@@ -1684,10 +1684,10 @@ class QuicServerWorkerTakeoverTest : public Test {
   void testNoPacketForwarding(Buf data, size_t len, ConnectionId connId);
 
  protected:
-  std::unique_ptr<QuicServerWorker> takeoverWorker_;
   std::shared_ptr<MockWorkerCallback> takeoverWorkerCb_;
   folly::test::MockAsyncUDPSocket* takeoverSocket_;
   folly::EventBase evb_;
+  std::unique_ptr<QuicServerWorker> takeoverWorker_;
   folly::IOBufEqualTo eq;
   folly::SocketAddress clientAddr{kClientAddr};
   std::unique_ptr<MockQuicUDPSocketFactory> takeoverSocketFactory_;
@@ -1997,6 +1997,7 @@ TEST_F(QuicServerWorkerTakeoverTest, QuicServerTakeoverCbReadError) {
   folly::AsyncSocketException ex(
       folly::AsyncSocketException::AsyncSocketExceptionType::UNKNOWN, "");
   takeoverCb->onReadError(ex);
+  evb_.loopIgnoreKeepAlive();
 }
 
 class QuicServerTest : public Test {

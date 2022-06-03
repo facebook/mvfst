@@ -57,13 +57,13 @@ QuicServerWorker::QuicServerWorker(
 }
 
 folly::EventBase* QuicServerWorker::getEventBase() const {
-  return evb_;
+  return evb_.get();
 }
 
 void QuicServerWorker::setSocket(
     std::unique_ptr<folly::AsyncUDPSocket> socket) {
   socket_ = std::move(socket);
-  evb_ = socket_->getEventBase();
+  evb_ = folly::Executor::KeepAlive(socket_->getEventBase());
 }
 
 void QuicServerWorker::bind(
@@ -162,7 +162,7 @@ void QuicServerWorker::start() {
   CHECK(socket_);
   if (!pacingTimer_) {
     pacingTimer_ = TimerHighRes::newTimer(
-        evb_, transportSettings_.pacingTimerTickInterval);
+        evb_.get(), transportSettings_.pacingTimerTickInterval);
   }
   socket_->resumeRead(this);
   VLOG(10) << fmt::format(
@@ -1337,6 +1337,7 @@ void QuicServerWorker::shutdownAllConnections(LocalErrorCode error) {
   socket_.reset();
   takeoverCB_.reset();
   pacingTimer_.reset();
+  evb_.reset();
 }
 
 QuicServerWorker::~QuicServerWorker() {
