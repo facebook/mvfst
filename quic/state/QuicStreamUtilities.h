@@ -27,6 +27,16 @@ bool isClientStream(StreamId stream);
 bool isServerStream(StreamId stream);
 
 /**
+ * Returns whether the given stream group identifies a group of client streams.
+ */
+bool isClientStreamGroup(StreamGroupId id);
+
+/**
+ * Returns whether the given stream group identifies a group of server streams.
+ */
+bool isServerStreamGroup(StreamGroupId id);
+
+/**
  * Returns whether the given StreamId identifies a unidirectional stream.
  */
 bool isUnidirectionalStream(StreamId stream);

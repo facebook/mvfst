@@ -22,6 +22,7 @@ namespace test {
 
 struct StreamManagerTestParam {
   bool notifyOnNewStreamsExplicitly;
+  bool isUnidirectional;
 };
 
 class QuicStreamManagerTest
@@ -708,6 +709,89 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         StreamManagerTestParam{.notifyOnNewStreamsExplicitly = false},
         StreamManagerTestParam{.notifyOnNewStreamsExplicitly = true}));
+
+class QuicStreamManagerGroupsTest : public QuicStreamManagerTest {
+ public:
+  auto createNextStreamGroup() {
+    auto& manager = *conn.streamManager;
+    const bool isUnidirectional = GetParam().isUnidirectional;
+    return isUnidirectional ? manager.createNextUnidirectionalStreamGroup()
+                            : manager.createNextBidirectionalStreamGroup();
+  }
+  auto getNumGroups() {
+    auto& manager = *conn.streamManager;
+    const bool isUnidirectional = GetParam().isUnidirectional;
+    return isUnidirectional ? manager.getNumUnidirectionalGroups()
+                            : manager.getNumBidirectionalGroups();
+  }
+  auto createNextStreamInGroup(StreamGroupId groupId) {
+    auto& manager = *conn.streamManager;
+    const bool isUnidirectional = GetParam().isUnidirectional;
+    return isUnidirectional ? manager.createNextUnidirectionalStream(groupId)
+                            : manager.createNextBidirectionalStream(groupId);
+  }
+};
+
+TEST_P(QuicStreamManagerGroupsTest, TestStreamGroupLimits) {
+  auto& manager = *conn.streamManager;
+
+  // By default, no group creation hapenning.
+  auto groupId = createNextStreamGroup();
+  EXPECT_FALSE(groupId.hasValue());
+  EXPECT_EQ(getNumGroups(), 0);
+
+  // Bump group limits.
+  conn.transportSettings.maxStreamGroupsAdvertized = 1;
+  manager.refreshTransportSettings(conn.transportSettings);
+  groupId = createNextStreamGroup();
+  EXPECT_TRUE(groupId.hasValue());
+  EXPECT_EQ(getNumGroups(), 1);
+
+  // Try again and it should fail running over the limit.
+  groupId = createNextStreamGroup();
+  EXPECT_FALSE(groupId.hasValue());
+  EXPECT_EQ(getNumGroups(), 1);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsNoGroup) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  // Should throw because no stream groups exist yet.
+  EXPECT_THROW(createNextStreamInGroup(1), QuicTransportException);
+  EXPECT_EQ(getNumGroups(), 0);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsWrongNodeType) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  // Should throw because client stream group id is provided.
+  EXPECT_THROW(createNextStreamInGroup(2), QuicTransportException);
+  EXPECT_EQ(getNumGroups(), 0);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsSuccess) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  auto groupId = createNextStreamGroup();
+  EXPECT_TRUE(groupId.hasValue());
+  EXPECT_EQ(getNumGroups(), 1);
+
+  auto stream = createNextStreamInGroup(*groupId);
+  EXPECT_TRUE(stream.hasValue());
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicStreamManagerGroupsTest,
+    QuicStreamManagerGroupsTest,
+    ::testing::Values(
+        StreamManagerTestParam{.isUnidirectional = false},
+        StreamManagerTestParam{.isUnidirectional = true}));
 
 } // namespace test
 } // namespace quic

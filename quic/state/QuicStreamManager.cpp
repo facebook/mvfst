@@ -317,17 +317,27 @@ QuicStreamState* QuicStreamManager::getStream(StreamId streamId) {
 }
 
 folly::Expected<QuicStreamState*, LocalErrorCode>
-QuicStreamManager::createNextBidirectionalStream() {
-  auto stream = createStream(nextBidirectionalStreamId_);
+QuicStreamManager::createNextBidirectionalStream(
+    folly::Optional<StreamGroupId> streamGroupId) {
+  auto stream =
+      createStream(nextBidirectionalStreamId_, std::move(streamGroupId));
   if (stream.hasValue()) {
     nextBidirectionalStreamId_ += detail::kStreamIncrement;
   }
   return stream;
 }
 
+folly::Expected<StreamGroupId, LocalErrorCode>
+QuicStreamManager::createNextBidirectionalStreamGroup() {
+  return createNextStreamGroup(
+      nextBidirectionalStreamGroupId_, openBidirectionalLocalStreamGroups_);
+}
+
 folly::Expected<QuicStreamState*, LocalErrorCode>
-QuicStreamManager::createNextUnidirectionalStream() {
-  auto stream = createStream(nextUnidirectionalStreamId_);
+QuicStreamManager::createNextUnidirectionalStream(
+    folly::Optional<StreamGroupId> streamGroupId) {
+  auto stream =
+      createStream(nextUnidirectionalStreamId_, std::move(streamGroupId));
   if (stream.hasValue()) {
     nextUnidirectionalStreamId_ += detail::kStreamIncrement;
   }
@@ -346,6 +356,31 @@ QuicStreamManager::instantiatePeerStream(StreamId streamId) {
   addToStreamPriorityMap(it.first->second);
   QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   return &it.first->second;
+}
+
+folly::Expected<StreamGroupId, LocalErrorCode>
+QuicStreamManager::createNextUnidirectionalStreamGroup() {
+  return createNextStreamGroup(
+      nextUnidirectionalStreamGroupId_, openUnidirectionalLocalStreamGroups_);
+}
+
+folly::Expected<StreamGroupId, LocalErrorCode>
+QuicStreamManager::createNextStreamGroup(
+    StreamGroupId& groupId,
+    folly::F14FastSet<StreamGroupId>& streamGroups) {
+  auto maxLocalStreamGroupId = std::min(
+      transportSettings_->maxStreamGroupsAdvertized *
+          detail::kStreamGroupIncrement,
+      detail::kMaxStreamGroupId);
+  if (groupId >= maxLocalStreamGroupId) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_LIMIT_EXCEEDED);
+  }
+
+  auto id = groupId;
+  groupId += detail::kStreamIncrement;
+  streamGroups.insert(id);
+
+  return id;
 }
 
 QuicStreamState* FOLLY_NULLABLE
@@ -412,7 +447,9 @@ QuicStreamManager::getOrCreatePeerStream(StreamId streamId) {
 }
 
 folly::Expected<QuicStreamState*, LocalErrorCode>
-QuicStreamManager::createStream(StreamId streamId) {
+QuicStreamManager::createStream(
+    StreamId streamId,
+    folly::Optional<StreamGroupId> streamGroupId) {
   if (nodeType_ == QuicNodeType::Client && !isClientStream(streamId)) {
     throw QuicTransportException(
         "Attempted creating non-client stream on client",
@@ -422,11 +459,35 @@ QuicStreamManager::createStream(StreamId streamId) {
         "Attempted creating non-server stream on server",
         TransportErrorCode::STREAM_STATE_ERROR);
   }
+  bool isUni = isUnidirectionalStream(streamId);
+
+  if (streamGroupId) {
+    const auto& openGroups = isUni ? openUnidirectionalLocalStreamGroups_
+                                   : openBidirectionalLocalStreamGroups_;
+    if (openGroups.find(*streamGroupId) == openGroups.cend()) {
+      throw QuicTransportException(
+          "Attempted creating a stream in non-existent group",
+          TransportErrorCode::STREAM_STATE_ERROR);
+    }
+
+    if (nodeType_ == QuicNodeType::Client &&
+        !isClientStreamGroup(*streamGroupId)) {
+      throw QuicTransportException(
+          "Attempted creating a stream in non-client stream group on client",
+          TransportErrorCode::STREAM_STATE_ERROR);
+    } else if (
+        nodeType_ == QuicNodeType::Server &&
+        !isServerStreamGroup(*streamGroupId)) {
+      throw QuicTransportException(
+          "Attempted creating a stream in non-server stream group on server",
+          TransportErrorCode::STREAM_STATE_ERROR);
+    }
+  }
+
   auto existingStream = getOrCreateOpenedLocalStream(streamId);
   if (existingStream) {
     return existingStream;
   }
-  bool isUni = isUnidirectionalStream(streamId);
   auto& nextAcceptableStreamId = isUni
       ? nextAcceptableLocalUnidirectionalStreamId_
       : nextAcceptableLocalBidirectionalStreamId_;
@@ -443,7 +504,7 @@ QuicStreamManager::createStream(StreamId streamId) {
   auto it = streams_.emplace(
       std::piecewise_construct,
       std::forward_as_tuple(streamId),
-      std::forward_as_tuple(streamId, conn_));
+      std::forward_as_tuple(streamId, streamGroupId, conn_));
   addToStreamPriorityMap(it.first->second);
   QUIC_STATS(conn_.statsCallback, onNewQuicStream);
   updateAppIdleState();
@@ -525,6 +586,7 @@ void QuicStreamManager::removeClosedStream(StreamId streamId) {
         : openBidirectionalLocalStreams_;
     openLocalStreams.erase(streamId);
   }
+
   updateAppIdleState();
   notifyStreamPriorityChanges();
 }

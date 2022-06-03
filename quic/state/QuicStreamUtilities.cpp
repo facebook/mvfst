@@ -17,6 +17,14 @@ bool isClientStream(StreamId stream) {
   return (stream & 0b01) == 0;
 }
 
+bool isClientStreamGroup(StreamGroupId id) {
+  return (id & 0b01) == 0;
+}
+
+bool isServerStreamGroup(StreamGroupId id) {
+  return id & 0b01;
+}
+
 bool isUnidirectionalStream(StreamId stream) {
   return stream & 0b10;
 }
