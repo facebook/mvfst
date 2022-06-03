@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+#include <quic/api/QuicTransportFunctions.h>
 #include <quic/api/test/MockQuicSocket.h>
 #include <quic/client/handshake/CachedServerTransportParameters.h>
 #include <quic/client/handshake/ClientHandshake.h>
@@ -177,5 +178,44 @@ TEST_F(ClientStateMachineTest, TestProcessMaxDatagramSizeOk) {
       clientConn.datagramState.maxWriteFrameSize,
       kMaxDatagramPacketOverhead + 1);
 }
+
+struct maxStreamGroupsAdvertizedtestStruct {
+  uint64_t peerMaxGroupsIn;
+  folly::Optional<uint64_t> expectedTransportSettingVal;
+};
+class ClientStateMachineMaxStreamGroupsAdvertizedParamTest
+    : public ClientStateMachineTest,
+      public ::testing::WithParamInterface<
+          maxStreamGroupsAdvertizedtestStruct> {};
+
+TEST_P(
+    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
+    TestMaxStreamGroupsAdvertizedParam) {
+  QuicClientConnectionState clientConn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  std::vector<TransportParameter> transportParams;
+
+  if (GetParam().peerMaxGroupsIn > 0) {
+    auto streamGroupsEnabledParam =
+        std::make_unique<CustomIntegralTransportParameter>(
+            kStreamGroupsEnabledCustomParamId, GetParam().peerMaxGroupsIn);
+    CHECK(setCustomTransportParameter(
+        std::move(streamGroupsEnabledParam), transportParams));
+  }
+  ServerTransportParameters serverTransportParams = {
+      std::move(transportParams)};
+  processServerInitialParams(clientConn, serverTransportParams, 0);
+
+  EXPECT_EQ(
+      clientConn.peerMaxStreamGroupsAdvertized,
+      GetParam().expectedTransportSettingVal);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
+    ClientStateMachineMaxStreamGroupsAdvertizedParamTest,
+    ::testing::Values(
+        maxStreamGroupsAdvertizedtestStruct{0, folly::none},
+        maxStreamGroupsAdvertizedtestStruct{16, 16}));
 
 } // namespace quic::test

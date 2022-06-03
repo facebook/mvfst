@@ -248,6 +248,8 @@ class QuicClientTransport
    */
   void maybeSendTransportKnobs();
 
+  void maybeEnableStreamGroups();
+
   bool replaySafeNotified_{false};
   // Set it QuicClientTransport is in a self owning mode. This will be cleaned
   // up when the caller invokes a terminal call to the transport.

@@ -997,6 +997,7 @@ void QuicClientTransport::startCryptoHandshake() {
   setD6DRaiseTimeoutTransportParameter();
   setD6DProbeTimeoutTransportParameter();
   setSupportedExtensionTransportParameters();
+  maybeEnableStreamGroups();
 
   auto paramsExtension = std::make_shared<ClientTransportParametersExtension>(
       conn_->originalVersion.value(),
@@ -1825,6 +1826,22 @@ void QuicClientTransport::maybeSendTransportKnobs() {
       }
     }
     transportKnobsSent_ = true;
+  }
+}
+
+void QuicClientTransport::maybeEnableStreamGroups() {
+  if (conn_->transportSettings.maxStreamGroupsAdvertized == 0) {
+    return;
+  }
+
+  auto streamGroupsEnabledParam =
+      std::make_unique<CustomIntegralTransportParameter>(
+          kStreamGroupsEnabledCustomParamId,
+          conn_->transportSettings.maxStreamGroupsAdvertized);
+
+  if (!setCustomTransportParameter(
+          std::move(streamGroupsEnabledParam), customTransportParameters_)) {
+    LOG(ERROR) << "failed to set stream groups enabled transport parameter";
   }
 }
 

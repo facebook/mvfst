@@ -159,6 +159,9 @@ void processClientInitialParams(
       TransportParameterId::max_ack_delay, clientParams.parameters);
   auto maxDatagramFrameSize = getIntegerParameter(
       TransportParameterId::max_datagram_frame_size, clientParams.parameters);
+  auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
+      static_cast<TransportParameterId>(kStreamGroupsEnabledCustomParamId),
+      clientParams.parameters);
 
   if (conn.version == QuicVersion::QUIC_DRAFT ||
       conn.version == QuicVersion::QUIC_V1) {
@@ -326,6 +329,10 @@ void processClientInitialParams(
                    << *d6dProbeTimeout;
       }
     }
+  }
+
+  if (peerMaxStreamGroupsAdvertized) {
+    conn.peerMaxStreamGroupsAdvertized = *peerMaxStreamGroupsAdvertized;
   }
 }
 
@@ -1480,6 +1487,19 @@ std::vector<TransportParameter> setSupportedExtensionTransportParameters(
             conn.datagramState.maxReadFrameSize);
     customTransportParams.push_back(maxDatagramFrameSize->encode());
   }
+
+  if (conn.transportSettings.maxStreamGroupsAdvertized > 0) {
+    auto streamGroupsEnabledParam =
+        std::make_unique<CustomIntegralTransportParameter>(
+            kStreamGroupsEnabledCustomParamId,
+            conn.transportSettings.maxStreamGroupsAdvertized);
+
+    if (!setCustomTransportParameter(
+            std::move(streamGroupsEnabledParam), customTransportParams)) {
+      LOG(ERROR) << "failed to set stream groups enabled transport parameter";
+    }
+  }
+
   return customTransportParams;
 }
 } // namespace quic

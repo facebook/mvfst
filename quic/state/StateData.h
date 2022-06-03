@@ -733,6 +733,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   };
 
   DatagramState datagramState;
+
+  // Peer max stream groups advertized.
+  folly::Optional<uint64_t> peerMaxStreamGroupsAdvertized;
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);
