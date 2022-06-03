@@ -339,5 +339,21 @@ class MockQuicSocket : public QuicSocket {
       getSocketObserverContainer,
       (),
       (const));
+  MOCK_METHOD(
+      (folly::Expected<StreamGroupId, LocalErrorCode>),
+      createBidirectionalStreamGroup,
+      ());
+  MOCK_METHOD(
+      (folly::Expected<StreamGroupId, LocalErrorCode>),
+      createUnidirectionalStreamGroup,
+      ());
+  MOCK_METHOD(
+      (folly::Expected<StreamId, LocalErrorCode>),
+      createBidirectionalStreamInGroup,
+      (StreamGroupId));
+  MOCK_METHOD(
+      (folly::Expected<StreamId, LocalErrorCode>),
+      createUnidirectionalStreamInGroup,
+      (StreamGroupId));
 };
 } // namespace quic

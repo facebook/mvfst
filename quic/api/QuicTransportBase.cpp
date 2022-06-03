@@ -1955,6 +1955,28 @@ QuicTransportBase::createUnidirectionalStream(bool /*replaySafe*/) {
   return createStreamInternal(false);
 }
 
+folly::Expected<StreamGroupId, LocalErrorCode>
+QuicTransportBase::createBidirectionalStreamGroup() {
+  return 0;
+}
+
+folly::Expected<StreamGroupId, LocalErrorCode>
+QuicTransportBase::createUnidirectionalStreamGroup() {
+  return 0;
+}
+
+folly::Expected<StreamId, LocalErrorCode>
+QuicTransportBase::createBidirectionalStreamInGroup(
+    StreamGroupId /* groupId */) {
+  return 0;
+}
+
+folly::Expected<StreamId, LocalErrorCode>
+QuicTransportBase::createUnidirectionalStreamInGroup(
+    StreamGroupId /* groupId */) {
+  return 0;
+}
+
 bool QuicTransportBase::isClientStream(StreamId stream) noexcept {
   return quic::isClientStream(stream);
 }

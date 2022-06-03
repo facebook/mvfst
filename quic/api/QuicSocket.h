@@ -95,10 +95,36 @@ class QuicSocket {
     virtual void onNewBidirectionalStream(StreamId id) noexcept = 0;
 
     /**
+     * Invoked when the peer creates a new bidirectional stream group.
+     */
+    virtual void onNewBidirectionalStreamGroup(StreamGroupId) noexcept {}
+
+    /**
+     * Invoked when the peer creates a new bidirectional stream in a specific
+     * group.
+     */
+    virtual void onNewBidirectionalStreamInGroup(
+        StreamId,
+        StreamGroupId) noexcept {}
+
+    /**
      * Invoked when the peer creates a new unidirectional stream.  The most
      * common flow would be to set the ReadCallback from here
      */
     virtual void onNewUnidirectionalStream(StreamId id) noexcept = 0;
+
+    /**
+     * Invoked when the peer creates a new unidirectional stream group.
+     */
+    virtual void onNewUnidirectionalStreamGroup(StreamGroupId) noexcept {}
+
+    /**
+     * Invoked when the peer creates a new unidirectional stream in a specific
+     * group.
+     */
+    virtual void onNewUnidirectionalStreamInGroup(
+        StreamId,
+        StreamGroupId) noexcept {}
 
     /**
      * Invoked when a stream receives a StopSending frame from a peer.
@@ -543,10 +569,21 @@ class QuicSocket {
      */
     virtual void readAvailable(StreamId id) noexcept = 0;
 
+    /*
+     * Same as above, but called on streams within a group.
+     */
+    virtual void readAvailableWithGroup(StreamId, StreamGroupId) noexcept {}
+
     /**
      * Called from the transport layer when there is an error on the stream.
      */
     virtual void readError(StreamId id, QuicError error) noexcept = 0;
+
+    /**
+     * Same as above, but called on streams within a group.
+     */
+    virtual void
+    readErrorWithGroup(StreamId, StreamGroupId, QuicError) noexcept {}
   };
 
   /**
@@ -755,6 +792,30 @@ class QuicSocket {
    */
   virtual folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
       bool replaySafe = true) = 0;
+
+  /**
+   *  Create a bidirectional stream group.
+   */
+  virtual folly::Expected<StreamGroupId, LocalErrorCode>
+  createBidirectionalStreamGroup() = 0;
+
+  /**
+   *  Create a unidirectional stream group.
+   */
+  virtual folly::Expected<StreamGroupId, LocalErrorCode>
+  createUnidirectionalStreamGroup() = 0;
+
+  /**
+   *  Same as createBidirectionalStream(), but creates a stream in a group.
+   */
+  virtual folly::Expected<StreamId, LocalErrorCode>
+  createBidirectionalStreamInGroup(StreamGroupId groupId) = 0;
+
+  /**
+   *  Same as createBidirectionalStream(), but creates a stream in a group.
+   */
+  virtual folly::Expected<StreamId, LocalErrorCode>
+  createUnidirectionalStreamInGroup(StreamGroupId groupId) = 0;
 
   /**
    * Returns the number of bidirectional streams that can be opened.

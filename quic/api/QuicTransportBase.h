@@ -153,6 +153,14 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
       bool replaySafe = true) override;
   folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStream(
       bool replaySafe = true) override;
+  folly::Expected<StreamGroupId, LocalErrorCode>
+  createBidirectionalStreamGroup() override;
+  folly::Expected<StreamGroupId, LocalErrorCode>
+  createUnidirectionalStreamGroup() override;
+  folly::Expected<StreamId, LocalErrorCode> createBidirectionalStreamInGroup(
+      StreamGroupId groupId) override;
+  folly::Expected<StreamId, LocalErrorCode> createUnidirectionalStreamInGroup(
+      StreamGroupId groupId) override;
   uint64_t getNumOpenableBidirectionalStreams() const override;
   uint64_t getNumOpenableUnidirectionalStreams() const override;
   bool isClientStream(StreamId stream) noexcept override;
