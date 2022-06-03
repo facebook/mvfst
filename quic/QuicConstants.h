@@ -193,6 +193,15 @@ enum class FrameType : uint64_t {
   DATAGRAM_LEN = 0x31,
   KNOB = 0x1550,
   ACK_FREQUENCY = 0xAF,
+  // Stream groups.
+  GROUP_STREAM = 0x32,
+  GROUP_STREAM_FIN = 0x33,
+  GROUP_STREAM_LEN = 0x34,
+  GROUP_STREAM_LEN_FIN = 0x35,
+  GROUP_STREAM_OFF = 0x36,
+  GROUP_STREAM_OFF_FIN = 0x37,
+  GROUP_STREAM_OFF_LEN = 0x38,
+  GROUP_STREAM_OFF_LEN_FIN = 0x39,
 };
 
 inline constexpr uint16_t toFrameError(FrameType frame) {

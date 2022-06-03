@@ -124,7 +124,8 @@ ReadAckFrame decodeAckFrameWithECN(
 
 ReadStreamFrame decodeStreamFrame(
     BufQueue& queue,
-    StreamTypeField frameTypeField);
+    StreamTypeField frameTypeField,
+    bool isGroupFrame = false);
 
 ReadCryptoFrame decodeCryptoFrame(folly::io::Cursor& cursor);
 

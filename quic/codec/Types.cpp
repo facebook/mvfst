@@ -294,6 +294,11 @@ uint8_t StreamTypeField::fieldValue() const {
   return field_;
 }
 
+StreamTypeField::Builder& StreamTypeField::Builder::switchToStreamGroups() {
+  field_ = static_cast<uint8_t>(FrameType::GROUP_STREAM);
+  return *this;
+}
+
 StreamTypeField::Builder& StreamTypeField::Builder::setFin() {
   field_ |= StreamTypeField::kFinBit;
   return *this;
@@ -430,6 +435,15 @@ std::string toString(FrameType frame) {
       return "KNOB";
     case FrameType::ACK_FREQUENCY:
       return "ACK_FREQUENCY";
+    case FrameType::GROUP_STREAM:
+    case FrameType::GROUP_STREAM_FIN:
+    case FrameType::GROUP_STREAM_LEN:
+    case FrameType::GROUP_STREAM_LEN_FIN:
+    case FrameType::GROUP_STREAM_OFF:
+    case FrameType::GROUP_STREAM_OFF_FIN:
+    case FrameType::GROUP_STREAM_OFF_LEN:
+    case FrameType::GROUP_STREAM_OFF_LEN_FIN:
+      return "GROUP_STREAM";
   }
   LOG(WARNING) << "toString has unhandled frame type";
   return "UNKNOWN";

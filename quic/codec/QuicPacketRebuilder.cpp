@@ -97,7 +97,8 @@ folly::Optional<PacketEvent> PacketRebuilder::rebuildFromPacket(
               // It's safe to skip the length if it was the last frame in the
               // original packet and there's no ACK frame. Since we put the ACK
               // frame last we need to end the stream frame in that case.
-              lastFrame && bufferLen && !hasAckFrame);
+              lastFrame && bufferLen && !hasAckFrame,
+              streamFrame.streamGroupId);
           bool ret = dataLen.has_value() && *dataLen == streamFrame.len;
           if (ret) {
             // Writing 0 byte for stream data is legit if the stream frame has

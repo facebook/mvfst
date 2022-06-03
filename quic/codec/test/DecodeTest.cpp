@@ -85,7 +85,8 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
     folly::Optional<QuicInteger> offset = folly::none,
     folly::Optional<QuicInteger> dataLength = folly::none,
     Buf data = nullptr,
-    bool useRealValuesForStreamId = false) {
+    bool useRealValuesForStreamId = false,
+    folly::Optional<QuicInteger> groupId = folly::none) {
   std::unique_ptr<folly::IOBuf> streamFrame = folly::IOBuf::create(0);
   BufAppender wcursor(streamFrame.get(), 10);
   auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
@@ -95,6 +96,9 @@ std::unique_ptr<folly::IOBuf> createStreamFrame(
     } else {
       streamId->encode(appenderOp);
     }
+  }
+  if (groupId) {
+    groupId->encode(appenderOp);
   }
   if (offset) {
     offset->encode(appenderOp);
@@ -774,6 +778,36 @@ TEST_F(DecodeTest, ParsePlaintextRetryToken) {
   EXPECT_TRUE(parseResult.hasValue());
 
   EXPECT_EQ(parseResult.value(), timestampInMs);
+}
+
+TEST_F(DecodeTest, StreamGroupDecodeSuccess) {
+  QuicInteger streamId(10);
+  QuicInteger groupId(20);
+  QuicInteger offset(10);
+  QuicInteger length(1);
+  auto streamType = StreamTypeField::Builder()
+                        .switchToStreamGroups()
+                        .setFin()
+                        .setOffset()
+                        .setLength()
+                        .build();
+
+  auto streamFrame = createStreamFrame(
+      streamId,
+      offset,
+      length,
+      folly::IOBuf::copyBuffer("a"),
+      false /* useRealValuesForStreamId */,
+      groupId);
+  BufQueue queue;
+  queue.append(streamFrame->clone());
+  auto decodedFrame =
+      decodeStreamFrame(queue, streamType, true /* isGroupFrame */);
+  EXPECT_EQ(decodedFrame.offset, 10);
+  EXPECT_EQ(decodedFrame.data->computeChainDataLength(), 1);
+  EXPECT_EQ(decodedFrame.streamId, 10);
+  EXPECT_EQ(*decodedFrame.streamGroupId, 20);
+  EXPECT_TRUE(decodedFrame.fin);
 }
 
 } // namespace test

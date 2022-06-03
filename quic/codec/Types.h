@@ -1003,6 +1003,7 @@ struct StreamTypeField {
   struct Builder {
    public:
     Builder() : field_(static_cast<uint8_t>(FrameType::STREAM)) {}
+    Builder& switchToStreamGroups();
     Builder& setFin();
     Builder& setOffset();
     Builder& setLength();

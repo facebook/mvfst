@@ -358,7 +358,8 @@ bool StreamFrameScheduler::writeStreamLossBuffers(
         bufferLen, // writeBufferLen -- only the len of the single buffer.
         bufferLen, // flowControlLen -- not relevant, already flow controlled.
         buffer->eof,
-        folly::none /* skipLenHint */);
+        folly::none /* skipLenHint */,
+        stream.groupId);
     if (dataLen) {
       wroteStreamFrame = true;
       writeStreamFrameData(builder, buffer->data, *dataLen);
@@ -531,7 +532,8 @@ bool StreamFrameScheduler::writeStreamFrame(
       bufferLen,
       flowControlLen,
       canWriteFin,
-      folly::none /* skipLenHint */);
+      folly::none /* skipLenHint */,
+      stream.groupId);
   if (!dataLen) {
     return false;
   }

@@ -364,15 +364,32 @@ ReadNewTokenFrame decodeNewTokenFrame(folly::io::Cursor& cursor) {
 
 ReadStreamFrame decodeStreamFrame(
     BufQueue& queue,
-    StreamTypeField frameTypeField) {
+    StreamTypeField frameTypeField,
+    bool isGroupFrame) {
+  const quic::FrameType frameType =
+      isGroupFrame ? quic::FrameType::GROUP_STREAM : quic::FrameType::STREAM;
   folly::io::Cursor cursor(queue.front());
+
   auto streamId = decodeQuicInteger(cursor);
   if (!streamId) {
     throw QuicTransportException(
         "Invalid stream id",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-        quic::FrameType::STREAM);
+        frameType);
   }
+
+  folly::Optional<StreamGroupId> groupId;
+  if (isGroupFrame) {
+    auto gId = decodeQuicInteger(cursor);
+    if (!gId) {
+      throw QuicTransportException(
+          "Invalid group stream id",
+          quic::TransportErrorCode::FRAME_ENCODING_ERROR,
+          frameType);
+    }
+    groupId = gId->first;
+  }
+
   uint64_t offset = 0;
   if (frameTypeField.hasOffset()) {
     auto optionalOffset = decodeQuicInteger(cursor);
@@ -380,7 +397,7 @@ ReadStreamFrame decodeStreamFrame(
       throw QuicTransportException(
           "Invalid offset",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::STREAM);
+          frameType);
     }
     offset = optionalOffset->first;
   }
@@ -392,7 +409,7 @@ ReadStreamFrame decodeStreamFrame(
       throw QuicTransportException(
           "Invalid length",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::STREAM);
+          frameType);
     }
   }
   Buf data;
@@ -401,7 +418,7 @@ ReadStreamFrame decodeStreamFrame(
       throw QuicTransportException(
           "Length mismatch",
           quic::TransportErrorCode::FRAME_ENCODING_ERROR,
-          quic::FrameType::STREAM);
+          frameType);
     }
     // If dataLength > data's actual length then the cursor will throw.
     queue.trimStart(cursor - queue.front());
@@ -413,7 +430,11 @@ ReadStreamFrame decodeStreamFrame(
     data = queue.move();
   }
   return ReadStreamFrame(
-      folly::to<StreamId>(streamId->first), offset, std::move(data), fin);
+      folly::to<StreamId>(streamId->first),
+      offset,
+      std::move(data),
+      fin,
+      groupId);
 }
 
 MaxDataFrame decodeMaxDataFrame(folly::io::Cursor& cursor) {
@@ -756,8 +777,23 @@ QuicFrame parseFrame(
       case FrameType::STREAM_OFF_LEN:
       case FrameType::STREAM_OFF_LEN_FIN:
         consumedQueue = true;
-        return QuicFrame(
-            decodeStreamFrame(queue, StreamTypeField(frameTypeInt->first)));
+        return QuicFrame(decodeStreamFrame(
+            queue,
+            StreamTypeField(frameTypeInt->first),
+            false /* isGroupFrame */));
+      case FrameType::GROUP_STREAM:
+      case FrameType::GROUP_STREAM_FIN:
+      case FrameType::GROUP_STREAM_LEN:
+      case FrameType::GROUP_STREAM_LEN_FIN:
+      case FrameType::GROUP_STREAM_OFF:
+      case FrameType::GROUP_STREAM_OFF_FIN:
+      case FrameType::GROUP_STREAM_OFF_LEN:
+      case FrameType::GROUP_STREAM_OFF_LEN_FIN:
+        consumedQueue = true;
+        return QuicFrame(decodeStreamFrame(
+            queue,
+            StreamTypeField(frameTypeInt->first),
+            true /* isGroupFrame */));
       case FrameType::MAX_DATA:
         return QuicFrame(decodeMaxDataFrame(cursor));
       case FrameType::MAX_STREAM_DATA:

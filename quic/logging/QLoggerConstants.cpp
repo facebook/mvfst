@@ -79,6 +79,15 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "knob";
     case FrameType::ACK_FREQUENCY:
       return "ack_frequency";
+    case FrameType::GROUP_STREAM:
+    case FrameType::GROUP_STREAM_FIN:
+    case FrameType::GROUP_STREAM_LEN:
+    case FrameType::GROUP_STREAM_LEN_FIN:
+    case FrameType::GROUP_STREAM_OFF:
+    case FrameType::GROUP_STREAM_OFF_FIN:
+    case FrameType::GROUP_STREAM_OFF_LEN:
+    case FrameType::GROUP_STREAM_OFF_LEN_FIN:
+      return "group_stream";
   }
   folly::assume_unreachable();
 }

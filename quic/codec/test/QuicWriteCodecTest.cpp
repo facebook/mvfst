@@ -1624,5 +1624,58 @@ TEST_F(QuicWriteCodecTest, WritePathResponse) {
   EXPECT_EQ(wirePathResponseFrame.pathData, pathData);
   EXPECT_EQ(queue.chainLength(), 0);
 }
+
+TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
+  MockQuicPacketBuilder pktBuilder;
+  pktBuilder.remaining_ = 1300;
+  setupCommonExpects(pktBuilder);
+  auto inputBuf = buildRandomInputData(50);
+
+  StreamId streamId = 4;
+  StreamGroupId groupId = 64;
+  uint64_t offset = 0;
+  bool fin = true;
+
+  auto dataLen = writeStreamFrameHeader(
+      pktBuilder,
+      streamId,
+      offset,
+      50,
+      50,
+      fin,
+      folly::none /* skipLenHint */,
+      groupId);
+  ASSERT_TRUE(dataLen);
+  ASSERT_EQ(*dataLen, 50);
+  writeStreamFrameData(pktBuilder, inputBuf->clone(), 50);
+
+  auto outputBuf = pktBuilder.data_->clone();
+  EXPECT_EQ(outputBuf->computeChainDataLength(), 55);
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  EXPECT_EQ(regularPacket.frames.size(), 1);
+  auto& resultFrame = *regularPacket.frames.back().asWriteStreamFrame();
+  EXPECT_EQ(resultFrame.streamId, streamId);
+  EXPECT_EQ(resultFrame.streamGroupId, groupId);
+  EXPECT_EQ(resultFrame.offset, offset);
+  EXPECT_EQ(resultFrame.len, 50);
+
+  // Verify the on wire bytes via decoder.
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame streamFrameDecoded = quic::parseFrame(
+      queue,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  auto& decodedStreamFrame = *streamFrameDecoded.asReadStreamFrame();
+  EXPECT_EQ(decodedStreamFrame.streamId, streamId);
+  EXPECT_EQ(decodedStreamFrame.streamGroupId, groupId);
+  EXPECT_EQ(decodedStreamFrame.offset, offset);
+  EXPECT_EQ(decodedStreamFrame.data->computeChainDataLength(), 50);
+  EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, decodedStreamFrame.data));
+}
+
 } // namespace test
 } // namespace quic

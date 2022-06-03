@@ -35,7 +35,8 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
     uint64_t writeBufferLen,
     uint64_t flowControlLen,
     bool fin,
-    folly::Optional<bool> skipLenHint) {
+    folly::Optional<bool> skipLenHint,
+    folly::Optional<StreamGroupId> streamGroupId) {
   if (builder.remainingSpaceInPkt() == 0) {
     return folly::none;
   }
@@ -45,10 +46,21 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
         LocalErrorCode::INTERNAL_ERROR);
   }
   StreamTypeField::Builder streamTypeBuilder;
+  if (streamGroupId) {
+    streamTypeBuilder.switchToStreamGroups();
+  }
   QuicInteger idInt(id);
-  // First account for the things that are non-optional: frame type and stream
-  // id.
+  folly::Optional<QuicInteger> groupIdInt;
+  if (streamGroupId) {
+    groupIdInt = QuicInteger(*streamGroupId);
+  }
+
+  // First account for the things that are non-optional: frame type, stream id
+  // and (optional) group id.
   uint64_t headerSize = sizeof(uint8_t) + idInt.getSize();
+  if (groupIdInt) {
+    headerSize += groupIdInt->getSize();
+  }
   if (builder.remainingSpaceInPkt() < headerSize) {
     VLOG(4) << "No space in packet for stream header. stream=" << id
             << " remaining=" << builder.remainingSpaceInPkt();
@@ -131,14 +143,22 @@ folly::Optional<uint64_t> writeStreamFrameHeader(
   auto streamType = streamTypeBuilder.build();
   builder.writeBE(streamType.fieldValue());
   builder.write(idInt);
+  if (groupIdInt) {
+    builder.write(*groupIdInt);
+  }
   if (offset != 0) {
     builder.write(offsetInt);
   }
   if (dataLenLen > 0) {
     builder.write(QuicInteger(dataLen));
   }
-  builder.appendFrame(
-      WriteStreamFrame(id, offset, dataLen, streamType.hasFin()));
+  builder.appendFrame(WriteStreamFrame(
+      id,
+      offset,
+      dataLen,
+      streamType.hasFin(),
+      false /* fromBufMetaIn */,
+      streamGroupId));
   DCHECK(dataLen <= builder.remainingSpaceInPkt());
   return folly::make_optional(dataLen);
 }
