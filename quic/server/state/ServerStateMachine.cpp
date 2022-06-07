@@ -1083,7 +1083,8 @@ void onServerReadDataFromOpen(
                    << " fin=" << frame.fin << " " << conn;
           pktHasRetransmittableData = true;
           isNonProbingPacket = true;
-          auto stream = conn.streamManager->getStream(frame.streamId);
+          auto stream = conn.streamManager->getStream(
+              frame.streamId, frame.streamGroupId);
           // Ignore data from closed streams that we don't have the
           // state for any more.
           if (stream) {

@@ -494,7 +494,8 @@ void QuicClientTransport::processPacketData(
                  << " len=" << frame.data->computeChainDataLength()
                  << " fin=" << frame.fin << " packetNum=" << packetNum << " "
                  << *this;
-        auto stream = conn_->streamManager->getStream(frame.streamId);
+        auto stream = conn_->streamManager->getStream(
+            frame.streamId, frame.streamGroupId);
         pktHasRetransmittableData = true;
         if (!stream) {
           VLOG(10) << "Could not find stream=" << frame.streamId << " "

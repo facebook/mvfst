@@ -39,15 +39,26 @@ enum class TestFrameType : uint8_t {
   EXPIRED_DATA,
   REJECTED_DATA,
   MAX_STREAMS,
-  DATAGRAM
+  DATAGRAM,
+  STREAM_GROUP
 };
 
 // A made up encoding decoding of a stream.
-Buf encodeStreamBuffer(StreamId id, StreamBuffer data) {
+Buf encodeStreamBuffer(
+    StreamId id,
+    StreamBuffer data,
+    folly::Optional<StreamGroupId> groupId = folly::none) {
   auto buf = IOBuf::create(10);
   folly::io::Appender appender(buf.get(), 10);
-  appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM));
+  if (!groupId) {
+    appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM));
+  } else {
+    appender.writeBE(static_cast<uint8_t>(TestFrameType::STREAM_GROUP));
+  }
   appender.writeBE(id);
+  if (groupId) {
+    appender.writeBE(*groupId);
+  }
   auto dataBuf = data.data.move();
   dataBuf->coalesce();
   appender.writeBE<uint32_t>(dataBuf->length());
@@ -114,6 +125,23 @@ std::pair<StreamId, StreamBuffer> decodeStreamBuffer(
   return std::make_pair(
       streamId,
       StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof));
+}
+
+struct StreamGroupIdBuf {
+  StreamId id;
+  StreamGroupId groupId;
+  StreamBuffer buf;
+};
+
+StreamGroupIdBuf decodeStreamGroupBuffer(folly::io::Cursor& cursor) {
+  auto streamId = cursor.readBE<StreamId>();
+  auto groupId = cursor.readBE<StreamGroupId>();
+  auto dataBuffer = decodeDataBuffer(cursor);
+  bool eof = (bool)cursor.readBE<uint8_t>();
+  return StreamGroupIdBuf{
+      streamId,
+      groupId,
+      StreamBuffer(std::move(dataBuffer.first), dataBuffer.second, eof)};
 }
 
 StreamBuffer decodeCryptoBuffer(folly::io::Cursor& cursor) {
@@ -258,6 +286,16 @@ class TestQuicTransport
         auto buffer = decodeDatagramFrame(cursor);
         auto frame = DatagramFrame(buffer.second, std::move(buffer.first));
         handleDatagram(*conn_, frame, data.receiveTimePoint);
+      } else if (type == TestFrameType::STREAM_GROUP) {
+        auto res = decodeStreamGroupBuffer(cursor);
+        QuicStreamState* stream =
+            conn_->streamManager->getStream(res.id, res.groupId);
+        if (!stream) {
+          continue;
+        }
+        appendDataToReadBuffer(*stream, std::move(res.buf));
+        conn_->streamManager->updateReadableStreams(*stream);
+        conn_->streamManager->updatePeekableStreams(*stream);
       } else {
         auto buffer = decodeStreamBuffer(cursor);
         QuicStreamState* stream = conn_->streamManager->getStream(buffer.first);
@@ -346,8 +384,11 @@ class TestQuicTransport
 
   void onReadError(const folly::AsyncSocketException&) noexcept {}
 
-  void addDataToStream(StreamId id, StreamBuffer data) {
-    auto buf = encodeStreamBuffer(id, std::move(data));
+  void addDataToStream(
+      StreamId id,
+      StreamBuffer data,
+      folly::Optional<StreamGroupId> groupId = folly::none) {
+    auto buf = encodeStreamBuffer(id, std::move(data), std::move(groupId));
     SocketAddress addr("127.0.0.1", 1000);
     onNetworkData(addr, NetworkData(std::move(buf), Clock::now()));
   }
@@ -4036,6 +4077,161 @@ TEST_P(QuicTransportImplTestBase, BackgroundModeChangeWithStreamChanges) {
   CHECK_NOTNULL(manager.getStream(stream2Id))->recvState =
       StreamRecvState::Closed;
   manager.removeClosedStream(stream2Id);
+}
+
+class QuicTransportImplTestWithGroups : public QuicTransportImplTestBase {};
+
+INSTANTIATE_TEST_SUITE_P(
+    QuicTransportImplTestWithGroups,
+    QuicTransportImplTestWithGroups,
+    ::testing::Values(DelayedStreamNotifsTestParam{
+        .notifyOnNewStreamsExplicitly = true}));
+
+TEST_P(QuicTransportImplTestWithGroups, ReadCallbackWithGroupsDataAvailable) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.maxStreamGroupsAdvertized = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  auto groupId = transport->createBidirectionalStreamGroup();
+  EXPECT_TRUE(groupId.hasValue());
+  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
+  auto stream2 = transport->createBidirectionalStreamInGroup(*groupId).value();
+
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
+
+  transport->setReadCallback(stream1, &readCb1);
+  transport->setReadCallback(stream2, &readCb2);
+
+  transport->addDataToStream(
+      stream1,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
+      *groupId);
+
+  transport->addDataToStream(
+      stream2,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10),
+      *groupId);
+
+  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
+  transport->driveReadCallbacks();
+
+  transport->addDataToStream(
+      stream2,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
+      *groupId);
+
+  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
+  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
+  transport->driveReadCallbacks();
+
+  EXPECT_CALL(readCb1, readAvailableWithGroup(stream1, *groupId));
+  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
+  transport->driveReadCallbacks();
+
+  EXPECT_CALL(readCb2, readAvailableWithGroup(stream2, *groupId));
+  transport->setReadCallback(stream1, nullptr);
+  transport->driveReadCallbacks();
+  transport.reset();
+}
+
+TEST_P(QuicTransportImplTestWithGroups, ReadErrorCallbackWithGroups) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.maxStreamGroupsAdvertized = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  auto groupId = transport->createBidirectionalStreamGroup();
+  EXPECT_TRUE(groupId.hasValue());
+  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
+
+  NiceMock<MockReadCallback> readCb1;
+
+  transport->setReadCallback(stream1, &readCb1);
+
+  transport->addStreamReadError(stream1, LocalErrorCode::NO_ERROR);
+  transport->addDataToStream(
+      stream1,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
+      *groupId);
+
+  EXPECT_CALL(readCb1, readErrorWithGroup(stream1, *groupId, _));
+  transport->driveReadCallbacks();
+
+  transport.reset();
+}
+
+TEST_P(
+    QuicTransportImplTestWithGroups,
+    ReadCallbackWithGroupsCancellCallbacks) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.maxStreamGroupsAdvertized = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  auto groupId = transport->createBidirectionalStreamGroup();
+  EXPECT_TRUE(groupId.hasValue());
+  auto stream1 = transport->createBidirectionalStreamInGroup(*groupId).value();
+  auto stream2 = transport->createBidirectionalStreamInGroup(*groupId).value();
+
+  NiceMock<MockReadCallback> readCb1;
+  NiceMock<MockReadCallback> readCb2;
+
+  transport->setReadCallback(stream1, &readCb1);
+  transport->setReadCallback(stream2, &readCb2);
+
+  transport->addDataToStream(
+      stream1,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 0),
+      *groupId);
+
+  transport->addDataToStream(
+      stream2,
+      StreamBuffer(folly::IOBuf::copyBuffer("actual stream data"), 10),
+      *groupId);
+
+  EXPECT_CALL(readCb1, readErrorWithGroup(stream1, *groupId, _));
+  EXPECT_CALL(readCb2, readErrorWithGroup(stream2, *groupId, _));
+  QuicError error =
+      QuicError(TransportErrorCode::PROTOCOL_VIOLATION, "test error");
+  transport->cancelAllAppCallbacks(error);
+  transport.reset();
+}
+
+TEST_P(QuicTransportImplTestWithGroups, onNewStreamsAndGroupsCallbacks) {
+  auto transportSettings = transport->getTransportSettings();
+  transportSettings.maxStreamGroupsAdvertized = 16;
+  transport->setTransportSettings(transportSettings);
+  transport->getConnectionState().streamManager->refreshTransportSettings(
+      transportSettings);
+
+  auto readData = folly::IOBuf::copyBuffer("actual stream data");
+
+  StreamGroupId groupId = 0x00;
+  StreamId stream1 = 0x00;
+  EXPECT_CALL(connCallback, onNewBidirectionalStreamGroup(groupId));
+  EXPECT_CALL(connCallback, onNewBidirectionalStreamInGroup(stream1, groupId));
+  transport->addDataToStream(
+      stream1, StreamBuffer(readData->clone(), 0, true), groupId);
+
+  StreamId stream2 = 0x04;
+  EXPECT_CALL(connCallback, onNewBidirectionalStreamInGroup(stream2, groupId));
+  transport->addDataToStream(
+      stream2, StreamBuffer(readData->clone(), 0, true), groupId);
+
+  StreamGroupId groupIdUni = 0x02;
+  StreamId uniStream3 = 0xa;
+  EXPECT_CALL(connCallback, onNewUnidirectionalStreamGroup(groupIdUni));
+  EXPECT_CALL(
+      connCallback, onNewUnidirectionalStreamInGroup(uniStream3, groupIdUni));
+  transport->addDataToStream(
+      uniStream3, StreamBuffer(readData->clone(), 0, true), groupIdUni);
+
+  transport.reset();
 }
 
 } // namespace test

@@ -709,6 +709,7 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   void handleAckEventCallbacks();
   void handleCancelByteEventCallbacks();
   void handleNewStreamCallbacks(std::vector<StreamId>& newPeerStreams);
+  void handleNewGroupedStreamCallbacks(std::vector<StreamId>& newPeerStreams);
   void handleDeliveryCallbacks();
   void handleStreamFlowControlUpdatedCallbacks(
       std::vector<StreamId>& streamStorage);
@@ -933,6 +934,18 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   // (value >= threshold), the connection is considered to be in backround mode.
   folly::Optional<PriorityLevel> backgroundPriorityThreshold_;
   folly::Optional<float> backgroundUtilizationFactor_;
+
+ private:
+  /**
+   * Helper funtions to handle new streams.
+   */
+  void handleNewStreams(std::vector<StreamId>& newPeerStreams);
+  void handleNewGroupedStreams(std::vector<StreamId>& newPeerStreams);
+
+  /**
+   * Helper to log new stream event to observer.
+   */
+  void logStreamOpenEvent(StreamId streamId);
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicTransportBase& qt);

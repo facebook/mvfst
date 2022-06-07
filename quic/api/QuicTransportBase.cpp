@@ -854,12 +854,21 @@ void QuicTransportBase::invokeReadDataAndCallbacks() {
       peekCallbacks_.erase(streamId);
       VLOG(10) << "invoking read error callbacks on stream=" << streamId << " "
                << *this;
-      readCb->readError(streamId, QuicError(*stream->streamReadError));
+      if (!stream->groupId) {
+        readCb->readError(streamId, QuicError(*stream->streamReadError));
+      } else {
+        readCb->readErrorWithGroup(
+            streamId, *stream->groupId, QuicError(*stream->streamReadError));
+      }
     } else if (
         readCb && callback->second.resumed && stream->hasReadableData()) {
       VLOG(10) << "invoking read callbacks on stream=" << streamId << " "
                << *this;
-      readCb->readAvailable(streamId);
+      if (!stream->groupId) {
+        readCb->readAvailable(streamId);
+      } else {
+        readCb->readAvailableWithGroup(streamId, *stream->groupId);
+      }
     }
   }
   if (self->datagramCallback_ && !conn_->datagramState.readBuffer.empty()) {
@@ -1538,11 +1547,24 @@ void QuicTransportBase::handleCancelByteEventCallbacks() {
   }
 }
 
-void QuicTransportBase::handleNewStreamCallbacks(
-    std::vector<StreamId>& streamStorage) {
-  streamStorage =
-      conn_->streamManager->consumeNewPeerStreams(std::move(streamStorage));
+void QuicTransportBase::logStreamOpenEvent(StreamId streamId) {
+  if (getSocketObserverContainer() &&
+      getSocketObserverContainer()
+          ->hasObserversForEvent<
+              SocketObserverInterface::Events::streamEvents>()) {
+    getSocketObserverContainer()
+        ->invokeInterfaceMethod<SocketObserverInterface::Events::streamEvents>(
+            [event = SocketObserverInterface::StreamOpenEvent(
+                 streamId,
+                 getStreamInitiator(streamId),
+                 getStreamDirectionality(streamId))](
+                auto observer, auto observed) {
+              observer->streamOpened(observed, event);
+            });
+  }
+}
 
+void QuicTransportBase::handleNewStreams(std::vector<StreamId>& streamStorage) {
   const auto& newPeerStreamIds = streamStorage;
   for (const auto& streamId : newPeerStreamIds) {
     CHECK_NOTNULL(connCallback_);
@@ -1552,28 +1574,58 @@ void QuicTransportBase::handleNewStreamCallbacks(
       connCallback_->onNewUnidirectionalStream(streamId);
     }
 
-    if (getSocketObserverContainer() &&
-        getSocketObserverContainer()
-            ->hasObserversForEvent<
-                SocketObserverInterface::Events::streamEvents>()) {
-      getSocketObserverContainer()
-          ->invokeInterfaceMethod<
-              SocketObserverInterface::Events::streamEvents>(
-              [event = SocketObserverInterface::StreamOpenEvent(
-                   streamId,
-                   getStreamInitiator(streamId),
-                   getStreamDirectionality(streamId))](
-                  auto observer, auto observed) {
-                observer->streamOpened(observed, event);
-              });
-    }
-
+    logStreamOpenEvent(streamId);
     if (closeState_ != CloseState::OPEN) {
       return;
     }
   }
-
   streamStorage.clear();
+}
+
+void QuicTransportBase::handleNewGroupedStreams(
+    std::vector<StreamId>& streamStorage) {
+  const auto& newPeerStreamIds = streamStorage;
+  for (const auto& streamId : newPeerStreamIds) {
+    CHECK_NOTNULL(connCallback_);
+    auto stream = conn_->streamManager->getStream(streamId);
+    CHECK(stream->groupId);
+    if (isBidirectionalStream(streamId)) {
+      connCallback_->onNewBidirectionalStreamInGroup(
+          streamId, *stream->groupId);
+    } else {
+      connCallback_->onNewUnidirectionalStreamInGroup(
+          streamId, *stream->groupId);
+    }
+
+    logStreamOpenEvent(streamId);
+    if (closeState_ != CloseState::OPEN) {
+      return;
+    }
+  }
+  streamStorage.clear();
+}
+
+void QuicTransportBase::handleNewStreamCallbacks(
+    std::vector<StreamId>& streamStorage) {
+  streamStorage =
+      conn_->streamManager->consumeNewPeerStreams(std::move(streamStorage));
+  handleNewStreams(streamStorage);
+}
+
+void QuicTransportBase::handleNewGroupedStreamCallbacks(
+    std::vector<StreamId>& streamStorage) {
+  auto newStreamGroups = conn_->streamManager->consumeNewPeerStreamGroups();
+  for (auto newStreamGroupId : newStreamGroups) {
+    if (isBidirectionalStream(newStreamGroupId)) {
+      connCallback_->onNewBidirectionalStreamGroup(newStreamGroupId);
+    } else {
+      connCallback_->onNewUnidirectionalStreamGroup(newStreamGroupId);
+    }
+  }
+
+  streamStorage = conn_->streamManager->consumeNewGroupedPeerStreams(
+      std::move(streamStorage));
+  handleNewGroupedStreams(streamStorage);
 }
 
 void QuicTransportBase::handleDeliveryCallbacks() {
@@ -1718,6 +1770,11 @@ void QuicTransportBase::processCallbacksAfterNetworkData() {
   std::vector<StreamId> tempStorage;
 
   handleNewStreamCallbacks(tempStorage);
+  if (closeState_ != CloseState::OPEN) {
+    return;
+  }
+
+  handleNewGroupedStreamCallbacks(tempStorage);
   if (closeState_ != CloseState::OPEN) {
     return;
   }
@@ -2845,7 +2902,12 @@ void QuicTransportBase::cancelAllAppCallbacks(const QuicError& err) noexcept {
   for (auto& cb : readCallbacksCopy) {
     readCallbacks_.erase(cb.first);
     if (cb.second.readCb) {
-      cb.second.readCb->readError(cb.first, err);
+      auto stream = conn_->streamManager->getStream(cb.first);
+      if (!stream->groupId) {
+        cb.second.readCb->readError(cb.first, err);
+      } else {
+        cb.second.readCb->readErrorWithGroup(cb.first, *stream->groupId, err);
+      }
     }
   }
 
@@ -2901,8 +2963,14 @@ void QuicTransportBase::resetNonControlStreams(
       auto readCallbackIt = readCallbacks_.find(id);
       if (readCallbackIt != readCallbacks_.end() &&
           readCallbackIt->second.readCb) {
-        readCallbackIt->second.readCb->readError(
-            id, QuicError(error, errorMsg.str()));
+        auto stream = conn_->streamManager->getStream(id);
+        if (!stream->groupId) {
+          readCallbackIt->second.readCb->readError(
+              id, QuicError(error, errorMsg.str()));
+        } else {
+          readCallbackIt->second.readCb->readErrorWithGroup(
+              id, *stream->groupId, QuicError(error, errorMsg.str()));
+        }
       }
       peekCallbacks_.erase(id);
       stopSending(id, error);
