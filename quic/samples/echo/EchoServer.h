@@ -66,7 +66,8 @@ class EchoServer {
       uint16_t port = 6666,
       bool useDatagrams = false,
       uint64_t activeConnIdLimit = 10,
-      bool enableMigration = true)
+      bool enableMigration = true,
+      bool enableStreamGroups = false)
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
     server_->setQuicServerTransportFactory(
         std::make_unique<EchoServerTransportFactory>(useDatagrams));
@@ -80,6 +81,10 @@ class EchoServer {
     settingsCopy.datagramConfig.enabled = useDatagrams;
     settingsCopy.selfActiveConnectionIdLimit = activeConnIdLimit;
     settingsCopy.disableMigration = !enableMigration;
+    if (enableStreamGroups) {
+      settingsCopy.notifyOnNewStreamsExplicitly = true;
+      settingsCopy.maxStreamGroupsAdvertized = 1024;
+    }
     server_->setTransportSettings(std::move(settingsCopy));
   }
 
