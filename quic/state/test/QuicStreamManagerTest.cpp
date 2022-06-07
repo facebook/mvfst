@@ -786,12 +786,100 @@ TEST_P(QuicStreamManagerGroupsTest, TestStreamsCreationInGroupsSuccess) {
   EXPECT_TRUE(stream.hasValue());
 }
 
+TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupDisabled) {
+  auto& manager = *conn.streamManager;
+
+  const StreamId peerStreamId = 2;
+  const StreamGroupId peeGroupId = 0;
+  // Throws because no groups are allowed.
+  EXPECT_THROW(
+      manager.getStream(peerStreamId, peeGroupId), QuicTransportException);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroup) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  const StreamId peerStreamId = 2;
+  const StreamGroupId peeGroupId = 0;
+  auto stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupBadGroupId) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  const StreamId peerStreamId = 2;
+  const StreamGroupId peeGroupId = 1;
+  // Expect to throw because groups id 1 is server id.
+  EXPECT_THROW(
+      manager.getStream(peerStreamId, peeGroupId), QuicTransportException);
+}
+
+TEST_P(QuicStreamManagerGroupsTest, TestPeerStreamsWithGroupAccounting) {
+  auto& manager = *conn.streamManager;
+  conn.transportSettings.maxStreamGroupsAdvertized = 16;
+  manager.refreshTransportSettings(conn.transportSettings);
+
+  StreamId peerStreamId = 2;
+  StreamGroupId peeGroupId = 0;
+  auto stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+  EXPECT_EQ(manager.getNumNewPeerStreamGroups(), 1);
+  EXPECT_EQ(manager.getNumPeerStreamGroupsSeen(), 1);
+
+  // Another stream, same group.
+  peerStreamId = 6;
+  peeGroupId = 0;
+  stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+  EXPECT_EQ(manager.getNumNewPeerStreamGroups(), 1);
+  EXPECT_EQ(manager.getNumPeerStreamGroupsSeen(), 1);
+
+  // New stream, new group.
+  peerStreamId = 10;
+  peeGroupId = 4;
+  stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+  EXPECT_EQ(manager.getNumNewPeerStreamGroups(), 2);
+  EXPECT_EQ(manager.getNumPeerStreamGroupsSeen(), 2);
+
+  // New stream, previous group.
+  peerStreamId = 14;
+  peeGroupId = 0;
+  stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+  EXPECT_EQ(manager.getNumNewPeerStreamGroups(), 2);
+  EXPECT_EQ(manager.getNumPeerStreamGroupsSeen(), 2);
+
+  // New stream, current group.
+  peerStreamId = 18;
+  peeGroupId = 4;
+  stream = manager.getStream(peerStreamId, peeGroupId);
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->groupId, peeGroupId);
+  EXPECT_EQ(manager.getNumNewPeerStreamGroups(), 2);
+  EXPECT_EQ(manager.getNumPeerStreamGroupsSeen(), 2);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     QuicStreamManagerGroupsTest,
     QuicStreamManagerGroupsTest,
     ::testing::Values(
-        StreamManagerTestParam{.isUnidirectional = false},
-        StreamManagerTestParam{.isUnidirectional = true}));
+        StreamManagerTestParam{
+            .notifyOnNewStreamsExplicitly = true,
+            .isUnidirectional = false},
+        StreamManagerTestParam{
+            .notifyOnNewStreamsExplicitly = true,
+            .isUnidirectional = true}));
 
 } // namespace test
 } // namespace quic
