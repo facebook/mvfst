@@ -100,7 +100,7 @@ void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
     if (conn.pacer) {
       conn.pacer->setExperimental(true);
     }
-  } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
+  } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL2) {
     conn.transportSettings.enableWritableBytesLimit = true;
   }
 }
