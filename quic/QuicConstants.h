@@ -152,7 +152,9 @@ BETTER_ENUM(
     // Keepalive timer enabled
     KEEPALIVE_ENABLED = 0x7777,
     // Remove from loss buffer on spurious loss
-    REMOVE_FROM_LOSS_BUFFER = 0x8888)
+    REMOVE_FROM_LOSS_BUFFER = 0x8888,
+    // Knob for setting max pacing rate, with sequence number
+    MAX_PACING_RATE_KNOB_SEQUENCED = 0x9999)
 
 enum class FrameType : uint64_t {
   PADDING = 0x00,
