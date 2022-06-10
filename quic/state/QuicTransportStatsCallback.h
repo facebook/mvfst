@@ -155,6 +155,8 @@ class QuicTransportStatsCallback {
 
   virtual void onTransportKnobError(TransportKnobParamId knobType) = 0;
 
+  virtual void onTransportKnobOutOfOrder(TransportKnobParamId knobType) = 0;
+
   virtual void onServerUnfinishedHandshake() = 0;
 
   virtual void onZeroRttBuffered() = 0;

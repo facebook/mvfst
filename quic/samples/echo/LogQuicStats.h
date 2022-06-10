@@ -205,6 +205,11 @@ class LogQuicStats : public quic::QuicTransportStatsCallback {
             << "onTransportKnboError knobType=" << knobType._to_string();
   }
 
+  void onTransportKnobOutOfOrder(TransportKnobParamId knobType) override {
+    VLOG(2) << prefix_
+            << "onTransportKnobOutOfOrder knobType=" << knobType._to_string();
+  }
+
   void onServerUnfinishedHandshake() override {
     VLOG(2) << prefix_ << "onServerUnfinishedHandshake";
   }

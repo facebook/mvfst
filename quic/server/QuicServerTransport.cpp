@@ -17,6 +17,7 @@
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace quic {
 
@@ -463,8 +464,12 @@ void QuicServerTransport::handleTransportKnobParams(
       knobParamId = TransportKnobParamId::_from_integral(param.id);
     }
     if (maybeParamHandler != transportKnobParamHandlers_.end()) {
-      (maybeParamHandler->second)(this, param.val);
-      QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
+      try {
+        (maybeParamHandler->second)(this, param.val);
+        QUIC_STATS(conn_->statsCallback, onTransportKnobApplied, knobParamId);
+      } catch (const std::exception& /* ex */) {
+        QUIC_STATS(conn_->statsCallback, onTransportKnobError, knobParamId);
+      }
     } else {
       QUIC_STATS(conn_->statsCallback, onTransportKnobError, knobParamId);
     }
@@ -839,7 +844,8 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
         auto& maxPacingRateKnobState =
             serverTransport->serverConn_->maxPacingRateKnobState;
         if (maxPacingRateKnobState.frameOutOfOrderDetected) {
-          return;
+          throw std::runtime_error(
+              "MAX_PACING_RATE_KNOB frame out of order detected");
         }
 
         // if pacing is already disabled and the new value is disabling it,
@@ -849,8 +855,12 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 std::numeric_limits<uint64_t>::max() &&
             maxPacingRateKnobState.lastMaxRateBytesPerSec == val) {
           maxPacingRateKnobState.frameOutOfOrderDetected = true;
-          // TODO(dvn) add QUIC_STATS
-          return;
+          QUIC_STATS(
+              serverTransport->serverConn_->statsCallback,
+              onTransportKnobOutOfOrder,
+              TransportKnobParamId::MAX_PACING_RATE_KNOB);
+          throw std::runtime_error(
+              "MAX_PACING_RATE_KNOB frame out of order detected");
         }
 
         VLOG(3) << "Knob param received, set max pacing rate to ("

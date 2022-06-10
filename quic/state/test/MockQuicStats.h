@@ -57,6 +57,7 @@ class MockQuicStats : public QuicTransportStatsCallback {
   MOCK_METHOD(void, onConnectionPMTUUpperBoundDetected, ());
   MOCK_METHOD(void, onTransportKnobApplied, (TransportKnobParamId));
   MOCK_METHOD(void, onTransportKnobError, (TransportKnobParamId));
+  MOCK_METHOD(void, onTransportKnobOutOfOrder, (TransportKnobParamId));
   MOCK_METHOD(void, onServerUnfinishedHandshake, ());
   MOCK_METHOD(void, onZeroRttBuffered, ());
   MOCK_METHOD(void, onZeroRttBufferedPruned, ());
