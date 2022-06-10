@@ -818,9 +818,45 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
       [](QuicServerTransport* serverTransport, uint64_t val) {
         CHECK(serverTransport);
+
+        // Check if the server should process this knob, i.e should set the max
+        // pacing rate to the given value. Currently there is a possiblity that
+        // MAX_PACING_RATE_KNOB frames arrive out of order, causing incorrect
+        // max pacing rate to be set on the transport, i.e. the rate is set to a
+        // low value when it should be set to max value (i.e. disabled pacing).
+        //
+        // To address this issue while a new knob ID is introduced (where
+        // sequence number is included alongside the max pacing rate value),
+        // this handler will not call setMaxPacingRate(val) after it has
+        // received two consecutive frames where pacing is disabled, so that it
+        // can prevent the abovementioned scenario where the frames should be:
+        //
+        //   NO_PACING --> PACING --> NO_PACING
+        //
+        // due to out-of-order, becomes:
+        //
+        //   NO_PACING --> NO_PACING --> PACING
+        auto& maxPacingRateKnobState =
+            serverTransport->serverConn_->maxPacingRateKnobState;
+        if (maxPacingRateKnobState.frameOutOfOrderDetected) {
+          return;
+        }
+
+        // if pacing is already disabled and the new value is disabling it,
+        // assume there has been an out of order frame and stop processing
+        // pacing frames
+        if (maxPacingRateKnobState.lastMaxRateBytesPerSec ==
+                std::numeric_limits<uint64_t>::max() &&
+            maxPacingRateKnobState.lastMaxRateBytesPerSec == val) {
+          maxPacingRateKnobState.frameOutOfOrderDetected = true;
+          // TODO(dvn) add QUIC_STATS
+          return;
+        }
+
         VLOG(3) << "Knob param received, set max pacing rate to ("
                 << unsigned(val) << " bytes per second)";
         serverTransport->setMaxPacingRate(val);
+        maxPacingRateKnobState.lastMaxRateBytesPerSec = val;
       });
 
   registerTransportKnobParamHandler(

@@ -26,6 +26,7 @@ namespace test {
 namespace {
 using ByteEvent = QuicTransportBase::ByteEvent;
 using PacketDropReason = QuicTransportStatsCallback::PacketDropReason;
+auto constexpr kTestMaxPacingRate = std::numeric_limits<uint64_t>::max();
 } // namespace
 
 folly::Optional<QuicFrame> getFrameIfPresent(
@@ -4331,6 +4332,116 @@ TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
   EXPECT_CALL(*rawPacer, setExperimental(false)).Times(1);
   server->handleKnobParams(
       {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 0}});
+}
+
+TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  // verify init state NO_PACING
+  auto maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // set max pacing rate
+  uint64_t pacingRate = 1234;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        pacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // disable pacing
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        kTestMaxPacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // set max pacing rate again
+  pacingRate = 5678;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        pacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // another pacing rate should still work
+  pacingRate = 9999;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        pacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(pacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // disable pacing
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        kTestMaxPacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+}
+
+/*
+ * Verify that if the transport receives a request to set max pacing rate after
+ * out of order frame detected, then the request to set max pacing will not be
+ * processed.
+ *
+ *   NO_PACING --> NO_PACING --> PACING
+ */
+TEST_F(QuicServerTransportTest, TestSetMaxPacingRateFrameOutOfOrder) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  // verify init state NO_PACING
+  auto maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_FALSE(maxPacingRateKnobState.frameOutOfOrderDetected);
+  EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
+
+  // disable pacing while the current pacing state is still NO_PACING, should
+  // detect out of order frame
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        kTestMaxPacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
+
+  // any attempt to set max pacing rate from now on should fail
+  uint64_t pacingRate = 1234;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        pacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
+
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(kTestMaxPacingRate)).Times(0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        kTestMaxPacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
+
+  pacingRate = 5678;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(pacingRate)).Times(0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
+        pacingRate}});
+  maxPacingRateKnobState = server->getConn().maxPacingRateKnobState;
+  EXPECT_TRUE(maxPacingRateKnobState.frameOutOfOrderDetected);
 }
 
 class QuicServerTransportForciblySetUDUPayloadSizeTest

@@ -83,6 +83,14 @@ struct ConnectionMigrationState {
   folly::Optional<CongestionAndRttState> lastCongestionAndRtt;
 };
 
+/**
+ * State used during processing of MAX_PACING_RATE_KNOB frames.
+ */
+struct MaxPacingRateKnobState {
+  uint64_t lastMaxRateBytesPerSec = std::numeric_limits<uint64_t>::max();
+  bool frameOutOfOrderDetected = false;
+};
+
 struct QuicServerConnectionState : public QuicConnectionStateBase {
   ~QuicServerConnectionState() override = default;
 
@@ -137,6 +145,10 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // Whether or not the client has verified their address (thru CFIN or
   // NewToken).
   bool isClientAddrVerified{false};
+
+  // State for max pacing rate knob. Currently used to detect out of order
+  // MAX_PACING_RATE_KNOB frames.
+  MaxPacingRateKnobState maxPacingRateKnobState{};
 
 #ifdef CCP_ENABLED
   // Pointer to struct that maintains state needed for interacting with libccp.
