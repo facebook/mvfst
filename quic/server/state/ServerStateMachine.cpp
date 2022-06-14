@@ -91,17 +91,10 @@ void recoverOrResetCongestionAndRttState(
 }
 
 void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
+  // no-op versions
   if (conn.version == QuicVersion::MVFST_EXPERIMENTAL) {
-    // MVFST_EXPERIMENTAL currently enables experimental congestion control
-    // and experimental pacer. (here and in the client transport)
-    if (conn.congestionController) {
-      conn.congestionController->setExperimental(true);
-    }
-    if (conn.pacer) {
-      conn.pacer->setExperimental(true);
-    }
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL2) {
-    conn.transportSettings.enableWritableBytesLimit = true;
+  } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
   }
 }
 } // namespace
