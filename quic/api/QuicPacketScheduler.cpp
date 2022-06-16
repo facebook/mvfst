@@ -245,7 +245,7 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
     rstWritten = rstScheduler_->writeRsts(wrapper);
   }
   // Long time ago we decided RST has higher priority than Acks.
-  if (ackScheduler_ && ackScheduler_->hasPendingAcks()) {
+  if (hasPendingAcks()) {
     if (cryptoDataWritten || rstWritten) {
       // If packet has non ack data, it is subject to congestion control. We
       // need to use the wrapper/
@@ -317,8 +317,7 @@ void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
 }
 
 bool FrameScheduler::hasData() const {
-  return (ackScheduler_ && ackScheduler_->hasPendingAcks()) ||
-      hasImmediateData();
+  return (hasPendingAcks()) || hasImmediateData();
 }
 
 bool FrameScheduler::hasPendingAcks() const {
