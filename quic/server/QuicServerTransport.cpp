@@ -918,12 +918,12 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       [](QuicServerTransport* serverTransport, uint64_t val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
-        auto useAdaptiveLossThresholds = static_cast<bool>(val);
-        server_conn->transportSettings.useAdaptiveLossThresholds =
-            useAdaptiveLossThresholds;
+        auto useAdaptiveLossReorderingThresholds = static_cast<bool>(val);
+        server_conn->transportSettings.useAdaptiveLossReorderingThresholds =
+            useAdaptiveLossReorderingThresholds;
         VLOG(3) << fmt::format(
-            "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossThresholds is now set to {}",
-            useAdaptiveLossThresholds);
+            "ADAPTIVE_LOSS_DETECTION KnobParam received, UseAdaptiveLossReorderingThresholds is now set to {}",
+            useAdaptiveLossReorderingThresholds);
       });
 
   registerTransportKnobParamHandler(
