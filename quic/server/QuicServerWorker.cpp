@@ -311,26 +311,24 @@ void QuicServerWorker::onDataAvailable(
     size_t remaining = len;
     size_t offset = 0;
     while (remaining) {
-      if (static_cast<int>(remaining) > params.gro) {
-        auto tmp = data->cloneOne();
-        // start at offset
-        tmp->trimStart(offset);
-        // the actual len is len - offset now
-        // leave params.gro_ bytes
-        tmp->trimEnd(len - offset - params.gro);
-        DCHECK_EQ(tmp->length(), params.gro);
-
-        offset += params.gro;
-        remaining -= params.gro;
-        handleNetworkData(client, std::move(tmp), packetReceiveTime);
-      } else {
+      if (static_cast<int>(remaining) <= params.gro) {
         // do not clone the last packet
         // start at offset, use all the remaining data
         data->trimStart(offset);
         DCHECK_EQ(data->length(), remaining);
-        remaining = 0;
         handleNetworkData(client, std::move(data), packetReceiveTime);
+        break;
       }
+      auto tmp = data->cloneOne();
+      // start at offset
+      tmp->trimStart(offset);
+      // the actual len is len - offset now
+      // leave params.gro_ bytes
+      tmp->trimEnd(len - offset - params.gro);
+      DCHECK_EQ(tmp->length(), params.gro);
+      offset += params.gro;
+      remaining -= params.gro;
+      handleNetworkData(client, std::move(tmp), packetReceiveTime);
     }
   }
 }
