@@ -3655,6 +3655,9 @@ QuicSocket::WriteResult QuicTransportBase::setDSRPacketizationRequestSender(
       return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
     }
     stream->dsrSender = std::move(sender);
+    // Always set adaptive reordering when using DSR for now since it ends up
+    // being crucial to avoid spurious losses when there are multiple senders.
+    conn_->transportSettings.useAdaptiveLossReorderingThresholds = true;
     // Fow now, no appLimited or appIdle update here since we are not writing
     // either BufferMetas yet. The first BufferMeta write will update it.
   } catch (const QuicTransportException& ex) {
