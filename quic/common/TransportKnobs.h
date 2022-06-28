@@ -9,6 +9,7 @@
 #include <folly/Optional.h>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace quic {
@@ -21,8 +22,9 @@ namespace quic {
  * methods (e.g. transport parameter).
  */
 struct TransportKnobParam {
+  using Val = std::variant<uint64_t, std::string>;
   uint64_t id;
-  uint64_t val;
+  Val val;
 };
 
 constexpr uint64_t kPriorityThresholdKnobMultiplier = 1000;

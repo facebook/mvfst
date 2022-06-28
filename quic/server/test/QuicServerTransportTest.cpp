@@ -8,6 +8,7 @@
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 
 #include <quic/codec/QuicPacketBuilder.h>
+#include <quic/common/TransportKnobs.h>
 #include <quic/dsr/Types.h>
 #include <quic/dsr/test/Mocks.h>
 #include <quic/fizz/handshake/FizzCryptoFactory.h>
@@ -1511,7 +1512,7 @@ TEST_F(QuicServerTransportTest, CongestionControlAggressivenessKnob) {
 
   // Set to background mode will no have an effect. It only works on BBR.
   server->handleKnobParams({
-      {52395, 75},
+      {52395, uint64_t{75}},
   });
 
   // Switch to BBR congestion control
@@ -1525,14 +1526,14 @@ TEST_F(QuicServerTransportTest, CongestionControlAggressivenessKnob) {
 
   // Set to background mode.
   server->handleKnobParams({
-      {52395, 75},
+      {52395, uint64_t{75}},
   });
   // BBR should now be in background mode
   EXPECT_TRUE(cc->isInBackgroundMode());
 
   // Turn off background mode and verify it
   server->handleKnobParams({
-      {52395, 100},
+      {52395, uint64_t{100}},
   });
   EXPECT_FALSE(cc->isInBackgroundMode());
 }
@@ -4263,40 +4264,58 @@ TEST_F(QuicUnencryptedServerTransportTest, DuplicateOneRttWriteCipher) {
 TEST_F(QuicServerTransportTest, TestRegisterAndHandleTransportKnobParams) {
   int flag = 0;
   server->registerKnobParamHandler(
-      199, [&](QuicServerTransport* /* server_conn */, uint64_t val) {
-        EXPECT_EQ(val, 10);
+      199,
+      [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
+        EXPECT_EQ(std::get<uint64_t>(val), 10);
         flag = 1;
       });
   server->registerKnobParamHandler(
-      200, [&](QuicServerTransport* /* server_conn */, uint64_t /* val */) {
-        flag = 2;
-      });
+      200,
+      [&](QuicServerTransport* /* server_conn */,
+          const TransportKnobParam::Val& /* val */) { flag = 2; });
   server->handleKnobParams({
-      {199, 10},
-      {201, 20},
+      {199, uint64_t{10}},
+      {201, uint64_t{20}},
   });
 
   EXPECT_EQ(flag, 1);
 
   // ovewrite will fail, the new handler won't be called
   server->registerKnobParamHandler(
-      199, [&](QuicServerTransport* /* server_conn */, uint64_t val) {
-        EXPECT_EQ(val, 30);
+      199,
+      [&](QuicServerTransport* /* server_conn */, TransportKnobParam::Val val) {
+        EXPECT_EQ(std::get<uint64_t>(val), 30);
         flag = 3;
       });
 
   server->handleKnobParams({
-      {199, 10},
-      {201, 20},
+      {199, uint64_t{10}},
+      {201, uint64_t{20}},
   });
   EXPECT_EQ(flag, 1);
+}
+
+TEST_F(
+    QuicServerTransportTest,
+    TestHandleTransportKnobParamWithUnexpectedValTypes) {
+  // expect an uint64_t but string value provided
+  auto knobParamId =
+      static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB);
+  EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(1);
+  server->handleKnobParams({{knobParamId, "not-uint64_t"}});
+
+  // expect a string but uint64_t value provided
+  knobParamId = static_cast<uint64_t>(
+      TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
+  EXPECT_CALL(*quicStats_, onTransportKnobError(Eq(knobParamId))).Times(1);
+  server->handleKnobParams({{knobParamId, uint64_t{1234}}});
 }
 
 TEST_F(QuicServerTransportTest, TestRegisterPMTUZeroBlackholeDetection) {
   server->handleKnobParams(
       {{static_cast<uint64_t>(
             TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
-        1}});
+        uint64_t{1}}});
   EXPECT_TRUE(server->getConn().d6d.noBlackholeDetection);
 }
 
@@ -4309,13 +4328,16 @@ TEST_F(QuicServerTransportTest, TestCCExperimentalKnobHandler) {
 
   EXPECT_CALL(*rawCongestionController, setExperimental(true)).Times(2);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 1}});
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        uint64_t{1}}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 2}});
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        uint64_t{2}}});
 
   EXPECT_CALL(*rawCongestionController, setExperimental(false)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL), 0}});
+      {{static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
+        uint64_t{0}}});
 }
 
 TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
@@ -4325,13 +4347,16 @@ TEST_F(QuicServerTransportTest, TestPacerExperimentalKnobHandler) {
 
   EXPECT_CALL(*rawPacer, setExperimental(true)).Times(2);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 1}});
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        uint64_t{1}}});
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 2}});
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        uint64_t{2}}});
 
   EXPECT_CALL(*rawPacer, setExperimental(false)).Times(1);
   server->handleKnobParams(
-      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL), 0}});
+      {{static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
+        uint64_t{0}}});
 }
 
 TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
@@ -4459,7 +4484,7 @@ TEST_F(
   server->handleKnobParams(
       {{static_cast<uint64_t>(
             TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-        1}});
+        uint64_t{1}}});
   EXPECT_EQ(server->getConn().udpSendPacketLen, 1452);
 }
 

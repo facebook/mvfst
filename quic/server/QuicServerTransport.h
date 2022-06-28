@@ -176,7 +176,8 @@ class QuicServerTransport
   // Made it protected for testing purpose
   void registerTransportKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerTransport*, uint64_t)>&& handler);
+      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
+          handler);
 
  private:
   void processPendingData(bool async);
@@ -200,7 +201,7 @@ class QuicServerTransport
   QuicServerConnectionState* serverConn_;
   std::unordered_map<
       uint64_t,
-      std::function<void(QuicServerTransport*, uint64_t)>>
+      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>>
       transportKnobParamHandlers_;
 
   // Container of observers for the socket / transport.

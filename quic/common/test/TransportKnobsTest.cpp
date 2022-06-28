@@ -44,7 +44,10 @@ TEST(QuicKnobsParsingTest, Simple) {
       "  \"2\": 3"
       "  }",
       false,
-      {{0, 1}, {2, 3}, {11, 5}, {19, 6}}};
+      {{0, uint64_t{1}},
+       {2, uint64_t{3}},
+       {11, uint64_t{5}},
+       {19, uint64_t{6}}}};
   run(fixture);
 }
 
@@ -169,7 +172,7 @@ TEST(QuicKnobsParsingTest, ValidFractionParam) {
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = (4 * 100 + 5)}}};
+      args, false, {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
   run(fixture);
 }
 
@@ -178,7 +181,7 @@ TEST(QuicKnobsParsingTest, ValidFractionParamDefault) {
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB);
   std::string args = fmt::format(R"({{"{}" : "4/5"}})", key);
   QuicKnobsParsingTestFixture fixture = {
-      args, false, {{.id = key, .val = (4 * 100 + 5)}}};
+      args, false, {{.id = key, .val = uint64_t{4 * 100 + 5}}}};
   run(fixture);
 }
 
@@ -232,7 +235,7 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
 TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7, 25");
-  auto expectedCombinedVal = 7 * kPriorityThresholdKnobMultiplier + 25;
+  uint64_t expectedCombinedVal = 7 * kPriorityThresholdKnobMultiplier + 25;
   QuicKnobsParsingTestFixture fixture = {
       args, false, {{.id = key, .val = expectedCombinedVal}}};
   run(fixture);
@@ -272,7 +275,7 @@ TEST(QuicKnobsParsingTest, InvalidAutoBackgroundUtilizationPercentOutOfBounds) {
 
 TEST(QuicKnobsParsingTest, NonStringKey) {
   QuicKnobsParsingTestFixture fixture = {
-      "{ 10 : 1 }", false, {{.id = 10, .val = 1}}};
+      "{ 10 : 1 }", false, {{.id = 10, .val = uint64_t{1}}}};
   run(fixture);
 }
 

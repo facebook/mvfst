@@ -16,6 +16,7 @@
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
+#include <quic/common/TransportKnobs.h>
 #include <algorithm>
 #include <stdexcept>
 
@@ -663,7 +664,8 @@ void QuicServerTransport::maybeStartD6DProbing() {
 
 void QuicServerTransport::registerTransportKnobParamHandler(
     uint64_t paramId,
-    std::function<void(QuicServerTransport*, uint64_t)>&& handler) {
+    std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
+        handler) {
   transportKnobParamHandlers_.emplace(paramId, std::move(handler));
 }
 
@@ -715,10 +717,12 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::ZERO_PMTU_BLACKHOLE_DETECTION),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
-        if (static_cast<bool>(val)) {
+        // TODO(dvn) TransportKnobParam::Val can probably hold bool value as
+        // well
+        if (static_cast<bool>(std::get<uint64_t>(val))) {
           server_conn->d6d.noBlackholeDetection = true;
           VLOG(3)
               << "Knob param received, pmtu blackhole detection is turned off";
@@ -728,10 +732,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(
           TransportKnobParamId::FORCIBLY_SET_UDP_PAYLOAD_SIZE),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
-        if (static_cast<bool>(val)) {
+        if (static_cast<bool>(std::get<uint64_t>(val))) {
           server_conn->udpSendPacketLen = server_conn->peerMaxUdpPayloadSize;
           VLOG(3)
               << "Knob param received, udpSendPacketLen is forcibly set to max UDP payload size advertised by peer";
@@ -740,10 +744,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_ALGORITHM_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
-        auto cctype = static_cast<CongestionControlType>(val);
+        auto cctype =
+            static_cast<CongestionControlType>(std::get<uint64_t>(val));
         VLOG(3) << "Knob param received, set congestion control type to "
                 << congestionControlTypeToString(cctype);
         if (cctype == server_conn->congestionController->type()) {
@@ -766,9 +771,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_AGRESSIVENESS_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
+        auto val = std::get<uint64_t>(value);
         if (val < 25 || val > 100) {
           LOG(ERROR)
               << "Invalid CC_AGRESSIVENESS_KNOB value received from client, value = "
@@ -785,9 +791,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
+        auto val = std::get<uint64_t>(value);
         uint8_t numerator = (val / 100);
         uint8_t denominator = (val - (numerator * 100));
         VLOG(3) << "Knob param received, set STARTUP rtt factor to ("
@@ -798,9 +805,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::DEFAULT_RTT_FACTOR_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
+        auto val = std::get<uint64_t>(value);
         auto numerator = (uint8_t)(val / 100);
         auto denominator = (uint8_t)(val - (numerator * 100));
         VLOG(3) << "Knob param received, set DEFAULT rtt factor to ("
@@ -811,9 +819,10 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::NOTSENT_BUFFER_SIZE_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
+        auto val = std::get<uint64_t>(value);
         VLOG(3) << "Knob param received, set total buffer space available to ("
                 << unsigned(val) << ")";
         server_conn->transportSettings.totalBufferSpaceAvailable = val;
@@ -821,8 +830,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::MAX_PACING_RATE_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
 
         // Check if the server should process this knob, i.e should set the max
         // pacing rate to the given value. Currently there is a possiblity that
@@ -871,8 +881,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
         uint64_t priorityThreshold = val / kPriorityThresholdKnobMultiplier;
         uint64_t utilizationPercent = val % kPriorityThresholdKnobMultiplier;
         float utilizationFactor = float(utilizationPercent) / 100.0f;
@@ -887,11 +898,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::CC_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         if (server_conn->congestionController) {
-          auto enableExperimental = static_cast<bool>(val);
+          auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
           server_conn->congestionController->setExperimental(
               enableExperimental);
           VLOG(3) << fmt::format(
@@ -905,8 +916,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::SHORT_HEADER_PADDING_KNOB),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
         serverTransport->serverConn_->transportSettings.paddingModulo = val;
         VLOG(3) << fmt::format(
             "SHORT_HEADER_PADDING_KNOB KnobParam received, setting paddingModulo={}",
@@ -915,10 +927,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::ADAPTIVE_LOSS_DETECTION),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
-        auto useAdaptiveLossReorderingThresholds = static_cast<bool>(val);
+        auto useAdaptiveLossReorderingThresholds =
+            static_cast<bool>(std::get<uint64_t>(val));
         server_conn->transportSettings.useAdaptiveLossReorderingThresholds =
             useAdaptiveLossReorderingThresholds;
         VLOG(3) << fmt::format(
@@ -928,11 +941,11 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
 
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::PACER_EXPERIMENTAL),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val val) {
         CHECK(serverTransport);
         auto server_conn = serverTransport->serverConn_;
         if (server_conn->pacer) {
-          auto enableExperimental = static_cast<bool>(val);
+          auto enableExperimental = static_cast<bool>(std::get<uint64_t>(val));
           server_conn->pacer->setExperimental(enableExperimental);
           VLOG(3) << fmt::format(
               "PACER_EXPERIMENTAL KnobParam received, "
@@ -942,8 +955,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::KEEPALIVE_ENABLED),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
         auto server_conn = serverTransport->serverConn_;
         server_conn->transportSettings.enableKeepalive = static_cast<bool>(val);
         VLOG(3) << "KEEPALIVE_ENABLED KnobParam received: "
@@ -951,8 +965,9 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
       });
   registerTransportKnobParamHandler(
       static_cast<uint64_t>(TransportKnobParamId::REMOVE_FROM_LOSS_BUFFER),
-      [](QuicServerTransport* serverTransport, uint64_t val) {
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
         CHECK(serverTransport);
+        auto val = std::get<uint64_t>(value);
         auto server_conn = serverTransport->serverConn_;
         server_conn->transportSettings.removeFromLossBufferOnSpurious =
             static_cast<bool>(val);

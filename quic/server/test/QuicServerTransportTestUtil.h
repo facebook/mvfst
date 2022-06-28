@@ -15,13 +15,13 @@
 #include <quic/api/test/Mocks.h>
 #include <quic/codec/DefaultConnectionIdAlgo.h>
 #include <quic/codec/Types.h>
+#include <quic/common/TransportKnobs.h>
 #include <quic/common/test/TestUtils.h>
 #include <quic/congestion_control/ServerCongestionControllerFactory.h>
 #include <quic/fizz/server/handshake/FizzServerQuicHandshakeContext.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/test/Mocks.h>
 #include <quic/state/test/MockQuicStats.h>
-
 #include <utility>
 
 namespace quic::test {
@@ -103,7 +103,8 @@ class TestingQuicServerTransport : public QuicServerTransport {
 
   void registerKnobParamHandler(
       uint64_t paramId,
-      std::function<void(QuicServerTransport*, uint64_t)>&& handler) {
+      std::function<void(QuicServerTransport*, TransportKnobParam::Val)>&&
+          handler) {
     registerTransportKnobParamHandler(paramId, std::move(handler));
   }
 
