@@ -1335,6 +1335,103 @@ TEST_F(QuicServerTransportTest, ReceiveConnectionClose) {
   checkTransportStateUpdate(qLogger, std::move(closedMsg));
 }
 
+TEST_F(QuicServerTransportTest, ReceiveConnectionCloseBeforeDatagram) {
+  auto& conn = server->getNonConstConn();
+  conn.datagramState.maxReadFrameSize = std::numeric_limits<uint16_t>::max();
+  conn.datagramState.maxReadBufferSize = 10;
+
+  auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
+  server->getNonConstConn().qLogger = qLogger;
+
+  {
+    // Deliver a datagram.
+    // Should be received just fine.
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        clientNextAppDataPacketNum++);
+    RegularQuicPacketBuilder builder(
+        server->getConn().udpSendPacketLen,
+        std::move(header),
+        0 /* largestAcked */);
+    builder.encodePacketHeader();
+    StringPiece datagramPayload = "do not rely on me. I am unreliable";
+    DatagramFrame datagramFrame(
+        datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+    writeFrame(datagramFrame, builder);
+    auto packet = std::move(builder).buildPacket();
+
+    EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(1);
+    deliverDataWithoutErrorCheck(packetToBuf(packet));
+    ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 1);
+  }
+
+  auto lateDgPktNum = clientNextAppDataPacketNum++;
+  auto connClosePktNum = clientNextAppDataPacketNum++;
+
+  {
+    // Deliver conn close followed by another datagram.
+    // Conn should close and clean up, the late datagram should be ignored and
+    // dropped on the floor.
+
+    // Build conn close frame.
+    ShortHeader header(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        connClosePktNum);
+    RegularQuicPacketBuilder builder(
+        server->getConn().udpSendPacketLen,
+        std::move(header),
+        0 /* largestAcked */);
+    builder.encodePacketHeader();
+    std::string errMsg = "Stand clear of the closing doors, please";
+    ConnectionCloseFrame connClose(
+        QuicErrorCode(TransportErrorCode::NO_ERROR), errMsg);
+    writeFrame(std::move(connClose), builder);
+    auto packet = std::move(builder).buildPacket();
+
+    // Build late datagram.
+    ShortHeader header2(
+        ProtectionType::KeyPhaseZero,
+        *server->getConn().serverConnectionId,
+        lateDgPktNum);
+    RegularQuicPacketBuilder builder2(
+        server->getConn().udpSendPacketLen,
+        std::move(header2),
+        0 /* largestAcked */);
+    builder2.encodePacketHeader();
+    StringPiece datagramPayload = "do not rely on me. I am unreliable";
+    DatagramFrame datagramFrame(
+        datagramPayload.size(), IOBuf::copyBuffer(datagramPayload));
+    writeFrame(datagramFrame, builder2);
+    auto packet2 = std::move(builder2).buildPacket();
+
+    // Deliver conn close followed by late datagram.
+    EXPECT_CALL(*quicStats_, onDatagramRead(_)).Times(0);
+    EXPECT_CALL(connCallback, onConnectionEnd()).Times(1);
+    deliverDataWithoutErrorCheck(packetToBuf(packet));
+    deliverDataWithoutErrorCheck(packetToBuf(packet2));
+
+    // Now the transport should be closed
+    EXPECT_EQ(
+        server->getConn().localConnectionError->code,
+        QuicErrorCode(TransportErrorCode::NO_ERROR));
+    EXPECT_EQ(
+        server->getConn().peerConnectionError->code,
+        QuicErrorCode(TransportErrorCode::NO_ERROR));
+    auto closedMsg =
+        folly::to<std::string>("Server closed by peer reason=", errMsg);
+    EXPECT_EQ(server->getConn().peerConnectionError->message, closedMsg);
+    EXPECT_TRUE(server->isClosed());
+    EXPECT_TRUE(verifyFramePresent(
+        serverWrites,
+        *makeClientEncryptedCodec(),
+        QuicFrame::Type::ConnectionCloseFrame));
+    ASSERT_EQ(server->getConn().datagramState.readBuffer.size(), 0);
+    checkTransportStateUpdate(qLogger, std::move(closedMsg));
+  }
+}
+
 TEST_F(QuicServerTransportTest, ReceiveApplicationClose) {
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Server);
   server->getNonConstConn().qLogger = qLogger;
