@@ -232,6 +232,16 @@ TEST(QuicKnobsParsingTest, InvalidMaxPacingRateAsLargeNumber) {
   run(fixture);
 }
 
+TEST(QuicKnobsParsingTest, MaxPacingRateWithSequenceNumber) {
+  auto key = static_cast<uint64_t>(
+      TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
+  auto val = "1234,1";
+  std::string args = fmt::format(R"({{"{}" : "{}"}})", key, val);
+  QuicKnobsParsingTestFixture fixture = {
+      args, false, {{.id = key, .val = val}}};
+  run(fixture);
+}
+
 TEST(QuicKnobsParsingTest, ValidAutoBackgroundMode) {
   auto key = static_cast<uint64_t>(TransportKnobParamId::AUTO_BACKGROUND_MODE);
   std::string args = fmt::format(R"({{"{}" : "{}"}})", key, "7, 25");

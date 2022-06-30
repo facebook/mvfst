@@ -16,6 +16,7 @@
 #include <quic/server/handshake/DefaultAppTokenValidator.h>
 #include <quic/server/handshake/StatelessResetGenerator.h>
 
+#include <folly/Optional.h>
 #include <quic/common/TransportKnobs.h>
 #include <algorithm>
 #include <stdexcept>
@@ -877,6 +878,57 @@ void QuicServerTransport::registerAllTransportKnobParamHandlers() {
                 << unsigned(val) << " bytes per second)";
         serverTransport->setMaxPacingRate(val);
         maxPacingRateKnobState.lastMaxRateBytesPerSec = val;
+      });
+
+  registerTransportKnobParamHandler(
+      static_cast<uint64_t>(
+          TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+      [](QuicServerTransport* serverTransport, TransportKnobParam::Val value) {
+        CHECK(serverTransport);
+        auto val = std::get<std::string>(value);
+        std::string rateBytesPerSecStr, seqNumStr;
+        if (!folly::split(',', val, rateBytesPerSecStr, seqNumStr)) {
+          std::string errMsg = fmt::format(
+              "MAX_PACING_RATE_KNOB_SEQUENCED frame value {} is not in expected format: "
+              "{{rate}},{{sequenceNumber}}",
+              val);
+          throw std::runtime_error(errMsg);
+        }
+
+        auto maybeRateBytesPerSec = folly::tryTo<uint64_t>(rateBytesPerSecStr);
+        if (maybeRateBytesPerSec.hasError()) {
+          std::string errMsg = fmt::format(
+              "MAX_PACING_RATE_KNOB_SEQUENCED frame received with invalid rate {}",
+              rateBytesPerSecStr);
+          throw std::runtime_error(errMsg);
+        }
+
+        auto expectedSeqNum = folly::tryTo<uint64_t>(seqNumStr);
+        if (expectedSeqNum.hasError()) {
+          std::string errMsg = fmt::format(
+              "MAX_PACING_RATE_KNOB_SEQUENCED frame received with invalid sequence number {}",
+              seqNumStr);
+          throw std::runtime_error(errMsg);
+        }
+
+        if (serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum >=
+            folly::make_optional(expectedSeqNum.value())) {
+          QUIC_STATS(
+              serverTransport->serverConn_->statsCallback,
+              onTransportKnobOutOfOrder,
+              TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED);
+          throw std::runtime_error(
+              "MAX_PACING_RATE_KNOB_SEQUENCED frame received out of order");
+        }
+
+        VLOG(3) << fmt::format(
+            "MAX_PACING_RATE_KNOB_SEQUENCED frame received with rate {} bytes/sec "
+            "and sequence number {}",
+            maybeRateBytesPerSec.value(),
+            expectedSeqNum.value());
+        serverTransport->setMaxPacingRate(maybeRateBytesPerSec.value());
+        serverTransport->serverConn_->maybeLastMaxPacingRateKnobSeqNum =
+            expectedSeqNum.value();
       });
 
   registerTransportKnobParamHandler(

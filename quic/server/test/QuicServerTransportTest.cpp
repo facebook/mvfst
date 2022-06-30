@@ -4515,6 +4515,147 @@ TEST_F(QuicServerTransportTest, TestSetMaxPacingRateLifecycle) {
   EXPECT_EQ(kTestMaxPacingRate, maxPacingRateKnobState.lastMaxRateBytesPerSec);
 }
 
+TEST_F(
+    QuicServerTransportTest,
+    TestMaxPacingRateKnobSequencedWithInvalidFrameValues) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  // expect pacer never gets called
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(_)).Times(0);
+
+  // only pacing provided
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "1234"}});
+
+  // extra field beside pacing rate & sequence number
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "1234,5678,9999"}});
+
+  // non uint64_t provided as pacing rate
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "abc,1"}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "2a,1"}});
+
+  // non uint64_t provided as sequence number
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "1234,def"}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "1234,2a"}});
+
+  // negative integer provided
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "-1000,1"}});
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        "1000,-2"}});
+
+  // now, expect pacer to get called as we pass valid params
+  uint64_t rate = 1000;
+  uint64_t seqNum = 1;
+  auto knobVal = [&rate, &seqNum]() {
+    return fmt::format("{},{}", rate, seqNum);
+  };
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        knobVal()}});
+
+  rate = 9999;
+  seqNum = 100;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        knobVal()}});
+}
+
+class OutOfOrderMaxPacingRateKnobSequencedFrameTest
+    : public QuicServerTransportTest,
+      public testing::WithParamInterface<uint64_t> {};
+
+TEST_P(
+    OutOfOrderMaxPacingRateKnobSequencedFrameTest,
+    TestMaxPacingRateKnobSequencedWithOutOfOrderFrames) {
+  auto mockPacer = std::make_unique<NiceMock<MockPacer>>();
+  auto rawPacer = mockPacer.get();
+  server->getNonConstConn().pacer = std::move(mockPacer);
+
+  // first frame received with seqNum
+  uint64_t rate = 5678;
+  uint64_t seqNum = GetParam();
+  auto serializedKnobVal = [&rate, &seqNum]() {
+    return fmt::format("{},{}", rate, seqNum);
+  };
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        serializedKnobVal()}});
+
+  // second frame received with the same seqNum, should be rejected regardless
+  // of pacing rate being different
+  rate = 1234;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(_)).Times(0);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        serializedKnobVal()}});
+
+  // second frame received with sequence number being less than seqNum, should
+  // be rejected
+  if (seqNum > 0) {
+    rate = 8888;
+    seqNum = GetParam() - 1;
+    EXPECT_CALL(*rawPacer, setMaxPacingRate(_)).Times(0);
+    server->handleKnobParams(
+        {{static_cast<uint64_t>(
+              TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+          serializedKnobVal()}});
+  }
+
+  // third frame received with sequence number = seqNum + 1, should be accepted
+  rate = 9999;
+  seqNum = GetParam() + 1;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        serializedKnobVal()}});
+
+  // forth frame received with larger sequence number should be accepted
+  rate = 1111;
+  seqNum = GetParam() + 1000;
+  EXPECT_CALL(*rawPacer, setMaxPacingRate(rate)).Times(1);
+  server->handleKnobParams(
+      {{static_cast<uint64_t>(
+            TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED),
+        serializedKnobVal()}});
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    OutOfOrderMaxPacingRateKnobSequencedFrameTests,
+    OutOfOrderMaxPacingRateKnobSequencedFrameTest,
+    ::testing::Values(0, 1, 7, 42));
+
 /*
  * Verify that if the transport receives a request to set max pacing rate after
  * out of order frame detected, then the request to set max pacing will not be

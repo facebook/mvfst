@@ -50,6 +50,9 @@ folly::Optional<TransportKnobParams> parseTransportKnobs(
            * we parse manually to enable us to support uint64_t
            */
           switch (paramId) {
+            case TransportKnobParamId::MAX_PACING_RATE_KNOB_SEQUENCED:
+              knobParams.push_back({paramId, val.asString()});
+              continue; // triggers next loop iteration
             case TransportKnobParamId::AUTO_BACKGROUND_MODE:
             case TransportKnobParamId::CC_ALGORITHM_KNOB:
             case TransportKnobParamId::STARTUP_RTT_FACTOR_KNOB:

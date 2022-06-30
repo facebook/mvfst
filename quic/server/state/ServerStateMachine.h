@@ -150,6 +150,9 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
   // MAX_PACING_RATE_KNOB frames.
   MaxPacingRateKnobState maxPacingRateKnobState{};
 
+  // Sequence number of the last received MAX_PACING_RATE_KNOB_SEQUENCED.
+  folly::Optional<uint64_t> maybeLastMaxPacingRateKnobSeqNum{folly::none};
+
 #ifdef CCP_ENABLED
   // Pointer to struct that maintains state needed for interacting with libccp.
   // Once instance of this struct is created for each instance of
