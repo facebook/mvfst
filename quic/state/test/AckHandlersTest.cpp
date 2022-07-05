@@ -150,6 +150,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
           EXPECT_EQ(ul(101), ack->largestAckedPacket);
           EXPECT_EQ(ul(101), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
+          EXPECT_EQ(expectedAckedBytes, ack->totalBytesAcked);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
         if (loss) {
@@ -525,6 +526,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
           EXPECT_EQ(ul(101), ack->largestAckedPacket);
           EXPECT_EQ(ul(101), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
+          EXPECT_EQ(expectedAckedBytes, ack->totalBytesAcked);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
         if (loss) {
@@ -678,6 +680,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
           EXPECT_EQ(ul(45), ack->largestAckedPacket);
           EXPECT_EQ(ul(45), ack->largestNewlyAckedPacket);
           EXPECT_EQ(expectedAckedBytes, ack->ackedBytes);
+          EXPECT_EQ(expectedAckedBytes, ack->totalBytesAcked);
           EXPECT_EQ(expectedAckedPackets, ack->ackedPackets.size());
         }
         if (loss) {
@@ -817,6 +820,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         EXPECT_EQ(ul(26), ackEvent->largestAckedPacket);
         EXPECT_EQ(ul(26), ackEvent->largestNewlyAckedPacket);
         EXPECT_EQ(expectedAckedBytes, ackEvent->ackedBytes);
+        EXPECT_EQ(expectedAckedBytes, ackEvent->totalBytesAcked);
         EXPECT_EQ(expectedAckedPackets, ackEvent->ackedPackets.size());
       }));
   EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
@@ -1770,6 +1774,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
     EXPECT_EQ(10, ack.ackedBytes);
+    EXPECT_EQ(10, ack.totalBytesAcked);
     EXPECT_TRUE(ack.largestNewlyAckedPacketAppLimited);
     EXPECT_EQ(GetParam(), ack.packetNumberSpace);
     EXPECT_EQ(
@@ -1897,6 +1902,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
     EXPECT_EQ(10, ack.ackedBytes);
+    EXPECT_EQ(10, ack.totalBytesAcked);
     EXPECT_TRUE(ack.largestNewlyAckedPacketAppLimited);
     EXPECT_EQ(GetParam(), ack.packetNumberSpace);
     EXPECT_EQ(
@@ -2020,6 +2026,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoCongestionController) {
         Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
     EXPECT_EQ(10, ack.ackedBytes);
+    EXPECT_EQ(10, ack.totalBytesAcked);
     EXPECT_TRUE(ack.largestNewlyAckedPacketAppLimited);
     EXPECT_EQ(GetParam(), ack.packetNumberSpace);
     EXPECT_EQ(
@@ -2710,6 +2717,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
             Pointee(getAckPacketMatcher(9, getWriteCount(9), getSentTime(9))));
 
         EXPECT_EQ(10, ack->ackedBytes);
+        EXPECT_EQ(0, ack->totalBytesAcked); // implicit ack
         EXPECT_TRUE(ack->implicit);
         EXPECT_FALSE(ack->rttSample.has_value());
         EXPECT_EQ(srttBefore, conn.lossState.srtt);
@@ -3338,6 +3346,9 @@ TEST_F(AckEventForAppDataTest, AckEventAckedBytes) {
   // check ackedBytes
   EXPECT_EQ(
       getEncodedSize(packet1) + getEncodedSize(packet2), ackEvent.ackedBytes);
+  EXPECT_EQ(
+      getEncodedSize(packet1) + getEncodedSize(packet2),
+      ackEvent.totalBytesAcked);
 }
 
 /**
@@ -3379,6 +3390,7 @@ TEST_F(AckEventForAppDataTest, AckEventAckedBytesSeparateAcks) {
 
     // check ackedBytes
     EXPECT_EQ(getEncodedSize(packet1), ackEvent.ackedBytes);
+    EXPECT_EQ(getEncodedSize(packet1), ackEvent.totalBytesAcked);
   }
 
   // deliver ACK for packet2
@@ -3388,6 +3400,9 @@ TEST_F(AckEventForAppDataTest, AckEventAckedBytesSeparateAcks) {
 
     // check ackedBytes
     EXPECT_EQ(getEncodedSize(packet2), ackEvent.ackedBytes);
+    EXPECT_EQ(
+        getEncodedSize(packet1) + getEncodedSize(packet2),
+        ackEvent.totalBytesAcked);
   }
 }
 

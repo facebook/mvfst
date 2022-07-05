@@ -653,6 +653,11 @@ TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendSingleDataPacketWithAck) {
         ASSERT_THAT(ackEvent, Not(IsNull()));
         if (ackEvent) {
           EXPECT_EQ(1, ackEvent->ackedPackets.size());
+          EXPECT_EQ(44, ackEvent->ackedBytes);
+          EXPECT_EQ(44, ackEvent->totalBytesAcked);
+          EXPECT_EQ(
+              this->getNonConstConn().lossState.totalBytesAcked,
+              ackEvent->totalBytesAcked);
           EXPECT_EQ(lastPacketNum, ackEvent->largestAckedPacket);
           EXPECT_EQ(lastPacketNum, ackEvent->largestNewlyAckedPacket);
         }
@@ -712,6 +717,11 @@ TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendTwoDataPacketsWithAck) {
         ASSERT_THAT(ackEvent, Not(IsNull()));
         if (ackEvent) {
           EXPECT_EQ(2, ackEvent->ackedPackets.size());
+          EXPECT_EQ(2 * 44, ackEvent->ackedBytes);
+          EXPECT_EQ(2 * 44, ackEvent->totalBytesAcked);
+          EXPECT_EQ(
+              this->getNonConstConn().lossState.totalBytesAcked,
+              ackEvent->totalBytesAcked);
           EXPECT_EQ(lastPacketNum, ackEvent->largestAckedPacket);
           EXPECT_EQ(lastPacketNum, ackEvent->largestNewlyAckedPacket);
         }

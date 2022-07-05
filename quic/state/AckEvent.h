@@ -121,6 +121,12 @@ struct AckEvent {
   // determine information about stream bytes.
   uint64_t ackedBytes{0};
 
+  // total number of bytes acked on this connection after ACK processed.
+  //
+  // this value is the same as lossState.totalBytesAcked and does not
+  // include bytea acked via implicit ACKs.
+  uint64_t totalBytesAcked{0};
+
   // the highest packet number newly acked during processing of this event.
   //
   // this may not be the same as the largestAckedPacket if the OutstandingPacket

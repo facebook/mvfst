@@ -280,6 +280,7 @@ AckEvent processAckFrame(
         }
         conn.lossState.lastAckedTime = ackReceiveTime;
         conn.lossState.adjustedLastAckedTime = ackReceiveTime - frame.ackDelay;
+        ack.totalBytesAcked = conn.lossState.totalBytesAcked;
       }
 
       {
