@@ -916,6 +916,10 @@ void updateConnection(
   if (conn.pacer) {
     conn.pacer->onPacketSent();
   }
+  for (auto& packetProcessor : conn.packetProcessors) {
+    packetProcessor->onPacketSent(pkt);
+  }
+
   if (conn.pathValidationLimiter &&
       (conn.pendingEvents.pathChallenge || conn.outstandingPathValidation)) {
     conn.pathValidationLimiter->onPacketSent(pkt.metadata.encodedSize);

@@ -483,6 +483,9 @@ AckEvent processAckFrame(
       }
     }
     conn.congestionController->onPacketAckOrLoss(&ack, lossEvent.get_pointer());
+    for (auto& packetProcessor : conn.packetProcessors) {
+      packetProcessor->onPacketAck(&ack);
+    }
     ack.ccState = conn.congestionController->getState();
   }
   clearOldOutstandingPackets(conn, ackReceiveTime, pnSpace);

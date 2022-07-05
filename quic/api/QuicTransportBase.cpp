@@ -3428,6 +3428,12 @@ void QuicTransportBase::setCongestionControl(CongestionControlType type) {
   }
 }
 
+void QuicTransportBase::addPacketProcessor(
+    std::shared_ptr<PacketProcessor> packetProcessor) {
+  DCHECK(conn_);
+  conn_->packetProcessors.push_back(std::move(packetProcessor));
+}
+
 bool QuicTransportBase::isDetachable() {
   // only the client is detachable.
   return conn_->nodeType == QuicNodeType::Client;

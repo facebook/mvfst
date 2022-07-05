@@ -18,6 +18,7 @@
 #include <quic/server/test/QuicServerTransportTestUtil.h>
 #include <quic/state/AckEvent.h>
 #include <quic/state/OutstandingPacket.h>
+#include <quic/state/test/Mocks.h>
 
 using namespace folly;
 using namespace testing;
@@ -613,6 +614,113 @@ TYPED_TEST(
   // should be no space (capacity) for ACK events
   EXPECT_EQ(0, this->getConn().lastProcessedAckEvents.capacity());
 
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor callbacks when sending a packet and its ack
+ */
+TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendSingleDataPacketWithAck) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto outstandingPacket) {
+        EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
+        EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
+        EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
+      }));
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets.has_value());
+  quic::PacketNum firstPacketNum = maybeWrittenPackets->start;
+  quic::PacketNum lastPacketNum = maybeWrittenPackets->end;
+  EXPECT_EQ(1, lastPacketNum - firstPacketNum + 1);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto ackEvent) {
+        ASSERT_THAT(ackEvent, Not(IsNull()));
+        if (ackEvent) {
+          EXPECT_EQ(1, ackEvent->ackedPackets.size());
+          EXPECT_EQ(lastPacketNum, ackEvent->largestAckedPacket);
+          EXPECT_EQ(lastPacketNum, ackEvent->largestNewlyAckedPacket);
+        }
+      }));
+
+  // deliver an ACK for all of the outstanding packets
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      std::chrono::steady_clock::time_point());
+  this->destroyTransport();
+}
+
+/**
+ * Verify PacketProcessor callbacks when sending two data packets and receiving
+ * one ack
+ */
+TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendTwoDataPacketsWithAck) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  this->getNonConstConn().packetProcessors.push_back(
+      std::move(mockPacketProcessor));
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketSent(_))
+      .Times(2)
+      .WillOnce(Invoke([&](auto outstandingPacket) {
+        EXPECT_EQ(4, outstandingPacket.metadata.totalPacketsSent);
+        EXPECT_EQ(1, outstandingPacket.metadata.packetsInflight);
+        EXPECT_EQ(3, outstandingPacket.metadata.writeCount);
+      }))
+      .WillOnce(Invoke([&](auto outstandingPacket) {
+        EXPECT_EQ(5, outstandingPacket.metadata.totalPacketsSent);
+        EXPECT_EQ(2, outstandingPacket.metadata.packetsInflight);
+        EXPECT_EQ(4, outstandingPacket.metadata.writeCount);
+      }));
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("hello"), false);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+
+  // write some more bytes into the same stream
+  this->getTransport()->writeChain(streamId, IOBuf::copyBuffer("world"), false);
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+
+  // should have sent two packets
+  ASSERT_TRUE(maybeWrittenPackets1.has_value());
+  ASSERT_TRUE(maybeWrittenPackets2.has_value());
+  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+  quic::PacketNum lastPacketNum = maybeWrittenPackets2->end;
+  EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
+
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto ackEvent) {
+        ASSERT_THAT(ackEvent, Not(IsNull()));
+        if (ackEvent) {
+          EXPECT_EQ(2, ackEvent->ackedPackets.size());
+          EXPECT_EQ(lastPacketNum, ackEvent->largestAckedPacket);
+          EXPECT_EQ(lastPacketNum, ackEvent->largestNewlyAckedPacket);
+        }
+      }));
+
+  // deliver an ACK for all of the outstanding packets
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      std::chrono::steady_clock::time_point());
   this->destroyTransport();
 }
 

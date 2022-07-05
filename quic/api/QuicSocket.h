@@ -1242,6 +1242,12 @@ class QuicSocket {
    */
   virtual void setCongestionControl(CongestionControlType type) = 0;
 
+  /**
+   * Add a packet processor
+   */
+  virtual void addPacketProcessor(
+      std::shared_ptr<PacketProcessor> packetProcessor) = 0;
+
   using Observer = SocketObserverContainer::Observer;
   using ManagedObserver = SocketObserverContainer::ManagedObserver;
 

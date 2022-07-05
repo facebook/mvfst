@@ -35,6 +35,13 @@ class MockCongestionController : public CongestionController {
   MOCK_METHOD(void, setExperimental, (bool));
 };
 
+class MockPacketProcessor : public PacketProcessor {
+ public:
+  ~MockPacketProcessor() override = default;
+  MOCK_METHOD(void, onPacketSent, (const OutstandingPacket&), (override));
+  MOCK_METHOD(void, onPacketAck, (const AckEvent* FOLLY_NULLABLE), (override));
+};
+
 class MockPacer : public Pacer {
  public:
   MOCK_METHOD(

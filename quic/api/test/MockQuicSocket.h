@@ -303,6 +303,8 @@ class MockQuicSocket : public QuicSocket {
 
   MOCK_METHOD(void, setCongestionControl, (CongestionControlType));
 
+  MOCK_METHOD(void, addPacketProcessor, (std::shared_ptr<PacketProcessor>));
+
   ConnectionSetupCallback* setupCb_{nullptr};
   ConnectionCallback* connCb_{nullptr};
 

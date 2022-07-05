@@ -102,6 +102,9 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
@@ -153,6 +156,8 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocks) {
           lostPacketsCounter++;
         }
       }));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
+
   processAckFrame(
       conn,
       GetParam(),
@@ -472,6 +477,9 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
@@ -524,6 +532,7 @@ TEST_P(AckHandlersTest, TestAckMultipleSequentialBlocksLoss) {
         }
       }))
       .WillRepeatedly(Invoke([](auto, auto) {}));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(3);
   processAckFrame(
       conn,
       GetParam(),
@@ -624,6 +633,9 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
@@ -672,6 +684,7 @@ TEST_P(AckHandlersTest, TestAckBlocksWithGaps) {
           lostPacketsCounter++;
         }
       }));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
   processAckFrame(
       conn,
       GetParam(),
@@ -736,6 +749,9 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   // Get the time based loss detection out of the way
   conn.lossState.srtt = 10s;
 
@@ -803,6 +819,7 @@ TEST_P(AckHandlersTest, TestNonSequentialPacketNumbers) {
         EXPECT_EQ(expectedAckedBytes, ackEvent->ackedBytes);
         EXPECT_EQ(expectedAckedPackets, ackEvent->ackedPackets.size());
       }));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
   processAckFrame(
       conn,
       GetParam(),
@@ -1150,6 +1167,9 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
@@ -1163,7 +1183,7 @@ TEST_P(AckHandlersTest, NoSkipAckVisitor) {
             ackEvent->ackedPackets.front()
                 .outstandingPacketMetadata.totalBytesSent);
       }));
-
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
   // We need to at least have one frame to trigger ackVisitor
@@ -1210,6 +1230,9 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke([&](auto ackEvent, auto) {
@@ -1223,6 +1246,7 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
             ackEvent->ackedPackets.front()
                 .outstandingPacketMetadata.totalBytesSent);
       }));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   PacketNum packetNum = 0;
   auto regularPacket = createNewPacket(packetNum, GetParam());
@@ -1267,6 +1291,78 @@ TEST_P(AckHandlersTest, SkipAckVisitor) {
       ) { /* no-op lossVisitor */ },
       Clock::now());
   EXPECT_EQ(0, ackVisitorCounter);
+}
+
+TEST_P(AckHandlersTest, MultiplePacketProcessors) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  auto mockCongestionController = std::make_unique<MockCongestionController>();
+  conn.congestionController = std::move(mockCongestionController);
+
+  auto mockPacketProcessor1 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor1 = mockPacketProcessor1.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor1));
+
+  auto mockPacketProcessor2 = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor2 = mockPacketProcessor2.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor2));
+
+  StreamId streamid = 0;
+
+  // Write 10 packets
+  for (PacketNum packetNum = 0; packetNum < 10; packetNum++) {
+    auto regularPacket = createNewPacket(packetNum, GetParam());
+
+    WriteStreamFrame frame(streamid++, 0, 0, true);
+    regularPacket.frames.emplace_back(std::move(frame));
+    conn.outstandings
+        .packetCount[regularPacket.header.getPacketNumberSpace()]++;
+    conn.outstandings.packets.emplace_back(
+        std::move(regularPacket),
+        Clock::now(),
+        1,
+        0,
+        false,
+        1 * (packetNum + 1),
+        0,
+        0,
+        0,
+        LossState(),
+        0,
+        OutstandingPacketMetadata::DetailsPerStream());
+  }
+
+  ReadAckFrame ackFrame;
+  ackFrame.largestAcked = 9;
+  ackFrame.ackBlocks.emplace_back(0, 9);
+
+  auto checkAck = [&](auto ack) {
+    EXPECT_EQ(ul(9), ack.largestAckedPacket);
+    EXPECT_EQ(ul(9), ack.largestNewlyAckedPacket);
+    EXPECT_EQ(10, ack.ackedBytes);
+    EXPECT_EQ(10, ack.ackedPackets.size());
+  };
+
+  EXPECT_CALL(*rawPacketProcessor1, onPacketAck(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto ack) {
+        ASSERT_THAT(ack, Not(IsNull()));
+        checkAck(*ack);
+      }));
+  EXPECT_CALL(*rawPacketProcessor2, onPacketAck(_))
+      .Times(1)
+      .WillOnce(Invoke([&](auto ack) {
+        ASSERT_THAT(ack, Not(IsNull()));
+        checkAck(*ack);
+      }));
+
+  processAckFrame(
+      conn,
+      GetParam(),
+      ackFrame,
+      [&](const auto&, const auto&, const auto&) { /* ackVisitor */ },
+      [&](auto&, auto&, bool) { /* lossVisitor */ },
+      Clock::now());
 }
 
 TEST_P(AckHandlersTest, NoDoubleProcess) {
@@ -1487,6 +1583,9 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
   EXPECT_CALL(*rawCongestionController, onPacketAckOrLoss(_, _))
       .Times(1)
       .WillOnce(Invoke(
@@ -1497,7 +1596,7 @@ TEST_P(AckHandlersTest, AckNotOutstandingButLoss) {
             EXPECT_TRUE(
                 CHECK_NOTNULL(lossEvent)->largestLostPacketNum.has_value());
           }));
-
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
   // But packet 1 has been outstanding for longer than delayUntilLost:
   PacketNum packetNum = 1;
   auto regularPacket = createNewPacket(packetNum, GetParam());
@@ -1602,6 +1701,9 @@ TEST_P(AckHandlersTest, AckEventCreation) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -1704,6 +1806,7 @@ TEST_P(AckHandlersTest, AckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled out
   auto ackEvent = processAckFrame(
@@ -1729,6 +1832,9 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -1826,6 +1932,7 @@ TEST_P(AckHandlersTest, AckEventCreationSingleWrite) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   // check the AckEvent returned by processAckFrame so everything is filled out
   auto ackEvent = processAckFrame(
@@ -1956,6 +2063,9 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -2038,6 +2148,7 @@ TEST_P(AckHandlersTest, AckEventCreationInvalidAckDelay) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
       conn,
@@ -2054,6 +2165,9 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -2134,6 +2248,7 @@ TEST_P(AckHandlersTest, AckEventCreationRttMinusAckDelayIsZero) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
       conn,
@@ -2151,6 +2266,9 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
       std::make_unique<StrictMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   // prevent packets from being marked as lost
   // must initialize srtt and lrtt in parallel
@@ -2257,6 +2375,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
         conn,
@@ -2309,6 +2428,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
         conn,
@@ -2361,6 +2481,7 @@ TEST_P(AckHandlersTest, AckEventCreationReorderingLargestPacketAcked) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
         conn,
@@ -2379,6 +2500,9 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
       std::make_unique<StrictMock<MockCongestionController>>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   // setting a very low reordering threshold to force loss by reorder
   conn.lossState.reorderingThreshold = 1;
@@ -2476,6 +2600,7 @@ TEST_P(AckHandlersTest, AckEventCreationNoMatchingPacketDueToLoss) {
         .WillOnce(Return(writableBytes));
     EXPECT_CALL(*rawCongestionController, getCongestionWindow())
         .WillOnce(Return(congestionWindow));
+    EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
     processAckFrame(
         conn,
@@ -2517,6 +2642,9 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
   auto mockCongestionController = std::make_unique<MockCongestionController>();
   auto rawCongestionController = mockCongestionController.get();
   conn.congestionController = std::move(mockCongestionController);
+  auto mockPacketProcessor = std::make_unique<MockPacketProcessor>();
+  auto rawPacketProcessor = mockPacketProcessor.get();
+  conn.packetProcessors.push_back(std::move(mockPacketProcessor));
 
   const TimePoint startTime = Clock::now();
   PacketNum packetNum = 0;
@@ -2590,6 +2718,7 @@ TEST_P(AckHandlersTest, ImplictAckEventCreation) {
       .WillOnce(Return(writableBytes));
   EXPECT_CALL(*rawCongestionController, getCongestionWindow())
       .WillOnce(Return(congestionWindow));
+  EXPECT_CALL(*rawPacketProcessor, onPacketAck(_)).Times(1);
 
   processAckFrame(
       conn,

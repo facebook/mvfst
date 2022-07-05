@@ -635,6 +635,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   // If you don't set it, the default is Cubic
   void setCongestionControl(CongestionControlType type) override;
 
+  void addPacketProcessor(
+      std::shared_ptr<PacketProcessor> packetProcessor) override;
+
   void describe(std::ostream& os) const;
 
   void setLogger(std::shared_ptr<Logger> logger) {
