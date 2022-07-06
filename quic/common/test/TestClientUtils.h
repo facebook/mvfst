@@ -15,9 +15,10 @@ class TestCertificateVerifier : public fizz::CertificateVerifier {
  public:
   ~TestCertificateVerifier() override = default;
 
-  void verify(const std::vector<std::shared_ptr<const fizz::PeerCert>>&)
+  std::shared_ptr<const folly::AsyncTransportCertificate> verify(
+      const std::vector<std::shared_ptr<const fizz::PeerCert>>& certs)
       const override {
-    return;
+    return certs.front();
   }
 
   [[nodiscard]] std::vector<fizz::Extension> getCertificateRequestExtensions()
