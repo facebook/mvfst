@@ -673,6 +673,19 @@ QuicTransportBase::getStreamFlowControl(StreamId id) const {
       stream->flowControlState.advertisedMaxOffset);
 }
 
+folly::Expected<uint64_t, LocalErrorCode>
+QuicTransportBase::getMaxWritableOnStream(StreamId id) const {
+  if (!conn_->streamManager->streamExists(id)) {
+    return folly::makeUnexpected(LocalErrorCode::STREAM_NOT_EXISTS);
+  }
+  if (isReceivingStream(conn_->nodeType, id)) {
+    return folly::makeUnexpected(LocalErrorCode::INVALID_OPERATION);
+  }
+
+  auto stream = CHECK_NOTNULL(conn_->streamManager->getStream(id));
+  return maxWritableOnStream(*stream);
+}
+
 folly::Expected<folly::Unit, LocalErrorCode>
 QuicTransportBase::setConnectionFlowControlWindow(uint64_t windowSize) {
   if (closeState_ != CloseState::OPEN) {
@@ -2165,7 +2178,8 @@ QuicTransportBase::notifyPendingWriteOnStream(StreamId id, WriteCallback* wcb) {
   return folly::unit;
 }
 
-uint64_t QuicTransportBase::maxWritableOnStream(const QuicStreamState& stream) {
+uint64_t QuicTransportBase::maxWritableOnStream(
+    const QuicStreamState& stream) const {
   auto connWritableBytes = maxWritableOnConn();
   auto streamFlowControlBytes = getSendStreamFlowControlBytesAPI(stream);
   auto flowControlAllowedBytes =
@@ -2173,7 +2187,7 @@ uint64_t QuicTransportBase::maxWritableOnStream(const QuicStreamState& stream) {
   return flowControlAllowedBytes;
 }
 
-uint64_t QuicTransportBase::maxWritableOnConn() {
+uint64_t QuicTransportBase::maxWritableOnConn() const {
   auto connWritableBytes = getSendConnFlowControlBytesAPI(*conn_);
   auto availableBufferSpace = bufferSpaceAvailable();
   return std::min(connWritableBytes, availableBufferSpace);

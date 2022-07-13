@@ -103,6 +103,9 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
   folly::Expected<QuicSocket::FlowControlState, LocalErrorCode>
   getStreamFlowControl(StreamId id) const override;
 
+  folly::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
+      StreamId id) const override;
+
   folly::Expected<folly::Unit, LocalErrorCode> setConnectionFlowControlWindow(
       uint64_t windowSize) override;
 
@@ -788,8 +791,8 @@ class QuicTransportBase : public QuicSocket, QuicStreamPrioritiesObserver {
    */
   void pacedWriteDataToSocket(bool fromTimer);
 
-  uint64_t maxWritableOnStream(const QuicStreamState&);
-  uint64_t maxWritableOnConn();
+  uint64_t maxWritableOnStream(const QuicStreamState&) const;
+  uint64_t maxWritableOnConn() const;
 
   void lossTimeoutExpired() noexcept;
   void ackTimeoutExpired() noexcept;

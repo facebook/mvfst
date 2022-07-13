@@ -86,6 +86,11 @@ class MockQuicSocket : public QuicSocket {
       getStreamFlowControl,
       (StreamId),
       (const));
+  MOCK_METHOD(
+      (folly::Expected<uint64_t, LocalErrorCode>),
+      getMaxWritableOnStream,
+      (StreamId),
+      (const));
   MOCK_METHOD(void, unsetAllReadCallbacks, ());
   MOCK_METHOD(void, unsetAllPeekCallbacks, ());
   MOCK_METHOD(void, unsetAllDeliveryCallbacks, ());

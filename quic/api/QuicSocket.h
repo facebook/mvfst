@@ -498,6 +498,13 @@ class QuicSocket {
   getStreamFlowControl(StreamId id) const = 0;
 
   /**
+   * Returns the minimum of current send flow control window and available
+   * buffer space.
+   */
+  virtual folly::Expected<uint64_t, LocalErrorCode> getMaxWritableOnStream(
+      StreamId id) const = 0;
+
+  /**
    * Sets the flow control window for the connection.
    * Use setStreamFlowControlWindow for per Stream flow control.
    */

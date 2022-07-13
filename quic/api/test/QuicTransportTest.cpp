@@ -4797,5 +4797,182 @@ TEST_F(QuicTransportTest, SetMaxPacingRateWithAndWithoutPacing) {
   EXPECT_FALSE(res2.hasError());
 }
 
+TEST_F(QuicTransportTest, GetMaxWritableInvalidStream) {
+  // Stream ID is for a peer-initiated bidirectional stream that doesn't exist
+  StreamId id = 0b100;
+  auto maxWritable = transport_->getMaxWritableOnStream(id);
+  // max writable on non-existent stream returns an error
+  EXPECT_TRUE(maxWritable.hasError());
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableOnIncomingUnidirectionalStream) {
+  auto& conn = transport_->getConnectionState();
+  // Stream ID is for a peer-initiated unidirectional stream
+  StreamId id = 0b110;
+  conn.streamManager->getStream(id);
+  auto maxWritable = transport_->getMaxWritableOnStream(id);
+  // max writable on receive only stream returns an error
+  EXPECT_TRUE(maxWritable.hasError());
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableStreamFlowControlLimited) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream ID is for a peer-initiated bidirectional stream
+  StreamId id = 0b100;
+  auto stream = conn.streamManager->getStream(id);
+
+  // set stream fcw < both conn fc and total buffer space available, such that
+  // we're limited by stream fcw
+  stream->flowControlState.peerAdvertisedMaxOffset = 1500;
+  conn.flowControlState.peerAdvertisedMaxOffset = 2000;
+  transportSettings.totalBufferSpaceAvailable = 2000;
+  transport_->setTransportSettings(transportSettings);
+
+  auto maxWritable = transport_->getMaxWritableOnStream(id);
+  EXPECT_FALSE(maxWritable.hasError());
+  EXPECT_EQ(*maxWritable, stream->flowControlState.peerAdvertisedMaxOffset);
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableConnFlowControlLimited) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream ID is for a peer-initiated bidirectional stream
+  StreamId id = 0b100;
+  auto stream = conn.streamManager->getStream(id);
+
+  // set conn fcw < both stream fcw and buffer space, such that we're conn fcw
+  // limited
+  conn.flowControlState.peerAdvertisedMaxOffset = 1500;
+  transportSettings.totalBufferSpaceAvailable = 2000;
+  transport_->setTransportSettings(transportSettings);
+  stream->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  auto maxWritable = transport_->getMaxWritableOnStream(id);
+  EXPECT_FALSE(maxWritable.hasError());
+  EXPECT_EQ(*maxWritable, conn.flowControlState.peerAdvertisedMaxOffset);
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableBufferSpaceLimited) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream ID is for a peer-initiated bidirectional stream
+  StreamId id = 0b100;
+  auto stream = conn.streamManager->getStream(id);
+
+  // set total buffer space available < stream and conn fcw, such that
+  // we're limited by buffer space
+  transportSettings.totalBufferSpaceAvailable = 1500;
+  transport_->setTransportSettings(transportSettings);
+  stream->flowControlState.peerAdvertisedMaxOffset = 2000;
+  conn.flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  auto maxWritable = transport_->getMaxWritableOnStream(id);
+  EXPECT_FALSE(maxWritable.hasError());
+  EXPECT_EQ(*maxWritable, transportSettings.totalBufferSpaceAvailable);
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableStreamFlowControlLimitedTwoStreams) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream IDs are for a peer-initiated bidirectional stream
+  StreamId id1 = 0b100;
+  StreamId id2 = 0b1100;
+
+  // let's assume we have 1k bytes left in each window
+  auto stream1 = conn.streamManager->getStream(id1);
+  stream1->currentWriteOffset = 1000;
+  stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  auto stream2 = conn.streamManager->getStream(id2);
+  stream2->currentWriteOffset = 1000;
+  stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  // set sum of write offset accordingly
+  conn.flowControlState.sumCurWriteOffset = 2000;
+
+  // set stream fcw < both conn fcw and total buffer space available, such that
+  // we're limited by stream fcw
+  conn.flowControlState.peerAdvertisedMaxOffset = 4000;
+  transportSettings.totalBufferSpaceAvailable = 2000;
+  transport_->setTransportSettings(transportSettings);
+
+  auto maxWritable1 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable1.hasError());
+  EXPECT_EQ(*maxWritable1, 1000);
+
+  auto maxWritable2 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable2.hasError());
+  EXPECT_EQ(*maxWritable2, 1000);
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableConnFlowControlLimitedTwoStreams) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream IDs are for a peer-initiated bidirectional stream
+  StreamId id1 = 0b100;
+  StreamId id2 = 0b1100;
+
+  // let's assume we have 1k bytes left in each window
+  auto stream1 = conn.streamManager->getStream(id1);
+  stream1->currentWriteOffset = 1000;
+  stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  auto stream2 = conn.streamManager->getStream(id2);
+  stream2->currentWriteOffset = 1000;
+  stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  // set sum of write offset accordingly
+  conn.flowControlState.sumCurWriteOffset = 2000;
+
+  // set conn fcw < both stream fcw and total buffer space available, such that
+  // we're limited by conn fcw
+  conn.flowControlState.peerAdvertisedMaxOffset = 2500;
+  transportSettings.totalBufferSpaceAvailable = 800;
+  transport_->setTransportSettings(transportSettings);
+
+  auto maxWritable1 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable1.hasError());
+  EXPECT_EQ(*maxWritable1, 500);
+
+  auto maxWritable2 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable2.hasError());
+  EXPECT_EQ(*maxWritable2, 500);
+}
+
+TEST_F(QuicTransportTest, GetMaxWritableBufferSpaceLimitedTwoStreams) {
+  auto& conn = transport_->getConnectionState();
+  auto transportSettings = transport_->getTransportSettings();
+  // Stream IDs are for a peer-initiated bidirectional stream
+  StreamId id1 = 0b100;
+  StreamId id2 = 0b1100;
+
+  // let's assume we have 1k bytes left in each window
+  auto stream1 = conn.streamManager->getStream(id1);
+  stream1->currentWriteOffset = 1000;
+  stream1->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  auto stream2 = conn.streamManager->getStream(id2);
+  stream2->currentWriteOffset = 1000;
+  stream2->flowControlState.peerAdvertisedMaxOffset = 2000;
+
+  // set sum of write offset accordingly
+  conn.flowControlState.sumCurWriteOffset = 2000;
+
+  // set total buffer space available < stream and conn fcw, such that we're
+  // limited by buffer space
+  transportSettings.totalBufferSpaceAvailable = 500;
+  transport_->setTransportSettings(transportSettings);
+  conn.flowControlState.peerAdvertisedMaxOffset = 3000;
+
+  auto maxWritable1 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable1.hasError());
+  EXPECT_EQ(*maxWritable1, transportSettings.totalBufferSpaceAvailable);
+
+  auto maxWritable2 = transport_->getMaxWritableOnStream(id1);
+  EXPECT_FALSE(maxWritable2.hasError());
+  EXPECT_EQ(*maxWritable2, transportSettings.totalBufferSpaceAvailable);
+}
+
 } // namespace test
 } // namespace quic
