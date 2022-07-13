@@ -233,6 +233,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     startDone_.wait();
 
     std::string message;
+    bool closed = false;
     auto client = quicClient_;
 
     if (enableStreamGroups_) {
@@ -246,6 +247,12 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     }
 
     auto sendMessageInStream = [&]() {
+      if (message == "/close") {
+        quicClient_->close(folly::none);
+        closed = true;
+        return;
+      }
+
       // create new stream for each message
       auto streamId = client->createBidirectionalStream().value();
       client->setReadCallback(streamId, this);
@@ -265,7 +272,7 @@ class EchoClient : public quic::QuicSocket::ConnectionSetupCallback,
     };
 
     // loop until Ctrl+D
-    while (std::getline(std::cin, message)) {
+    while (!closed && std::getline(std::cin, message)) {
       if (message.empty()) {
         continue;
       }
