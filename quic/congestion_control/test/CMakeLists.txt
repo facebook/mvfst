@@ -22,6 +22,7 @@ quic_add_test(TARGET CongestionControllerTests
   CubicTest.cpp
   NewRenoTest.cpp
   PacerTest.cpp
+  SimulatedTBFTest.cpp
   DEPENDS
   Folly::folly
   mvfst_cc_algo
