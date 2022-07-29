@@ -10,6 +10,7 @@
 #include <folly/portability/GMock.h>
 
 #include <quic/api/QuicSocket.h>
+#include <quic/dsr/Types.h>
 
 namespace quic {
 
