@@ -1,9 +1,4 @@
-use clap;
 use clap::Arg;
-use portus;
-use slog;
-use std;
-use time;
 use {
     Alg, GenericCongAvoidAlg, GenericCongAvoidConfigReport, GenericCongAvoidConfigSS,
     DEFAULT_SS_THRESH,
