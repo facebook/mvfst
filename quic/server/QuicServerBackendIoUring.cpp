@@ -21,6 +21,10 @@ DEFINE_int32(
     qs_io_uring_use_registered_fds,
     256,
     "io_uring backend use registered fds");
+DEFINE_bool(
+    qs_io_uring_register_ring,
+    false,
+    "io_uring backend use registered ring");
 
 namespace quic {
 
@@ -32,6 +36,7 @@ std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
       options.setCapacity(static_cast<size_t>(FLAGS_qs_io_uring_capacity))
           .setMaxSubmit(static_cast<size_t>(FLAGS_qs_io_uring_max_submit))
           .setMaxGet(static_cast<size_t>(FLAGS_qs_io_uring_max_get))
+          .setRegisterRingFd(FLAGS_qs_io_uring_register_ring)
           .setUseRegisteredFds(FLAGS_qs_io_uring_use_registered_fds);
       if (folly::IoUringBackend::kernelSupportsRecvmsgMultishot()) {
         options.setInitialProvidedBuffers(2048, 2000);
