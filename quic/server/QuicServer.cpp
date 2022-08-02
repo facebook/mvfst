@@ -103,12 +103,13 @@ void QuicServer::start(const folly::SocketAddress& address, size_t maxWorkers) {
   if (maxWorkers == 0) {
     maxWorkers = numCpu;
   }
+  auto const backendDetails = getEventBaseBackendDetails();
+  backendSupportsMultishotCallback_ = backendDetails.supportsRecvmsgMultishot;
   auto numWorkers = std::min(numCpu, maxWorkers);
   std::vector<folly::EventBase*> evbs;
   for (size_t i = 0; i < numWorkers; ++i) {
     auto scopedEvb = std::make_unique<folly::ScopedEventBaseThread>(
-        folly::EventBase::Options().setBackendFactory(
-            [] { return getEventBaseBackend(); }),
+        folly::EventBase::Options().setBackendFactory(backendDetails.factory),
         nullptr,
         "");
     workerEvbs_.push_back(std::move(scopedEvb));
@@ -201,8 +202,16 @@ void QuicServer::initializeWorkers(
 }
 
 std::unique_ptr<QuicServerWorker> QuicServer::newWorkerWithoutSocket() {
-  auto worker = std::make_unique<QuicServerWorker>(
-      this->shared_from_this(), FLAGS_qs_io_uring_use_async_recv);
+  QuicServerWorker::SetEventCallback sec;
+  if (FLAGS_qs_io_uring_use_async_recv) {
+    sec = backendSupportsMultishotCallback_
+        ? QuicServerWorker::SetEventCallback::RECVMSG_MULTISHOT
+        : QuicServerWorker::SetEventCallback::RECVMSG;
+  } else {
+    sec = QuicServerWorker::SetEventCallback::NONE;
+  }
+  auto worker =
+      std::make_unique<QuicServerWorker>(this->shared_from_this(), sec);
   worker->setNewConnectionSocketFactory(socketFactory_.get());
   worker->setSupportedVersions(supportedVersions_);
   worker->setTransportSettings(transportSettings_);

@@ -8,7 +8,11 @@
 #include <quic/server/QuicServer.h>
 
 namespace quic {
-std::unique_ptr<folly::EventBaseBackendBase> QuicServer::getEventBaseBackend() {
-  return folly::EventBase::getDefaultBackend();
+
+QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
+  EventBaseBackendDetails ret;
+  ret.factory = &folly::EventBase::getDefaultBackend;
+  return ret;
 }
+
 } // namespace quic

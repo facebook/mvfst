@@ -17,13 +17,15 @@ DEFINE_int32(
     "io_uring backend capacity - use a > 0 value to enable it");
 DEFINE_int32(qs_io_uring_max_submit, 128, "io_uring backend max submit");
 DEFINE_int32(qs_io_uring_max_get, -1, "io_uring backend max get");
-DEFINE_bool(
+DEFINE_int32(
     qs_io_uring_use_registered_fds,
-    false,
+    256,
     "io_uring backend use registered fds");
 
 namespace quic {
-std::unique_ptr<folly::EventBaseBackendBase> QuicServer::getEventBaseBackend() {
+
+namespace {
+std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
   if (FLAGS_qs_io_uring_capacity > 0) {
     try {
       folly::PollIoBackend::Options options;
@@ -31,6 +33,9 @@ std::unique_ptr<folly::EventBaseBackendBase> QuicServer::getEventBaseBackend() {
           .setMaxSubmit(static_cast<size_t>(FLAGS_qs_io_uring_max_submit))
           .setMaxGet(static_cast<size_t>(FLAGS_qs_io_uring_max_get))
           .setUseRegisteredFds(FLAGS_qs_io_uring_use_registered_fds);
+      if (folly::IoUringBackend::kernelSupportsRecvmsgMultishot()) {
+        options.setInitialProvidedBuffers(2048, 2000);
+      }
       auto ret = std::make_unique<folly::IoUringBackend>(options);
       LOG(INFO) << "Allocating io_uring backend(" << FLAGS_qs_io_uring_capacity
                 << "," << FLAGS_qs_io_uring_max_submit << ","
@@ -44,14 +49,29 @@ std::unique_ptr<folly::EventBaseBackendBase> QuicServer::getEventBaseBackend() {
   }
   return folly::EventBase::getDefaultBackend();
 }
+
+} // namespace
+
+QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
+  EventBaseBackendDetails ret;
+  ret.factory = &getEventBaseBackend;
+  ret.supportsRecvmsgMultishot =
+      folly::IoUringBackend::kernelSupportsRecvmsgMultishot();
+  return ret;
+}
+
 } // namespace quic
 
 #else
 
 namespace quic {
-std::unique_ptr<folly::EventBaseBackendBase> getEventBaseBackend() {
-  return folly::EventBase::getDefaultBackend();
+
+QuicServer::EventBaseBackendDetails QuicServer::getEventBaseBackendDetails() {
+  EventBaseBackendDetails ret;
+  ret.factory = &folly::EventBase::getDefaultBackend;
+  return ret;
 }
+
 } // namespace quic
 
 #endif
