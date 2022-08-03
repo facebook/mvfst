@@ -33,7 +33,6 @@
 #include <quic/state/QuicStreamFunctions.h>
 #include <quic/state/StateData.h>
 
-using namespace std;
 using namespace testing;
 
 namespace quic {
