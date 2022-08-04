@@ -92,6 +92,29 @@ TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1) {
   EXPECT_EQ(clientParams->parameters.size(), 11);
 }
 
+TEST(FizzClientHandshakeTest, TestGetChloExtensionsV1Alias) {
+  FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
+      QuicVersion::QUIC_V1_ALIAS,
+      kDefaultConnectionWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultStreamWindowSize,
+      kDefaultMaxStreamsBidirectional,
+      kDefaultMaxStreamsUnidirectional,
+      kDefaultIdleTimeout,
+      kDefaultAckDelayExponent,
+      kDefaultUDPSendPacketLen,
+      kDefaultActiveConnectionIdLimit,
+      ConnectionId(std::vector<uint8_t>())));
+  auto extensions = ext.getClientHelloExtensions();
+
+  EXPECT_EQ(extensions.size(), 1);
+  auto clientParams =
+      getClientExtension(extensions, QuicVersion::QUIC_V1_ALIAS);
+  ASSERT_TRUE(clientParams.has_value());
+  EXPECT_EQ(clientParams->parameters.size(), 11);
+}
+
 TEST(FizzClientHandshakeTest, TestOnEE) {
   FizzClientExtensions ext(std::make_shared<ClientTransportParametersExtension>(
       QuicVersion::MVFST,

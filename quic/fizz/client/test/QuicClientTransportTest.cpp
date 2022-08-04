@@ -984,6 +984,8 @@ INSTANTIATE_TEST_SUITE_P(
         TestingParams(QuicVersion::MVFST),
         TestingParams(QuicVersion::QUIC_V1),
         TestingParams(QuicVersion::QUIC_V1, 0),
+        TestingParams(QuicVersion::QUIC_V1_ALIAS),
+        TestingParams(QuicVersion::QUIC_V1_ALIAS, 0),
         TestingParams(QuicVersion::QUIC_DRAFT),
         TestingParams(QuicVersion::QUIC_DRAFT, 0)));
 
@@ -3287,7 +3289,11 @@ class QuicClientTransportAfterStartTestTimeout
 INSTANTIATE_TEST_SUITE_P(
     QuicClientTransportAfterStartTestTimeouts,
     QuicClientTransportAfterStartTestTimeout,
-    Values(QuicVersion::MVFST, QuicVersion::QUIC_V1, QuicVersion::QUIC_DRAFT));
+    Values(
+        QuicVersion::MVFST,
+        QuicVersion::QUIC_V1,
+        QuicVersion::QUIC_V1_ALIAS,
+        QuicVersion::QUIC_DRAFT));
 
 TEST_P(
     QuicClientTransportAfterStartTestTimeout,

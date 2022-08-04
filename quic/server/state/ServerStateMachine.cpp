@@ -157,7 +157,8 @@ void processClientInitialParams(
       clientParams.parameters);
 
   if (conn.version == QuicVersion::QUIC_DRAFT ||
-      conn.version == QuicVersion::QUIC_V1) {
+      conn.version == QuicVersion::QUIC_V1 ||
+      conn.version == QuicVersion::QUIC_V1_ALIAS) {
     auto initialSourceConnId = getConnIdParameter(
         TransportParameterId::initial_source_connection_id,
         clientParams.parameters);
