@@ -862,10 +862,13 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   if (connIdParam->hostId != hostId_) {
+#if !defined(_MSC_VER) // This condition should be removed once we
+                       // transition to folly XLOG.
     VLOG_EVERY_N(2, 100) << fmt::format(
         "Dropping packet routed to wrong host, from client={}, routingInfo={},",
         client.describe(),
         logRoutingInfo(routingData.destinationConnId));
+#endif
     QUIC_STATS(
         statsCallback_,
         onPacketDropped,
