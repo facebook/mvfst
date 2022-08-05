@@ -14,14 +14,19 @@ namespace quic {
 class QuicReusePortUDPSocketFactory : public QuicUDPSocketFactory {
  public:
   ~QuicReusePortUDPSocketFactory() override {}
-  QuicReusePortUDPSocketFactory() {}
+  QuicReusePortUDPSocketFactory(bool reusePort = true, bool reuseAddr = false)
+      : reusePort_(reusePort), reuseAddr_(reuseAddr) {}
 
   std::unique_ptr<folly::AsyncUDPSocket> make(folly::EventBase* evb, int)
       override {
     auto sock = std::make_unique<folly::AsyncUDPSocket>(evb);
-    sock->setReusePort(true);
-    sock->setReuseAddr(false);
+    sock->setReusePort(reusePort_);
+    sock->setReuseAddr(reuseAddr_);
     return sock;
   }
+
+ private:
+  bool reusePort_;
+  bool reuseAddr_;
 };
 } // namespace quic

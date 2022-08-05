@@ -42,7 +42,12 @@ size_t getWorkerToRouteTo(
 } // namespace
 
 QuicServer::QuicServer() {
+#ifdef _WIN32
+  listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>(
+      true /* reusePort*/, true /* reuseAddr */);
+#else
   listenerSocketFactory_ = std::make_unique<QuicReusePortUDPSocketFactory>();
+#endif
   socketFactory_ = std::make_unique<QuicSharedUDPSocketFactory>();
 }
 
