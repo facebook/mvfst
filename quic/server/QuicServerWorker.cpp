@@ -668,8 +668,12 @@ void QuicServerWorker::dispatchPacketData(
 
         // This could be a new connection, add it in the map
         // verify that the initial packet is at least min initial bytes
-        // to avoid amplification attacks.
-        if (networkData.totalData < kMinInitialPacketSize) {
+        // to avoid amplification attacks. Also check CID sizes.
+        if (routingData.isInitial &&
+            (networkData.totalData < kMinInitialPacketSize ||
+             routingData.destinationConnId.size() <
+                 kMinInitialDestinationConnIdLength ||
+             routingData.destinationConnId.size() > kMaxConnectionIdSize)) {
           // Don't even attempt to forward the packet, just drop it.
           VLOG(3) << "Dropping small initial packet from client=" << client;
           QUIC_STATS(

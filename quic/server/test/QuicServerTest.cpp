@@ -598,7 +598,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
       .WillRepeatedly(Return(&eventbase_));
   EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr2));
-  ConnectionId connId2({2, 4, 5, 6});
+  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
   num = 1;
   version = QuicVersion::MVFST;
   RoutingData routingData2(
@@ -620,7 +620,7 @@ TEST_F(QuicServerWorkerTest, RateLimit) {
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
-  ConnectionId connId3({8, 4, 5, 6});
+  ConnectionId connId3({8, 4, 5, 6, 7, 8, 9, 10});
   num = 1;
   version = QuicVersion::MVFST;
   RoutingData routingData3(
@@ -693,7 +693,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       .WillRepeatedly(Return(&eventbase_));
   EXPECT_CALL(*testTransport2, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr2));
-  ConnectionId connId2({2, 4, 5, 6});
+  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData2(
       HeaderForm::Long, true, false, true, connId2, connId2);
@@ -714,7 +714,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
   auto caddr3 = folly::SocketAddress("3.3.4.5", 1234);
   auto mockSock3 =
       std::make_unique<NiceMock<folly::test::MockAsyncUDPSocket>>(&eventbase_);
-  ConnectionId connId3({3, 4, 5, 6});
+  ConnectionId connId3({3, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData3(
       HeaderForm::Long, true, false, true, connId3, connId3);
@@ -748,7 +748,7 @@ TEST_F(QuicServerWorkerTest, UnfinishedHandshakeLimit) {
       .WillRepeatedly(Return(&eventbase_));
   EXPECT_CALL(*testTransport4, getOriginalPeerAddress())
       .WillRepeatedly(ReturnRef(caddr4));
-  ConnectionId connId4({4, 4, 5, 6});
+  ConnectionId connId4({4, 4, 5, 6, 7, 8, 9, 10});
   version = QuicVersion::MVFST;
   RoutingData routingData4(
       HeaderForm::Long, true, false, true, connId4, connId4);
@@ -977,6 +977,7 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
 TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
+  LOG(ERROR) << "from test CID: " << int(connId.size());
   createQuicConnection(kClientAddr, connId);
 
   auto data = folly::IOBuf::copyBuffer("data");
@@ -1037,7 +1038,7 @@ TEST_F(QuicServerWorkerTest, QuicServerNewConnection) {
 
   // routing by address after transport_'s connid available, but before
   // transport2's connid available.
-  ConnectionId connId2({2, 4, 5, 6});
+  ConnectionId connId2({2, 4, 5, 6, 7, 8, 9, 10});
   folly::SocketAddress clientAddr2("2.3.4.5", 2345);
   NiceMock<MockConnectionSetupCallback> connSetupCb;
   NiceMock<MockConnectionCallback> connCb;
@@ -1285,6 +1286,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShortDispatch) {
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
   EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
@@ -1313,6 +1315,7 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooLargeDispatch) {
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(
       LongHeader::Types::Initial, srcConnId, dstConnId, num, version);
+  EXPECT_CALL(*factory_, _make(_, _, _, _)).Times(0);
   EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
   EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
   EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
