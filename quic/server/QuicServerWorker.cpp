@@ -257,6 +257,20 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   return false;
 }
 
+void QuicServerWorker::sendVersionNegotiationPacket(
+    const folly::SocketAddress& client,
+    LongHeaderInvariant& invariant) {
+  VersionNegotiationPacketBuilder builder(
+      invariant.dstConnId, invariant.srcConnId, supportedVersions_);
+  auto versionNegotiationPacket = std::move(builder).buildPacket();
+  VLOG(4) << "Version negotiation sent to client=" << client;
+  auto len = versionNegotiationPacket.second->computeChainDataLength();
+  QUIC_STATS(statsCallback_, onWrite, len);
+  QUIC_STATS(statsCallback_, onPacketProcessed);
+  QUIC_STATS(statsCallback_, onPacketSent);
+  socket_->write(client, versionNegotiationPacket.second);
+}
+
 void QuicServerWorker::onDataAvailable(
     const folly::SocketAddress& client,
     size_t len,
@@ -838,12 +852,17 @@ void QuicServerWorker::dispatchPacketData(
     return;
   }
   if (cannotMakeTransport) {
-    VLOG(3)
-        << "Dropping packet due to transport factory did not make transport";
+    // Act as though we received a junk Initial.
+    CHECK(routingData.sourceConnId.has_value());
+    LongHeaderInvariant inv{
+        QuicVersion::MVFST_INVALID,
+        routingData.sourceConnId.value(),
+        routingData.destinationConnId};
     QUIC_STATS(
         statsCallback_,
         onPacketDropped,
         PacketDropReason::CANNOT_MAKE_TRANSPORT);
+    sendVersionNegotiationPacket(client, inv);
     return;
   }
   if (!connIdAlgo_->canParse(routingData.destinationConnId)) {

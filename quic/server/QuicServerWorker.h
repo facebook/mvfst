@@ -563,6 +563,10 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       LongHeaderInvariant& invariant,
       size_t datagramLen);
 
+  void sendVersionNegotiationPacket(
+      const folly::SocketAddress& client,
+      LongHeaderInvariant& invariant);
+
   /**
    * Helper method to extract and log routing info from the given (dest) connId
    */

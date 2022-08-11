@@ -139,6 +139,7 @@ class QuicServerWorkerTest : public Test {
     settings.statelessResetTokenSecret = getRandSecret();
     tokenSecret_ = getRandSecret();
     settings.retryTokenSecret = tokenSecret_;
+    worker_->setSupportedVersions({QuicVersion::MVFST});
     worker_->setTransportStatsCallback(std::move(quicStats));
     worker_->setTransportSettings(settings);
     worker_->setSocket(std::move(sock));
@@ -795,6 +796,9 @@ TEST_F(QuicServerWorkerTest, TestRetryValidInitial) {
 
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
+  expectConnectionCreation(kClientAddr, transport_);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
   auto retryToken = testSendRetry(srcConnId, dstConnId, kClientAddr);
   testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
 }
@@ -804,6 +808,9 @@ TEST_F(QuicServerWorkerTest, TestRetryUnfinishedValidInitial) {
   // as the client IP is the same as the one stored in the retry token
   auto dstConnId = getTestConnectionId(hostId_);
   auto srcConnId = getTestConnectionId(0);
+  expectConnectionCreation(kClientAddr, transport_);
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  EXPECT_CALL(*transport_, setTransportStatsCallback(nullptr));
   auto retryToken = testSendRetryUnfinished(srcConnId, dstConnId, kClientAddr);
   testSendInitialWithRetryToken(retryToken, srcConnId, dstConnId, kClientAddr);
 }
@@ -1127,7 +1134,19 @@ TEST_F(QuicServerWorkerTest, QuicShedTest) {
   auto connId = getTestConnectionId(hostId_);
   EXPECT_CALL(
       *quicStats_, onPacketDropped(PacketDropReason::CANNOT_MAKE_TRANSPORT));
+  folly::Optional<VersionNegotiationPacket> versionPacket;
+  EXPECT_CALL(*socketPtr_, write(_, _))
+      .WillOnce(Invoke([&](const SocketAddress&,
+                           const std::unique_ptr<folly::IOBuf>& writtenData) {
+        auto codec = std::make_unique<QuicReadCodec>(QuicNodeType::Server);
+        auto packetQueue = bufToQueue(writtenData->clone());
+        versionPacket = codec->tryParsingVersionNegotiation(packetQueue);
+        return packetQueue.chainLength();
+      }));
+
   createQuicConnectionDuringShedding(kClientAddr, connId);
+  EXPECT_TRUE(versionPacket.has_value());
+  EXPECT_EQ(versionPacket->destinationConnectionId, connId);
 }
 
 TEST_F(QuicServerWorkerTest, BlockedSourcePort) {
@@ -1157,7 +1176,7 @@ TEST_F(QuicServerWorkerTest, ZeroLengthConnectionId) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
@@ -1220,10 +1239,10 @@ TEST_F(QuicServerWorkerTest, ConnectionIdTooShort) {
   PacketNum num = 1;
   QuicVersion version = QuicVersion::MVFST;
   LongHeader header(LongHeader::Types::Initial, connId, connId, num, version);
-  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(0);
-  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(1);
-  EXPECT_CALL(*quicStats_, onPacketSent()).Times(1);
-  EXPECT_CALL(*quicStats_, onWrite(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketDropped(_)).Times(1);
+  EXPECT_CALL(*quicStats_, onPacketProcessed()).Times(0);
+  EXPECT_CALL(*quicStats_, onPacketSent()).Times(0);
+  EXPECT_CALL(*quicStats_, onWrite(_)).Times(0);
 
   RegularQuicPacketBuilder builder(
       kDefaultUDPSendPacketLen, std::move(header), 0 /* largestAcked */);
