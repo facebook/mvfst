@@ -34,7 +34,9 @@ class DSRStreamFrameScheduler {
   SchedulingResult writeStream(DSRPacketBuilderBase& builder);
 
  private:
-  void enrichInstruction(SendInstruction::Builder& builder);
+  void enrichInstruction(
+      SendInstruction::Builder& builder,
+      const QuicStreamState& stream);
 
  private:
   QuicServerConnectionState& conn_;

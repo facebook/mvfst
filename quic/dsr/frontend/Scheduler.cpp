@@ -9,6 +9,7 @@
 #include <quic/dsr/frontend/WriteCodec.h>
 #include <quic/flowcontrol/QuicFlowController.h>
 #include <quic/state/QuicStateFunctions.h>
+#include <quic/state/QuicStreamFunctions.h>
 
 namespace quic {
 
@@ -62,7 +63,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
       if (builder.remainingSpace() < encodedSize) {
         return result;
       }
-      enrichInstruction(instructionBuilder);
+      enrichInstruction(instructionBuilder, *stream);
       builder.addSendInstruction(instructionBuilder.build(), encodedSize);
       result.writeSuccess = true;
       return result;
@@ -102,7 +103,7 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
     if (builder.remainingSpace() < encodedSize) {
       return result;
     }
-    enrichInstruction(instructionBuilder);
+    enrichInstruction(instructionBuilder, *stream);
     builder.addSendInstruction(instructionBuilder.build(), encodedSize);
     result.writeSuccess = true;
     return result;
@@ -111,10 +112,16 @@ DSRStreamFrameScheduler::SchedulingResult DSRStreamFrameScheduler::writeStream(
 }
 
 void DSRStreamFrameScheduler::enrichInstruction(
-    SendInstruction::Builder& builder) {
+    SendInstruction::Builder& builder,
+    const QuicStreamState& stream) {
   builder.setPacketNum(getNextPacketNum(conn_, PacketNumberSpace::AppData))
       .setLargestAckedPacketNum(getAckState(conn_, PacketNumberSpace::AppData)
                                     .largestAckedByPeer.value_or(0));
+
+  auto largestDeliverableOffset = getLargestDeliverableOffset(stream);
+  if (largestDeliverableOffset) {
+    builder.setLargestAckedStreamOffset(*largestDeliverableOffset);
+  }
 }
 
 } // namespace quic

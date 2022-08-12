@@ -61,6 +61,7 @@ struct SendInstruction {
         clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
+        largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
         offset(other.offset),
         len(other.len),
@@ -82,6 +83,7 @@ struct SendInstruction {
         clientAddress(other.clientAddress),
         packetNum(other.packetNum),
         largestAckedPacketNum(other.largestAckedPacketNum),
+        largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
         offset(other.offset),
         len(other.len),
@@ -99,6 +101,7 @@ struct SendInstruction {
   PacketNum largestAckedPacketNum{0};
 
   // QUIC Stream info
+  folly::Optional<uint64_t> largestAckedStreamOffset;
   StreamId streamId;
   uint64_t offset;
   uint64_t len;
@@ -130,6 +133,7 @@ struct SendInstruction {
           clientAddr,
           packetNum,
           largestAckedPacketNum,
+          largestAckedStreamOffset,
           streamId,
           *offset,
           *len,
@@ -147,6 +151,11 @@ struct SendInstruction {
 
     Builder& setLargestAckedPacketNum(PacketNum val) {
       largestAckedPacketNum = val;
+      return *this;
+    }
+
+    Builder& setLargestAckedStreamOffset(uint64_t val) {
+      largestAckedStreamOffset = val;
       return *this;
     }
 
@@ -186,6 +195,7 @@ struct SendInstruction {
     const folly::SocketAddress& clientAddr;
     PacketNum packetNum{0};
     PacketNum largestAckedPacketNum{0};
+    folly::Optional<uint64_t> largestAckedStreamOffset;
     StreamId streamId;
     folly::Optional<uint64_t> offset;
     folly::Optional<uint64_t> len;
@@ -202,7 +212,8 @@ struct SendInstruction {
       const ConnectionId& scidIn,
       const folly::SocketAddress& clientAddrIn,
       PacketNum packetNumIn,
-      PacketNum largestAcked,
+      PacketNum largestAckedPacketNumIn,
+      folly::Optional<uint64_t> largestAckedStreamOffsetIn,
       StreamId idIn,
       uint64_t offsetIn,
       uint64_t lenIn,
@@ -215,7 +226,8 @@ struct SendInstruction {
         scid(scidIn),
         clientAddress(clientAddrIn),
         packetNum(packetNumIn),
-        largestAckedPacketNum(largestAcked),
+        largestAckedPacketNum(largestAckedPacketNumIn),
+        largestAckedStreamOffset(largestAckedStreamOffsetIn),
         streamId(idIn),
         offset(offsetIn),
         len(lenIn),
