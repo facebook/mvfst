@@ -79,7 +79,7 @@ TEST_F(WriteCodecTest, RegularWrite) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(dataLen, sendInstruction.len);
   EXPECT_EQ(fin, sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -105,7 +105,7 @@ TEST_F(WriteCodecTest, PacketSizeLimit) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_GT(dataLen, sendInstruction.len);
   EXPECT_EQ(fin, sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -131,7 +131,7 @@ TEST_F(WriteCodecTest, FlowControlLimit) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(flowControlLen, sendInstruction.len);
   EXPECT_EQ(fin, sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -179,7 +179,7 @@ TEST_F(WriteCodecTest, CanHaveOneByteData) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(1, sendInstruction.len);
   EXPECT_EQ(fin, sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -228,7 +228,7 @@ TEST_F(WriteCodecTest, PacketSpaceEqStreamHeaderSizeWithFIN) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(0, sendInstruction.len);
   EXPECT_TRUE(sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -254,7 +254,7 @@ TEST_F(WriteCodecTest, WriteFIN) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(10, sendInstruction.len);
   EXPECT_TRUE(sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);
@@ -280,7 +280,7 @@ TEST_F(WriteCodecTest, FINWithoutData) {
   auto sendInstruction = instructionBuilder.build();
   EXPECT_GT(result, 0);
   EXPECT_EQ(stream, sendInstruction.streamId);
-  EXPECT_EQ(offset, sendInstruction.offset);
+  EXPECT_EQ(offset, sendInstruction.streamOffset);
   EXPECT_EQ(0, sendInstruction.len);
   EXPECT_TRUE(sendInstruction.fin);
   EXPECT_EQ(bufMetaStartingOffset, sendInstruction.bufMetaStartingOffset);

@@ -39,7 +39,7 @@ uint32_t writeDSRStreamFrame(
   if (offset != 0) {
     headerSize += offsetInt.getSize();
   }
-  instructionBuilder.setOffset(offset);
+  instructionBuilder.setStreamOffset(offset);
 
   uint64_t dataLen = std::min(writeBufferLen, flowControlLen);
   dataLen = std::min(dataLen, packetBuilder.remainingSpace() - headerSize);

@@ -18,10 +18,10 @@ quic::PacketizationRequest sendInstructionToPacketizationRequest(
       instruction.packetNum,
       instruction.largestAckedPacketNum,
       instruction.streamId,
-      instruction.offset,
+      instruction.streamOffset,
       instruction.len,
       instruction.fin,
-      instruction.offset - instruction.bufMetaStartingOffset);
+      instruction.streamOffset - instruction.bufMetaStartingOffset);
   return request;
 }
 

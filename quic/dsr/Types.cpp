@@ -12,7 +12,7 @@ WriteStreamFrame sendInstructionToWriteStreamFrame(
     const SendInstruction& sendInstruction) {
   WriteStreamFrame frame(
       sendInstruction.streamId,
-      sendInstruction.offset,
+      sendInstruction.streamOffset,
       sendInstruction.len,
       sendInstruction.fin);
   frame.fromBufMeta = true;

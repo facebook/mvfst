@@ -48,7 +48,7 @@ TEST_F(SchedulerTest, ScheduleStream) {
   EXPECT_CALL(builder_, addSendInstruction(_, _))
       .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t) {
         EXPECT_EQ(stream->id, (size_t)instruction.streamId);
-        EXPECT_EQ(expectedBufMetaOffset, instruction.offset);
+        EXPECT_EQ(expectedBufMetaOffset, instruction.streamOffset);
         EXPECT_GT(200, instruction.len);
         writtenLength = instruction.len;
         EXPECT_FALSE(instruction.fin);
@@ -75,7 +75,7 @@ TEST_F(SchedulerTest, ScheduleStream) {
   EXPECT_CALL(builder_, addSendInstruction(_, _))
       .WillOnce(Invoke([&](SendInstruction&& instruction, uint32_t) {
         EXPECT_EQ(stream->id, (size_t)instruction.streamId);
-        EXPECT_EQ(nextExpectedOffset, instruction.offset);
+        EXPECT_EQ(nextExpectedOffset, instruction.streamOffset);
         EXPECT_GT(instruction.len, 0);
         writtenLength = instruction.len;
         EXPECT_TRUE(instruction.fin);

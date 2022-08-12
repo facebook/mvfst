@@ -21,8 +21,8 @@ bool operator==(
     const SendInstruction& instruction,
     const WriteStreamFrame& frame) {
   return instruction.streamId == frame.streamId &&
-      instruction.offset == frame.offset && instruction.len == frame.len &&
-      instruction.fin == frame.fin;
+      instruction.streamOffset == frame.offset &&
+      instruction.len == frame.len && instruction.fin == frame.fin;
 }
 
 bool operator==(
@@ -49,7 +49,7 @@ TEST_F(PacketBuilderTest, SimpleBuild) {
   bool fin = true;
   uint64_t bufMetaStartingOffset = 333;
   SendInstruction::Builder siBuilder(conn_, id);
-  siBuilder.setOffset(offset);
+  siBuilder.setStreamOffset(offset);
   siBuilder.setLength(length);
   siBuilder.setFin(fin);
   siBuilder.setBufMetaStartingOffset(bufMetaStartingOffset);
@@ -81,7 +81,7 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
   StreamId id = 0;
   packetBuilder.addSendInstruction(
       SendInstruction::Builder(conn_, id)
-          .setOffset(0)
+          .setStreamOffset(0)
           .setLength(100)
           .setFin(false)
           .setBufMetaStartingOffset(333)
@@ -89,7 +89,7 @@ TEST_F(PacketBuilderTest, WriteTwoInstructions) {
       110);
   packetBuilder.addSendInstruction(
       SendInstruction::Builder(conn_, id)
-          .setOffset(100)
+          .setStreamOffset(100)
           .setLength(100)
           .setFin(true)
           .setBufMetaStartingOffset(333)

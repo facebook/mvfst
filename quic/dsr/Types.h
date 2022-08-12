@@ -63,7 +63,7 @@ struct SendInstruction {
         largestAckedPacketNum(other.largestAckedPacketNum),
         largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
-        offset(other.offset),
+        streamOffset(other.streamOffset),
         len(other.len),
         fin(other.fin),
         bufMetaStartingOffset(other.bufMetaStartingOffset),
@@ -85,7 +85,7 @@ struct SendInstruction {
         largestAckedPacketNum(other.largestAckedPacketNum),
         largestAckedStreamOffset(other.largestAckedStreamOffset),
         streamId(other.streamId),
-        offset(other.offset),
+        streamOffset(other.streamOffset),
         len(other.len),
         fin(other.fin),
         bufMetaStartingOffset(other.bufMetaStartingOffset),
@@ -103,7 +103,7 @@ struct SendInstruction {
   // QUIC Stream info
   folly::Optional<uint64_t> largestAckedStreamOffset;
   StreamId streamId;
-  uint64_t offset;
+  uint64_t streamOffset;
   uint64_t len;
   bool fin;
   uint64_t bufMetaStartingOffset;
@@ -135,7 +135,7 @@ struct SendInstruction {
           largestAckedPacketNum,
           largestAckedStreamOffset,
           streamId,
-          *offset,
+          *streamOffset,
           *len,
           fin,
           *bufMetaStartingOffset,
@@ -159,8 +159,8 @@ struct SendInstruction {
       return *this;
     }
 
-    Builder& setOffset(uint64_t val) {
-      offset = val;
+    Builder& setStreamOffset(uint64_t val) {
+      streamOffset = val;
       return *this;
     }
 
@@ -197,7 +197,7 @@ struct SendInstruction {
     PacketNum largestAckedPacketNum{0};
     folly::Optional<uint64_t> largestAckedStreamOffset;
     StreamId streamId;
-    folly::Optional<uint64_t> offset;
+    folly::Optional<uint64_t> streamOffset;
     folly::Optional<uint64_t> len;
     bool fin{false};
     folly::Optional<uint64_t> bufMetaStartingOffset;
@@ -215,7 +215,7 @@ struct SendInstruction {
       PacketNum largestAckedPacketNumIn,
       folly::Optional<uint64_t> largestAckedStreamOffsetIn,
       StreamId idIn,
-      uint64_t offsetIn,
+      uint64_t streamOffsetIn,
       uint64_t lenIn,
       bool finIn,
       uint64_t bufMetaStartingOffsetIn,
@@ -229,7 +229,7 @@ struct SendInstruction {
         largestAckedPacketNum(largestAckedPacketNumIn),
         largestAckedStreamOffset(largestAckedStreamOffsetIn),
         streamId(idIn),
-        offset(offsetIn),
+        streamOffset(streamOffsetIn),
         len(lenIn),
         fin(finIn),
         bufMetaStartingOffset(bufMetaStartingOffsetIn),
