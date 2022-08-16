@@ -1275,6 +1275,22 @@ class QuicSocket {
   }
 
   /**
+   * Adds an observer.
+   *
+   * If the observer is already added, this is a no-op.
+   *
+   * @param observer     Observer to add.
+   * @return             Whether the observer was added (fails if no list).
+   */
+  bool addObserver(std::shared_ptr<Observer> observer) {
+    if (auto list = getSocketObserverContainer()) {
+      list->addObserver(std::move(observer));
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Removes an observer.
    *
    * @param observer     Observer to remove.
@@ -1283,6 +1299,19 @@ class QuicSocket {
   bool removeObserver(Observer* observer) {
     if (auto list = getSocketObserverContainer()) {
       return list->removeObserver(observer);
+    }
+    return false;
+  }
+
+  /**
+   * Removes an observer.
+   *
+   * @param observer     Observer to remove.
+   * @return             Whether the observer was found and removed.
+   */
+  bool removeObserver(std::shared_ptr<Observer> observer) {
+    if (auto list = getSocketObserverContainer()) {
+      return list->removeObserver(std::move(observer));
     }
     return false;
   }
