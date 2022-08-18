@@ -42,7 +42,59 @@
 
 ## Building mvfst
 
-### Ubuntu 16+
+### Method 1 \[Recommended]: Using Getdeps.py
+
+This script is used by many of Meta's OSS tools.  It will download and build all of the necessary dependencies first, and will then invoke cmake, etc. to build mvfst.  This will help ensure that you build with relevant versions of all of the dependent libraries, taking into account what versions are installed locally on your system.
+
+It's written in python so you'll need python3.6 or later on your PATH.  It works on Linux, macOS and Windows.
+
+The settings for mvfst's cmake build are held in its getdeps manifest `build/fbcode_builder/manifests/mvfst`, which you can edit locally if desired.
+
+#### Dependencies
+
+If on Linux or MacOS (with homebrew installed) you can install system dependencies to save building them:
+
+    # Clone the repo
+    git clone https://github.com/facebookincubator/mvfst.git
+    # Install dependencies
+    cd mvfst
+    sudo ./build/fbcode_builder/getdeps.py install-system-deps --recursive --install-prefix=$(pwd)/_build
+
+
+If you'd like to see the packages before installing them:
+
+    ./build/fbcode_builder/getdeps.py install-system-deps --dry-run --recursive
+
+On other platforms or if on Linux and without system dependencies `getdeps.py` will mostly download and build them for you during the build step.
+
+#### Build
+
+For a simplified build, you can use the `getdeps.sh` wrapper script. This will download and build all the required dependencies, then build mvfst. It will use the default scratch path for building and install the result in _build.
+
+    # Clone the repo
+    git clone https://github.com/facebookincubator/mvfst.git
+    # Build using the wrapper script
+    cd mvfst
+    ./getdeps.sh
+
+At the end of the build, mvfst binaries will be installed at `_build/mvfst`. You can find the scratch path from the logs or by running `python3 ./build/fbcode_builder/getdeps.py show-build-dir mvfst`.
+
+For more control over `getdeps.py`, you can run the tool directly.
+
+    # Show help
+    python3 ./build/fbcode_builder/getdeps.py build mvfst -h
+    # Build mvfst, using system packages for dependencies if available
+    python3 ./build/fbcode_builder/getdeps.py --allow-system-packages build mvfst --install-prefix=$(pwd)/_build
+
+#### Run tests
+
+By default `getdeps.py` will build the tests for mvfst. You can use it to run them too:
+
+    python3 ./build/fbcode_builder/getdeps.py test mvfst --install-prefix=$(pwd)/_build
+
+### Method 2 \[Deprecated]: Using build.sh script
+
+This method can be used on Ubuntu 18+ and macOS.
 
 To begin, you should install the dependencies we need for build. This largely
 consists of dependencies from [folly](https://github.com/facebook/folly) as well as
@@ -97,17 +149,29 @@ You might need to run the script as root to install to certain directories.
 By default the build script `build_helper.sh` enables the building of test target (i.e. runs with `-DBUILD_TEST=ON` option). Since some of tests in `mvfst` require some test artifacts of Fizz, it is necessary to supply the path of the Fizz src directory (via option `DFIZZ_PROJECT`) to correctly build all test targets in `mvfst`.
 
 ## Run a sample client and server
-Building the test targets of `mvfst` (or via `build_helper.sh`) should automatically build the sample client and server binaries into the default `_build/build` directory (or whichever target directory was specified). The server will automatically bind to `::1` by default if no host is used, but you can then spin a simple echo server by running:
+Building the test targets of `mvfst` should automatically build the sample client and server binaries into the build directory.
+
+For `getdeps.py` build, you can find the echo binary at:
 ```
-./_build/build/quic/samples/echo -mode=server -host=<host> -port=<port>
+cd $(python3 ./build/fbcode_builder/getdeps.py show-build-dir mvfst)/quic/samples/echo
+```
+
+For the deprecated `build.sh` script, it will be at the following location if you used the default build path.
+```
+cd ./_build/build/quic/samples/echo
+```
+
+The server will automatically bind to `::1` by default if no host is used, but you can then spin a simple echo server by running:
+```
+./echo -mode=server -host=<host> -port=<port>
 ```
 and to run a client:
 ```
-./_build/build/quic/samples/echo -mode=client -host=<host> -port=<port>
+./echo -mode=client -host=<host> -port=<port>
 ```
 For more options, see
 ```
-./_build/build/quic/samples/echo --help
+./echo --help
 ```
 ## HTTP/3
 This repo implements the QUIC transport. For an HTTP/3 implementation that uses Mvfst, please check out [Proxygen](https://github.com/facebook/proxygen).
