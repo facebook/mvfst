@@ -98,6 +98,74 @@ void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
   }
 }
+
+/**
+ * Only certain frames are allowed/disallowed in unprotected (initial,
+ * handshake) and zero-rtt packets.
+ */
+bool isUnprotectedPacketFrameInvalid(const QuicFrame& quicFrame) {
+  switch (quicFrame.type()) {
+    case QuicFrame::Type::PaddingFrame:
+    case QuicFrame::Type::ReadAckFrame:
+    case QuicFrame::Type::ConnectionCloseFrame:
+    case QuicFrame::Type::ReadCryptoFrame:
+    case QuicFrame::Type::PingFrame:
+      return false;
+    case QuicFrame::Type::RstStreamFrame:
+    case QuicFrame::Type::MaxDataFrame:
+    case QuicFrame::Type::MaxStreamDataFrame:
+    case QuicFrame::Type::DataBlockedFrame:
+    case QuicFrame::Type::StreamDataBlockedFrame:
+    case QuicFrame::Type::StreamsBlockedFrame:
+    case QuicFrame::Type::ReadStreamFrame:
+    case QuicFrame::Type::ReadNewTokenFrame:
+    case QuicFrame::Type::DatagramFrame:
+    case QuicFrame::Type::NoopFrame:
+    case QuicFrame::Type::QuicSimpleFrame:
+      return true;
+  }
+}
+
+bool isZeroRttPacketSimpleFrameInvalid(const QuicSimpleFrame& quicSimpleFrame) {
+  switch (quicSimpleFrame.type()) {
+    case QuicSimpleFrame::Type::HandshakeDoneFrame:
+    case QuicSimpleFrame::Type::RetireConnectionIdFrame:
+    case QuicSimpleFrame::Type::PathResponseFrame:
+    case QuicSimpleFrame::Type::AckFrequencyFrame:
+      return true;
+    case QuicSimpleFrame::Type::StopSendingFrame:
+    case QuicSimpleFrame::Type::PathChallengeFrame:
+    case QuicSimpleFrame::Type::NewConnectionIdFrame:
+    case QuicSimpleFrame::Type::MaxStreamsFrame:
+    case QuicSimpleFrame::Type::KnobFrame:
+    case QuicSimpleFrame::Type::NewTokenFrame:
+      return false;
+  }
+}
+
+bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
+  switch (quicFrame.type()) {
+    case QuicFrame::Type::ReadAckFrame:
+    case QuicFrame::Type::ReadCryptoFrame:
+    case QuicFrame::Type::ReadNewTokenFrame:
+      return true;
+    case QuicFrame::Type::PingFrame:
+    case QuicFrame::Type::ConnectionCloseFrame:
+    case QuicFrame::Type::PaddingFrame:
+    case QuicFrame::Type::RstStreamFrame:
+    case QuicFrame::Type::MaxDataFrame:
+    case QuicFrame::Type::MaxStreamDataFrame:
+    case QuicFrame::Type::DataBlockedFrame:
+    case QuicFrame::Type::StreamDataBlockedFrame:
+    case QuicFrame::Type::StreamsBlockedFrame:
+    case QuicFrame::Type::ReadStreamFrame:
+    case QuicFrame::Type::DatagramFrame:
+    case QuicFrame::Type::NoopFrame:
+      return false;
+    case QuicFrame::Type::QuicSimpleFrame:
+      return isZeroRttPacketSimpleFrameInvalid(*quicFrame.asQuicSimpleFrame());
+  }
+}
 } // namespace
 
 void processClientInitialParams(
@@ -870,15 +938,16 @@ void onServerReadDataFromOpen(
         protectionLevel == ProtectionType::KeyPhaseZero ||
         protectionLevel == ProtectionType::KeyPhaseOne;
 
-    if (!isProtectedPacket) {
+    bool isZeroRttPacket = protectionLevel == ProtectionType::ZeroRtt;
+
+    if (!isProtectedPacket || isZeroRttPacket) {
+      // there are some frame restrictions
+      auto isFrameInvalidFn = !isProtectedPacket
+          ? isUnprotectedPacketFrameInvalid
+          : isZeroRttPacketFrameInvalid;
       for (auto& quicFrame : regularPacket.frames) {
-        auto isPadding = quicFrame.asPaddingFrame();
-        auto isAck = quicFrame.asReadAckFrame();
-        auto isClose = quicFrame.asConnectionCloseFrame();
-        auto isCrypto = quicFrame.asReadCryptoFrame();
-        auto isPing = quicFrame.asPingFrame();
-        // TODO: add path challenge and response
-        if (!isPadding && !isAck && !isClose && !isCrypto && !isPing) {
+        bool isFrameInvalid = isFrameInvalidFn(quicFrame);
+        if (isFrameInvalid) {
           QUIC_STATS(
               conn.statsCallback,
               onPacketDropped,

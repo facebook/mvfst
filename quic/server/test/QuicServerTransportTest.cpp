@@ -3245,6 +3245,130 @@ TEST_F(
 
 TEST_F(
     QuicUnencryptedServerTransportTest,
+    ReceiveRetireConnIdFrameInZeroRttPacket) {
+  server->getNonConstConn().transportSettings.disableMigration = false;
+  fakeHandshake->allowZeroRttKeys();
+  recvClientHello();
+
+  // create 0-rtt packet with some stream data and a retire_conn_id frame
+  LongHeader header(
+      LongHeader::Types::ZeroRtt,
+      *clientConnectionId,
+      *initialDestinationConnectionId,
+      clientNextAppDataPacketNum++,
+      server->getConn().supportedVersions[0]);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAckedPacketNum=*/0);
+  RetireConnectionIdFrame retireConnIdFrame(0);
+  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+
+  // add some data
+  auto data = IOBuf::copyBuffer("hello!");
+  auto dataLen = *writeStreamFrameHeader(
+      builder,
+      /*id=*/4,
+      /*offset=*/0,
+      data->computeChainDataLength(),
+      data->computeChainDataLength(),
+      /*fin=*/true,
+      /*skipLenHint=*/folly::none);
+  writeStreamFrameData(
+      builder,
+      data->clone(),
+      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+
+  builder.encodePacketHeader();
+  builder.accountForCipherOverhead(0);
+
+  auto packet = std::move(builder).buildPacket();
+  EXPECT_THROW(deliverData(packetToBuf(packet), true), std::runtime_error);
+  EXPECT_TRUE(server->getConn().localConnectionError);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    ReceivePathResponseFrameInZeroRttPacket) {
+  server->getNonConstConn().transportSettings.disableMigration = false;
+  fakeHandshake->allowZeroRttKeys();
+  recvClientHello();
+
+  // create 0-rtt packet with some stream data and a path response frame
+  LongHeader header(
+      LongHeader::Types::ZeroRtt,
+      *clientConnectionId,
+      *initialDestinationConnectionId,
+      clientNextAppDataPacketNum++,
+      server->getConn().supportedVersions[0]);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
+  writeSimpleFrame(PathResponseFrame(0xaabbccddeeff), builder);
+
+  // add some data
+  auto data = IOBuf::copyBuffer("hello!");
+  auto dataLen = *writeStreamFrameHeader(
+      builder,
+      /*id=*/4,
+      /*offset=*/0,
+      data->computeChainDataLength(),
+      data->computeChainDataLength(),
+      /*eof=*/true,
+      /*skipLenHint=*/folly::none);
+  writeStreamFrameData(
+      builder,
+      data->clone(),
+      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+
+  builder.encodePacketHeader();
+  builder.accountForCipherOverhead(0);
+
+  auto packet = std::move(builder).buildPacket();
+  EXPECT_THROW(deliverData(packetToBuf(packet), true), std::runtime_error);
+  EXPECT_TRUE(server->getConn().localConnectionError);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
+    ReceiveNewTokenFrameInZeroRttPacket) {
+  server->getNonConstConn().transportSettings.disableMigration = false;
+  fakeHandshake->allowZeroRttKeys();
+  recvClientHello();
+
+  // create 0-rtt packet with some stream data and a new token frame
+  LongHeader header(
+      LongHeader::Types::ZeroRtt,
+      *clientConnectionId,
+      *initialDestinationConnectionId,
+      clientNextAppDataPacketNum++,
+      server->getConn().supportedVersions[0]);
+  RegularQuicPacketBuilder builder(
+      kDefaultUDPSendPacketLen, std::move(header), /*largestAcked=*/0);
+  writeSimpleFrame(NewTokenFrame("token!"), builder);
+
+  // add some data
+  auto data = IOBuf::copyBuffer("hello!");
+  auto dataLen = *writeStreamFrameHeader(
+      builder,
+      /*id=*/4,
+      /*offset=*/0,
+      data->computeChainDataLength(),
+      data->computeChainDataLength(),
+      /*eof=*/true,
+      /*skipLenHint=*/folly::none);
+  writeStreamFrameData(
+      builder,
+      data->clone(),
+      std::min(folly::to<size_t>(dataLen), data->computeChainDataLength()));
+
+  builder.encodePacketHeader();
+  builder.accountForCipherOverhead(0);
+
+  auto packet = std::move(builder).buildPacket();
+  EXPECT_THROW(deliverData(packetToBuf(packet), true), std::runtime_error);
+  EXPECT_TRUE(server->getConn().localConnectionError);
+}
+
+TEST_F(
+    QuicUnencryptedServerTransportTest,
     ReceiveZeroRttPacketFromChangedPeerAddress) {
   server->getNonConstConn().transportSettings.disableMigration = false;
   fakeHandshake->allowZeroRttKeys();
