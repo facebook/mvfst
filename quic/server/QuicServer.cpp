@@ -22,7 +22,7 @@
 #include <quic/server/QuicSharedUDPSocketFactory.h>
 #include <quic/server/SlidingWindowRateLimiter.h>
 
-FOLLY_GFLAGS_DEFINE_bool(
+DEFINE_bool(
     qs_io_uring_use_async_recv,
     true,
     "io_uring backend use async recv");
