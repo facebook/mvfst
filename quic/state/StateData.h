@@ -743,6 +743,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
   // Peer max stream groups advertized.
   folly::Optional<uint64_t> peerMaxStreamGroupsAdvertized;
+
+  // Sequence number to use for the next ACK_FREQUENCY frame
+  uint64_t nextAckFrequencyFrameSequenceNumber{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const QuicConnectionStateBase& st);
