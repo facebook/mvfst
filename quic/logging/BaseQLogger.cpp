@@ -68,7 +68,7 @@ void addQuicSimpleFrameToEvent(
           frame.sequenceNumber,
           frame.packetTolerance,
           frame.updateMaxAckDelay,
-          frame.ignoreOrder));
+          frame.reorderThreshold));
       break;
     }
     case quic::QuicSimpleFrame::Type::NewTokenFrame: {

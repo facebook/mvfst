@@ -131,6 +131,30 @@ std::unique_ptr<folly::IOBuf> createCryptoFrame(
   return cryptoFrame;
 }
 
+std::unique_ptr<folly::IOBuf> createAckFrequencyFrame(
+    folly::Optional<QuicInteger> sequenceNumber,
+    folly::Optional<QuicInteger> packetTolerance,
+    folly::Optional<QuicInteger> maxAckDelay,
+    folly::Optional<QuicInteger> reorderThreshold) {
+  QuicInteger intFrameType(static_cast<uint64_t>(FrameType::ACK_FREQUENCY));
+  std::unique_ptr<folly::IOBuf> ackFrequencyFrame = folly::IOBuf::create(0);
+  BufAppender wcursor(ackFrequencyFrame.get(), 50);
+  auto appenderOp = [&](auto val) { wcursor.writeBE(val); };
+  if (sequenceNumber) {
+    sequenceNumber->encode(appenderOp);
+  }
+  if (packetTolerance) {
+    packetTolerance->encode(appenderOp);
+  }
+  if (maxAckDelay) {
+    maxAckDelay->encode(appenderOp);
+  }
+  if (reorderThreshold) {
+    reorderThreshold->encode(appenderOp);
+  }
+  return ackFrequencyFrame;
+}
+
 TEST_F(DecodeTest, VersionNegotiationPacketDecodeTest) {
   ConnectionId srcCid = getTestConnectionId(0),
                destCid = getTestConnectionId(1);
@@ -808,6 +832,35 @@ TEST_F(DecodeTest, StreamGroupDecodeSuccess) {
   EXPECT_EQ(decodedFrame.streamId, 10);
   EXPECT_EQ(*decodedFrame.streamGroupId, 20);
   EXPECT_TRUE(decodedFrame.fin);
+}
+
+TEST_F(DecodeTest, AckFrequencyFrameDecodeValid) {
+  QuicInteger sequenceNumber(1);
+  QuicInteger packetTolerance(100);
+  QuicInteger maxAckDelay(100000); // 100 ms
+  QuicInteger reorderThreshold(50);
+  auto ackFrequencyFrame = createAckFrequencyFrame(
+      sequenceNumber, packetTolerance, maxAckDelay, reorderThreshold);
+  ASSERT_NE(ackFrequencyFrame, nullptr);
+
+  folly::io::Cursor cursor(ackFrequencyFrame.get());
+  auto decodedFrame = decodeAckFrequencyFrame(cursor);
+  EXPECT_EQ(decodedFrame.sequenceNumber, 1);
+  EXPECT_EQ(decodedFrame.packetTolerance, 100);
+  EXPECT_EQ(decodedFrame.updateMaxAckDelay, 100000);
+  EXPECT_EQ(decodedFrame.reorderThreshold, 50);
+}
+
+TEST_F(DecodeTest, AckFrequencyFrameDecodeInvalidReserved) {
+  QuicInteger sequenceNumber(1);
+  QuicInteger packetTolerance(100);
+  QuicInteger maxAckDelay(100000); // 100 ms
+  auto ackFrequencyFrame = createAckFrequencyFrame(
+      sequenceNumber, packetTolerance, maxAckDelay, folly::none);
+  ASSERT_NE(ackFrequencyFrame, nullptr);
+
+  folly::io::Cursor cursor(ackFrequencyFrame.get());
+  EXPECT_THROW(decodeAckFrequencyFrame(cursor), QuicTransportException);
 }
 
 } // namespace test

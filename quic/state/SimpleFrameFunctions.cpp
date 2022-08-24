@@ -257,12 +257,14 @@ bool updateSimpleFrameOnPacketReceived(
       if (!ackState.ackFrequencySequenceNumber ||
           ackFrequencyFrame->sequenceNumber >
               ackState.ackFrequencySequenceNumber.value()) {
+        ackState.ackFrequencySequenceNumber = ackFrequencyFrame->sequenceNumber;
         ackState.tolerance = ackFrequencyFrame->packetTolerance;
-        ackState.ignoreReorder = ackFrequencyFrame->ignoreOrder;
         conn.ackStates.maxAckDelay =
             std::chrono::microseconds(std::max<uint64_t>(
                 conn.transportSettings.minAckDelay->count(),
                 ackFrequencyFrame->updateMaxAckDelay));
+        conn.lossState.reorderingThreshold =
+            ackFrequencyFrame->reorderThreshold;
       }
       return true;
     }

@@ -1677,5 +1677,51 @@ TEST_F(QuicWriteCodecTest, WriteStreamFrameWithGroup) {
   EXPECT_TRUE(folly::IOBufEqualTo()(inputBuf, decodedStreamFrame.data));
 }
 
+TEST_F(QuicWriteCodecTest, WriteAckFrequencyFrame) {
+  MockQuicPacketBuilder pktBuilder;
+  pktBuilder.remaining_ = 1300;
+  setupCommonExpects(pktBuilder);
+
+  AckFrequencyFrame frame;
+  frame.sequenceNumber = 5; // Length: 1
+  frame.packetTolerance = 100; // Length: 2
+  frame.updateMaxAckDelay = 150000; // Length: 4
+  frame.reorderThreshold = 50; // Length: 1
+
+  auto dataLen = writeSimpleFrame(frame, pktBuilder);
+  ASSERT_EQ(dataLen, 10); // Based upon the values passed above + 2 (frame-type)
+
+  auto outputBuf = pktBuilder.data_->clone();
+  EXPECT_EQ(outputBuf->computeChainDataLength(), 10);
+
+  auto builtOut = std::move(pktBuilder).buildTestPacket();
+  auto regularPacket = builtOut.first;
+  ASSERT_EQ(regularPacket.frames.size(), 1);
+  ASSERT_TRUE(regularPacket.frames[0].asQuicSimpleFrame());
+  auto resultFrame =
+      regularPacket.frames[0].asQuicSimpleFrame()->asAckFrequencyFrame();
+  ASSERT_TRUE(resultFrame);
+  EXPECT_EQ(resultFrame->sequenceNumber, frame.sequenceNumber);
+  EXPECT_EQ(resultFrame->packetTolerance, frame.packetTolerance);
+  EXPECT_EQ(resultFrame->sequenceNumber, frame.sequenceNumber);
+  EXPECT_EQ(resultFrame->reorderThreshold, frame.reorderThreshold);
+
+  // Verify the on wire bytes via decoder.
+  auto wireBuf = std::move(builtOut.second);
+  BufQueue queue;
+  queue.append(wireBuf->clone());
+  QuicFrame parsedFrame = quic::parseFrame(
+      queue,
+      regularPacket.header,
+      CodecParameters(kDefaultAckDelayExponent, QuicVersion::MVFST));
+  ASSERT_TRUE(parsedFrame.asQuicSimpleFrame());
+  auto decodedFrame = parsedFrame.asQuicSimpleFrame()->asAckFrequencyFrame();
+  ASSERT_TRUE(decodedFrame);
+  EXPECT_EQ(decodedFrame->sequenceNumber, frame.sequenceNumber);
+  EXPECT_EQ(decodedFrame->packetTolerance, frame.packetTolerance);
+  EXPECT_EQ(decodedFrame->sequenceNumber, frame.sequenceNumber);
+  EXPECT_EQ(decodedFrame->reorderThreshold, frame.reorderThreshold);
+}
+
 } // namespace test
 } // namespace quic

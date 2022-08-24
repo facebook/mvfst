@@ -157,17 +157,17 @@ class AckFrequencyFrameLog : public QLogFrame {
   uint64_t sequenceNumber;
   uint64_t packetTolerance;
   uint64_t updateMaxAckDelay;
-  bool ignoreOrder;
+  uint64_t reorderThreshold;
 
   explicit AckFrequencyFrameLog(
       uint64_t sequenceNumberIn,
       uint64_t packetToleranceIn,
       uint64_t updateMaxAckDelayIn,
-      bool ignoreOrderIn)
+      uint64_t reorderThresholdIn)
       : sequenceNumber(sequenceNumberIn),
         packetTolerance(packetToleranceIn),
         updateMaxAckDelay(updateMaxAckDelayIn),
-        ignoreOrder(ignoreOrderIn) {}
+        reorderThreshold(reorderThresholdIn) {}
   ~AckFrequencyFrameLog() override = default;
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };

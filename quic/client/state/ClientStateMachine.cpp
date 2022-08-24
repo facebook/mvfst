@@ -131,6 +131,8 @@ void processServerInitialParams(
   auto peerMaxStreamGroupsAdvertized = getIntegerParameter(
       static_cast<TransportParameterId>(kStreamGroupsEnabledCustomParamId),
       serverParams.parameters);
+  auto minAckDelay = getIntegerParameter(
+      TransportParameterId::min_ack_delay, serverParams.parameters);
 
   if (conn.version == QuicVersion::QUIC_DRAFT ||
       conn.version == QuicVersion::QUIC_V1 ||
@@ -195,6 +197,9 @@ void processServerInitialParams(
   }
   conn.peerAckDelayExponent =
       ackDelayExponent.value_or(kDefaultAckDelayExponent);
+  if (minAckDelay.has_value()) {
+    conn.peerMinAckDelay = std::chrono::microseconds(minAckDelay.value());
+  }
   if (conn.transportSettings.canIgnorePathMTU) {
     if (*packetSize > kDefaultMaxUDPPayload) {
       *packetSize = kDefaultUDPSendPacketLen;

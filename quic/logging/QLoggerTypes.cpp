@@ -123,7 +123,7 @@ folly::dynamic AckFrequencyFrameLog::toDynamic() const {
   d["sequence_number"] = sequenceNumber;
   d["packet_tolerance"] = packetTolerance;
   d["update_max_ack_delay"] = updateMaxAckDelay;
-  d["ignore_order"] = ignoreOrder;
+  d["reorder_threshold"] = reorderThreshold;
   return d;
 }
 

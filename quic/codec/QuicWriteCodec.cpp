@@ -492,15 +492,16 @@ size_t writeSimpleFrame(
       QuicInteger intSequenceNumber(ackFrequencyFrame->sequenceNumber);
       QuicInteger intPacketTolerance(ackFrequencyFrame->packetTolerance);
       QuicInteger intUpdateMaxAckDelay(ackFrequencyFrame->updateMaxAckDelay);
+      QuicInteger intReorderThreshold(ackFrequencyFrame->reorderThreshold);
       size_t ackFrequencyFrameLen = intFrameType.getSize() +
           intSequenceNumber.getSize() + intPacketTolerance.getSize() +
-          intUpdateMaxAckDelay.getSize() + 1 /* ignoreOrder */;
+          intUpdateMaxAckDelay.getSize() + intReorderThreshold.getSize();
       if (packetSpaceCheck(spaceLeft, ackFrequencyFrameLen)) {
         builder.write(intFrameType);
         builder.write(intSequenceNumber);
         builder.write(intPacketTolerance);
         builder.write(intUpdateMaxAckDelay);
-        builder.writeBE(ackFrequencyFrame->ignoreOrder);
+        builder.write(intReorderThreshold);
         builder.appendFrame(QuicSimpleFrame(*ackFrequencyFrame));
         return ackFrequencyFrameLen;
       }

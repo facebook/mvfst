@@ -115,13 +115,13 @@ struct AckFrequencyFrame {
   uint64_t sequenceNumber; // Used to identify newest.
   uint64_t packetTolerance; // How many packets before ACKing.
   uint64_t updateMaxAckDelay; // New max_ack_delay to use.
-  uint8_t ignoreOrder; // Whether to ignore reordering ACKs.
+  uint64_t reorderThreshold; // New out-of-order packet threshold before ACKing.
 
   bool operator==(const AckFrequencyFrame& other) const {
     return other.sequenceNumber == sequenceNumber &&
         other.packetTolerance == packetTolerance &&
         other.updateMaxAckDelay == updateMaxAckDelay &&
-        other.ignoreOrder == ignoreOrder;
+        other.reorderThreshold == reorderThreshold;
   }
 };
 

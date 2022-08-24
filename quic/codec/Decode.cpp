@@ -120,19 +120,19 @@ AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK_FREQUENCY);
   }
-  if (cursor.isAtEnd()) {
+  auto reorderThreshold = decodeQuicInteger(cursor);
+  if (!reorderThreshold) {
     throw QuicTransportException(
-        "Bad ignore order",
+        "Bad reorder threshold",
         quic::TransportErrorCode::FRAME_ENCODING_ERROR,
         quic::FrameType::ACK_FREQUENCY);
   }
-  auto ignoreOrder = cursor.readBE<uint8_t>();
 
   AckFrequencyFrame frame;
   frame.sequenceNumber = sequenceNumber->first;
   frame.packetTolerance = packetTolerance->first;
   frame.updateMaxAckDelay = updateMaxAckDelay->first;
-  frame.ignoreOrder = ignoreOrder;
+  frame.reorderThreshold = reorderThreshold->first;
   return frame;
 }
 
@@ -837,11 +837,13 @@ QuicFrame parseFrame(
       case FrameType::ACK_FREQUENCY:
         return QuicFrame(decodeAckFrequencyFrame(cursor));
     }
-  } catch (const std::exception&) {
+  } catch (const std::exception& e) {
     error = true;
     throw QuicTransportException(
-        folly::to<std::string>(
-            "Frame format invalid, type=", frameTypeInt->first),
+        fmt::format(
+            "Frame format invalid, type={}, error={}",
+            frameTypeInt->first,
+            e.what()),
         TransportErrorCode::FRAME_ENCODING_ERROR,
         frameType);
   }
