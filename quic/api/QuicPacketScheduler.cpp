@@ -186,6 +186,11 @@ FrameScheduler::Builder& FrameScheduler::Builder::datagramFrames() {
   return *this;
 }
 
+FrameScheduler::Builder& FrameScheduler::Builder::immediateAckFrames() {
+  immediateAckFrameScheduler_ = true;
+  return *this;
+}
+
 FrameScheduler FrameScheduler::Builder::build() && {
   FrameScheduler scheduler(name_, conn_);
   if (streamFrameScheduler_) {
@@ -216,6 +221,10 @@ FrameScheduler FrameScheduler::Builder::build() && {
   }
   if (datagramFrameScheduler_) {
     scheduler.datagramFrameScheduler_.emplace(DatagramFrameScheduler(conn_));
+  }
+  if (immediateAckFrameScheduler_) {
+    scheduler.immediateAckFrameScheduler_.emplace(
+        ImmediateAckFrameScheduler(conn_));
   }
   return scheduler;
 }
@@ -258,6 +267,13 @@ SchedulingResult FrameScheduler::scheduleFramesForPacket(
       // write up to writable bytes.
       ackScheduler_->writeNextAcks(builder);
     }
+  }
+  // Immediate ACK frames are subject to congestion control but should be sent
+  // before other frames to maximize their chance of being included in the
+  // packet since they are time sensitive
+  if (immediateAckFrameScheduler_ &&
+      immediateAckFrameScheduler_->hasPendingImmediateAckFrame()) {
+    immediateAckFrameScheduler_->writeImmediateAckFrame(wrapper);
   }
   if (windowUpdateScheduler_ &&
       windowUpdateScheduler_->hasPendingWindowUpdates()) {
@@ -317,7 +333,7 @@ void FrameScheduler::writeNextAcks(PacketBuilderInterface& builder) {
 }
 
 bool FrameScheduler::hasData() const {
-  return (hasPendingAcks()) || hasImmediateData();
+  return hasPendingAcks() || hasImmediateData();
 }
 
 bool FrameScheduler::hasPendingAcks() const {
@@ -335,7 +351,9 @@ bool FrameScheduler::hasImmediateData() const {
        simpleFrameScheduler_->hasPendingSimpleFrames()) ||
       (pingFrameScheduler_ && pingFrameScheduler_->hasPingFrame()) ||
       (datagramFrameScheduler_ &&
-       datagramFrameScheduler_->hasPendingDatagramFrames());
+       datagramFrameScheduler_->hasPendingDatagramFrames()) ||
+      (immediateAckFrameScheduler_ &&
+       immediateAckFrameScheduler_->hasPendingImmediateAckFrame());
 }
 
 folly::StringPiece FrameScheduler::name() const {
@@ -777,6 +795,19 @@ bool CryptoStreamScheduler::writeCryptoData(PacketBuilderInterface& builder) {
 bool CryptoStreamScheduler::hasData() const {
   return !cryptoStream_.writeBuffer.empty() ||
       !cryptoStream_.lossBuffer.empty();
+}
+
+ImmediateAckFrameScheduler::ImmediateAckFrameScheduler(
+    const QuicConnectionStateBase& conn)
+    : conn_(conn) {}
+
+bool ImmediateAckFrameScheduler::hasPendingImmediateAckFrame() const {
+  return conn_.pendingEvents.requestImmediateAck;
+}
+
+bool ImmediateAckFrameScheduler::writeImmediateAckFrame(
+    PacketBuilderInterface& builder) {
+  return 0 != writeFrame(ImmediateAckFrame(), builder);
 }
 
 CloningScheduler::CloningScheduler(

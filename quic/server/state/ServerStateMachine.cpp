@@ -121,6 +121,7 @@ bool isUnprotectedPacketFrameInvalid(const QuicFrame& quicFrame) {
     case QuicFrame::Type::ReadNewTokenFrame:
     case QuicFrame::Type::DatagramFrame:
     case QuicFrame::Type::NoopFrame:
+    case QuicFrame::Type::ImmediateAckFrame:
     case QuicFrame::Type::QuicSimpleFrame:
       return true;
   }
@@ -148,6 +149,7 @@ bool isZeroRttPacketFrameInvalid(const QuicFrame& quicFrame) {
     case QuicFrame::Type::ReadAckFrame:
     case QuicFrame::Type::ReadCryptoFrame:
     case QuicFrame::Type::ReadNewTokenFrame:
+    case QuicFrame::Type::ImmediateAckFrame:
       return true;
     case QuicFrame::Type::PingFrame:
     case QuicFrame::Type::ConnectionCloseFrame:
@@ -1262,6 +1264,21 @@ void onServerReadDataFromOpen(
           // early. So, make Datagram frames count towards ack policy
           pktHasRetransmittableData = true;
           handleDatagram(conn, frame, readData.networkData.receiveTimePoint);
+          break;
+        }
+        case QuicFrame::Type::ImmediateAckFrame: {
+          if (!conn.transportSettings.minAckDelay.hasValue()) {
+            // We do not accept IMMEDIATE_ACK frames. This is a protocol
+            // violation.
+            throw QuicTransportException(
+                "Received IMMEDIATE_ACK frame without announcing min_ack_delay",
+                TransportErrorCode::PROTOCOL_VIOLATION,
+                FrameType::IMMEDIATE_ACK);
+          }
+          // Send an ACK from any packet number space.
+          conn.ackStates.initialAckState.needsToSendAckImmediately = true;
+          conn.ackStates.handshakeAckState.needsToSendAckImmediately = true;
+          conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
           break;
         }
         default: {

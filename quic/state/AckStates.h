@@ -36,8 +36,10 @@ struct AckState {
   folly::Optional<uint64_t> tolerance;
   folly::Optional<uint64_t> ackFrequencySequenceNumber;
   // Flag indicating that if we need to send ack immediately. This will be set
-  // to true if we got packets with retransmittable data and haven't sent the
+  // to true in either of the following cases:
+  // - we got packets with retransmittable data and haven't sent the
   // ack for the first time.
+  // - the peer has requested it through an immediate ack frame.
   bool needsToSendAckImmediately{false};
   // Count of oustanding packets received with retransmittable data.
   uint8_t numRxPacketsRecvd{0};

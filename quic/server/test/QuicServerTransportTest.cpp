@@ -2858,6 +2858,65 @@ TEST_F(QuicServerTransportTest, PingIsTreatedAsRetransmittable) {
   EXPECT_TRUE(server->getConn().pendingEvents.scheduleAckTimeout);
 }
 
+TEST_F(QuicServerTransportTest, ImmediateAckValid) {
+  // Verify that an incoming IMMEDIATE_ACK frame flags all
+  // packet number spaces to generate ACKs immediately.
+  ImmediateAckFrame immediateAckFrame;
+  // We support receiving IMMEDIATE_ACK
+  server->getNonConstConn().transportSettings.minAckDelay = 1ms;
+
+  auto packetNum = clientNextAppDataPacketNum++;
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      packetNum);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  writeFrame(immediateAckFrame, builder);
+  auto packet = std::move(builder).buildPacket();
+  ASSERT_NO_THROW(deliverData(packetToBuf(packet)));
+  // An ACK has been scheduled for AppData number space.
+  EXPECT_TRUE(server->getConn()
+                  .ackStates.appDataAckState.largestAckScheduled.hasValue());
+  EXPECT_EQ(
+      server->getConn().ackStates.appDataAckState.largestAckScheduled.value_or(
+          packetNum + 1),
+      packetNum);
+}
+
+TEST_F(QuicServerTransportTest, ImmediateAckProtocolViolation) {
+  // Verify that an incoming IMMEDIATE_ACK frame flags all
+  // packet number spaces to generate ACKs immediately.
+  ImmediateAckFrame immediateAckFrame;
+  // We do not support IMMEDIATE_ACK frames
+  server->getNonConstConn().transportSettings.minAckDelay.clear();
+
+  auto packetNum = clientNextAppDataPacketNum++;
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *server->getConn().serverConnectionId,
+      packetNum);
+  RegularQuicPacketBuilder builder(
+      server->getConn().udpSendPacketLen,
+      std::move(header),
+      0 /* largestAcked */);
+  builder.encodePacketHeader();
+  writeFrame(immediateAckFrame, builder);
+  auto packet = std::move(builder).buildPacket();
+  // This should throw a protocol violation error
+  ASSERT_THROW(deliverData(packetToBuf(packet)), std::runtime_error);
+  // Verify that none of the ack states have changed
+  EXPECT_FALSE(
+      server->getConn().ackStates.initialAckState.needsToSendAckImmediately);
+  EXPECT_FALSE(
+      server->getConn().ackStates.handshakeAckState.needsToSendAckImmediately);
+  EXPECT_FALSE(
+      server->getConn().ackStates.appDataAckState.needsToSendAckImmediately);
+}
+
 TEST_F(QuicServerTransportTest, ReceiveDatagramFrameAndDiscard) {
   ShortHeader header(
       ProtectionType::KeyPhaseZero,

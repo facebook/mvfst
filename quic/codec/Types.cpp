@@ -435,6 +435,8 @@ std::string toString(FrameType frame) {
       return "KNOB";
     case FrameType::ACK_FREQUENCY:
       return "ACK_FREQUENCY";
+    case FrameType::IMMEDIATE_ACK:
+      return "IMMEDIATE_ACK";
     case FrameType::GROUP_STREAM:
     case FrameType::GROUP_STREAM_FIN:
     case FrameType::GROUP_STREAM_LEN:

@@ -125,6 +125,14 @@ struct AckFrequencyFrame {
   }
 };
 
+struct ImmediateAckFrame {
+  ImmediateAckFrame() = default;
+
+  bool operator==(const ImmediateAckFrame& /*rhs*/) const {
+    return true;
+  }
+};
+
 /**
  * AckBlock represents a series of continuous packet sequences from
  * [startPacket, endPacket]
@@ -760,7 +768,8 @@ DECLARE_VARIANT_TYPE(QuicSimpleFrame, QUIC_SIMPLE_FRAME)
   F(QuicSimpleFrame, __VA_ARGS__)        \
   F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)              \
-  F(DatagramFrame, __VA_ARGS__)
+  F(DatagramFrame, __VA_ARGS__)          \
+  F(ImmediateAckFrame, __VA_ARGS__)
 
 DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
 
@@ -779,7 +788,8 @@ DECLARE_VARIANT_TYPE(QuicFrame, QUIC_FRAME)
   F(QuicSimpleFrame, __VA_ARGS__)        \
   F(PingFrame, __VA_ARGS__)              \
   F(NoopFrame, __VA_ARGS__)              \
-  F(DatagramFrame, __VA_ARGS__)
+  F(DatagramFrame, __VA_ARGS__)          \
+  F(ImmediateAckFrame, __VA_ARGS__)
 
 // Types of frames which are written.
 DECLARE_VARIANT_TYPE(QuicWriteFrame, QUIC_WRITE_FRAME)

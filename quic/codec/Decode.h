@@ -93,6 +93,8 @@ KnobFrame decodeKnobFrame(folly::io::Cursor& cursor);
 
 AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor);
 
+ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor& cursor);
+
 DataBlockedFrame decodeDataBlockedFrame(folly::io::Cursor& cursor);
 
 StreamDataBlockedFrame decodeStreamDataBlockedFrame(folly::io::Cursor& cursor);

@@ -151,7 +151,8 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
             .simpleFrames()
             .resetFrames()
             .streamFrames()
-            .pingFrames();
+            .pingFrames()
+            .immediateAckFrames();
     if (!exceptCryptoStream) {
       probeSchedulerBuilder.cryptoFrames();
     }
@@ -187,7 +188,8 @@ WriteQuicDataResult writeQuicDataToSocketImpl(
           .blockedFrames()
           .simpleFrames()
           .pingFrames()
-          .datagramFrames();
+          .datagramFrames()
+          .immediateAckFrames();
   if (!exceptCryptoStream) {
     schedulerBuilder.cryptoFrames();
   }
@@ -830,6 +832,12 @@ void updateConnection(
       }
       case QuicWriteFrame::Type::DatagramFrame: {
         // do not mark Datagram frames as retransmittable
+        break;
+      }
+      case QuicWriteFrame::Type::ImmediateAckFrame: {
+        // do not mark immediate acks as retranmittable.
+        // turn off the immediate ack pending event.
+        conn.pendingEvents.requestImmediateAck = false;
         break;
       }
       default:

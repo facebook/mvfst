@@ -127,6 +127,12 @@ folly::dynamic AckFrequencyFrameLog::toDynamic() const {
   return d;
 }
 
+folly::dynamic ImmediateAckFrameLog::toDynamic() const {
+  folly::dynamic d = folly::dynamic::object();
+  d["frame_type"] = toQlogString(FrameType::IMMEDIATE_ACK);
+  return d;
+}
+
 folly::dynamic StreamDataBlockedFrameLog::toDynamic() const {
   folly::dynamic d = folly::dynamic::object();
   d["frame_type"] = toQlogString(FrameType::STREAM_DATA_BLOCKED);

@@ -726,6 +726,17 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       // no space left in packet
       return size_t(0);
     }
+    case QuicWriteFrame::Type::ImmediateAckFrame: {
+      const ImmediateAckFrame& immediateAckFrame = *frame.asImmediateAckFrame();
+      QuicInteger intFrameType(static_cast<uint8_t>(FrameType::IMMEDIATE_ACK));
+      if (packetSpaceCheck(spaceLeft, intFrameType.getSize())) {
+        builder.write(intFrameType);
+        builder.appendFrame(immediateAckFrame);
+        return intFrameType.getSize();
+      }
+      // no space left in packet
+      return size_t(0);
+    }
     default: {
       // TODO add support for: RETIRE_CONNECTION_ID and NEW_TOKEN frames
       auto errorStr = folly::to<std::string>(

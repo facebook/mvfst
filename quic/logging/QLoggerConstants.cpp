@@ -79,6 +79,8 @@ folly::StringPiece toQlogString(FrameType frame) {
       return "knob";
     case FrameType::ACK_FREQUENCY:
       return "ack_frequency";
+    case FrameType::IMMEDIATE_ACK:
+      return "immediate_ack";
     case FrameType::GROUP_STREAM:
     case FrameType::GROUP_STREAM_FIN:
     case FrameType::GROUP_STREAM_LEN:

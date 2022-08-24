@@ -172,6 +172,13 @@ class AckFrequencyFrameLog : public QLogFrame {
   FOLLY_NODISCARD folly::dynamic toDynamic() const override;
 };
 
+class ImmediateAckFrameLog : public QLogFrame {
+ public:
+  ImmediateAckFrameLog() = default;
+  ~ImmediateAckFrameLog() override = default;
+  FOLLY_NODISCARD folly::dynamic toDynamic() const override;
+};
+
 class StreamDataBlockedFrameLog : public QLogFrame {
  public:
   StreamId streamId;

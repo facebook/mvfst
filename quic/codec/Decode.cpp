@@ -136,6 +136,10 @@ AckFrequencyFrame decodeAckFrequencyFrame(folly::io::Cursor& cursor) {
   return frame;
 }
 
+ImmediateAckFrame decodeImmediateAckFrame(folly::io::Cursor&) {
+  return ImmediateAckFrame();
+}
+
 ReadAckFrame decodeAckFrame(
     folly::io::Cursor& cursor,
     const PacketHeader& header,
@@ -836,6 +840,8 @@ QuicFrame parseFrame(
         return QuicFrame(decodeKnobFrame(cursor));
       case FrameType::ACK_FREQUENCY:
         return QuicFrame(decodeAckFrequencyFrame(cursor));
+      case FrameType::IMMEDIATE_ACK:
+        return QuicFrame(decodeImmediateAckFrame(cursor));
     }
   } catch (const std::exception& e) {
     error = true;

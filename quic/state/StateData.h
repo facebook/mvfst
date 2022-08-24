@@ -495,6 +495,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
 
     // Do we need to send data blocked frame when connection is blocked.
     bool sendDataBlocked{false};
+
+    // Send an immediate ack frame (requesting an ack)
+    bool requestImmediateAck{false};
   };
 
   PendingEvents pendingEvents;
@@ -549,7 +552,8 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Value of the negotiated ack delay exponent.
   uint64_t peerAckDelayExponent{kDefaultAckDelayExponent};
 
-  // The value of the peer's min_ack_delay, for creating ACK_FREQUENCY frames.
+  // The value of the peer's min_ack_delay, for creating ACK_FREQUENCY and
+  // IMMEDIATE_ACK frames.
   folly::Optional<std::chrono::microseconds> peerMinAckDelay;
 
   // Idle timeout advertised by the peer. Initially sets it to the maximum value

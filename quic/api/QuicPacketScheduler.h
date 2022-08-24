@@ -242,6 +242,18 @@ class CryptoStreamScheduler {
   const QuicCryptoStream& cryptoStream_;
 };
 
+class ImmediateAckFrameScheduler {
+ public:
+  explicit ImmediateAckFrameScheduler(const QuicConnectionStateBase& conn);
+
+  [[nodiscard]] bool hasPendingImmediateAckFrame() const;
+
+  bool writeImmediateAckFrame(PacketBuilderInterface& builder);
+
+ private:
+  const QuicConnectionStateBase& conn_;
+};
+
 class FrameScheduler : public QuicPacketScheduler {
  public:
   ~FrameScheduler() override = default;
@@ -262,6 +274,7 @@ class FrameScheduler : public QuicPacketScheduler {
     Builder& simpleFrames();
     Builder& pingFrames();
     Builder& datagramFrames();
+    Builder& immediateAckFrames();
 
     FrameScheduler build() &&;
 
@@ -281,6 +294,7 @@ class FrameScheduler : public QuicPacketScheduler {
     bool simpleFrameScheduler_{false};
     bool pingFrameScheduler_{false};
     bool datagramFrameScheduler_{false};
+    bool immediateAckFrameScheduler_{false};
   };
 
   FrameScheduler(folly::StringPiece name, QuicConnectionStateBase& conn);
@@ -313,6 +327,7 @@ class FrameScheduler : public QuicPacketScheduler {
   folly::Optional<SimpleFrameScheduler> simpleFrameScheduler_;
   folly::Optional<PingFrameScheduler> pingFrameScheduler_;
   folly::Optional<DatagramFrameScheduler> datagramFrameScheduler_;
+  folly::Optional<ImmediateAckFrameScheduler> immediateAckFrameScheduler_;
   folly::StringPiece name_;
   QuicConnectionStateBase& conn_;
 };

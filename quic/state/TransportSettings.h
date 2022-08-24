@@ -216,6 +216,9 @@ struct TransportSettings {
       kDefaultRxPacketsBeforeAckInitThreshold};
   uint16_t rxPacketsBeforeAckBeforeInit{kDefaultRxPacketsBeforeAckBeforeInit};
   uint16_t rxPacketsBeforeAckAfterInit{kDefaultRxPacketsBeforeAckAfterInit};
+  // The minimum amount of time in microseconds by which an ack can be delayed
+  // Setting a value here also indicates to the peer that it can send
+  // ACK_FREQUENCY and IMMEDIATE_ACK frames
   folly::Optional<std::chrono::microseconds> minAckDelay;
   // Limits the amount of data that should be buffered in a QuicSocket.
   // If the amount of data in the buffer equals or exceeds this amount, then

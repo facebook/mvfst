@@ -250,7 +250,12 @@ bool updateSimpleFrameOnPacketReceived(
     }
     case QuicSimpleFrame::Type::AckFrequencyFrame: {
       if (!conn.transportSettings.minAckDelay.hasValue()) {
-        return true;
+        // We do not accept ACK_FREQUENCY frames. This is a protocol
+        // violation.
+        throw QuicTransportException(
+            "Received ACK_FREQUENCY frame without announcing min_ack_delay",
+            TransportErrorCode::PROTOCOL_VIOLATION,
+            FrameType::ACK_FREQUENCY);
       }
       const auto ackFrequencyFrame = frame.asAckFrequencyFrame();
       auto& ackState = conn.ackStates.appDataAckState;

@@ -193,6 +193,10 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
             std::make_unique<quic::DatagramFrameLog>(frame.length));
         break;
       }
+      case QuicFrame::Type::ImmediateAckFrame: {
+        event->frames.push_back(std::make_unique<quic::ImmediateAckFrameLog>());
+        break;
+      }
     }
   }
   if (numPaddingFrames > 0) {
@@ -299,7 +303,12 @@ std::unique_ptr<QLogPacketEvent> BaseQLogger::createPacketEvent(
         // TODO
         break;
       }
-      default: {
+      case QuicWriteFrame::Type::ImmediateAckFrame: {
+        event->frames.push_back(std::make_unique<quic::ImmediateAckFrameLog>());
+        break;
+      }
+      case QuicWriteFrame::Type::PingFrame: {
+        event->frames.push_back(std::make_unique<quic::PingFrameLog>());
         break;
       }
     }

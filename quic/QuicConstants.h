@@ -194,6 +194,7 @@ enum class FrameType : uint64_t {
   DATAGRAM = 0x30,
   DATAGRAM_LEN = 0x31,
   KNOB = 0x1550,
+  IMMEDIATE_ACK = 0xAC,
   ACK_FREQUENCY = 0xAF,
   // Stream groups.
   GROUP_STREAM = 0x32,

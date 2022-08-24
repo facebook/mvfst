@@ -614,6 +614,21 @@ void QuicClientTransport::processPacketData(
         handleDatagram(*conn_, frame, receiveTimePoint);
         break;
       }
+      case QuicFrame::Type::ImmediateAckFrame: {
+        if (!conn_->transportSettings.minAckDelay.hasValue()) {
+          // We do not accept IMMEDIATE_ACK frames. This is a protocol
+          // violation.
+          throw QuicTransportException(
+              "Received IMMEDIATE_ACK frame without announcing min_ack_delay",
+              TransportErrorCode::PROTOCOL_VIOLATION,
+              FrameType::IMMEDIATE_ACK);
+        }
+        // Send an ACK from any packet number space.
+        conn_->ackStates.initialAckState.needsToSendAckImmediately = true;
+        conn_->ackStates.handshakeAckState.needsToSendAckImmediately = true;
+        conn_->ackStates.appDataAckState.needsToSendAckImmediately = true;
+        break;
+      }
       default:
         break;
     }

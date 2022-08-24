@@ -1235,6 +1235,35 @@ TEST_F(QuicPacketSchedulerTest, LargestAckToSend) {
   EXPECT_EQ(folly::none, largestAckToSend(conn.ackStates.appDataAckState));
 }
 
+TEST_F(QuicPacketSchedulerTest, NeedsToSendAckWithoutAcksAvailable) {
+  // This covers the scheduler behavior when an IMMEDIATE_ACK frame is received.
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  AckScheduler initialAckScheduler(
+      conn, getAckState(conn, PacketNumberSpace::Initial));
+  AckScheduler handshakeAckScheduler(
+      conn, getAckState(conn, PacketNumberSpace::Handshake));
+  AckScheduler appDataAckScheduler(
+      conn, getAckState(conn, PacketNumberSpace::AppData));
+  EXPECT_FALSE(initialAckScheduler.hasPendingAcks());
+  EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
+  EXPECT_FALSE(appDataAckScheduler.hasPendingAcks());
+
+  conn.ackStates.initialAckState.needsToSendAckImmediately = true;
+  conn.ackStates.handshakeAckState.needsToSendAckImmediately = true;
+  conn.ackStates.appDataAckState.needsToSendAckImmediately = true;
+
+  conn.ackStates.initialAckState.acks.insert(0, 100);
+  EXPECT_TRUE(initialAckScheduler.hasPendingAcks());
+
+  conn.ackStates.handshakeAckState.acks.insert(0, 100);
+  conn.ackStates.handshakeAckState.largestAckScheduled = 200;
+  EXPECT_FALSE(handshakeAckScheduler.hasPendingAcks());
+
+  conn.ackStates.handshakeAckState.largestAckScheduled = folly::none;
+  EXPECT_TRUE(handshakeAckScheduler.hasPendingAcks());
+}
+
 TEST_F(QuicPacketSchedulerTest, StreamFrameSchedulerAllFit) {
   QuicClientConnectionState conn(
       FizzClientQuicHandshakeContext::Builder().build());
@@ -2298,6 +2327,80 @@ TEST_F(QuicPacketSchedulerTest, ShortHeaderPaddingMaxPacketLength) {
   auto packetLength = headerLength + bodyLength;
 
   EXPECT_EQ(packetLength, conn.udpSendPacketLen);
+}
+
+TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerOnRequest) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.pendingEvents.requestImmediateAck = true;
+  auto connId = getTestConnectionId();
+
+  LongHeader longHeader(
+      LongHeader::Types::Initial,
+      getTestConnectionId(1),
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
+  increaseNextPacketNum(conn, PacketNumberSpace::Initial);
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(longHeader),
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+
+  FrameScheduler immediateAckOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "ImmediateAckOnlyScheduler")
+              .immediateAckFrames())
+          .build();
+
+  auto result = immediateAckOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  EXPECT_EQ(conn.udpSendPacketLen, packetLength);
+}
+
+TEST_F(QuicPacketSchedulerTest, ImmediateAckFrameSchedulerNotRequested) {
+  QuicClientConnectionState conn(
+      FizzClientQuicHandshakeContext::Builder().build());
+  conn.pendingEvents.requestImmediateAck = false;
+  auto connId = getTestConnectionId();
+
+  LongHeader longHeader(
+      LongHeader::Types::Initial,
+      getTestConnectionId(1),
+      connId,
+      getNextPacketNum(conn, PacketNumberSpace::Initial),
+      QuicVersion::MVFST);
+  increaseNextPacketNum(conn, PacketNumberSpace::Initial);
+
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen,
+      std::move(longHeader),
+      conn.ackStates.initialAckState.largestAckedByPeer.value_or(0));
+
+  FrameScheduler immediateAckOnlyScheduler =
+      std::move(
+          FrameScheduler::Builder(
+              conn,
+              EncryptionLevel::Initial,
+              LongHeader::typeToPacketNumberSpace(LongHeader::Types::Initial),
+              "ImmediateAckOnlyScheduler")
+              .immediateAckFrames())
+          .build();
+
+  auto result = immediateAckOnlyScheduler.scheduleFramesForPacket(
+      std::move(builder), conn.udpSendPacketLen);
+  auto packetLength = result.packet->header->computeChainDataLength() +
+      result.packet->body->computeChainDataLength();
+  // The immediate ACK scheduler was not triggered. This packet has no frames
+  // and it shouldn't get padded.
+  EXPECT_LT(packetLength, conn.udpSendPacketLen);
 }
 
 INSTANTIATE_TEST_SUITE_P(
