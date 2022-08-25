@@ -36,7 +36,7 @@ TEST_P(QuicIntegerDecodeTest, DecodeTrim) {
   for (int atMost = 0; atMost <= GetParam().encodedLength; atMost++) {
     auto wrappedEncoded = IOBuf::copyBuffer(encodedBytes);
     wrappedEncoded->trimEnd(std::min(
-        wrappedEncoded->computeChainDataLength(),
+        (unsigned long)(wrappedEncoded->computeChainDataLength()),
         (unsigned long)(GetParam().encodedLength - atMost)));
     folly::io::Cursor cursor(wrappedEncoded.get());
     auto originalLength = cursor.length();
@@ -129,26 +129,26 @@ INSTANTIATE_TEST_SUITE_P(
     QuicIntegerTests,
     QuicIntegerDecodeTest,
     Values(
-        (IntegerParams){0, "00", false, 1},
-        (IntegerParams){494878333, "9d7f3e7d", false, 4},
-        (IntegerParams){15293, "7bbd", false, 2},
-        (IntegerParams){37, "25", false, 1},
-        (IntegerParams){37, "4025", false, 2},
-        (IntegerParams){37, "80000025", false, 4},
-        (IntegerParams){37, "C000000000000025", false, 8},
-        (IntegerParams){37, "40", true}));
+        IntegerParams({0, "00", false, 1}),
+        IntegerParams({494878333, "9d7f3e7d", false, 4}),
+        IntegerParams({15293, "7bbd", false, 2}),
+        IntegerParams({37, "25", false, 1}),
+        IntegerParams({37, "4025", false, 2}),
+        IntegerParams({37, "80000025", false, 4}),
+        IntegerParams({37, "C000000000000025", false, 8}),
+        IntegerParams({37, "40", true})));
 
 INSTANTIATE_TEST_SUITE_P(
     QuicIntegerEncodeTests,
     QuicIntegerEncodeTest,
     Values(
-        (IntegerParams){0, "00", false, 1},
-        (IntegerParams){151288809941952652, "c2197c5eff14e88c", false},
-        (IntegerParams){151288809941952652, "c2197c5eff14e88c", false},
-        (IntegerParams){494878333, "9d7f3e7d", false},
-        (IntegerParams){15293, "7bbd", false},
-        (IntegerParams){37, "25", false},
-        (IntegerParams){std::numeric_limits<uint64_t>::max(), "25", true}));
+        IntegerParams({0, "00", false, 1}),
+        IntegerParams({151288809941952652, "c2197c5eff14e88c", false}),
+        IntegerParams({151288809941952652, "c2197c5eff14e88c", false}),
+        IntegerParams({494878333, "9d7f3e7d", false}),
+        IntegerParams({15293, "7bbd", false}),
+        IntegerParams({37, "25", false}),
+        IntegerParams({std::numeric_limits<uint64_t>::max(), "25", true})));
 
 } // namespace test
 } // namespace quic
