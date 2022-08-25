@@ -39,7 +39,7 @@ void FileQLogger::setupStream() {
       folly::to<std::string>(path_, "/", (dcid.value()).hex(), extension);
   try {
     writer_ = std::make_unique<folly::AsyncFileWriter>(outputPath);
-  } catch (std::system_error err) {
+  } catch (const std::system_error& err) {
     LOG(ERROR) << "Error creating qlog file. " << err.what();
     return;
   }
