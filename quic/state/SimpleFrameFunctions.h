@@ -47,6 +47,6 @@ void updateSimpleFrameOnPacketLoss(
 bool updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frameIn,
-    PacketNum packetNum,
+    const ConnectionId& dstConnId,
     bool fromChangedPeerAddress);
 } // namespace quic

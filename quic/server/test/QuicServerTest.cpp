@@ -911,8 +911,6 @@ TEST_F(QuicServerWorkerTest, QuicServerWorkerUnbindBeforeCidAvailable) {
   EXPECT_EQ(0, srcAddrMap.size());
 }
 
-// TODO (T54143063) Must change use of connectionIdMap_ before
-// can test multiple conn ids routing to the same connection.
 TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
   auto connId = getTestConnectionId(hostId_);
@@ -975,6 +973,63 @@ TEST_F(QuicServerWorkerTest, QuicServerMultipleConnIdsRouting) {
   EXPECT_EQ(connIdMap.count(connId), 0);
   EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
 
+  // transport_ dtor is run at the end of the test, which causes
+  // onConnectionUnbound to be called if the routingCallback_ is
+  // still set.
+  transport_->QuicServerTransport::setRoutingCallback(nullptr);
+}
+
+TEST_F(QuicServerWorkerTest, RetireConnIds) {
+  EXPECT_CALL(*socketPtr_, address()).WillRepeatedly(ReturnRef(fakeAddress_));
+  auto connId = getTestConnectionId(hostId_);
+  createQuicConnection(kClientAddr, connId);
+
+  const auto& connIdMap = worker_->getConnectionIdMap();
+  const auto& addrMap = worker_->getSrcToTransportMap();
+
+  EXPECT_CALL(*quicStats_, onNewConnection());
+  transport_->QuicServerTransport::setRoutingCallback(worker_.get());
+  worker_->onConnectionIdAvailable(transport_, connId);
+  EXPECT_EQ(connIdMap.count(connId), 1);
+
+  EXPECT_CALL(*transport_, getClientChosenDestConnectionId())
+      .WillRepeatedly(Return(connId));
+  worker_->onConnectionIdBound(transport_);
+
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
+
+  // create two additional conn ids
+  auto connId2 = connId;
+  connId2.data()[7] ^= 0x1;
+  worker_->onConnectionIdAvailable(transport_, connId2);
+
+  auto connId3 = connId;
+  connId3.data()[7] ^= 0x2;
+  worker_->onConnectionIdAvailable(transport_, connId3);
+  eventbase_.loopIgnoreKeepAlive();
+
+  EXPECT_EQ(connIdMap.size(), 3);
+
+  // retiring invalid conn id should not change map size
+  auto invalidConnId = connId;
+  invalidConnId.data()[0] ^= 0x1;
+  worker_->onConnectionIdRetired(*transport_, invalidConnId);
+  EXPECT_EQ(connIdMap.size(), 3);
+
+  // retiring valid conn ids should decrease map size by one each time
+  worker_->onConnectionIdRetired(*transport_, connId2);
+  EXPECT_EQ(connIdMap.size(), 2);
+
+  worker_->onConnectionIdRetired(*transport_, connId3);
+  EXPECT_EQ(connIdMap.size(), 1);
+
+  EXPECT_CALL(*transport_, setRoutingCallback(nullptr));
+  worker_->onConnectionUnbound(
+      transport_.get(),
+      std::make_pair(kClientAddr, connId),
+      std::vector<ConnectionIdData>{ConnectionIdData{connId, 0}});
+  EXPECT_EQ(connIdMap.count(connId), 0);
+  EXPECT_EQ(addrMap.count(std::make_pair(kClientAddr, connId)), 0);
   // transport_ dtor is run at the end of the test, which causes
   // onConnectionUnbound to be called if the routingCallback_ is
   // still set.

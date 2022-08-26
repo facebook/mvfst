@@ -555,7 +555,7 @@ constexpr uint64_t kMaxNewTokenValidMs = 1000 * 24 * 60 * 60;
 constexpr uint64_t kDefaultActiveConnectionIdLimit = 2;
 
 // Maximum number of active connection ids to generate for the peer.
-constexpr uint64_t kMaxActiveConnectionIdLimit = 100;
+constexpr uint64_t kMaxActiveConnectionIdLimit = 5;
 
 constexpr uint64_t kMaxPacketNumber = (1ull << 62) - 1;
 

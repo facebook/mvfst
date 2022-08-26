@@ -113,7 +113,7 @@ void updateSimpleFrameOnPacketLoss(
 bool updateSimpleFrameOnPacketReceived(
     QuicConnectionStateBase& conn,
     const QuicSimpleFrame& frame,
-    PacketNum /*packetNum*/,
+    const ConnectionId& dstConnId,
     bool fromChangedPeerAddress) {
   switch (frame.type()) {
     case QuicSimpleFrame::Type::StopSendingFrame: {
@@ -227,6 +227,41 @@ bool updateSimpleFrameOnPacketReceived(
       return true;
     }
     case QuicSimpleFrame::Type::RetireConnectionIdFrame: {
+      const auto& curNodeConnId = conn.nodeType == QuicNodeType::Server
+          ? conn.serverConnectionId
+          : conn.clientConnectionId;
+      if (!curNodeConnId || curNodeConnId->size() == 0) {
+        throw QuicTransportException(
+            "Peer issued RETIRE_CONNECTION_ID_FRAME to endpoint using 0-len connection ids.",
+            TransportErrorCode::PROTOCOL_VIOLATION);
+      }
+      const RetireConnectionIdFrame& retireConnIdFrame =
+          *frame.asRetireConnectionIdFrame();
+      auto& selfConnIds = conn.selfConnectionIds;
+      // search for conn id corresponding to sequence number
+      auto it = std::find_if(
+          selfConnIds.cbegin(),
+          selfConnIds.cend(),
+          [&](const ConnectionIdData& connId) {
+            return retireConnIdFrame.sequenceNumber == connId.sequenceNumber;
+          });
+      if (it == selfConnIds.end()) {
+        // ignore invalid seq no
+        return true;
+      }
+
+      if (dstConnId == it->connId) {
+        throw QuicTransportException(
+            "Peer issued RETIRE_CONNECTION_ID_FRAME refers to dst conn id field of containing packet.",
+            TransportErrorCode::PROTOCOL_VIOLATION);
+      }
+
+      if (conn.nodeType == QuicNodeType::Server) {
+        // in the server case, we need to queue unbinding from map
+        CHECK(conn.connIdsRetiringSoon.has_value());
+        conn.connIdsRetiringSoon->push_back(it->connId);
+      }
+      selfConnIds.erase(it);
       return true;
     }
     case QuicSimpleFrame::Type::HandshakeDoneFrame: {

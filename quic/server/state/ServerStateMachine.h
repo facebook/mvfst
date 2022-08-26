@@ -196,6 +196,7 @@ struct QuicServerConnectionState : public QuicConnectionStateBase {
     pendingOneRttData = std::make_unique<std::vector<ServerEvents::ReadData>>();
     streamManager = std::make_unique<QuicStreamManager>(
         *this, this->nodeType, transportSettings);
+    connIdsRetiringSoon.emplace(SmallVec<ConnectionId, 5>{});
   }
 };
 

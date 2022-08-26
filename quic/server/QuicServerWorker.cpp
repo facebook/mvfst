@@ -1291,6 +1291,18 @@ void QuicServerWorker::onConnectionIdAvailable(
   }
 }
 
+void QuicServerWorker::onConnectionIdRetired(
+    QuicServerTransport::Ref transport,
+    ConnectionId id) noexcept {
+  auto it = connectionIdMap_.find(id);
+  if (it == connectionIdMap_.end()) {
+    LOG(ERROR) << "Failed to retire CID=" << id << " " << transport;
+  } else {
+    VLOG(4) << "Retiring CID=" << id << " " << transport;
+    connectionIdMap_.erase(it);
+  }
+}
+
 void QuicServerWorker::onConnectionIdBound(
     QuicServerTransport::Ptr transport) noexcept {
   auto clientInitialDestCid = transport->getClientChosenDestConnectionId();

@@ -393,6 +393,14 @@ class QuicServerWorker : public folly::AsyncUDPSocket::ReadCallback,
       ConnectionId id) noexcept override;
 
   /**
+   * Called when a connection id has been retired by the peer thru a
+   * RETIRE_CONNECTION_ID frame.
+   */
+  void onConnectionIdRetired(
+      QuicServerTransport::Ref transport,
+      ConnectionId id) noexcept override;
+
+  /**
    * Called when a connecton id is bound and ip address should not
    * be used any more for routing.
    */

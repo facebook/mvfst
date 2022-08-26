@@ -2242,6 +2242,157 @@ TEST_F(QuicServerTransportTest, TooManyMigrations) {
           PacketDropReason::PEER_ADDRESS_CHANGE));
 }
 
+TEST_P(QuicServerTransportAllowMigrationTest, RetiringConnIdIssuesNewIds) {
+  auto& conn = server->getNonConstConn();
+  // reset queued packets
+  conn.outstandings.reset();
+  auto initialServerConnId = conn.selfConnectionIds[0];
+  auto nextConnId = conn.selfConnectionIds[1].connId;
+  EXPECT_EQ(initialServerConnId.sequenceNumber, 0);
+
+  auto data = IOBuf::copyBuffer("hi there!");
+  auto packetStreamData = packetToBuf(createStreamPacket(
+      *clientConnectionId,
+      *serverConnectionId,
+      clientNextAppDataPacketNum++,
+      2,
+      *data,
+      0 /* cipherOverhead */,
+      0 /* largestAcked */));
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero, nextConnId, clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  // build packet containing a frame retiring the initial server conn id
+  ASSERT_TRUE(builder.canBuildPacket());
+  RetireConnectionIdFrame retireConnIdFrame(initialServerConnId.sequenceNumber);
+  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  auto retireConnIdPacket = std::move(builder).buildPacket();
+
+  /**
+   * Deliver both packets (one containing stream data and the other containing a
+   * RETIRE_CONNECTION_ID frame). The RETIRE_CONNECTION_ID frame should result
+   * in invoking onConnectionIdRetired().
+   */
+  EXPECT_CALL(
+      routingCallback, onConnectionIdRetired(_, initialServerConnId.connId));
+  deliverData(std::move(packetStreamData), false);
+  deliverData(packetToBuf(retireConnIdPacket));
+  // received a RETIRE_CONN_ID frame for seq no 0, expect next seq to be 1
+  EXPECT_EQ(conn.selfConnectionIds[0].sequenceNumber, 1);
+
+  // server should have written NEW_CONNECTION_ID frame since we've retired one
+  auto numNewConnIdFrames = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame>());
+  EXPECT_EQ(numNewConnIdFrames, 1);
+}
+
+TEST_P(QuicServerTransportAllowMigrationTest, RetiringInvalidConnId) {
+  auto& conn = server->getNonConstConn();
+  // reset queued packets
+  conn.outstandings.reset();
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  // build packet containing a frame retiring an invalid conn id / seq no
+  ASSERT_TRUE(builder.canBuildPacket());
+  RetireConnectionIdFrame retireConnIdFrame(conn.nextSelfConnectionIdSequence);
+  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  auto retireConnIdPacket = std::move(builder).buildPacket();
+
+  // retiring invalid conn id should not invoke onConnectionIdRetired()
+  EXPECT_CALL(routingCallback, onConnectionIdRetired(_, _)).Times(0);
+  deliverData(packetToBuf(retireConnIdPacket));
+  // no changes should have been made to selfConnectionIds
+  EXPECT_EQ(conn.selfConnectionIds[0].sequenceNumber, 0);
+  EXPECT_TRUE(conn.connIdsRetiringSoon->empty());
+
+  // verify that we don't issue a new conn id
+  auto numNewConnIdFrames = std::count_if(
+      conn.outstandings.packets.begin(),
+      conn.outstandings.packets.end(),
+      findFrameInPacketFunc<QuicSimpleFrame::Type::NewConnectionIdFrame>());
+  EXPECT_EQ(numNewConnIdFrames, 0);
+}
+
+TEST_P(QuicServerTransportAllowMigrationTest, RetireConnIdOfContainingPacket) {
+  /**
+   * From RFC9000:
+   * The sequence number specified in a RETIRE_CONNECTION_ID frame MUST NOT
+   * refer to the Destination Connection ID field of the packet in which the
+   * frame is contained.  The peer MAY treat this as a connection error of type
+   * PROTOCOL_VIOLATION.
+   */
+
+  auto& conn = server->getNonConstConn();
+  // reset queued packets
+  conn.outstandings.reset();
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  // build packet containing a frame retiring conn id of containing packet
+  ASSERT_TRUE(builder.canBuildPacket());
+  RetireConnectionIdFrame retireConnIdFrame(0);
+  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  auto retireConnIdPacket = std::move(builder).buildPacket();
+
+  // parsing packet should throw an error
+  EXPECT_THROW(
+      deliverData(packetToBuf(retireConnIdPacket)), std::runtime_error);
+}
+
+TEST_P(
+    QuicServerTransportAllowMigrationTest,
+    RetireConnIdFrameZeroLengthSrcConnId) {
+  /**
+   * From RFC9000:
+   * An endpoint cannot send this frame if it was provided with a zero-length
+   * connection ID by its peer. An endpoint that provides a zero- length
+   * connection ID MUST treat receipt of a RETIRE_CONNECTION_ID frame as a
+   * connection error of type PROTOCOL_VIOLATION.
+   */
+  auto& conn = server->getNonConstConn();
+  // reset queued packets
+  conn.outstandings.reset();
+  // simulate that the client has a zero-length conn id
+  conn.clientConnectionId = ConnectionId(std::vector<uint8_t>{});
+
+  ShortHeader header(
+      ProtectionType::KeyPhaseZero,
+      *serverConnectionId,
+      clientNextAppDataPacketNum++);
+  RegularQuicPacketBuilder builder(
+      conn.udpSendPacketLen, std::move(header), 0 /* largestAcked */);
+  builder.encodePacketHeader();
+
+  // build packet containing a RETIRE_CONNECTION_ID frame
+  ASSERT_TRUE(builder.canBuildPacket());
+  RetireConnectionIdFrame retireConnIdFrame(0);
+  writeSimpleFrame(QuicSimpleFrame(retireConnIdFrame), builder);
+  auto retireConnIdPacket = std::move(builder).buildPacket();
+
+  // parsing packet should throw an error
+  EXPECT_THROW(
+      deliverData(packetToBuf(retireConnIdPacket)), std::runtime_error);
+}
+
 TEST_P(QuicServerTransportAllowMigrationTest, MigrateToValidatedPeer) {
   folly::SocketAddress newPeer("100.101.102.103", 23456);
   server->getNonConstConn().migrationState.previousPeerAddresses.push_back(

@@ -738,7 +738,6 @@ size_t writeFrame(QuicWriteFrame&& frame, PacketBuilderInterface& builder) {
       return size_t(0);
     }
     default: {
-      // TODO add support for: RETIRE_CONNECTION_ID and NEW_TOKEN frames
       auto errorStr = folly::to<std::string>(
           "Unknown / unsupported frame type received at ", __func__);
       VLOG(2) << errorStr;

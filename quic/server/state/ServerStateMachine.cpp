@@ -1250,10 +1250,14 @@ void onServerReadDataFromOpen(
         case QuicFrame::Type::PaddingFrame:
           break;
         case QuicFrame::Type::QuicSimpleFrame: {
+          auto dstConnId =
+              regularPacket.header.getHeaderForm() == HeaderForm::Short
+              ? regularPacket.header.asShort()->getConnectionId()
+              : regularPacket.header.asLong()->getDestinationConnId();
           pktHasRetransmittableData = true;
           QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
           isNonProbingPacket |= updateSimpleFrameOnPacketReceived(
-              conn, simpleFrame, packetNum, readData.peer != conn.peerAddress);
+              conn, simpleFrame, dstConnId, readData.peer != conn.peerAddress);
           break;
         }
         case QuicFrame::Type::DatagramFrame: {

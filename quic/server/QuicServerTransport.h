@@ -35,6 +35,7 @@ class QuicServerTransport
       public std::enable_shared_from_this<QuicServerTransport> {
  public:
   using Ptr = std::shared_ptr<QuicServerTransport>;
+  using Ref = const QuicServerTransport&;
   using SourceIdentity = std::pair<folly::SocketAddress, ConnectionId>;
 
   class RoutingCallback {
@@ -44,6 +45,10 @@ class QuicServerTransport
     // Called when a connection id is available
     virtual void onConnectionIdAvailable(
         Ptr transport,
+        ConnectionId id) noexcept = 0;
+
+    virtual void onConnectionIdRetired(
+        Ref transport,
         ConnectionId id) noexcept = 0;
 
     // Called when a connecton id is bound and ip address should not
@@ -182,6 +187,7 @@ class QuicServerTransport
  private:
   void processPendingData(bool async);
   void maybeNotifyTransportReady();
+  void maybeNotifyConnectionIdRetired();
   void maybeNotifyConnectionIdBound();
   void maybeWriteNewSessionTicket();
   void maybeIssueConnectionIds();
@@ -197,7 +203,6 @@ class QuicServerTransport
   bool notifiedRouting_{false};
   bool notifiedConnIdBound_{false};
   bool newSessionTicketWritten_{false};
-  bool connectionIdsIssued_{false};
   QuicServerConnectionState* serverConn_;
   std::unordered_map<
       uint64_t,

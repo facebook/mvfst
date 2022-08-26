@@ -601,7 +601,11 @@ void QuicClientTransport::processPacketData(
         QuicSimpleFrame& simpleFrame = *quicFrame.asQuicSimpleFrame();
         pktHasRetransmittableData = true;
         updateSimpleFrameOnPacketReceived(
-            *conn_, simpleFrame, packetNum, false);
+            *conn_,
+            simpleFrame,
+            longHeader ? longHeader->getDestinationConnId()
+                       : shortHeader->getConnectionId(),
+            false);
         break;
       }
       case QuicFrame::Type::DatagramFrame: {

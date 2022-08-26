@@ -116,6 +116,11 @@ class MockRoutingCallback : public QuicServerTransport::RoutingCallback {
       (noexcept));
   MOCK_METHOD(
       (void),
+      onConnectionIdRetired,
+      (QuicServerTransport::Ref, ConnectionId),
+      (noexcept));
+  MOCK_METHOD(
+      (void),
       onConnectionIdBound,
       (QuicServerTransport::Ptr),
       (noexcept));

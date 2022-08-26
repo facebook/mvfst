@@ -394,6 +394,9 @@ struct QuicConnectionStateBase : public folly::DelayedDestruction {
   // Connection ids issued by peer - to be used as destination ids.
   std::vector<ConnectionIdData> peerConnectionIds;
 
+  // Connection ids to be unbinded soon (server only)
+  folly::Optional<SmallVec<ConnectionId, 5>> connIdsRetiringSoon;
+
   // ConnectionIdAlgo implementation to encode and decode ConnectionId with
   // various info, such as routing related info.
   ConnectionIdAlgo* connIdAlgo{nullptr};

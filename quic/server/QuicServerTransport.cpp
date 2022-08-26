@@ -160,10 +160,8 @@ void QuicServerTransport::onReadData(
   }
   if (!notifiedRouting_ && routingCb_ && conn_->serverConnectionId) {
     notifiedRouting_ = true;
-    if (routingCb_) {
-      routingCb_->onConnectionIdAvailable(
-          shared_from_this(), *conn_->serverConnectionId);
-    }
+    routingCb_->onConnectionIdAvailable(
+        shared_from_this(), *conn_->serverConnectionId);
   }
   if (connSetupCallback_ && waitingForFirstPacket &&
       hasReceivedPackets(*conn_)) {
@@ -186,6 +184,7 @@ void QuicServerTransport::onReadData(
   maybeWriteNewSessionTicket();
   maybeNotifyConnectionIdBound();
   maybeNotifyHandshakeFinished();
+  maybeNotifyConnectionIdRetired();
   maybeIssueConnectionIds();
   maybeStartD6DProbing();
   maybeNotifyTransportReady();
@@ -559,6 +558,17 @@ void QuicServerTransport::maybeWriteNewSessionTicket() {
   }
 }
 
+void QuicServerTransport::maybeNotifyConnectionIdRetired() {
+  if (!conn_->transportSettings.disableMigration && routingCb_ &&
+      !conn_->connIdsRetiringSoon->empty() &&
+      serverConn_->serverHandshakeLayer->isHandshakeDone()) {
+    for (const auto& connId : *conn_->connIdsRetiringSoon) {
+      routingCb_->onConnectionIdRetired(*this, connId);
+    }
+    conn_->connIdsRetiringSoon->clear();
+  }
+}
+
 void QuicServerTransport::maybeNotifyConnectionIdBound() {
   // make this connId bound only when the keys are available
   if (!notifiedConnIdBound_ && routingCb_ && conn_->serverConnectionId &&
@@ -582,15 +592,14 @@ void QuicServerTransport::maybeNotifyHandshakeFinished() {
 }
 
 void QuicServerTransport::maybeIssueConnectionIds() {
-  if (!conn_->transportSettings.disableMigration && !connectionIdsIssued_ &&
+  // If the peer specifies that they have a limit of 1,000,000 connection
+  // ids then only issue a small number at first, since the server still
+  // needs to be able to search through all issued ids for routing.
+  const uint64_t maximumIdsToIssue = maximumConnectionIdsToIssue(*conn_);
+  if (!conn_->transportSettings.disableMigration &&
+      (conn_->selfConnectionIds.size() < maximumIdsToIssue) &&
       serverConn_->serverHandshakeLayer->isHandshakeDone()) {
-    connectionIdsIssued_ = true;
     CHECK(conn_->transportSettings.statelessResetTokenSecret.has_value());
-
-    // If the peer specifies that they have a limit of 1,000,000 connection
-    // ids then only issue a small number at first, since the server still
-    // needs to be able to search through all issued ids for routing.
-    const uint64_t maximumIdsToIssue = maximumConnectionIdsToIssue(*conn_);
 
     // Make sure size of selfConnectionIds is not larger than maximumIdsToIssue
     for (size_t i = conn_->selfConnectionIds.size(); i < maximumIdsToIssue;

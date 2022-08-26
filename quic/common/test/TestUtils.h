@@ -295,10 +295,7 @@ auto findFrameInPacketFunc() {
     return std::find_if(
                p.packet.frames.begin(), p.packet.frames.end(), [&](auto& f) {
                  QuicSimpleFrame* simpleFrame = f.asQuicSimpleFrame();
-                 if (!simpleFrame) {
-                   return false;
-                 }
-                 return simpleFrame->type() == Type;
+                 return simpleFrame && simpleFrame->type() == Type;
                }) != p.packet.frames.end();
   };
 }
