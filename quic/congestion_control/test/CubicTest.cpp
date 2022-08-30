@@ -151,13 +151,13 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet2);
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-  // Cwnd >= 2400, inflight = 1000:
-  EXPECT_GE(cubic.getWritableBytes(), 1400);
+  // Cwnd >= 2100, inflight = 1000:
+  EXPECT_GE(cubic.getWritableBytes(), 1100);
   // This won't bring state machine back to Steady since endOfRecovery = 3
   cubic.onPacketAckOrLoss(
       makeAck(3, 1000, Clock::now(), packet3.metadata.time), folly::none);
   // Cwnd no change, inflight = 0:
-  EXPECT_GE(cubic.getWritableBytes(), 2400);
+  EXPECT_GE(cubic.getWritableBytes(), 2100);
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 
   auto packet4 = makeTestingWritePacket(4, 1000, 5000);
@@ -166,7 +166,7 @@ TEST_F(CubicTest, CwndIncreaseAfterReduction) {
   // This will bring state machine back to steady
   cubic.onPacketAckOrLoss(
       makeAck(4, 1000, Clock::now(), packet4.metadata.time), folly::none);
-  EXPECT_GE(cubic.getWritableBytes(), 2400);
+  EXPECT_GE(cubic.getWritableBytes(), 2100);
   EXPECT_EQ(CubicStates::Steady, cubic.state());
 
   std::vector<int> indices =

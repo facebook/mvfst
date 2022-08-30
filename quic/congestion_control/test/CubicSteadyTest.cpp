@@ -40,6 +40,6 @@ TEST_F(CubicSteadyTest, CubicReduction) {
   CongestionController::LossEvent loss;
   loss.addLostPacket(packet1);
   cubic.onPacketAckOrLoss(folly::none, std::move(loss));
-  EXPECT_EQ(2400, cubic.getWritableBytes());
+  EXPECT_EQ(2100, cubic.getWritableBytes());
   EXPECT_EQ(CubicStates::FastRecovery, cubic.state());
 }

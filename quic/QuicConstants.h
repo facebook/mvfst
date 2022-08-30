@@ -431,7 +431,7 @@ constexpr std::chrono::microseconds kDelayIncreaseLowerBound(4ms);
 
 /* Cubic */
 // Default cwnd reduction factor:
-constexpr double kDefaultCubicReductionFactor = 0.8;
+constexpr double kDefaultCubicReductionFactor = 0.7;
 // Time elapsed scaling factor
 constexpr double kTimeScalingFactor = 0.4;
 // Default emulated connection numbers for each real connection

@@ -476,8 +476,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
   }
   if (hystartState_.ackTrain) {
     hystartState_.delayMin = std::min(
-        hystartState_.delayMin.value_or(conn_.lossState.srtt),
-        conn_.lossState.srtt);
+        hystartState_.delayMin.value_or(conn_.lossState.lrtt),
+        conn_.lossState.lrtt);
     // Within kAckCountingGap since lastJiffy:
     // TODO: we should experiment with subtract ackdelay from
     // (ackTime - lastJiffy) as well
@@ -494,8 +494,8 @@ void Cubic::onPacketAckedInHystart(const AckEvent& ack) {
   if (hystartState_.found == Cubic::HystartFound::No) {
     if (hystartState_.ackCount < kAckSampling) {
       hystartState_.currSampledRtt = std::min(
-          conn_.lossState.srtt,
-          hystartState_.currSampledRtt.value_or(conn_.lossState.srtt));
+          conn_.lossState.lrtt,
+          hystartState_.currSampledRtt.value_or(conn_.lossState.lrtt));
       // We can return early if ++ackCount not meeting kAckSampling:
       if (++hystartState_.ackCount < kAckSampling) {
         VLOG(20) << "Cubic, AckTrain didn't find exit point. ackCount also "
