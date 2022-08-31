@@ -54,6 +54,20 @@ RegularQuicWritePacket makeTestLongPacket(LongHeader::Types type) {
 class UpdateLargestReceivedPacketNumTest
     : public TestWithParam<PacketNumberSpace> {};
 
+TEST_P(UpdateLargestReceivedPacketNumTest, FirstPacketNotOutOfOrder) {
+  QuicServerConnectionState conn(
+      FizzServerQuicHandshakeContext::Builder().build());
+  /**
+   * We skip setting the getAckState(conn, GetParam()).largestReceivedPacketNum
+   * to simulate that we haven't received any packets yet.
+   * `updateLargestReceivedPacketNum()` should return false for the first packet
+   * received.
+   */
+  PacketNum firstPacket = folly::Random::rand32(1, 100);
+  EXPECT_FALSE(updateLargestReceivedPacketNum(
+      getAckState(conn, GetParam()), firstPacket, Clock::now()));
+}
+
 TEST_P(UpdateLargestReceivedPacketNumTest, ReceiveNew) {
   QuicServerConnectionState conn(
       FizzServerQuicHandshakeContext::Builder().build());
@@ -296,10 +310,10 @@ TEST_P(UpdateAckStateTest, UpdateAckSendStateOnRecvPacketsCrypto) {
 TEST_P(
     UpdateAckStateTest,
     UpdateAckSendStateOnRecvPacketsInitCryptoExperimental) {
-  /* EXPERIMENTAL – Crypto always leads to immediate ack unless init packet
-   * space.
-   */
+  // EXPERIMENTAL – Crypto always leads to immediate ack unless init packet
+  // space.
   QuicConnectionStateBase conn(QuicNodeType::Server);
+  conn.transportSettings.skipAckOnlyInitial = true;
 
   bool isInitPktNumSpace = GetParam() == PacketNumberSpace::Initial;
 

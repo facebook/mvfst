@@ -74,7 +74,7 @@ bool updateLargestReceivedPacketNum(
     ackState.largestRecvdPacketTime = receivedTime;
   }
   static_assert(ClockType::is_steady, "Needs steady clock");
-  return expectedNextPacket != packetNum;
+  return expectedNextPacket && expectedNextPacket != packetNum;
 }
 
 std::deque<OutstandingPacket>::iterator getNextOutstandingPacket(
