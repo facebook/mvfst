@@ -93,7 +93,7 @@ void recoverOrResetCongestionAndRttState(
 void maybeSetExperimentalSettings(QuicServerConnectionState& conn) {
   // no-op versions
   if (conn.version == QuicVersion::MVFST_EXPERIMENTAL) {
-    conn.transportSettings.enableWritableBytesLimit = true;
+    conn.transportSettings.skipAckOnlyInitial = true;
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL2) {
   } else if (conn.version == QuicVersion::MVFST_EXPERIMENTAL3) {
   }
