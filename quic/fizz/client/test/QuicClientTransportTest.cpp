@@ -2765,7 +2765,7 @@ TEST_F(
 
 TEST_P(QuicClientTransportAfterStartTest, ReadStreamCoalesced) {
   expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR);
+      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR_CLIENT);
   uint8_t connIdSize = GetParam();
 
   client->getNonConstConn().clientConnectionId =
@@ -5465,7 +5465,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_F(QuicProcessDataTest, ProcessDataWithGarbageAtEnd) {
   expectQuicStatsPacketDrop(
-      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR);
+      QuicTransportStatsCallback::PacketDropReason::PARSE_ERROR_CLIENT);
   auto qLogger = std::make_shared<FileQLogger>(VantagePoint::Client);
   client->getNonConstConn().qLogger = qLogger;
   auto params = mockClientHandshake->getServerTransportParams();

@@ -214,7 +214,7 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
   if (isInitial && datagramLen < kMinInitialPacketSize) {
     VLOG(3) << "Dropping initial packet due to invalid size";
     QUIC_STATS(
-        statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+        statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET_SIZE);
     return true;
   }
   isInitial =
@@ -235,7 +235,9 @@ bool QuicServerWorker::maybeSendVersionNegotiationPacketOrDrop(
     if (negotiationNeeded && !isInitial) {
       VLOG(3) << "Dropping non-initial packet due to invalid version";
       QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_,
+          onPacketDropped,
+          PacketDropReason::INVALID_PACKET_VERSION);
       return true;
     }
     if (negotiationNeeded) {
@@ -387,7 +389,9 @@ void QuicServerWorker::handleNetworkData(
     if (!cursor.canAdvance(sizeof(uint8_t))) {
       VLOG(4) << "Dropping packet too small";
       QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_,
+          onPacketDropped,
+          PacketDropReason::INVALID_PACKET_INITIAL_BYTE);
       return;
     }
     uint8_t initialByte = cursor.readBE<uint8_t>();
@@ -399,7 +403,9 @@ void QuicServerWorker::handleNetworkData(
       if (!parsedShortHeader) {
         if (!tryHandlingAsHealthCheck(client, *data)) {
           QUIC_STATS(
-              statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+              statsCallback_,
+              onPacketDropped,
+              PacketDropReason::PARSE_ERROR_SHORT_HEADER);
           VLOG(6) << "Failed to parse short header";
         }
         return;
@@ -424,7 +430,9 @@ void QuicServerWorker::handleNetworkData(
     if (!parsedLongHeader) {
       if (!tryHandlingAsHealthCheck(client, *data)) {
         QUIC_STATS(
-            statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+            statsCallback_,
+            onPacketDropped,
+            PacketDropReason::PARSE_ERROR_LONG_HEADER);
         VLOG(6) << "Failed to parse long header";
       }
       return;
@@ -458,7 +466,9 @@ void QuicServerWorker::handleNetworkData(
       // drop packet if connId is present but is not valid.
       VLOG(3) << "Dropping packet due to invalid connectionId";
       QUIC_STATS(
-          statsCallback_, onPacketDropped, PacketDropReason::INVALID_PACKET);
+          statsCallback_,
+          onPacketDropped,
+          PacketDropReason::INVALID_PACKET_CID);
       return;
     }
     RoutingData routingData(
@@ -476,7 +486,10 @@ void QuicServerWorker::handleNetworkData(
         isForwardedData);
   } catch (const std::exception& ex) {
     // Drop the packet.
-    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(
+        statsCallback_,
+        onPacketDropped,
+        PacketDropReason::PARSE_ERROR_EXCEPTION);
     VLOG(6) << "Failed to parse packet header " << ex.what();
   }
 }
@@ -602,7 +615,7 @@ void QuicServerWorker::forwardNetworkData(
       QUIC_STATS(
           statsCallback_,
           onPacketDropped,
-          PacketDropReason::CONNECTION_NOT_FOUND);
+          PacketDropReason::UNKNOWN_CID_VERSION);
     }
     return;
   }
@@ -693,7 +706,7 @@ void QuicServerWorker::dispatchPacketData(
           QUIC_STATS(
               statsCallback_,
               onPacketDropped,
-              PacketDropReason::INVALID_PACKET);
+              PacketDropReason::INVALID_PACKET_SIZE_INITIAL);
           return;
         }
 
@@ -868,7 +881,10 @@ void QuicServerWorker::dispatchPacketData(
   if (!connIdAlgo_->canParse(routingData.destinationConnId)) {
     VLOG(3) << "Dropping packet with bad DCID, routingInfo="
             << logRoutingInfo(routingData.destinationConnId);
-    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(
+        statsCallback_,
+        onPacketDropped,
+        PacketDropReason::PARSE_ERROR_BAD_DCID);
     // TODO do we need to reset?
     return;
   }
@@ -880,7 +896,8 @@ void QuicServerWorker::dispatchPacketData(
         connIdParam.error().what(),
         folly::to<std::string>(connIdParam.error().errorCode()),
         logRoutingInfo(routingData.destinationConnId));
-    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_DCID);
     // TODO do we need to reset?
     return;
   }
@@ -905,9 +922,7 @@ void QuicServerWorker::dispatchPacketData(
 
   if (!packetForwardingEnabled_ || isForwardedData) {
     QUIC_STATS(
-        statsCallback_,
-        onPacketDropped,
-        PacketDropReason::CONNECTION_NOT_FOUND);
+        statsCallback_, onPacketDropped, PacketDropReason::CANNOT_FORWARD_DATA);
     return sendResetPacket(
         routingData.headerForm,
         client,

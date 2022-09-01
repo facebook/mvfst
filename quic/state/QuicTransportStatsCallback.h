@@ -31,8 +31,28 @@ class QuicTransportStatsCallback {
     NONE,
     CONNECTION_NOT_FOUND,
     DECRYPTION_ERROR,
-    INVALID_PACKET,
-    PARSE_ERROR,
+    INVALID_PACKET_SIZE,
+    INVALID_PACKET_SIZE_INITIAL,
+    INVALID_PACKET_VERSION,
+    INVALID_PACKET_INITIAL_BYTE,
+    INVALID_PACKET_CID,
+    INVALID_PACKET_VN,
+    PARSE_ERROR_SHORT_HEADER,
+    PARSE_ERROR_LONG_HEADER,
+    PARSE_ERROR_LONG_HEADER_INITIAL,
+    PARSE_ERROR_EXCEPTION,
+    PARSE_ERROR_BAD_DCID,
+    PARSE_ERROR_DCID,
+    PARSE_ERROR_PACKET_BUFFERED,
+    PARSE_ERROR_CLIENT,
+    CIPHER_UNAVAILABLE,
+    UNEXPECTED_RETRY,
+    UNEXPECTED_RESET,
+    UNEXPECTED_NOTHING,
+    UNEXPECTED_PROTECTION_LEVEL,
+    EMPTY_DATA,
+    MAX_BUFFERED,
+    BUFFER_UNAVAILABLE,
     PEER_ADDRESS_CHANGE,
     PROTOCOL_VIOLATION,
     ROUTING_ERROR_WRONG_HOST,
@@ -46,6 +66,8 @@ class QuicTransportStatsCallback {
     CLIENT_STATE_CLOSED,
     CLIENT_SHUTDOWN,
     INVALID_SRC_PORT,
+    UNKNOWN_CID_VERSION,
+    CANNOT_FORWARD_DATA,
     // NOTE: MAX should always be at the end
     MAX
   };
@@ -187,10 +209,50 @@ class QuicTransportStatsCallback {
         return "CONNECTION_NOT_FOUND";
       case PacketDropReason::DECRYPTION_ERROR:
         return "DECRYPTION_ERROR";
-      case PacketDropReason::INVALID_PACKET:
-        return "INVALID_PACKET";
-      case PacketDropReason::PARSE_ERROR:
-        return "PARSE_ERROR";
+      case PacketDropReason::INVALID_PACKET_SIZE:
+        return "INVALID_PACKET_SIZE";
+      case PacketDropReason::INVALID_PACKET_SIZE_INITIAL:
+        return "INVALID_PACKET_SIZE_INITIAL";
+      case PacketDropReason::INVALID_PACKET_VERSION:
+        return "INVALID_PACKET_VERSION";
+      case PacketDropReason::INVALID_PACKET_INITIAL_BYTE:
+        return "INVALID_PACKET_INITIAL_BYTE";
+      case PacketDropReason::INVALID_PACKET_CID:
+        return "INVALID_PACKET_CID";
+      case PacketDropReason::INVALID_PACKET_VN:
+        return "INVALID_PACKET_VN";
+      case PacketDropReason::PARSE_ERROR_SHORT_HEADER:
+        return "PARSE_ERROR_SHORT_HEADER";
+      case PacketDropReason::PARSE_ERROR_LONG_HEADER:
+        return "PARSE_ERROR_LONG_HEADER";
+      case PacketDropReason::PARSE_ERROR_EXCEPTION:
+        return "PARSE_ERROR_EXCEPTION";
+      case PacketDropReason::PARSE_ERROR_BAD_DCID:
+        return "PARSE_ERROR_BAD_DCID";
+      case PacketDropReason::PARSE_ERROR_DCID:
+        return "PARSE_ERROR_DCID";
+      case PacketDropReason::PARSE_ERROR_PACKET_BUFFERED:
+        return "PARSE_ERROR_PACKET_BUFFERED";
+      case PacketDropReason::PARSE_ERROR_CLIENT:
+        return "PARSE_ERROR_CLIENT";
+      case PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL:
+        return "PARSE_ERROR_LONG_HEADER_INITIAL";
+      case PacketDropReason::CIPHER_UNAVAILABLE:
+        return "CIPHER_UNAVAILABLE";
+      case PacketDropReason::UNEXPECTED_RETRY:
+        return "UNEXPECTED_RETRY";
+      case PacketDropReason::UNEXPECTED_RESET:
+        return "UNEXPECTED_RESET";
+      case PacketDropReason::UNEXPECTED_NOTHING:
+        return "UNEXPECTED_NOTHING";
+      case PacketDropReason::UNEXPECTED_PROTECTION_LEVEL:
+        return "UNEXPECTED_PROTECTION_LEVEL";
+      case PacketDropReason::EMPTY_DATA:
+        return "EMPTY_DATA";
+      case PacketDropReason::MAX_BUFFERED:
+        return "MAX_BUFFERED";
+      case PacketDropReason::BUFFER_UNAVAILABLE:
+        return "BUFFER_UNAVAILABLE";
       case PacketDropReason::PEER_ADDRESS_CHANGE:
         return "PEER_ADDRESS_CHANGE";
       case PacketDropReason::PROTOCOL_VIOLATION:
@@ -217,10 +279,12 @@ class QuicTransportStatsCallback {
         return "CLIENT_SHUTDOWN";
       case PacketDropReason::INVALID_SRC_PORT:
         return "INVALID_SRC_PORT";
+      case PacketDropReason::UNKNOWN_CID_VERSION:
+        return "UNKNOWN_CID_VERSION";
+      case PacketDropReason::CANNOT_FORWARD_DATA:
+        return "CANNOT_FORWARD_DATA";
       case PacketDropReason::MAX:
         return "MAX";
-      default:
-        throw std::runtime_error("Undefined PacketDropReason passed");
     }
   }
 

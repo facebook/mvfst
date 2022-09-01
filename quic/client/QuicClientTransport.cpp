@@ -268,7 +268,8 @@ void QuicClientTransport::processPacketData(
 
   RegularQuicPacket* regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
-    QUIC_STATS(statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR);
+    QUIC_STATS(
+        statsCallback_, onPacketDropped, PacketDropReason::PARSE_ERROR_CLIENT);
     if (conn_->qLogger) {
       conn_->qLogger->addPacketDrop(packetSize, kParse);
     }

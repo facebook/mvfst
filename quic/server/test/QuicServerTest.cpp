@@ -539,7 +539,7 @@ TEST_F(QuicServerWorkerTest, NoConnFoundTestReset) {
       std::move(data),
       getTestConnectionId(hostId_),
       std::move(shortHeaderConnId),
-      QuicTransportStatsCallback::PacketDropReason::CONNECTION_NOT_FOUND);
+      QuicTransportStatsCallback::PacketDropReason::CANNOT_FORWARD_DATA);
 }
 
 TEST_F(QuicServerWorkerTest, RateLimit) {

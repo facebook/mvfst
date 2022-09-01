@@ -692,6 +692,8 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kNoData);
     }
+    QUIC_STATS(
+        conn.statsCallback, onPacketDropped, PacketDropReason::EMPTY_DATA);
     return;
   }
   if (originalData->protectionType != ProtectionType::ZeroRtt &&
@@ -700,6 +702,10 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kUnexpectedProtectionLevel);
     }
+    QUIC_STATS(
+        conn.statsCallback,
+        onPacketDropped,
+        PacketDropReason::UNEXPECTED_PROTECTION_LEVEL);
     return;
   }
 
@@ -711,6 +717,8 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kMaxBuffered);
     }
+    QUIC_STATS(
+        conn.statsCallback, onPacketDropped, PacketDropReason::MAX_BUFFERED);
     return;
   }
 
@@ -721,6 +729,10 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketBuffered(originalData->protectionType, packetSize);
     }
+    QUIC_STATS(
+        conn.statsCallback,
+        onPacketDropped,
+        PacketDropReason::PARSE_ERROR_PACKET_BUFFERED);
     ServerEvents::ReadData pendingReadData;
     pendingReadData.peer = readData.peer;
     pendingReadData.networkData = NetworkDataSingle(
@@ -735,6 +747,11 @@ void handleCipherUnavailable(
     if (conn.qLogger) {
       conn.qLogger->addPacketDrop(packetSize, kBufferUnavailable);
     }
+    QUIC_STATS(
+        conn.statsCallback,
+        onPacketDropped,
+        PacketDropReason::BUFFER_UNAVAILABLE);
+    return;
   }
 }
 
@@ -760,10 +777,12 @@ void onServerReadDataFromOpen(
         conn.qLogger->addPacketDrop(
             0,
             QuicTransportStatsCallback::toString(
-                PacketDropReason::PARSE_ERROR));
+                PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL));
       }
       QUIC_STATS(
-          conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::PARSE_ERROR_LONG_HEADER_INITIAL);
       return;
     }
     QuicVersion version = parsedLongHeader->invariant.version;
@@ -773,12 +792,12 @@ void onServerReadDataFromOpen(
         conn.qLogger->addPacketDrop(
             0,
             QuicTransportStatsCallback::toString(
-                PacketDropReason::INVALID_PACKET));
+                PacketDropReason::INVALID_PACKET_VN));
       }
       QUIC_STATS(
           conn.statsCallback,
           onPacketDropped,
-          PacketDropReason::INVALID_PACKET);
+          PacketDropReason::INVALID_PACKET_VN);
       return;
     }
 
@@ -874,6 +893,10 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kRetry);
         }
+        QUIC_STATS(
+            conn.statsCallback,
+            onPacketDropped,
+            PacketDropReason::UNEXPECTED_RETRY);
         break;
       }
       case CodecResult::Type::STATELESS_RESET: {
@@ -881,6 +904,10 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kReset);
         }
+        QUIC_STATS(
+            conn.statsCallback,
+            onPacketDropped,
+            PacketDropReason::UNEXPECTED_RESET);
         break;
       }
       case CodecResult::Type::NOTHING: {
@@ -888,6 +915,10 @@ void onServerReadDataFromOpen(
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
         }
+        QUIC_STATS(
+            conn.statsCallback,
+            onPacketDropped,
+            PacketDropReason::UNEXPECTED_NOTHING);
         if (firstPacketFromPeer) {
           throw QuicInternalException(
               "Failed to decrypt first packet from peer",
@@ -903,10 +934,8 @@ void onServerReadDataFromOpen(
     if (!regularOptional) {
       // We were unable to parse the packet, drop for now. All the drop reasons
       // should have already been logged into QLogger and QuicTrace inside the
-      // previous switch-case block. We just need to update QUIC_STATS here.
+      // previous switch-case block. All stats have already been updated.
       VLOG(10) << "Not able to parse QUIC packet " << conn;
-      QUIC_STATS(
-          conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
       continue;
     }
     if (regularOptional->frames.empty()) {
@@ -1420,6 +1449,10 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
+      QUIC_STATS(
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::CIPHER_UNAVAILABLE);
       break;
     }
     case CodecResult::Type::RETRY: {
@@ -1428,6 +1461,10 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kRetry);
       }
+      QUIC_STATS(
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::UNEXPECTED_RETRY);
       break;
     }
     case CodecResult::Type::STATELESS_RESET: {
@@ -1435,6 +1472,10 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kReset);
       }
+      QUIC_STATS(
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::UNEXPECTED_RESET);
       break;
     }
     case CodecResult::Type::NOTHING: {
@@ -1442,6 +1483,10 @@ void onServerReadDataFromClosed(
       if (conn.qLogger) {
         conn.qLogger->addPacketDrop(packetSize, kCipherUnavailable);
       }
+      QUIC_STATS(
+          conn.statsCallback,
+          onPacketDropped,
+          PacketDropReason::UNEXPECTED_NOTHING);
       break;
     }
     case CodecResult::Type::REGULAR_PACKET:
@@ -1450,14 +1495,8 @@ void onServerReadDataFromClosed(
   auto regularOptional = parsedPacket.regularPacket();
   if (!regularOptional) {
     // We were unable to parse the packet, drop for now.
+    // Packet drop has already been added to qlog and stats
     VLOG(10) << "Not able to parse QUIC packet " << conn;
-    if (conn.qLogger) {
-      conn.qLogger->addPacketDrop(
-          packetSize,
-          QuicTransportStatsCallback::toString(PacketDropReason::PARSE_ERROR));
-    }
-    QUIC_STATS(
-        conn.statsCallback, onPacketDropped, PacketDropReason::PARSE_ERROR);
     return;
   }
   if (regularOptional->frames.empty()) {
