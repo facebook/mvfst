@@ -3799,6 +3799,39 @@ TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackFinOnly) {
   client->close(folly::none);
 }
 
+TEST_F(QuicClientTransportAfterStartTest, InvokesDeliveryCallbackRange) {
+  AckBlocks sentPackets;
+  auto streamId =
+      client->createBidirectionalStream(false /* replaySafe */).value();
+
+  auto data = IOBuf::copyBuffer("some data");
+  client->writeChain(streamId, data->clone(), false, nullptr);
+  for (uint64_t offset = 0; offset < data->computeChainDataLength(); offset++) {
+    client->registerDeliveryCallback(streamId, offset, &deliveryCallback);
+    EXPECT_CALL(deliveryCallback, onDeliveryAck(streamId, offset, _)).Times(1);
+  }
+  client->registerDeliveryCallback(
+      streamId, data->computeChainDataLength(), &deliveryCallback);
+  EXPECT_CALL(
+      deliveryCallback,
+      onDeliveryAck(streamId, data->computeChainDataLength(), _))
+      .Times(0);
+  loopForWrites();
+
+  verifyShortPackets(sentPackets);
+  ASSERT_EQ(sentPackets.size(), 1);
+
+  // Write an AckFrame back to client:
+  auto packet = packetToBuf(createAckPacket(
+      client->getNonConstConn(),
+      ++appDataPacketNum,
+      sentPackets,
+      PacketNumberSpace::AppData));
+
+  deliverData(packet->coalesce());
+  client->close(folly::none);
+}
+
 TEST_F(
     QuicClientTransportAfterStartTest,
     RegisterDeliveryCallbackForAlreadyDeliveredOffset) {

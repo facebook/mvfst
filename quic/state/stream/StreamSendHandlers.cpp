@@ -117,10 +117,10 @@ void sendAckSMHandler(
                    << " offset=" << ackedBuffer->second->offset
                    << " len=" << ackedBuffer->second->data.chainLength()
                    << " eof=" << ackedBuffer->second->eof << " " << stream.conn;
-          stream.ackedIntervals.insert(
+          stream.updateAckedIntervals(
               ackedBuffer->second->offset,
-              ackedBuffer->second->offset +
-                  ackedBuffer->second->data.chainLength());
+              ackedBuffer->second->data.chainLength(),
+              ackedBuffer->second->eof);
           stream.retransmissionBuffer.erase(ackedBuffer);
         }
       } else {
@@ -134,9 +134,10 @@ void sendAckSMHandler(
                    << " offset=" << ackedBuffer->second.offset
                    << " len=" << ackedBuffer->second.length
                    << " eof=" << ackedBuffer->second.eof << " " << stream.conn;
-          stream.ackedIntervals.insert(
+          stream.updateAckedIntervals(
               ackedBuffer->second.offset,
-              ackedBuffer->second.offset + ackedBuffer->second.length);
+              ackedBuffer->second.length,
+              ackedBuffer->second.eof);
           stream.retransmissionBufMetas.erase(ackedBuffer);
         }
       }

@@ -159,6 +159,22 @@ struct QuicStreamLike {
   // egress packets that contains a *new* STREAM frame for this stream.
   uint64_t numPacketsTxWithNewData{0};
 
+  void updateAckedIntervals(uint64_t offset, uint64_t len, bool eof) {
+    // When there's an EOF we count the byte of 1 past the end as having been
+    // ACKed, since this is useful for delivery APIs.
+    int lenAdjustment = [eof]() {
+      if (eof) {
+        return 0;
+      } else {
+        return 1;
+      }
+    }();
+    if (lenAdjustment && len == 0) {
+      LOG(FATAL) << "ACK for empty stream frame with no fin.";
+    }
+    ackedIntervals.insert(offset, offset + len - lenAdjustment);
+  }
+
   /*
    * Either insert a new entry into the loss buffer, or merge the buffer with
    * an existing entry.

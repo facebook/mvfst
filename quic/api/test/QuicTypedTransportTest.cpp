@@ -734,6 +734,122 @@ TYPED_TEST(QuicTypedTransportTest, PacketProcessorSendTwoDataPacketsWithAck) {
   this->destroyTransport();
 }
 
+TYPED_TEST(QuicTypedTransportTest, StreamAckedIntervalsDeliveryCallbacks) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  auto data1 = IOBuf::copyBuffer("hello");
+  this->getTransport()->writeChain(streamId, data1->clone(), false);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+
+  // write some more bytes into the same stream
+  auto data2 = IOBuf::copyBuffer("world");
+  this->getTransport()->writeChain(streamId, data2->clone(), false);
+  const auto maybeWrittenPackets2 = this->loopForWrites();
+
+  data1->prependChain(std::move(data2));
+  auto combined = std::move(data1);
+
+  // should have sent two packets
+  ASSERT_TRUE(maybeWrittenPackets1.has_value());
+  ASSERT_TRUE(maybeWrittenPackets2.has_value());
+  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+  quic::PacketNum lastPacketNum = maybeWrittenPackets2->end;
+  EXPECT_EQ(2, lastPacketNum - firstPacketNum + 1);
+
+  MockDeliveryCallback cb;
+  for (uint64_t offset = 0; offset < combined->computeChainDataLength();
+       offset++) {
+    this->getTransport()->registerDeliveryCallback(streamId, offset, &cb);
+    EXPECT_CALL(cb, onDeliveryAck(streamId, offset, _)).Times(1);
+  }
+  this->getTransport()->registerDeliveryCallback(
+      streamId, combined->computeChainDataLength(), &cb);
+  EXPECT_CALL(
+      cb, onDeliveryAck(streamId, combined->computeChainDataLength(), _))
+      .Times(0);
+
+  // deliver an ACK for all of the outstanding packets
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(firstPacketNum, lastPacketNum),
+      std::chrono::steady_clock::time_point());
+  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_TRUE(stream);
+  EXPECT_FALSE(stream->ackedIntervals.empty());
+  EXPECT_EQ(stream->ackedIntervals.size(), 1);
+  EXPECT_EQ(stream->ackedIntervals.front().start, 0);
+  // The largest ACKed offset is the size of the stream data - 1
+  EXPECT_EQ(
+      stream->ackedIntervals.front().end,
+      combined->computeChainDataLength() - 1);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTest,
+    StreamAckedIntervalsDeliveryCallbacksFinOnly) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(streamId, nullptr, true);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets1.has_value());
+  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+  MockDeliveryCallback cb;
+  this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
+  EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
+
+  // deliver an ACK for all of the outstanding packets
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(firstPacketNum, firstPacketNum),
+      std::chrono::steady_clock::time_point());
+  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_TRUE(stream);
+  EXPECT_FALSE(stream->ackedIntervals.empty());
+  EXPECT_EQ(stream->ackedIntervals.size(), 1);
+  EXPECT_EQ(stream->ackedIntervals.front().start, 0);
+  EXPECT_EQ(stream->ackedIntervals.front().end, 0);
+  this->destroyTransport();
+}
+
+TYPED_TEST(
+    QuicTypedTransportTest,
+    StreamAckedIntervalsDeliveryCallbacksSingleByteNoFin) {
+  // clear any outstanding packets
+  this->getNonConstConn().outstandings.reset();
+
+  // open a stream and write some bytes
+  auto streamId = this->getTransport()->createBidirectionalStream().value();
+  this->getTransport()->writeChain(
+      streamId, folly::IOBuf::copyBuffer("a"), false);
+  const auto maybeWrittenPackets1 = this->loopForWrites();
+
+  // should have sent one packet
+  ASSERT_TRUE(maybeWrittenPackets1.has_value());
+  quic::PacketNum firstPacketNum = maybeWrittenPackets1->start;
+  MockDeliveryCallback cb;
+  this->getTransport()->registerDeliveryCallback(streamId, 0, &cb);
+  EXPECT_CALL(cb, onDeliveryAck(streamId, 0, _));
+
+  // deliver an ACK for all of the outstanding packets
+  this->deliverPacket(
+      this->buildAckPacketForSentAppDataPackets(firstPacketNum, firstPacketNum),
+      std::chrono::steady_clock::time_point());
+  auto stream = this->getNonConstConn().streamManager->getStream(streamId);
+  ASSERT_TRUE(stream);
+  EXPECT_FALSE(stream->ackedIntervals.empty());
+  EXPECT_EQ(stream->ackedIntervals.size(), 1);
+  EXPECT_EQ(stream->ackedIntervals.front().start, 0);
+  EXPECT_EQ(stream->ackedIntervals.front().end, 0);
+  this->destroyTransport();
+}
+
 template <typename T>
 class QuicTypedTransportTestForObservers : public QuicTypedTransportTest<T> {
  public:

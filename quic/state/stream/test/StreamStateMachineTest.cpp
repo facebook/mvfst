@@ -218,7 +218,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   sendAckSMHandler(*stream, streamFrame3);
   ASSERT_EQ(stream->sendState, StreamSendState::Open);
   ASSERT_EQ(stream->ackedIntervals.front().start, 10);
-  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 20);
 
   auto& streamFrame2 =
       *conn->outstandings.packets[1].packet.frames[0].asWriteStreamFrame();
@@ -226,7 +226,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   sendAckSMHandler(*stream, streamFrame2);
   ASSERT_EQ(stream->sendState, StreamSendState::Open);
   ASSERT_EQ(stream->ackedIntervals.front().start, 5);
-  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 20);
 
   auto& streamFrame1 =
       *conn->outstandings.packets[0].packet.frames[0].asWriteStreamFrame();
@@ -234,7 +234,7 @@ TEST_F(QuicOpenStateTest, AckStreamMulti) {
   sendAckSMHandler(*stream, streamFrame1);
   ASSERT_EQ(stream->sendState, StreamSendState::Open);
   ASSERT_EQ(stream->ackedIntervals.front().start, 0);
-  ASSERT_EQ(stream->ackedIntervals.front().end, 21);
+  ASSERT_EQ(stream->ackedIntervals.front().end, 20);
 }
 
 TEST_F(QuicOpenStateTest, RetxBufferSortedAfterAck) {
