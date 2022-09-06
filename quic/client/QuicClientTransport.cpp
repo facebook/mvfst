@@ -836,11 +836,10 @@ void QuicClientTransport::onReadData(
 void QuicClientTransport::writeData() {
   QuicVersion version = conn_->version.value_or(*conn_->originalVersion);
   const ConnectionId& srcConnId = *conn_->clientConnectionId;
-  const ConnectionId* destConnId =
-      &(*clientConn_->initialDestinationConnectionId);
-  if (conn_->serverConnectionId) {
-    destConnId = &(*conn_->serverConnectionId);
-  }
+  const ConnectionId& destConnId = conn_->serverConnectionId
+      ? *conn_->serverConnectionId
+      : *clientConn_->initialDestinationConnectionId;
+
   if (closeState_ == CloseState::CLOSED) {
     auto rtt = clientConn_->lossState.srtt == 0us
         ? clientConn_->transportSettings.initialRtt
@@ -857,7 +856,7 @@ void QuicClientTransport::writeData() {
       writeShortClose(
           *socket_,
           *conn_,
-          *destConnId,
+          destConnId,
           conn_->localConnectionError,
           *conn_->oneRttWriteCipher,
           *conn_->oneRttWriteHeaderCipher);
@@ -868,7 +867,7 @@ void QuicClientTransport::writeData() {
           *socket_,
           *conn_,
           srcConnId,
-          *destConnId,
+          destConnId,
           LongHeader::Types::Handshake,
           conn_->localConnectionError,
           *conn_->handshakeWriteCipher,
@@ -881,7 +880,7 @@ void QuicClientTransport::writeData() {
           *socket_,
           *conn_,
           srcConnId,
-          *destConnId,
+          destConnId,
           LongHeader::Types::Initial,
           conn_->localConnectionError,
           *conn_->initialWriteCipher,
@@ -920,7 +919,7 @@ void QuicClientTransport::writeData() {
                          *socket_,
                          *conn_,
                          srcConnId /* src */,
-                         *destConnId /* dst */,
+                         destConnId /* dst */,
                          LongHeader::Types::Initial,
                          *conn_->initialWriteCipher,
                          *conn_->initialHeaderCipher,
@@ -950,7 +949,7 @@ void QuicClientTransport::writeData() {
                          *socket_,
                          *conn_,
                          srcConnId /* src */,
-                         *destConnId /* dst */,
+                         destConnId /* dst */,
                          LongHeader::Types::Handshake,
                          *conn_->handshakeWriteCipher,
                          *conn_->handshakeWriteHeaderCipher,
@@ -968,7 +967,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId /* src */,
-        *destConnId /* dst */,
+        destConnId /* dst */,
         *clientConn_->zeroRttWriteCipher,
         *clientConn_->zeroRttWriteHeaderCipher,
         version,
@@ -983,7 +982,7 @@ void QuicClientTransport::writeData() {
         *socket_,
         *conn_,
         srcConnId,
-        *destConnId,
+        destConnId,
         *conn_->oneRttWriteCipher,
         *conn_->oneRttWriteHeaderCipher,
         version,
