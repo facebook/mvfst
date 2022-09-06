@@ -1012,7 +1012,9 @@ void onServerReadDataFromOpen(
     }
 
     if (conn.peerAddress != readData.peer) {
-      if (encryptionLevel != EncryptionLevel::AppData) {
+      auto migrationDenied = (encryptionLevel != EncryptionLevel::AppData) ||
+          conn.transportSettings.disableMigration;
+      if (migrationDenied) {
         if (conn.qLogger) {
           conn.qLogger->addPacketDrop(
               packetSize,
@@ -1023,24 +1025,11 @@ void onServerReadDataFromOpen(
             conn.statsCallback,
             onPacketDropped,
             PacketDropReason::PEER_ADDRESS_CHANGE);
+        const char* errMsg = encryptionLevel != EncryptionLevel::AppData
+            ? "Migration not allowed during handshake"
+            : "Migration disabled";
         throw QuicTransportException(
-            "Migration not allowed during handshake",
-            TransportErrorCode::INVALID_MIGRATION);
-      }
-
-      if (conn.transportSettings.disableMigration) {
-        if (conn.qLogger) {
-          conn.qLogger->addPacketDrop(
-              packetSize,
-              QuicTransportStatsCallback::toString(
-                  PacketDropReason::PEER_ADDRESS_CHANGE));
-        }
-        QUIC_STATS(
-            conn.statsCallback,
-            onPacketDropped,
-            PacketDropReason::PEER_ADDRESS_CHANGE);
-        throw QuicTransportException(
-            "Migration disabled", TransportErrorCode::INVALID_MIGRATION);
+            errMsg, TransportErrorCode::INVALID_MIGRATION);
       }
     }
 
